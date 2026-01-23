@@ -31,8 +31,23 @@ export default function AuthCallback() {
       try {
         console.log('[AuthCallback] Starting auth callback...');
         
-        // Ottieni la sessione da Supabase dopo il redirect
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Parse hash fragment and exchange for session
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        
+        console.log('[AuthCallback] Hash params:', { hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken });
+        
+        if (!accessToken) {
+          throw new Error("Nessun access token trovato nell'URL");
+        }
+        
+        // Set the session with the tokens from the hash
+        const { data: { session }, error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken || '',
+        });
+        
         console.log('[AuthCallback] Session result:', { session: !!session, error });
 
         if (error) {
