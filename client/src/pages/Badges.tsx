@@ -370,9 +370,9 @@ export default function Badges() {
                     onClick={() => handleBadgeClick(badge, badgeProgress?.indexOf(badge) || index)}
                     className="cursor-pointer flex flex-col items-center"
                   >
-                    {/* Badge Container with 3D rotation */}
+                    {/* Badge Container */}
                     <div 
-                      className={`w-24 h-24 flex items-center justify-center relative flex-shrink-0 ${isEarned ? 'badge-3d' : ''}`}
+                      className="w-32 h-32 sm:w-36 sm:h-36 flex items-center justify-center relative flex-shrink-0"
                       style={isEarned ? {
                         filter: `drop-shadow(0 0 20px ${colors.glow}) drop-shadow(0 0 40px ${colors.glow})`,
                       } : {
@@ -380,13 +380,13 @@ export default function Badges() {
                         filter: 'grayscale(100%)',
                       }}
                     >
-                      {/* Badge Image */}
+                      {/* Badge Image with 3D rotation */}
                       <div className="relative z-10 w-full h-full flex items-center justify-center">
                         {isEarned && pngPath ? (
                           <img 
                             src={pngPath} 
                             alt={badge.name}
-                            className="w-full h-full object-contain"
+                            className={`w-full h-full object-contain ${isEarned ? 'badge-3d' : ''}`}
                           />
                         ) : (
                           <div 
@@ -474,7 +474,8 @@ export default function Badges() {
                 <div className="flex flex-col items-center text-center relative">
                   {/* Large Badge */}
                   <div 
-                    className={`w-40 h-40 flex items-center justify-center relative mb-4 ${
+                    className="w-48 h-48 flex items-center justify-center relative mb-4">
+                    <div className={`w-full h-full flex items-center justify-center ${
                       selectedBadge.earned && showUnlockAnimation ? 'badge-unlock-animation' : ''
                     }`}
                     style={selectedBadge.earned ? {
@@ -498,6 +499,7 @@ export default function Badges() {
                         <Lock className="w-16 h-16 text-[oklch(0.40_0.02_250)]" />
                       </div>
                     )}
+                  </div>
                   </div>
 
                   {/* Badge Info */}
