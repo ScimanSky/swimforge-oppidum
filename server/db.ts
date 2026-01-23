@@ -123,12 +123,24 @@ export async function getLeaderboard(orderBy: 'level' | 'totalXp' | 'badges' = '
   if (!db) return [];
   
   if (orderBy === 'badges') {
+    // Use subquery for badge count to avoid GROUP BY issues with MySQL ONLY_FULL_GROUP_BY
     const result = await db.execute(sql`
-      SELECT sp.*, u.name, u.email, COUNT(ub.id) as badgeCount
+      SELECT 
+        sp.id,
+        sp.userId,
+        sp.level,
+        sp.totalXp,
+        sp.totalDistanceMeters,
+        sp.totalTimeSeconds,
+        sp.totalSessions,
+        sp.garminConnected,
+        sp.createdAt,
+        sp.updatedAt,
+        u.name,
+        u.email,
+        COALESCE((SELECT COUNT(*) FROM user_badges WHERE userId = sp.userId), 0) as badgeCount
       FROM swimmer_profiles sp
       JOIN users u ON sp.userId = u.id
-      LEFT JOIN user_badges ub ON sp.userId = ub.userId
-      GROUP BY sp.id
       ORDER BY badgeCount DESC, sp.totalXp DESC
       LIMIT ${limit}
     `);
