@@ -86,4 +86,5 @@
 - [x] Fix errore React setState durante rendering in Profile (e altri componenti)
 - [x] Fix errore Garmin 'str' object has no attribute 'expired' (aggiornato microservizio e messaggi utente)
 - [x] Fix errore "Impossibile connettersi a Garmin" (migliorata gestione OAuth1)
+- [x] Implementare supporto MFA (codice via email) per Garmin Connect
 

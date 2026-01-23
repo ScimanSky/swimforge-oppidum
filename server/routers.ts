@@ -262,6 +262,21 @@ export const appRouter = router({
         return await garmin.connectGarmin(ctx.user.id, input.email, input.password);
       }),
     
+    // Complete MFA authentication with code from email
+    completeMfa: protectedProcedure
+      .input(z.object({
+        mfaCode: z.string().min(1),
+        email: z.string().email(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        return await garmin.completeMfa(ctx.user.id, input.mfaCode, input.email);
+      }),
+    
+    // Check MFA status
+    mfaStatus: protectedProcedure.query(async ({ ctx }) => {
+      return await garmin.getMfaStatus(ctx.user.id);
+    }),
+    
     disconnect: protectedProcedure.mutation(async ({ ctx }) => {
       const success = await garmin.disconnectGarmin(ctx.user.id);
       return { success };

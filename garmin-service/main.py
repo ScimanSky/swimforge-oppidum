@@ -4,8 +4,13 @@ SwimForge Garmin Connect Microservice
 This microservice handles authentication and data synchronization with Garmin Connect
 using the unofficial python-garminconnect library.
 
+Supports MFA (Multi-Factor Authentication) with a two-step flow:
+1. POST /auth/login - Initiates login, returns mfa_required if MFA is needed
+2. POST /auth/mfa - Completes login with MFA code
+
 Endpoints:
-- POST /auth/login - Authenticate with Garmin Connect
+- POST /auth/login - Authenticate with Garmin Connect (step 1)
+- POST /auth/mfa - Complete MFA authentication (step 2)
 - POST /auth/logout - Clear stored session
 - GET /auth/status - Check authentication status
 - GET /activities/swimming - Fetch swimming activities
@@ -40,9 +45,13 @@ TOKEN_STORE_DIR = Path(os.getenv("TOKEN_STORE_DIR", "/tmp/garmin_tokens"))
 # Ensure token store directory exists
 TOKEN_STORE_DIR.mkdir(parents=True, exist_ok=True)
 
-# In-memory session storage (for demo - use Redis in production)
-# Structure: {user_id: {"client": Garmin, "email": str, "last_sync": datetime}}
+# In-memory session storage
+# Structure: {user_id: {"client": Garmin, "email": str, "last_sync": datetime, "mfa_state": Any}}
 sessions: Dict[str, Dict[str, Any]] = {}
+
+# Pending MFA sessions (waiting for MFA code)
+# Structure: {user_id: {"client": Garmin, "mfa_state": Any, "email": str, "created_at": datetime}}
+pending_mfa: Dict[str, Dict[str, Any]] = {}
 
 
 # Pydantic models
@@ -52,10 +61,16 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class MFARequest(BaseModel):
+    user_id: str
+    mfa_code: str
+
+
 class LoginResponse(BaseModel):
     success: bool
     message: str
     user_id: Optional[str] = None
+    mfa_required: bool = False
 
 
 class StatusResponse(BaseModel):
@@ -97,24 +112,25 @@ class SyncResponse(BaseModel):
 # Lifespan context manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Starting Garmin Connect Microservice...")
+    logger.info("Starting Garmin Connect Microservice with MFA support...")
     yield
     logger.info("Shutting down Garmin Connect Microservice...")
     sessions.clear()
+    pending_mfa.clear()
 
 
 # Create FastAPI app
 app = FastAPI(
     title="SwimForge Garmin Service",
-    description="Microservice for Garmin Connect integration",
-    version="1.0.0",
+    description="Microservice for Garmin Connect integration with MFA support",
+    version="2.0.0",
     lifespan=lifespan
 )
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately in production
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -198,36 +214,56 @@ def parse_swimming_activity(activity: dict) -> SwimmingActivity:
     )
 
 
+def cleanup_expired_mfa():
+    """Remove expired MFA sessions (older than 10 minutes)"""
+    now = datetime.now()
+    expired = []
+    for user_id, data in pending_mfa.items():
+        created_at = data.get("created_at")
+        if created_at and (now - created_at).total_seconds() > 600:  # 10 minutes
+            expired.append(user_id)
+    for user_id in expired:
+        del pending_mfa[user_id]
+        logger.info(f"Cleaned up expired MFA session for user {user_id}")
+
+
 # API Endpoints
 @app.get("/")
 async def root():
-    return {"service": "SwimForge Garmin Service", "status": "running"}
+    return {"service": "SwimForge Garmin Service", "version": "2.0.0", "mfa_support": True}
 
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "active_sessions": len(sessions)}
+    cleanup_expired_mfa()
+    return {
+        "status": "healthy",
+        "active_sessions": len(sessions),
+        "pending_mfa": len(pending_mfa)
+    }
 
 
 @app.post("/auth/login", response_model=LoginResponse)
 async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
     """
-    Authenticate with Garmin Connect and store session
+    Step 1: Authenticate with Garmin Connect
+    If MFA is required, returns mfa_required=True and you must call /auth/mfa with the code
     """
     try:
         logger.info(f"Attempting login for user {request.user_id}")
+        cleanup_expired_mfa()
         
-        # Import here to catch import errors
+        # Import garminconnect
         try:
             from garminconnect import Garmin
         except ImportError as e:
             logger.error(f"Failed to import garminconnect: {e}")
             raise HTTPException(
                 status_code=500,
-                detail="Garmin Connect library not available. Please try again later."
+                detail="Garmin Connect library not available."
             )
         
-        # Delete any existing invalid tokens first
+        # Delete any existing invalid tokens
         token_path = get_token_path(request.user_id)
         if token_path.exists():
             try:
@@ -236,94 +272,225 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
             except Exception:
                 pass
         
-        # Create Garmin client with credentials
+        # Clear any pending MFA for this user
+        if request.user_id in pending_mfa:
+            del pending_mfa[request.user_id]
+        
+        # Create Garmin client with return_on_mfa=True to handle MFA
+        client = Garmin(
+            email=request.email,
+            password=request.password,
+            is_cn=False,
+            return_on_mfa=True  # This is the key parameter for MFA support
+        )
+        
+        logger.info(f"Attempting Garmin login for user {request.user_id}")
+        
+        # Attempt login
+        result = client.login()
+        
+        # Check if MFA is required
+        # When return_on_mfa=True, login() returns a tuple (status, mfa_state) if MFA is needed
+        if isinstance(result, tuple) and len(result) == 2:
+            status, mfa_state = result
+            if status == "needs_mfa":
+                logger.info(f"MFA required for user {request.user_id}")
+                
+                # Store pending MFA session
+                pending_mfa[request.user_id] = {
+                    "client": client,
+                    "mfa_state": mfa_state,
+                    "email": request.email,
+                    "created_at": datetime.now()
+                }
+                
+                return LoginResponse(
+                    success=False,
+                    message="È richiesta l'autenticazione a due fattori (MFA). Controlla la tua email e inserisci il codice ricevuto.",
+                    user_id=request.user_id,
+                    mfa_required=True
+                )
+        
+        # Login successful without MFA
+        logger.info(f"Login successful (no MFA) for user {request.user_id}")
+        
+        # Save tokens
         try:
-            client = Garmin(request.email, request.password)
-            
-            # Perform fresh login - this is the critical step
-            logger.info(f"Attempting fresh login for user {request.user_id}")
-            client.login()
-            
-            logger.info(f"Login successful for user {request.user_id}")
-            
-            # Save tokens for future use
-            try:
-                client.garth.dump(str(token_path))
-                logger.info(f"Saved tokens for user {request.user_id}")
-            except Exception as e:
-                logger.warning(f"Could not save tokens: {e}")
-            
-            # Get user profile for display name
-            try:
-                display_name = client.display_name
-            except Exception:
-                display_name = request.email
-            
-            # Store session
-            sessions[request.user_id] = {
-                "client": client,
-                "email": request.email,
-                "display_name": display_name,
-                "last_sync": None,
-                "connected_at": datetime.now().isoformat()
-            }
-            
-            return LoginResponse(
-                success=True,
-                message="Connesso a Garmin Connect con successo!",
-                user_id=request.user_id
-            )
-            
-        except Exception as login_error:
-            error_str = str(login_error)
-            logger.error(f"Login failed for user {request.user_id}: {error_str}")
-            
-            # Check for specific error patterns
-            if "OAuth1 token" in error_str or "oauth1" in error_str.lower():
-                raise HTTPException(
-                    status_code=400,
-                    detail="Errore di autenticazione OAuth. Questo può essere causato da MFA attivo sul tuo account Garmin. Disabilita temporaneamente l'autenticazione a due fattori nelle impostazioni di Garmin Connect, poi riprova."
-                )
-            elif "401" in error_str or "Unauthorized" in error_str or "Authentication" in error_str:
-                raise HTTPException(
-                    status_code=401,
-                    detail="Credenziali Garmin non valide. Verifica email e password."
-                )
-            elif "MFA" in error_str or "two-factor" in error_str.lower() or "2fa" in error_str.lower():
-                raise HTTPException(
-                    status_code=400,
-                    detail="Il tuo account Garmin ha l'autenticazione a due fattori (MFA) attiva. Disabilita temporaneamente MFA nelle impostazioni di Garmin Connect, collega l'account, poi riattiva MFA."
-                )
-            elif "'str' object has no attribute" in error_str:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Errore di autenticazione. Questo è spesso causato da MFA attivo. Disabilita temporaneamente l'autenticazione a due fattori nelle impostazioni di Garmin Connect."
-                )
-            else:
-                raise HTTPException(
-                    status_code=500,
-                    detail=f"Errore durante il collegamento: {error_str}"
-                )
+            client.garth.dump(str(token_path))
+            logger.info(f"Saved tokens for user {request.user_id}")
+        except Exception as e:
+            logger.warning(f"Could not save tokens: {e}")
+        
+        # Get display name
+        try:
+            display_name = client.display_name
+        except Exception:
+            display_name = request.email
+        
+        # Store session
+        sessions[request.user_id] = {
+            "client": client,
+            "email": request.email,
+            "display_name": display_name,
+            "last_sync": None,
+            "connected_at": datetime.now().isoformat()
+        }
+        
+        return LoginResponse(
+            success=True,
+            message="Connesso a Garmin Connect con successo!",
+            user_id=request.user_id,
+            mfa_required=False
+        )
         
     except HTTPException:
         raise
     except Exception as e:
-        error_msg = str(e)
-        logger.error(f"Unexpected error during login for user {request.user_id}: {error_msg}")
+        error_str = str(e)
+        logger.error(f"Login error for user {request.user_id}: {error_str}")
+        
+        # Check for specific errors
+        if "401" in error_str or "Unauthorized" in error_str or "Authentication" in error_str:
+            raise HTTPException(
+                status_code=401,
+                detail="Credenziali Garmin non valide. Verifica email e password."
+            )
+        elif "MFA" in error_str.upper() or "needs_mfa" in error_str.lower():
+            raise HTTPException(
+                status_code=400,
+                detail="È richiesta l'autenticazione MFA ma non è stata gestita correttamente. Riprova."
+            )
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Errore durante il collegamento: {error_str}"
+            )
+
+
+@app.post("/auth/mfa", response_model=LoginResponse)
+async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_key)):
+    """
+    Step 2: Complete MFA authentication with the code received via email
+    """
+    try:
+        logger.info(f"Completing MFA for user {request.user_id}")
+        
+        # Check if we have a pending MFA session
+        if request.user_id not in pending_mfa:
+            raise HTTPException(
+                status_code=400,
+                detail="Nessuna sessione MFA in attesa. Riavvia il processo di login."
+            )
+        
+        mfa_session = pending_mfa[request.user_id]
+        client = mfa_session["client"]
+        mfa_state = mfa_session["mfa_state"]
+        email = mfa_session["email"]
+        
+        # Check if session is expired (10 minutes)
+        created_at = mfa_session.get("created_at")
+        if created_at and (datetime.now() - created_at).total_seconds() > 600:
+            del pending_mfa[request.user_id]
+            raise HTTPException(
+                status_code=400,
+                detail="La sessione MFA è scaduta. Riavvia il processo di login."
+            )
+        
+        # Complete MFA
+        try:
+            client.resume_login(mfa_state, request.mfa_code)
+            logger.info(f"MFA completed successfully for user {request.user_id}")
+        except Exception as mfa_error:
+            error_str = str(mfa_error)
+            logger.error(f"MFA error for user {request.user_id}: {error_str}")
+            
+            if "401" in error_str or "403" in error_str or "Invalid" in error_str:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Codice MFA non valido. Verifica il codice e riprova."
+                )
+            elif "429" in error_str:
+                # Clean up on rate limit
+                del pending_mfa[request.user_id]
+                raise HTTPException(
+                    status_code=429,
+                    detail="Troppi tentativi. Attendi qualche minuto e riprova."
+                )
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Errore durante la verifica MFA: {error_str}"
+                )
+        
+        # Clean up pending MFA
+        del pending_mfa[request.user_id]
+        
+        # Save tokens
+        token_path = get_token_path(request.user_id)
+        try:
+            client.garth.dump(str(token_path))
+            logger.info(f"Saved tokens for user {request.user_id}")
+        except Exception as e:
+            logger.warning(f"Could not save tokens: {e}")
+        
+        # Get display name
+        try:
+            display_name = client.display_name
+        except Exception:
+            display_name = email
+        
+        # Store session
+        sessions[request.user_id] = {
+            "client": client,
+            "email": email,
+            "display_name": display_name,
+            "last_sync": None,
+            "connected_at": datetime.now().isoformat()
+        }
+        
+        return LoginResponse(
+            success=True,
+            message="Connesso a Garmin Connect con successo!",
+            user_id=request.user_id,
+            mfa_required=False
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected MFA error for user {request.user_id}: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Errore imprevisto: {error_msg}"
+            detail=f"Errore imprevisto: {str(e)}"
         )
+
+
+@app.get("/auth/mfa-status/{user_id}")
+async def get_mfa_status(user_id: str, api_key: str = Depends(verify_api_key)):
+    """Check if there's a pending MFA session for a user"""
+    cleanup_expired_mfa()
+    
+    if user_id in pending_mfa:
+        created_at = pending_mfa[user_id].get("created_at")
+        if created_at:
+            remaining = 600 - (datetime.now() - created_at).total_seconds()
+            return {
+                "pending": True,
+                "remaining_seconds": max(0, int(remaining))
+            }
+    
+    return {"pending": False, "remaining_seconds": 0}
 
 
 @app.post("/auth/logout")
 async def logout(user_id: str, api_key: str = Depends(verify_api_key)):
-    """
-    Clear stored session for user
-    """
+    """Clear stored session for user"""
     if user_id in sessions:
         del sessions[user_id]
         logger.info(f"Logged out user {user_id}")
+    
+    if user_id in pending_mfa:
+        del pending_mfa[user_id]
     
     # Delete stored tokens
     token_path = get_token_path(user_id)
@@ -332,14 +499,12 @@ async def logout(user_id: str, api_key: str = Depends(verify_api_key)):
     except Exception:
         pass
     
-    return {"success": True, "message": "Successfully disconnected"}
+    return {"success": True, "message": "Disconnesso con successo"}
 
 
 @app.get("/auth/status/{user_id}", response_model=StatusResponse)
 async def get_status(user_id: str, api_key: str = Depends(verify_api_key)):
-    """
-    Check authentication status for user
-    """
+    """Check authentication status for user"""
     session = sessions.get(user_id)
     
     if not session or not session.get("client"):
@@ -368,15 +533,13 @@ async def get_swimming_activities(
     days_back: int = 30,
     api_key: str = Depends(verify_api_key)
 ):
-    """
-    Fetch swimming activities from Garmin Connect
-    """
+    """Fetch swimming activities from Garmin Connect"""
     client = get_garmin_client(user_id)
     
     if not client:
         raise HTTPException(
             status_code=401,
-            detail="Not authenticated. Please login first."
+            detail="Non autenticato. Effettua prima il login."
         )
     
     try:
@@ -412,21 +575,19 @@ async def get_swimming_activities(
         logger.error(f"Error fetching activities for user {user_id}: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Error fetching activities: {str(e)}"
+            detail=f"Errore nel recupero delle attività: {str(e)}"
         )
 
 
 @app.post("/sync", response_model=SyncResponse)
 async def sync_activities(request: SyncRequest, api_key: str = Depends(verify_api_key)):
-    """
-    Sync swimming activities from Garmin Connect
-    """
+    """Sync swimming activities from Garmin Connect"""
     client = get_garmin_client(request.user_id)
     
     if not client:
         raise HTTPException(
             status_code=401,
-            detail="Not authenticated. Please login first."
+            detail="Non autenticato. Effettua prima il login."
         )
     
     try:
@@ -447,7 +608,7 @@ async def sync_activities(request: SyncRequest, api_key: str = Depends(verify_ap
             success=True,
             synced_count=len(activities),
             activities=activities,
-            message=f"Synced {len(activities)} swimming activities"
+            message=f"Sincronizzate {len(activities)} attività di nuoto"
         )
         
     except HTTPException:
@@ -456,7 +617,7 @@ async def sync_activities(request: SyncRequest, api_key: str = Depends(verify_ap
         logger.error(f"Error syncing activities for user {request.user_id}: {e}")
         raise HTTPException(
             status_code=500,
-            detail=f"Error syncing activities: {str(e)}"
+            detail=f"Errore nella sincronizzazione: {str(e)}"
         )
 
 

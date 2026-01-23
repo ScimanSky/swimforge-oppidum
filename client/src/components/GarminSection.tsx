@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -13,17 +13,21 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { motion } from "framer-motion";
-import { Link as LinkIcon, RefreshCw, Unlink, Loader2 } from "lucide-react";
+import { Link as LinkIcon, RefreshCw, Unlink, Loader2, Mail, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 
 interface GarminSectionProps {
   garminConnected: boolean;
 }
 
+type AuthStep = "credentials" | "mfa";
+
 export default function GarminSection({ garminConnected }: GarminSectionProps) {
   const [isConnectDialogOpen, setIsConnectDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [mfaCode, setMfaCode] = useState("");
+  const [authStep, setAuthStep] = useState<AuthStep>("credentials");
 
   const utils = trpc.useUtils();
 
@@ -33,13 +37,31 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
     onSuccess: (data) => {
       if (data.success) {
         toast.success("Garmin Connect collegato con successo!");
-        setIsConnectDialogOpen(false);
-        setEmail("");
-        setPassword("");
+        resetDialog();
+        utils.garmin.status.invalidate();
+        utils.profile.get.invalidate();
+      } else if (data.mfaRequired) {
+        // MFA required - switch to MFA step
+        setAuthStep("mfa");
+        toast.info("Controlla la tua email per il codice di verifica");
+      } else {
+        toast.error(data.error || "Errore nel collegamento");
+      }
+    },
+    onError: (error) => {
+      toast.error("Errore: " + error.message);
+    },
+  });
+
+  const mfaMutation = trpc.garmin.completeMfa.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success("Garmin Connect collegato con successo!");
+        resetDialog();
         utils.garmin.status.invalidate();
         utils.profile.get.invalidate();
       } else {
-        toast.error(data.error || "Errore nel collegamento");
+        toast.error(data.error || "Codice MFA non valido");
       }
     },
     onError: (error) => {
@@ -73,6 +95,14 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
     },
   });
 
+  const resetDialog = () => {
+    setIsConnectDialogOpen(false);
+    setEmail("");
+    setPassword("");
+    setMfaCode("");
+    setAuthStep("credentials");
+  };
+
   const handleConnect = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
@@ -82,7 +112,24 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
     connectMutation.mutate({ email, password });
   };
 
+  const handleMfaSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mfaCode) {
+      toast.error("Inserisci il codice di verifica");
+      return;
+    }
+    mfaMutation.mutate({ mfaCode, email });
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    if (!open) {
+      resetDialog();
+    }
+    setIsConnectDialogOpen(open);
+  };
+
   const isConnected = garminStatus?.connected || garminConnected;
+  const isLoading = connectMutation.isPending || mfaMutation.isPending;
 
   return (
     <motion.div
@@ -143,7 +190,7 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
                   </Button>
                 </>
               ) : (
-                <Dialog open={isConnectDialogOpen} onOpenChange={setIsConnectDialogOpen}>
+                <Dialog open={isConnectDialogOpen} onOpenChange={handleDialogClose}>
                   <DialogTrigger asChild>
                     <Button variant="outline" size="sm">
                       Collega
@@ -151,58 +198,127 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
                   </DialogTrigger>
                   <DialogContent>
                     <DialogHeader>
-                      <DialogTitle>Collega Garmin Connect</DialogTitle>
-                      <DialogDescription>
-                        Inserisci le credenziali del tuo account Garmin Connect per sincronizzare automaticamente le tue attività di nuoto.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={handleConnect} className="space-y-4 mt-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="garmin-email">Email Garmin</Label>
-                        <Input
-                          id="garmin-email"
-                          type="email"
-                          placeholder="email@esempio.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="garmin-password">Password</Label>
-                        <Input
-                          id="garmin-password"
-                          type="password"
-                          placeholder="••••••••"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="text-xs text-muted-foreground space-y-2">
-                        <p>
-                          Le tue credenziali sono crittografate e utilizzate solo per sincronizzare le attività.
-                        </p>
-                        <p className="text-orange-600 dark:text-orange-400">
-                          <strong>Nota:</strong> Se hai l'autenticazione a due fattori (MFA) attiva su Garmin, 
-                          potrebbe essere necessario disabilitarla temporaneamente per il collegamento.
-                        </p>
-                      </div>
-                      <Button
-                        type="submit"
-                        className="w-full bg-[var(--navy)] hover:bg-[var(--navy-light)]"
-                        disabled={connectMutation.isPending}
-                      >
-                        {connectMutation.isPending ? (
+                      <DialogTitle className="flex items-center gap-2">
+                        {authStep === "credentials" ? (
                           <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Collegamento...
+                            <LinkIcon className="h-5 w-5" />
+                            Collega Garmin Connect
                           </>
                         ) : (
-                          "Collega Account"
+                          <>
+                            <KeyRound className="h-5 w-5" />
+                            Verifica Codice MFA
+                          </>
                         )}
-                      </Button>
-                    </form>
+                      </DialogTitle>
+                      <DialogDescription>
+                        {authStep === "credentials" 
+                          ? "Inserisci le credenziali del tuo account Garmin Connect per sincronizzare automaticamente le tue attività di nuoto."
+                          : "Abbiamo inviato un codice di verifica alla tua email. Inseriscilo qui sotto per completare il collegamento."
+                        }
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    {authStep === "credentials" ? (
+                      <form onSubmit={handleConnect} className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="garmin-email">Email Garmin</Label>
+                          <Input
+                            id="garmin-email"
+                            type="email"
+                            placeholder="email@esempio.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="garmin-password">Password</Label>
+                          <Input
+                            id="garmin-password"
+                            type="password"
+                            placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="text-xs text-muted-foreground space-y-2">
+                          <p>
+                            Le tue credenziali sono crittografate e utilizzate solo per sincronizzare le attività.
+                          </p>
+                          <p className="text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                            <Mail className="h-3 w-3" />
+                            Se hai MFA attivo, riceverai un codice via email nel passaggio successivo.
+                          </p>
+                        </div>
+                        <Button
+                          type="submit"
+                          className="w-full bg-[var(--navy)] hover:bg-[var(--navy-light)]"
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Collegamento...
+                            </>
+                          ) : (
+                            "Collega Account"
+                          )}
+                        </Button>
+                      </form>
+                    ) : (
+                      <form onSubmit={handleMfaSubmit} className="space-y-4 mt-4">
+                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                          <p className="text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                            <Mail className="h-4 w-4" />
+                            Controlla la tua email <strong>{email}</strong>
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="mfa-code">Codice di Verifica</Label>
+                          <Input
+                            id="mfa-code"
+                            type="text"
+                            placeholder="123456"
+                            value={mfaCode}
+                            onChange={(e) => setMfaCode(e.target.value)}
+                            maxLength={10}
+                            className="text-center text-2xl tracking-widest font-mono"
+                            autoFocus
+                            required
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Inserisci il codice a 6 cifre ricevuto via email da Garmin
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="flex-1"
+                            onClick={() => setAuthStep("credentials")}
+                            disabled={isLoading}
+                          >
+                            Indietro
+                          </Button>
+                          <Button
+                            type="submit"
+                            className="flex-1 bg-[var(--navy)] hover:bg-[var(--navy-light)]"
+                            disabled={isLoading || mfaCode.length < 4}
+                          >
+                            {isLoading ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Verifica...
+                              </>
+                            ) : (
+                              "Verifica Codice"
+                            )}
+                          </Button>
+                        </div>
+                      </form>
+                    )}
                   </DialogContent>
                 </Dialog>
               )}

@@ -8,6 +8,10 @@
  * - Frontend calls Node.js backend (this file)
  * - Node.js backend calls Python microservice for Garmin operations
  * - Python microservice handles Garmin authentication and data fetching
+ * 
+ * MFA Support:
+ * - Step 1: connectGarmin() - Returns mfaRequired=true if MFA is needed
+ * - Step 2: completeMfa() - Complete authentication with MFA code
  */
 
 import { getDb } from "./db";
@@ -41,6 +45,7 @@ interface GarminServiceResponse {
   count?: number;
   activities?: GarminServiceActivity[];
   synced_count?: number;
+  mfa_required?: boolean;
 }
 
 /**
@@ -63,12 +68,13 @@ async function callGarminService(
       body: body ? JSON.stringify(body) : undefined,
     });
 
+    const data = await response.json().catch(() => ({ detail: "Unknown error" }));
+
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: "Unknown error" }));
-      throw new Error(error.detail || `HTTP ${response.status}`);
+      throw new Error(data.detail || `HTTP ${response.status}`);
     }
 
-    return await response.json();
+    return data;
   } catch (error: any) {
     console.error(`[Garmin Service] Error calling ${endpoint}:`, error.message);
     throw error;
@@ -120,13 +126,32 @@ export async function getGarminStatus(userId: number): Promise<{
 }
 
 /**
+ * Check if there's a pending MFA session for a user
+ */
+export async function getMfaStatus(userId: number): Promise<{
+  pending: boolean;
+  remainingSeconds: number;
+}> {
+  try {
+    const result = await callGarminService(`/auth/mfa-status/${userId}`);
+    return {
+      pending: result.pending || false,
+      remainingSeconds: result.remaining_seconds || 0,
+    };
+  } catch {
+    return { pending: false, remainingSeconds: 0 };
+  }
+}
+
+/**
  * Connect to Garmin with email/password via microservice
+ * Returns mfaRequired=true if MFA is needed (call completeMfa next)
  */
 export async function connectGarmin(
   userId: number,
   email: string,
   password: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; mfaRequired?: boolean; error?: string }> {
   const db = await getDb();
   if (!db) {
     return { success: false, error: "Database not available" };
@@ -139,6 +164,15 @@ export async function connectGarmin(
       email,
       password,
     });
+
+    // Check if MFA is required
+    if (result.mfa_required) {
+      return { 
+        success: false, 
+        mfaRequired: true,
+        error: result.message || "È richiesta l'autenticazione a due fattori (MFA)"
+      };
+    }
 
     if (!result.success) {
       return { success: false, error: result.message || "Authentication failed" };
@@ -180,6 +214,72 @@ export async function connectGarmin(
     return { 
       success: false, 
       error: error.message || "Connection failed. Check your credentials." 
+    };
+  }
+}
+
+/**
+ * Complete MFA authentication with the code received via email
+ */
+export async function completeMfa(
+  userId: number,
+  mfaCode: string,
+  email: string
+): Promise<{ success: boolean; error?: string }> {
+  const db = await getDb();
+  if (!db) {
+    return { success: false, error: "Database not available" };
+  }
+
+  try {
+    // Call microservice to complete MFA
+    const result = await callGarminService("/auth/mfa", "POST", {
+      user_id: String(userId),
+      mfa_code: mfaCode,
+    });
+
+    if (!result.success) {
+      return { success: false, error: result.message || "MFA verification failed" };
+    }
+
+    // Store connection info in local database
+    await db.insert(garminTokens).values({
+      userId,
+      garminEmail: email,
+      oauth1Token: JSON.stringify({ 
+        connected: true, 
+        service_user_id: String(userId),
+        connected_at: new Date().toISOString(),
+        mfa_completed: true
+      }),
+      oauth2Token: null,
+      tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+    }).onDuplicateKeyUpdate({
+      set: {
+        garminEmail: email,
+        oauth1Token: JSON.stringify({ 
+          connected: true, 
+          service_user_id: String(userId),
+          connected_at: new Date().toISOString(),
+          mfa_completed: true
+        }),
+        tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+        updatedAt: new Date(),
+      },
+    });
+
+    // Update profile
+    await db
+      .update(swimmerProfiles)
+      .set({ garminConnected: true })
+      .where(eq(swimmerProfiles.userId, userId));
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("[Garmin] MFA completion failed:", error);
+    return { 
+      success: false, 
+      error: error.message || "MFA verification failed" 
     };
   }
 }
@@ -355,7 +455,7 @@ export async function syncGarminActivities(
         result.activities.reduce((sum, a) => sum + a.distance_meters, 0);
       const newTotalTime = (profile.totalTimeSeconds || 0) + 
         result.activities.reduce((sum, a) => sum + a.duration_seconds, 0);
-      const newSessionCount = (profile.totalSessions || 0) + syncedCount;
+      const newTotalSessions = (profile.totalSessions || 0) + syncedCount;
 
       // Calculate new level
       const newLevel = calculateLevel(newTotalXp);
@@ -367,79 +467,62 @@ export async function syncGarminActivities(
           level: newLevel,
           totalDistanceMeters: newTotalDistance,
           totalTimeSeconds: newTotalTime,
-          totalSessions: newSessionCount,
+          totalSessions: newTotalSessions,
         })
-        .where(eq(swimmerProfiles.id, profile.id));
+        .where(eq(swimmerProfiles.userId, userId));
 
       // Check and award badges
       await checkAndAwardBadges(userId, {
         totalDistance: newTotalDistance,
-        totalTime: newTotalTime,
-        sessionsCount: newSessionCount,
+        totalSessions: newTotalSessions,
+        totalXp: newTotalXp,
         level: newLevel,
-        hasOpenWater: result.activities.some(a => a.is_open_water),
       });
     }
 
-    // Update last sync timestamp
+    // Update last sync time
     await db
       .update(garminTokens)
       .set({ lastSyncAt: new Date() })
       .where(eq(garminTokens.userId, userId));
 
-    return { 
-      synced: syncedCount, 
-      newXp: totalNewXp,
-    };
+    return { synced: syncedCount, newXp: totalNewXp };
   } catch (error: any) {
     console.error("[Garmin] Sync failed:", error);
-    
-    // Check if it's an auth error
-    if (error.message?.includes("401") || error.message?.includes("expired")) {
-      // Clear local connection
-      await db.delete(garminTokens).where(eq(garminTokens.userId, userId));
-      await db
-        .update(swimmerProfiles)
-        .set({ garminConnected: false })
-        .where(eq(swimmerProfiles.userId, userId));
-      
-      return { synced: 0, newXp: 0, error: "Sessione Garmin scaduta. Ricollegati." };
-    }
-    
     return { synced: 0, newXp: 0, error: error.message || "Sync failed" };
   }
 }
 
 /**
- * Calculate level from total XP
+ * Calculate level from XP
  */
 function calculateLevel(totalXp: number): number {
-  // Level thresholds (exponential growth)
-  const thresholds = [
-    0,      // Level 1: 0 XP
-    500,    // Level 2: 500 XP
-    1200,   // Level 3: 1,200 XP
-    2100,   // Level 4: 2,100 XP
-    3200,   // Level 5: 3,200 XP
-    4500,   // Level 6: 4,500 XP
-    6000,   // Level 7: 6,000 XP
-    7700,   // Level 8: 7,700 XP
-    9600,   // Level 9: 9,600 XP
-    11700,  // Level 10: 11,700 XP
-    14000,  // Level 11: 14,000 XP
-    16500,  // Level 12: 16,500 XP
-    19200,  // Level 13: 19,200 XP
-    22100,  // Level 14: 22,100 XP
-    25200,  // Level 15: 25,200 XP
-    28500,  // Level 16: 28,500 XP
-    32000,  // Level 17: 32,000 XP
-    35700,  // Level 18: 35,700 XP
-    39600,  // Level 19: 39,600 XP
-    43700,  // Level 20: 43,700 XP (Poseidone)
+  // Level thresholds (cumulative XP needed)
+  const levelThresholds = [
+    0,      // Level 1
+    500,    // Level 2
+    1200,   // Level 3
+    2100,   // Level 4
+    3200,   // Level 5
+    4500,   // Level 6
+    6000,   // Level 7
+    7700,   // Level 8
+    9600,   // Level 9
+    11700,  // Level 10
+    14000,  // Level 11
+    16500,  // Level 12
+    19200,  // Level 13
+    22100,  // Level 14
+    25200,  // Level 15
+    28500,  // Level 16
+    32000,  // Level 17
+    35700,  // Level 18
+    39600,  // Level 19
+    43700,  // Level 20
   ];
 
-  for (let i = thresholds.length - 1; i >= 0; i--) {
-    if (totalXp >= thresholds[i]) {
+  for (let i = levelThresholds.length - 1; i >= 0; i--) {
+    if (totalXp >= levelThresholds[i]) {
       return i + 1;
     }
   }
@@ -453,52 +536,55 @@ async function checkAndAwardBadges(
   userId: number,
   stats: {
     totalDistance: number;
-    totalTime: number;
-    sessionsCount: number;
+    totalSessions: number;
+    totalXp: number;
     level: number;
-    hasOpenWater: boolean;
   }
 ): Promise<void> {
   const db = await getDb();
   if (!db) return;
 
-  // Get all badges
-  const allBadges = await db.select().from(badgeDefinitions);
-  
+  // Get all badge definitions
+  const badges = await db.select().from(badgeDefinitions);
+
   // Get user's existing badges
   const existingBadges = await db
     .select()
     .from(userBadges)
     .where(eq(userBadges.userId, userId));
-  
+
   const existingBadgeIds = new Set(existingBadges.map(b => b.badgeId));
 
   // Check each badge
-  for (const badge of allBadges) {
+  for (const badge of badges) {
     if (existingBadgeIds.has(badge.id)) continue;
 
     let earned = false;
-    const requirement = badge.requirementValue || 0;
 
-    switch (badge.category) {
-      case "distance":
-        earned = stats.totalDistance >= requirement;
-        break;
-      case "consistency":
-        earned = stats.sessionsCount >= requirement;
-        break;
-      case "milestone":
-        if (badge.code?.includes("level")) {
-          const levelReq = parseInt(badge.code.replace("level_", "")) || 0;
-          earned = stats.level >= levelReq;
-        } else if (badge.code?.includes("hours")) {
-          const hoursReq = parseInt(badge.code.replace("hours_", "")) || 0;
-          earned = stats.totalTime >= hoursReq * 3600;
+    // Parse requirement
+    const reqType = badge.requirementType;
+    const reqValue = badge.requirementValue;
+    
+    // Check based on requirement type
+    switch (reqType) {
+      case "total_distance_km":
+        if (stats.totalDistance >= reqValue * 1000) {
+          earned = true;
         }
         break;
-      case "open_water":
-        if (badge.code === "first_open_water") {
-          earned = stats.hasOpenWater;
+      case "total_sessions":
+        if (stats.totalSessions >= reqValue) {
+          earned = true;
+        }
+        break;
+      case "level":
+        if (stats.level >= reqValue) {
+          earned = true;
+        }
+        break;
+      case "total_xp":
+        if (stats.totalXp >= reqValue) {
+          earned = true;
         }
         break;
     }
@@ -507,27 +593,15 @@ async function checkAndAwardBadges(
       await db.insert(userBadges).values({
         userId,
         badgeId: badge.id,
-        earnedAt: new Date(),
       });
-
-      // Award XP for badge
-      if (badge.xpReward > 0) {
-        await db.insert(xpTransactions).values({
-          userId,
-          amount: badge.xpReward,
-          reason: "badge",
-          referenceId: badge.id,
-          description: `Badge sbloccato: ${badge.name}`,
-        });
-      }
     }
   }
 }
 
 /**
- * Get swimming activities for a user
+ * Get user's swimming activities
  */
-export async function getSwimmingActivities(
+export async function getUserActivities(
   userId: number,
   limit: number = 50
 ): Promise<any[]> {
@@ -542,4 +616,52 @@ export async function getSwimmingActivities(
     .limit(limit);
 
   return activities;
+}
+
+/**
+ * Get user's personal records
+ */
+export async function getPersonalRecords(userId: number): Promise<{
+  longestSession: number;
+  fastestPace100m: number;
+  mostDistanceWeek: number;
+}> {
+  const db = await getDb();
+  if (!db) {
+    return { longestSession: 0, fastestPace100m: 0, mostDistanceWeek: 0 };
+  }
+
+  const activities = await db
+    .select()
+    .from(swimmingActivities)
+    .where(eq(swimmingActivities.userId, userId));
+
+  let longestSession = 0;
+  let fastestPace100m = Infinity;
+
+  for (const activity of activities) {
+    if (activity.distanceMeters > longestSession) {
+      longestSession = activity.distanceMeters;
+    }
+    if (activity.avgPacePer100m && activity.avgPacePer100m < fastestPace100m) {
+      fastestPace100m = activity.avgPacePer100m;
+    }
+  }
+
+  // Calculate most distance in a week
+  const weekDistances: { [key: string]: number } = {};
+  for (const activity of activities) {
+    const date = new Date(activity.activityDate);
+    const weekStart = new Date(date);
+    weekStart.setDate(date.getDate() - date.getDay());
+    const weekKey = weekStart.toISOString().split("T")[0];
+    weekDistances[weekKey] = (weekDistances[weekKey] || 0) + activity.distanceMeters;
+  }
+  const mostDistanceWeek = Math.max(0, ...Object.values(weekDistances));
+
+  return {
+    longestSession,
+    fastestPace100m: fastestPace100m === Infinity ? 0 : fastestPace100m,
+    mostDistanceWeek,
+  };
 }
