@@ -276,11 +276,12 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
         if request.user_id in pending_mfa:
             del pending_mfa[request.user_id]
         
-        # Create Garmin client
+        # Create Garmin client with return_on_mfa=True
         client = Garmin(
             email=request.email,
             password=request.password,
-            is_cn=False
+            is_cn=False,
+            return_on_mfa=True
         )
         
         logger.info(f"Attempting Garmin login for user {request.user_id}")
@@ -297,13 +298,13 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
             sys.stdin = old_stdin  # Restore stdin
             
             # Check if MFA is required
-            # When return_on_mfa=True, login() may return a tuple (status, mfa_state) if MFA is needed
+            # When return_on_mfa=True, login() returns a tuple (status, mfa_state) if MFA is needed
             if isinstance(result, tuple) and len(result) == 2:
                 status, mfa_state = result
-                if status == "needs_mfa" or status == "MFA":
-                    logger.info(f"MFA required for user {request.user_id} (tuple response)")
+                if status == "needs_mfa":
+                    logger.info(f"MFA required for user {request.user_id}")
                     
-                    # Store pending MFA session
+                    # Store pending MFA session with mfa_state
                     pending_mfa[request.user_id] = {
                         "client": client,
                         "mfa_state": mfa_state,
@@ -446,31 +447,14 @@ async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_ke
                 detail="La sessione MFA è scaduta. Riavvia il processo di login."
             )
         
-        # Complete MFA using HTTP API directly
-        import httpx
-        
+        # Complete MFA using resume_login
         try:
-            # Get the session cookies from the client
-            # We need to send the MFA code to Garmin's verification endpoint
-            logger.info(f"Sending MFA code to Garmin for user {request.user_id}")
+            logger.info(f"Completing MFA with resume_login for user {request.user_id}")
             
-            # Use the client's HTTP session to send MFA code
-            response = client.garth.client.post(
-                "https://sso.garmin.com/sso/verifyMFA/loginEnterMfaCode",
-                json={
-                    "mfaCode": request.mfa_code,
-                    "embedWidget": False
-                }
-            )
+            # Use resume_login to complete MFA authentication
+            client.resume_login(mfa_state, request.mfa_code)
             
-            if response.status_code == 200:
-                logger.info(f"MFA completed successfully for user {request.user_id}")
-            else:
-                logger.error(f"MFA verification failed with status {response.status_code}")
-                raise HTTPException(
-                    status_code=401,
-                    detail="Codice MFA non valido. Verifica il codice e riprova."
-                )
+            logger.info(f"MFA completed successfully for user {request.user_id}")
                 
         except HTTPException:
             raise
