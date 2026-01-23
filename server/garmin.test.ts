@@ -38,7 +38,7 @@ describe("Garmin Integration", () => {
       expect(result).toEqual({ connected: false });
     });
 
-    it("returns connected: true with email when tokens exist", async () => {
+    it("returns connected: true with email when tokens exist (microservice fallback)", async () => {
       const mockTokens = [{
         garminEmail: "test@garmin.com",
         lastSyncAt: new Date("2024-01-15"),
@@ -54,9 +54,13 @@ describe("Garmin Integration", () => {
       const { getDb } = await import("./db");
       vi.mocked(getDb).mockResolvedValue(mockDb as any);
 
+      // Mock fetch to simulate microservice being unavailable (fallback scenario)
+      global.fetch = vi.fn().mockRejectedValue(new Error("Connection refused"));
+
       const { getGarminStatus } = await import("./garmin");
       const result = await getGarminStatus(1);
 
+      // When microservice fails, it falls back to local data
       expect(result.connected).toBe(true);
       expect(result.email).toBe("test@garmin.com");
       expect(result.lastSync).toEqual(new Date("2024-01-15"));

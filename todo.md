@@ -78,3 +78,9 @@
 - [x] Micro-interazioni feedback
 - [ ] Dark mode support
 
+## Bug Fix
+- [x] Verificare e correggere dialog login Garmin Connect
+- [x] Implementare microservizio Python per Garmin Connect
+- [x] Integrare microservizio con backend Node.js
+- [x] Test sincronizzazione attività Garmin
+
