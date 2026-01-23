@@ -286,8 +286,15 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
         logger.info(f"Attempting Garmin login for user {request.user_id}")
         
         # Attempt login
+        # Redirect stdin to avoid EOF error when MFA is required
+        import sys
+        from io import StringIO
+        old_stdin = sys.stdin
+        sys.stdin = StringIO()  # Empty stdin to catch MFA prompt
+        
         try:
             result = client.login()
+            sys.stdin = old_stdin  # Restore stdin
             
             # Check if MFA is required
             # When return_on_mfa=True, login() may return a tuple (status, mfa_state) if MFA is needed
@@ -310,10 +317,30 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
                         user_id=request.user_id,
                         mfa_required=True
                     )
+        except EOFError as eof_error:
+            # EOFError means MFA is required (trying to read from stdin)
+            sys.stdin = old_stdin  # Restore stdin
+            logger.info(f"MFA required for user {request.user_id} (EOFError caught)")
+            
+            # Store pending MFA session with client
+            pending_mfa[request.user_id] = {
+                "client": client,
+                "mfa_state": None,
+                "email": request.email,
+                "created_at": datetime.now()
+            }
+            
+            return LoginResponse(
+                success=False,
+                message="È richiesta l'autenticazione a due fattori (MFA). Controlla la tua email e inserisci il codice ricevuto.",
+                user_id=request.user_id,
+                mfa_required=True
+            )
         except Exception as login_error:
+            sys.stdin = old_stdin  # Restore stdin
             # Check if it's an MFA-related exception
             error_msg = str(login_error).lower()
-            if "mfa" in error_msg or "multi" in error_msg or "factor" in error_msg or "verification" in error_msg:
+            if "mfa" in error_msg or "multi" in error_msg or "factor" in error_msg or "verification" in error_msg or "eof" in error_msg:
                 logger.info(f"MFA required for user {request.user_id} (exception caught)")
                 
                 # Store pending MFA session with client
