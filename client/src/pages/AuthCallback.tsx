@@ -29,18 +29,28 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
+        console.log('[AuthCallback] Starting auth callback...');
+        
         // Ottieni la sessione da Supabase dopo il redirect
         const { data: { session }, error } = await supabase.auth.getSession();
+        console.log('[AuthCallback] Session result:', { session: !!session, error });
 
         if (error) {
           throw error;
         }
 
         if (!session) {
+          console.error('[AuthCallback] No session found!');
           throw new Error("Nessuna sessione trovata");
         }
 
         // Sincronizza l'utente con il backend
+        console.log('[AuthCallback] Syncing user with backend:', {
+          userId: session.user.id,
+          email: session.user.email,
+          name: session.user.user_metadata?.full_name || session.user.user_metadata?.name
+        });
+        
         syncSupabaseUserMutation.mutate({
           accessToken: session.access_token,
           user: {
