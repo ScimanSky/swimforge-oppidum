@@ -513,3 +513,54 @@ export async function updateWeeklyStats(userId: number, weekStart: Date, session
     });
   }
 }
+
+// Create OAuth user (Google, etc.)
+export async function createOAuthUser(data: {
+  email: string;
+  name: string | null;
+  supabaseId: string;
+  loginMethod: string;
+}): Promise<{ success: boolean; user?: User; error?: string }> {
+  const db = await getDb();
+  if (!db) {
+    return { success: false, error: "Database not available" };
+  }
+
+  try {
+    // Create user without password
+    const result = await db.insert(users).values({
+      email: data.email,
+      name: data.name || data.email.split('@')[0],
+      openId: data.supabaseId,
+      loginMethod: data.loginMethod,
+      lastSignedIn: new Date(),
+      passwordHash: null, // OAuth users don't have passwords
+    }).returning();
+
+    if (result.length === 0) {
+      return { success: false, error: "Failed to create OAuth user" };
+    }
+
+    const user = result[0];
+
+    // Create swimmer profile
+    await db.insert(swimmerProfiles).values({ userId: user.id });
+
+    return { success: true, user };
+  } catch (error) {
+    console.error("[Database] Failed to create OAuth user:", error);
+    return { success: false, error: "OAuth user creation failed" };
+  }
+}
+
+// Update user last signed in
+export async function updateUserLastSignedIn(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  
+  try {
+    await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, userId));
+  } catch (error) {
+    console.error("[Database] Failed to update last signed in:", error);
+  }
+}

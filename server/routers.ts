@@ -78,6 +78,54 @@ export const appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
+    
+    // Sync Supabase OAuth user
+    syncSupabaseUser: publicProcedure
+      .input(z.object({
+        accessToken: z.string(),
+        user: z.object({
+          id: z.string(),
+          email: z.string().email(),
+          name: z.string().nullable(),
+        }),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        // Verifica che l'utente esista o crealo
+        let user = await db.getUserByEmail(input.user.email);
+        
+        if (!user) {
+          // Crea nuovo utente da OAuth
+          const result = await db.createOAuthUser({
+            email: input.user.email,
+            name: input.user.name || null,
+            supabaseId: input.user.id,
+            loginMethod: 'google',
+          });
+          
+          if (!result.success || !result.user) {
+            throw new TRPCError({ 
+              code: "INTERNAL_SERVER_ERROR", 
+              message: "Failed to create user" 
+            });
+          }
+          
+          user = result.user;
+        } else {
+          // Aggiorna last signed in
+          await db.updateUserLastSignedIn(user.id);
+        }
+        
+        // Crea session token
+        const sessionToken = await sdk.createSessionToken(user.id.toString(), {
+          name: user.name || "",
+          expiresInMs: ONE_YEAR_MS,
+        });
+        
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        
+        return { success: true, user: { id: user.id, email: user.email, name: user.name } };
+      }),
   }),
 
   // Swimmer Profile
