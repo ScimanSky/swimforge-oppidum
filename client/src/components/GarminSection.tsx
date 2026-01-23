@@ -179,9 +179,15 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
                           required
                         />
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        Le tue credenziali sono crittografate e utilizzate solo per sincronizzare le attività.
-                      </p>
+                      <div className="text-xs text-muted-foreground space-y-2">
+                        <p>
+                          Le tue credenziali sono crittografate e utilizzate solo per sincronizzare le attività.
+                        </p>
+                        <p className="text-orange-600 dark:text-orange-400">
+                          <strong>Nota:</strong> Se hai l'autenticazione a due fattori (MFA) attiva su Garmin, 
+                          potrebbe essere necessario disabilitarla temporaneamente per il collegamento.
+                        </p>
+                      </div>
                       <Button
                         type="submit"
                         className="w-full bg-[var(--navy)] hover:bg-[var(--navy-light)]"

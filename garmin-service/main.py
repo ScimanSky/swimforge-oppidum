@@ -18,11 +18,11 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
-from garminconnect import Garmin, GarminConnectAuthenticationError, GarminConnectConnectionError
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -35,6 +35,10 @@ logger = logging.getLogger(__name__)
 # Configuration
 API_SECRET_KEY = os.getenv("GARMIN_SERVICE_SECRET", "swimforge-garmin-secret-key")
 MAIN_API_URL = os.getenv("MAIN_API_URL", "http://localhost:3000")
+TOKEN_STORE_DIR = Path(os.getenv("TOKEN_STORE_DIR", "/tmp/garmin_tokens"))
+
+# Ensure token store directory exists
+TOKEN_STORE_DIR.mkdir(parents=True, exist_ok=True)
 
 # In-memory session storage (for demo - use Redis in production)
 # Structure: {user_id: {"client": Garmin, "email": str, "last_sync": datetime}}
@@ -125,7 +129,38 @@ async def verify_api_key(x_api_key: str = Header(None)):
 
 
 # Helper functions
-def get_garmin_client(user_id: str) -> Optional[Garmin]:
+def get_token_path(user_id: str) -> Path:
+    """Get the token file path for a user"""
+    return TOKEN_STORE_DIR / f"{user_id}.json"
+
+
+def save_tokens(user_id: str, garth_client) -> bool:
+    """Save garth tokens to file"""
+    try:
+        token_path = get_token_path(user_id)
+        garth_client.dump(str(token_path))
+        logger.info(f"Tokens saved for user {user_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to save tokens for user {user_id}: {e}")
+        return False
+
+
+def load_tokens(user_id: str, garth_client) -> bool:
+    """Load garth tokens from file"""
+    try:
+        token_path = get_token_path(user_id)
+        if token_path.exists():
+            garth_client.load(str(token_path))
+            logger.info(f"Tokens loaded for user {user_id}")
+            return True
+        return False
+    except Exception as e:
+        logger.error(f"Failed to load tokens for user {user_id}: {e}")
+        return False
+
+
+def get_garmin_client(user_id: str):
     """Get existing Garmin client for user"""
     session = sessions.get(user_id)
     if session and session.get("client"):
@@ -208,17 +243,61 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
     try:
         logger.info(f"Attempting login for user {request.user_id}")
         
+        # Import here to catch import errors
+        try:
+            from garminconnect import Garmin, GarminConnectAuthenticationError, GarminConnectConnectionError
+        except ImportError as e:
+            logger.error(f"Failed to import garminconnect: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="Garmin Connect library not available. Please try again later."
+            )
+        
         # Create Garmin client
         client = Garmin(request.email, request.password)
         
-        # Attempt login
+        # Try to load existing tokens first
+        token_path = get_token_path(request.user_id)
+        if token_path.exists():
+            try:
+                client.garth.load(str(token_path))
+                # Verify tokens are still valid
+                client.display_name
+                logger.info(f"Loaded existing tokens for user {request.user_id}")
+                
+                # Store session
+                sessions[request.user_id] = {
+                    "client": client,
+                    "email": request.email,
+                    "display_name": client.display_name,
+                    "last_sync": None,
+                    "connected_at": datetime.now().isoformat()
+                }
+                
+                return LoginResponse(
+                    success=True,
+                    message="Successfully connected using saved tokens",
+                    user_id=request.user_id
+                )
+            except Exception as e:
+                logger.info(f"Saved tokens invalid, performing fresh login: {e}")
+                # Delete invalid tokens
+                token_path.unlink(missing_ok=True)
+        
+        # Attempt fresh login
         client.login()
+        
+        # Save tokens for future use
+        try:
+            client.garth.dump(str(token_path))
+            logger.info(f"Saved tokens for user {request.user_id}")
+        except Exception as e:
+            logger.warning(f"Could not save tokens: {e}")
         
         # Get user profile for display name
         try:
-            profile = client.get_full_name()
-            display_name = profile if isinstance(profile, str) else None
-        except:
+            display_name = client.display_name
+        except Exception:
             display_name = None
         
         # Store session
@@ -238,24 +317,36 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
             user_id=request.user_id
         )
         
-    except GarminConnectAuthenticationError as e:
-        logger.error(f"Authentication failed for user {request.user_id}: {e}")
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid Garmin credentials. Please check your email and password."
-        )
-    except GarminConnectConnectionError as e:
-        logger.error(f"Connection error for user {request.user_id}: {e}")
-        raise HTTPException(
-            status_code=503,
-            detail="Unable to connect to Garmin. Please try again later."
-        )
     except Exception as e:
-        logger.error(f"Unexpected error during login for user {request.user_id}: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"An error occurred: {str(e)}"
-        )
+        error_msg = str(e)
+        logger.error(f"Login error for user {request.user_id}: {error_msg}")
+        
+        # Handle specific error types
+        if "GarminConnectAuthenticationError" in str(type(e).__name__) or "401" in error_msg or "Unauthorized" in error_msg:
+            raise HTTPException(
+                status_code=401,
+                detail="Credenziali Garmin non valide. Verifica email e password."
+            )
+        elif "GarminConnectConnectionError" in str(type(e).__name__):
+            raise HTTPException(
+                status_code=503,
+                detail="Impossibile connettersi a Garmin. Riprova più tardi."
+            )
+        elif "MFA" in error_msg or "OAuth1 token" in error_msg:
+            raise HTTPException(
+                status_code=400,
+                detail="Il tuo account Garmin ha l'autenticazione a due fattori (MFA) attiva. Per usare SwimForge, disabilita temporaneamente MFA nelle impostazioni di Garmin Connect, collega l'account, poi riattiva MFA."
+            )
+        elif "'str' object has no attribute" in error_msg:
+            raise HTTPException(
+                status_code=500,
+                detail="Errore di autenticazione Garmin. Questo può essere causato da MFA attivo o da un problema temporaneo. Prova a disabilitare MFA o riprova più tardi."
+            )
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Errore durante il collegamento: {error_msg}"
+            )
 
 
 @app.post("/auth/logout")
@@ -266,9 +357,12 @@ async def logout(user_id: str, api_key: str = Depends(verify_api_key)):
     if user_id in sessions:
         del sessions[user_id]
         logger.info(f"Logged out user {user_id}")
-        return {"success": True, "message": "Successfully disconnected"}
     
-    return {"success": True, "message": "No active session found"}
+    # Delete stored tokens
+    token_path = get_token_path(user_id)
+    token_path.unlink(missing_ok=True)
+    
+    return {"success": True, "message": "Successfully disconnected"}
 
 
 @app.get("/auth/status/{user_id}", response_model=StatusResponse)
@@ -279,6 +373,15 @@ async def get_status(user_id: str, api_key: str = Depends(verify_api_key)):
     session = sessions.get(user_id)
     
     if not session or not session.get("client"):
+        # Check if we have stored tokens
+        token_path = get_token_path(user_id)
+        if token_path.exists():
+            return StatusResponse(
+                connected=True,
+                email=None,
+                last_sync=None,
+                display_name="(Token salvato)"
+            )
         return StatusResponse(connected=False)
     
     return StatusResponse(
@@ -309,7 +412,6 @@ async def get_swimming_activities(
     try:
         # Get activities
         start_date = datetime.now() - timedelta(days=days_back)
-        end_date = datetime.now()
         
         # Fetch activities (limit to 100)
         activities = client.get_activities(0, 100)
@@ -325,7 +427,7 @@ async def get_swimming_activities(
                         act_dt = datetime.fromisoformat(activity_date.replace("Z", "+00:00"))
                         if act_dt.replace(tzinfo=None) >= start_date:
                             swimming_activities.append(parse_swimming_activity(activity))
-                    except:
+                    except Exception:
                         swimming_activities.append(parse_swimming_activity(activity))
         
         logger.info(f"Found {len(swimming_activities)} swimming activities for user {user_id}")
@@ -336,14 +438,6 @@ async def get_swimming_activities(
             "activities": [a.model_dump() for a in swimming_activities]
         }
         
-    except GarminConnectAuthenticationError:
-        # Session expired, remove it
-        if user_id in sessions:
-            del sessions[user_id]
-        raise HTTPException(
-            status_code=401,
-            detail="Session expired. Please login again."
-        )
     except Exception as e:
         logger.error(f"Error fetching activities for user {user_id}: {e}")
         raise HTTPException(
@@ -355,7 +449,7 @@ async def get_swimming_activities(
 @app.post("/sync", response_model=SyncResponse)
 async def sync_activities(request: SyncRequest, api_key: str = Depends(verify_api_key)):
     """
-    Sync swimming activities from Garmin to SwimForge
+    Sync swimming activities from Garmin Connect
     """
     client = get_garmin_client(request.user_id)
     
@@ -366,44 +460,28 @@ async def sync_activities(request: SyncRequest, api_key: str = Depends(verify_ap
         )
     
     try:
-        # Get activities
-        activities = client.get_activities(0, 100)
-        
-        # Filter for swimming activities within date range
-        start_date = datetime.now() - timedelta(days=request.days_back)
-        swimming_activities = []
-        
-        for activity in activities:
-            if is_swimming_activity(activity):
-                activity_date = activity.get("startTimeLocal", "")
-                if activity_date:
-                    try:
-                        act_dt = datetime.fromisoformat(activity_date.replace("Z", "+00:00"))
-                        if act_dt.replace(tzinfo=None) >= start_date:
-                            swimming_activities.append(parse_swimming_activity(activity))
-                    except:
-                        swimming_activities.append(parse_swimming_activity(activity))
+        # Get swimming activities
+        result = await get_swimming_activities(
+            request.user_id,
+            request.days_back,
+            api_key
+        )
         
         # Update last sync time
         if request.user_id in sessions:
             sessions[request.user_id]["last_sync"] = datetime.now().isoformat()
         
-        logger.info(f"Synced {len(swimming_activities)} activities for user {request.user_id}")
+        activities = [SwimmingActivity(**a) for a in result["activities"]]
         
         return SyncResponse(
             success=True,
-            synced_count=len(swimming_activities),
-            activities=swimming_activities,
-            message=f"Successfully synced {len(swimming_activities)} swimming activities"
+            synced_count=len(activities),
+            activities=activities,
+            message=f"Synced {len(activities)} swimming activities"
         )
         
-    except GarminConnectAuthenticationError:
-        if request.user_id in sessions:
-            del sessions[request.user_id]
-        raise HTTPException(
-            status_code=401,
-            detail="Session expired. Please login again."
-        )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error syncing activities for user {request.user_id}: {e}")
         raise HTTPException(
@@ -414,5 +492,4 @@ async def sync_activities(request: SyncRequest, api_key: str = Depends(verify_ap
 
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

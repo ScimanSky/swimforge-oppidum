@@ -84,4 +84,5 @@
 - [x] Integrare microservizio con backend Node.js
 - [x] Test sincronizzazione attività Garmin
 - [x] Fix errore React setState durante rendering in Profile (e altri componenti)
+- [x] Fix errore Garmin 'str' object has no attribute 'expired' (aggiornato microservizio e messaggi utente)
 
