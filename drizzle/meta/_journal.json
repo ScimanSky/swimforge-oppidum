@@ -1,5 +1,27 @@
 {
   "version": "7",
   "dialect": "mysql",
-  "entries": []
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1769165358223,
+      "tag": "0000_early_thena",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1769165513956,
+      "tag": "0001_unusual_quasimodo",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1769166233381,
+      "tag": "0002_gray_human_robot",
+      "breakpoints": true
+    }
+  ]
 }
