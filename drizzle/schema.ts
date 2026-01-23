@@ -1,135 +1,144 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, boolean, json } from "drizzle-orm/mysql-core";
+import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean, json, serial } from "drizzle-orm/pg-core";
+
+// ============================================
+// ENUMS for PostgreSQL
+// ============================================
+export const roleEnum = pgEnum("role", ["user", "admin"]);
+export const strokeTypeEnum = pgEnum("stroke_type", ["freestyle", "backstroke", "breaststroke", "butterfly", "mixed"]);
+export const badgeCategoryEnum = pgEnum("badge_category", ["distance", "session", "consistency", "open_water", "special", "milestone"]);
+export const badgeRarityEnum = pgEnum("badge_rarity", ["common", "uncommon", "rare", "epic", "legendary"]);
+export const xpReasonEnum = pgEnum("xp_reason", ["activity", "badge", "bonus", "streak", "record", "level_up"]);
 
 // ============================================
 // USERS TABLE (Core auth)
 // ============================================
-export const users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  openId: varchar("open_id", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
-  loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  loginMethod: varchar("login_method", { length: 64 }),
+  role: roleEnum("role").default("user").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  lastSignedIn: timestamp("last_signed_in").defaultNow().notNull(),
 });
 
 // ============================================
 // SWIMMER PROFILES (Extended user data)
 // ============================================
-export const swimmerProfiles = mysqlTable("swimmer_profiles", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().unique(),
-  avatarUrl: text("avatarUrl"),
-  level: int("level").default(1).notNull(),
-  totalXp: int("totalXp").default(0).notNull(),
-  currentLevelXp: int("currentLevelXp").default(0).notNull(),
-  totalDistanceMeters: int("totalDistanceMeters").default(0).notNull(),
-  totalTimeSeconds: int("totalTimeSeconds").default(0).notNull(),
-  totalSessions: int("totalSessions").default(0).notNull(),
-  totalOpenWaterSessions: int("totalOpenWaterSessions").default(0).notNull(),
-  totalOpenWaterMeters: int("totalOpenWaterMeters").default(0).notNull(),
-  garminConnected: boolean("garminConnected").default(false).notNull(),
-  garminTokenEncrypted: text("garminTokenEncrypted"),
-  garminLastSync: timestamp("garminLastSync"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+export const swimmerProfiles = pgTable("swimmer_profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  avatarUrl: text("avatar_url"),
+  level: integer("level").default(1).notNull(),
+  totalXp: integer("total_xp").default(0).notNull(),
+  currentLevelXp: integer("current_level_xp").default(0).notNull(),
+  totalDistanceMeters: integer("total_distance_meters").default(0).notNull(),
+  totalTimeSeconds: integer("total_time_seconds").default(0).notNull(),
+  totalSessions: integer("total_sessions").default(0).notNull(),
+  totalOpenWaterSessions: integer("total_open_water_sessions").default(0).notNull(),
+  totalOpenWaterMeters: integer("total_open_water_meters").default(0).notNull(),
+  garminConnected: boolean("garmin_connected").default(false).notNull(),
+  garminTokenEncrypted: text("garmin_token_encrypted"),
+  garminLastSync: timestamp("garmin_last_sync"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // ============================================
 // SWIMMING ACTIVITIES
 // ============================================
-export const swimmingActivities = mysqlTable("swimming_activities", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  garminActivityId: varchar("garminActivityId", { length: 64 }),
-  activityDate: timestamp("activityDate").notNull(),
-  distanceMeters: int("distanceMeters").notNull(),
-  durationSeconds: int("durationSeconds").notNull(),
-  poolLengthMeters: int("poolLengthMeters").default(25),
-  strokeType: mysqlEnum("strokeType", ["freestyle", "backstroke", "breaststroke", "butterfly", "mixed"]).default("mixed"),
-  avgPacePer100m: int("avgPacePer100m"),
-  calories: int("calories"),
-  avgHeartRate: int("avgHeartRate"),
-  maxHeartRate: int("maxHeartRate"),
-  swolfScore: int("swolfScore"),
-  lapsCount: int("lapsCount"),
-  isOpenWater: boolean("isOpenWater").default(false).notNull(),
+export const swimmingActivities = pgTable("swimming_activities", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  garminActivityId: varchar("garmin_activity_id", { length: 64 }),
+  activityDate: timestamp("activity_date").notNull(),
+  distanceMeters: integer("distance_meters").notNull(),
+  durationSeconds: integer("duration_seconds").notNull(),
+  poolLengthMeters: integer("pool_length_meters").default(25),
+  strokeType: strokeTypeEnum("stroke_type").default("mixed"),
+  avgPacePer100m: integer("avg_pace_per_100m"),
+  calories: integer("calories"),
+  avgHeartRate: integer("avg_heart_rate"),
+  maxHeartRate: integer("max_heart_rate"),
+  swolfScore: integer("swolf_score"),
+  lapsCount: integer("laps_count"),
+  isOpenWater: boolean("is_open_water").default(false).notNull(),
   location: text("location"),
-  xpEarned: int("xpEarned").default(0).notNull(),
+  xpEarned: integer("xp_earned").default(0).notNull(),
   notes: text("notes"),
-  rawData: json("rawData"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  rawData: json("raw_data"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // ============================================
 // BADGE DEFINITIONS
 // ============================================
-export const badgeDefinitions = mysqlTable("badge_definitions", {
-  id: int("id").autoincrement().primaryKey(),
+export const badgeDefinitions = pgTable("badge_definitions", {
+  id: serial("id").primaryKey(),
   code: varchar("code", { length: 64 }).notNull().unique(),
   name: varchar("name", { length: 128 }).notNull(),
   description: text("description").notNull(),
-  category: mysqlEnum("category", ["distance", "session", "consistency", "open_water", "special", "milestone"]).notNull(),
-  iconName: varchar("iconName", { length: 64 }).notNull(),
-  colorPrimary: varchar("colorPrimary", { length: 16 }).default("#1e3a5f"),
-  colorSecondary: varchar("colorSecondary", { length: 16 }).default("#3b82f6"),
-  requirementType: varchar("requirementType", { length: 64 }).notNull(),
-  requirementValue: int("requirementValue").notNull(),
-  requirementExtra: json("requirementExtra"),
-  xpReward: int("xpReward").default(100).notNull(),
-  rarity: mysqlEnum("rarity", ["common", "uncommon", "rare", "epic", "legendary"]).default("common").notNull(),
-  soundEffect: varchar("soundEffect", { length: 64 }).default("badge_unlock"),
-  sortOrder: int("sortOrder").default(0).notNull(),
-  isActive: boolean("isActive").default(true).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  category: badgeCategoryEnum("category").notNull(),
+  iconName: varchar("icon_name", { length: 64 }).notNull(),
+  colorPrimary: varchar("color_primary", { length: 16 }).default("#1e3a5f"),
+  colorSecondary: varchar("color_secondary", { length: 16 }).default("#3b82f6"),
+  requirementType: varchar("requirement_type", { length: 64 }).notNull(),
+  requirementValue: integer("requirement_value").notNull(),
+  requirementExtra: json("requirement_extra"),
+  xpReward: integer("xp_reward").default(100).notNull(),
+  rarity: badgeRarityEnum("rarity").default("common").notNull(),
+  soundEffect: varchar("sound_effect", { length: 64 }).default("badge_unlock"),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // ============================================
 // USER BADGES (Earned)
 // ============================================
-export const userBadges = mysqlTable("user_badges", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  badgeId: int("badgeId").notNull(),
-  earnedAt: timestamp("earnedAt").defaultNow().notNull(),
-  activityId: int("activityId"),
+export const userBadges = pgTable("user_badges", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  badgeId: integer("badge_id").notNull(),
+  earnedAt: timestamp("earned_at").defaultNow().notNull(),
+  activityId: integer("activity_id"),
 });
 
 // ============================================
 // XP TRANSACTIONS (Audit log)
 // ============================================
-export const xpTransactions = mysqlTable("xp_transactions", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  amount: int("amount").notNull(),
-  reason: mysqlEnum("reason", ["activity", "badge", "bonus", "streak", "record", "level_up"]).notNull(),
-  referenceId: int("referenceId"),
+export const xpTransactions = pgTable("xp_transactions", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  amount: integer("amount").notNull(),
+  reason: xpReasonEnum("reason").notNull(),
+  referenceId: integer("reference_id"),
   description: text("description"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // ============================================
 // PERSONAL RECORDS
 // ============================================
-export const personalRecords = mysqlTable("personal_records", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  recordType: varchar("recordType", { length: 64 }).notNull(),
-  value: int("value").notNull(),
-  strokeType: mysqlEnum("strokeType", ["freestyle", "backstroke", "breaststroke", "butterfly", "mixed"]),
-  activityId: int("activityId"),
-  achievedAt: timestamp("achievedAt").defaultNow().notNull(),
-  previousValue: int("previousValue"),
+export const personalRecords = pgTable("personal_records", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  recordType: varchar("record_type", { length: 64 }).notNull(),
+  value: integer("value").notNull(),
+  strokeType: strokeTypeEnum("stroke_type"),
+  activityId: integer("activity_id"),
+  achievedAt: timestamp("achieved_at").defaultNow().notNull(),
+  previousValue: integer("previous_value"),
 });
 
 // ============================================
 // LEVEL THRESHOLDS
 // ============================================
-export const levelThresholds = mysqlTable("level_thresholds", {
-  level: int("level").primaryKey(),
-  xpRequired: int("xpRequired").notNull(),
+export const levelThresholds = pgTable("level_thresholds", {
+  level: integer("level").primaryKey(),
+  xpRequired: integer("xp_required").notNull(),
   title: varchar("title", { length: 64 }).notNull(),
   color: varchar("color", { length: 16 }).default("#3b82f6"),
 });
@@ -137,30 +146,30 @@ export const levelThresholds = mysqlTable("level_thresholds", {
 // ============================================
 // GARMIN TOKENS
 // ============================================
-export const garminTokens = mysqlTable("garmin_tokens", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().unique(),
-  garminEmail: varchar("garminEmail", { length: 320 }),
-  oauth1Token: text("oauth1Token"),
-  oauth2Token: text("oauth2Token"),
-  tokenExpiresAt: timestamp("tokenExpiresAt"),
-  lastSyncAt: timestamp("lastSyncAt"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+export const garminTokens = pgTable("garmin_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  garminEmail: varchar("garmin_email", { length: 320 }),
+  oauth1Token: text("oauth1_token"),
+  oauth2Token: text("oauth2_token"),
+  tokenExpiresAt: timestamp("token_expires_at"),
+  lastSyncAt: timestamp("last_sync_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // ============================================
 // WEEKLY STATS (for tracking weekly goals)
 // ============================================
-export const weeklyStats = mysqlTable("weekly_stats", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  weekStart: timestamp("weekStart").notNull(),
-  sessionsCount: int("sessionsCount").default(0).notNull(),
-  totalDistanceMeters: int("totalDistanceMeters").default(0).notNull(),
-  totalTimeSeconds: int("totalTimeSeconds").default(0).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+export const weeklyStats = pgTable("weekly_stats", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  weekStart: timestamp("week_start").notNull(),
+  sessionsCount: integer("sessions_count").default(0).notNull(),
+  totalDistanceMeters: integer("total_distance_meters").default(0).notNull(),
+  totalTimeSeconds: integer("total_time_seconds").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Type exports

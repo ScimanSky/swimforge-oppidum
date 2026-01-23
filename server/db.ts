@@ -1,5 +1,6 @@
 import { eq, desc, and, gte, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import { 
   InsertUser, users, 
   swimmerProfiles, InsertSwimmerProfile,
@@ -14,11 +15,16 @@ import {
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: Pool | null = null;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }
+      });
+      _db = drizzle(_pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -78,7 +84,11 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+    // PostgreSQL upsert using ON CONFLICT
+    await db.insert(users).values(values).onConflictDoUpdate({
+      target: users.openId,
+      set: updateSet
+    });
     
     // Create swimmer profile if not exists
     const existingUser = await db.select().from(users).where(eq(users.openId, user.openId)).limit(1);
@@ -123,28 +133,28 @@ export async function getLeaderboard(orderBy: 'level' | 'totalXp' | 'badges' = '
   if (!db) return [];
   
   if (orderBy === 'badges') {
-    // Use subquery for badge count to avoid GROUP BY issues with MySQL ONLY_FULL_GROUP_BY
+    // Use subquery for badge count
     const result = await db.execute(sql`
       SELECT 
         sp.id,
-        sp.userId,
+        sp.user_id as "userId",
         sp.level,
-        sp.totalXp,
-        sp.totalDistanceMeters,
-        sp.totalTimeSeconds,
-        sp.totalSessions,
-        sp.garminConnected,
-        sp.createdAt,
-        sp.updatedAt,
+        sp.total_xp as "totalXp",
+        sp.total_distance_meters as "totalDistanceMeters",
+        sp.total_time_seconds as "totalTimeSeconds",
+        sp.total_sessions as "totalSessions",
+        sp.garmin_connected as "garminConnected",
+        sp.created_at as "createdAt",
+        sp.updated_at as "updatedAt",
         u.name,
         u.email,
-        COALESCE((SELECT COUNT(*) FROM user_badges WHERE userId = sp.userId), 0) as badgeCount
+        COALESCE((SELECT COUNT(*) FROM user_badges WHERE user_id = sp.user_id), 0) as "badgeCount"
       FROM swimmer_profiles sp
-      JOIN users u ON sp.userId = u.id
-      ORDER BY badgeCount DESC, sp.totalXp DESC
+      JOIN users u ON sp.user_id = u.id
+      ORDER BY "badgeCount" DESC, sp.total_xp DESC
       LIMIT ${limit}
     `);
-    return (result as unknown as any[][])[0] || [];
+    return result.rows || [];
   }
   
   const orderColumn = orderBy === 'level' ? swimmerProfiles.level : swimmerProfiles.totalXp;
@@ -166,8 +176,8 @@ export async function getLeaderboard(orderBy: 'level' | 'totalXp' | 'badges' = '
 export async function createActivity(data: InsertSwimmingActivity) {
   const db = await getDb();
   if (!db) return null;
-  const result = await db.insert(swimmingActivities).values(data);
-  return result[0].insertId;
+  const result = await db.insert(swimmingActivities).values(data).returning({ id: swimmingActivities.id });
+  return result[0]?.id || null;
 }
 
 export async function getActivities(userId: number, limit = 20, offset = 0) {
@@ -246,22 +256,22 @@ export async function hasUserBadge(userId: number, badgeId: number) {
 export async function awardBadge(data: InsertUserBadge) {
   const db = await getDb();
   if (!db) return null;
-  const result = await db.insert(userBadges).values(data);
-  return result[0].insertId;
+  const result = await db.insert(userBadges).values(data).returning({ id: userBadges.id });
+  return result[0]?.id || null;
 }
 
 export async function createBadgeDefinition(data: InsertBadgeDefinition) {
   const db = await getDb();
   if (!db) return null;
-  const result = await db.insert(badgeDefinitions).values(data);
-  return result[0].insertId;
+  const result = await db.insert(badgeDefinitions).values(data).returning({ id: badgeDefinitions.id });
+  return result[0]?.id || null;
 }
 
 export async function getBadgeDefinitionsCount() {
   const db = await getDb();
   if (!db) return 0;
   const result = await db.select({ count: sql<number>`count(*)` }).from(badgeDefinitions);
-  return result[0]?.count || 0;
+  return Number(result[0]?.count) || 0;
 }
 
 // ============================================
@@ -270,8 +280,8 @@ export async function getBadgeDefinitionsCount() {
 export async function createXpTransaction(data: InsertXpTransaction) {
   const db = await getDb();
   if (!db) return null;
-  const result = await db.insert(xpTransactions).values(data);
-  return result[0].insertId;
+  const result = await db.insert(xpTransactions).values(data).returning({ id: xpTransactions.id });
+  return result[0]?.id || null;
 }
 
 export async function getXpTransactions(userId: number, limit = 20) {
@@ -328,8 +338,8 @@ export async function upsertPersonalRecord(data: InsertPersonalRecord) {
     }).where(eq(personalRecords.id, existing.id));
     return existing.id;
   } else {
-    const result = await db.insert(personalRecords).values(data);
-    return result[0].insertId;
+    const result = await db.insert(personalRecords).values(data).returning({ id: personalRecords.id });
+    return result[0]?.id || null;
   }
 }
 
@@ -372,7 +382,9 @@ export async function getNextLevelThreshold(currentLevel: number) {
 export async function createLevelThreshold(level: number, xpRequired: number, title: string, color: string) {
   const db = await getDb();
   if (!db) return;
-  await db.insert(levelThresholds).values({ level, xpRequired, title, color }).onDuplicateKeyUpdate({
+  // PostgreSQL upsert
+  await db.insert(levelThresholds).values({ level, xpRequired, title, color }).onConflictDoUpdate({
+    target: levelThresholds.level,
     set: { xpRequired, title, color }
   });
 }

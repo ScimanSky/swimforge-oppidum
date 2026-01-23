@@ -3,7 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
 import {
   Trophy,
@@ -14,15 +14,37 @@ import {
   Award,
   TrendingUp,
 } from "lucide-react";
-import { useLocation, Link, Redirect } from "wouter";
+import { Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import { useState } from "react";
 
 type OrderBy = "level" | "totalXp" | "badges";
 
+// Helper to normalize leaderboard entry data from different query formats
+interface NormalizedEntry {
+  id: number;
+  userId: string;
+  userName: string;
+  level: number;
+  totalXp: number;
+  badgeCount?: number;
+}
+
+function normalizeEntry(entry: any): NormalizedEntry {
+  // Handle both formats: { profile: {...}, userName } and flat { userId, name, level, ... }
+  const profile = entry.profile || entry;
+  return {
+    id: profile.id || entry.id || 0,
+    userId: profile.userId || entry.userId || "",
+    userName: entry.userName || entry.name || "Nuotatore",
+    level: profile.level || entry.level || 1,
+    totalXp: profile.totalXp || entry.totalXp || 0,
+    badgeCount: entry.badgeCount || 0,
+  };
+}
+
 export default function Leaderboard() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
-  const [, setLocation] = useLocation();
   const [orderBy, setOrderBy] = useState<OrderBy>("totalXp");
 
   const { data: leaderboard, isLoading } = trpc.leaderboard.get.useQuery(
@@ -30,24 +52,10 @@ export default function Leaderboard() {
     { enabled: isAuthenticated }
   );
 
-  // Redirect if not authenticated - use Redirect component instead of setLocation during render
+  // Redirect if not authenticated
   if (!authLoading && !isAuthenticated) {
     return <Redirect to="/" />;
   }
-
-  // Get medal color for position
-  const getMedalColor = (position: number) => {
-    switch (position) {
-      case 1:
-        return "text-yellow-500";
-      case 2:
-        return "text-gray-400";
-      case 3:
-        return "text-amber-600";
-      default:
-        return "text-muted-foreground";
-    }
-  };
 
   // Get medal icon for position
   const getMedalIcon = (position: number) => {
@@ -68,15 +76,18 @@ export default function Leaderboard() {
   };
 
   // Format value based on orderBy
-  const formatValue = (entry: any) => {
+  const formatValue = (entry: NormalizedEntry): string => {
     if (orderBy === "badges") {
       return `${entry.badgeCount || 0} badge`;
     }
     if (orderBy === "level") {
-      return `Lv. ${entry.profile?.level || entry.level || 1}`;
+      return `Lv. ${entry.level}`;
     }
-    return `${(entry.profile?.totalXp || entry.totalXp || 0).toLocaleString()} XP`;
+    return `${entry.totalXp.toLocaleString()} XP`;
   };
+
+  // Normalize all entries
+  const normalizedLeaderboard = leaderboard?.map(normalizeEntry) || [];
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -126,7 +137,7 @@ export default function Leaderboard() {
         ) : (
           <div className="space-y-3">
             {/* Top 3 Podium */}
-            {leaderboard && leaderboard.length >= 3 && (
+            {normalizedLeaderboard.length >= 3 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -138,10 +149,10 @@ export default function Leaderboard() {
                     <span className="text-2xl font-bold text-gray-600">2</span>
                   </div>
                   <p className="text-sm font-medium text-center truncate w-full">
-                    {leaderboard[1]?.userName || "Nuotatore"}
+                    {normalizedLeaderboard[1]?.userName || "Nuotatore"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {formatValue(leaderboard[1])}
+                    {normalizedLeaderboard[1] ? formatValue(normalizedLeaderboard[1]) : "—"}
                   </p>
                 </div>
 
@@ -152,10 +163,10 @@ export default function Leaderboard() {
                     <span className="text-3xl font-bold text-white">1</span>
                   </div>
                   <p className="text-sm font-bold text-center truncate w-full">
-                    {leaderboard[0]?.userName || "Nuotatore"}
+                    {normalizedLeaderboard[0]?.userName || "Nuotatore"}
                   </p>
                   <p className="text-xs text-[var(--gold)] font-semibold">
-                    {formatValue(leaderboard[0])}
+                    {normalizedLeaderboard[0] ? formatValue(normalizedLeaderboard[0]) : "—"}
                   </p>
                 </div>
 
@@ -165,24 +176,23 @@ export default function Leaderboard() {
                     <span className="text-xl font-bold text-amber-700">3</span>
                   </div>
                   <p className="text-sm font-medium text-center truncate w-full">
-                    {leaderboard[2]?.userName || "Nuotatore"}
+                    {normalizedLeaderboard[2]?.userName || "Nuotatore"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {formatValue(leaderboard[2])}
+                    {normalizedLeaderboard[2] ? formatValue(normalizedLeaderboard[2]) : "—"}
                   </p>
                 </div>
               </motion.div>
             )}
 
             {/* Rest of the list */}
-            {leaderboard?.slice(3).map((entry, index) => {
+            {normalizedLeaderboard.slice(3).map((entry, index) => {
               const position = index + 4;
-              const isCurrentUser = entry.profile?.userId === user?.id;
-              const profile = entry.profile || entry;
+              const isCurrentUser = String(entry.userId) === String(user?.id);
 
               return (
                 <motion.div
-                  key={profile.id || index}
+                  key={entry.id || index}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 }}
@@ -197,22 +207,19 @@ export default function Leaderboard() {
 
                         {/* Avatar */}
                         <div 
-                          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
-                          style={{ 
-                            backgroundColor: profile.levelColor || (profile as any).profile?.levelColor || "#3b82f6" 
-                          }}
+                          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold bg-[var(--azure)]"
                         >
-                          {(entry.userName || "N")[0].toUpperCase()}
+                          {entry.userName[0].toUpperCase()}
                         </div>
 
                         {/* Name & Level */}
                         <div className="flex-1 min-w-0">
                           <p className={`font-medium truncate ${isCurrentUser ? "text-[var(--azure)]" : "text-card-foreground"}`}>
-                            {entry.userName || "Nuotatore"}
+                            {entry.userName}
                             {isCurrentUser && " (Tu)"}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Livello {profile.level || 1}
+                            Livello {entry.level}
                           </p>
                         </div>
 
@@ -229,7 +236,7 @@ export default function Leaderboard() {
               );
             })}
 
-            {(!leaderboard || leaderboard.length === 0) && (
+            {normalizedLeaderboard.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
                 <Trophy className="h-12 w-12 mx-auto mb-4 opacity-30" />
                 <p>Nessun nuotatore in classifica</p>

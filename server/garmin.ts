@@ -189,7 +189,8 @@ export async function connectGarmin(
       }),
       oauth2Token: null,
       tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-    }).onDuplicateKeyUpdate({
+    }).onConflictDoUpdate({
+      target: garminTokens.userId,
       set: {
         garminEmail: email,
         oauth1Token: JSON.stringify({ 
@@ -254,7 +255,8 @@ export async function completeMfa(
       }),
       oauth2Token: null,
       tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-    }).onDuplicateKeyUpdate({
+    }).onConflictDoUpdate({
+      target: garminTokens.userId,
       set: {
         garminEmail: email,
         oauth1Token: JSON.stringify({ 

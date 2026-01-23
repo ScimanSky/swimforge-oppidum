@@ -109,3 +109,16 @@
 - [x] Creare icone SVG per badge Traguardi (7 badge)
 - [x] Integrare le nuove icone nella pagina Badge
 
+## Deploy
+- [x] Push codice su GitHub
+- [ ] Deploy frontend su Vercel
+- [ ] Deploy microservizio Python su Render
+- [ ] Configurazione variabili ambiente
+
+## Migrazione a PostgreSQL (Supabase)
+- [ ] Modificare schema.ts per PostgreSQL
+- [ ] Modificare db.ts per PostgreSQL
+- [ ] Aggiornare dipendenze (pg invece di mysql2)
+- [ ] Push su GitHub
+- [ ] Deploy su Vercel
+
