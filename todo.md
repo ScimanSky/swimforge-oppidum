@@ -96,3 +96,7 @@
 - [x] Feedback sonoro per badge e level-up
 - [x] Card con effetti glassmorphism e bordi luminosi
 
+## Bug Fix UI
+- [x] Correggere forma badge da ovale a circolare
+- [x] Correggere testo badge troncato/illeggibile
+

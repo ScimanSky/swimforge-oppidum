@@ -1,7 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -21,7 +20,6 @@ import {
   Compass,
   Anchor,
   Lock,
-  Check,
   ChevronLeft,
   Sparkles,
 } from "lucide-react";
@@ -81,31 +79,36 @@ const rarityLabels: Record<string, string> = {
   legendary: "Leggendario",
 };
 
-const rarityColors: Record<string, { border: string; glow: string; bg: string }> = {
+const rarityColors: Record<string, { border: string; glow: string; bg: string; text: string }> = {
   common: {
     border: "oklch(0.5 0.03 250)",
     glow: "oklch(0.5 0.03 250 / 0.3)",
     bg: "oklch(0.22 0.03 250)",
+    text: "oklch(0.65 0.03 250)",
   },
   uncommon: {
     border: "oklch(0.70 0.20 145)",
     glow: "oklch(0.70 0.20 145 / 0.5)",
     bg: "oklch(0.25 0.08 145 / 0.3)",
+    text: "oklch(0.70 0.20 145)",
   },
   rare: {
     border: "oklch(0.70 0.18 220)",
     glow: "oklch(0.70 0.18 220 / 0.6)",
     bg: "oklch(0.25 0.08 220 / 0.3)",
+    text: "oklch(0.70 0.18 220)",
   },
   epic: {
     border: "oklch(0.65 0.22 300)",
     glow: "oklch(0.65 0.22 300 / 0.6)",
     bg: "oklch(0.25 0.10 300 / 0.3)",
+    text: "oklch(0.65 0.22 300)",
   },
   legendary: {
     border: "oklch(0.85 0.18 85)",
     glow: "oklch(0.85 0.18 85 / 0.7)",
     bg: "oklch(0.30 0.10 85 / 0.3)",
+    text: "oklch(0.85 0.18 85)",
   },
 };
 
@@ -222,17 +225,20 @@ export default function Badges() {
           </div>
         </div>
 
-        {/* Badge Grid */}
+        {/* Badge Grid - Fixed layout with proper sizing */}
         {isLoading ? (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
             {[...Array(12)].map((_, i) => (
-              <Skeleton key={i} className="aspect-square rounded-xl bg-[oklch(0.20_0.03_250)]" />
+              <div key={i} className="flex flex-col items-center gap-3">
+                <Skeleton className="w-20 h-20 rounded-full bg-[oklch(0.20_0.03_250)]" />
+                <Skeleton className="h-4 w-24 bg-[oklch(0.20_0.03_250)]" />
+              </div>
             ))}
           </div>
         ) : (
           <motion.div 
             layout
-            className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4"
+            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"
           >
             <AnimatePresence mode="popLayout">
               {filteredBadges?.map((badge) => {
@@ -250,65 +256,83 @@ export default function Badges() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => handleBadgeClick(badge)}
-                    className="cursor-pointer"
+                    className="cursor-pointer flex flex-col items-center"
                   >
-                    <div className={`badge-container ${isEarned ? `badge-${badge.rarity}` : 'badge-locked'}`}>
-                      <div 
-                        className="badge-frame"
-                        style={isEarned ? {
-                          boxShadow: `0 0 20px ${colors.glow}`,
-                          background: `linear-gradient(135deg, ${colors.bg} 0%, oklch(0.16 0.035 250) 100%)`,
-                        } : {}}
-                      >
-                        {/* Gradient Border */}
-                        {isEarned && (
-                          <div 
-                            className="absolute inset-[-3px] rounded-full"
-                            style={{
-                              background: `linear-gradient(135deg, ${colors.border} 0%, ${colors.border}80 100%)`,
-                              padding: '3px',
-                              WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                              WebkitMaskComposite: 'xor',
-                              maskComposite: 'exclude',
+                    {/* Badge Circle - Fixed size, perfectly round */}
+                    <div 
+                      className="w-20 h-20 rounded-full flex items-center justify-center relative flex-shrink-0"
+                      style={isEarned ? {
+                        background: `linear-gradient(135deg, ${colors.bg} 0%, oklch(0.16 0.035 250) 100%)`,
+                        boxShadow: `0 0 25px ${colors.glow}`,
+                      } : {
+                        background: 'oklch(0.18 0.03 250)',
+                        opacity: 0.6,
+                      }}
+                    >
+                      {/* Gradient Border Ring */}
+                      {isEarned && (
+                        <div 
+                          className="absolute inset-[-3px] rounded-full pointer-events-none"
+                          style={{
+                            background: `linear-gradient(135deg, ${colors.border} 0%, ${colors.border}80 100%)`,
+                            padding: '3px',
+                            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                            WebkitMaskComposite: 'xor',
+                            maskComposite: 'exclude',
+                          }}
+                        />
+                      )}
+                      
+                      {/* Locked Border */}
+                      {!isEarned && (
+                        <div 
+                          className="absolute inset-[-2px] rounded-full pointer-events-none"
+                          style={{
+                            border: '2px dashed oklch(0.35 0.02 250)',
+                          }}
+                        />
+                      )}
+                      
+                      {/* Icon */}
+                      <div className="relative z-10">
+                        {isEarned ? (
+                          <IconComponent 
+                            className="w-9 h-9" 
+                            style={{ 
+                              color: colors.border,
+                              filter: `drop-shadow(0 0 8px ${colors.glow})`,
                             }}
                           />
+                        ) : (
+                          <Lock className="w-7 h-7 text-[oklch(0.40_0.02_250)]" />
                         )}
-                        
-                        {/* Icon */}
-                        <div className="relative z-10">
-                          {isEarned ? (
-                            <IconComponent 
-                              className="h-8 w-8" 
-                              style={{ 
-                                color: colors.border,
-                                filter: `drop-shadow(0 0 8px ${colors.glow})`,
-                              }}
-                            />
-                          ) : (
-                            <Lock className="h-6 w-6 text-[oklch(0.40_0.02_250)]" />
-                          )}
+                      </div>
+                    </div>
+                    
+                    {/* Badge Name - Full text, no truncation */}
+                    <p 
+                      className="text-center font-medium mt-3 text-sm leading-tight max-w-[100px]"
+                      style={{ 
+                        color: isEarned ? colors.text : 'oklch(0.45 0.02 250)',
+                      }}
+                    >
+                      {badge.name}
+                    </p>
+                    
+                    {/* Progress Bar for Locked Badges */}
+                    {!isEarned && badge.progress > 0 && (
+                      <div className="w-16 mt-2">
+                        <div className="h-1 bg-[oklch(0.20_0.03_250)] rounded-full overflow-hidden">
+                          <div 
+                            className="h-full rounded-full"
+                            style={{ 
+                              width: `${badge.progress}%`,
+                              background: 'oklch(0.50 0.08 220)',
+                            }}
+                          />
                         </div>
                       </div>
-                      
-                      {/* Badge Name */}
-                      <p className={`text-xs text-center font-medium mt-2 line-clamp-2 ${
-                        isEarned ? "text-[oklch(0.85_0.02_220)]" : "text-[oklch(0.45_0.02_250)]"
-                      }`}>
-                        {badge.name}
-                      </p>
-                      
-                      {/* Progress Bar for Locked Badges */}
-                      {!isEarned && badge.progress > 0 && (
-                        <div className="w-full mt-1 px-2">
-                          <div className="h-1 bg-[oklch(0.20_0.03_250)] rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-[oklch(0.50_0.08_220)]" 
-                              style={{ width: `${badge.progress}%` }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </motion.div>
                 );
               })}
@@ -378,14 +402,14 @@ export default function Badges() {
                           
                           {isEarned ? (
                             <IconComponent 
-                              className="h-14 w-14 relative z-10" 
+                              className="w-14 h-14 relative z-10" 
                               style={{ 
                                 color: colors.border,
                                 filter: `drop-shadow(0 0 15px ${colors.glow})`,
                               }}
                             />
                           ) : (
-                            <Lock className="h-12 w-12 text-[oklch(0.40_0.02_250)]" />
+                            <Lock className="w-12 h-12 text-[oklch(0.40_0.02_250)]" />
                           )}
                         </motion.div>
                       </div>
@@ -403,43 +427,58 @@ export default function Badges() {
                         </p>
                       </div>
 
-                      <p className="text-center text-[oklch(0.65_0.03_220)] mb-6">
+                      {/* Description */}
+                      <p className="text-center text-[oklch(0.70_0.03_220)] text-sm mb-4">
                         {badge.description}
                       </p>
 
-                      {/* Progress or Earned Date */}
-                      {isEarned ? (
-                        <div className="flex items-center justify-center gap-2 text-[oklch(0.70_0.20_145)] mb-4 p-3 rounded-lg bg-[oklch(0.70_0.20_145_/_0.1)] border border-[oklch(0.70_0.20_145_/_0.3)]">
-                          <Check className="h-5 w-5" />
-                          <span className="text-sm font-medium">
-                            Sbloccato il {new Date(badge.earnedAt!).toLocaleDateString("it-IT")}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="mb-4 p-3 rounded-lg bg-[oklch(0.18_0.03_250)]">
-                          <div className="flex justify-between text-sm mb-2">
-                            <span className="text-[oklch(0.60_0.03_220)]">Progresso</span>
-                            <span className="font-bold text-[oklch(0.70_0.18_220)]">{badge.progress}%</span>
+                      {/* Requirement */}
+                      <div className="bg-[oklch(0.14_0.03_250)] rounded-lg p-3 mb-4">
+                        <p className="text-xs text-[oklch(0.55_0.03_220)] mb-1">Requisito</p>
+                        <p className="text-sm text-[oklch(0.85_0.02_220)]">
+                          {badge.requirementType === 'total_distance' && `Nuota ${(badge.requirementValue / 1000).toFixed(0)} km totali`}
+                          {badge.requirementType === 'single_session' && `Nuota ${(badge.requirementValue / 1000).toFixed(1)} km in una sessione`}
+                          {badge.requirementType === 'sessions_count' && `Completa ${badge.requirementValue} sessioni`}
+                          {badge.requirementType === 'consecutive_weeks' && `Allenati per ${badge.requirementValue} settimane consecutive`}
+                          {badge.requirementType === 'open_water_distance' && `Nuota ${(badge.requirementValue / 1000).toFixed(1)} km in acque libere`}
+                          {badge.requirementType === 'total_time' && `Nuota per ${badge.requirementValue} ore totali`}
+                          {badge.requirementType === 'level' && `Raggiungi il livello ${badge.requirementValue}`}
+                          {badge.requirementType === 'special' && badge.description}
+                        </p>
+                      </div>
+
+                      {/* Progress */}
+                      {!isEarned && (
+                        <div className="mb-4">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-[oklch(0.55_0.03_220)]">Progresso</span>
+                            <span className="text-[oklch(0.70_0.18_220)]">{badge.progress}%</span>
                           </div>
-                          <div className="xp-bar-container">
+                          <div className="h-2 bg-[oklch(0.20_0.03_250)] rounded-full overflow-hidden">
                             <div 
-                              className="h-full bg-[oklch(0.50_0.10_220)] rounded-full" 
-                              style={{ width: `${badge.progress}%` }}
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{ 
+                                width: `${badge.progress}%`,
+                                background: `linear-gradient(90deg, ${colors.border} 0%, ${colors.border}80 100%)`,
+                              }}
                             />
                           </div>
                         </div>
                       )}
 
-                      {/* XP Reward */}
-                      <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-[oklch(0.82_0.18_85_/_0.1)] border border-[oklch(0.82_0.18_85_/_0.3)]">
-                        <Zap className="h-5 w-5 text-[oklch(0.82_0.18_85)]" />
-                        <span className="font-bold text-[oklch(0.82_0.18_85)]">+{badge.xpReward} XP</span>
-                      </div>
+                      {/* Earned Date */}
+                      {isEarned && badge.earnedAt && (
+                        <div className="text-center">
+                          <p className="text-xs text-[oklch(0.55_0.03_220)]">
+                            Sbloccato il {new Date(badge.earnedAt).toLocaleDateString('it-IT')}
+                          </p>
+                        </div>
+                      )}
 
                       {/* Close Button */}
                       <Button
-                        className="w-full mt-6 glow-button"
                         onClick={() => setSelectedBadge(null)}
+                        className="w-full mt-4 glow-button"
                       >
                         Chiudi
                       </Button>
