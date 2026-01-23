@@ -5,60 +5,53 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Trophy,
-  Medal,
-  Star,
-  Award,
-  Waves,
-  Target,
-  Clock,
-  Crown,
-  Gem,
-  Flame,
-  Zap,
-  Calendar,
-  Heart,
-  Compass,
-  Anchor,
   Lock,
   ChevronLeft,
-  Sparkles,
+  X,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import { useState, useRef, useCallback } from "react";
 
-// Icon mapping
-const iconMap: Record<string, React.ComponentType<any>> = {
-  trophy: Trophy,
-  medal: Medal,
-  star: Star,
-  award: Award,
-  crown: Crown,
-  gem: Gem,
-  diamond: Gem,
-  flame: Flame,
-  zap: Zap,
-  rocket: Zap,
-  battery: Zap,
-  calendar: Calendar,
-  "calendar-check": Calendar,
-  target: Target,
-  heart: Heart,
-  sun: Star,
-  waves: Waves,
-  compass: Compass,
-  ship: Anchor,
-  anchor: Anchor,
-  globe: Waves,
-  users: Trophy,
-  octagon: Crown,
-  clock: Clock,
-  hourglass: Clock,
-  timer: Clock,
-  "arrow-up": Star,
-  "arrow-up-circle": Star,
-  "chevrons-up": Star,
-  sparkles: Sparkles,
+// Mapping badge code to SVG file
+const badgeSvgMap: Record<string, string> = {
+  // Distanza
+  "first_km": "/badges/first_km.svg",
+  "marathon_beginner": "/badges/marathon_beginner.svg",
+  "aquatic_marathon": "/badges/aquatic_marathon.svg",
+  "centurion": "/badges/centurion.svg",
+  "epic_crossing": "/badges/epic_crossing.svg",
+  "half_millennium": "/badges/half_millennium.svg",
+  "millionaire": "/badges/millionaire.svg",
+  // Sessione
+  "solid_session": "/badges/solid_session.svg",
+  "endurance": "/badges/endurance.svg",
+  "ultra_swimmer": "/badges/ultra_swimmer.svg",
+  "unstoppable_machine": "/badges/unstoppable_machine.svg",
+  // Costanza
+  "promising_start": "/badges/promising_start.svg",
+  "healthy_habit": "/badges/healthy_habit.svg",
+  "half_century": "/badges/half_century.svg",
+  "centenarian": "/badges/centenarian.svg",
+  "pool_devotee": "/badges/pool_devotee.svg",
+  "year_in_pool": "/badges/year_in_pool.svg",
+  // Acque Libere
+  "sea_baptism": "/badges/sea_baptism.svg",
+  "navigator": "/badges/navigator.svg",
+  "sea_wolf": "/badges/sea_wolf.svg",
+  "marine_explorer": "/badges/marine_explorer.svg",
+  "crosser": "/badges/crosser.svg",
+  // Speciali
+  "oppidum_member": "/badges/oppidum_member.svg",
+  "golden_octopus": "/badges/golden_octopus.svg",
+  // Traguardi
+  "first_10_hours": "/badges/first_10_hours.svg",
+  "fifty_hours": "/badges/fifty_hours.svg",
+  "time_centenarian": "/badges/time_centenarian.svg",
+  "level_5": "/badges/level_5.svg",
+  "level_10": "/badges/level_10.svg",
+  "level_15": "/badges/level_15.svg",
+  "poseidon": "/badges/poseidon.svg",
 };
 
 const categoryLabels: Record<string, string> = {
@@ -112,10 +105,48 @@ const rarityColors: Record<string, { border: string; glow: string; bg: string; t
   },
 };
 
+// Helper to get badge code from name
+function getBadgeCode(name: string): string {
+  const codeMap: Record<string, string> = {
+    "Primo Chilometro": "first_km",
+    "Maratoneta in Erba": "marathon_beginner",
+    "Maratona Acquatica": "aquatic_marathon",
+    "Centurione": "centurion",
+    "Traversata Epica": "epic_crossing",
+    "Mezzo Millennio": "half_millennium",
+    "Il Milionario": "millionaire",
+    "Sessione Solida": "solid_session",
+    "Resistenza": "endurance",
+    "Ultra Nuotatore": "ultra_swimmer",
+    "Macchina Instancabile": "unstoppable_machine",
+    "Inizio Promettente": "promising_start",
+    "Abitudine Sana": "healthy_habit",
+    "Mezzo Centinaio": "half_century",
+    "Centenario": "centenarian",
+    "Devoto alla Vasca": "pool_devotee",
+    "Un Anno in Vasca": "year_in_pool",
+    "Battesimo del Mare": "sea_baptism",
+    "Navigatore": "navigator",
+    "Lupo di Mare": "sea_wolf",
+    "Esploratore Marino": "marine_explorer",
+    "Attraversatore": "crosser",
+    "Membro Oppidum": "oppidum_member",
+    "Polpo d'Oro": "golden_octopus",
+    "Prime 10 Ore": "first_10_hours",
+    "50 Ore di Dedizione": "fifty_hours",
+    "Centenario del Tempo": "time_centenarian",
+    "Livello 5 Raggiunto": "level_5",
+    "Livello 10 Raggiunto": "level_10",
+    "Livello 15 Raggiunto": "level_15",
+    "Poseidone": "poseidon",
+  };
+  return codeMap[name] || "first_km";
+}
+
 export default function Badges() {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState("all");
-  const [selectedBadge, setSelectedBadge] = useState<number | null>(null);
+  const [selectedBadge, setSelectedBadge] = useState<any | null>(null);
   const [showUnlockAnimation, setShowUnlockAnimation] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -146,13 +177,8 @@ export default function Badges() {
     }
   }, []);
 
-  // Get icon component
-  const getIcon = (iconName: string) => {
-    return iconMap[iconName] || Trophy;
-  };
-
   const handleBadgeClick = (badge: any) => {
-    setSelectedBadge(badge.id);
+    setSelectedBadge(badge);
     if (badge.earned) {
       playSound();
       setShowUnlockAnimation(true);
@@ -225,7 +251,7 @@ export default function Badges() {
           </div>
         </div>
 
-        {/* Badge Grid - Fixed layout with proper sizing */}
+        {/* Badge Grid */}
         {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
             {[...Array(12)].map((_, i) => (
@@ -242,9 +268,10 @@ export default function Badges() {
           >
             <AnimatePresence mode="popLayout">
               {filteredBadges?.map((badge) => {
-                const IconComponent = getIcon(badge.iconName);
                 const isEarned = badge.earned;
                 const colors = rarityColors[badge.rarity] || rarityColors.common;
+                const badgeCode = getBadgeCode(badge.name);
+                const svgPath = badgeSvgMap[badgeCode];
 
                 return (
                   <motion.div
@@ -258,21 +285,19 @@ export default function Badges() {
                     onClick={() => handleBadgeClick(badge)}
                     className="cursor-pointer flex flex-col items-center"
                   >
-                    {/* Badge Circle - Fixed size, perfectly round */}
+                    {/* Badge Circle with SVG */}
                     <div 
-                      className="w-20 h-20 rounded-full flex items-center justify-center relative flex-shrink-0"
+                      className="w-20 h-20 rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden"
                       style={isEarned ? {
-                        background: `linear-gradient(135deg, ${colors.bg} 0%, oklch(0.16 0.035 250) 100%)`,
-                        boxShadow: `0 0 25px ${colors.glow}`,
+                        boxShadow: `0 0 25px ${colors.glow}, 0 0 50px ${colors.glow}`,
                       } : {
-                        background: 'oklch(0.18 0.03 250)',
-                        opacity: 0.6,
+                        opacity: 0.5,
                       }}
                     >
-                      {/* Gradient Border Ring */}
+                      {/* Gradient Border Ring for earned badges */}
                       {isEarned && (
                         <div 
-                          className="absolute inset-[-3px] rounded-full pointer-events-none"
+                          className="absolute inset-[-3px] rounded-full pointer-events-none animate-pulse"
                           style={{
                             background: `linear-gradient(135deg, ${colors.border} 0%, ${colors.border}80 100%)`,
                             padding: '3px',
@@ -293,23 +318,31 @@ export default function Badges() {
                         />
                       )}
                       
-                      {/* Icon */}
-                      <div className="relative z-10">
-                        {isEarned ? (
-                          <IconComponent 
-                            className="w-9 h-9" 
-                            style={{ 
-                              color: colors.border,
+                      {/* Badge SVG or Lock Icon */}
+                      <div className="relative z-10 w-full h-full flex items-center justify-center">
+                        {isEarned && svgPath ? (
+                          <img 
+                            src={svgPath} 
+                            alt={badge.name}
+                            className="w-full h-full"
+                            style={{
                               filter: `drop-shadow(0 0 8px ${colors.glow})`,
                             }}
                           />
                         ) : (
-                          <Lock className="w-7 h-7 text-[oklch(0.40_0.02_250)]" />
+                          <div 
+                            className="w-full h-full rounded-full flex items-center justify-center"
+                            style={{
+                              background: 'oklch(0.18 0.03 250)',
+                            }}
+                          >
+                            <Lock className="w-8 h-8 text-[oklch(0.40_0.02_250)]" />
+                          </div>
                         )}
                       </div>
                     </div>
                     
-                    {/* Badge Name - Full text, no truncation */}
+                    {/* Badge Name */}
                     <p 
                       className="text-center font-medium mt-3 text-sm leading-tight max-w-[100px]"
                       style={{ 
@@ -342,7 +375,7 @@ export default function Badges() {
 
         {/* Badge Detail Modal */}
         <AnimatePresence>
-          {selectedBadge && badgeProgress && (
+          {selectedBadge && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -354,137 +387,105 @@ export default function Badges() {
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.8, opacity: 0 }}
+                className="neon-card p-6 max-w-sm w-full relative"
                 onClick={(e) => e.stopPropagation()}
-                className="neon-card p-6 max-w-sm w-full"
               >
-                {(() => {
-                  const badge = badgeProgress.find((b) => b.id === selectedBadge);
-                  if (!badge) return null;
+                {/* Close button */}
+                <button 
+                  onClick={() => setSelectedBadge(null)}
+                  className="absolute top-4 right-4 text-[oklch(0.60_0.03_220)] hover:text-[oklch(0.80_0.03_220)]"
+                >
+                  <X className="w-5 h-5" />
+                </button>
 
-                  const IconComponent = getIcon(badge.iconName);
-                  const isEarned = badge.earned;
-                  const colors = rarityColors[badge.rarity] || rarityColors.common;
-
-                  return (
-                    <>
-                      {/* Badge Icon with Animation */}
-                      <div className="flex justify-center mb-6 relative">
-                        {/* Particle Burst Effect */}
-                        {showUnlockAnimation && isEarned && (
-                          <div className="particle-burst absolute inset-0" />
-                        )}
-                        
-                        <motion.div
-                          initial={isEarned ? { scale: 0, rotate: -180 } : {}}
-                          animate={isEarned ? { scale: 1, rotate: 0 } : {}}
-                          transition={{ type: "spring", duration: 0.8 }}
-                          className="w-28 h-28 rounded-full flex items-center justify-center relative"
-                          style={isEarned ? {
-                            background: `linear-gradient(135deg, ${colors.bg} 0%, oklch(0.16 0.035 250) 100%)`,
-                            boxShadow: `0 0 40px ${colors.glow}, 0 0 80px ${colors.glow}`,
-                          } : {
-                            background: 'oklch(0.18 0.03 250)',
-                          }}
-                        >
-                          {/* Gradient Border */}
-                          {isEarned && (
-                            <div 
-                              className="absolute inset-[-4px] rounded-full"
-                              style={{
-                                background: `linear-gradient(135deg, ${colors.border} 0%, ${colors.border}60 100%)`,
-                                padding: '4px',
-                                WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                                WebkitMaskComposite: 'xor',
-                                maskComposite: 'exclude',
-                              }}
-                            />
-                          )}
-                          
-                          {isEarned ? (
-                            <IconComponent 
-                              className="w-14 h-14 relative z-10" 
-                              style={{ 
-                                color: colors.border,
-                                filter: `drop-shadow(0 0 15px ${colors.glow})`,
-                              }}
-                            />
-                          ) : (
-                            <Lock className="w-12 h-12 text-[oklch(0.40_0.02_250)]" />
-                          )}
-                        </motion.div>
-                      </div>
-
-                      {/* Badge Info */}
-                      <div className="text-center mb-4">
-                        <h3 className="text-xl font-bold text-[oklch(0.95_0.01_220)] mb-2">
-                          {badge.name}
-                        </h3>
-                        <p 
-                          className="text-sm font-semibold"
-                          style={{ color: colors.border }}
-                        >
-                          {rarityLabels[badge.rarity]}
-                        </p>
-                      </div>
-
-                      {/* Description */}
-                      <p className="text-center text-[oklch(0.70_0.03_220)] text-sm mb-4">
-                        {badge.description}
-                      </p>
-
-                      {/* Requirement */}
-                      <div className="bg-[oklch(0.14_0.03_250)] rounded-lg p-3 mb-4">
-                        <p className="text-xs text-[oklch(0.55_0.03_220)] mb-1">Requisito</p>
-                        <p className="text-sm text-[oklch(0.85_0.02_220)]">
-                          {badge.requirementType === 'total_distance' && `Nuota ${(badge.requirementValue / 1000).toFixed(0)} km totali`}
-                          {badge.requirementType === 'single_session' && `Nuota ${(badge.requirementValue / 1000).toFixed(1)} km in una sessione`}
-                          {badge.requirementType === 'sessions_count' && `Completa ${badge.requirementValue} sessioni`}
-                          {badge.requirementType === 'consecutive_weeks' && `Allenati per ${badge.requirementValue} settimane consecutive`}
-                          {badge.requirementType === 'open_water_distance' && `Nuota ${(badge.requirementValue / 1000).toFixed(1)} km in acque libere`}
-                          {badge.requirementType === 'total_time' && `Nuota per ${badge.requirementValue} ore totali`}
-                          {badge.requirementType === 'level' && `Raggiungi il livello ${badge.requirementValue}`}
-                          {badge.requirementType === 'special' && badge.description}
-                        </p>
-                      </div>
-
-                      {/* Progress */}
-                      {!isEarned && (
-                        <div className="mb-4">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-[oklch(0.55_0.03_220)]">Progresso</span>
-                            <span className="text-[oklch(0.70_0.18_220)]">{badge.progress}%</span>
-                          </div>
-                          <div className="h-2 bg-[oklch(0.20_0.03_250)] rounded-full overflow-hidden">
-                            <div 
-                              className="h-full rounded-full transition-all duration-500"
-                              style={{ 
-                                width: `${badge.progress}%`,
-                                background: `linear-gradient(90deg, ${colors.border} 0%, ${colors.border}80 100%)`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Earned Date */}
-                      {isEarned && badge.earnedAt && (
-                        <div className="text-center">
-                          <p className="text-xs text-[oklch(0.55_0.03_220)]">
-                            Sbloccato il {new Date(badge.earnedAt).toLocaleDateString('it-IT')}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Close Button */}
-                      <Button
-                        onClick={() => setSelectedBadge(null)}
-                        className="w-full mt-4 glow-button"
+                {/* Badge Display */}
+                <div className="flex flex-col items-center text-center">
+                  {/* Large Badge */}
+                  <div 
+                    className={`w-32 h-32 rounded-full flex items-center justify-center relative mb-4 ${
+                      selectedBadge.earned && showUnlockAnimation ? 'badge-unlock' : ''
+                    }`}
+                    style={selectedBadge.earned ? {
+                      boxShadow: `0 0 40px ${rarityColors[selectedBadge.rarity]?.glow || rarityColors.common.glow}`,
+                    } : {}}
+                  >
+                    {selectedBadge.earned && (
+                      <div 
+                        className="absolute inset-[-4px] rounded-full"
+                        style={{
+                          background: `linear-gradient(135deg, ${rarityColors[selectedBadge.rarity]?.border || rarityColors.common.border} 0%, ${rarityColors[selectedBadge.rarity]?.border || rarityColors.common.border}80 100%)`,
+                          padding: '4px',
+                          WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
+                          WebkitMaskComposite: 'xor',
+                          maskComposite: 'exclude',
+                        }}
+                      />
+                    )}
+                    
+                    {selectedBadge.earned ? (
+                      <img 
+                        src={badgeSvgMap[getBadgeCode(selectedBadge.name)]} 
+                        alt={selectedBadge.name}
+                        className="w-full h-full"
+                        style={{
+                          filter: `drop-shadow(0 0 12px ${rarityColors[selectedBadge.rarity]?.glow || rarityColors.common.glow})`,
+                        }}
+                      />
+                    ) : (
+                      <div 
+                        className="w-full h-full rounded-full flex items-center justify-center"
+                        style={{ background: 'oklch(0.18 0.03 250)' }}
                       >
-                        Chiudi
-                      </Button>
-                    </>
-                  );
-                })()}
+                        <Lock className="w-12 h-12 text-[oklch(0.40_0.02_250)]" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Badge Info */}
+                  <h3 
+                    className="text-xl font-bold mb-1"
+                    style={{ color: rarityColors[selectedBadge.rarity]?.text || rarityColors.common.text }}
+                  >
+                    {selectedBadge.name}
+                  </h3>
+                  
+                  <span 
+                    className="text-xs font-medium px-3 py-1 rounded-full mb-3"
+                    style={{
+                      background: rarityColors[selectedBadge.rarity]?.bg || rarityColors.common.bg,
+                      color: rarityColors[selectedBadge.rarity]?.text || rarityColors.common.text,
+                    }}
+                  >
+                    {rarityLabels[selectedBadge.rarity] || "Comune"}
+                  </span>
+                  
+                  <p className="text-[oklch(0.70_0.03_220)] text-sm mb-4">
+                    {selectedBadge.description}
+                  </p>
+
+                  {/* Progress or Earned Date */}
+                  {selectedBadge.earned ? (
+                    <div className="text-[oklch(0.60_0.03_220)] text-xs">
+                      Sbloccato il {new Date(selectedBadge.earnedAt).toLocaleDateString('it-IT')}
+                    </div>
+                  ) : (
+                    <div className="w-full">
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-[oklch(0.60_0.03_220)]">Progresso</span>
+                        <span className="text-[oklch(0.70_0.18_220)]">{selectedBadge.progress}%</span>
+                      </div>
+                      <div className="h-2 bg-[oklch(0.20_0.03_250)] rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ 
+                            width: `${selectedBadge.progress}%`,
+                            background: 'linear-gradient(90deg, oklch(0.50 0.08 220), oklch(0.70 0.18 220))',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </motion.div>
             </motion.div>
           )}

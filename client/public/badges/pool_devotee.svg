@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="bg-pool_devotee" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a3a5c"/>
+      <stop offset="100%" style="stop-color:#0d1f33"/>
+    </linearGradient>
+    <linearGradient id="glow-pool_devotee" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a855f7"/>
+      <stop offset="100%" style="stop-color:#7c3aed"/>
+    </linearGradient>
+    <filter id="neon-pool_devotee">
+      <feGaussianBlur stdDeviation="1.5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glow-effect-pool_devotee">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="47" fill="url(#bg-pool_devotee)"/>
+  <!-- Outer ring -->
+  <circle cx="50" cy="50" r="47" fill="none" stroke="url(#glow-pool_devotee)" stroke-width="3" filter="url(#glow-effect-pool_devotee)"/>
+  <!-- Inner decorative ring -->
+  <circle cx="50" cy="50" r="40" fill="none" stroke="#a855f7" stroke-width="0.5" opacity="0.4"/>
+  <!-- Icon content -->
+  <g filter="url(#neon-pool_devotee)" fill="#a855f7" stroke="#a855f7">
+    
+    <!-- Temple/shrine with waves -->
+    <path d="M30 65 L30 45 L50 30 L70 45 L70 65" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="25" y1="65" x2="75" y2="65" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M35 55 Q42 48, 50 55 T65 55" fill="none" stroke-width="2" stroke-linecap="round"/>
+    <text x="50" y="82" text-anchor="middle" fill="currentColor" stroke="none" font-family="Arial" font-size="7" font-weight="bold">26 SETT</text>
+
+  </g>
+</svg>

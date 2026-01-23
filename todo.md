@@ -100,3 +100,12 @@
 - [x] Correggere forma badge da ovale a circolare
 - [x] Correggere testo badge troncato/illeggibile
 
+## Icone Badge Personalizzate
+- [x] Creare icone SVG per badge Distanza (7 badge)
+- [x] Creare icone SVG per badge Sessione (4 badge)
+- [x] Creare icone SVG per badge Costanza (6 badge)
+- [x] Creare icone SVG per badge Acque Libere (5 badge)
+- [x] Creare icone SVG per badge Speciali (2 badge)
+- [x] Creare icone SVG per badge Traguardi (7 badge)
+- [x] Integrare le nuove icone nella pagina Badge
+

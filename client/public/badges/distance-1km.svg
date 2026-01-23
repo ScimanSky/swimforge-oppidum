@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="bg1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a3a5c"/>
+      <stop offset="100%" style="stop-color:#0d1f33"/>
+    </linearGradient>
+    <linearGradient id="glow1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4ecdc4"/>
+      <stop offset="100%" style="stop-color:#2a9d8f"/>
+    </linearGradient>
+    <filter id="neon1">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <circle cx="50" cy="50" r="48" fill="url(#bg1)" stroke="url(#glow1)" stroke-width="3"/>
+  <g filter="url(#neon1)" fill="none" stroke="#4ecdc4" stroke-width="2.5" stroke-linecap="round">
+    <!-- Wave pattern -->
+    <path d="M20 50 Q30 35, 40 50 T60 50 T80 50"/>
+    <path d="M25 60 Q35 45, 45 60 T65 60 T85 60" opacity="0.6"/>
+    <!-- 1KM text -->
+    <text x="50" y="38" text-anchor="middle" fill="#4ecdc4" stroke="none" font-family="Arial Black" font-size="14" font-weight="bold">1</text>
+    <text x="50" y="78" text-anchor="middle" fill="#4ecdc4" stroke="none" font-family="Arial" font-size="10" font-weight="bold">KM</text>
+  </g>
+</svg>
