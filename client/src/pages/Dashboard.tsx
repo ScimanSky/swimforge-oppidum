@@ -22,7 +22,7 @@ import {
   Home,
   User,
 } from "lucide-react";
-import { useLocation, Link } from "wouter";
+import { useLocation, Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
 
 export default function Dashboard() {
@@ -44,10 +44,9 @@ export default function Dashboard() {
     { enabled: isAuthenticated }
   );
 
-  // Redirect to home if not authenticated
+  // Redirect to home if not authenticated - use Redirect component instead of setLocation during render
   if (!authLoading && !isAuthenticated) {
-    setLocation("/");
-    return null;
+    return <Redirect to="/" />;
   }
 
   const isLoading = authLoading || profileLoading;

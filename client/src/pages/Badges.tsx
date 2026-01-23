@@ -26,7 +26,7 @@ import {
   Check,
   ChevronLeft,
 } from "lucide-react";
-import { useLocation, Link } from "wouter";
+import { useLocation, Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import { useState, useEffect, useRef } from "react";
 
@@ -93,10 +93,9 @@ export default function Badges() {
     { enabled: isAuthenticated }
   );
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated - use Redirect component instead of setLocation during render
   if (!authLoading && !isAuthenticated) {
-    setLocation("/");
-    return null;
+    return <Redirect to="/" />;
   }
 
   // Filter badges by category

@@ -14,7 +14,7 @@ import {
   Award,
   TrendingUp,
 } from "lucide-react";
-import { useLocation, Link } from "wouter";
+import { useLocation, Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import { useState } from "react";
 
@@ -30,10 +30,9 @@ export default function Leaderboard() {
     { enabled: isAuthenticated }
   );
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated - use Redirect component instead of setLocation during render
   if (!authLoading && !isAuthenticated) {
-    setLocation("/");
-    return null;
+    return <Redirect to="/" />;
   }
 
   // Get medal color for position

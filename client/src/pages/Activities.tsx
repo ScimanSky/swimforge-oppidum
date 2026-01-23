@@ -22,7 +22,7 @@ import {
   MapPin,
   FileText,
 } from "lucide-react";
-import { useLocation, Link } from "wouter";
+import { useLocation, Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -66,10 +66,9 @@ export default function Activities() {
     },
   });
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated - use Redirect component instead of setLocation during render
   if (!authLoading && !isAuthenticated) {
-    setLocation("/");
-    return null;
+    return <Redirect to="/" />;
   }
 
   const resetForm = () => {

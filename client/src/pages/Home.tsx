@@ -13,16 +13,15 @@ import {
   Medal,
   TrendingUp
 } from "lucide-react";
-import { useLocation } from "wouter";
+import { useLocation, Redirect } from "wouter";
 
 export default function Home() {
   const { user, loading, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
 
-  // Redirect to dashboard if authenticated
+  // Redirect to dashboard if authenticated - use Redirect component instead of setLocation during render
   if (isAuthenticated && !loading) {
-    setLocation("/dashboard");
-    return null;
+    return <Redirect to="/dashboard" />;
   }
 
   const features = [

@@ -83,4 +83,5 @@
 - [x] Implementare microservizio Python per Garmin Connect
 - [x] Integrare microservizio con backend Node.js
 - [x] Test sincronizzazione attività Garmin
+- [x] Fix errore React setState durante rendering in Profile (e altri componenti)
 

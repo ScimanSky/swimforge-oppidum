@@ -21,10 +21,11 @@ import {
   Calendar,
   TrendingUp,
 } from "lucide-react";
-import { useLocation, Link } from "wouter";
+import { useLocation, Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import GarminSection from "@/components/GarminSection";
 import { toast } from "sonner";
+import { useEffect } from "react";
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
@@ -54,10 +55,9 @@ export default function Profile() {
     },
   });
 
-  // Redirect if not authenticated
+  // Redirect if not authenticated - use Redirect component instead of setLocation during render
   if (!authLoading && !isAuthenticated) {
-    setLocation("/");
-    return null;
+    return <Redirect to="/" />;
   }
 
   const handleLogout = async () => {
