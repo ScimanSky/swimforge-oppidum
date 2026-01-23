@@ -134,32 +134,6 @@ def get_token_path(user_id: str) -> Path:
     return TOKEN_STORE_DIR / f"{user_id}.json"
 
 
-def save_tokens(user_id: str, garth_client) -> bool:
-    """Save garth tokens to file"""
-    try:
-        token_path = get_token_path(user_id)
-        garth_client.dump(str(token_path))
-        logger.info(f"Tokens saved for user {user_id}")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to save tokens for user {user_id}: {e}")
-        return False
-
-
-def load_tokens(user_id: str, garth_client) -> bool:
-    """Load garth tokens from file"""
-    try:
-        token_path = get_token_path(user_id)
-        if token_path.exists():
-            garth_client.load(str(token_path))
-            logger.info(f"Tokens loaded for user {user_id}")
-            return True
-        return False
-    except Exception as e:
-        logger.error(f"Failed to load tokens for user {user_id}: {e}")
-        return False
-
-
 def get_garmin_client(user_id: str):
     """Get existing Garmin client for user"""
     session = sessions.get(user_id)
@@ -245,7 +219,7 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
         
         # Import here to catch import errors
         try:
-            from garminconnect import Garmin, GarminConnectAuthenticationError, GarminConnectConnectionError
+            from garminconnect import Garmin
         except ImportError as e:
             logger.error(f"Failed to import garminconnect: {e}")
             raise HTTPException(
@@ -253,100 +227,93 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
                 detail="Garmin Connect library not available. Please try again later."
             )
         
-        # Create Garmin client
-        client = Garmin(request.email, request.password)
-        
-        # Try to load existing tokens first
+        # Delete any existing invalid tokens first
         token_path = get_token_path(request.user_id)
         if token_path.exists():
             try:
-                client.garth.load(str(token_path))
-                # Verify tokens are still valid
-                client.display_name
-                logger.info(f"Loaded existing tokens for user {request.user_id}")
-                
-                # Store session
-                sessions[request.user_id] = {
-                    "client": client,
-                    "email": request.email,
-                    "display_name": client.display_name,
-                    "last_sync": None,
-                    "connected_at": datetime.now().isoformat()
-                }
-                
-                return LoginResponse(
-                    success=True,
-                    message="Successfully connected using saved tokens",
-                    user_id=request.user_id
-                )
+                token_path.unlink()
+                logger.info(f"Deleted existing tokens for user {request.user_id}")
+            except Exception:
+                pass
+        
+        # Create Garmin client with credentials
+        try:
+            client = Garmin(request.email, request.password)
+            
+            # Perform fresh login - this is the critical step
+            logger.info(f"Attempting fresh login for user {request.user_id}")
+            client.login()
+            
+            logger.info(f"Login successful for user {request.user_id}")
+            
+            # Save tokens for future use
+            try:
+                client.garth.dump(str(token_path))
+                logger.info(f"Saved tokens for user {request.user_id}")
             except Exception as e:
-                logger.info(f"Saved tokens invalid, performing fresh login: {e}")
-                # Delete invalid tokens
-                token_path.unlink(missing_ok=True)
+                logger.warning(f"Could not save tokens: {e}")
+            
+            # Get user profile for display name
+            try:
+                display_name = client.display_name
+            except Exception:
+                display_name = request.email
+            
+            # Store session
+            sessions[request.user_id] = {
+                "client": client,
+                "email": request.email,
+                "display_name": display_name,
+                "last_sync": None,
+                "connected_at": datetime.now().isoformat()
+            }
+            
+            return LoginResponse(
+                success=True,
+                message="Connesso a Garmin Connect con successo!",
+                user_id=request.user_id
+            )
+            
+        except Exception as login_error:
+            error_str = str(login_error)
+            logger.error(f"Login failed for user {request.user_id}: {error_str}")
+            
+            # Check for specific error patterns
+            if "OAuth1 token" in error_str or "oauth1" in error_str.lower():
+                raise HTTPException(
+                    status_code=400,
+                    detail="Errore di autenticazione OAuth. Questo può essere causato da MFA attivo sul tuo account Garmin. Disabilita temporaneamente l'autenticazione a due fattori nelle impostazioni di Garmin Connect, poi riprova."
+                )
+            elif "401" in error_str or "Unauthorized" in error_str or "Authentication" in error_str:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Credenziali Garmin non valide. Verifica email e password."
+                )
+            elif "MFA" in error_str or "two-factor" in error_str.lower() or "2fa" in error_str.lower():
+                raise HTTPException(
+                    status_code=400,
+                    detail="Il tuo account Garmin ha l'autenticazione a due fattori (MFA) attiva. Disabilita temporaneamente MFA nelle impostazioni di Garmin Connect, collega l'account, poi riattiva MFA."
+                )
+            elif "'str' object has no attribute" in error_str:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Errore di autenticazione. Questo è spesso causato da MFA attivo. Disabilita temporaneamente l'autenticazione a due fattori nelle impostazioni di Garmin Connect."
+                )
+            else:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Errore durante il collegamento: {error_str}"
+                )
         
-        # Attempt fresh login
-        client.login()
-        
-        # Save tokens for future use
-        try:
-            client.garth.dump(str(token_path))
-            logger.info(f"Saved tokens for user {request.user_id}")
-        except Exception as e:
-            logger.warning(f"Could not save tokens: {e}")
-        
-        # Get user profile for display name
-        try:
-            display_name = client.display_name
-        except Exception:
-            display_name = None
-        
-        # Store session
-        sessions[request.user_id] = {
-            "client": client,
-            "email": request.email,
-            "display_name": display_name,
-            "last_sync": None,
-            "connected_at": datetime.now().isoformat()
-        }
-        
-        logger.info(f"Login successful for user {request.user_id}")
-        
-        return LoginResponse(
-            success=True,
-            message="Successfully connected to Garmin Connect",
-            user_id=request.user_id
-        )
-        
+    except HTTPException:
+        raise
     except Exception as e:
         error_msg = str(e)
-        logger.error(f"Login error for user {request.user_id}: {error_msg}")
-        
-        # Handle specific error types
-        if "GarminConnectAuthenticationError" in str(type(e).__name__) or "401" in error_msg or "Unauthorized" in error_msg:
-            raise HTTPException(
-                status_code=401,
-                detail="Credenziali Garmin non valide. Verifica email e password."
-            )
-        elif "GarminConnectConnectionError" in str(type(e).__name__):
-            raise HTTPException(
-                status_code=503,
-                detail="Impossibile connettersi a Garmin. Riprova più tardi."
-            )
-        elif "MFA" in error_msg or "OAuth1 token" in error_msg:
-            raise HTTPException(
-                status_code=400,
-                detail="Il tuo account Garmin ha l'autenticazione a due fattori (MFA) attiva. Per usare SwimForge, disabilita temporaneamente MFA nelle impostazioni di Garmin Connect, collega l'account, poi riattiva MFA."
-            )
-        elif "'str' object has no attribute" in error_msg:
-            raise HTTPException(
-                status_code=500,
-                detail="Errore di autenticazione Garmin. Questo può essere causato da MFA attivo o da un problema temporaneo. Prova a disabilitare MFA o riprova più tardi."
-            )
-        else:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Errore durante il collegamento: {error_msg}"
-            )
+        logger.error(f"Unexpected error during login for user {request.user_id}: {error_msg}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Errore imprevisto: {error_msg}"
+        )
 
 
 @app.post("/auth/logout")
@@ -360,7 +327,10 @@ async def logout(user_id: str, api_key: str = Depends(verify_api_key)):
     
     # Delete stored tokens
     token_path = get_token_path(user_id)
-    token_path.unlink(missing_ok=True)
+    try:
+        token_path.unlink(missing_ok=True)
+    except Exception:
+        pass
     
     return {"success": True, "message": "Successfully disconnected"}
 
