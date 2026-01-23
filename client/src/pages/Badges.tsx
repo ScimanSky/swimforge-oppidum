@@ -8,50 +8,51 @@ import {
   Lock,
   ChevronLeft,
   X,
+  Sparkles,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import { useState, useRef, useCallback } from "react";
 
-// Mapping badge code to SVG file
-const badgeSvgMap: Record<string, string> = {
+// Mapping badge code to PNG file (new 3D badges)
+const badgePngMap: Record<string, string> = {
   // Distanza
-  "first_km": "/badges/first_km.svg",
-  "marathon_beginner": "/badges/marathon_beginner.svg",
-  "aquatic_marathon": "/badges/aquatic_marathon.svg",
-  "centurion": "/badges/centurion.svg",
-  "epic_crossing": "/badges/epic_crossing.svg",
-  "half_millennium": "/badges/half_millennium.svg",
-  "millionaire": "/badges/millionaire.svg",
+  "first_km": "/badges_new/first_km.png",
+  "marathon_beginner": "/badges_new/marathon_beginner.png",
+  "aquatic_marathon": "/badges_new/aquatic_marathon.png",
+  "centurion": "/badges_new/centurion.png",
+  "epic_crossing": "/badges_new/epic_crossing.png",
+  "half_millennium": "/badges_new/half_millennium.png",
+  "millionaire": "/badges_new/millionaire.png",
   // Sessione
-  "solid_session": "/badges/solid_session.svg",
-  "endurance": "/badges/endurance.svg",
-  "ultra_swimmer": "/badges/ultra_swimmer.svg",
-  "unstoppable_machine": "/badges/unstoppable_machine.svg",
+  "solid_session": "/badges_new/solid_session.png",
+  "endurance": "/badges_new/endurance.png",
+  "ultra_swimmer": "/badges_new/ultra_swimmer.png",
+  "unstoppable_machine": "/badges_new/unstoppable_machine.png",
   // Costanza
-  "promising_start": "/badges/promising_start.svg",
-  "healthy_habit": "/badges/healthy_habit.svg",
-  "half_century": "/badges/half_century.svg",
-  "centenarian": "/badges/centenarian.svg",
-  "pool_devotee": "/badges/pool_devotee.svg",
-  "year_in_pool": "/badges/year_in_pool.svg",
+  "promising_start": "/badges_new/promising_start.png",
+  "healthy_habit": "/badges_new/healthy_habit.png",
+  "half_century": "/badges_new/half_century.png",
+  "centenarian": "/badges_new/centenarian.png",
+  "pool_devotee": "/badges_new/pool_devotee.png",
+  "year_in_pool": "/badges_new/year_in_pool.png",
   // Acque Libere
-  "sea_baptism": "/badges/sea_baptism.svg",
-  "navigator": "/badges/navigator.svg",
-  "sea_wolf": "/badges/sea_wolf.svg",
-  "marine_explorer": "/badges/marine_explorer.svg",
-  "crosser": "/badges/crosser.svg",
+  "sea_baptism": "/badges_new/sea_baptism.png",
+  "navigator": "/badges_new/navigator.png",
+  "sea_wolf": "/badges_new/sea_wolf.png",
+  "marine_explorer": "/badges_new/marine_explorer.png",
+  "crosser": "/badges_new/crosser.png",
   // Speciali
-  "oppidum_member": "/badges/oppidum_member.svg",
-  "golden_octopus": "/badges/golden_octopus.svg",
+  "oppidum_member": "/badges_new/oppidum_member.png",
+  "golden_octopus": "/badges_new/golden_octopus.png",
   // Traguardi
-  "first_10_hours": "/badges/first_10_hours.svg",
-  "fifty_hours": "/badges/fifty_hours.svg",
-  "time_centenarian": "/badges/time_centenarian.svg",
-  "level_5": "/badges/level_5.svg",
-  "level_10": "/badges/level_10.svg",
-  "level_15": "/badges/level_15.svg",
-  "poseidon": "/badges/poseidon.svg",
+  "first_10_hours": "/badges_new/first_10_hours.png",
+  "fifty_hours": "/badges_new/fifty_hours.png",
+  "time_centenarian": "/badges_new/time_centenarian.png",
+  "level_5": "/badges_new/level_5.png",
+  "level_10": "/badges_new/level_10.png",
+  "level_15": "/badges_new/level_15.png",
+  "poseidon": "/badges_new/poseidon.png",
 };
 
 const categoryLabels: Record<string, string> = {
@@ -149,6 +150,7 @@ export default function Badges() {
   const [selectedBadge, setSelectedBadge] = useState<any | null>(null);
   const [showUnlockAnimation, setShowUnlockAnimation] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [currentSoundUrl, setCurrentSoundUrl] = useState<string>("");
 
   const { data: badgeProgress, isLoading } = trpc.badges.progress.useQuery(
     undefined,
@@ -169,29 +171,112 @@ export default function Badges() {
   const earnedCount = badgeProgress?.filter((b) => b.earned).length || 0;
   const totalCount = badgeProgress?.length || 0;
 
-  // Play sound effect
-  const playSound = useCallback(() => {
+  // Get sound URL based on badge number and rarity
+  const getBadgeSoundUrl = useCallback((badgeNumber: number, rarity: string): string => {
+    // Legendary badges always get epic sound
+    if (rarity === 'legendary') {
+      return 'https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3';
+    }
+    
+    // Otherwise use badge number for progression
+    if (badgeNumber <= 10) {
+      return 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'; // Quick Win
+    } else if (badgeNumber <= 20) {
+      return 'https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3'; // Bonus Earned
+    } else if (badgeNumber <= 30) {
+      return 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3'; // Achievement Unlocked
+    } else {
+      return 'https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3'; // Epic Win
+    }
+  }, []);
+
+  // Play sound effect with dynamic URL
+  const playSound = useCallback((soundUrl: string) => {
     if (audioRef.current) {
+      audioRef.current.src = soundUrl;
       audioRef.current.currentTime = 0;
       audioRef.current.play().catch(() => {});
     }
   }, []);
 
-  const handleBadgeClick = (badge: any) => {
+  const handleBadgeClick = (badge: any, badgeIndex: number) => {
     setSelectedBadge(badge);
     if (badge.earned) {
-      playSound();
+      const soundUrl = getBadgeSoundUrl(badgeIndex + 1, badge.rarity);
+      playSound(soundUrl);
       setShowUnlockAnimation(true);
-      setTimeout(() => setShowUnlockAnimation(false), 800);
+      setTimeout(() => setShowUnlockAnimation(false), 1200);
     }
   };
 
   return (
     <div className="min-h-screen pb-24">
-      {/* Hidden audio element for badge sounds */}
-      <audio ref={audioRef} preload="auto">
-        <source src="https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3" type="audio/mpeg" />
-      </audio>
+      {/* Hidden audio element for badge sounds (dynamic source) */}
+      <audio ref={audioRef} preload="auto" />
+
+      {/* Custom CSS for 3D rotation and unlock animations */}
+      <style>{`
+        @keyframes badge-rotate {
+          0% { transform: rotateY(0deg); }
+          100% { transform: rotateY(360deg); }
+        }
+
+        @keyframes badge-unlock {
+          0% { 
+            transform: scale(0.5) rotate(0deg); 
+            opacity: 0;
+          }
+          50% { 
+            transform: scale(1.2) rotate(180deg); 
+            opacity: 1;
+          }
+          100% { 
+            transform: scale(1) rotate(360deg); 
+            opacity: 1;
+          }
+        }
+
+        @keyframes sparkle {
+          0%, 100% { 
+            transform: scale(0) rotate(0deg); 
+            opacity: 0;
+          }
+          50% { 
+            transform: scale(1) rotate(180deg); 
+            opacity: 1;
+          }
+        }
+
+        .badge-3d {
+          transform-style: preserve-3d;
+          transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .badge-3d:hover {
+          animation: badge-rotate 1s ease-in-out;
+        }
+
+        .badge-unlock-animation {
+          animation: badge-unlock 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .sparkle-particle {
+          position: absolute;
+          width: 8px;
+          height: 8px;
+          background: radial-gradient(circle, #fff 0%, transparent 70%);
+          border-radius: 50%;
+          pointer-events: none;
+          animation: sparkle 1s ease-out forwards;
+        }
+
+        .sparkle-particle:nth-child(1) { top: 10%; left: 10%; animation-delay: 0s; }
+        .sparkle-particle:nth-child(2) { top: 20%; right: 15%; animation-delay: 0.1s; }
+        .sparkle-particle:nth-child(3) { bottom: 20%; left: 20%; animation-delay: 0.2s; }
+        .sparkle-particle:nth-child(4) { bottom: 15%; right: 10%; animation-delay: 0.15s; }
+        .sparkle-particle:nth-child(5) { top: 50%; left: 5%; animation-delay: 0.25s; }
+        .sparkle-particle:nth-child(6) { top: 50%; right: 5%; animation-delay: 0.3s; }
+      `}</style>
 
       {/* Header */}
       <header className="sticky top-0 z-40 bg-[var(--navy)]/95 backdrop-blur-lg border-b border-[oklch(0.30_0.04_250_/_0.5)]">
@@ -256,7 +341,7 @@ export default function Badges() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
             {[...Array(12)].map((_, i) => (
               <div key={i} className="flex flex-col items-center gap-3">
-                <Skeleton className="w-20 h-20 rounded-full bg-[oklch(0.20_0.03_250)]" />
+                <Skeleton className="w-24 h-24 rounded-full bg-[oklch(0.20_0.03_250)]" />
                 <Skeleton className="h-4 w-24 bg-[oklch(0.20_0.03_250)]" />
               </div>
             ))}
@@ -267,11 +352,11 @@ export default function Badges() {
             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"
           >
             <AnimatePresence mode="popLayout">
-              {filteredBadges?.map((badge) => {
+              {filteredBadges?.map((badge, index) => {
                 const isEarned = badge.earned;
                 const colors = rarityColors[badge.rarity] || rarityColors.common;
                 const badgeCode = getBadgeCode(badge.name);
-                const svgPath = badgeSvgMap[badgeCode];
+                const pngPath = badgePngMap[badgeCode];
 
                 return (
                   <motion.div
@@ -282,58 +367,33 @@ export default function Badges() {
                     exit={{ opacity: 0, scale: 0.8 }}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => handleBadgeClick(badge)}
+                    onClick={() => handleBadgeClick(badge, badgeProgress?.indexOf(badge) || index)}
                     className="cursor-pointer flex flex-col items-center"
                   >
-                    {/* Badge Circle with SVG */}
+                    {/* Badge Container with 3D rotation */}
                     <div 
-                      className="w-20 h-20 rounded-full flex items-center justify-center relative flex-shrink-0 overflow-hidden"
+                      className={`w-24 h-24 flex items-center justify-center relative flex-shrink-0 ${isEarned ? 'badge-3d' : ''}`}
                       style={isEarned ? {
-                        boxShadow: `0 0 25px ${colors.glow}, 0 0 50px ${colors.glow}`,
+                        filter: `drop-shadow(0 0 20px ${colors.glow}) drop-shadow(0 0 40px ${colors.glow})`,
                       } : {
-                        opacity: 0.5,
+                        opacity: 0.4,
+                        filter: 'grayscale(100%)',
                       }}
                     >
-                      {/* Gradient Border Ring for earned badges */}
-                      {isEarned && (
-                        <div 
-                          className="absolute inset-[-3px] rounded-full pointer-events-none animate-pulse"
-                          style={{
-                            background: `linear-gradient(135deg, ${colors.border} 0%, ${colors.border}80 100%)`,
-                            padding: '3px',
-                            WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                            WebkitMaskComposite: 'xor',
-                            maskComposite: 'exclude',
-                          }}
-                        />
-                      )}
-                      
-                      {/* Locked Border */}
-                      {!isEarned && (
-                        <div 
-                          className="absolute inset-[-2px] rounded-full pointer-events-none"
-                          style={{
-                            border: '2px dashed oklch(0.35 0.02 250)',
-                          }}
-                        />
-                      )}
-                      
-                      {/* Badge SVG or Lock Icon */}
+                      {/* Badge Image */}
                       <div className="relative z-10 w-full h-full flex items-center justify-center">
-                        {isEarned && svgPath ? (
+                        {isEarned && pngPath ? (
                           <img 
-                            src={svgPath} 
+                            src={pngPath} 
                             alt={badge.name}
-                            className="w-full h-full"
-                            style={{
-                              filter: `drop-shadow(0 0 8px ${colors.glow})`,
-                            }}
+                            className="w-full h-full object-contain"
                           />
                         ) : (
                           <div 
-                            className="w-full h-full rounded-full flex items-center justify-center"
+                            className="w-20 h-20 rounded-full flex items-center justify-center relative"
                             style={{
                               background: 'oklch(0.18 0.03 250)',
+                              border: '2px dashed oklch(0.35 0.02 250)',
                             }}
                           >
                             <Lock className="w-8 h-8 text-[oklch(0.40_0.02_250)]" />
@@ -387,56 +447,55 @@ export default function Badges() {
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 exit={{ scale: 0.8, opacity: 0 }}
-                className="neon-card p-6 max-w-sm w-full relative"
+                className="neon-card p-6 max-w-sm w-full relative overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
               >
+                {/* Sparkle particles for unlock animation */}
+                {selectedBadge.earned && showUnlockAnimation && (
+                  <>
+                    <div className="sparkle-particle" />
+                    <div className="sparkle-particle" />
+                    <div className="sparkle-particle" />
+                    <div className="sparkle-particle" />
+                    <div className="sparkle-particle" />
+                    <div className="sparkle-particle" />
+                  </>
+                )}
+
                 {/* Close button */}
                 <button 
                   onClick={() => setSelectedBadge(null)}
-                  className="absolute top-4 right-4 text-[oklch(0.60_0.03_220)] hover:text-[oklch(0.80_0.03_220)]"
+                  className="absolute top-4 right-4 text-[oklch(0.60_0.03_220)] hover:text-[oklch(0.80_0.03_220)] z-10"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-5 w-5" />
                 </button>
 
                 {/* Badge Display */}
-                <div className="flex flex-col items-center text-center">
+                <div className="flex flex-col items-center text-center relative">
                   {/* Large Badge */}
                   <div 
-                    className={`w-32 h-32 rounded-full flex items-center justify-center relative mb-4 ${
-                      selectedBadge.earned && showUnlockAnimation ? 'badge-unlock' : ''
+                    className={`w-40 h-40 flex items-center justify-center relative mb-4 ${
+                      selectedBadge.earned && showUnlockAnimation ? 'badge-unlock-animation' : ''
                     }`}
                     style={selectedBadge.earned ? {
-                      boxShadow: `0 0 40px ${rarityColors[selectedBadge.rarity]?.glow || rarityColors.common.glow}`,
+                      filter: `drop-shadow(0 0 30px ${rarityColors[selectedBadge.rarity]?.glow || rarityColors.common.glow}) drop-shadow(0 0 60px ${rarityColors[selectedBadge.rarity]?.glow || rarityColors.common.glow})`,
                     } : {}}
                   >
-                    {selectedBadge.earned && (
-                      <div 
-                        className="absolute inset-[-4px] rounded-full"
-                        style={{
-                          background: `linear-gradient(135deg, ${rarityColors[selectedBadge.rarity]?.border || rarityColors.common.border} 0%, ${rarityColors[selectedBadge.rarity]?.border || rarityColors.common.border}80 100%)`,
-                          padding: '4px',
-                          WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                          WebkitMaskComposite: 'xor',
-                          maskComposite: 'exclude',
-                        }}
-                      />
-                    )}
-                    
                     {selectedBadge.earned ? (
                       <img 
-                        src={badgeSvgMap[getBadgeCode(selectedBadge.name)]} 
+                        src={badgePngMap[getBadgeCode(selectedBadge.name)]} 
                         alt={selectedBadge.name}
-                        className="w-full h-full"
-                        style={{
-                          filter: `drop-shadow(0 0 12px ${rarityColors[selectedBadge.rarity]?.glow || rarityColors.common.glow})`,
-                        }}
+                        className="w-full h-full object-contain"
                       />
                     ) : (
                       <div 
-                        className="w-full h-full rounded-full flex items-center justify-center"
-                        style={{ background: 'oklch(0.18 0.03 250)' }}
+                        className="w-32 h-32 rounded-full flex items-center justify-center"
+                        style={{ 
+                          background: 'oklch(0.18 0.03 250)',
+                          border: '3px dashed oklch(0.35 0.02 250)',
+                        }}
                       >
-                        <Lock className="w-12 h-12 text-[oklch(0.40_0.02_250)]" />
+                        <Lock className="w-16 h-16 text-[oklch(0.40_0.02_250)]" />
                       </div>
                     )}
                   </div>
@@ -450,13 +509,15 @@ export default function Badges() {
                   </h3>
                   
                   <span 
-                    className="text-xs font-medium px-3 py-1 rounded-full mb-3"
+                    className="text-xs font-medium px-3 py-1 rounded-full mb-3 flex items-center gap-1"
                     style={{
                       background: rarityColors[selectedBadge.rarity]?.bg || rarityColors.common.bg,
                       color: rarityColors[selectedBadge.rarity]?.text || rarityColors.common.text,
                     }}
                   >
+                    {selectedBadge.rarity === 'legendary' && <Sparkles className="w-3 h-3" />}
                     {rarityLabels[selectedBadge.rarity] || "Comune"}
+                    {selectedBadge.rarity === 'legendary' && <Sparkles className="w-3 h-3" />}
                   </span>
                   
                   <p className="text-[oklch(0.70_0.03_220)] text-sm mb-4">
