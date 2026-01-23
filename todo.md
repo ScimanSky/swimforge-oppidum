@@ -89,3 +89,10 @@
 - [x] Implementare supporto MFA (codice via email) per Garmin Connect
 - [x] Fix errore SQL leaderboard GROUP BY incompatibile con MySQL
 
+## Restyling UI (Dark Gaming Theme)
+- [x] Nuovo tema dark con sfondo scuro e colori Oppidum
+- [x] Badge con bordi luminosi e effetti glow neon
+- [x] Animazioni unlock elaborate con particelle
+- [x] Feedback sonoro per badge e level-up
+- [x] Card con effetti glassmorphism e bordi luminosi
+

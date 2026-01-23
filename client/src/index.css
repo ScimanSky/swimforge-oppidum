@@ -43,97 +43,58 @@
 }
 
 :root {
-  /* SwimForge Oppidum Theme - Navy Blue, Azure, Gold */
+  /* SwimForge Oppidum Dark Gaming Theme */
   --radius: 0.75rem;
   
-  /* Oppidum Brand Colors */
-  --navy: oklch(0.25 0.05 250);
-  --navy-light: oklch(0.35 0.06 250);
-  --azure: oklch(0.65 0.15 230);
-  --azure-light: oklch(0.75 0.12 230);
-  --gold: oklch(0.78 0.15 85);
-  --gold-light: oklch(0.85 0.12 85);
+  /* Oppidum Brand Colors - Neon Gaming Style */
+  --navy-deep: oklch(0.12 0.03 250);
+  --navy: oklch(0.18 0.04 250);
+  --navy-light: oklch(0.25 0.05 250);
+  --azure: oklch(0.70 0.18 220);
+  --azure-bright: oklch(0.80 0.15 220);
+  --azure-glow: oklch(0.75 0.20 220);
+  --gold: oklch(0.82 0.18 85);
+  --gold-bright: oklch(0.88 0.15 85);
+  --cyan: oklch(0.75 0.15 195);
+  --cyan-glow: oklch(0.80 0.18 195);
+  --purple: oklch(0.60 0.20 300);
+  --green: oklch(0.70 0.20 145);
   
-  --primary: var(--navy);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: var(--azure);
-  --secondary-foreground: oklch(0.98 0 0);
-  --accent: var(--gold);
-  --accent-foreground: var(--navy);
-  
-  --background: oklch(0.98 0.005 250);
-  --foreground: oklch(0.2 0.03 250);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.03 250);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.03 250);
-  --muted: oklch(0.95 0.01 250);
-  --muted-foreground: oklch(0.5 0.02 250);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.9 0.015 250);
-  --input: oklch(0.9 0.015 250);
-  --ring: var(--azure);
-  
-  --chart-1: var(--navy);
-  --chart-2: var(--azure);
-  --chart-3: var(--gold);
-  --chart-4: oklch(0.6 0.15 160);
-  --chart-5: oklch(0.6 0.15 320);
-  
-  --sidebar: oklch(0.98 0 0);
-  --sidebar-foreground: oklch(0.2 0.03 250);
-  --sidebar-primary: var(--azure);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.95 0.01 250);
-  --sidebar-accent-foreground: oklch(0.2 0.03 250);
-  --sidebar-border: oklch(0.9 0.015 250);
-  --sidebar-ring: var(--azure);
-}
-
-.dark {
-  /* SwimForge Oppidum Dark Theme */
-  --navy: oklch(0.25 0.05 250);
-  --navy-light: oklch(0.35 0.06 250);
-  --azure: oklch(0.65 0.15 230);
-  --azure-light: oklch(0.75 0.12 230);
-  --gold: oklch(0.78 0.15 85);
-  --gold-light: oklch(0.85 0.12 85);
-  
+  /* Dark Theme as Default */
   --primary: var(--azure);
-  --primary-foreground: oklch(0.15 0.03 250);
-  --secondary: oklch(0.3 0.04 250);
-  --secondary-foreground: oklch(0.95 0.01 250);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: var(--navy-light);
+  --secondary-foreground: oklch(0.95 0.01 220);
   --accent: var(--gold);
-  --accent-foreground: oklch(0.15 0.03 250);
+  --accent-foreground: var(--navy-deep);
   
-  --background: oklch(0.15 0.025 250);
-  --foreground: oklch(0.95 0.01 250);
-  --card: oklch(0.2 0.03 250);
-  --card-foreground: oklch(0.95 0.01 250);
-  --popover: oklch(0.2 0.03 250);
-  --popover-foreground: oklch(0.95 0.01 250);
-  --muted: oklch(0.25 0.03 250);
-  --muted-foreground: oklch(0.7 0.02 250);
-  --destructive: oklch(0.6 0.2 25);
+  --background: var(--navy-deep);
+  --foreground: oklch(0.95 0.01 220);
+  --card: oklch(0.16 0.035 250);
+  --card-foreground: oklch(0.95 0.01 220);
+  --popover: oklch(0.18 0.04 250);
+  --popover-foreground: oklch(0.95 0.01 220);
+  --muted: oklch(0.22 0.035 250);
+  --muted-foreground: oklch(0.65 0.03 220);
+  --destructive: oklch(0.6 0.22 25);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.3 0.03 250);
-  --input: oklch(0.3 0.03 250);
+  --border: oklch(0.28 0.04 250);
+  --input: oklch(0.22 0.04 250);
   --ring: var(--azure);
   
   --chart-1: var(--azure);
   --chart-2: var(--gold);
-  --chart-3: oklch(0.65 0.15 160);
-  --chart-4: oklch(0.65 0.15 320);
-  --chart-5: oklch(0.65 0.15 50);
+  --chart-3: var(--cyan);
+  --chart-4: var(--purple);
+  --chart-5: var(--green);
   
-  --sidebar: oklch(0.18 0.025 250);
-  --sidebar-foreground: oklch(0.95 0.01 250);
+  --sidebar: var(--navy);
+  --sidebar-foreground: oklch(0.95 0.01 220);
   --sidebar-primary: var(--azure);
-  --sidebar-primary-foreground: oklch(0.15 0.03 250);
-  --sidebar-accent: oklch(0.25 0.03 250);
-  --sidebar-accent-foreground: oklch(0.95 0.01 250);
-  --sidebar-border: oklch(0.3 0.03 250);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.22 0.04 250);
+  --sidebar-accent-foreground: oklch(0.95 0.01 220);
+  --sidebar-border: oklch(0.28 0.04 250);
   --sidebar-ring: var(--azure);
 }
 
@@ -143,6 +104,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    background: linear-gradient(180deg, 
+      oklch(0.10 0.03 250) 0%, 
+      oklch(0.14 0.035 250) 50%,
+      oklch(0.12 0.03 250) 100%
+    );
+    min-height: 100vh;
   }
   button:not(:disabled),
   [role="button"]:not([aria-disabled="true"]),
@@ -158,24 +125,11 @@
 }
 
 @layer components {
-  /**
-   * Custom container utility that centers content and adds responsive padding.
-   *
-   * This overrides Tailwind's default container behavior to:
-   * - Auto-center content (mx-auto)
-   * - Add responsive horizontal padding
-   * - Set max-width for large screens
-   *
-   * Usage: <div className="container">...</div>
-   *
-   * For custom widths, use max-w-* utilities directly:
-   * <div className="max-w-6xl mx-auto px-4">...</div>
-   */
   .container {
     width: 100%;
     margin-left: auto;
     margin-right: auto;
-    padding-left: 1rem; /* 16px - mobile padding */
+    padding-left: 1rem;
     padding-right: 1rem;
   }
 
@@ -186,70 +140,525 @@
 
   @media (min-width: 640px) {
     .container {
-      padding-left: 1.5rem; /* 24px - tablet padding */
+      padding-left: 1.5rem;
       padding-right: 1.5rem;
     }
   }
 
   @media (min-width: 1024px) {
     .container {
-      padding-left: 2rem; /* 32px - desktop padding */
+      padding-left: 2rem;
       padding-right: 2rem;
-      max-width: 1280px; /* Standard content width */
+      max-width: 1280px;
     }
+  }
+
+  /* Gaming Card Style - Glassmorphism with Neon Border */
+  .game-card {
+    background: linear-gradient(135deg, 
+      oklch(0.18 0.04 250 / 0.9) 0%, 
+      oklch(0.14 0.035 250 / 0.8) 100%
+    );
+    backdrop-filter: blur(10px);
+    border: 1px solid oklch(0.35 0.06 250 / 0.3);
+    border-radius: 1rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .game-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      oklch(0.70 0.18 220 / 0.5) 50%, 
+      transparent 100%
+    );
+  }
+
+  /* Neon Glow Card */
+  .neon-card {
+    background: oklch(0.16 0.035 250 / 0.95);
+    border: 1px solid oklch(0.70 0.18 220 / 0.3);
+    border-radius: 1rem;
+    box-shadow: 
+      0 0 20px oklch(0.70 0.18 220 / 0.1),
+      inset 0 1px 0 oklch(1 0 0 / 0.05);
+    transition: all 0.3s ease;
+  }
+
+  .neon-card:hover {
+    border-color: oklch(0.70 0.18 220 / 0.5);
+    box-shadow: 
+      0 0 30px oklch(0.70 0.18 220 / 0.2),
+      0 0 60px oklch(0.70 0.18 220 / 0.1),
+      inset 0 1px 0 oklch(1 0 0 / 0.05);
+  }
+
+  /* Hero Card with Gradient Border */
+  .hero-card {
+    background: linear-gradient(135deg, 
+      oklch(0.20 0.05 250) 0%, 
+      oklch(0.15 0.04 250) 100%
+    );
+    border-radius: 1.25rem;
+    position: relative;
+    padding: 2px;
+  }
+
+  .hero-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 1.25rem;
+    padding: 2px;
+    background: linear-gradient(135deg, 
+      oklch(0.70 0.18 220 / 0.6) 0%, 
+      oklch(0.82 0.18 85 / 0.4) 50%,
+      oklch(0.75 0.15 195 / 0.6) 100%
+    );
+    -webkit-mask: 
+      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0);
+    mask: 
+      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  .hero-card-inner {
+    background: linear-gradient(135deg, 
+      oklch(0.20 0.05 250) 0%, 
+      oklch(0.15 0.04 250) 100%
+    );
+    border-radius: calc(1.25rem - 2px);
+    padding: 1.5rem;
   }
 }
 
-/* SwimForge Custom Utilities */
+/* SwimForge Gaming Utilities */
 @layer utilities {
-  /* XP Progress bar animation */
+  /* XP Progress bar - Neon Style */
+  .xp-bar-container {
+    background: oklch(0.20 0.04 250);
+    border-radius: 9999px;
+    height: 8px;
+    overflow: hidden;
+    position: relative;
+  }
+
   .xp-bar-fill {
-    background: linear-gradient(90deg, var(--gold) 0%, var(--gold-light) 100%);
-    animation: xp-pulse 2s ease-in-out infinite;
+    background: linear-gradient(90deg, 
+      oklch(0.70 0.18 220) 0%, 
+      oklch(0.75 0.15 195) 50%,
+      oklch(0.82 0.18 85) 100%
+    );
+    height: 100%;
+    border-radius: 9999px;
+    position: relative;
+    animation: xp-shimmer 2s ease-in-out infinite;
   }
 
-  @keyframes xp-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.85; }
+  .xp-bar-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      oklch(1 0 0 / 0.3) 50%, 
+      transparent 100%
+    );
+    animation: xp-shine 2s ease-in-out infinite;
   }
 
-  /* Badge glow effect */
-  .badge-glow {
-    box-shadow: 0 0 20px oklch(0.65 0.15 230 / 0.5);
-    animation: badge-glow-pulse 2s ease-in-out infinite;
+  @keyframes xp-shimmer {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.2); }
   }
 
-  @keyframes badge-glow-pulse {
-    0%, 100% { box-shadow: 0 0 20px oklch(0.65 0.15 230 / 0.5); }
-    50% { box-shadow: 0 0 30px oklch(0.65 0.15 230 / 0.7); }
+  @keyframes xp-shine {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
   }
 
-  /* Badge unlock animation */
+  /* Badge Container - Hexagonal Style */
+  .badge-container {
+    width: 100px;
+    height: 100px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .badge-frame {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: linear-gradient(135deg, 
+      oklch(0.22 0.04 250) 0%, 
+      oklch(0.16 0.035 250) 100%
+    );
+    border: 3px solid transparent;
+    transition: all 0.3s ease;
+  }
+
+  .badge-frame::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    padding: 3px;
+    background: linear-gradient(135deg, 
+      var(--badge-color-1, oklch(0.5 0.02 250)) 0%, 
+      var(--badge-color-2, oklch(0.4 0.02 250)) 100%
+    );
+    -webkit-mask: 
+      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0);
+    mask: 
+      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  .badge-icon {
+    font-size: 2.5rem;
+    filter: drop-shadow(0 0 10px var(--badge-glow, oklch(0.5 0.02 250 / 0.5)));
+  }
+
+  /* Badge Rarity Styles */
+  .badge-common .badge-frame {
+    --badge-color-1: oklch(0.5 0.03 250);
+    --badge-color-2: oklch(0.4 0.02 250);
+    --badge-glow: oklch(0.5 0.03 250 / 0.3);
+  }
+
+  .badge-uncommon .badge-frame {
+    --badge-color-1: oklch(0.70 0.20 145);
+    --badge-color-2: oklch(0.60 0.18 145);
+    --badge-glow: oklch(0.70 0.20 145 / 0.5);
+    box-shadow: 0 0 20px oklch(0.70 0.20 145 / 0.3);
+  }
+
+  .badge-rare .badge-frame {
+    --badge-color-1: oklch(0.70 0.18 220);
+    --badge-color-2: oklch(0.60 0.16 220);
+    --badge-glow: oklch(0.70 0.18 220 / 0.6);
+    box-shadow: 0 0 25px oklch(0.70 0.18 220 / 0.4);
+  }
+
+  .badge-epic .badge-frame {
+    --badge-color-1: oklch(0.65 0.22 300);
+    --badge-color-2: oklch(0.55 0.20 300);
+    --badge-glow: oklch(0.65 0.22 300 / 0.6);
+    box-shadow: 0 0 30px oklch(0.65 0.22 300 / 0.4);
+    animation: epic-pulse 2s ease-in-out infinite;
+  }
+
+  .badge-legendary .badge-frame {
+    --badge-color-1: oklch(0.85 0.18 85);
+    --badge-color-2: oklch(0.75 0.20 50);
+    --badge-glow: oklch(0.85 0.18 85 / 0.7);
+    box-shadow: 
+      0 0 30px oklch(0.85 0.18 85 / 0.5),
+      0 0 60px oklch(0.85 0.18 85 / 0.3);
+    animation: legendary-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes epic-pulse {
+    0%, 100% { 
+      box-shadow: 0 0 30px oklch(0.65 0.22 300 / 0.4);
+      filter: brightness(1);
+    }
+    50% { 
+      box-shadow: 0 0 40px oklch(0.65 0.22 300 / 0.6);
+      filter: brightness(1.1);
+    }
+  }
+
+  @keyframes legendary-pulse {
+    0%, 100% { 
+      box-shadow: 
+        0 0 30px oklch(0.85 0.18 85 / 0.5),
+        0 0 60px oklch(0.85 0.18 85 / 0.3);
+      filter: brightness(1);
+    }
+    50% { 
+      box-shadow: 
+        0 0 40px oklch(0.85 0.18 85 / 0.7),
+        0 0 80px oklch(0.85 0.18 85 / 0.4);
+      filter: brightness(1.15);
+    }
+  }
+
+  /* Badge Locked State */
+  .badge-locked .badge-frame {
+    background: oklch(0.15 0.02 250);
+    opacity: 0.5;
+    filter: grayscale(1);
+  }
+
+  .badge-locked .badge-icon {
+    opacity: 0.3;
+  }
+
+  /* Badge Unlock Animation */
   .badge-unlock {
-    animation: badge-unlock 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    animation: badge-unlock 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   }
 
   @keyframes badge-unlock {
-    0% { transform: scale(0) rotate(-180deg); opacity: 0; }
-    50% { transform: scale(1.2) rotate(10deg); }
-    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    0% { 
+      transform: scale(0) rotate(-180deg); 
+      opacity: 0;
+      filter: brightness(3);
+    }
+    50% { 
+      transform: scale(1.3) rotate(10deg);
+      filter: brightness(2);
+    }
+    75% {
+      transform: scale(0.9) rotate(-5deg);
+    }
+    100% { 
+      transform: scale(1) rotate(0deg); 
+      opacity: 1;
+      filter: brightness(1);
+    }
   }
 
-  /* Level up animation */
+  /* Particle Burst Effect */
+  .particle-burst {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+
+  .particle-burst::before,
+  .particle-burst::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    animation: particle-expand 0.8s ease-out forwards;
+  }
+
+  .particle-burst::before {
+    border: 2px solid oklch(0.70 0.18 220 / 0.6);
+  }
+
+  .particle-burst::after {
+    border: 2px solid oklch(0.82 0.18 85 / 0.4);
+    animation-delay: 0.1s;
+  }
+
+  @keyframes particle-expand {
+    0% { transform: scale(0.5); opacity: 1; }
+    100% { transform: scale(2); opacity: 0; }
+  }
+
+  /* Level Up Animation */
   .level-up {
-    animation: level-up 1s ease-out;
+    animation: level-up 1.2s ease-out;
   }
 
   @keyframes level-up {
-    0% { transform: scale(1); }
-    25% { transform: scale(1.1); }
-    50% { transform: scale(1); box-shadow: 0 0 0 0 oklch(0.78 0.15 85 / 0.7); }
-    100% { transform: scale(1); box-shadow: 0 0 0 20px oklch(0.78 0.15 85 / 0); }
+    0% { 
+      transform: scale(1);
+      filter: brightness(1);
+    }
+    20% { 
+      transform: scale(1.15);
+      filter: brightness(1.5);
+    }
+    40% { 
+      transform: scale(1);
+      filter: brightness(1);
+    }
+    60% {
+      transform: scale(1.05);
+    }
+    100% { 
+      transform: scale(1);
+    }
   }
 
-  /* Shimmer effect for loading */
+  /* Neon Text Glow */
+  .neon-text {
+    text-shadow: 
+      0 0 10px oklch(0.70 0.18 220 / 0.8),
+      0 0 20px oklch(0.70 0.18 220 / 0.6),
+      0 0 40px oklch(0.70 0.18 220 / 0.4);
+  }
+
+  .neon-text-gold {
+    text-shadow: 
+      0 0 10px oklch(0.82 0.18 85 / 0.8),
+      0 0 20px oklch(0.82 0.18 85 / 0.6),
+      0 0 40px oklch(0.82 0.18 85 / 0.4);
+  }
+
+  /* Gradient Text */
+  .gradient-text {
+    background: linear-gradient(90deg, 
+      oklch(0.70 0.18 220) 0%, 
+      oklch(0.75 0.15 195) 50%,
+      oklch(0.82 0.18 85) 100%
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Stats Card */
+  .stat-card {
+    background: oklch(0.16 0.035 250 / 0.8);
+    border: 1px solid oklch(0.30 0.04 250 / 0.5);
+    border-radius: 1rem;
+    padding: 1.25rem;
+    text-align: center;
+    transition: all 0.3s ease;
+  }
+
+  .stat-card:hover {
+    border-color: oklch(0.70 0.18 220 / 0.5);
+    box-shadow: 0 0 20px oklch(0.70 0.18 220 / 0.15);
+    transform: translateY(-2px);
+  }
+
+  .stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: oklch(0.95 0.01 220);
+  }
+
+  .stat-label {
+    font-size: 0.875rem;
+    color: oklch(0.60 0.03 220);
+    margin-top: 0.25rem;
+  }
+
+  .stat-icon {
+    color: oklch(0.70 0.18 220);
+    margin-bottom: 0.5rem;
+  }
+
+  /* Leaderboard Row */
+  .leaderboard-row {
+    background: oklch(0.16 0.035 250 / 0.6);
+    border: 1px solid oklch(0.28 0.04 250 / 0.5);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .leaderboard-row:hover {
+    background: oklch(0.18 0.04 250 / 0.8);
+    border-color: oklch(0.70 0.18 220 / 0.4);
+    transform: translateX(4px);
+  }
+
+  .leaderboard-rank {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1rem;
+  }
+
+  .rank-1 {
+    background: linear-gradient(135deg, oklch(0.85 0.18 85) 0%, oklch(0.75 0.20 50) 100%);
+    color: oklch(0.15 0.03 250);
+    box-shadow: 0 0 15px oklch(0.85 0.18 85 / 0.5);
+  }
+
+  .rank-2 {
+    background: linear-gradient(135deg, oklch(0.75 0.02 250) 0%, oklch(0.60 0.02 250) 100%);
+    color: oklch(0.15 0.03 250);
+    box-shadow: 0 0 10px oklch(0.75 0.02 250 / 0.4);
+  }
+
+  .rank-3 {
+    background: linear-gradient(135deg, oklch(0.65 0.12 50) 0%, oklch(0.55 0.10 50) 100%);
+    color: oklch(0.15 0.03 250);
+    box-shadow: 0 0 10px oklch(0.65 0.12 50 / 0.4);
+  }
+
+  /* Bottom Navigation - Gaming Style */
+  .bottom-nav {
+    background: linear-gradient(180deg, 
+      oklch(0.14 0.035 250 / 0.95) 0%, 
+      oklch(0.12 0.03 250 / 0.98) 100%
+    );
+    backdrop-filter: blur(20px);
+    border-top: 1px solid oklch(0.30 0.04 250 / 0.5);
+    box-shadow: 0 -10px 40px oklch(0 0 0 / 0.3);
+  }
+
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem 1rem;
+    color: oklch(0.55 0.03 220);
+    transition: all 0.3s ease;
+    position: relative;
+  }
+
+  .nav-item.active {
+    color: oklch(0.70 0.18 220);
+  }
+
+  .nav-item.active::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 3px;
+    background: linear-gradient(90deg, 
+      oklch(0.70 0.18 220) 0%, 
+      oklch(0.75 0.15 195) 100%
+    );
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 0 10px oklch(0.70 0.18 220 / 0.5);
+  }
+
+  .nav-item:hover:not(.active) {
+    color: oklch(0.75 0.10 220);
+  }
+
+  /* Shimmer Loading */
   .shimmer {
-    background: linear-gradient(90deg, var(--muted) 0%, oklch(0.6 0.02 250 / 0.1) 50%, var(--muted) 100%);
+    background: linear-gradient(90deg, 
+      oklch(0.20 0.03 250) 0%, 
+      oklch(0.25 0.04 250) 50%, 
+      oklch(0.20 0.03 250) 100%
+    );
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
   }
@@ -259,76 +668,17 @@
     100% { background-position: -200% 0; }
   }
 
-  /* Water wave background */
-  .water-wave {
-    background: linear-gradient(180deg, oklch(0.65 0.15 230 / 0.1) 0%, oklch(0.65 0.15 230 / 0.05) 100%);
-  }
-
-  /* Gradient text */
-  .gradient-text {
-    background: linear-gradient(90deg, var(--azure) 0%, var(--gold) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  /* Card hover effect */
-  .card-hover {
-    transition: all 0.3s ease;
-  }
-
-  .card-hover:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 40px -10px oklch(0.65 0.15 230 / 0.2);
-  }
-
-  /* Rarity colors */
-  .rarity-common { color: var(--muted-foreground); }
-  .rarity-uncommon { color: oklch(0.65 0.2 145); }
-  .rarity-rare { color: oklch(0.6 0.2 250); }
-  .rarity-epic { color: oklch(0.6 0.25 300); }
-  .rarity-legendary { color: var(--gold); }
-
-  /* Badge rarity borders */
-  .badge-common { border-color: oklch(0.5 0.02 250 / 0.3); }
-  
-  .badge-uncommon { 
-    border-color: oklch(0.65 0.2 145 / 0.5);
-    box-shadow: 0 0 10px oklch(0.65 0.2 145 / 0.2);
-  }
-  
-  .badge-rare { 
-    border-color: oklch(0.6 0.2 250 / 0.5);
-    box-shadow: 0 0 15px oklch(0.6 0.2 250 / 0.3);
-  }
-  
-  .badge-epic { 
-    border-color: oklch(0.6 0.25 300 / 0.5);
-    box-shadow: 0 0 20px oklch(0.6 0.25 300 / 0.4);
-  }
-  
-  .badge-legendary { 
-    border-color: oklch(0.78 0.15 85 / 0.5);
-    box-shadow: 0 0 25px oklch(0.78 0.15 85 / 0.5);
-    animation: legendary-pulse 2s ease-in-out infinite;
-  }
-
-  @keyframes legendary-pulse {
-    0%, 100% { box-shadow: 0 0 25px oklch(0.78 0.15 85 / 0.5); }
-    50% { box-shadow: 0 0 35px oklch(0.78 0.15 85 / 0.7); }
-  }
-
-  /* Floating animation for badges */
+  /* Floating Animation */
   .float {
     animation: float 3s ease-in-out infinite;
   }
 
   @keyframes float {
     0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
+    50% { transform: translateY(-8px); }
   }
 
-  /* Pulse ring animation */
+  /* Pulse Ring */
   .pulse-ring {
     animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
   }
@@ -338,7 +688,7 @@
     80%, 100% { transform: scale(2); opacity: 0; }
   }
 
-  /* Stats counter animation */
+  /* Count Up Animation */
   .count-up {
     animation: count-up 0.5s ease-out;
   }
@@ -346,5 +696,358 @@
   @keyframes count-up {
     0% { transform: translateY(10px); opacity: 0; }
     100% { transform: translateY(0); opacity: 1; }
+  }
+
+  /* Rarity Text Colors */
+  .rarity-common { color: oklch(0.60 0.03 250); }
+  .rarity-uncommon { color: oklch(0.70 0.20 145); }
+  .rarity-rare { color: oklch(0.70 0.18 220); }
+  .rarity-epic { color: oklch(0.65 0.22 300); }
+  .rarity-legendary { color: oklch(0.85 0.18 85); }
+
+  /* Glow Button */
+  .glow-button {
+    background: linear-gradient(135deg, 
+      oklch(0.70 0.18 220) 0%, 
+      oklch(0.60 0.16 220) 100%
+    );
+    color: oklch(0.98 0 0);
+    border: none;
+    border-radius: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    box-shadow: 0 0 20px oklch(0.70 0.18 220 / 0.3);
+  }
+
+  .glow-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 
+      0 0 30px oklch(0.70 0.18 220 / 0.5),
+      0 5px 20px oklch(0 0 0 / 0.3);
+  }
+
+  .glow-button:active {
+    transform: translateY(0);
+  }
+
+  /* Activity Card */
+  .activity-card {
+    background: oklch(0.16 0.035 250 / 0.8);
+    border: 1px solid oklch(0.28 0.04 250 / 0.5);
+    border-radius: 1rem;
+    padding: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .activity-card:hover {
+    border-color: oklch(0.70 0.18 220 / 0.4);
+    box-shadow: 0 0 15px oklch(0.70 0.18 220 / 0.1);
+  }
+
+  /* Tab Style */
+  .game-tab {
+    background: transparent;
+    border: 1px solid oklch(0.30 0.04 250 / 0.5);
+    border-radius: 0.5rem;
+    padding: 0.5rem 1rem;
+    color: oklch(0.60 0.03 220);
+    transition: all 0.3s ease;
+  }
+
+  .game-tab.active {
+    background: oklch(0.70 0.18 220 / 0.2);
+    border-color: oklch(0.70 0.18 220 / 0.6);
+    color: oklch(0.70 0.18 220);
+    box-shadow: 0 0 15px oklch(0.70 0.18 220 / 0.2);
+  }
+
+  .game-tab:hover:not(.active) {
+    border-color: oklch(0.50 0.08 220 / 0.5);
+    color: oklch(0.75 0.10 220);
+  }
+}
+
+/* Advanced Particle Effects */
+@layer utilities {
+  /* Sparkle Particles */
+  .sparkle-container {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .sparkle {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: oklch(0.95 0.02 85);
+    border-radius: 50%;
+    animation: sparkle-float 1.5s ease-out forwards;
+  }
+
+  @keyframes sparkle-float {
+    0% {
+      transform: translate(0, 0) scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(var(--tx, 50px), var(--ty, -80px)) scale(0);
+      opacity: 0;
+    }
+  }
+
+  /* Confetti Burst */
+  .confetti-burst {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .confetti {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    animation: confetti-fall 1s ease-out forwards;
+  }
+
+  @keyframes confetti-fall {
+    0% {
+      transform: translate(0, 0) rotate(0deg) scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(var(--tx, 0), var(--ty, 100px)) rotate(720deg) scale(0);
+      opacity: 0;
+    }
+  }
+
+  /* Ring Pulse Effect */
+  .ring-pulse {
+    position: absolute;
+    inset: -10px;
+    border: 3px solid oklch(0.70 0.18 220 / 0.6);
+    border-radius: 50%;
+    animation: ring-expand 0.8s ease-out forwards;
+  }
+
+  .ring-pulse:nth-child(2) {
+    animation-delay: 0.15s;
+    border-color: oklch(0.82 0.18 85 / 0.5);
+  }
+
+  .ring-pulse:nth-child(3) {
+    animation-delay: 0.3s;
+    border-color: oklch(0.75 0.15 195 / 0.4);
+  }
+
+  @keyframes ring-expand {
+    0% {
+      transform: scale(0.5);
+      opacity: 1;
+    }
+    100% {
+      transform: scale(2.5);
+      opacity: 0;
+    }
+  }
+
+  /* Level Badge - Gaming Style */
+  .level-badge {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: linear-gradient(135deg, 
+      oklch(0.22 0.05 250) 0%, 
+      oklch(0.16 0.04 250) 100%
+    );
+    box-shadow: 
+      0 0 30px oklch(0.70 0.18 220 / 0.3),
+      inset 0 0 20px oklch(0.70 0.18 220 / 0.1);
+  }
+
+  .level-badge::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, 
+      oklch(0.70 0.18 220) 0%, 
+      oklch(0.82 0.18 85) 50%,
+      oklch(0.75 0.15 195) 100%
+    );
+    padding: 3px;
+    -webkit-mask: 
+      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0);
+    mask: 
+      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: border-rotate 4s linear infinite;
+  }
+
+  @keyframes border-rotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Trophy Shine Effect */
+  .trophy-shine {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .trophy-shine::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: linear-gradient(
+      45deg,
+      transparent 40%,
+      oklch(1 0 0 / 0.1) 50%,
+      transparent 60%
+    );
+    animation: trophy-shine 3s ease-in-out infinite;
+  }
+
+  @keyframes trophy-shine {
+    0% { transform: translateX(-100%) rotate(45deg); }
+    100% { transform: translateX(100%) rotate(45deg); }
+  }
+
+  /* Notification Badge Bounce */
+  .notification-bounce {
+    animation: notification-bounce 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+
+  @keyframes notification-bounce {
+    0% { transform: scale(0); }
+    50% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+  }
+
+  /* XP Gain Animation */
+  .xp-gain {
+    animation: xp-gain 1s ease-out forwards;
+    color: oklch(0.82 0.18 85);
+    font-weight: 700;
+  }
+
+  @keyframes xp-gain {
+    0% {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: translateY(-20px) scale(1.2);
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(-40px) scale(0.8);
+      opacity: 0;
+    }
+  }
+
+  /* Badge Unlock Celebration */
+  .badge-celebration {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .celebration-particle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    animation: celebration-burst 1.5s ease-out forwards;
+  }
+
+  @keyframes celebration-burst {
+    0% {
+      transform: translate(-50%, -50%) scale(0);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(
+        calc(-50% + var(--dx, 0) * 200px), 
+        calc(-50% + var(--dy, 0) * 200px)
+      ) scale(1);
+      opacity: 0;
+    }
+  }
+
+  /* Glowing Border Animation */
+  .glow-border {
+    position: relative;
+  }
+
+  .glow-border::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: linear-gradient(
+      var(--glow-angle, 0deg),
+      oklch(0.70 0.18 220) 0%,
+      oklch(0.82 0.18 85) 25%,
+      oklch(0.75 0.15 195) 50%,
+      oklch(0.65 0.22 300) 75%,
+      oklch(0.70 0.18 220) 100%
+    );
+    padding: 2px;
+    -webkit-mask: 
+      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0);
+    mask: 
+      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: glow-rotate 3s linear infinite;
+  }
+
+  @keyframes glow-rotate {
+    0% { --glow-angle: 0deg; }
+    100% { --glow-angle: 360deg; }
+  }
+
+  /* Pulse Glow */
+  .pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 0 20px oklch(0.70 0.18 220 / 0.3);
+    }
+    50% {
+      box-shadow: 0 0 40px oklch(0.70 0.18 220 / 0.6);
+    }
+  }
+
+  /* Success Flash */
+  .success-flash {
+    animation: success-flash 0.5s ease-out;
+  }
+
+  @keyframes success-flash {
+    0% {
+      background-color: oklch(0.70 0.20 145 / 0.3);
+    }
+    100% {
+      background-color: transparent;
+    }
   }
 }
