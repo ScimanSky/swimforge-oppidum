@@ -446,20 +446,35 @@ async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_ke
                 detail="La sessione MFA è scaduta. Riavvia il processo di login."
             )
         
-        # Complete MFA
-        # Redirect stdin and provide the MFA code
-        import sys
-        from io import StringIO
-        old_stdin = sys.stdin
-        sys.stdin = StringIO(request.mfa_code + "\n")  # Provide MFA code via stdin
+        # Complete MFA using HTTP API directly
+        import httpx
         
         try:
-            # Call login again, this time it will read the MFA code from stdin
-            client.login()
-            sys.stdin = old_stdin  # Restore stdin
-            logger.info(f"MFA completed successfully for user {request.user_id}")
+            # Get the session cookies from the client
+            # We need to send the MFA code to Garmin's verification endpoint
+            logger.info(f"Sending MFA code to Garmin for user {request.user_id}")
+            
+            # Use the client's HTTP session to send MFA code
+            response = client.garth.client.post(
+                "https://sso.garmin.com/sso/verifyMFA/loginEnterMfaCode",
+                json={
+                    "mfaCode": request.mfa_code,
+                    "embedWidget": False
+                }
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"MFA completed successfully for user {request.user_id}")
+            else:
+                logger.error(f"MFA verification failed with status {response.status_code}")
+                raise HTTPException(
+                    status_code=401,
+                    detail="Codice MFA non valido. Verifica il codice e riprova."
+                )
+                
+        except HTTPException:
+            raise
         except Exception as mfa_error:
-            sys.stdin = old_stdin  # Restore stdin
             error_str = str(mfa_error)
             logger.error(f"MFA error for user {request.user_id}: {error_str}")
             
