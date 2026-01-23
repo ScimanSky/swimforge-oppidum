@@ -287,19 +287,40 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
         logger.info(f"Attempting Garmin login for user {request.user_id}")
         
         # Attempt login
-        result = client.login()
-        
-        # Check if MFA is required
-        # When return_on_mfa=True, login() returns a tuple (status, mfa_state) if MFA is needed
-        if isinstance(result, tuple) and len(result) == 2:
-            status, mfa_state = result
-            if status == "needs_mfa":
-                logger.info(f"MFA required for user {request.user_id}")
+        try:
+            result = client.login()
+            
+            # Check if MFA is required
+            # When return_on_mfa=True, login() may return a tuple (status, mfa_state) if MFA is needed
+            if isinstance(result, tuple) and len(result) == 2:
+                status, mfa_state = result
+                if status == "needs_mfa" or status == "MFA":
+                    logger.info(f"MFA required for user {request.user_id} (tuple response)")
+                    
+                    # Store pending MFA session
+                    pending_mfa[request.user_id] = {
+                        "client": client,
+                        "mfa_state": mfa_state,
+                        "email": request.email,
+                        "created_at": datetime.now()
+                    }
+                    
+                    return LoginResponse(
+                        success=False,
+                        message="È richiesta l'autenticazione a due fattori (MFA). Controlla la tua email e inserisci il codice ricevuto.",
+                        user_id=request.user_id,
+                        mfa_required=True
+                    )
+        except Exception as login_error:
+            # Check if it's an MFA-related exception
+            error_msg = str(login_error).lower()
+            if "mfa" in error_msg or "multi" in error_msg or "factor" in error_msg or "verification" in error_msg:
+                logger.info(f"MFA required for user {request.user_id} (exception caught)")
                 
-                # Store pending MFA session
+                # Store pending MFA session with client
                 pending_mfa[request.user_id] = {
                     "client": client,
-                    "mfa_state": mfa_state,
+                    "mfa_state": None,  # Will be handled by resume_login
                     "email": request.email,
                     "created_at": datetime.now()
                 }
@@ -310,6 +331,9 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
                     user_id=request.user_id,
                     mfa_required=True
                 )
+            else:
+                # Re-raise if not MFA-related
+                raise login_error
         
         # Login successful without MFA
         logger.info(f"Login successful (no MFA) for user {request.user_id}")
@@ -398,7 +422,12 @@ async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_ke
         
         # Complete MFA
         try:
-            client.resume_login(mfa_state, request.mfa_code)
+            # If mfa_state is None, try to call login with MFA code directly
+            if mfa_state is None:
+                # Some versions require setting the MFA code differently
+                client.login(mfa_code=request.mfa_code)
+            else:
+                client.resume_login(mfa_state, request.mfa_code)
             logger.info(f"MFA completed successfully for user {request.user_id}")
         except Exception as mfa_error:
             error_str = str(mfa_error)
