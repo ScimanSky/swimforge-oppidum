@@ -10,11 +10,14 @@ import Badges from "./pages/Badges";
 import Leaderboard from "./pages/Leaderboard";
 import Activities from "./pages/Activities";
 import Profile from "./pages/Profile";
+import Auth from "./pages/Auth";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/auth" component={Auth} />
+      <Route path="/login" component={Auth} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/badges" component={Badges} />
       <Route path="/leaderboard" component={Leaderboard} />

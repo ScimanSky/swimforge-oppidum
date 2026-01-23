@@ -14,10 +14,11 @@ export const xpReasonEnum = pgEnum("xp_reason", ["activity", "badge", "bonus", "
 // ============================================
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
-  openId: varchar("open_id", { length: 64 }).notNull().unique(),
+  openId: varchar("open_id", { length: 64 }).unique(), // Now optional for email/password auth
   name: text("name"),
-  email: varchar("email", { length: 320 }),
-  loginMethod: varchar("login_method", { length: 64 }),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  passwordHash: text("password_hash"), // For email/password authentication
+  loginMethod: varchar("login_method", { length: 64 }).default("email").notNull(),
   role: roleEnum("role").default("user").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

@@ -2,16 +2,77 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { sdk } from "./_core/sdk";
 import { z } from "zod";
 import * as db from "./db";
 import * as garmin from "./garmin";
 import { TRPCError } from "@trpc/server";
+
+const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
 export const appRouter = router({
   system: systemRouter,
   
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    
+    // Register with email and password
+    register: publicProcedure
+      .input(z.object({
+        email: z.string().email(),
+        password: z.string().min(6, "Password must be at least 6 characters"),
+        name: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await db.registerUser(input.email, input.password, input.name);
+        
+        if (!result.success || !result.user) {
+          throw new TRPCError({ 
+            code: "BAD_REQUEST", 
+            message: result.error || "Registration failed" 
+          });
+        }
+        
+        // Create session token
+        const sessionToken = await sdk.createSessionToken(result.user.id.toString(), {
+          name: result.user.name || "",
+          expiresInMs: ONE_YEAR_MS,
+        });
+        
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        
+        return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
+      }),
+    
+    // Login with email and password
+    login: publicProcedure
+      .input(z.object({
+        email: z.string().email(),
+        password: z.string().min(1),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const result = await db.loginUser(input.email, input.password);
+        
+        if (!result.success || !result.user) {
+          throw new TRPCError({ 
+            code: "UNAUTHORIZED", 
+            message: result.error || "Invalid credentials" 
+          });
+        }
+        
+        // Create session token
+        const sessionToken = await sdk.createSessionToken(result.user.id.toString(), {
+          name: result.user.name || "",
+          expiresInMs: ONE_YEAR_MS,
+        });
+        
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        
+        return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
+      }),
+    
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

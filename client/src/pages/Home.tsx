@@ -1,7 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { getLoginUrl } from "@/const";
+import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { 
   Trophy, 
@@ -112,14 +112,15 @@ export default function Home() {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6, delay: 0.5 }}
             >
-              <Button
-                size="lg"
-                className="bg-[var(--gold)] hover:bg-[var(--gold-light)] text-[var(--navy)] font-semibold text-lg px-8 py-6 rounded-xl shadow-lg hover:shadow-xl transition-all"
-                onClick={() => window.location.href = getLoginUrl()}
-              >
-                Inizia l'Avventura
-                <ChevronRight className="ml-2 h-5 w-5" />
-              </Button>
+              <Link href="/auth">
+                <Button
+                  size="lg"
+                  className="bg-[var(--gold)] hover:bg-[var(--gold-light)] text-[var(--navy)] font-semibold text-lg px-8 py-6 rounded-xl shadow-lg hover:shadow-xl transition-all"
+                >
+                  Inizia l'Avventura
+                  <ChevronRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
             </motion.div>
 
             {/* Stats preview */}
@@ -257,14 +258,15 @@ export default function Home() {
             <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
               Unisciti ai tuoi compagni di squadra e inizia a guadagnare XP oggi stesso.
             </p>
-            <Button
-              size="lg"
-              className="bg-[var(--navy)] hover:bg-[var(--navy-light)] text-white font-semibold text-lg px-8 py-6 rounded-xl"
-              onClick={() => window.location.href = getLoginUrl()}
-            >
-              Accedi con Manus
-              <ChevronRight className="ml-2 h-5 w-5" />
-            </Button>
+            <Link href="/auth">
+              <Button
+                size="lg"
+                className="bg-[var(--navy)] hover:bg-[var(--navy-light)] text-white font-semibold text-lg px-8 py-6 rounded-xl"
+              >
+                Accedi o Registrati
+                <ChevronRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
           </motion.div>
         </div>
       </section>

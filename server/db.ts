@@ -1,8 +1,9 @@
 import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import bcrypt from "bcryptjs";
 import { 
-  InsertUser, users, 
+  InsertUser, users, User,
   swimmerProfiles, InsertSwimmerProfile,
   swimmingActivities, InsertSwimmingActivity,
   badgeDefinitions, InsertBadgeDefinition,
@@ -36,11 +37,100 @@ export async function getDb() {
 // ============================================
 // USER QUERIES
 // ============================================
-export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) {
-    throw new Error("User openId is required for upsert");
+
+// Register a new user with email and password
+export async function registerUser(email: string, password: string, name?: string): Promise<{ success: boolean; user?: User; error?: string }> {
+  const db = await getDb();
+  if (!db) {
+    return { success: false, error: "Database not available" };
   }
 
+  try {
+    // Check if user already exists
+    const existing = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    if (existing.length > 0) {
+      return { success: false, error: "Email already registered" };
+    }
+
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    // Create user
+    const result = await db.insert(users).values({
+      email,
+      passwordHash,
+      name: name || email.split('@')[0],
+      loginMethod: 'email',
+      lastSignedIn: new Date(),
+    }).returning();
+
+    if (result.length === 0) {
+      return { success: false, error: "Failed to create user" };
+    }
+
+    const user = result[0];
+
+    // Create swimmer profile
+    await db.insert(swimmerProfiles).values({ userId: user.id });
+
+    return { success: true, user };
+  } catch (error) {
+    console.error("[Database] Failed to register user:", error);
+    return { success: false, error: "Registration failed" };
+  }
+}
+
+// Login with email and password
+export async function loginUser(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
+  const db = await getDb();
+  if (!db) {
+    return { success: false, error: "Database not available" };
+  }
+
+  try {
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    if (result.length === 0) {
+      return { success: false, error: "Invalid email or password" };
+    }
+
+    const user = result[0];
+    if (!user.passwordHash) {
+      return { success: false, error: "Invalid email or password" };
+    }
+
+    const isValid = await bcrypt.compare(password, user.passwordHash);
+    if (!isValid) {
+      return { success: false, error: "Invalid email or password" };
+    }
+
+    // Update last signed in
+    await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, user.id));
+
+    return { success: true, user };
+  } catch (error) {
+    console.error("[Database] Failed to login user:", error);
+    return { success: false, error: "Login failed" };
+  }
+}
+
+// Get user by ID
+export async function getUserById(id: number): Promise<User | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+// Get user by email
+export async function getUserByEmail(email: string): Promise<User | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+// Legacy: upsert user (for OAuth compatibility)
+export async function upsertUser(user: InsertUser): Promise<void> {
   const db = await getDb();
   if (!db) {
     console.warn("[Database] Cannot upsert user: database not available");
@@ -48,22 +138,18 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 
   try {
-    const values: InsertUser = { openId: user.openId };
+    const values: InsertUser = { email: user.email || '' };
     const updateSet: Record<string, unknown> = {};
 
-    const textFields = ["name", "email", "loginMethod"] as const;
-    type TextField = (typeof textFields)[number];
-
-    const assignNullable = (field: TextField) => {
-      const value = user[field];
-      if (value === undefined) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
-
-    textFields.forEach(assignNullable);
-
+    if (user.openId) values.openId = user.openId;
+    if (user.name) {
+      values.name = user.name;
+      updateSet.name = user.name;
+    }
+    if (user.loginMethod) {
+      values.loginMethod = user.loginMethod;
+      updateSet.loginMethod = user.loginMethod;
+    }
     if (user.lastSignedIn !== undefined) {
       values.lastSignedIn = user.lastSignedIn;
       updateSet.lastSignedIn = user.lastSignedIn;
@@ -71,9 +157,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user.role !== undefined) {
       values.role = user.role;
       updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
     }
 
     if (!values.lastSignedIn) {
@@ -84,14 +167,14 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.lastSignedIn = new Date();
     }
 
-    // PostgreSQL upsert using ON CONFLICT
+    // PostgreSQL upsert using ON CONFLICT on email
     await db.insert(users).values(values).onConflictDoUpdate({
-      target: users.openId,
+      target: users.email,
       set: updateSet
     });
     
     // Create swimmer profile if not exists
-    const existingUser = await db.select().from(users).where(eq(users.openId, user.openId)).limit(1);
+    const existingUser = await db.select().from(users).where(eq(users.email, user.email || '')).limit(1);
     if (existingUser.length > 0) {
       const userId = existingUser[0].id;
       const existingProfile = await db.select().from(swimmerProfiles).where(eq(swimmerProfiles.userId, userId)).limit(1);

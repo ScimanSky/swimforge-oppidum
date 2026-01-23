@@ -116,9 +116,19 @@
 - [ ] Configurazione variabili ambiente
 
 ## Migrazione a PostgreSQL (Supabase)
-- [ ] Modificare schema.ts per PostgreSQL
-- [ ] Modificare db.ts per PostgreSQL
-- [ ] Aggiornare dipendenze (pg invece di mysql2)
-- [ ] Push su GitHub
-- [ ] Deploy su Vercel
+- [x] Modificare schema.ts per PostgreSQL
+- [x] Modificare db.ts per PostgreSQL
+- [x] Aggiornare dipendenze (pg invece di mysql2)
+- [x] Push su GitHub
+- [x] Deploy su Render (invece di Vercel)
+
+## Autenticazione Email/Password (Render Deployment)
+- [x] Aggiungere campo password_hash alla tabella users
+- [x] Installare bcrypt per hashing password
+- [x] Implementare endpoint di registrazione
+- [x] Implementare endpoint di login
+- [x] Aggiornare frontend con form login/registrazione
+- [x] Aggiornare SDK per supportare sia OAuth che email/password
+- [ ] Push su GitHub e redeploy su Render
+- [ ] Aggiornare schema Supabase con nuovo campo password_hash
 

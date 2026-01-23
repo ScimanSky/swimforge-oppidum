@@ -268,34 +268,41 @@ class SDKServer {
 
     const sessionUserId = session.openId;
     const signedInAt = new Date();
-    let user = await db.getUserByOpenId(sessionUserId);
-
-    // If user not in DB, sync from OAuth server automatically
+    
+    // First try to find user by ID (for email/password auth)
+    const userId = parseInt(sessionUserId, 10);
+    let user: User | undefined;
+    
+    if (!isNaN(userId)) {
+      user = await db.getUserById(userId);
+    }
+    
+    // Fallback to openId lookup (for OAuth)
     if (!user) {
+      user = await db.getUserByOpenId(sessionUserId);
+    }
+
+    // If user not in DB and OAuth is configured, sync from OAuth server
+    if (!user && ENV.oAuthServerUrl) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
         await db.upsertUser({
           openId: userInfo.openId,
           name: userInfo.name || null,
-          email: userInfo.email ?? null,
-          loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
+          email: userInfo.email || `${userInfo.openId}@swimforge.app`,
+          loginMethod: userInfo.loginMethod ?? userInfo.platform ?? undefined,
           lastSignedIn: signedInAt,
         });
         user = await db.getUserByOpenId(userInfo.openId);
       } catch (error) {
         console.error("[Auth] Failed to sync user from OAuth:", error);
-        throw ForbiddenError("Failed to sync user info");
+        // Don't throw here for email/password auth fallback
       }
     }
 
     if (!user) {
       throw ForbiddenError("User not found");
     }
-
-    await db.upsertUser({
-      openId: user.openId,
-      lastSignedIn: signedInAt,
-    });
 
     return user;
   }
