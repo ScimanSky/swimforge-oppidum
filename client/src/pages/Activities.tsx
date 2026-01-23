@@ -172,19 +172,14 @@ export default function Activities() {
               </div>
             </div>
 
-            {/* Add Activity Button */}
-            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" className="bg-[var(--gold)] hover:bg-[var(--gold-light)] text-[var(--navy)]">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Aggiungi
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Nuova Attività</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+            {/* Manual activity creation disabled to prevent cheating */}
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content - FORM REMOVED */}
+      {false && (
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4" style={{display: 'none'}}>
                   {/* Date */}
                   <div className="space-y-2">
                     <Label htmlFor="date">Data</Label>
@@ -298,11 +293,7 @@ export default function Activities() {
                     {createActivity.isPending ? "Salvataggio..." : "Salva Attività"}
                   </Button>
                 </form>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-      </header>
+      )}
 
       <main className="container py-6 space-y-4">
         {isLoading ? (
@@ -417,14 +408,12 @@ export default function Activities() {
           <div className="text-center py-12 text-muted-foreground">
             <Waves className="h-12 w-12 mx-auto mb-4 opacity-30" />
             <p className="font-medium">Nessuna attività registrata</p>
-            <p className="text-sm mt-1">Aggiungi la tua prima nuotata o collega Garmin</p>
-            <Button
-              className="mt-4 bg-[var(--gold)] hover:bg-[var(--gold-light)] text-[var(--navy)]"
-              onClick={() => setIsAddDialogOpen(true)}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Aggiungi Attività
-            </Button>
+            <p className="text-sm mt-1">Collega Garmin Connect per sincronizzare le tue attività</p>
+            <Link href="/profile">
+              <Button className="mt-4 bg-[var(--gold)] hover:bg-[var(--gold-light)] text-[var(--navy)]">
+                Vai al Profilo
+              </Button>
+            </Link>
           </div>
         )}
       </main>

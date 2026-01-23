@@ -162,6 +162,38 @@ export const appRouter = router({
         await db.updateSwimmerProfile(ctx.user.id, input);
         return { success: true };
       }),
+    
+    refreshStats: protectedProcedure
+      .mutation(async ({ ctx }) => {
+        // Recalculate all stats from activities
+        const activities = await db.getActivities(ctx.user.id, 10000, 0); // Get all activities
+        
+        const totalDistance = activities.reduce((sum, a) => sum + a.distanceMeters, 0);
+        const totalTime = activities.reduce((sum, a) => sum + a.durationSeconds, 0);
+        const totalSessions = activities.length;
+        const openWaterActivities = activities.filter(a => a.isOpenWater);
+        const totalOpenWaterSessions = openWaterActivities.length;
+        const totalOpenWaterMeters = openWaterActivities.reduce((sum, a) => sum + a.distanceMeters, 0);
+        
+        await db.updateSwimmerProfile(ctx.user.id, {
+          totalDistanceMeters: totalDistance,
+          totalTimeSeconds: totalTime,
+          totalSessions: totalSessions,
+          totalOpenWaterSessions: totalOpenWaterSessions,
+          totalOpenWaterMeters: totalOpenWaterMeters,
+        });
+        
+        return { 
+          success: true, 
+          stats: {
+            totalDistance,
+            totalTime,
+            totalSessions,
+            totalOpenWaterSessions,
+            totalOpenWaterMeters,
+          }
+        };
+      }),
   }),
 
   // Activities
@@ -185,6 +217,7 @@ export const appRouter = router({
         return activity;
       }),
     
+    // Manual activity creation disabled to prevent cheating
     create: protectedProcedure
       .input(z.object({
         activityDate: z.string().transform(s => new Date(s)),
@@ -203,7 +236,12 @@ export const appRouter = router({
         notes: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        // Calculate XP for this activity
+        throw new TRPCError({ 
+          code: "FORBIDDEN", 
+          message: "L'inserimento manuale delle attività è disabilitato. Collega Garmin Connect." 
+        });
+        
+        /* DISABLED - Calculate XP for this activity
         const baseXp = Math.floor(input.distanceMeters / 100); // 1 XP per 100m
         const sessionBonus = 50; // Bonus for completing a session
         const intensityBonus = input.isOpenWater ? 25 : 0; // Open water bonus
@@ -257,6 +295,7 @@ export const appRouter = router({
         }
         
         return { id: activityId, xpEarned: totalXp };
+        */
       }),
     
     updateNotes: protectedProcedure
