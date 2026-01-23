@@ -90,8 +90,11 @@ export const appRouter = router({
         }),
       }))
       .mutation(async ({ ctx, input }) => {
+        console.log('[syncSupabaseUser] Called with:', { email: input.user.email, name: input.user.name, userId: input.user.id });
+        
         // Verifica che l'utente esista o crealo
         let user = await db.getUserByEmail(input.user.email);
+        console.log('[syncSupabaseUser] Existing user:', user ? { id: user.id, email: user.email } : 'null');
         
         if (!user) {
           // Crea nuovo utente da OAuth
@@ -110,9 +113,11 @@ export const appRouter = router({
           }
           
           user = result.user;
+          console.log('[syncSupabaseUser] User created:', { id: user.id, email: user.email });
         } else {
           // Aggiorna last signed in
           await db.updateUserLastSignedIn(user.id);
+          console.log('[syncSupabaseUser] User last signed in updated');
         }
         
         // Crea session token
@@ -123,6 +128,7 @@ export const appRouter = router({
         
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        console.log('[syncSupabaseUser] Cookie set, returning success');
         
         return { success: true, user: { id: user.id, email: user.email, name: user.name } };
       }),

@@ -11,14 +11,17 @@ export default function AuthCallback() {
   const [errorMessage, setErrorMessage] = useState("");
 
   const syncSupabaseUserMutation = trpc.auth.syncSupabaseUser.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log('[AuthCallback] syncSupabaseUser SUCCESS:', data);
       setStatus("success");
       toast.success("Accesso effettuato con successo!");
       setTimeout(() => {
+        console.log('[AuthCallback] Redirecting to dashboard...');
         window.location.href = "/dashboard";
       }, 1000);
     },
     onError: (error) => {
+      console.error('[AuthCallback] syncSupabaseUser ERROR:', error);
       setStatus("error");
       setErrorMessage(error.message || "Errore durante la sincronizzazione");
       toast.error("Errore durante l'accesso");
@@ -65,6 +68,7 @@ export default function AuthCallback() {
           name: session.user.user_metadata?.full_name || session.user.user_metadata?.name
         });
         
+        console.log('[AuthCallback] Calling syncSupabaseUser mutation...');
         syncSupabaseUserMutation.mutate({
           accessToken: session.access_token,
           user: {
