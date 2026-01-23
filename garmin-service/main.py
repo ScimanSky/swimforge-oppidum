@@ -447,19 +447,23 @@ async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_ke
             )
         
         # Complete MFA
+        # Redirect stdin and provide the MFA code
+        import sys
+        from io import StringIO
+        old_stdin = sys.stdin
+        sys.stdin = StringIO(request.mfa_code + "\n")  # Provide MFA code via stdin
+        
         try:
-            # If mfa_state is None, try to call login with MFA code directly
-            if mfa_state is None:
-                # Some versions require setting the MFA code differently
-                client.login(mfa_code=request.mfa_code)
-            else:
-                client.resume_login(mfa_state, request.mfa_code)
+            # Call login again, this time it will read the MFA code from stdin
+            client.login()
+            sys.stdin = old_stdin  # Restore stdin
             logger.info(f"MFA completed successfully for user {request.user_id}")
         except Exception as mfa_error:
+            sys.stdin = old_stdin  # Restore stdin
             error_str = str(mfa_error)
             logger.error(f"MFA error for user {request.user_id}: {error_str}")
             
-            if "401" in error_str or "403" in error_str or "Invalid" in error_str:
+            if "401" in error_str or "403" in error_str or "Invalid" in error_str or "incorrect" in error_str.lower():
                 raise HTTPException(
                     status_code=401,
                     detail="Codice MFA non valido. Verifica il codice e riprova."
