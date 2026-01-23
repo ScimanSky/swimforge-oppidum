@@ -29,7 +29,9 @@ export default function Auth() {
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: () => {
       toast.success("Login effettuato con successo!");
-      window.location.href = "/dashboard";
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 100);
     },
     onError: (error) => {
       toast.error(error.message || "Errore durante il login");
@@ -40,7 +42,9 @@ export default function Auth() {
   const registerMutation = trpc.auth.register.useMutation({
     onSuccess: () => {
       toast.success("Registrazione completata! Benvenuto in SwimForge!");
-      window.location.href = "/dashboard";
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 100);
     },
     onError: (error) => {
       toast.error(error.message || "Errore durante la registrazione");
