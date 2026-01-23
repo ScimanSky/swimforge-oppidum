@@ -15,8 +15,7 @@ export default function AuthCallback() {
       setStatus("success");
       toast.success("Accesso effettuato con successo!");
       setTimeout(() => {
-        navigate("/dashboard");
-        window.location.reload();
+        window.location.href = "/dashboard";
       }, 1000);
     },
     onError: (error) => {
