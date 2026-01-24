@@ -185,6 +185,10 @@ def parse_swimming_activity(activity: dict) -> SwimmingActivity:
     activity_type = activity.get("activityType", {}).get("typeKey", "").lower()
     is_open_water = "open_water" in activity_type or "openwater" in activity_type
     
+    # Log the full activity JSON to see all available fields
+    logger.info(f"Activity JSON keys: {list(activity.keys())}")
+    logger.info(f"Duration fields: duration={activity.get('duration')}, activeDuration={activity.get('activeDuration')}, movingDuration={activity.get('movingDuration')}, elapsedDuration={activity.get('elapsedDuration')}")
+    
     distance = int(activity.get("distance", 0))
     # Use activeDuration (moving time) instead of duration (total time with pauses)
     duration = int(activity.get("activeDuration", activity.get("duration", 0)))
