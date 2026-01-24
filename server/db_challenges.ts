@@ -94,7 +94,17 @@ export async function createChallenge(data: {
     ) RETURNING id
   `);
 
-  return (result.rows[0] as any)?.id || null;
+  const challengeId = (result.rows[0] as any)?.id;
+  
+  // Automatically add creator as participant
+  if (challengeId) {
+    await db.execute(sql`
+      INSERT INTO challenge_participants (challenge_id, user_id)
+      VALUES (${challengeId}, ${data.creatorId})
+    `);
+  }
+
+  return challengeId || null;
 }
 
 /**
