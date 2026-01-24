@@ -338,21 +338,22 @@ export default function Dashboard() {
                       <motion.img 
                         src={getBadgeImageUrl(badge.code)}
                         alt={badge.name}
-                        className="w-20 h-20 object-contain relative z-10"
+                        className="w-20 h-20 object-contain relative z-10 mix-blend-lighten"
                         whileHover={{
                           filter: [
-                            `drop-shadow(0 0 10px ${colors.glow})`,
-                            `drop-shadow(0 0 25px ${colors.glow}) brightness(1.2)`,
-                            `drop-shadow(0 0 10px ${colors.glow})`,
+                            `drop-shadow(0 0 15px ${colors.glow})`,
+                            `drop-shadow(0 0 30px ${colors.glow}) brightness(1.3)`,
+                            `drop-shadow(0 0 15px ${colors.glow})`,
                           ],
+                          scale: 1.1,
                         }}
                         transition={{
-                          duration: 0.6,
+                          duration: 0.8,
                           repeat: Infinity,
                         }}
                         style={{ 
-                          filter: `drop-shadow(0 0 12px ${colors.glow})`,
-                          transform: 'translateZ(30px)',
+                          filter: `drop-shadow(0 0 15px ${colors.glow})`,
+                          transform: 'translateZ(50px)',
                         }}
                       />
                     </motion.div>
