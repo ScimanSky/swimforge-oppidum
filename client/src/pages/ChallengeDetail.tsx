@@ -21,7 +21,23 @@ export default function ChallengeDetail() {
 
     const updateCountdown = () => {
       const now = new Date();
-      const endDate = new Date(challenge.end_date);
+      
+      // Parse end date - handle both string and Date object
+      let endDate: Date;
+      if (typeof challenge.end_date === 'string') {
+        // Try parsing as ISO string first, then as regular date string
+        endDate = new Date(challenge.end_date.includes('T') ? challenge.end_date : challenge.end_date + 'T23:59:59');
+      } else {
+        endDate = new Date(challenge.end_date);
+      }
+      
+      // Check if date is valid
+      if (isNaN(endDate.getTime())) {
+        console.error('Invalid end_date:', challenge.end_date);
+        setTimeLeft("Data non valida");
+        return;
+      }
+      
       const diff = endDate.getTime() - now.getTime();
 
       if (diff <= 0) {
