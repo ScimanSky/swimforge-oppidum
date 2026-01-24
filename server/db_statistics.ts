@@ -1,6 +1,7 @@
 import { getDb } from "./db";
 import { swimmingActivities, swimmerProfiles } from "../drizzle/schema";
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { generateAIInsights, UserStatsData } from "./ai_insights";
 
 // ============================================
 // TYPES
@@ -317,24 +318,63 @@ export async function getAdvancedMetrics(
     percentage: Math.abs(trendPercentage),
   };
 
-  // Insights
-  const insights: string[] = [];
+  // Get user profile for level and XP
+  const profile = await db
+    .select()
+    .from(swimmerProfiles)
+    .where(eq(swimmerProfiles.userId, userId))
+    .limit(1);
 
-  if (consistencyScore >= 80) {
-    insights.push('🔥 Consistency eccellente! Continua così!');
-  } else if (consistencyScore < 50) {
-    insights.push('💪 Cerca di nuotare più regolarmente per migliorare la consistency');
+  const userLevel = profile[0]?.level || 1;
+  const userXp = profile[0]?.totalXp || 0;
+
+  // Calculate HR zones and SWOLF
+  const hrActivities = currentActivities.filter(a => a.avgHeartRate && a.avgHeartRate > 0);
+  let hrZones = undefined;
+  if (hrActivities.length > 0) {
+    const zone1 = hrActivities.filter(a => a.avgHeartRate! < 120).length;
+    const zone2 = hrActivities.filter(a => a.avgHeartRate! >= 120 && a.avgHeartRate! < 140).length;
+    const zone3 = hrActivities.filter(a => a.avgHeartRate! >= 140 && a.avgHeartRate! < 160).length;
+    const zone4 = hrActivities.filter(a => a.avgHeartRate! >= 160 && a.avgHeartRate! < 180).length;
+    const zone5 = hrActivities.filter(a => a.avgHeartRate! >= 180).length;
+    const total = hrActivities.length;
+    hrZones = {
+      zone1: Math.round((zone1 / total) * 100),
+      zone2: Math.round((zone2 / total) * 100),
+      zone3: Math.round((zone3 / total) * 100),
+      zone4: Math.round((zone4 / total) * 100),
+      zone5: Math.round((zone5 / total) * 100),
+    };
   }
 
-  if (trendIndicator.direction === 'up') {
-    insights.push(`⚡ Performance in crescita +${trendIndicator.percentage}%`);
-  } else if (trendIndicator.direction === 'down') {
-    insights.push(`📉 Performance in calo -${trendIndicator.percentage}%. Riprendi il ritmo!`);
-  }
+  const swolfActivities = currentActivities.filter(a => a.avgSwolf && a.avgSwolf > 0);
+  const swolfAvg = swolfActivities.length > 0
+    ? Math.round(swolfActivities.reduce((sum, a) => sum + a.avgSwolf!, 0) / swolfActivities.length)
+    : undefined;
 
-  if (currentStreak >= 7) {
-    insights.push(`🔥 Streak di ${currentStreak} giorni! Fantastico!`);
-  }
+  const caloriesTotal = currentActivities.reduce((sum, a) => sum + (a.calories || 0), 0);
+
+  // Prepare data for AI
+  const userData: UserStatsData = {
+    level: userLevel,
+    totalXp: userXp,
+    currentStreak,
+    recordStreak,
+    avgPaceSeconds: avgPace,
+    totalDistanceMeters: currentDistance * 1000,
+    sessions: currentSessions,
+    hrZones,
+    trend: trendIndicator.direction,
+    trendPercentage: trendIndicator.percentage,
+    performanceIndex,
+    consistencyScore,
+    periodDays: days,
+    swolfAvg,
+    caloriesTotal,
+  };
+
+  // Generate AI insights
+  const insights = await generateAIInsights(userData);
 
   // Predictions (estimate when user will reach 50km)
   const targetKm = 50;
