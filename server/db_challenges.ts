@@ -79,13 +79,17 @@ export async function createChallenge(data: {
       break;
   }
 
+  // Determine initial status based on start date
+  const now = new Date();
+  const initialStatus = data.startDate <= now ? 'active' : 'pending';
+
   const result = await db.execute(sql`
     INSERT INTO challenges (
       name, description, creator_id, type, objective, duration,
-      start_date, end_date, badge_image_url, badge_name, prize_description
+      start_date, end_date, status, badge_image_url, badge_name, prize_description
     ) VALUES (
       ${data.name}, ${data.description || null}, ${data.creatorId}, ${data.type}, ${data.objective},
-      ${data.duration}, ${data.startDate}, ${endDate}, ${data.badgeImageUrl || null},
+      ${data.duration}, ${data.startDate}, ${endDate}, ${initialStatus}, ${data.badgeImageUrl || null},
       ${data.badgeName || null}, ${data.prizeDescription || null}
     ) RETURNING id
   `);
@@ -99,6 +103,18 @@ export async function createChallenge(data: {
 export async function getActiveChallenges(userId: number): Promise<any[]> {
   const db = await getDb();
   if (!db) return [];
+
+  // Auto-update challenge statuses based on dates
+  const now = new Date();
+  await db.execute(sql`
+    UPDATE challenges
+    SET status = CASE
+      WHEN start_date <= ${now} AND end_date >= ${now} THEN 'active'
+      WHEN end_date < ${now} THEN 'completed'
+      ELSE 'pending'
+    END
+    WHERE status != 'completed'
+  `);
 
   const result = await db.execute(sql`
     SELECT 
