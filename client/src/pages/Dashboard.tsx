@@ -1,10 +1,10 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { getBadgeImageUrl } from "@/lib/badgeImages";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion } from "framer-motion";
 import {
-  Trophy,
   Waves,
   Clock,
   Target,
@@ -12,10 +12,7 @@ import {
   ChevronRight,
   Zap,
   Activity,
-  Award,
-  Users,
   User,
-  Sparkles,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
@@ -203,6 +200,66 @@ export default function Dashboard() {
           ))}
         </motion.div>
 
+        {/* Progress Charts */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.15 }}
+        >
+          <div className="neon-card p-4">
+            <h3 className="text-lg font-bold flex items-center gap-2 mb-4 text-[oklch(0.95_0.01_220)]">
+              <Activity className="h-5 w-5 text-[oklch(0.70_0.18_220)]" />
+              Progressi Settimanali
+            </h3>
+            
+            {activitiesLoading ? (
+              <Skeleton className="h-48 w-full bg-[oklch(0.20_0.03_250)]" />
+            ) : activities && activities.length > 0 ? (
+              <div className="h-48 flex items-end justify-between gap-2 px-2">
+                {activities.slice(0, 7).reverse().map((activity, idx) => {
+                  const maxDistance = Math.max(...activities.slice(0, 7).map(a => a.distanceMeters));
+                  const height = (activity.distanceMeters / maxDistance) * 100;
+                  const date = new Date(activity.activityDate);
+                  const dayName = date.toLocaleDateString('it-IT', { weekday: 'short' });
+                  
+                  return (
+                    <div key={activity.id} className="flex-1 flex flex-col items-center gap-2">
+                      <motion.div
+                        initial={{ height: 0 }}
+                        animate={{ height: `${height}%` }}
+                        transition={{ duration: 0.5, delay: idx * 0.1 }}
+                        className="w-full rounded-t-lg relative group"
+                        style={{
+                          background: activity.isOpenWater 
+                            ? 'linear-gradient(to top, oklch(0.70 0.15 195), oklch(0.70 0.15 195 / 0.6))'
+                            : 'linear-gradient(to top, oklch(0.70 0.18 220), oklch(0.70 0.18 220 / 0.6))',
+                          boxShadow: activity.isOpenWater
+                            ? '0 0 10px oklch(0.70 0.15 195 / 0.5)'
+                            : '0 0 10px oklch(0.70 0.18 220 / 0.5)',
+                          minHeight: '20px',
+                        }}
+                      >
+                        {/* Tooltip on hover */}
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                          <div className="bg-[oklch(0.15_0.03_250)] px-2 py-1 rounded text-xs whitespace-nowrap border border-[oklch(0.30_0.04_250)]">
+                            <p className="font-bold text-[oklch(0.95_0.01_220)]">{(activity.distanceMeters / 1000).toFixed(1)} km</p>
+                            <p className="text-[oklch(0.60_0.03_220)]">{formatDate(activity.activityDate)}</p>
+                          </div>
+                        </div>
+                      </motion.div>
+                      <p className="text-xs text-[oklch(0.60_0.03_220)] font-medium">{dayName}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="h-48 flex items-center justify-center">
+                <p className="text-sm text-[oklch(0.50_0.03_220)]">Nessuna attività recente</p>
+              </div>
+            )}
+          </div>
+        </motion.div>
+
         {/* Recent Badges */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -265,7 +322,7 @@ export default function Dashboard() {
                       />
                       {/* Badge Image */}
                       <img 
-                        src={badge.imageUrl || `/badges/${badge.id}.png`}
+                        src={getBadgeImageUrl(badge.code)}
                         alt={badge.name}
                         className="w-14 h-14 object-contain relative z-10"
                         style={{ 
@@ -358,52 +415,7 @@ export default function Dashboard() {
           </div>
         </motion.div>
 
-        {/* Quick Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.4 }}
-          className="grid grid-cols-2 gap-3"
-        >
-          <Link href="/leaderboard">
-            <div className="neon-card p-4 cursor-pointer hover:scale-[1.02] transition-transform">
-              <div className="flex items-center gap-3">
-                <div 
-                  className="w-10 h-10 rounded-full flex items-center justify-center"
-                  style={{ 
-                    backgroundColor: "oklch(0.65 0.22 300 / 0.2)",
-                    boxShadow: "0 0 15px oklch(0.65 0.22 300 / 0.3)",
-                  }}
-                >
-                  <Users className="h-5 w-5 text-[oklch(0.65_0.22_300)]" />
-                </div>
-                <div>
-                  <p className="font-medium text-[oklch(0.90_0.02_220)]">Classifica</p>
-                  <p className="text-xs text-[oklch(0.50_0.03_220)]">Sfida i compagni</p>
-                </div>
-              </div>
-            </div>
-          </Link>
-          <Link href="/badges">
-            <div className="neon-card p-4 cursor-pointer hover:scale-[1.02] transition-transform">
-              <div className="flex items-center gap-3">
-                <div 
-                  className="w-10 h-10 rounded-full flex items-center justify-center"
-                  style={{ 
-                    backgroundColor: "oklch(0.82 0.18 85 / 0.2)",
-                    boxShadow: "0 0 15px oklch(0.82 0.18 85 / 0.3)",
-                  }}
-                >
-                  <Award className="h-5 w-5 text-[oklch(0.82_0.18_85)]" />
-                </div>
-                <div>
-                  <p className="font-medium text-[oklch(0.90_0.02_220)]">Badge</p>
-                  <p className="text-xs text-[oklch(0.50_0.03_220)]">Collezione completa</p>
-                </div>
-              </div>
-            </div>
-          </Link>
-        </motion.div>
+
       </main>
 
       {/* Mobile Navigation */}
