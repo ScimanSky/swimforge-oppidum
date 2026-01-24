@@ -134,12 +134,24 @@ export default function ChallengeDetail() {
                     {index + 1}
                   </div>
 
-                  {/* Avatar */}
-                  <img
-                    src={participant.avatarUrl || '/default-avatar.png'}
-                    alt={participant.username}
-                    className="w-10 h-10 rounded-full"
-                  />
+                  {/* Profile Badge */}
+                  <div className="relative w-10 h-10 flex-shrink-0">
+                    {participant.profileBadgeUrl ? (
+                      <img
+                        src={participant.profileBadgeUrl}
+                        alt={participant.profileBadgeName || 'Badge'}
+                        className="w-full h-full object-contain"
+                        title={`${participant.profileBadgeName} (Livello ${participant.profileBadgeLevel})`}
+                      />
+                    ) : (
+                      <div 
+                        className="w-full h-full rounded-full bg-[oklch(0.25_0.05_220)] flex items-center justify-center text-[oklch(0.60_0.03_220)] text-xs font-bold"
+                        title="Novizio (Livello 1)"
+                      >
+                        1
+                      </div>
+                    )}
+                  </div>
 
                   {/* Username */}
                   <span className="flex-1 text-[oklch(0.95_0.01_220)] font-medium">

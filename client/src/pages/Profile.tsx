@@ -45,6 +45,16 @@ export default function Profile() {
     },
   });
 
+  const initializeProfileBadges = trpc.badges.initializeProfileBadges.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Badge profilo inizializzati per ${data.updated} utenti!`);
+      utils.profile.get.invalidate();
+    },
+    onError: () => {
+      toast.error("Errore nell'inizializzazione badge profilo");
+    },
+  });
+
   const seedData = trpc.admin.seedData.useMutation({
     onSuccess: () => {
       toast.success("Dati inizializzati con successo!");
@@ -215,7 +225,7 @@ export default function Profile() {
                   Amministrazione
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-0">
+              <CardContent className="pt-0 space-y-2">
                 <Button
                   variant="outline"
                   className="w-full"
@@ -223,6 +233,14 @@ export default function Profile() {
                   disabled={seedData.isPending}
                 >
                   {seedData.isPending ? "Inizializzazione..." : "Inizializza Badge e Livelli"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => initializeProfileBadges.mutate()}
+                  disabled={initializeProfileBadges.isPending}
+                >
+                  {initializeProfileBadges.isPending ? "Inizializzazione..." : "Inizializza Badge Profilo"}
                 </Button>
               </CardContent>
             </Card>

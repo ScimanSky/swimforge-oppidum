@@ -17,6 +17,7 @@
 import { getDb } from "./db";
 import { garminTokens, swimmingActivities, swimmerProfiles, xpTransactions, badgeDefinitions, userBadges } from "../drizzle/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
+import { updateUserProfileBadge } from "./db_profile_badges";
 
 // Garmin microservice configuration
 const GARMIN_SERVICE_URL = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
@@ -496,7 +497,6 @@ export async function syncGarminActivities(
         .orderBy(desc(swimmingActivities.distanceMeters))
         .limit(1);
       const longestSessionDistance = longestActivity[0]?.distanceMeters || 0;
-
       // Check and award badges
       await checkAndAwardBadges(userId, {
         totalDistance: newTotalDistance,
@@ -504,10 +504,11 @@ export async function syncGarminActivities(
         totalXp: newTotalXp,
         level: newLevel,
         totalTime: newTotalTime,
-        totalOpenWaterSessions: newTotalOpenWaterSessions,
-        totalOpenWaterDistance: newTotalOpenWaterDistance,
-        longestSessionDistance: longestSessionDistance,
+        longestSessionDistance,
       });
+
+      // Update profile badge based on new XP
+      await updateUserProfileBadge(userId, newTotalXp);
 
       // Auto-update challenge progress for active challenges
       await updateActiveChallengesProgress(userId);

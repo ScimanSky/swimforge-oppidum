@@ -6,6 +6,7 @@ import { sdk } from "./_core/sdk";
 import { z } from "zod";
 import * as db from "./db";
 import * as garmin from "./garmin";
+import { initializeAllUserProfileBadges } from "./db_profile_badges";
 import { TRPCError } from "@trpc/server";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -449,6 +450,12 @@ export const appRouter = router({
       }
 
       return { success: true, newBadges: newBadgesCount };
+    }),
+
+    // Initialize profile badges for all users
+    initializeProfileBadges: protectedProcedure.mutation(async () => {
+      const result = await initializeAllUserProfileBadges();
+      return { success: true, updated: result.updated };
     }),
   }),
 
