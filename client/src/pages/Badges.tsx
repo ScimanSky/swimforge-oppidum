@@ -14,6 +14,7 @@ import { Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import { useState, useRef, useCallback } from "react";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
+import { toast } from "sonner";
 
 // Badge images are now handled by getBadgeImageUrl from badgeImages.ts
 
@@ -82,6 +83,15 @@ export default function Badges() {
     undefined,
     { enabled: isAuthenticated }
   );
+
+  const fixBadgeUrls = trpc.admin.fixBadgeUrls.useMutation({
+    onSuccess: () => {
+      toast.success("Badge profilo aggiornati! Ricarica la pagina.");
+    },
+    onError: () => {
+      toast.error("Errore nell'aggiornamento badge profilo");
+    },
+  });
 
   // Redirect if not authenticated
   if (!authLoading && !isAuthenticated) {
@@ -213,12 +223,21 @@ export default function Badges() {
                 <ChevronLeft className="h-5 w-5" />
               </Button>
             </Link>
-            <div>
+            <div className="flex-1">
               <h1 className="font-bold text-lg text-[oklch(0.95_0.01_220)]">Bacheca Badge</h1>
               <p className="text-sm text-[oklch(0.60_0.03_220)]">
                 <span className="text-[oklch(0.70_0.18_220)]">{earnedCount}</span> / {totalCount} sbloccati
               </p>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => fixBadgeUrls.mutate()}
+              disabled={fixBadgeUrls.isPending}
+              className="text-xs"
+            >
+              {fixBadgeUrls.isPending ? "Aggiornamento..." : "Fix Badge Profilo"}
+            </Button>
           </div>
         </div>
       </header>
