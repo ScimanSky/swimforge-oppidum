@@ -53,7 +53,7 @@ export function getBadgeImageUrl(badgeCode: string): string {
   const filename = BADGE_IMAGE_MAP[badgeCode];
   if (!filename) {
     console.warn(`No image mapping found for badge code: ${badgeCode}`);
-    return "/badges/oppidum_member.svg"; // fallback
+    return "/badges/oppidum_member.png"; // fallback
   }
-  return `/badges/${filename}.svg`;
+  return `/badges/${filename}.png`;
 }

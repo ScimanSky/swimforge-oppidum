@@ -301,32 +301,58 @@ export default function Dashboard() {
                   return (
                     <motion.div
                       key={badge.id}
-                      whileHover={{ scale: 1.1, rotateY: 15 }}
-                      className="flex-shrink-0 w-20 h-20 rounded-lg flex items-center justify-center relative overflow-hidden"
+                      whileHover={{ 
+                        scale: 1.15, 
+                        rotateY: 25,
+                        rotateX: 10,
+                        z: 50,
+                      }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 20,
+                      }}
+                      className="flex-shrink-0 w-24 h-24 rounded-full flex items-center justify-center relative"
                       style={{ 
-                        background: `linear-gradient(135deg, oklch(0.22 0.03 250) 0%, oklch(0.16 0.035 250) 100%)`,
-                        boxShadow: `0 0 20px ${colors.glow}`,
                         transformStyle: 'preserve-3d',
+                        perspective: '1000px',
                       }}
                     >
-                      {/* Gradient Border */}
-                      <div 
-                        className="absolute inset-[-2px] rounded-lg"
-                        style={{
-                          background: `linear-gradient(135deg, ${colors.border} 0%, ${colors.border}80 100%)`,
-                          padding: '2px',
-                          WebkitMask: 'linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0)',
-                          WebkitMaskComposite: 'xor',
-                          maskComposite: 'exclude',
+                      {/* Animated Glow Ring */}
+                      <motion.div 
+                        className="absolute inset-0 rounded-full"
+                        animate={{
+                          boxShadow: [
+                            `0 0 20px ${colors.glow}`,
+                            `0 0 40px ${colors.glow}`,
+                            `0 0 20px ${colors.glow}`,
+                          ],
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                          ease: "easeInOut",
                         }}
                       />
-                      {/* Badge Image */}
-                      <img 
+                      {/* Badge Image 3D */}
+                      <motion.img 
                         src={getBadgeImageUrl(badge.code)}
                         alt={badge.name}
-                        className="w-14 h-14 object-contain relative z-10"
+                        className="w-20 h-20 object-contain relative z-10"
+                        whileHover={{
+                          filter: [
+                            `drop-shadow(0 0 10px ${colors.glow})`,
+                            `drop-shadow(0 0 25px ${colors.glow}) brightness(1.2)`,
+                            `drop-shadow(0 0 10px ${colors.glow})`,
+                          ],
+                        }}
+                        transition={{
+                          duration: 0.6,
+                          repeat: Infinity,
+                        }}
                         style={{ 
-                          filter: `drop-shadow(0 0 8px ${colors.glow})`,
+                          filter: `drop-shadow(0 0 12px ${colors.glow})`,
+                          transform: 'translateZ(30px)',
                         }}
                       />
                     </motion.div>
