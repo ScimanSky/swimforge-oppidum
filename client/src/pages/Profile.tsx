@@ -150,6 +150,14 @@ export default function Profile() {
                         src={profile.profileBadge.badge_image_url} 
                         alt={profile.profileBadge.name}
                         className="w-full h-full object-contain drop-shadow-2xl"
+                        onContextMenu={(e) => e.preventDefault()}
+                        draggable={false}
+                        style={{ 
+                          WebkitTouchCallout: 'none',
+                          WebkitUserSelect: 'none',
+                          userSelect: 'none',
+                          touchAction: 'manipulation'
+                        }}
                       />
                     ) : (
                       <div 
