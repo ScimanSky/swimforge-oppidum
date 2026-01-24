@@ -14,6 +14,7 @@ import { toast } from "sonner";
 
 export default function Challenges() {
   const [, setLocation] = useLocation();
+  const utils = trpc.useUtils();
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   
@@ -41,6 +42,8 @@ export default function Challenges() {
       setObjective("total_distance");
       setDuration("1_week");
       setStartDate(new Date().toISOString().split('T')[0]);
+      // Refresh challenges list
+      utils.challenges.list.invalidate();
     },
     onError: (error) => {
       toast.error("Errore", {
@@ -54,6 +57,8 @@ export default function Challenges() {
       toast.success("Iscrizione Completata!", {
         description: "Sei entrato nella sfida con successo.",
       });
+      // Refresh challenges list to show updated participant status
+      utils.challenges.list.invalidate();
     },
     onError: (error) => {
       toast.error("Errore", {
