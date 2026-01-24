@@ -331,6 +331,13 @@ export default function Badges() {
                             src={pngPath} 
                             alt={badge.name}
                             className={`w-full h-full object-contain ${isEarned ? 'badge-3d' : ''}`}
+                            onContextMenu={(e) => e.preventDefault()}
+                            style={{ 
+                              WebkitTouchCallout: 'none',
+                              WebkitUserSelect: 'none',
+                              userSelect: 'none',
+                              pointerEvents: 'none'
+                            }}
                           />
                         ) : (
                           <div 
@@ -431,6 +438,12 @@ export default function Badges() {
                         src={getBadgeImageUrl(selectedBadge.code)} 
                         alt={selectedBadge.name}
                         className="w-full h-full object-contain"
+                        onContextMenu={(e) => e.preventDefault()}
+                        style={{ 
+                          WebkitTouchCallout: 'none',
+                          WebkitUserSelect: 'none',
+                          userSelect: 'none'
+                        }}
                       />
                     ) : (
                       <div 
