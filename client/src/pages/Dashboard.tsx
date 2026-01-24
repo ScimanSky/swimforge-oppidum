@@ -37,6 +37,11 @@ export default function Dashboard() {
     { enabled: isAuthenticated }
   );
 
+  const { data: challenges, isLoading: challengesLoading } = trpc.challenges.list.useQuery(
+    undefined,
+    { enabled: isAuthenticated }
+  );
+
   // Redirect to home if not authenticated
   if (!authLoading && !isAuthenticated) {
     return <Redirect to="/" />;
@@ -283,16 +288,48 @@ export default function Dashboard() {
             </div>
             
             <div className="space-y-3">
-              <div className="text-center py-8">
-                <Trophy className="h-12 w-12 mx-auto mb-3 text-[oklch(0.70_0.18_220)]" />
-                <p className="text-sm text-[oklch(0.60_0.03_220)] mb-4">Nessuna sfida attiva al momento</p>
-                <Link href="/challenges">
-                  <Button className="bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] hover:opacity-90">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Crea la Tua Prima Sfida
-                  </Button>
-                </Link>
-              </div>
+              {challengesLoading ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-[oklch(0.60_0.03_220)]">Caricamento...</p>
+                </div>
+              ) : challenges && challenges.length > 0 ? (
+                challenges.slice(0, 2).map((challenge: any) => (
+                  <div key={challenge.id} className="p-3 rounded-lg bg-[oklch(0.18_0.03_250)] border border-[oklch(0.30_0.04_250)]">
+                    <div className="flex items-start justify-between mb-2">
+                      <h4 className="font-semibold text-[oklch(0.95_0.01_220)] text-sm">{challenge.name}</h4>
+                      <span className="text-xs text-[oklch(0.70_0.18_85)] font-medium">
+                        {challenge.status === 'active' ? '✅ Attiva' : '⏳ In Arrivo'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[oklch(0.60_0.03_220)] mb-2">
+                      {challenge.type === 'pool' ? '🏊 Piscina' : challenge.type === 'open_water' ? '🌊 Acque Libere' : '🏊🌊 Entrambi'}
+                      {' • '}
+                      {challenge.duration === '3_days' ? '3 giorni' : challenge.duration === '1_week' ? '1 settimana' : challenge.duration === '2_weeks' ? '2 settimane' : '1 mese'}
+                    </p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-[oklch(0.50_0.03_220)]">
+                        {challenge.participantCount || 0} partecipanti
+                      </span>
+                      <Link href="/challenges">
+                        <Button size="sm" variant="ghost" className="h-7 text-xs text-[oklch(0.70_0.18_220)] hover:bg-[oklch(0.70_0.18_220_/_0.1)]">
+                          Dettagli
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <Trophy className="h-12 w-12 mx-auto mb-3 text-[oklch(0.70_0.18_220)]" />
+                  <p className="text-sm text-[oklch(0.60_0.03_220)] mb-4">Nessuna sfida attiva al momento</p>
+                  <Link href="/challenges">
+                    <Button className="bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] hover:opacity-90">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Crea la Tua Prima Sfida
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </motion.div>

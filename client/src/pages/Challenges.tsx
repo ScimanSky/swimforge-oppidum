@@ -17,6 +17,9 @@ export default function Challenges() {
 
   const [showCreateForm, setShowCreateForm] = useState(false);
   
+  // Fetch active challenges
+  const { data: challenges, isLoading } = trpc.challenges.list.useQuery();
+  
   // Form state
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -220,23 +223,89 @@ export default function Challenges() {
           </motion.div>
         )}
 
-        {/* Empty State */}
-        <div className="neon-card p-12 text-center">
-          <Trophy className="h-16 w-16 mx-auto mb-4 text-[oklch(0.70_0.18_220)]" />
-          <h3 className="text-xl font-bold text-[oklch(0.95_0.01_220)] mb-2">Nessuna Sfida Attiva</h3>
-          <p className="text-[oklch(0.60_0.03_220)] mb-6">
-            Crea la tua prima sfida e invita altri nuotatori a competere!
-          </p>
-          {!showCreateForm && (
-            <Button
-              onClick={() => setShowCreateForm(true)}
-              className="bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] hover:opacity-90"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Crea la Tua Prima Sfida
-            </Button>
-          )}
-        </div>
+        {/* Challenges List */}
+        {isLoading ? (
+          <div className="neon-card p-8 text-center">
+            <p className="text-[oklch(0.60_0.03_220)]">Caricamento sfide...</p>
+          </div>
+        ) : challenges && challenges.length > 0 ? (
+          <div className="space-y-4">
+            {challenges.map((challenge: any) => (
+              <motion.div
+                key={challenge.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="neon-card p-6"
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-[oklch(0.95_0.01_220)] mb-1">{challenge.name}</h3>
+                    {challenge.description && (
+                      <p className="text-[oklch(0.60_0.03_220)] text-sm">{challenge.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-[oklch(0.70_0.18_220)]">
+                    <Users className="h-4 w-4" />
+                    <span className="text-sm font-medium">{challenge.participantCount || 0}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <p className="text-xs text-[oklch(0.50_0.03_220)] mb-1">Tipo</p>
+                    <p className="text-sm font-medium text-[oklch(0.85_0.01_220)]">
+                      {challenge.type === 'pool' ? '🏊 Piscina' : challenge.type === 'open_water' ? '🌊 Acque Libere' : '🏊🌊 Entrambi'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[oklch(0.50_0.03_220)] mb-1">Obiettivo</p>
+                    <p className="text-sm font-medium text-[oklch(0.85_0.01_220)]">
+                      {objectiveLabels[challenge.objective as keyof typeof objectiveLabels]}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[oklch(0.50_0.03_220)] mb-1">Durata</p>
+                    <p className="text-sm font-medium text-[oklch(0.85_0.01_220)]">
+                      {durationLabels[challenge.duration as keyof typeof durationLabels]}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-[oklch(0.50_0.03_220)] mb-1">Stato</p>
+                    <p className="text-sm font-medium text-[oklch(0.70_0.18_85)]">
+                      {challenge.status === 'active' ? '✅ Attiva' : challenge.status === 'upcoming' ? '⏳ In Arrivo' : '🏁 Completata'}
+                    </p>
+                  </div>
+                </div>
+
+                {challenge.status === 'active' && (
+                  <Button
+                    className="w-full bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] hover:opacity-90"
+                  >
+                    <Trophy className="h-4 w-4 mr-2" />
+                    Unisciti alla Sfida
+                  </Button>
+                )}
+              </motion.div>
+            ))}
+          </div>
+        ) : (
+          <div className="neon-card p-12 text-center">
+            <Trophy className="h-16 w-16 mx-auto mb-4 text-[oklch(0.70_0.18_220)]" />
+            <h3 className="text-xl font-bold text-[oklch(0.95_0.01_220)] mb-2">Nessuna Sfida Attiva</h3>
+            <p className="text-[oklch(0.60_0.03_220)] mb-6">
+              Crea la tua prima sfida e invita altri nuotatori a competere!
+            </p>
+            {!showCreateForm && (
+              <Button
+                onClick={() => setShowCreateForm(true)}
+                className="bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] hover:opacity-90"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Crea la Tua Prima Sfida
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       <MobileNav />
