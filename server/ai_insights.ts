@@ -45,7 +45,7 @@ export async function generateAIInsights(
   }
 
   try {
-    const model = client.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const model = client.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `Sei un coach di nuoto esperto e motivazionale. Analizza questi dati di un nuotatore e genera 3-4 insights personalizzati, motivazionali e actionable in italiano.
 
