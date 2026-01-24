@@ -7,6 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { completeChallenges } from "../cron_challenges";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -60,6 +61,18 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+
+  // Start cron job for challenge completion (runs every hour)
+  setInterval(async () => {
+    console.log("[Cron] Running challenge completion job...");
+    await completeChallenges();
+  }, 60 * 60 * 1000); // Every hour
+
+  // Run once on startup
+  setTimeout(async () => {
+    console.log("[Cron] Initial challenge completion check...");
+    await completeChallenges();
+  }, 5000); // 5 seconds after startup
 }
 
 startServer().catch(console.error);

@@ -146,12 +146,17 @@ export const appRouter = router({
       const nextLevel = await db.getNextLevelThreshold(profile.level);
       const currentLevelInfo = await db.getLevelForXp(profile.totalXp);
       
+      // Get profile badge
+      const { getUserProfileBadge } = await import("./db_profile_badges");
+      const profileBadge = await getUserProfileBadge(ctx.user.id);
+      
       return {
         ...profile,
         levelTitle: currentLevelInfo.title,
         levelColor: currentLevelInfo.color,
         nextLevelXp: nextLevel?.xpRequired || null,
         xpToNextLevel: nextLevel ? nextLevel.xpRequired - profile.totalXp : 0,
+        profileBadge,
       };
     }),
     
@@ -635,6 +640,17 @@ export const appRouter = router({
       
       await seedBadgesAndLevels();
       return { success: true };
+    }),
+
+    // Manually trigger challenge completion (for testing)
+    completeChallenges: protectedProcedure.mutation(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      
+      const cronChallenges = await import("./cron_challenges");
+      const result = await cronChallenges.completeChallenges();
+      return result;
     }),
   }),
 });

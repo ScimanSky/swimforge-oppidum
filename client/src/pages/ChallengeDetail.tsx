@@ -2,7 +2,8 @@ import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
-import { Trophy, ArrowLeft, Calendar, Target, Users, Medal } from "lucide-react";
+import { Trophy, ArrowLeft, Calendar, Target, Users, Medal, Clock } from "lucide-react";
+import { useState, useEffect } from "react";
 import MobileNav from "@/components/MobileNav";
 
 export default function ChallengeDetail() {
@@ -11,6 +12,42 @@ export default function ChallengeDetail() {
   const challengeId = parseInt(params.id || "0");
 
   const { data: challenge, isLoading } = trpc.challenges.getById.useQuery({ id: challengeId });
+
+  // Countdown timer
+  const [timeLeft, setTimeLeft] = useState<string>("");
+
+  useEffect(() => {
+    if (!challenge) return;
+
+    const updateCountdown = () => {
+      const now = new Date();
+      const endDate = new Date(challenge.end_date);
+      const diff = endDate.getTime() - now.getTime();
+
+      if (diff <= 0) {
+        setTimeLeft("Terminata");
+        return;
+      }
+
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      if (days > 0) {
+        setTimeLeft(`${days}g ${hours}h ${minutes}m`);
+      } else if (hours > 0) {
+        setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+      } else {
+        setTimeLeft(`${minutes}m ${seconds}s`);
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [challenge]);
 
   if (isLoading) {
     return (
@@ -100,6 +137,15 @@ export default function ChallengeDetail() {
               <span className="text-sm">{challenge.participants?.length || 0} Partecipanti</span>
             </div>
           </div>
+
+          {/* Countdown Timer */}
+          {challenge.status === 'active' && timeLeft && timeLeft !== "Terminata" && (
+            <div className="mt-4 p-3 rounded-lg bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.60_0.15_220)] flex items-center justify-center gap-2">
+              <Clock className="h-5 w-5 text-white" />
+              <span className="text-lg font-bold text-white">{timeLeft}</span>
+              <span className="text-sm text-white/80">rimanenti</span>
+            </div>
+          )}
         </motion.div>
 
         {/* Leaderboard */}

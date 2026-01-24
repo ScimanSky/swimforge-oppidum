@@ -138,12 +138,22 @@ export default function Profile() {
                 </div>
               ) : (
                 <div className="flex items-center gap-4">
-                  {/* Avatar */}
-                  <div 
-                    className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-bold shadow-lg border-4 border-white/30"
-                    style={{ backgroundColor: profile?.levelColor || "#3b82f6" }}
-                  >
-                    {(user?.name || "N")[0].toUpperCase()}
+                  {/* Profile Badge */}
+                  <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg">
+                    {profile?.profileBadge?.image_url ? (
+                      <img 
+                        src={profile.profileBadge.image_url} 
+                        alt={profile.profileBadge.name}
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div 
+                        className="w-full h-full rounded-full flex items-center justify-center text-3xl font-bold border-4 border-white/30"
+                        style={{ backgroundColor: profile?.levelColor || "#3b82f6" }}
+                      >
+                        {(user?.name || "N")[0].toUpperCase()}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <h2 className="text-xl font-bold">{user?.name || "Nuotatore"}</h2>
