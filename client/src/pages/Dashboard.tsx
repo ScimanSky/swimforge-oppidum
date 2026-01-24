@@ -18,9 +18,12 @@ import {
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
+import { useBadgeNotifications } from "@/hooks/useBadgeNotifications";
+import { useEffect } from "react";
 
 export default function Dashboard() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
+  const { addBadges } = useBadgeNotifications();
 
   const { data: profile, isLoading: profileLoading } = trpc.profile.get.useQuery(
     undefined,
@@ -41,6 +44,19 @@ export default function Dashboard() {
     undefined,
     { enabled: isAuthenticated }
   );
+
+  // Check for newly unlocked badges
+  const { data: newBadges } = trpc.badges.checkNewBadges.useQuery(
+    undefined,
+    { enabled: isAuthenticated, refetchOnMount: true }
+  );
+
+  // Show badge notifications when new badges are unlocked
+  useEffect(() => {
+    if (newBadges && newBadges.length > 0) {
+      addBadges(newBadges);
+    }
+  }, [newBadges, addBadges]);
 
   // Redirect to home if not authenticated
   if (!authLoading && !isAuthenticated) {

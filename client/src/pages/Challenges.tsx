@@ -67,6 +67,21 @@ export default function Challenges() {
     },
   });
 
+  const leaveChallengeMutation = trpc.challenges.leave.useMutation({
+    onSuccess: () => {
+      toast.success("Sfida Abbandonata", {
+        description: "Sei uscito dalla sfida.",
+      });
+      // Refresh challenges list
+      utils.challenges.list.invalidate();
+    },
+    onError: (error) => {
+      toast.error("Errore", {
+        description: error.message,
+      });
+    },
+  });
+
   const handleCreateChallenge = () => {
     if (!name.trim()) {
       toast.error("Errore", {
@@ -313,7 +328,17 @@ export default function Challenges() {
                       {joinChallengeMutation.isPending ? "Iscrizione..." : "Unisciti"}
                     </Button>
                   )}
-                  {challenge.isParticipant && (
+                  {challenge.isParticipant && challenge.status === 'active' && (
+                    <Button
+                      onClick={() => leaveChallengeMutation.mutate({ challengeId: challenge.id })}
+                      disabled={leaveChallengeMutation.isPending}
+                      variant="outline"
+                      className="flex-1 border-red-500/50 text-red-400 hover:bg-red-500/10"
+                    >
+                      {leaveChallengeMutation.isPending ? "Uscita..." : "Abbandona"}
+                    </Button>
+                  )}
+                  {challenge.isParticipant && challenge.status !== 'active' && (
                     <div className="flex-1 px-4 py-2 rounded-lg bg-[oklch(0.25_0.05_220)] border border-[oklch(0.70_0.18_220)] text-center">
                       <span className="text-sm font-medium text-[oklch(0.70_0.18_220)]">✓ Iscritto</span>
                     </div>

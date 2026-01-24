@@ -14,6 +14,8 @@ import Activities from "./pages/Activities";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
+import BadgeUnlockNotification from "./components/BadgeUnlockNotification";
+import { useBadgeNotifications } from "./hooks/useBadgeNotifications";
 
 function Router() {
   return (
@@ -36,12 +38,20 @@ function Router() {
 }
 
 function App() {
+  const { pendingBadges, isShowing, clearBadges } = useBadgeNotifications();
+
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster richColors position="top-center" />
           <Router />
+          {isShowing && pendingBadges.length > 0 && (
+            <BadgeUnlockNotification
+              badges={pendingBadges}
+              onComplete={clearBadges}
+            />
+          )}
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

@@ -462,6 +462,12 @@ export const appRouter = router({
       const result = await initializeAllUserProfileBadges();
       return { success: true, updated: result.updated };
     }),
+
+    // Check for newly unlocked badges and return them
+    checkNewBadges: protectedProcedure.query(async ({ ctx }) => {
+      const newBadges = await checkAndAwardBadges(ctx.user.id);
+      return newBadges;
+    }),
   }),
 
   // Leaderboard
@@ -656,11 +662,12 @@ export const appRouter = router({
 });
 
 // Helper function to check and award badges
-async function checkAndAwardBadges(userId: number) {
+async function checkAndAwardBadges(userId: number): Promise<any[]> {
   const profile = await db.getSwimmerProfile(userId);
-  if (!profile) return;
+  if (!profile) return [];
   
   const allBadges = await db.getAllBadgeDefinitions();
+  const newlyAwardedBadges: any[] = [];
   
   for (const badge of allBadges) {
     const hasBadge = await db.hasUserBadge(userId, badge.id);
@@ -709,8 +716,13 @@ async function checkAndAwardBadges(userId: number) {
       await db.updateSwimmerProfile(userId, {
         totalXp: profile.totalXp + badge.xpReward,
       });
+      
+      // Add to newly awarded badges
+      newlyAwardedBadges.push(badge);
     }
   }
+  
+  return newlyAwardedBadges;
 }
 
 // Seed function for badges and levels
