@@ -118,14 +118,24 @@ export default function Dashboard() {
                 {/* Level Badge */}
                 <div className="flex items-center gap-4 mb-6">
                   <motion.div 
-                    className="level-badge"
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: "spring", duration: 0.6 }}
+                    className="w-20 h-20 flex-shrink-0"
                   >
-                    <span className="text-2xl font-bold text-[oklch(0.95_0.01_220)]">
-                      {profile?.level || 1}
-                    </span>
+                    {profile?.profileBadge?.image_url ? (
+                      <img 
+                        src={profile.profileBadge.image_url} 
+                        alt={profile.profileBadge.name}
+                        className="w-full h-full object-contain drop-shadow-lg"
+                      />
+                    ) : (
+                      <div className="level-badge">
+                        <span className="text-2xl font-bold text-[oklch(0.95_0.01_220)]">
+                          {profile?.level || 1}
+                        </span>
+                      </div>
+                    )}
                   </motion.div>
                   <div>
                     <p className="text-[oklch(0.60_0.03_220)] text-sm uppercase tracking-wider">Livello</p>

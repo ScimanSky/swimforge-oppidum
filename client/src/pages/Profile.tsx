@@ -139,12 +139,12 @@ export default function Profile() {
               ) : (
                 <div className="flex items-center gap-4">
                   {/* Profile Badge */}
-                  <div className="w-20 h-20 rounded-full flex items-center justify-center shadow-lg">
+                  <div className="w-20 h-20 flex items-center justify-center shadow-lg">
                     {profile?.profileBadge?.image_url ? (
                       <img 
                         src={profile.profileBadge.image_url} 
                         alt={profile.profileBadge.name}
-                        className="w-full h-full object-contain"
+                        className="w-full h-full object-contain drop-shadow-2xl"
                       />
                     ) : (
                       <div 
