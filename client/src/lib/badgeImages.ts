@@ -2,7 +2,7 @@
 export const BADGE_IMAGE_MAP: Record<string, string> = {
   // Distance badges
   "dist_1km": "first_km",
-  "dist_5km": "distance-1km",
+  "dist_5km": "first_km",
   "dist_10km": "centurion",
   "dist_25km": "marathon_beginner",
   "dist_100km": "aquatic_marathon",
@@ -53,7 +53,7 @@ export function getBadgeImageUrl(badgeCode: string): string {
   const filename = BADGE_IMAGE_MAP[badgeCode];
   if (!filename) {
     console.warn(`No image mapping found for badge code: ${badgeCode}`);
-    return "/badges/oppidum_member.png"; // fallback
+    return "/badges_new/oppidum_member.png"; // fallback
   }
-  return `/badges/${filename}.png`;
+  return `/badges_new/${filename}.png`;
 }

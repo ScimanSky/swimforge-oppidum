@@ -335,23 +335,31 @@ export const appRouter = router({
         
         if (!earned && profile) {
           switch (badge.requirementType) {
-            case "total_distance":
-              progress = Math.min(100, (profile.totalDistanceMeters / badge.requirementValue) * 100);
+            case "total_distance_km":
+              progress = Math.min(100, (profile.totalDistanceMeters / 1000 / badge.requirementValue) * 100);
               break;
-            case "sessions_count":
+            case "single_session_distance_km":
+              // For session distance, we need to check activities (handled separately)
+              progress = 0;
+              break;
+            case "total_sessions":
               progress = Math.min(100, (profile.totalSessions / badge.requirementValue) * 100);
               break;
-            case "total_time":
-              progress = Math.min(100, (profile.totalTimeSeconds / badge.requirementValue) * 100);
+            case "total_time_hours":
+              progress = Math.min(100, (profile.totalTimeSeconds / 3600 / badge.requirementValue) * 100);
               break;
-            case "open_water_sessions":
+            case "total_open_water_sessions":
               progress = Math.min(100, (profile.totalOpenWaterSessions / badge.requirementValue) * 100);
               break;
-            case "open_water_total":
-              progress = Math.min(100, (profile.totalOpenWaterMeters / badge.requirementValue) * 100);
+            case "total_open_water_distance_km":
+              progress = Math.min(100, (profile.totalOpenWaterMeters / 1000 / badge.requirementValue) * 100);
               break;
-            case "level_reached":
+            case "level":
               progress = Math.min(100, (profile.level / badge.requirementValue) * 100);
+              break;
+            case "manual":
+              // Manual badges (oppidum_member, golden_octopus) don't have auto progress
+              progress = 0;
               break;
           }
         }
@@ -470,29 +478,29 @@ async function checkAndAwardBadges(userId: number) {
     let shouldAward = false;
     
     switch (badge.requirementType) {
-      case "total_distance":
-        shouldAward = profile.totalDistanceMeters >= badge.requirementValue;
+      case "total_distance_km":
+        shouldAward = (profile.totalDistanceMeters / 1000) >= badge.requirementValue;
         break;
-      case "single_session_distance":
-        // This would need to check the latest activity
+      case "single_session_distance_km":
+        // This would need to check the latest activity (handled in activity creation)
         break;
-      case "sessions_count":
+      case "total_sessions":
         shouldAward = profile.totalSessions >= badge.requirementValue;
         break;
-      case "total_time":
-        shouldAward = profile.totalTimeSeconds >= badge.requirementValue;
+      case "total_time_hours":
+        shouldAward = (profile.totalTimeSeconds / 3600) >= badge.requirementValue;
         break;
-      case "open_water_sessions":
+      case "total_open_water_sessions":
         shouldAward = profile.totalOpenWaterSessions >= badge.requirementValue;
         break;
-      case "open_water_total":
-        shouldAward = profile.totalOpenWaterMeters >= badge.requirementValue;
+      case "total_open_water_distance_km":
+        shouldAward = (profile.totalOpenWaterMeters / 1000) >= badge.requirementValue;
         break;
-      case "level_reached":
+      case "level":
         shouldAward = profile.level >= badge.requirementValue;
         break;
-      case "special":
-        // Special badges are awarded manually or through specific triggers
+      case "manual":
+        // Manual badges (oppidum_member, golden_octopus) are awarded manually
         break;
     }
     

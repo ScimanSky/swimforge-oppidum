@@ -13,47 +13,9 @@ import {
 import { Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import { useState, useRef, useCallback } from "react";
+import { getBadgeImageUrl } from "@/lib/badgeImages";
 
-// Mapping badge code to PNG file (3D isometric badges)
-const badgePngMap: Record<string, string> = {
-  // Distanza
-  "first_km": "/badges/first_km.png",
-  "marathon_beginner": "/badges/marathon_beginner.png",
-  "aquatic_marathon": "/badges/aquatic_marathon.png",
-  "centurion": "/badges/centurion.png",
-  "epic_crossing": "/badges/epic_crossing.png",
-  "half_millennium": "/badges/half_millennium.png",
-  "millionaire": "/badges/millionaire.png",
-  // Sessione
-  "solid_session": "/badges/solid_session.png",
-  "endurance": "/badges/endurance.png",
-  "ultra_swimmer": "/badges/ultra_swimmer.png",
-  "unstoppable_machine": "/badges/unstoppable_machine.png",
-  // Costanza
-  "promising_start": "/badges/promising_start.png",
-  "healthy_habit": "/badges/healthy_habit.png",
-  "half_century": "/badges/half_century.png",
-  "centenarian": "/badges/centenarian.png",
-  "pool_devotee": "/badges/pool_devotee.png",
-  "year_in_pool": "/badges/year_in_pool.png",
-  // Acque Libere
-  "sea_baptism": "/badges/sea_baptism.png",
-  "navigator": "/badges/navigator.png",
-  "sea_wolf": "/badges/sea_wolf.png",
-  "marine_explorer": "/badges/marine_explorer.png",
-  "crosser": "/badges/crosser.png",
-  // Speciali
-  "oppidum_member": "/badges/oppidum_member.png",
-  "golden_octopus": "/badges/golden_octopus.png",
-  // Traguardi
-  "first_10_hours": "/badges/first_10_hours.png",
-  "fifty_hours": "/badges/fifty_hours.png",
-  "time_centenarian": "/badges/time_centenarian.png",
-  "level_5": "/badges/level_5.png",
-  "level_10": "/badges/level_10.png",
-  "level_15": "/badges/level_15.png",
-  "poseidon": "/badges/poseidon.png",
-};
+// Badge images are now handled by getBadgeImageUrl from badgeImages.ts
 
 const categoryLabels: Record<string, string> = {
   all: "Tutti",
@@ -106,43 +68,7 @@ const rarityColors: Record<string, { border: string; glow: string; bg: string; t
   },
 };
 
-// Helper to get badge code from name
-function getBadgeCode(name: string): string {
-  const codeMap: Record<string, string> = {
-    "Primo Chilometro": "first_km",
-    "Maratoneta in Erba": "marathon_beginner",
-    "Maratona Acquatica": "aquatic_marathon",
-    "Centurione": "centurion",
-    "Traversata Epica": "epic_crossing",
-    "Mezzo Millennio": "half_millennium",
-    "Il Milionario": "millionaire",
-    "Sessione Solida": "solid_session",
-    "Resistenza": "endurance",
-    "Ultra Nuotatore": "ultra_swimmer",
-    "Macchina Instancabile": "unstoppable_machine",
-    "Inizio Promettente": "promising_start",
-    "Abitudine Sana": "healthy_habit",
-    "Mezzo Centinaio": "half_century",
-    "Centenario": "centenarian",
-    "Devoto alla Vasca": "pool_devotee",
-    "Un Anno in Vasca": "year_in_pool",
-    "Battesimo del Mare": "sea_baptism",
-    "Navigatore": "navigator",
-    "Lupo di Mare": "sea_wolf",
-    "Esploratore Marino": "marine_explorer",
-    "Attraversatore": "crosser",
-    "Membro Oppidum": "oppidum_member",
-    "Polpo d'Oro": "golden_octopus",
-    "Prime 10 Ore": "first_10_hours",
-    "50 Ore di Dedizione": "fifty_hours",
-    "Centenario del Tempo": "time_centenarian",
-    "Livello 5 Raggiunto": "level_5",
-    "Livello 10 Raggiunto": "level_10",
-    "Livello 15 Raggiunto": "level_15",
-    "Poseidone": "poseidon",
-  };
-  return codeMap[name] || "first_km";
-}
+// Badge code is now directly available from badge.code
 
 export default function Badges() {
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -355,8 +281,7 @@ export default function Badges() {
               {filteredBadges?.map((badge, index) => {
                 const isEarned = badge.earned;
                 const colors = rarityColors[badge.rarity] || rarityColors.common;
-                const badgeCode = getBadgeCode(badge.name);
-                const pngPath = badgePngMap[badgeCode];
+                const pngPath = getBadgeImageUrl(badge.code);
 
                 return (
                   <motion.div
@@ -484,7 +409,7 @@ export default function Badges() {
                   >
                     {selectedBadge.earned ? (
                       <img 
-                        src={badgePngMap[getBadgeCode(selectedBadge.name)]} 
+                        src={getBadgeImageUrl(selectedBadge.code)} 
                         alt={selectedBadge.name}
                         className="w-full h-full object-contain"
                       />
