@@ -139,9 +139,9 @@ export default function Dashboard() {
                     transition={{ type: "spring", duration: 0.6 }}
                     className="w-20 h-20 flex-shrink-0"
                   >
-                    {profile?.profileBadge?.image_url ? (
+                    {profile?.profileBadge?.badge_image_url ? (
                       <img 
-                        src={profile.profileBadge.image_url} 
+                        src={profile.profileBadge.badge_image_url} 
                         alt={profile.profileBadge.name}
                         className="w-full h-full object-contain drop-shadow-lg"
                       />

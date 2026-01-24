@@ -673,6 +673,12 @@ export const appRouter = router({
       const result = await cronChallenges.completeChallenges();
       return result;
     }),
+
+    // Fix badge URLs (temporary endpoint)
+    fixBadgeUrls: publicProcedure.mutation(async () => {
+      const { fixBadgeUrls } = await import("./fix_badge_urls");
+      return await fixBadgeUrls();
+    }),
   }),
 });
 
