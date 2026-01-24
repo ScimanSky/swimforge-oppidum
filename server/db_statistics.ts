@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { getDb } from "./db";
 import { swimmingActivities, swimmerProfiles } from "../drizzle/schema";
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
 
@@ -83,6 +83,7 @@ export async function getProgressTimeline(
 ): Promise<TimelineDataPoint[]> {
   const startDate = getDaysAgo(days);
 
+  const db = await getDb();
   const activities = await db
     .select({
       date: swimmingActivities.activityDate,
@@ -140,6 +141,7 @@ export async function getPerformanceAnalysis(
 ): Promise<PerformanceAnalysis> {
   const startDate = getDaysAgo(days);
 
+  const db = await getDb();
   const activities = await db
     .select()
     .from(swimmingActivities)
@@ -224,6 +226,7 @@ export async function getAdvancedMetrics(
   const startDate = getDaysAgo(days);
   const previousStartDate = getDaysAgo(days * 2);
 
+  const db = await getDb();
   // Current period
   const currentActivities = await db
     .select()
