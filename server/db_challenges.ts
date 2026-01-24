@@ -130,7 +130,7 @@ export async function getActiveChallenges(userId: number): Promise<any[]> {
       c.*,
       cp.current_progress,
       cp.current_rank,
-      CASE WHEN cp.user_id IS NOT NULL THEN true ELSE false END as is_participant,
+      CASE WHEN cp.user_id IS NOT NULL THEN true ELSE false END as "isParticipant",
       (SELECT COUNT(*) FROM challenge_participants WHERE challenge_id = c.id) as participant_count,
       (SELECT json_agg(json_build_object(
         'userId', user_id,
