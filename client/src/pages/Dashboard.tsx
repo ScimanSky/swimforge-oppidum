@@ -13,6 +13,8 @@ import {
   Zap,
   Activity,
   User,
+  Plus,
+  Trophy,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
@@ -260,7 +262,7 @@ export default function Dashboard() {
           </div>
         </motion.div>
 
-        {/* Recent Badges */}
+        {/* Active Challenges */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -269,102 +271,29 @@ export default function Dashboard() {
           <div className="neon-card p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold flex items-center gap-2 text-[oklch(0.95_0.01_220)]">
-                <Medal className="h-5 w-5 text-[oklch(0.82_0.18_85)]" />
-                Ultimi Badge Sbloccati
+                <Trophy className="h-5 w-5 text-[oklch(0.82_0.18_85)]" />
+                Sfide Attive
               </h3>
-              <Link href="/badges">
+              <Link href="/challenges">
                 <Button variant="ghost" size="sm" className="text-[oklch(0.70_0.18_220)] hover:bg-[oklch(0.70_0.18_220_/_0.1)]">
-                  Bacheca
-                  <ChevronRight className="h-4 w-4 ml-1" />
+                  Crea Sfida
+                  <Plus className="h-4 w-4 ml-1" />
                 </Button>
               </Link>
             </div>
             
-            {badgesLoading ? (
-              <div className="flex gap-4">
-                {[1, 2, 3, 4].map((i) => (
-                  <Skeleton key={i} className="w-16 h-16 rounded-full bg-[oklch(0.20_0.03_250)]" />
-                ))}
+            <div className="space-y-3">
+              <div className="text-center py-8">
+                <Trophy className="h-12 w-12 mx-auto mb-3 text-[oklch(0.70_0.18_220)]" />
+                <p className="text-sm text-[oklch(0.60_0.03_220)] mb-4">Nessuna sfida attiva al momento</p>
+                <Link href="/challenges">
+                  <Button className="bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] hover:opacity-90">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Crea la Tua Prima Sfida
+                  </Button>
+                </Link>
               </div>
-            ) : recentBadges && recentBadges.length > 0 ? (
-              <div className="flex gap-4 overflow-x-auto pb-2">
-                {recentBadges.slice(0, 5).map(({ badge, userBadge }) => {
-                  const rarityColors: Record<string, { border: string; glow: string }> = {
-                    common: { border: "oklch(0.5 0.03 250)", glow: "oklch(0.5 0.03 250 / 0.3)" },
-                    uncommon: { border: "oklch(0.70 0.20 145)", glow: "oklch(0.70 0.20 145 / 0.5)" },
-                    rare: { border: "oklch(0.70 0.18 220)", glow: "oklch(0.70 0.18 220 / 0.6)" },
-                    epic: { border: "oklch(0.65 0.22 300)", glow: "oklch(0.65 0.22 300 / 0.6)" },
-                    legendary: { border: "oklch(0.85 0.18 85)", glow: "oklch(0.85 0.18 85 / 0.7)" },
-                  };
-                  const colors = rarityColors[badge.rarity] || rarityColors.common;
-                  
-                  return (
-                    <motion.div
-                      key={badge.id}
-                      whileHover={{ 
-                        scale: 1.15, 
-                        rotateY: 25,
-                        rotateX: 10,
-                        z: 50,
-                      }}
-                      transition={{
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 20,
-                      }}
-                      className="flex-shrink-0 w-20 h-20 flex items-center justify-center relative"
-                      style={{ 
-                        transformStyle: 'preserve-3d',
-                        perspective: '1000px',
-                      }}
-                    >
-                      {/* Animated Glow Ring */}
-                      <motion.div 
-                        className="absolute inset-0 rounded-full"
-                        animate={{
-                          boxShadow: [
-                            `0 0 20px ${colors.glow}`,
-                            `0 0 40px ${colors.glow}`,
-                            `0 0 20px ${colors.glow}`,
-                          ],
-                        }}
-                        transition={{
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: "easeInOut",
-                        }}
-                      />
-                      {/* Badge Image 3D */}
-                      <motion.img 
-                        src={getBadgeImageUrl(badge.code)}
-                        alt={badge.name}
-                        className="w-full h-full object-contain relative z-10"
-                        whileHover={{
-                          filter: [
-                            `drop-shadow(0 0 10px ${colors.glow})`,
-                            `drop-shadow(0 0 20px ${colors.glow}) brightness(1.2)`,
-                            `drop-shadow(0 0 10px ${colors.glow})`,
-                          ],
-                        }}
-                        transition={{
-                          duration: 0.8,
-                          repeat: Infinity,
-                        }}
-                        style={{ 
-                          filter: `drop-shadow(0 0 10px ${colors.glow})`,
-                          transform: 'translateZ(30px)',
-                        }}
-                      />
-                    </motion.div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-6">
-                <Medal className="h-10 w-10 mx-auto mb-2 text-[oklch(0.35_0.03_250)]" />
-                <p className="text-sm text-[oklch(0.50_0.03_220)]">Nessun badge ancora. Continua a nuotare!</p>
-              </div>
-            )}
+            </div>
           </div>
         </motion.div>
 

@@ -451,6 +451,64 @@ export const appRouter = router({
       }),
   }),
 
+  // Challenges: User challenges system
+  challenges: router({  
+    // Get active challenges for current user
+    list: protectedProcedure.query(async ({ ctx }) => {
+      const challengesDb = await import("./db_challenges");
+      return await challengesDb.getActiveChallenges(ctx.user.id);
+    }),
+
+    // Create a new challenge
+    create: protectedProcedure
+      .input(z.object({
+        name: z.string().min(3).max(128),
+        description: z.string().optional(),
+        type: z.enum(["pool", "open_water", "both"]),
+        objective: z.enum(["total_distance", "total_sessions", "consistency", "avg_pace", "total_time", "longest_session"]),
+        duration: z.enum(["3_days", "1_week", "2_weeks", "1_month"]),
+        startDate: z.string(), // ISO date string
+        badgeImageUrl: z.string().optional(),
+        badgeName: z.string().optional(),
+        prizeDescription: z.string().optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const challengesDb = await import("./db_challenges");
+        const challengeId = await challengesDb.createChallenge({
+          ...input,
+          creatorId: ctx.user.id,
+          startDate: new Date(input.startDate),
+        });
+        
+        if (!challengeId) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create challenge" });
+        }
+        
+        // Auto-join creator to challenge
+        await challengesDb.joinChallenge(challengeId, ctx.user.id);
+        
+        return { id: challengeId };
+      }),
+
+    // Join a challenge
+    join: protectedProcedure
+      .input(z.object({ challengeId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const challengesDb = await import("./db_challenges");
+        const success = await challengesDb.joinChallenge(input.challengeId, ctx.user.id);
+        return { success };
+      }),
+
+    // Refresh challenge progress (called after sync)
+    refreshProgress: protectedProcedure
+      .input(z.object({ challengeId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const challengesDb = await import("./db_challenges");
+        await challengesDb.calculateChallengeProgress(input.challengeId);
+        return { success: true };
+      }),
+  }),
+
   // Admin: Seed badges and levels
   admin: router({
     seedData: protectedProcedure.mutation(async ({ ctx }) => {
