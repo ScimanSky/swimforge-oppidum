@@ -680,6 +680,39 @@ export const appRouter = router({
       return await fixBadgeUrls();
     }),
   }),
+
+  // Statistics
+  statistics: router({
+    // Get progress timeline data
+    getTimeline: protectedProcedure
+      .input(z.object({
+        days: z.number().default(30),
+      }))
+      .query(async ({ ctx, input }) => {
+        const { getProgressTimeline } = await import("./db_statistics");
+        return await getProgressTimeline(ctx.user.id, input.days);
+      }),
+
+    // Get performance analysis
+    getPerformance: protectedProcedure
+      .input(z.object({
+        days: z.number().default(30),
+      }))
+      .query(async ({ ctx, input }) => {
+        const { getPerformanceAnalysis } = await import("./db_statistics");
+        return await getPerformanceAnalysis(ctx.user.id, input.days);
+      }),
+
+    // Get advanced metrics
+    getAdvanced: protectedProcedure
+      .input(z.object({
+        days: z.number().default(30),
+      }))
+      .query(async ({ ctx, input }) => {
+        const { getAdvancedMetrics } = await import("./db_statistics");
+        return await getAdvancedMetrics(ctx.user.id, input.days);
+      }),
+  }),
 });
 
 // Helper function to check and award badges

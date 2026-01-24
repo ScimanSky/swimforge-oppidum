@@ -12,6 +12,7 @@ import ChallengeDetail from "./pages/ChallengeDetail";
 import Leaderboard from "./pages/Leaderboard";
 import Activities from "./pages/Activities";
 import Profile from "./pages/Profile";
+import Statistics from "./pages/Statistics";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import BadgeUnlockNotification from "./components/BadgeUnlockNotification";
@@ -30,6 +31,7 @@ function Router() {
       <Route path="/challenges/:id" component={ChallengeDetail} />
       <Route path="/leaderboard" component={Leaderboard} />
       <Route path="/activities" component={Activities} />
+      <Route path="/statistics" component={Statistics} />
       <Route path="/profile" component={Profile} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
