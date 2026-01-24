@@ -473,12 +473,30 @@ export async function syncGarminActivities(
         })
         .where(eq(swimmerProfiles.userId, userId));
 
+      // Calculate open water stats
+      const newTotalOpenWaterSessions = (profile.totalOpenWaterSessions || 0) + 
+        result.activities.filter(a => a.is_open_water).length;
+      const newTotalOpenWaterDistance = (profile.totalOpenWaterMeters || 0) + 
+        result.activities.filter(a => a.is_open_water).reduce((sum, a) => sum + a.distance_meters, 0);
+
+      // Update profile with open water stats
+      await db
+        .update(swimmerProfiles)
+        .set({
+          totalOpenWaterSessions: newTotalOpenWaterSessions,
+          totalOpenWaterMeters: newTotalOpenWaterDistance,
+        })
+        .where(eq(swimmerProfiles.userId, userId));
+
       // Check and award badges
       await checkAndAwardBadges(userId, {
         totalDistance: newTotalDistance,
         totalSessions: newTotalSessions,
         totalXp: newTotalXp,
         level: newLevel,
+        totalTime: newTotalTime,
+        totalOpenWaterSessions: newTotalOpenWaterSessions,
+        totalOpenWaterDistance: newTotalOpenWaterDistance,
       });
     }
 
@@ -541,13 +559,17 @@ async function checkAndAwardBadges(
     totalSessions: number;
     totalXp: number;
     level: number;
+    totalTime?: number;
+    totalOpenWaterSessions?: number;
+    totalOpenWaterDistance?: number;
+    longestSessionDistance?: number;
   }
 ): Promise<void> {
   const db = await getDb();
   if (!db) return;
 
   // Get all badge definitions
-  const badges = await db.select().from(badgeDefinitions);
+  const badges = await db.select().from(badgeDefinitions).where(eq(badgeDefinitions.isActive, true));
 
   // Get user's existing badges
   const existingBadges = await db
@@ -556,6 +578,17 @@ async function checkAndAwardBadges(
     .where(eq(userBadges.userId, userId));
 
   const existingBadgeIds = new Set(existingBadges.map(b => b.badgeId));
+
+  // Get longest session distance for single_session_distance_km badges
+  if (!stats.longestSessionDistance) {
+    const activities = await db
+      .select()
+      .from(swimmingActivities)
+      .where(eq(swimmingActivities.userId, userId))
+      .orderBy(desc(swimmingActivities.distanceMeters))
+      .limit(1);
+    stats.longestSessionDistance = activities[0]?.distanceMeters || 0;
+  }
 
   // Check each badge
   for (const badge of badges) {
@@ -574,8 +607,28 @@ async function checkAndAwardBadges(
           earned = true;
         }
         break;
+      case "single_session_distance_km":
+        if (stats.longestSessionDistance && stats.longestSessionDistance >= reqValue * 1000) {
+          earned = true;
+        }
+        break;
       case "total_sessions":
         if (stats.totalSessions >= reqValue) {
+          earned = true;
+        }
+        break;
+      case "total_time_hours":
+        if (stats.totalTime && stats.totalTime >= reqValue * 3600) {
+          earned = true;
+        }
+        break;
+      case "total_open_water_sessions":
+        if (stats.totalOpenWaterSessions && stats.totalOpenWaterSessions >= reqValue) {
+          earned = true;
+        }
+        break;
+      case "total_open_water_distance_km":
+        if (stats.totalOpenWaterDistance && stats.totalOpenWaterDistance >= reqValue * 1000) {
           earned = true;
         }
         break;
@@ -588,6 +641,9 @@ async function checkAndAwardBadges(
         if (stats.totalXp >= reqValue) {
           earned = true;
         }
+        break;
+      case "manual":
+        // Manual badges are not auto-awarded
         break;
     }
 

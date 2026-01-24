@@ -2,7 +2,7 @@
 export const BADGE_IMAGE_MAP: Record<string, string> = {
   // Distance badges
   "dist_1km": "first_km",
-  "dist_5km": "first_km",
+  "dist_5km": "distance_5km",
   "dist_10km": "centurion",
   "dist_25km": "marathon_beginner",
   "dist_100km": "aquatic_marathon",
