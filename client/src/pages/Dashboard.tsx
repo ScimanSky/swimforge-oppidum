@@ -213,7 +213,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold flex items-center gap-2 text-[oklch(0.95_0.01_220)]">
                 <Medal className="h-5 w-5 text-[oklch(0.82_0.18_85)]" />
-                I Tuoi Trofei
+                Ultimi Badge Sbloccati
               </h3>
               <Link href="/badges">
                 <Button variant="ghost" size="sm" className="text-[oklch(0.70_0.18_220)] hover:bg-[oklch(0.70_0.18_220_/_0.1)]">
@@ -244,16 +244,17 @@ export default function Dashboard() {
                   return (
                     <motion.div
                       key={badge.id}
-                      whileHover={{ scale: 1.1 }}
-                      className="flex-shrink-0 w-16 h-16 rounded-full flex items-center justify-center relative"
+                      whileHover={{ scale: 1.1, rotateY: 15 }}
+                      className="flex-shrink-0 w-20 h-20 rounded-lg flex items-center justify-center relative overflow-hidden"
                       style={{ 
                         background: `linear-gradient(135deg, oklch(0.22 0.03 250) 0%, oklch(0.16 0.035 250) 100%)`,
                         boxShadow: `0 0 20px ${colors.glow}`,
+                        transformStyle: 'preserve-3d',
                       }}
                     >
                       {/* Gradient Border */}
                       <div 
-                        className="absolute inset-[-2px] rounded-full"
+                        className="absolute inset-[-2px] rounded-lg"
                         style={{
                           background: `linear-gradient(135deg, ${colors.border} 0%, ${colors.border}80 100%)`,
                           padding: '2px',
@@ -262,12 +263,14 @@ export default function Dashboard() {
                           maskComposite: 'exclude',
                         }}
                       />
-                      <Trophy 
-                        className="h-7 w-7 relative z-10" 
+                      {/* Badge Image */}
+                      <img 
+                        src={badge.imageUrl || `/badges/${badge.id}.png`}
+                        alt={badge.name}
+                        className="w-14 h-14 object-contain relative z-10"
                         style={{ 
-                          color: colors.border,
                           filter: `drop-shadow(0 0 8px ${colors.glow})`,
-                        }} 
+                        }}
                       />
                     </motion.div>
                   );
