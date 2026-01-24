@@ -105,6 +105,7 @@ export async function getActiveChallenges(userId: number): Promise<any[]> {
       c.*,
       cp.current_progress,
       cp.current_rank,
+      CASE WHEN cp.user_id IS NOT NULL THEN true ELSE false END as is_participant,
       (SELECT COUNT(*) FROM challenge_participants WHERE challenge_id = c.id) as participant_count,
       (SELECT json_agg(json_build_object(
         'userId', user_id,
@@ -115,7 +116,6 @@ export async function getActiveChallenges(userId: number): Promise<any[]> {
     FROM challenges c
     LEFT JOIN challenge_participants cp ON c.id = cp.challenge_id AND cp.user_id = ${userId}
     WHERE c.status IN ('pending', 'active')
-      AND (cp.user_id = ${userId} OR c.creator_id = ${userId})
     ORDER BY c.start_date DESC
   `);
 

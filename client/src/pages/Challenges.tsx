@@ -298,7 +298,7 @@ export default function Challenges() {
                   >
                     Dettagli
                   </Button>
-                  {challenge.status === 'active' && (
+                  {challenge.status === 'active' && !challenge.isParticipant && (
                     <Button
                       onClick={() => joinChallengeMutation.mutate({ challengeId: challenge.id })}
                       disabled={joinChallengeMutation.isPending}
@@ -307,6 +307,11 @@ export default function Challenges() {
                       <Trophy className="h-4 w-4 mr-2" />
                       {joinChallengeMutation.isPending ? "Iscrizione..." : "Unisciti"}
                     </Button>
+                  )}
+                  {challenge.isParticipant && (
+                    <div className="flex-1 px-4 py-2 rounded-lg bg-[oklch(0.25_0.05_220)] border border-[oklch(0.70_0.18_220)] text-center">
+                      <span className="text-sm font-medium text-[oklch(0.70_0.18_220)]">✓ Iscritto</span>
+                    </div>
                   )}
                 </div>
               </motion.div>
