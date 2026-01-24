@@ -14,45 +14,45 @@ import { Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import { useState, useRef, useCallback } from "react";
 
-// Mapping badge code to PNG file (new 3D badges)
+// Mapping badge code to PNG file (3D isometric badges)
 const badgePngMap: Record<string, string> = {
   // Distanza
-  "first_km": "/badges_new/first_km.png",
-  "marathon_beginner": "/badges_new/marathon_beginner.png",
-  "aquatic_marathon": "/badges_new/aquatic_marathon.png",
-  "centurion": "/badges_new/centurion.png",
-  "epic_crossing": "/badges_new/epic_crossing.png",
-  "half_millennium": "/badges_new/half_millennium.png",
-  "millionaire": "/badges_new/millionaire.png",
+  "first_km": "/badges/first_km.png",
+  "marathon_beginner": "/badges/marathon_beginner.png",
+  "aquatic_marathon": "/badges/aquatic_marathon.png",
+  "centurion": "/badges/centurion.png",
+  "epic_crossing": "/badges/epic_crossing.png",
+  "half_millennium": "/badges/half_millennium.png",
+  "millionaire": "/badges/millionaire.png",
   // Sessione
-  "solid_session": "/badges_new/solid_session.png",
-  "endurance": "/badges_new/endurance.png",
-  "ultra_swimmer": "/badges_new/ultra_swimmer.png",
-  "unstoppable_machine": "/badges_new/unstoppable_machine.png",
+  "solid_session": "/badges/solid_session.png",
+  "endurance": "/badges/endurance.png",
+  "ultra_swimmer": "/badges/ultra_swimmer.png",
+  "unstoppable_machine": "/badges/unstoppable_machine.png",
   // Costanza
-  "promising_start": "/badges_new/promising_start.png",
-  "healthy_habit": "/badges_new/healthy_habit.png",
-  "half_century": "/badges_new/half_century.png",
-  "centenarian": "/badges_new/centenarian.png",
-  "pool_devotee": "/badges_new/pool_devotee.png",
-  "year_in_pool": "/badges_new/year_in_pool.png",
+  "promising_start": "/badges/promising_start.png",
+  "healthy_habit": "/badges/healthy_habit.png",
+  "half_century": "/badges/half_century.png",
+  "centenarian": "/badges/centenarian.png",
+  "pool_devotee": "/badges/pool_devotee.png",
+  "year_in_pool": "/badges/year_in_pool.png",
   // Acque Libere
-  "sea_baptism": "/badges_new/sea_baptism.png",
-  "navigator": "/badges_new/navigator.png",
-  "sea_wolf": "/badges_new/sea_wolf.png",
-  "marine_explorer": "/badges_new/marine_explorer.png",
-  "crosser": "/badges_new/crosser.png",
+  "sea_baptism": "/badges/sea_baptism.png",
+  "navigator": "/badges/navigator.png",
+  "sea_wolf": "/badges/sea_wolf.png",
+  "marine_explorer": "/badges/marine_explorer.png",
+  "crosser": "/badges/crosser.png",
   // Speciali
-  "oppidum_member": "/badges_new/oppidum_member.png",
-  "golden_octopus": "/badges_new/golden_octopus.png",
+  "oppidum_member": "/badges/oppidum_member.png",
+  "golden_octopus": "/badges/golden_octopus.png",
   // Traguardi
-  "first_10_hours": "/badges_new/first_10_hours.png",
-  "fifty_hours": "/badges_new/fifty_hours.png",
-  "time_centenarian": "/badges_new/time_centenarian.png",
-  "level_5": "/badges_new/level_5.png",
-  "level_10": "/badges_new/level_10.png",
-  "level_15": "/badges_new/level_15.png",
-  "poseidon": "/badges_new/poseidon.png",
+  "first_10_hours": "/badges/first_10_hours.png",
+  "fifty_hours": "/badges/fifty_hours.png",
+  "time_centenarian": "/badges/time_centenarian.png",
+  "level_5": "/badges/level_5.png",
+  "level_10": "/badges/level_10.png",
+  "level_15": "/badges/level_15.png",
+  "poseidon": "/badges/poseidon.png",
 };
 
 const categoryLabels: Record<string, string> = {
