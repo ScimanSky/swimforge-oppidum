@@ -190,8 +190,9 @@ def parse_swimming_activity(activity: dict) -> SwimmingActivity:
     logger.info(f"Duration fields: duration={activity.get('duration')}, activeDuration={activity.get('activeDuration')}, movingDuration={activity.get('movingDuration')}, elapsedDuration={activity.get('elapsedDuration')}")
     
     distance = int(activity.get("distance", 0))
-    # Use activeDuration (moving time) instead of duration (total time with pauses)
-    duration = int(activity.get("activeDuration", activity.get("duration", 0)))
+    # Use movingDuration (moving time) instead of duration (total time with pauses)
+    # activeDuration doesn't exist for swimming activities, use movingDuration
+    duration = int(activity.get("movingDuration") or activity.get("duration", 0))
     
     # Calculate pace per 100m
     avg_pace = None
