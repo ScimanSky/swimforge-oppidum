@@ -312,7 +312,7 @@ export default function Dashboard() {
                         stiffness: 300,
                         damping: 20,
                       }}
-                      className="flex-shrink-0 w-24 h-24 rounded-full flex items-center justify-center relative"
+                      className="flex-shrink-0 w-20 h-20 flex items-center justify-center relative"
                       style={{ 
                         transformStyle: 'preserve-3d',
                         perspective: '1000px',
@@ -338,22 +338,21 @@ export default function Dashboard() {
                       <motion.img 
                         src={getBadgeImageUrl(badge.code)}
                         alt={badge.name}
-                        className="w-20 h-20 object-contain relative z-10 mix-blend-lighten"
+                        className="w-full h-full object-contain relative z-10"
                         whileHover={{
                           filter: [
-                            `drop-shadow(0 0 15px ${colors.glow})`,
-                            `drop-shadow(0 0 30px ${colors.glow}) brightness(1.3)`,
-                            `drop-shadow(0 0 15px ${colors.glow})`,
+                            `drop-shadow(0 0 10px ${colors.glow})`,
+                            `drop-shadow(0 0 20px ${colors.glow}) brightness(1.2)`,
+                            `drop-shadow(0 0 10px ${colors.glow})`,
                           ],
-                          scale: 1.1,
                         }}
                         transition={{
                           duration: 0.8,
                           repeat: Infinity,
                         }}
                         style={{ 
-                          filter: `drop-shadow(0 0 15px ${colors.glow})`,
-                          transform: 'translateZ(50px)',
+                          filter: `drop-shadow(0 0 10px ${colors.glow})`,
+                          transform: 'translateZ(30px)',
                         }}
                       />
                     </motion.div>
