@@ -141,8 +141,9 @@ export default function Profile() {
                   {/* Profile Badge */}
                   <motion.div 
                     className="w-32 h-32 flex items-center justify-center"
-                    animate={{ rotate: 360 }}
+                    animate={{ rotateY: 360 }}
                     transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                    style={{ transformStyle: "preserve-3d" }}
                   >
                     {profile?.profileBadge?.badge_image_url ? (
                       <img 

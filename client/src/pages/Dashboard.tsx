@@ -135,11 +135,12 @@ export default function Dashboard() {
                 <div className="flex items-center gap-4 mb-6">
                   <motion.div 
                     initial={{ scale: 0 }}
-                    animate={{ scale: 1, rotate: 360 }}
+                    animate={{ scale: 1, rotateY: 360 }}
                     transition={{ 
                       scale: { type: "spring", duration: 0.6 },
-                      rotate: { duration: 20, repeat: Infinity, ease: "linear" }
+                      rotateY: { duration: 20, repeat: Infinity, ease: "linear" }
                     }}
+                    style={{ transformStyle: "preserve-3d" }}
                     className="w-32 h-32 flex-shrink-0"
                   >
                     {profile?.profileBadge?.badge_image_url ? (
