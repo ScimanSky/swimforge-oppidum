@@ -10,11 +10,11 @@ import { motion } from "framer-motion";
 import { Trophy, Plus, Calendar, Target, Users, Award } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import MobileNav from "@/components/MobileNav";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "sonner";
 
 export default function Challenges() {
   const [, setLocation] = useLocation();
-  const { toast } = useToast();
+
   const [showCreateForm, setShowCreateForm] = useState(false);
   
   // Form state
