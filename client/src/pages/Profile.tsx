@@ -139,7 +139,11 @@ export default function Profile() {
               ) : (
                 <div className="flex items-center gap-4">
                   {/* Profile Badge */}
-                  <div className="w-20 h-20 flex items-center justify-center shadow-lg">
+                  <motion.div 
+                    className="w-32 h-32 flex items-center justify-center"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+                  >
                     {profile?.profileBadge?.badge_image_url ? (
                       <img 
                         src={profile.profileBadge.badge_image_url} 
@@ -154,7 +158,7 @@ export default function Profile() {
                         {(user?.name || "N")[0].toUpperCase()}
                       </div>
                     )}
-                  </div>
+                  </motion.div>
                   <div>
                     <h2 className="text-xl font-bold">{user?.name || "Nuotatore"}</h2>
                     <p className="text-white/70 text-sm">{user?.email}</p>

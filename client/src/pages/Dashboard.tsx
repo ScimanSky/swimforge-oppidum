@@ -135,15 +135,18 @@ export default function Dashboard() {
                 <div className="flex items-center gap-4 mb-6">
                   <motion.div 
                     initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: "spring", duration: 0.6 }}
-                    className="w-20 h-20 flex-shrink-0"
+                    animate={{ scale: 1, rotate: 360 }}
+                    transition={{ 
+                      scale: { type: "spring", duration: 0.6 },
+                      rotate: { duration: 20, repeat: Infinity, ease: "linear" }
+                    }}
+                    className="w-32 h-32 flex-shrink-0"
                   >
                     {profile?.profileBadge?.badge_image_url ? (
                       <img 
                         src={profile.profileBadge.badge_image_url} 
                         alt={profile.profileBadge.name}
-                        className="w-full h-full object-contain drop-shadow-lg"
+                        className="w-full h-full object-contain drop-shadow-2xl"
                       />
                     ) : (
                       <div className="level-badge">
