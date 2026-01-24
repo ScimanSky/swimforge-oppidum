@@ -186,7 +186,8 @@ def parse_swimming_activity(activity: dict) -> SwimmingActivity:
     is_open_water = "open_water" in activity_type or "openwater" in activity_type
     
     distance = int(activity.get("distance", 0))
-    duration = int(activity.get("duration", 0))
+    # Use activeDuration (moving time) instead of duration (total time with pauses)
+    duration = int(activity.get("activeDuration", activity.get("duration", 0)))
     
     # Calculate pace per 100m
     avg_pace = None
