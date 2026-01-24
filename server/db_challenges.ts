@@ -89,7 +89,7 @@ export async function createChallenge(data: {
       start_date, end_date, status, badge_image_url, badge_name, prize_description
     ) VALUES (
       ${data.name}, ${data.description || null}, ${data.creatorId}, ${data.type}, ${data.objective},
-      ${data.duration}, ${data.startDate}, ${endDate}, ${initialStatus}, ${data.badgeImageUrl || null},
+      ${data.duration}, ${data.startDate}, ${endDate}, ${initialStatus}::challenge_status, ${data.badgeImageUrl || null},
       ${data.badgeName || null}, ${data.prizeDescription || null}
     ) RETURNING id
   `);
@@ -105,15 +105,14 @@ export async function getActiveChallenges(userId: number): Promise<any[]> {
   if (!db) return [];
 
   // Auto-update challenge statuses based on dates
-  const now = new Date();
   await db.execute(sql`
     UPDATE challenges
     SET status = CASE
-      WHEN start_date <= ${now} AND end_date >= ${now} THEN 'active'
-      WHEN end_date < ${now} THEN 'completed'
-      ELSE 'pending'
+      WHEN start_date <= NOW() AND end_date >= NOW() THEN 'active'::challenge_status
+      WHEN end_date < NOW() THEN 'completed'::challenge_status
+      ELSE 'pending'::challenge_status
     END
-    WHERE status != 'completed'
+    WHERE status != 'completed'::challenge_status
   `);
 
   const result = await db.execute(sql`
