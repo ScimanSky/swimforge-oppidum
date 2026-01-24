@@ -168,6 +168,25 @@ export async function joinChallenge(challengeId: number, userId: number): Promis
 }
 
 /**
+ * Leave a challenge
+ */
+export async function leaveChallenge(challengeId: number, userId: number): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  try {
+    await db.execute(sql`
+      DELETE FROM challenge_participants
+      WHERE challenge_id = ${challengeId} AND user_id = ${userId}
+    `);
+    return true;
+  } catch (error) {
+    console.error("Error leaving challenge:", error);
+    return false;
+  }
+}
+
+/**
  * Update challenge progress for a user
  */
 export async function updateChallengeProgress(

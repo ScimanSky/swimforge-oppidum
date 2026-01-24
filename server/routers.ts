@@ -607,6 +607,15 @@ export const appRouter = router({
         return { success };
       }),
 
+    // Leave a challenge
+    leave: protectedProcedure
+      .input(z.object({ challengeId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const challengesDb = await import("./db_challenges");
+        const success = await challengesDb.leaveChallenge(input.challengeId, ctx.user.id);
+        return { success };
+      }),
+
     // Refresh challenge progress (called after sync)
     refreshProgress: protectedProcedure
       .input(z.object({ challengeId: z.number() }))

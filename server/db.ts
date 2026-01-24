@@ -14,6 +14,7 @@ import {
   weeklyStats
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { updateUserProfileBadge } from './db_profile_badges';
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: Pool | null = null;
@@ -72,6 +73,9 @@ export async function registerUser(email: string, password: string, name?: strin
 
     // Create swimmer profile
     await db.insert(swimmerProfiles).values({ userId: user.id });
+
+    // Assign initial profile badge (Novizio - level 1)
+    await updateUserProfileBadge(user.id, 0);
 
     return { success: true, user };
   } catch (error) {
@@ -545,6 +549,9 @@ export async function createOAuthUser(data: {
 
     // Create swimmer profile
     await db.insert(swimmerProfiles).values({ userId: user.id });
+
+    // Assign initial profile badge (Novizio - level 1)
+    await updateUserProfileBadge(user.id, 0);
 
     return { success: true, user };
   } catch (error) {
