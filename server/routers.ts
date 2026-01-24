@@ -604,6 +604,26 @@ export const appRouter = router({
         await challengesDb.calculateChallengeProgress(input.challengeId);
         return { success: true };
       }),
+
+    // Recalculate progress for all active challenges (admin only)
+    recalculateAllProgress: protectedProcedure.mutation(async ({ ctx }) => {
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+      // Get all active challenges
+      const result = await db.execute(sql`
+        SELECT id FROM challenges WHERE status = 'active' AND end_date >= NOW()
+      `);
+      const challenges = result.rows as any[];
+
+      // Recalculate progress for each challenge
+      const challengesDb = await import("./db_challenges");
+      for (const challenge of challenges) {
+        await challengesDb.calculateChallengeProgress(challenge.id);
+      }
+
+      return { success: true, updated: challenges.length };
+    }),
   }),
 
   // Admin: Seed badges and levels

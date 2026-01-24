@@ -55,6 +55,15 @@ export default function Profile() {
     },
   });
 
+  const recalculateChallengesProgress = trpc.challenges.recalculateAllProgress.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Progresso ricalcolato per ${data.updated} sfide attive!`);
+    },
+    onError: () => {
+      toast.error("Errore nel ricalcolo progresso sfide");
+    },
+  });
+
   const seedData = trpc.admin.seedData.useMutation({
     onSuccess: () => {
       toast.success("Dati inizializzati con successo!");
@@ -241,6 +250,14 @@ export default function Profile() {
                   disabled={initializeProfileBadges.isPending}
                 >
                   {initializeProfileBadges.isPending ? "Inizializzazione..." : "Inizializza Badge Profilo"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => recalculateChallengesProgress.mutate()}
+                  disabled={recalculateChallengesProgress.isPending}
+                >
+                  {recalculateChallengesProgress.isPending ? "Ricalcolo..." : "Ricalcola Progresso Sfide"}
                 </Button>
               </CardContent>
             </Card>
