@@ -147,8 +147,14 @@ export const appRouter = router({
       const currentLevelInfo = await db.getLevelForXp(profile.totalXp);
       
       // Get profile badge
-      const { getUserProfileBadge } = await import("./db_profile_badges");
-      const profileBadge = await getUserProfileBadge(ctx.user.id);
+      const { getUserProfileBadge, updateUserProfileBadge } = await import("./db_profile_badges");
+      let profileBadge = await getUserProfileBadge(ctx.user.id);
+      
+      // If user doesn't have a profile badge, assign one based on current XP
+      if (!profileBadge) {
+        await updateUserProfileBadge(ctx.user.id, profile.totalXp);
+        profileBadge = await getUserProfileBadge(ctx.user.id);
+      }
       
       return {
         ...profile,
