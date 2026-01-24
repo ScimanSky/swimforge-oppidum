@@ -49,6 +49,19 @@ export default function Challenges() {
     },
   });
 
+  const joinChallengeMutation = trpc.challenges.join.useMutation({
+    onSuccess: () => {
+      toast.success("Iscrizione Completata!", {
+        description: "Sei entrato nella sfida con successo.",
+      });
+    },
+    onError: (error) => {
+      toast.error("Errore", {
+        description: error.message,
+      });
+    },
+  });
+
   const handleCreateChallenge = () => {
     if (!name.trim()) {
       toast.error("Errore", {
@@ -277,14 +290,25 @@ export default function Challenges() {
                   </div>
                 </div>
 
-                {challenge.status === 'active' && (
+                <div className="flex gap-2">
                   <Button
-                    className="w-full bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] hover:opacity-90"
+                    onClick={() => setLocation(`/challenges/${challenge.id}`)}
+                    variant="outline"
+                    className="flex-1"
                   >
-                    <Trophy className="h-4 w-4 mr-2" />
-                    Unisciti alla Sfida
+                    Dettagli
                   </Button>
-                )}
+                  {challenge.status === 'active' && (
+                    <Button
+                      onClick={() => joinChallengeMutation.mutate({ challengeId: challenge.id })}
+                      disabled={joinChallengeMutation.isPending}
+                      className="flex-1 bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] hover:opacity-90 disabled:opacity-50"
+                    >
+                      <Trophy className="h-4 w-4 mr-2" />
+                      {joinChallengeMutation.isPending ? "Iscrizione..." : "Unisciti"}
+                    </Button>
+                  )}
+                </div>
               </motion.div>
             ))}
           </div>

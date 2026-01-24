@@ -459,6 +459,18 @@ export const appRouter = router({
       return await challengesDb.getActiveChallenges(ctx.user.id);
     }),
 
+    // Get challenge by ID with participants and leaderboard
+    getById: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const challengesDb = await import("./db_challenges_getById");
+        const challenge = await challengesDb.getChallengeById(input.id);
+        if (!challenge) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Challenge not found" });
+        }
+        return challenge;
+      }),
+
     // Create a new challenge
     create: protectedProcedure
       .input(z.object({

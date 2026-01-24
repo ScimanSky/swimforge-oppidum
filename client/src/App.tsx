@@ -8,6 +8,7 @@ import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Badges from "./pages/Badges";
 import Challenges from "./pages/Challenges";
+import ChallengeDetail from "./pages/ChallengeDetail";
 import Leaderboard from "./pages/Leaderboard";
 import Activities from "./pages/Activities";
 import Profile from "./pages/Profile";
@@ -24,6 +25,7 @@ function Router() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/badges" component={Badges} />
       <Route path="/challenges" component={Challenges} />
+      <Route path="/challenges/:id" component={ChallengeDetail} />
       <Route path="/leaderboard" component={Leaderboard} />
       <Route path="/activities" component={Activities} />
       <Route path="/profile" component={Profile} />
