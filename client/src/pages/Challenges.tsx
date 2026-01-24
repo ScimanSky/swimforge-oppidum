@@ -27,8 +27,7 @@ export default function Challenges() {
 
   const createChallengeMutation = trpc.challenges.create.useMutation({
     onSuccess: () => {
-      toast({
-        title: "Sfida Creata!",
+      toast.success("Sfida Creata!", {
         description: "La tua sfida è stata creata con successo.",
       });
       setShowCreateForm(false);
@@ -41,20 +40,16 @@ export default function Challenges() {
       setStartDate(new Date().toISOString().split('T')[0]);
     },
     onError: (error) => {
-      toast({
-        title: "Errore",
+      toast.error("Errore", {
         description: error.message,
-        variant: "destructive",
       });
     },
   });
 
   const handleCreateChallenge = () => {
     if (!name.trim()) {
-      toast({
-        title: "Errore",
+      toast.error("Errore", {
         description: "Inserisci un nome per la sfida",
-        variant: "destructive",
       });
       return;
     }
