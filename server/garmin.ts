@@ -488,6 +488,15 @@ export async function syncGarminActivities(
         })
         .where(eq(swimmerProfiles.userId, userId));
 
+      // Get longest session distance for badge checking
+      const longestActivity = await db
+        .select()
+        .from(swimmingActivities)
+        .where(eq(swimmingActivities.userId, userId))
+        .orderBy(desc(swimmingActivities.distanceMeters))
+        .limit(1);
+      const longestSessionDistance = longestActivity[0]?.distanceMeters || 0;
+
       // Check and award badges
       await checkAndAwardBadges(userId, {
         totalDistance: newTotalDistance,
@@ -497,6 +506,7 @@ export async function syncGarminActivities(
         totalTime: newTotalTime,
         totalOpenWaterSessions: newTotalOpenWaterSessions,
         totalOpenWaterDistance: newTotalOpenWaterDistance,
+        longestSessionDistance: longestSessionDistance,
       });
 
       // Auto-update challenge progress for active challenges

@@ -329,6 +329,12 @@ export const appRouter = router({
       const userBadges = await db.getUserBadges(ctx.user.id);
       const earnedBadgeIds = new Set(userBadges.map(ub => ub.badge.id));
       
+      // Get longest session distance for single_session_distance_km badges
+      const allActivities = await db.getActivities(ctx.user.id, 10000, 0);
+      const longestSessionMeters = allActivities.length > 0 
+        ? Math.max(...allActivities.map(a => a.distanceMeters))
+        : 0;
+      
       return allBadges.map(badge => {
         const earned = earnedBadgeIds.has(badge.id);
         let progress = 0;
@@ -339,8 +345,7 @@ export const appRouter = router({
               progress = Math.min(100, (profile.totalDistanceMeters / 1000 / badge.requirementValue) * 100);
               break;
             case "single_session_distance_km":
-              // For session distance, we need to check activities (handled separately)
-              progress = 0;
+              progress = Math.min(100, (longestSessionMeters / 1000 / badge.requirementValue) * 100);
               break;
             case "total_sessions":
               progress = Math.min(100, (profile.totalSessions / badge.requirementValue) * 100);
@@ -371,6 +376,79 @@ export const appRouter = router({
           earnedAt: userBadges.find(ub => ub.badge.id === badge.id)?.userBadge.earnedAt,
         };
       });
+    }),
+
+    // Recalculate and award badges based on current stats
+    recalculate: protectedProcedure.mutation(async ({ ctx }) => {
+      const profile = await db.getSwimmerProfile(ctx.user.id);
+      if (!profile) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Profile not found" });
+      }
+
+      // Get longest session distance
+      const allActivities = await db.getActivities(ctx.user.id, 10000, 0);
+      const longestSessionDistance = allActivities.length > 0 
+        ? Math.max(...allActivities.map(a => a.distanceMeters))
+        : 0;
+
+      const allBadges = await db.getAllBadgeDefinitions();
+      const userBadges = await db.getUserBadges(ctx.user.id);
+      const earnedBadgeIds = new Set(userBadges.map(ub => ub.badge.id));
+      
+      let newBadgesCount = 0;
+
+      for (const badge of allBadges) {
+        if (earnedBadgeIds.has(badge.id)) continue;
+
+        let shouldAward = false;
+
+        switch (badge.requirementType) {
+          case "total_distance_km":
+            shouldAward = (profile.totalDistanceMeters / 1000) >= badge.requirementValue;
+            break;
+          case "single_session_distance_km":
+            shouldAward = (longestSessionDistance / 1000) >= badge.requirementValue;
+            break;
+          case "total_sessions":
+            shouldAward = profile.totalSessions >= badge.requirementValue;
+            break;
+          case "total_time_hours":
+            shouldAward = (profile.totalTimeSeconds / 3600) >= badge.requirementValue;
+            break;
+          case "total_open_water_sessions":
+            shouldAward = profile.totalOpenWaterSessions >= badge.requirementValue;
+            break;
+          case "total_open_water_distance_km":
+            shouldAward = (profile.totalOpenWaterMeters / 1000) >= badge.requirementValue;
+            break;
+          case "level":
+            shouldAward = profile.level >= badge.requirementValue;
+            break;
+          case "manual":
+            // Manual badges are not auto-awarded
+            break;
+        }
+
+        if (shouldAward) {
+          await db.awardBadge({ userId: ctx.user.id, badgeId: badge.id });
+          await db.createXpTransaction({
+            userId: ctx.user.id,
+            amount: badge.xpReward,
+            reason: "badge",
+            referenceId: badge.id,
+            description: `Badge sbloccato: ${badge.name}`,
+          });
+          
+          // Update total XP
+          await db.updateSwimmerProfile(ctx.user.id, {
+            totalXp: profile.totalXp + badge.xpReward,
+          });
+
+          newBadgesCount++;
+        }
+      }
+
+      return { success: true, newBadges: newBadgesCount };
     }),
   }),
 

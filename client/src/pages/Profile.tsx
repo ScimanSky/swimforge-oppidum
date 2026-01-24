@@ -21,13 +21,29 @@ import { useEffect } from "react";
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
   const [, setLocation] = useLocation();
+  const utils = trpc.useUtils();
 
   const { data: profile, isLoading: profileLoading } = trpc.profile.get.useQuery(
     undefined,
     { enabled: isAuthenticated }
   );
 
-
+  const recalculateBadges = trpc.badges.recalculate.useMutation({
+    onSuccess: (data) => {
+      if (data.newBadges > 0) {
+        toast.success(`${data.newBadges} nuovi badge sbloccati!`);
+        // Refresh profile and badges
+        utils.profile.get.invalidate();
+        utils.badges.progress.invalidate();
+        utils.badges.userBadges.invalidate();
+      } else {
+        toast.success("Tutti i badge sono aggiornati!");
+      }
+    },
+    onError: () => {
+      toast.error("Errore nel ricalcolo badge");
+    },
+  });
 
   const seedData = trpc.admin.seedData.useMutation({
     onSuccess: () => {
@@ -155,6 +171,35 @@ export default function Profile() {
 
         {/* Garmin Connection */}
         <GarminSection garminConnected={profile?.garminConnected || false} />
+
+        {/* Badge Recalculation */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Ricalcola Badge
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <p className="text-sm text-muted-foreground mb-3">
+                Se hai notato badge mancanti, usa questo pulsante per ricalcolare tutti i badge in base alle tue statistiche attuali.
+              </p>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => recalculateBadges.mutate()}
+                disabled={recalculateBadges.isPending}
+              >
+                {recalculateBadges.isPending ? "Ricalcolo..." : "Ricalcola Badge"}
+              </Button>
+            </CardContent>
+          </Card>
+        </motion.div>
 
         {/* Admin Section */}
         {user?.role === "admin" && (
