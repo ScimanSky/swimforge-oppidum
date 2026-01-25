@@ -237,10 +237,13 @@ export async function updateSwimmerProfile(userId: number, data: Partial<InsertS
   await db.update(swimmerProfiles).set({ ...data, updatedAt: new Date() }).where(eq(swimmerProfiles.userId, userId));
 }
 
-export async function getLeaderboard(orderBy: 'level' | 'totalXp' | 'badges' = 'totalXp', limit = 50) {
+export async function getLeaderboard(orderBy: 'level' | 'totalXp' | 'badges' = 'totalXp', limit: number = 50) {
+  console.log('[getLeaderboard] Called with orderBy:', orderBy, 'limit:', limit);
   const db = await getDb();
-  if (!db) return [];
-  
+  if (!db) {
+    console.log('[getLeaderboard] DB not available');
+    return [];
+  }  
   if (orderBy === 'badges') {
     // Use subquery for badge count
     const result = await db.execute(sql`

@@ -552,7 +552,11 @@ export const appRouter = router({
         limit: z.number().min(1).max(100).default(50),
       }))
       .query(async ({ input }) => {
-        return await db.getLeaderboard(input.orderBy, input.limit);
+        const result = await db.getLeaderboard(input.orderBy, input.limit);
+        console.log('[Leaderboard Backend] Query result:', result);
+        console.log('[Leaderboard Backend] Result length:', result?.length);
+        console.log('[Leaderboard Backend] OrderBy:', input.orderBy);
+        return result;
       }),
   }),
 
