@@ -192,10 +192,22 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
     console.log(`[AI Insights] Raw response from Gemini (first 500 chars):`, text.substring(0, 500));
 
     // Parse insights (split by newlines, filter empty)
+    // Accept lines that start with emoji OR number + emoji (e.g., "1. 🎯")
     const insights = text
       .split("\n")
       .map((line) => line.trim())
-      .filter((line) => line.length > 0 && line.match(/^[🔥⚡💪🎯📈🏊🔄🌟🚀💯🏆❤️📊🎉👍🚀]/));
+      .filter((line) => {
+        if (line.length === 0) return false;
+        // Match lines starting with emoji
+        if (line.match(/^[🔥⚡💪🎯📈🏊🔄🌟🚀💯🏆❤️📊🎉👍🚀🏊‍♂️🏊‍♀️💬]/)) return true;
+        // Match lines starting with number + dot + space + emoji (e.g., "1. 🎯")
+        if (line.match(/^\d+\.\s*[🔥⚡💪🎯📈🏊🔄🌟🚀💯🏆❤️📊🎉👍🚀🏊‍♂️🏊‍♀️💬]/)) return true;
+        return false;
+      })
+      .map((line) => {
+        // Remove leading numbers (e.g., "1. 🎯" -> "🎯")
+        return line.replace(/^\d+\.\s*/, '');
+      });
 
     console.log(`[AI Insights] Parsed ${insights.length} insights from response`);
     if (insights.length === 0) {
@@ -206,9 +218,9 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
     if (insights.length > 0) {
       const finalInsights = insights.slice(0, 8);
       
-      // Save to cache (expires in 24 hours)
+      // Save to cache (expires in 1 hour for fresher insights)
       const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 24);
+      expiresAt.setHours(expiresAt.getHours() + 1);
       
       try {
         // Delete old cache
