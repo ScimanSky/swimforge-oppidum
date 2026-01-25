@@ -33,25 +33,32 @@ type GeneratedWorkout = {
 
 export default function Coach() {
   const [activeTab, setActiveTab] = useState<"pool" | "dryland">("pool");
-  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [forceRegenerate, setForceRegenerate] = useState(false);
 
   // Query for pool workout
   const poolWorkoutQuery = trpc.aiCoach.getPoolWorkout.useQuery(
-    { forceRegenerate: false },
-    { enabled: activeTab === "pool", staleTime: 1000 * 60 * 60 * 24 } // 24 hours
+    { forceRegenerate },
+    { 
+      enabled: activeTab === "pool",
+      staleTime: forceRegenerate ? 0 : 1000 * 60 * 60 * 24, // No cache if regenerating
+    }
   );
 
   // Query for dryland workout
   const drylandWorkoutQuery = trpc.aiCoach.getDrylandWorkout.useQuery(
-    { forceRegenerate: false },
-    { enabled: activeTab === "dryland", staleTime: 1000 * 60 * 60 * 24 } // 24 hours
+    { forceRegenerate },
+    { 
+      enabled: activeTab === "dryland",
+      staleTime: forceRegenerate ? 0 : 1000 * 60 * 60 * 24, // No cache if regenerating
+    }
   );
 
   const currentQuery = activeTab === "pool" ? poolWorkoutQuery : drylandWorkoutQuery;
   const workout = currentQuery.data as GeneratedWorkout | undefined;
+  const isRegenerating = forceRegenerate && currentQuery.isLoading;
 
   const handleRegenerate = async () => {
-    setIsRegenerating(true);
+    setForceRegenerate(true);
     try {
       if (activeTab === "pool") {
         await poolWorkoutQuery.refetch();
@@ -59,7 +66,7 @@ export default function Coach() {
         await drylandWorkoutQuery.refetch();
       }
     } finally {
-      setIsRegenerating(false);
+      setForceRegenerate(false);
     }
   };
 

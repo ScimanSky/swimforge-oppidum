@@ -88,6 +88,11 @@ export default function Leaderboard() {
 
   // Normalize all entries
   const normalizedLeaderboard = leaderboard?.map(normalizeEntry) || [];
+  
+  // Debug logging
+  console.log('[Leaderboard] Raw data:', leaderboard);
+  console.log('[Leaderboard] Normalized:', normalizedLeaderboard);
+  console.log('[Leaderboard] Order by:', orderBy);
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -95,7 +100,7 @@ export default function Leaderboard() {
       <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-white">
         <div className="container py-4">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard">
+            <Link href="/challenges">
               <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
                 <ChevronLeft className="h-5 w-5" />
               </Button>
