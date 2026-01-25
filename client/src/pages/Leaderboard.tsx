@@ -206,8 +206,8 @@ export default function Leaderboard() {
             )}
 
             {/* Rest of the list */}
-            {normalizedLeaderboard.slice(3).map((entry, index) => {
-              const position = index + 4;
+            {normalizedLeaderboard.slice(normalizedLeaderboard.length >= 3 ? 3 : 0).map((entry, index) => {
+              const position = normalizedLeaderboard.length >= 3 ? index + 4 : index + 1;
               const isCurrentUser = String(entry.userId) === String(user?.id);
 
               return (
