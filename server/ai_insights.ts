@@ -1,4 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { getDb } from "./db";
+import { aiInsightsCache } from "../drizzle/schema";
+import { eq, and, gt } from "drizzle-orm";
 
 // Initialize Gemini AI
 let genAI: GoogleGenerativeAI | null = null;
@@ -35,13 +38,38 @@ export interface UserStatsData {
 }
 
 export async function generateAIInsights(
-  userData: UserStatsData
+  userData: UserStatsData,
+  userId: number
 ): Promise<string[]> {
+  const db = await getDb();
+  if (!db) {
+    return [];
+  }
+
+  // Check cache first
+  const cached = await db
+    .select()
+    .from(aiInsightsCache)
+    .where(
+      and(
+        eq(aiInsightsCache.userId, userId),
+        eq(aiInsightsCache.periodDays, userData.periodDays),
+        gt(aiInsightsCache.expiresAt, new Date())
+      )
+    )
+    .limit(1);
+
+  if (cached.length > 0 && cached[0].insights.length > 0) {
+    console.log(`[AI Insights] Using cached insights for user ${userId}`);
+    return cached[0].insights;
+  }
+
   const client = getGeminiClient();
   
-  // Fallback to algorithmic insights if no API key
+  // Return empty array if no API key (no fallback)
   if (!client) {
-    return generateAlgorithmicInsights(userData);
+    console.warn("[AI Insights] No Gemini API key configured");
+    return [];
   }
 
   try {
@@ -116,98 +144,62 @@ Genera 3-4 insights seguendo RIGOROSAMENTE queste regole:`;
       .map((line) => line.trim())
       .filter((line) => line.length > 0 && line.match(/^[🔥⚡💪🎯📈🏊‍♂️🌟🚀💯🏆❤️📊🎉]/));
 
-    // Return first 4 insights or fallback
+    // Return first 4 insights and save to cache
     if (insights.length > 0) {
-      return insights.slice(0, 4);
+      const finalInsights = insights.slice(0, 4);
+      
+      // Save to cache (expires in 24 hours)
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24);
+      
+      try {
+        // Delete old cache
+        await db.delete(aiInsightsCache).where(eq(aiInsightsCache.userId, userId));
+        
+        // Insert new cache
+        await db.insert(aiInsightsCache).values({
+          userId,
+          insights: finalInsights,
+          periodDays: userData.periodDays,
+          expiresAt,
+        });
+        
+        console.log(`[AI Insights] Cached ${finalInsights.length} insights for user ${userId}`);
+      } catch (cacheError) {
+        console.error("[AI Insights] Error caching insights:", cacheError);
+      }
+      
+      return finalInsights;
     }
 
-    // Fallback if parsing fails
-    return generateAlgorithmicInsights(userData);
+    // Return empty array if parsing fails (no fallback)
+    console.warn("[AI Insights] Failed to parse AI response");
+    return [];
   } catch (error) {
-    console.error("Error generating AI insights:", error);
-    return generateAlgorithmicInsights(userData);
+    console.error("[AI Insights] Error generating AI insights:", error);
+    
+    // Try to return cached insights even if expired
+    const anyCached = await db
+      .select()
+      .from(aiInsightsCache)
+      .where(
+        and(
+          eq(aiInsightsCache.userId, userId),
+          eq(aiInsightsCache.periodDays, userData.periodDays)
+        )
+      )
+      .limit(1);
+    
+    if (anyCached.length > 0 && anyCached[0].insights.length > 0) {
+      console.log(`[AI Insights] Using expired cache for user ${userId} due to error`);
+      return anyCached[0].insights;
+    }
+    
+    return [];
   }
 }
 
-// Fallback algorithmic insights
-function generateAlgorithmicInsights(userData: UserStatsData): string[] {
-  const insights: string[] = [];
 
-  // Streak insight
-  if (userData.currentStreak > 0) {
-    if (userData.currentStreak >= 7) {
-      insights.push(
-        `🔥 Streak di ${userData.currentStreak} giorni! Sei nella top 15% degli utenti per costanza. Continua così!`
-      );
-    } else if (userData.currentStreak >= 3) {
-      insights.push(
-        `🔥 Streak di ${userData.currentStreak} giorni! Mantieni il ritmo per raggiungere una settimana completa!`
-      );
-    }
-  } else if (userData.recordStreak > 0) {
-    insights.push(
-      `💪 Hai perso lo streak. Il tuo record è ${userData.recordStreak} giorni - riparti oggi per batterlo!`
-    );
-  }
-
-  // Trend insight
-  if (userData.trend === "up" && userData.trendPercentage > 10) {
-    insights.push(
-      `📈 Performance in crescita +${userData.trendPercentage}%! Stai migliorando rapidamente, continua così!`
-    );
-  } else if (userData.trend === "down" && userData.trendPercentage > 10) {
-    insights.push(
-      `📊 Calo del ${userData.trendPercentage}% rispetto al periodo precedente. Riparti con una sessione oggi!`
-    );
-  }
-
-  // Distance insight
-  const kmPerWeek = (userData.totalDistanceMeters / 1000 / userData.periodDays) * 7;
-  if (kmPerWeek > 10) {
-    insights.push(
-      `🏊‍♂️ Hai nuotato ${(userData.totalDistanceMeters / 1000).toFixed(1)}km in ${userData.periodDays} giorni, ottimo ritmo!`
-    );
-  } else if (kmPerWeek > 5) {
-    insights.push(
-      `💪 ${(userData.totalDistanceMeters / 1000).toFixed(1)}km in ${userData.periodDays} giorni. Aggiungi una sessione per accelerare i progressi!`
-    );
-  }
-
-  // Pace insight
-  if (userData.avgPaceSeconds < 120) {
-    insights.push(
-      `⚡ Pace medio ${formatPace(userData.avgPaceSeconds)}/100m, eccellente velocità! Sei un nuotatore esperto!`
-    );
-  } else if (userData.avgPaceSeconds < 150) {
-    insights.push(
-      `⚡ Pace medio ${formatPace(userData.avgPaceSeconds)}/100m, buona velocità. Punta a scendere sotto i 2:00!`
-    );
-  }
-
-  // HR Zone insight
-  if (userData.hrZones) {
-    if (userData.hrZones.zone2 > 40) {
-      insights.push(
-        `❤️ La tua zona HR preferita è Z2 (aerobica, ${userData.hrZones.zone2}%). Perfetta per costruire resistenza!`
-      );
-    } else if (userData.hrZones.zone3 > 30) {
-      insights.push(
-        `❤️ Nuoti spesso in Z3 (soglia, ${userData.hrZones.zone3}%). Ottimo per migliorare la velocità!`
-      );
-    }
-  }
-
-  // Return at least 3 insights
-  if (insights.length < 3) {
-    insights.push(
-      `🎯 Consistency Score: ${userData.consistencyScore}/100. ${
-        userData.consistencyScore > 70 ? "Ottima regolarità!" : "Cerca di essere più costante!"
-      }`
-    );
-  }
-
-  return insights.slice(0, 4);
-}
 
 function formatPace(seconds: number): string {
   const minutes = Math.floor(seconds / 60);

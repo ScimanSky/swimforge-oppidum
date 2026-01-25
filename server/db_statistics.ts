@@ -383,7 +383,7 @@ export async function getAdvancedMetrics(
   };
 
   // Generate AI insights
-  const insights = await generateAIInsights(userData);
+  const insights = await generateAIInsights(userData, userId);
 
   // Predictions (estimate when user will reach 50km)
   const targetKm = 50;
@@ -397,9 +397,7 @@ export async function getAdvancedMetrics(
     daysRemaining: daysToTarget,
   } : null;
 
-  if (predictions) {
-    insights.push(`🎯 Obiettivo ${targetKm}km: ${Math.round(remainingKm)}km rimasti`);
-  }
+  // Remove static insight - only AI insights
 
   return {
     performanceIndex,

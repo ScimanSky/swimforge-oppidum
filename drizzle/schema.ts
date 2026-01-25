@@ -178,6 +178,18 @@ export const weeklyStats = pgTable("weekly_stats", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// ============================================
+// AI INSIGHTS CACHE
+// ============================================
+export const aiInsightsCache = pgTable("ai_insights_cache", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  insights: text("insights").array().notNull(), // Array of insight strings
+  periodDays: integer("period_days").notNull(), // Period used for generating insights (30, 60, 90, etc.)
+  generatedAt: timestamp("generated_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(), // Insights expire after 24 hours
+});
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -195,3 +207,5 @@ export type PersonalRecord = typeof personalRecords.$inferSelect;
 export type InsertPersonalRecord = typeof personalRecords.$inferInsert;
 export type LevelThreshold = typeof levelThresholds.$inferSelect;
 export type WeeklyStats = typeof weeklyStats.$inferSelect;
+export type AiInsightsCache = typeof aiInsightsCache.$inferSelect;
+export type InsertAiInsightsCache = typeof aiInsightsCache.$inferInsert;
