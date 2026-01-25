@@ -61,7 +61,7 @@ export default function Statistics() {
   }));
 
   return (
-    <div className="min-h-screen bg-[oklch(0.15_0.02_250)] text-white pb-20">
+    <div className="min-h-screen bg-[oklch(0.15_0.02_250)] text-white pb-20 overflow-x-hidden">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[oklch(0.18_0.03_250)] border-b border-[oklch(0.25_0.03_250)] px-4 py-4">
         <div className="flex items-center gap-3">
@@ -91,7 +91,7 @@ export default function Statistics() {
         </div>
       </div>
 
-      <div className="p-4 space-y-6">
+      <div className="p-4 space-y-6 max-w-full overflow-x-hidden">
         {isLoading ? (
           <>
             <Skeleton className="h-64 w-full" />

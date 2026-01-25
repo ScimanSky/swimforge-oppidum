@@ -134,27 +134,36 @@ async function fetchUserStats(userId: number): Promise<any> {
   }
 
   // Get swimmer profile
-  const profile = await db.query.swimmerProfiles.findFirst({
-    where: (profiles, { eq }) => eq(profiles.userId, userId),
-  });
+  const { swimmerProfiles, swimmingActivities } = await import("../drizzle/schema");
+  const { eq, and, gte, desc } = await import("drizzle-orm");
+  
+  const profileResult = await db
+    .select()
+    .from(swimmerProfiles)
+    .where(eq(swimmerProfiles.userId, userId))
+    .limit(1);
 
-  if (!profile) {
+  if (profileResult.length === 0) {
     throw new Error("Swimmer profile not found");
   }
+  
+  const profile = profileResult[0];
 
   // Get recent activities (last 30 days)
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const recentActivities = await db.query.swimmingActivities.findMany({
-    where: (activities, { eq, and, gte }) =>
+  const recentActivities = await db
+    .select()
+    .from(swimmingActivities)
+    .where(
       and(
-        eq(activities.userId, userId),
-        gte(activities.activityDate, thirtyDaysAgo)
-      ),
-    orderBy: (activities, { desc }) => [desc(activities.activityDate)],
-    limit: 20,
-  });
+        eq(swimmingActivities.userId, userId),
+        gte(swimmingActivities.activityDate, thirtyDaysAgo)
+      )
+    )
+    .orderBy(desc(swimmingActivities.activityDate))
+    .limit(20);
 
   // Calculate aggregate metrics
   const totalDistance = recentActivities.reduce(
