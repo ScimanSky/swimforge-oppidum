@@ -63,8 +63,17 @@ export const swimmingActivities = pgTable("swimming_activities", {
   calories: integer("calories"),
   avgHeartRate: integer("avg_heart_rate"),
   maxHeartRate: integer("max_heart_rate"),
-  swolfScore: integer("swolf_score"),
+  avgSwolf: integer("swolf_score"),
   lapsCount: integer("laps_count"),
+  avgStrokeDistance: integer("avg_stroke_distance"), // cm per bracciata
+  avgStrokes: integer("avg_strokes"), // bracciate per vasca
+  avgStrokeCadence: integer("avg_stroke_cadence"), // bracciate per minuto
+  trainingEffect: integer("training_effect"), // 0-50 (moltiplicato per 10)
+  anaerobicTrainingEffect: integer("anaerobic_training_effect"), // 0-50
+  vo2MaxValue: integer("vo2_max_value"), // ml/kg/min
+  recoveryTimeHours: integer("recovery_time_hours"), // ore
+  restingHeartRate: integer("resting_heart_rate"), // bpm
+  avgStress: integer("avg_stress"), // 0-100
   isOpenWater: boolean("is_open_water").default(false).notNull(),
   hrZone1Seconds: integer("hr_zone_1_seconds"),
   hrZone2Seconds: integer("hr_zone_2_seconds"),

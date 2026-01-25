@@ -37,6 +37,15 @@ interface GarminServiceActivity {
   max_heart_rate?: number;
   swolf_score?: number;
   laps_count?: number;
+  avg_stroke_distance?: number;  // cm per bracciata
+  avg_strokes?: number;  // bracciate per vasca
+  avg_stroke_cadence?: number;  // bracciate per minuto
+  training_effect?: number;  // 0-50 (moltiplicato per 10)
+  anaerobic_training_effect?: number;  // 0-50
+  vo2_max_value?: number;  // ml/kg/min
+  recovery_time_hours?: number;  // ore
+  resting_heart_rate?: number;  // bpm
+  avg_stress?: number;  // 0-100
   is_open_water: boolean;
   hr_zone_1_seconds?: number;
   hr_zone_2_seconds?: number;
@@ -439,6 +448,15 @@ export async function syncGarminActivities(
         maxHeartRate: activity.max_heart_rate,
         swolfScore: activity.swolf_score,
         lapsCount: activity.laps_count,
+        avgStrokeDistance: activity.avg_stroke_distance,
+        avgStrokes: activity.avg_strokes,
+        avgStrokeCadence: activity.avg_stroke_cadence,
+        trainingEffect: activity.training_effect,
+        anaerobicTrainingEffect: activity.anaerobic_training_effect,
+        vo2MaxValue: activity.vo2_max_value,
+        recoveryTimeHours: activity.recovery_time_hours,
+        restingHeartRate: activity.resting_heart_rate,
+        avgStress: activity.avg_stress,
         isOpenWater: activity.is_open_water,
         hrZone1Seconds: activity.hr_zone_1_seconds ? Math.round(activity.hr_zone_1_seconds) : undefined,
         hrZone2Seconds: activity.hr_zone_2_seconds ? Math.round(activity.hr_zone_2_seconds) : undefined,

@@ -95,6 +95,15 @@ class SwimmingActivity(BaseModel):
     swolf_score: Optional[int] = None
     laps_count: Optional[int] = None
     is_open_water: bool = False
+    avg_stroke_distance: Optional[int] = None  # cm per bracciata
+    avg_strokes: Optional[int] = None  # bracciate per vasca
+    avg_stroke_cadence: Optional[int] = None  # bracciate per minuto
+    training_effect: Optional[int] = None  # 0-50 (moltiplicato per 10)
+    anaerobic_training_effect: Optional[int] = None  # 0-50
+    vo2_max_value: Optional[int] = None  # ml/kg/min
+    recovery_time_hours: Optional[int] = None  # ore
+    resting_heart_rate: Optional[int] = None  # bpm
+    avg_stress: Optional[int] = None  # 0-100
     hr_zone_1_seconds: Optional[int] = None
     hr_zone_2_seconds: Optional[int] = None
     hr_zone_3_seconds: Optional[int] = None
@@ -204,6 +213,32 @@ def parse_swimming_activity(activity: dict, hr_zones_data: Optional[dict] = None
     if distance > 0 and duration > 0:
         avg_pace = int((duration / distance) * 100)
     
+    # Extract new technical data
+    avg_stroke_distance = activity.get("avgStrokeDistance")
+    if avg_stroke_distance:
+        avg_stroke_distance = int(avg_stroke_distance * 100)  # Convert m to cm
+    
+    avg_strokes = activity.get("avgStrokes")
+    avg_stroke_cadence = activity.get("avgStrokeCadenceRpm") or activity.get("avgStrokeCadence")
+    
+    # Extract training effect (multiply by 10 to store as integer)
+    training_effect = activity.get("aerobicTrainingEffect")
+    if training_effect:
+        training_effect = int(training_effect * 10)
+    
+    anaerobic_te = activity.get("anaerobicTrainingEffect")
+    if anaerobic_te:
+        anaerobic_te = int(anaerobic_te * 10)
+    
+    # Extract physiological data
+    vo2_max = activity.get("vO2MaxValue")
+    recovery_time = activity.get("recoveryTime")  # in minutes
+    if recovery_time:
+        recovery_time = int(recovery_time / 60)  # Convert to hours
+    
+    resting_hr = activity.get("restingHeartRate")
+    avg_stress = activity.get("averageStress")
+    
     return SwimmingActivity(
         activity_id=str(activity.get("activityId", "")),
         activity_name=activity.get("activityName", "Swimming"),
@@ -221,6 +256,15 @@ def parse_swimming_activity(activity: dict, hr_zones_data: Optional[dict] = None
         max_heart_rate=activity.get("maxHR"),
         swolf_score=activity.get("averageSwolf"),
         laps_count=activity.get("lapCount") or activity.get("totalLaps"),
+        avg_stroke_distance=avg_stroke_distance,
+        avg_strokes=avg_strokes,
+        avg_stroke_cadence=avg_stroke_cadence,
+        training_effect=training_effect,
+        anaerobic_training_effect=anaerobic_te,
+        vo2_max_value=vo2_max,
+        recovery_time_hours=recovery_time,
+        resting_heart_rate=resting_hr,
+        avg_stress=avg_stress,
         is_open_water=is_open_water,
         hr_zone_1_seconds=hr_zones_data.get("zone1") if hr_zones_data else None,
         hr_zone_2_seconds=hr_zones_data.get("zone2") if hr_zones_data else None,

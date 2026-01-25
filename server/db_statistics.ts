@@ -2,6 +2,14 @@ import { getDb } from "./db";
 import { swimmingActivities, swimmerProfiles } from "../drizzle/schema";
 import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
 import { generateAIInsights, UserStatsData } from "./ai_insights";
+import { 
+  calculateSEI, 
+  calculateTCI, 
+  calculateSER, 
+  calculateACS, 
+  calculateRRS, 
+  calculatePOI 
+} from "./advanced_metrics";
 
 // ============================================
 // TYPES
@@ -48,6 +56,13 @@ export interface AdvancedMetrics {
     current: number;
     record: number;
   };
+  // New advanced metrics
+  swimmingEfficiencyIndex: number | null; // SEI: 0-100
+  technicalConsistencyIndex: number | null; // TCI: 0-100
+  strokeEfficiencyRating: number | null; // SER: 0-100
+  aerobicCapacityScore: number | null; // ACS: 0-100
+  recoveryReadinessScore: number | null; // RRS: 0-100
+  progressiveOverloadIndex: number | null; // POI: -100 to +100
 }
 
 // ============================================
@@ -399,6 +414,64 @@ export async function getAdvancedMetrics(
 
   // Remove static insight - only AI insights
 
+  // Calculate new advanced metrics
+  // SEI: Average across all activities
+  const seiScores = currentActivities
+    .map(a => calculateSEI(a))
+    .filter((s): s is number => s !== null);
+  const swimmingEfficiencyIndex = seiScores.length > 0
+    ? Math.round(seiScores.reduce((sum, s) => sum + s, 0) / seiScores.length)
+    : null;
+
+  // TCI: Consistency across activities
+  const technicalConsistencyIndex = calculateTCI(currentActivities);
+
+  // SER: Average across all activities
+  const serScores = currentActivities
+    .map(a => calculateSER(a))
+    .filter((s): s is number => s !== null);
+  const strokeEfficiencyRating = serScores.length > 0
+    ? Math.round(serScores.reduce((sum, s) => sum + s, 0) / serScores.length)
+    : null;
+
+  // ACS: Average across activities with HR data
+  const acsScores = currentActivities
+    .map(a => calculateACS(a))
+    .filter((s): s is number => s !== null);
+  const aerobicCapacityScore = acsScores.length > 0
+    ? Math.round(acsScores.reduce((sum, s) => sum + s, 0) / acsScores.length)
+    : null;
+
+  // RRS: Based on most recent activity
+  const lastActivity = currentActivities[0];
+  const baselineRestingHR = 60;  // TODO: Get from user profile
+  const hoursSinceLastWorkout = lastActivity 
+    ? (Date.now() - new Date(lastActivity.activityDate).getTime()) / (1000 * 60 * 60)
+    : 999;
+  const recoveryReadinessScore = lastActivity
+    ? calculateRRS(
+        lastActivity.restingHeartRate,
+        baselineRestingHR,
+        hoursSinceLastWorkout,
+        lastActivity.recoveryTimeHours || 24
+      )
+    : null;
+
+  // POI: Compare current vs previous period
+  const currentStats = {
+    distance: currentDistance,
+    intensity: avgPace > 0 ? 120 / avgPace : 0,  // Normalized intensity
+    frequency: currentSessions
+  };
+  const previousStats = {
+    distance: previousDistance,
+    intensity: previousActivities.length > 0 
+      ? previousActivities.reduce((sum, a) => sum + (a.avgPacePer100m || 0), 0) / previousActivities.length
+      : 0,
+    frequency: previousActivities.length
+  };
+  const progressiveOverloadIndex = calculatePOI(currentStats, previousStats);
+
   return {
     performanceIndex,
     consistencyScore,
@@ -409,5 +482,12 @@ export async function getAdvancedMetrics(
       current: currentStreak,
       record: recordStreak,
     },
+    swimmingEfficiencyIndex,
+    technicalConsistencyIndex,
+    strokeEfficiencyRating,
+    aerobicCapacityScore,
+    recoveryReadinessScore,
+    progressiveOverloadIndex,
   };
+}
 }
