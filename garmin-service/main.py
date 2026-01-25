@@ -672,6 +672,59 @@ async def get_swimming_activities(
         )
 
 
+@app.get("/activity/{activity_id}/hr-zones")
+async def get_activity_hr_zones(
+    activity_id: str,
+    user_id: str = Header(None, alias="user-id"),
+    api_key: str = Depends(verify_api_key)
+):
+    """Get HR zones data for a specific activity"""
+    if not user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="user-id header is required"
+        )
+    
+    client = get_garmin_client(user_id)
+    
+    if not client:
+        raise HTTPException(
+            status_code=401,
+            detail="Non autenticato. Effettua prima il login."
+        )
+    
+    try:
+        logger.info(f"Fetching HR zones for activity {activity_id}")
+        hr_zones_response = client.get_activity_hr_in_timezones(activity_id)
+        
+        if not hr_zones_response:
+            return {
+                "zone1": 0,
+                "zone2": 0,
+                "zone3": 0,
+                "zone4": 0,
+                "zone5": 0
+            }
+        
+        hr_zones_data = {
+            "zone1": hr_zones_response.get("zone1TimeInSeconds", 0),
+            "zone2": hr_zones_response.get("zone2TimeInSeconds", 0),
+            "zone3": hr_zones_response.get("zone3TimeInSeconds", 0),
+            "zone4": hr_zones_response.get("zone4TimeInSeconds", 0),
+            "zone5": hr_zones_response.get("zone5TimeInSeconds", 0)
+        }
+        
+        logger.info(f"HR zones for activity {activity_id}: {hr_zones_data}")
+        return hr_zones_data
+        
+    except Exception as e:
+        logger.error(f"Error fetching HR zones for activity {activity_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Errore nel recupero delle zone HR: {str(e)}"
+        )
+
+
 @app.post("/sync", response_model=SyncResponse)
 async def sync_activities(request: SyncRequest, api_key: str = Depends(verify_api_key)):
     """Sync swimming activities from Garmin Connect"""

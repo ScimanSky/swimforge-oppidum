@@ -774,3 +774,122 @@ async function updateActiveChallengesProgress(userId: number): Promise<void> {
     console.error("[Garmin] Error updating challenge progress:", error);
   }
 }
+
+/**
+ * Migrate HR zones data for existing activities
+ * Fetches HR zones data from Garmin for activities that don't have it yet
+ */
+export async function migrateHrZones(userId: number): Promise<{
+  success: boolean;
+  message: string;
+  updated: number;
+  failed: number;
+  total: number;
+}> {
+  const db = await getDb();
+  if (!db) {
+    return {
+      success: false,
+      message: "Database not available",
+      updated: 0,
+      failed: 0,
+      total: 0,
+    };
+  }
+
+  try {
+    console.log(`[Garmin] Starting HR zones migration for user ${userId}`);
+
+    // Get all activities without HR zones data
+    const activitiesWithoutHR = await db
+      .select()
+      .from(swimmingActivities)
+      .where(
+        and(
+          eq(swimmingActivities.userId, userId),
+          sql`${swimmingActivities.hrZone1Seconds} IS NULL`
+        )
+      );
+
+    if (activitiesWithoutHR.length === 0) {
+      return {
+        success: true,
+        message: "All activities already have HR zones data",
+        updated: 0,
+        failed: 0,
+        total: 0,
+      };
+    }
+
+    console.log(`[Garmin] Found ${activitiesWithoutHR.length} activities without HR zones`);
+
+    let updated = 0;
+    let failed = 0;
+
+    // Fetch HR zones data for each activity
+    for (const activity of activitiesWithoutHR) {
+      try {
+        // Call Garmin Service to get HR zones data
+        const response = await fetch(
+          `${GARMIN_SERVICE_URL}/activity/${activity.garminActivityId}/hr-zones`,
+          {
+            headers: {
+              "user-id": userId.toString(),
+              "X-API-Key": GARMIN_SERVICE_SECRET,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          console.error(
+            `[Garmin] Failed to fetch HR zones for activity ${activity.garminActivityId}: ${response.status}`
+          );
+          failed++;
+          continue;
+        }
+
+        const hrZones = await response.json();
+
+        // Update activity with HR zones data
+        await db
+          .update(swimmingActivities)
+          .set({
+            hrZone1Seconds: hrZones.zone1 || 0,
+            hrZone2Seconds: hrZones.zone2 || 0,
+            hrZone3Seconds: hrZones.zone3 || 0,
+            hrZone4Seconds: hrZones.zone4 || 0,
+            hrZone5Seconds: hrZones.zone5 || 0,
+          })
+          .where(eq(swimmingActivities.id, activity.id));
+
+        updated++;
+        console.log(`[Garmin] Updated HR zones for activity ${activity.garminActivityId}`);
+      } catch (error) {
+        console.error(
+          `[Garmin] Error processing activity ${activity.garminActivityId}:`,
+          error
+        );
+        failed++;
+      }
+    }
+
+    console.log(`[Garmin] HR zones migration complete: ${updated} updated, ${failed} failed`);
+
+    return {
+      success: true,
+      message: `Migration complete: ${updated} activities updated, ${failed} failed`,
+      updated,
+      failed,
+      total: activitiesWithoutHR.length,
+    };
+  } catch (error) {
+    console.error("[Garmin] Error during HR zones migration:", error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : "Unknown error",
+      updated: 0,
+      failed: 0,
+      total: 0,
+    };
+  }
+}

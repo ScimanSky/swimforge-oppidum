@@ -551,6 +551,10 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         return await garmin.syncGarminActivities(ctx.user.id, input.daysBack);
       }),
+    
+    migrateHrZones: protectedProcedure.mutation(async ({ ctx }) => {
+      return await garmin.migrateHrZones(ctx.user.id);
+    }),
   }),
 
   // Challenges: User challenges system

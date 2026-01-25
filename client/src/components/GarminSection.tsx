@@ -95,6 +95,21 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
     },
   });
 
+  const migrateHrZonesMutation = trpc.garmin.migrateHrZones.useMutation({
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success(data.message);
+        utils.activities.list.invalidate();
+        utils.profile.get.invalidate();
+      } else {
+        toast.error(data.message);
+      }
+    },
+    onError: (error) => {
+      toast.error("Errore nella migrazione: " + error.message);
+    },
+  });
+
   const resetDialog = () => {
     setIsConnectDialogOpen(false);
     setEmail("");
@@ -172,6 +187,7 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
                     size="sm"
                     onClick={() => syncMutation.mutate({ daysBack: 30 })}
                     disabled={syncMutation.isPending}
+                    title="Sincronizza attività"
                   >
                     {syncMutation.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -182,9 +198,24 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
                   <Button
                     variant="outline"
                     size="sm"
+                    onClick={() => migrateHrZonesMutation.mutate()}
+                    disabled={migrateHrZonesMutation.isPending}
+                    title="Aggiorna zone HR"
+                    className="text-blue-600 hover:text-blue-700"
+                  >
+                    {migrateHrZonesMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <span className="text-xs font-semibold">HR</span>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => disconnectMutation.mutate()}
                     disabled={disconnectMutation.isPending}
                     className="text-destructive hover:text-destructive"
+                    title="Scollega Garmin"
                   >
                     <Unlink className="h-4 w-4" />
                   </Button>
