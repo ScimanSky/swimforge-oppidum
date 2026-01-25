@@ -153,25 +153,28 @@ export async function getPerformanceAnalysis(
       )
     );
 
-  // HR Zones
-  const hrZones = { zone1: 0, zone2: 0, zone3: 0, zone4: 0, zone5: 0 };
-  let hrCount = 0;
+  // HR Zones - Use real data from database instead of calculating from average HR
+  const hrZonesSeconds = { zone1: 0, zone2: 0, zone3: 0, zone4: 0, zone5: 0 };
 
   for (const activity of activities) {
-    if (activity.avgHeartRate) {
-      const zone = calculateHRZone(activity.avgHeartRate);
-      hrZones[`zone${zone}` as keyof typeof hrZones]++;
-      hrCount++;
-    }
+    // Sum up the actual time spent in each zone
+    hrZonesSeconds.zone1 += activity.hrZone1Seconds || 0;
+    hrZonesSeconds.zone2 += activity.hrZone2Seconds || 0;
+    hrZonesSeconds.zone3 += activity.hrZone3Seconds || 0;
+    hrZonesSeconds.zone4 += activity.hrZone4Seconds || 0;
+    hrZonesSeconds.zone5 += activity.hrZone5Seconds || 0;
   }
 
-  // Convert to percentages
+  // Calculate total time across all zones
+  const totalHrSeconds = Object.values(hrZonesSeconds).reduce((sum, val) => sum + val, 0);
+
+  // Convert to percentages based on actual time spent in each zone
   const hrZonesPercent = {
-    zone1: hrCount > 0 ? Math.round((hrZones.zone1 / hrCount) * 100) : 0,
-    zone2: hrCount > 0 ? Math.round((hrZones.zone2 / hrCount) * 100) : 0,
-    zone3: hrCount > 0 ? Math.round((hrZones.zone3 / hrCount) * 100) : 0,
-    zone4: hrCount > 0 ? Math.round((hrZones.zone4 / hrCount) * 100) : 0,
-    zone5: hrCount > 0 ? Math.round((hrZones.zone5 / hrCount) * 100) : 0,
+    zone1: totalHrSeconds > 0 ? Math.round((hrZonesSeconds.zone1 / totalHrSeconds) * 100) : 0,
+    zone2: totalHrSeconds > 0 ? Math.round((hrZonesSeconds.zone2 / totalHrSeconds) * 100) : 0,
+    zone3: totalHrSeconds > 0 ? Math.round((hrZonesSeconds.zone3 / totalHrSeconds) * 100) : 0,
+    zone4: totalHrSeconds > 0 ? Math.round((hrZonesSeconds.zone4 / totalHrSeconds) * 100) : 0,
+    zone5: totalHrSeconds > 0 ? Math.round((hrZonesSeconds.zone5 / totalHrSeconds) * 100) : 0,
   };
 
   // Pace Distribution
