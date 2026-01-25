@@ -548,6 +548,14 @@ export async function syncGarminActivities(
       .set({ lastSyncAt: new Date() })
       .where(eq(garminTokens.userId, userId));
 
+    // Update last_garmin_sync_at for auto-sync tracking
+    await db
+      .update(swimmerProfiles)
+      .set({ lastGarminSyncAt: new Date() })
+      .where(eq(swimmerProfiles.userId, userId));
+
+    console.log(`[Garmin Sync] Updated last_garmin_sync_at for user ${userId}`);
+
     return { synced: syncedCount, newXp: totalNewXp };
   } catch (error: any) {
     console.error("[Garmin] Sync failed:", error);

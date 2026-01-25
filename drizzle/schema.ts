@@ -43,6 +43,7 @@ export const swimmerProfiles = pgTable("swimmer_profiles", {
   garminConnected: boolean("garmin_connected").default(false).notNull(),
   garminTokenEncrypted: text("garmin_token_encrypted"),
   garminLastSync: timestamp("garmin_last_sync"),
+  lastGarminSyncAt: timestamp("last_garmin_sync_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
