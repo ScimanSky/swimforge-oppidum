@@ -174,8 +174,13 @@ async function fetchUserStats(userId: number): Promise<any> {
     (sum, a) => sum + (a.durationSeconds || 0),
     0
   );
-  const avgPace =
-    totalDistance > 0 ? (totalTime / totalDistance) * 100 : 0; // seconds per 100m
+  
+  // Calculate average pace from activities that have pace data
+  const activitiesWithPace = recentActivities.filter(a => a.avgPacePerHundredMeters && a.avgPacePerHundredMeters > 0);
+  const avgPace = activitiesWithPace.length > 0
+    ? activitiesWithPace.reduce((sum, a) => sum + (a.avgPacePerHundredMeters || 0), 0) / activitiesWithPace.length
+    : 0; // seconds per 100m
+    
   const avgSwolf =
     recentActivities.reduce((sum, a) => sum + (a.avgSwolf || 0), 0) /
     (recentActivities.length || 1);
@@ -212,22 +217,27 @@ async function fetchUserStats(userId: number): Promise<any> {
       0
     ) / (recentActivities.length || 1);
 
-  // HR zones analysis
-  const avgHRZone1Pct =
-    recentActivities.reduce((sum, a) => sum + (a.hrZone1Pct || 0), 0) /
-    (recentActivities.length || 1);
-  const avgHRZone2Pct =
-    recentActivities.reduce((sum, a) => sum + (a.hrZone2Pct || 0), 0) /
-    (recentActivities.length || 1);
-  const avgHRZone3Pct =
-    recentActivities.reduce((sum, a) => sum + (a.hrZone3Pct || 0), 0) /
-    (recentActivities.length || 1);
-  const avgHRZone4Pct =
-    recentActivities.reduce((sum, a) => sum + (a.hrZone4Pct || 0), 0) /
-    (recentActivities.length || 1);
-  const avgHRZone5Pct =
-    recentActivities.reduce((sum, a) => sum + (a.hrZone5Pct || 0), 0) /
-    (recentActivities.length || 1);
+  // HR zones analysis - only from activities with HR data
+  const activitiesWithHR = recentActivities.filter(a => 
+    (a.hrZone1Pct || 0) + (a.hrZone2Pct || 0) + (a.hrZone3Pct || 0) + (a.hrZone4Pct || 0) + (a.hrZone5Pct || 0) > 0
+  );
+  
+  const hasHRData = activitiesWithHR.length > 0;
+  const avgHRZone1Pct = hasHRData
+    ? activitiesWithHR.reduce((sum, a) => sum + (a.hrZone1Pct || 0), 0) / activitiesWithHR.length
+    : 0;
+  const avgHRZone2Pct = hasHRData
+    ? activitiesWithHR.reduce((sum, a) => sum + (a.hrZone2Pct || 0), 0) / activitiesWithHR.length
+    : 0;
+  const avgHRZone3Pct = hasHRData
+    ? activitiesWithHR.reduce((sum, a) => sum + (a.hrZone3Pct || 0), 0) / activitiesWithHR.length
+    : 0;
+  const avgHRZone4Pct = hasHRData
+    ? activitiesWithHR.reduce((sum, a) => sum + (a.hrZone4Pct || 0), 0) / activitiesWithHR.length
+    : 0;
+  const avgHRZone5Pct = hasHRData
+    ? activitiesWithHR.reduce((sum, a) => sum + (a.hrZone5Pct || 0), 0) / activitiesWithHR.length
+    : 0;
 
   // Training frequency
   const sessionsPerWeek = (recentActivities.length / 30) * 7;
@@ -256,6 +266,8 @@ async function fetchUserStats(userId: number): Promise<any> {
       poi: avgPOI.toFixed(2),
     },
     hrZones: {
+      hasData: hasHRData,
+      activitiesWithHR: activitiesWithHR.length,
       zone1: avgHRZone1Pct.toFixed(1),
       zone2: avgHRZone2Pct.toFixed(1),
       zone3: avgHRZone3Pct.toFixed(1),
@@ -297,20 +309,22 @@ function buildPoolWorkoutPrompt(userStats: any): string {
 - RRS (Recovery Readiness Score): ${userStats.advancedMetrics.rrs} - Prontezza al recupero
 - POI (Performance Optimization Index): ${userStats.advancedMetrics.poi} - Ottimizzazione performance
 
-**ZONE FREQUENZA CARDIACA (% tempo):**
-- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
+**ZONE FREQUENZA CARDIACA:**
+${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
 - Zona 2 (Aerobica): ${userStats.hrZones.zone2}%
 - Zona 3 (Soglia): ${userStats.hrZones.zone3}%
 - Zona 4 (Anaerobica): ${userStats.hrZones.zone4}%
 - Zona 5 (Massimale): ${userStats.hrZones.zone5}%
+- Dati disponibili da ${userStats.hrZones.activitiesWithHR} attività` : '- Dati HR non disponibili (il nuotatore dovrebbe monitorare HR nelle prossime sessioni)'}
 
 **ISTRUZIONI:**
 1. Analizza TUTTE le metriche per identificare punti di forza e debolezza
 2. Crea un allenamento strutturato: Riscaldamento → Serie Principali → Defaticamento
 3. Includi esercizi tecnici specifici basati su SEI, TCI, SER
-4. Bilancia intensità basandoti su ACS, RRS, zone HR
-5. Fornisci note tecniche dettagliate per ogni serie
-6. L'allenamento deve essere sfidante ma adatto al livello del nuotatore
+4. Bilancia intensità basandoti su ACS, RRS${userStats.hrZones.hasData ? ', zone HR' : ''}
+5. **IMPORTANTE: Per ogni serie con ripetizioni (es. 4x100), specifica SEMPRE il tempo di ripartenza (es. "a 1:50", "a 1:20", "a 0:50") basandoti sul passo medio del nuotatore (${userStats.recent.avgPace} sec/100m). Aggiungi 10-20 secondi al passo per serie tecniche, 5-10 secondi per serie di resistenza.**
+6. Fornisci note tecniche dettagliate per ogni serie
+7. L'allenamento deve essere sfidante ma adatto al livello del nuotatore
 
 **FORMATO RICHIESTO (JSON):**
 {
@@ -338,7 +352,7 @@ function buildPoolWorkoutPrompt(userStats: any): string {
           "name": "Esercizio tecnico",
           "sets": "4x",
           "distance": "100m",
-          "rest": "20 sec",
+          "rest": "a 1:50" (tempo di ripartenza basato sul passo),
           "intensity": "Moderata",
           "notes": "Focus su aspetto tecnico specifico"
         }
@@ -352,7 +366,7 @@ function buildPoolWorkoutPrompt(userStats: any): string {
           "name": "Serie principale",
           "sets": "8x",
           "distance": "50m",
-          "rest": "15 sec",
+          "rest": "a 0:50" (tempo di ripartenza),
           "intensity": "Alta - Zona 4",
           "notes": "Mantenere ritmo costante"
         }
@@ -401,9 +415,10 @@ function buildDrylandWorkoutPrompt(userStats: any): string {
 - RRS (Recovery Readiness Score): ${userStats.advancedMetrics.rrs} - Prontezza al recupero
 - POI (Performance Optimization Index): ${userStats.advancedMetrics.poi} - Ottimizzazione performance
 
-**ZONE FREQUENZA CARDIACA (% tempo):**
-- Zona 1-2 (Aerobica): ${(parseFloat(userStats.hrZones.zone1) + parseFloat(userStats.hrZones.zone2)).toFixed(1)}%
+**ZONE FREQUENZA CARDIACA:**
+${userStats.hrZones.hasData ? `- Zona 1-2 (Aerobica): ${(parseFloat(userStats.hrZones.zone1) + parseFloat(userStats.hrZones.zone2)).toFixed(1)}%
 - Zona 3-5 (Alta intensità): ${(parseFloat(userStats.hrZones.zone3) + parseFloat(userStats.hrZones.zone4) + parseFloat(userStats.hrZones.zone5)).toFixed(1)}%
+- Dati disponibili da ${userStats.hrZones.activitiesWithHR} attività` : '- Dati HR non disponibili (il nuotatore dovrebbe monitorare HR nelle prossime sessioni)'}
 
 **ISTRUZIONI:**
 1. Analizza le metriche per identificare aree da rafforzare
