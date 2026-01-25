@@ -38,6 +38,11 @@ interface GarminServiceActivity {
   swolf_score?: number;
   laps_count?: number;
   is_open_water: boolean;
+  hr_zone_1_seconds?: number;
+  hr_zone_2_seconds?: number;
+  hr_zone_3_seconds?: number;
+  hr_zone_4_seconds?: number;
+  hr_zone_5_seconds?: number;
 }
 
 interface GarminServiceResponse {
@@ -435,11 +440,11 @@ export async function syncGarminActivities(
         swolfScore: activity.swolf_score,
         lapsCount: activity.laps_count,
         isOpenWater: activity.is_open_water,
-        hrZone1Seconds: activity.hr_zone_1_seconds,
-        hrZone2Seconds: activity.hr_zone_2_seconds,
-        hrZone3Seconds: activity.hr_zone_3_seconds,
-        hrZone4Seconds: activity.hr_zone_4_seconds,
-        hrZone5Seconds: activity.hr_zone_5_seconds,
+        hrZone1Seconds: activity.hr_zone_1_seconds ? Math.round(activity.hr_zone_1_seconds) : undefined,
+        hrZone2Seconds: activity.hr_zone_2_seconds ? Math.round(activity.hr_zone_2_seconds) : undefined,
+        hrZone3Seconds: activity.hr_zone_3_seconds ? Math.round(activity.hr_zone_3_seconds) : undefined,
+        hrZone4Seconds: activity.hr_zone_4_seconds ? Math.round(activity.hr_zone_4_seconds) : undefined,
+        hrZone5Seconds: activity.hr_zone_5_seconds ? Math.round(activity.hr_zone_5_seconds) : undefined,
         xpEarned: activityXp,
       });
 
@@ -850,15 +855,15 @@ export async function migrateHrZones(userId: number): Promise<{
 
         const hrZones = await response.json();
 
-        // Update activity with HR zones data
+        // Update activity with HR zones data (round to integers)
         await db
           .update(swimmingActivities)
           .set({
-            hrZone1Seconds: hrZones.zone1 || 0,
-            hrZone2Seconds: hrZones.zone2 || 0,
-            hrZone3Seconds: hrZones.zone3 || 0,
-            hrZone4Seconds: hrZones.zone4 || 0,
-            hrZone5Seconds: hrZones.zone5 || 0,
+            hrZone1Seconds: Math.round(hrZones.zone1 || 0),
+            hrZone2Seconds: Math.round(hrZones.zone2 || 0),
+            hrZone3Seconds: Math.round(hrZones.zone3 || 0),
+            hrZone4Seconds: Math.round(hrZones.zone4 || 0),
+            hrZone5Seconds: Math.round(hrZones.zone5 || 0),
           })
           .where(eq(swimmingActivities.id, activity.id));
 
