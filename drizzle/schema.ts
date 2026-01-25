@@ -123,6 +123,30 @@ export const userBadges = pgTable("user_badges", {
 });
 
 // ============================================
+// ACHIEVEMENT BADGE DEFINITIONS (Auto-awarded badges)
+// ============================================
+export const achievementBadgeDefinitions = pgTable("achievement_badge_definitions", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  iconUrl: varchar("icon_url", { length: 255 }).notNull(),
+  criteriaType: varchar("criteria_type", { length: 50 }).notNull(),
+  criteriaJson: json("criteria_json").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ============================================
+// USER ACHIEVEMENT BADGES (Earned achievement badges)
+// ============================================
+export const userAchievementBadges = pgTable("user_achievement_badges", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  badgeId: integer("badge_id").notNull(),
+  awardedAt: timestamp("awarded_at").defaultNow().notNull(),
+  activityId: integer("activity_id"),
+});
+
+// ============================================
 // XP TRANSACTIONS (Audit log)
 // ============================================
 export const xpTransactions = pgTable("xp_transactions", {

@@ -504,6 +504,43 @@ export const appRouter = router({
       const newBadges = await checkAndAwardBadges(ctx.user.id);
       return newBadges;
     }),
+
+    // Get all achievement badge definitions
+    getAchievementBadgeDefinitions: protectedProcedure.query(async () => {
+      const database = await getDb();
+      if (!database) return [];
+      
+      const { achievementBadgeDefinitions } = await import("../drizzle/schema");
+      return await database.select().from(achievementBadgeDefinitions);
+    }),
+
+    // Get user's earned achievement badges
+    getUserAchievementBadges: protectedProcedure.query(async ({ ctx }) => {
+      const database = await getDb();
+      if (!database) return [];
+      
+      const { userAchievementBadges, achievementBadgeDefinitions } = await import("../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      const badges = await database
+        .select()
+        .from(userAchievementBadges)
+        .where(eq(userAchievementBadges.userId, ctx.user.id));
+      
+      // Join with badge definitions
+      const badgeIds = badges.map(b => b.badgeId);
+      const definitions = await database
+        .select()
+        .from(achievementBadgeDefinitions);
+      
+      return badges.map(badge => {
+        const definition = definitions.find(d => d.id === badge.badgeId);
+        return {
+          ...badge,
+          badge: definition,
+        };
+      });
+    }),
   }),
 
   // Leaderboard

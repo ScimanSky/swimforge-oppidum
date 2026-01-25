@@ -538,6 +538,19 @@ export async function syncGarminActivities(
       // Update profile badge based on new XP
       await updateUserProfileBadge(userId, newTotalXp);
 
+      // Check and award achievement badges
+      const { checkAndAwardBadges: checkAchievementBadges } = await import("./badge_engine");
+      (async () => {
+        try {
+          const newBadges = await checkAchievementBadges(userId);
+          if (newBadges.length > 0) {
+            console.log(`[Badge Engine] Awarded ${newBadges.length} new badges: ${newBadges.join(", ")}`);
+          }
+        } catch (error) {
+          console.error(`[Badge Engine] Failed for user ${userId}:`, error);
+        }
+      })();
+
       // Auto-update challenge progress for active challenges
       await updateActiveChallengesProgress(userId);
     }
