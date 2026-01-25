@@ -8,7 +8,7 @@ const navItems = [
   { href: "/badges", icon: Medal, label: "Badge" },
   { href: "/challenges", icon: Trophy, label: "Sfide" },
   { href: "/statistics", icon: BarChart3, label: "Stats" },
-  { href: "/profile", icon: User, label: "Profilo" },
+  { href: "/leaderboard", icon: Users, label: "Classifica" },
 ];
 
 export default function MobileNav() {
