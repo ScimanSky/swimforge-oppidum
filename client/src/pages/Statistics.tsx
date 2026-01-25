@@ -93,11 +93,16 @@ export default function Statistics() {
 
       <div className="p-4 space-y-6 max-w-full overflow-x-hidden">
         {isLoading ? (
-          <>
-            <Skeleton className="h-64 w-full" />
-            <Skeleton className="h-48 w-full" />
-            <Skeleton className="h-48 w-full" />
-          </>
+          <div className="flex flex-col items-center justify-center py-20 space-y-4">
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 border-4 border-[oklch(0.30_0.04_250)] rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-[oklch(0.70_0.18_220)] border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <div className="text-center space-y-2">
+              <p className="text-lg font-semibold text-[oklch(0.85_0.05_220)]">Caricamento statistiche...</p>
+              <p className="text-sm text-[oklch(0.65_0.03_220)]">Analisi dati in corso</p>
+            </div>
+          </div>
         ) : (
           <>
             {/* Progress Timeline */}

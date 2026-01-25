@@ -91,8 +91,11 @@ export default function Leaderboard() {
   
   // Debug logging
   console.log('[Leaderboard] Raw data:', leaderboard);
+  console.log('[Leaderboard] Raw data length:', leaderboard?.length);
   console.log('[Leaderboard] Normalized:', normalizedLeaderboard);
+  console.log('[Leaderboard] Normalized length:', normalizedLeaderboard.length);
   console.log('[Leaderboard] Order by:', orderBy);
+  console.log('[Leaderboard] isLoading:', isLoading);
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -141,6 +144,15 @@ export default function Leaderboard() {
           </div>
         ) : (
           <div className="space-y-3">
+            {/* Empty state */}
+            {normalizedLeaderboard.length === 0 && (
+              <div className="text-center py-12 space-y-3">
+                <Trophy className="w-16 h-16 mx-auto text-[oklch(0.50_0.03_220)]" />
+                <h3 className="text-lg font-semibold text-[oklch(0.85_0.05_220)]">Nessun nuotatore in classifica</h3>
+                <p className="text-sm text-[oklch(0.65_0.03_220)]">Completa la tua prima attività per apparire qui!</p>
+              </div>
+            )}
+
             {/* Top 3 Podium */}
             {normalizedLeaderboard.length >= 3 && (
               <motion.div

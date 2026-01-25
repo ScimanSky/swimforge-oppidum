@@ -231,7 +231,7 @@ export default function Coach() {
                         )}
                         {exercise.rest && (
                           <div>
-                            <span className="font-medium text-[oklch(0.85_0.01_220)]">Recupero:</span>{" "}
+                            <span className="font-medium text-[oklch(0.85_0.01_220)]">Ripartenza:</span>{" "}
                             {exercise.rest}
                           </div>
                         )}
