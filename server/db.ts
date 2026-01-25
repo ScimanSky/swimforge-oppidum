@@ -2,6 +2,8 @@ import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import bcrypt from "bcryptjs";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { 
   InsertUser, users, User,
   swimmerProfiles, InsertSwimmerProfile,
@@ -19,6 +21,23 @@ import { updateUserProfileBadge } from './db_profile_badges';
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: Pool | null = null;
 
+async function runMigrations(pool: Pool) {
+  try {
+    console.log("[Database] Running migrations...");
+    const migrationPath = join(process.cwd(), "drizzle", "0003_add_advanced_metrics.sql");
+    const migrationSQL = readFileSync(migrationPath, "utf-8");
+    await pool.query(migrationSQL);
+    console.log("[Database] Migrations completed successfully");
+  } catch (error: any) {
+    // Ignore errors if columns already exist
+    if (error.code === "42701" || error.message?.includes("already exists")) {
+      console.log("[Database] Migrations already applied");
+    } else {
+      console.error("[Database] Migration error:", error);
+    }
+  }
+}
+
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -27,6 +46,9 @@ export async function getDb() {
         ssl: { rejectUnauthorized: false }
       });
       _db = drizzle(_pool);
+      
+      // Run migrations on first connection
+      await runMigrations(_pool);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
