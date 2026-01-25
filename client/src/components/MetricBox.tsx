@@ -37,14 +37,14 @@ export function MetricBox({ label, value, max = 100, icon, info }: MetricBoxProp
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
       >
-        <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1">
-            {icon && <span className="text-sm">{icon}</span>}
-            <div className="text-sm text-[oklch(0.70_0.05_250)]">{label}</div>
+        <div className="flex items-center justify-between mb-2 gap-1">
+          <div className="flex items-center gap-1 flex-1 min-w-0">
+            {icon && <span className="text-xs sm:text-sm flex-shrink-0">{icon}</span>}
+            <div className="text-xs sm:text-sm text-[oklch(0.70_0.05_250)] truncate">{label}</div>
           </div>
           <button
             onClick={() => setShowModal(true)}
-            className="p-0.5 rounded hover:bg-[oklch(0.25_0.03_250)] transition-colors"
+            className="p-0.5 rounded hover:bg-[oklch(0.25_0.03_250)] transition-colors flex-shrink-0"
             title="Info"
           >
             <Info className="w-3.5 h-3.5 text-[oklch(0.60_0.05_250)]" />
