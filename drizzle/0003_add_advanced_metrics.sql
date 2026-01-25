@@ -12,9 +12,10 @@ ALTER TABLE "swimming_activities" ADD COLUMN IF NOT EXISTS "avg_stress" integer;
 -- Add AI insights cache table
 CREATE TABLE IF NOT EXISTS "ai_insights_cache" (
 	"id" serial PRIMARY KEY NOT NULL,
-	"user_id" integer NOT NULL,
-	"insights" json NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL,
+	"user_id" integer NOT NULL UNIQUE,
+	"insights" text[] NOT NULL,
+	"period_days" integer NOT NULL DEFAULT 30,
+	"generated_at" timestamp DEFAULT now() NOT NULL,
 	"expires_at" timestamp NOT NULL
 );
 
