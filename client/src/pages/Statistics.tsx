@@ -74,7 +74,7 @@ export default function Statistics() {
         </div>
 
         {/* Period Filter */}
-        <div className="flex gap-2 mt-4 overflow-x-auto">
+        <div className="flex gap-2 mt-4 overflow-x-auto scrollbar-hide pb-2">
           {PERIOD_OPTIONS.map((option) => (
             <button
               key={option.value}

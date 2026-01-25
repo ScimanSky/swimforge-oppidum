@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { trpc } from "../lib/trpc";
-import { RefreshCw, Dumbbell, Waves, Info, Clock, TrendingUp } from "lucide-react";
+import { RefreshCw, Dumbbell, Waves, Info, Clock, TrendingUp, ChevronLeft } from "lucide-react";
+import { Link } from "wouter";
+import MobileNav from "@/components/MobileNav";
 
 type WorkoutSection = {
   title: string;
@@ -62,53 +64,76 @@ export default function Coach() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 pb-24 md:pb-8">
+    <div className="min-h-screen bg-gradient-to-br from-[oklch(0.15_0.03_250)] via-[oklch(0.12_0.035_250)] to-[oklch(0.10_0.04_250)] text-white pb-20">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white px-6 py-8 shadow-lg">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-3 mb-2">
-            <Dumbbell className="w-8 h-8" />
-            <h1 className="text-3xl font-bold">AI Coach</h1>
+      <div className="sticky top-0 z-10 bg-[oklch(0.12_0.035_250_/_0.95)] backdrop-blur-lg border-b border-[oklch(0.30_0.04_250)]">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <Link href="/dashboard">
+                <button className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+              </Link>
+              <div className="flex items-center gap-3">
+                <Dumbbell className="w-6 h-6 text-[oklch(0.70_0.18_220)]" />
+                <h1 className="text-xl font-bold text-[oklch(0.95_0.01_220)]">AI Coach</h1>
+              </div>
+            </div>
+            {workout && (
+              <button
+                onClick={handleRegenerate}
+                disabled={isRegenerating}
+                className="p-2 text-[oklch(0.70_0.18_220)] hover:bg-[oklch(0.18_0.03_250)] rounded-lg transition-colors disabled:opacity-50"
+                title="Rigenera allenamento"
+              >
+                <RefreshCw
+                  className={`w-5 h-5 ${isRegenerating ? "animate-spin" : ""}`}
+                />
+              </button>
+            )}
           </div>
-          <p className="text-blue-100 text-sm">
+          <p className="text-[oklch(0.65_0.03_220)] text-sm mb-4">
             Allenamenti personalizzati basati sulle tue statistiche e metriche avanzate
           </p>
+
+          {/* Tabs */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveTab("pool")}
+              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+                activeTab === "pool"
+                  ? "bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] text-white shadow-lg"
+                  : "bg-[oklch(0.18_0.03_250)] text-[oklch(0.65_0.03_220)] hover:bg-[oklch(0.20_0.03_250)]"
+              }`}
+            >
+              <Waves className="w-5 h-5" />
+              <span>In Vasca</span>
+            </button>
+            <button
+              onClick={() => setActiveTab("dryland")}
+              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
+                activeTab === "dryland"
+                  ? "bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] text-white shadow-lg"
+                  : "bg-[oklch(0.18_0.03_250)] text-[oklch(0.65_0.03_220)] hover:bg-[oklch(0.20_0.03_250)]"
+              }`}
+            >
+              <Dumbbell className="w-5 h-5" />
+              <span>Fuori Vasca</span>
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* Tabs */}
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setActiveTab("pool")}
-            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
-              activeTab === "pool"
-                ? "bg-blue-600 text-white shadow-lg"
-                : "bg-white text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            <Waves className="w-5 h-5" />
-            <span>In Vasca</span>
-          </button>
-          <button
-            onClick={() => setActiveTab("dryland")}
-            className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
-              activeTab === "dryland"
-                ? "bg-blue-600 text-white shadow-lg"
-                : "bg-white text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            <Dumbbell className="w-5 h-5" />
-            <span>Fuori Vasca</span>
-          </button>
-        </div>
-
         {/* Loading State */}
         {currentQuery.isLoading && (
-          <div className="bg-white rounded-xl shadow-md p-12 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Generazione allenamento personalizzato...</p>
-            <p className="text-sm text-gray-500 mt-2">
+          <div className="neon-card p-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[oklch(0.70_0.18_220)] mx-auto mb-4"></div>
+            <p className="text-[oklch(0.75_0.03_220)] font-semibold">
+              Generazione allenamento personalizzato...
+            </p>
+            <p className="text-[oklch(0.55_0.03_220)] text-sm mt-2">
               Sto analizzando le tue metriche avanzate
             </p>
           </div>
@@ -116,16 +141,16 @@ export default function Coach() {
 
         {/* Error State */}
         {currentQuery.isError && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
-            <p className="text-red-600 font-semibold mb-2">
+          <div className="neon-card p-6 text-center border-2 border-red-500/30">
+            <p className="text-red-400 font-semibold mb-2">
               Errore nel caricamento dell'allenamento
             </p>
-            <p className="text-red-500 text-sm mb-4">
+            <p className="text-red-300/70 text-sm mb-4">
               {currentQuery.error?.message || "Riprova più tardi"}
             </p>
             <button
               onClick={() => currentQuery.refetch()}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              className="px-4 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition-colors border border-red-500/50"
             >
               Riprova
             </button>
@@ -136,34 +161,20 @@ export default function Coach() {
         {workout && !currentQuery.isLoading && (
           <div className="space-y-6">
             {/* Workout Header */}
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                    {workout.title}
-                  </h2>
-                  <p className="text-gray-600">{workout.description}</p>
-                </div>
-                <button
-                  onClick={handleRegenerate}
-                  disabled={isRegenerating}
-                  className="ml-4 p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
-                  title="Rigenera allenamento"
-                >
-                  <RefreshCw
-                    className={`w-5 h-5 ${isRegenerating ? "animate-spin" : ""}`}
-                  />
-                </button>
-              </div>
+            <div className="neon-card p-6">
+              <h2 className="text-2xl font-bold text-[oklch(0.95_0.01_220)] mb-2">
+                {workout.title}
+              </h2>
+              <p className="text-[oklch(0.75_0.03_220)] mb-4">{workout.description}</p>
 
               <div className="flex flex-wrap gap-4 text-sm">
-                <div className="flex items-center gap-2 text-gray-700">
-                  <Clock className="w-4 h-4 text-blue-600" />
+                <div className="flex items-center gap-2 text-[oklch(0.75_0.03_220)]">
+                  <Clock className="w-4 h-4 text-[oklch(0.70_0.18_220)]" />
                   <span className="font-semibold">Durata:</span>
                   <span>{workout.duration}</span>
                 </div>
-                <div className="flex items-center gap-2 text-gray-700">
-                  <TrendingUp className="w-4 h-4 text-blue-600" />
+                <div className="flex items-center gap-2 text-[oklch(0.75_0.03_220)]">
+                  <TrendingUp className="w-4 h-4 text-[oklch(0.70_0.18_220)]" />
                   <span className="font-semibold">Difficoltà:</span>
                   <span>{workout.difficulty}</span>
                 </div>
@@ -172,11 +183,8 @@ export default function Coach() {
 
             {/* Workout Sections */}
             {workout.sections.map((section, sectionIdx) => (
-              <div
-                key={sectionIdx}
-                className="bg-white rounded-xl shadow-md p-6"
-              >
-                <h3 className="text-xl font-bold text-gray-900 mb-4 border-b-2 border-blue-600 pb-2">
+              <div key={sectionIdx} className="neon-card p-6">
+                <h3 className="text-xl font-bold text-[oklch(0.95_0.01_220)] mb-4 pb-2 border-b-2 border-[oklch(0.70_0.18_220)]">
                   {section.title}
                 </h3>
 
@@ -184,51 +192,51 @@ export default function Coach() {
                   {section.exercises.map((exercise, exerciseIdx) => (
                     <div
                       key={exerciseIdx}
-                      className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors"
+                      className="bg-[oklch(0.18_0.03_250)] rounded-lg p-4 hover:bg-[oklch(0.20_0.03_250)] transition-colors border border-[oklch(0.25_0.03_250)]"
                     >
-                      <div className="font-semibold text-gray-900 mb-2">
+                      <div className="font-semibold text-[oklch(0.95_0.01_220)] mb-2">
                         {exercise.name}
                       </div>
 
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-gray-600 mb-2">
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-[oklch(0.75_0.03_220)] mb-2">
                         {exercise.sets && (
                           <div>
-                            <span className="font-medium">Serie:</span> {exercise.sets}
+                            <span className="font-medium text-[oklch(0.85_0.01_220)]">Serie:</span> {exercise.sets}
                           </div>
                         )}
                         {exercise.reps && (
                           <div>
-                            <span className="font-medium">Rip:</span> {exercise.reps}
+                            <span className="font-medium text-[oklch(0.85_0.01_220)]">Rip:</span> {exercise.reps}
                           </div>
                         )}
                         {exercise.distance && (
                           <div>
-                            <span className="font-medium">Distanza:</span>{" "}
+                            <span className="font-medium text-[oklch(0.85_0.01_220)]">Distanza:</span>{" "}
                             {exercise.distance}
                           </div>
                         )}
                         {exercise.duration && (
                           <div>
-                            <span className="font-medium">Durata:</span>{" "}
+                            <span className="font-medium text-[oklch(0.85_0.01_220)]">Durata:</span>{" "}
                             {exercise.duration}
                           </div>
                         )}
                         {exercise.rest && (
                           <div>
-                            <span className="font-medium">Recupero:</span>{" "}
+                            <span className="font-medium text-[oklch(0.85_0.01_220)]">Recupero:</span>{" "}
                             {exercise.rest}
                           </div>
                         )}
                         {exercise.intensity && (
                           <div>
-                            <span className="font-medium">Intensità:</span>{" "}
+                            <span className="font-medium text-[oklch(0.85_0.01_220)]">Intensità:</span>{" "}
                             {exercise.intensity}
                           </div>
                         )}
                       </div>
 
                       {exercise.notes && (
-                        <div className="text-sm text-gray-700 italic bg-blue-50 rounded p-2 border-l-2 border-blue-600">
+                        <div className="text-sm text-[oklch(0.75_0.03_220)] italic bg-[oklch(0.70_0.18_220_/_0.15)] rounded p-2 border-l-2 border-[oklch(0.70_0.18_220)]">
                           💡 {exercise.notes}
                         </div>
                       )}
@@ -237,10 +245,10 @@ export default function Coach() {
                 </div>
 
                 {section.notes && (
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-600">
+                  <div className="mt-4 p-3 bg-[oklch(0.70_0.18_220_/_0.15)] rounded-lg border-l-4 border-[oklch(0.70_0.18_220)]">
                     <div className="flex items-start gap-2">
-                      <Info className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-gray-700">{section.notes}</p>
+                      <Info className="w-4 h-4 text-[oklch(0.70_0.18_220)] mt-0.5 flex-shrink-0" />
+                      <p className="text-sm text-[oklch(0.75_0.03_220)]">{section.notes}</p>
                     </div>
                   </div>
                 )}
@@ -249,16 +257,16 @@ export default function Coach() {
 
             {/* Coach Notes */}
             {workout.coachNotes && workout.coachNotes.length > 0 && (
-              <div className="bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl shadow-md p-6 text-white">
-                <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
-                  <Info className="w-5 h-5" />
+              <div className="neon-card p-6 bg-gradient-to-br from-[oklch(0.70_0.18_220_/_0.15)] to-[oklch(0.70_0.15_195_/_0.15)] border-2 border-[oklch(0.70_0.18_220_/_0.3)]">
+                <h3 className="text-xl font-bold text-[oklch(0.95_0.01_220)] mb-4 flex items-center gap-2">
+                  <Info className="w-5 h-5 text-[oklch(0.70_0.18_220)]" />
                   Note del Coach
                 </h3>
                 <ul className="space-y-2">
                   {workout.coachNotes.map((note, idx) => (
                     <li key={idx} className="flex items-start gap-2">
-                      <span className="text-cyan-200 font-bold">•</span>
-                      <span className="text-blue-50">{note}</span>
+                      <span className="text-[oklch(0.70_0.18_220)] font-bold">•</span>
+                      <span className="text-[oklch(0.85_0.01_220)]">{note}</span>
                     </li>
                   ))}
                 </ul>
@@ -266,7 +274,7 @@ export default function Coach() {
             )}
 
             {/* Cache Info */}
-            <div className="text-center text-sm text-gray-500">
+            <div className="text-center text-sm text-[oklch(0.55_0.03_220)]">
               <p>
                 💡 Gli allenamenti vengono rigenerati ogni 24 ore in base alle tue
                 ultime statistiche
@@ -275,6 +283,8 @@ export default function Coach() {
           </div>
         )}
       </div>
+
+      <MobileNav />
     </div>
   );
 }
