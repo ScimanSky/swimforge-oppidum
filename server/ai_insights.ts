@@ -45,7 +45,7 @@ export async function generateAIInsights(
   }
 
   try {
-    const model = client.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+    const model = client.getGenerativeModel({ model: "gemini-2.5-flash" });
 
     const prompt = `Sei un coach di nuoto esperto e motivazionale. Analizza questi dati di un nuotatore e genera 3-4 insights personalizzati, motivazionali e actionable in italiano.
 
@@ -63,17 +63,48 @@ ${userData.hrZones ? `- Zone HR: Z1=${userData.hrZones.zone1}%, Z2=${userData.hr
 ${userData.swolfAvg ? `- SWOLF medio: ${userData.swolfAvg}` : ""}
 ${userData.caloriesTotal ? `- Calorie totali: ${userData.caloriesTotal}` : ""}
 
-Regole:
-1. Ogni insight deve iniziare con un emoji appropriato
-2. Usa tono amichevole, motivazionale e positivo
-3. Fornisci suggerimenti concreti e actionable
-4. Confronta con periodi precedenti quando possibile
-5. Celebra i successi e incoraggia nei momenti difficili
-6. Sii specifico con i numeri
-7. Ogni insight deve essere 1-2 frasi max
-8. Non ripetere informazioni già evidenti
+REGOLE FONDAMENTALI:
 
-Genera 3-4 insights unici e personalizzati:`;
+1. ❌ NON RIPETERE I DATI VISIBILI
+   - L'utente vede già distanza, sessioni, pace, streak
+   - NON dire "Hai nuotato X km in Y sessioni"
+   - NON dire "Il tuo pace medio è X:XX/100m"
+   - NON dire "Hai un Performance Index di X/100"
+
+2. ✅ INTERPRETA E COLLEGA I DATI
+   - Calcola medie (es. km per sessione, frequenza settimanale)
+   - Confronta con standard (principiante/intermedio/avanzato)
+   - Identifica pattern nascosti (es. "nuoti più veloce ma meno costante")
+   - Trova correlazioni (es. "le tue zone HR indicano che potresti spingere di più")
+
+3. ✅ DAI CONSIGLI SPECIFICI E ACTIONABLE
+   - Suggerisci modifiche concrete (es. "aggiungi 500m di tecnica ogni 3 sessioni")
+   - Proponi obiettivi raggiungibili (es. "punta a 3 sessioni/settimana per 2 settimane")
+   - Indica cosa fare DOMANI (es. "nella prossima sessione prova 4x100m in Z3")
+
+4. ✅ USA CONTESTO E PSICOLOGIA
+   - Se streak = 0 ma record > 0: motivazione per ripartire
+   - Se Performance Index alto ma Consistency basso: focus su regolarità
+   - Se trend negativo: incoraggiamento senza giudizio
+   - Se trend positivo: celebrazione + sfida successiva
+
+5. 📝 FORMATO
+   - Ogni insight inizia con emoji appropriato
+   - 1-2 frasi max per insight
+   - Tono amichevole e motivazionale
+   - Usa "tu" e linguaggio diretto
+
+ESEMPI DI INSIGHTS BUONI:
+✅ "Con una media di 2.7 km a sessione, sei già oltre la soglia 'principiante'. Prova ad aggiungere 500m di tecnica ogni 3 sessioni per passare al livello successivo più velocemente."
+✅ "Il tuo Performance Index alto ma Consistency basso suggerisce che quando nuoti, nuoti bene! Il prossimo step? Punta a 2-3 sessioni/settimana per 2 settimane consecutive."
+✅ "Le tue zone HR mostrano che passi il 60% del tempo in Z2 (aerobica). Ottimo per la base! Ora prova a inserire 1 sessione/settimana con 4x100m in Z3-Z4 per migliorare la velocità."
+
+ESEMPI DI INSIGHTS CATTIVI (DA EVITARE):
+❌ "Hai nuotato 16.3 km in 6 sessioni" (RIPETE I DATI)
+❌ "Il tuo pace medio è 1:40/100m" (RIPETE I DATI)
+❌ "Continua così!" (TROPPO GENERICO)
+
+Genera 3-4 insights seguendo RIGOROSAMENTE queste regole:`;
 
     const result = await model.generateContent(prompt);
     const response = result.response;
