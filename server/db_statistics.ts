@@ -378,6 +378,64 @@ export async function getAdvancedMetrics(
 
   const caloriesTotal = currentActivities.reduce((sum, a) => sum + (a.calories || 0), 0);
 
+  // Calculate new advanced metrics first (before AI insights)
+  // SEI: Average across all activities
+  const seiScores = currentActivities
+    .map(a => calculateSEI(a))
+    .filter((s): s is number => s !== null);
+  const swimmingEfficiencyIndex = seiScores.length > 0
+    ? Math.round(seiScores.reduce((sum, s) => sum + s, 0) / seiScores.length)
+    : undefined;
+
+  // TCI: Consistency across activities
+  const technicalConsistencyIndex = calculateTCI(currentActivities) || undefined;
+
+  // SER: Average across all activities
+  const serScores = currentActivities
+    .map(a => calculateSER(a))
+    .filter((s): s is number => s !== null);
+  const strokeEfficiencyRating = serScores.length > 0
+    ? Math.round(serScores.reduce((sum, s) => sum + s, 0) / serScores.length)
+    : undefined;
+
+  // ACS: Average across activities with HR data
+  const acsScores = currentActivities
+    .map(a => calculateACS(a))
+    .filter((s): s is number => s !== null);
+  const aerobicCapacityScore = acsScores.length > 0
+    ? Math.round(acsScores.reduce((sum, s) => sum + s, 0) / acsScores.length)
+    : undefined;
+
+  // RRS: Based on most recent activity
+  const lastActivity = currentActivities[0];
+  const baselineRestingHR = 60;  // TODO: Get from user profile
+  const hoursSinceLastWorkout = lastActivity 
+    ? (Date.now() - new Date(lastActivity.activityDate).getTime()) / (1000 * 60 * 60)
+    : 999;
+  const recoveryReadinessScore = lastActivity
+    ? calculateRRS(
+        lastActivity.restingHeartRate,
+        baselineRestingHR,
+        hoursSinceLastWorkout,
+        lastActivity.recoveryTimeHours || 24
+      ) || undefined
+    : undefined;
+
+  // POI: Compare current vs previous period
+  const currentStats = {
+    distance: currentDistance,
+    intensity: avgPace > 0 ? 120 / avgPace : 0,  // Normalized intensity
+    frequency: currentSessions
+  };
+  const previousStats = {
+    distance: previousDistance,
+    intensity: previousActivities.length > 0 
+      ? previousActivities.reduce((sum, a) => sum + (a.avgPacePer100m || 0), 0) / previousActivities.length
+      : 0,
+    frequency: previousActivities.length
+  };
+  const progressiveOverloadIndex = calculatePOI(currentStats, previousStats) || undefined;
+
   // Prepare data for AI
   const userData: UserStatsData = {
     level: userLevel,
@@ -395,6 +453,13 @@ export async function getAdvancedMetrics(
     periodDays: days,
     swolfAvg,
     caloriesTotal,
+    // New advanced metrics
+    swimmingEfficiencyIndex,
+    technicalConsistencyIndex,
+    strokeEfficiencyRating,
+    aerobicCapacityScore,
+    recoveryReadinessScore,
+    progressiveOverloadIndex,
   };
 
   // Generate AI insights
@@ -413,64 +478,6 @@ export async function getAdvancedMetrics(
   } : null;
 
   // Remove static insight - only AI insights
-
-  // Calculate new advanced metrics
-  // SEI: Average across all activities
-  const seiScores = currentActivities
-    .map(a => calculateSEI(a))
-    .filter((s): s is number => s !== null);
-  const swimmingEfficiencyIndex = seiScores.length > 0
-    ? Math.round(seiScores.reduce((sum, s) => sum + s, 0) / seiScores.length)
-    : null;
-
-  // TCI: Consistency across activities
-  const technicalConsistencyIndex = calculateTCI(currentActivities);
-
-  // SER: Average across all activities
-  const serScores = currentActivities
-    .map(a => calculateSER(a))
-    .filter((s): s is number => s !== null);
-  const strokeEfficiencyRating = serScores.length > 0
-    ? Math.round(serScores.reduce((sum, s) => sum + s, 0) / serScores.length)
-    : null;
-
-  // ACS: Average across activities with HR data
-  const acsScores = currentActivities
-    .map(a => calculateACS(a))
-    .filter((s): s is number => s !== null);
-  const aerobicCapacityScore = acsScores.length > 0
-    ? Math.round(acsScores.reduce((sum, s) => sum + s, 0) / acsScores.length)
-    : null;
-
-  // RRS: Based on most recent activity
-  const lastActivity = currentActivities[0];
-  const baselineRestingHR = 60;  // TODO: Get from user profile
-  const hoursSinceLastWorkout = lastActivity 
-    ? (Date.now() - new Date(lastActivity.activityDate).getTime()) / (1000 * 60 * 60)
-    : 999;
-  const recoveryReadinessScore = lastActivity
-    ? calculateRRS(
-        lastActivity.restingHeartRate,
-        baselineRestingHR,
-        hoursSinceLastWorkout,
-        lastActivity.recoveryTimeHours || 24
-      )
-    : null;
-
-  // POI: Compare current vs previous period
-  const currentStats = {
-    distance: currentDistance,
-    intensity: avgPace > 0 ? 120 / avgPace : 0,  // Normalized intensity
-    frequency: currentSessions
-  };
-  const previousStats = {
-    distance: previousDistance,
-    intensity: previousActivities.length > 0 
-      ? previousActivities.reduce((sum, a) => sum + (a.avgPacePer100m || 0), 0) / previousActivities.length
-      : 0,
-    frequency: previousActivities.length
-  };
-  const progressiveOverloadIndex = calculatePOI(currentStats, previousStats);
 
   return {
     performanceIndex,
