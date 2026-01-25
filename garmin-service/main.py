@@ -219,7 +219,12 @@ def parse_swimming_activity(activity: dict, hr_zones_data: Optional[dict] = None
         avg_stroke_distance = int(avg_stroke_distance * 100)  # Convert m to cm
     
     avg_strokes = activity.get("avgStrokes")
+    if avg_strokes:
+        avg_strokes = int(round(avg_strokes))
+    
     avg_stroke_cadence = activity.get("avgStrokeCadenceRpm") or activity.get("avgStrokeCadence")
+    if avg_stroke_cadence:
+        avg_stroke_cadence = int(round(avg_stroke_cadence))
     
     # Extract training effect (multiply by 10 to store as integer)
     training_effect = activity.get("aerobicTrainingEffect")
@@ -232,12 +237,20 @@ def parse_swimming_activity(activity: dict, hr_zones_data: Optional[dict] = None
     
     # Extract physiological data
     vo2_max = activity.get("vO2MaxValue")
+    if vo2_max:
+        vo2_max = int(round(vo2_max))
+    
     recovery_time = activity.get("recoveryTime")  # in minutes
     if recovery_time:
         recovery_time = int(recovery_time / 60)  # Convert to hours
     
     resting_hr = activity.get("restingHeartRate")
+    if resting_hr:
+        resting_hr = int(round(resting_hr))
+    
     avg_stress = activity.get("averageStress")
+    if avg_stress:
+        avg_stress = int(round(avg_stress))
     
     return SwimmingActivity(
         activity_id=str(activity.get("activityId", "")),
