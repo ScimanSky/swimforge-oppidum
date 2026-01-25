@@ -46,22 +46,26 @@ export async function generateAIInsights(
     return [];
   }
 
-  // Check cache first
-  const cached = await db
-    .select()
-    .from(aiInsightsCache)
-    .where(
-      and(
-        eq(aiInsightsCache.userId, userId),
-        eq(aiInsightsCache.periodDays, userData.periodDays),
-        gt(aiInsightsCache.expiresAt, new Date())
+  // Check cache first (with error handling for missing table)
+  try {
+    const cached = await db
+      .select()
+      .from(aiInsightsCache)
+      .where(
+        and(
+          eq(aiInsightsCache.userId, userId),
+          eq(aiInsightsCache.periodDays, userData.periodDays),
+          gt(aiInsightsCache.expiresAt, new Date())
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  if (cached.length > 0 && cached[0].insights.length > 0) {
-    console.log(`[AI Insights] Using cached insights for user ${userId}`);
-    return cached[0].insights;
+    if (cached.length > 0 && cached[0].insights.length > 0) {
+      console.log(`[AI Insights] Using cached insights for user ${userId}`);
+      return cached[0].insights;
+    }
+  } catch (cacheError) {
+    console.warn("[AI Insights] Cache table not available yet, skipping cache check");
   }
 
   const client = getGeminiClient();
@@ -166,7 +170,7 @@ Genera 3-4 insights seguendo RIGOROSAMENTE queste regole:`;
         
         console.log(`[AI Insights] Cached ${finalInsights.length} insights for user ${userId}`);
       } catch (cacheError) {
-        console.error("[AI Insights] Error caching insights:", cacheError);
+        console.warn("[AI Insights] Cache table not available yet, skipping cache save:", cacheError);
       }
       
       return finalInsights;
@@ -179,20 +183,24 @@ Genera 3-4 insights seguendo RIGOROSAMENTE queste regole:`;
     console.error("[AI Insights] Error generating AI insights:", error);
     
     // Try to return cached insights even if expired
-    const anyCached = await db
-      .select()
-      .from(aiInsightsCache)
-      .where(
-        and(
-          eq(aiInsightsCache.userId, userId),
-          eq(aiInsightsCache.periodDays, userData.periodDays)
+    try {
+      const anyCached = await db
+        .select()
+        .from(aiInsightsCache)
+        .where(
+          and(
+            eq(aiInsightsCache.userId, userId),
+            eq(aiInsightsCache.periodDays, userData.periodDays)
+          )
         )
-      )
-      .limit(1);
-    
-    if (anyCached.length > 0 && anyCached[0].insights.length > 0) {
-      console.log(`[AI Insights] Using expired cache for user ${userId} due to error`);
-      return anyCached[0].insights;
+        .limit(1);
+      
+      if (anyCached.length > 0 && anyCached[0].insights.length > 0) {
+        console.log(`[AI Insights] Using expired cache for user ${userId} due to error`);
+        return anyCached[0].insights;
+      }
+    } catch (fallbackError) {
+      console.warn("[AI Insights] Cache table not available for fallback");
     }
     
     return [];
