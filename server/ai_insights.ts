@@ -53,33 +53,30 @@ export async function generateAIInsights(
     return [];
   }
 
-  // Check cache first (with error handling for missing table)
-  try {
-    const cached = await db
-      .select()
-      .from(aiInsightsCache)
-      .where(
-        and(
-          eq(aiInsightsCache.userId, userId),
-          eq(aiInsightsCache.periodDays, userData.periodDays),
-          gt(aiInsightsCache.expiresAt, new Date())
-        )
-      )
-      .limit(1);
-
-    if (cached.length > 0 && cached[0].insights.length > 0) {
-      console.log(`[AI Insights] Using cached insights for user ${userId}`);
-      return cached[0].insights;
-    }
-  } catch (cacheError) {
-    console.warn("[AI Insights] Cache table not available yet, skipping cache check");
-  }
-
   const client = getGeminiClient();
   
-  // Return empty array if no API key (no fallback)
+  // If no API key, try to use cache as fallback
   if (!client) {
-    console.warn("[AI Insights] No Gemini API key configured");
+    console.warn("[AI Insights] No Gemini API key configured, trying cache fallback");
+    try {
+      const cached = await db
+        .select()
+        .from(aiInsightsCache)
+        .where(
+          and(
+            eq(aiInsightsCache.userId, userId),
+            eq(aiInsightsCache.periodDays, userData.periodDays)
+          )
+        )
+        .limit(1);
+
+      if (cached.length > 0 && cached[0].insights.length > 0) {
+        console.log(`[AI Insights] Using cached insights (no API key) for user ${userId}`);
+        return cached[0].insights;
+      }
+    } catch (cacheError) {
+      console.warn("[AI Insights] Cache table not available");
+    }
     return [];
   }
 
