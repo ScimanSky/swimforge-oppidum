@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, Medal, Users, Activity, User, Trophy, BarChart3 } from "lucide-react";
+import { Home, Medal, Users, Activity, User, Trophy, BarChart3, Dumbbell } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -8,7 +8,7 @@ const navItems = [
   { href: "/badges", icon: Medal, label: "Badge" },
   { href: "/challenges", icon: Trophy, label: "Sfide" },
   { href: "/statistics", icon: BarChart3, label: "Stats" },
-  { href: "/leaderboard", icon: Users, label: "Classifica" },
+  { href: "/coach", icon: Dumbbell, label: "Coach" },
 ];
 
 export default function MobileNav() {

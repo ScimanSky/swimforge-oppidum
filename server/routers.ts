@@ -7,6 +7,7 @@ import { z } from "zod";
 import * as db from "./db";
 import { getDb } from "./db";
 import * as garmin from "./garmin";
+import { sql } from "drizzle-orm";
 import { swimmerProfiles } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { initializeAllUserProfileBadges } from "./db_profile_badges";
@@ -782,6 +783,29 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const { getAdvancedMetrics } = await import("./db_statistics");
         return await getAdvancedMetrics(ctx.user.id, input.days);
+      }),
+  }),
+
+  // AI Coach
+  aiCoach: router({
+    // Get pool workout (cached or generate new)
+    getPoolWorkout: protectedProcedure
+      .input(z.object({
+        forceRegenerate: z.boolean().default(false),
+      }))
+      .query(async ({ ctx, input }) => {
+        const { getOrGenerateWorkout } = await import("./ai_coach");
+        return await getOrGenerateWorkout(ctx.user.id, "pool", input.forceRegenerate);
+      }),
+
+    // Get dryland workout (cached or generate new)
+    getDrylandWorkout: protectedProcedure
+      .input(z.object({
+        forceRegenerate: z.boolean().default(false),
+      }))
+      .query(async ({ ctx, input }) => {
+        const { getOrGenerateWorkout } = await import("./ai_coach");
+        return await getOrGenerateWorkout(ctx.user.id, "dryland", input.forceRegenerate);
       }),
   }),
 });

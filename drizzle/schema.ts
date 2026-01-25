@@ -224,6 +224,18 @@ export const aiInsightsCache = pgTable("ai_insights_cache", {
   expiresAt: timestamp("expires_at").notNull(), // Insights expire after 24 hours
 });
 
+// ============================================
+// AI COACH WORKOUTS CACHE
+// ============================================
+export const aiCoachWorkouts = pgTable("ai_coach_workouts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  workoutType: varchar("workout_type", { length: 20 }).notNull(), // 'pool' or 'dryland'
+  workoutData: text("workout_data").notNull(), // JSON string containing workout structure
+  generatedAt: timestamp("generated_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(), // Workouts expire after 24 hours
+});
+
 // Type exports
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
@@ -243,3 +255,5 @@ export type LevelThreshold = typeof levelThresholds.$inferSelect;
 export type WeeklyStats = typeof weeklyStats.$inferSelect;
 export type AiInsightsCache = typeof aiInsightsCache.$inferSelect;
 export type InsertAiInsightsCache = typeof aiInsightsCache.$inferInsert;
+export type AiCoachWorkout = typeof aiCoachWorkouts.$inferSelect;
+export type InsertAiCoachWorkout = typeof aiCoachWorkouts.$inferInsert;

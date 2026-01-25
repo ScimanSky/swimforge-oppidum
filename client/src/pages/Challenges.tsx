@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
-import { Trophy, Plus, Calendar, Target, Users, Award } from "lucide-react";
+import { Trophy, Plus, Calendar, Target, Users, Award, Medal } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import { toast } from "sonner";
@@ -127,13 +127,24 @@ export default function Challenges() {
             <Trophy className="h-6 w-6 text-[oklch(0.82_0.18_85)]" />
             <h1 className="text-xl font-bold text-[oklch(0.95_0.01_220)]">Sfide</h1>
           </div>
-          <Button
-            onClick={() => setShowCreateForm(!showCreateForm)}
-            className="bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] hover:opacity-90"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Crea Sfida
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link href="/leaderboard">
+              <Button
+                variant="outline"
+                className="border-[oklch(0.30_0.04_250)] text-[oklch(0.95_0.01_220)] hover:bg-[oklch(0.18_0.03_250)]"
+              >
+                <Users className="h-4 w-4 mr-2" />
+                Classifica
+              </Button>
+            </Link>
+            <Button
+              onClick={() => setShowCreateForm(!showCreateForm)}
+              className="bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] hover:opacity-90"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Crea Sfida
+            </Button>
+          </div>
         </div>
       </div>
 

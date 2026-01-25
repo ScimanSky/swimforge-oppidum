@@ -83,7 +83,9 @@ export async function generateAIInsights(
   try {
     const model = client.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    const prompt = `Sei un coach di nuoto esperto e motivazionale. Analizza questi dati di un nuotatore e genera 6-8 insights personalizzati, motivazionali e actionable in italiano, CATEGORIZZATI per argomento.
+    const prompt = `Sei un analista di performance di nuoto esperto. Analizza questi dati di un nuotatore e genera 6-8 insights analitici, identificando TENDENZE, PATTERN e AREE DI MIGLIORAMENTO in italiano, CATEGORIZZATI per argomento.
+
+⚠️ IMPORTANTE: NON fornire allenamenti specifici o workout dettagliati (quello è il ruolo dell'AI Coach). Focus su ANALISI e DIREZIONE GENERALE.
 
 Dati nuotatore (ultimi ${userData.periodDays} giorni):
 
@@ -127,10 +129,11 @@ REGOLE FONDAMENTALI:
    - Identifica pattern nascosti (es. "nuoti più veloce ma meno costante")
    - Trova correlazioni (es. "le tue zone HR indicano che potresti spingere di più")
 
-3. ✅ DAI CONSIGLI SPECIFICI E ACTIONABLE
-   - Suggerisci modifiche concrete (es. "aggiungi 500m di tecnica ogni 3 sessioni")
-   - Proponi obiettivi raggiungibili (es. "punta a 3 sessioni/settimana per 2 settimane")
-   - Indica cosa fare DOMANI (es. "nella prossima sessione prova 4x100m in Z3")
+3. ✅ DAI INDICAZIONI GENERALI (NON ALLENAMENTI SPECIFICI)
+   - Identifica aree da migliorare (es. "la tua tecnica varia troppo tra sessioni")
+   - Suggerisci direzioni generali (es. "considera di lavorare sulla consistenza del ritmo")
+   - Proponi focus generali (es. "potrebbe essere utile dedicare più tempo al recupero")
+   - ❌ NON dare serie/ripetizioni specifiche (es. NO "4x100m in Z3", NO "500m di tecnica")
 
 4. ✅ USA CONTESTO E PSICOLOGIA
    - Se streak = 0 ma record > 0: motivazione per ripartire
@@ -154,34 +157,36 @@ REGOLE FONDAMENTALI:
 ESEMPI DI INSIGHTS BUONI PER CATEGORIA:
 
 🏊 TECNICA:
-✅ "Il tuo SEI di 72/100 indica buona efficienza, ma c'è margine: riduci di 1-2 bracciate per vasca mantenendo il pace per salire sopra 80."
-✅ "TCI a 65 suggerisce variazioni nel ritmo. Usa un tempo trainer a 1:30/100m per 10x100 per stabilizzare la tecnica."
+✅ "Il tuo SEI di 72/100 indica buona efficienza, ma c'è margine di miglioramento: lavorare sulla riduzione delle bracciate potrebbe portarti sopra 80."
+✅ "TCI a 65 suggerisce variazioni nel ritmo tra sessioni. Maggiore focus sulla consistenza tecnica potrebbe stabilizzare le tue performance."
 
 💪 INTENSITÀ:
-✅ "Passi solo il 15% in Z3-Z4: ottimo per base aerobica! Ora aggiungi 1 sessione/settimana con 6x100m @ Z3 per sviluppare velocità."
-✅ "ACS di 78 indica solida capacità aerobica. Mantieni 2 sessioni lunghe/settimana in Z2 per consolidare."
+✅ "Passi solo il 15% in Z3-Z4: ottima base aerobica costruita! Il prossimo step naturale è integrare più lavoro ad alta intensità per sviluppare velocità."
+✅ "ACS di 78 indica solida capacità aerobica. Mantenere sessioni lunghe in Z2 ti aiuterà a consolidare questa base."
 
 📈 PROGRESSIONE:
-✅ "POI a +18% è perfetto! Stai progredendo al ritmo giusto senza rischio sovrallenamento. Mantieni questo trend per altre 2 settimane."
-✅ "Trend +12% con Performance Index 85: sei in crescita costante. Punta a 50km totali nel prossimo mese per consolidare."
+✅ "POI a +18% è perfetto! Stai progredendo al ritmo giusto senza rischio sovrallenamento. Questo trend è sostenibile per altre 2-3 settimane."
+✅ "Trend +12% con Performance Index 85: crescita costante e sana. Puntare a 50km totali nel prossimo mese consoliderebbe questi progressi."
 
 🔄 RECUPERO:
-✅ "RRS a 55 indica recupero parziale. Considera 1 giorno extra di riposo o una sessione facile in Z1-Z2 prima dell'allenamento intenso."
-✅ "Streak di 12 giorni è ottimo, ma RRS basso suggerisce stanchezza. Inserisci 1 giorno di recupero attivo ogni 4-5 allenamenti."
+✅ "RRS a 55 indica recupero parziale. Potrebbe essere utile considerare più giorni di riposo o sessioni più leggere."
+✅ "Streak di 12 giorni è ottimo, ma RRS basso suggerisce accumulo di fatica. Bilanciare intensità e recupero diventa prioritario."
 
 ⚡ EFFICIENZA:
-✅ "SER di 81 con SWOLF 42: stai scivolando bene! Lavora su catch-up drill per portare SWOLF sotto 40 e SER sopra 85."
-✅ "Consumi 450 cal/sessione con pace 1:45: ottimo rapporto! Aumenta intensità gradualmente per migliorare metabolismo."
+✅ "SER di 81 con SWOLF 42: stai scivolando bene! C'è potenziale per portare SWOLF sotto 40 lavorando sulla fase di presa."
+✅ "Consumi 450 cal/sessione con pace 1:45: ottimo rapporto efficienza/intensità! Aumentare gradualmente l'intensità potrebbe migliorare il metabolismo."
 
 🎯 OBIETTIVI:
-✅ "Al ritmo attuale (2.8 km/sessione), raggiungerai 50km in 18 giorni. Aggiungi 1 sessione/settimana per anticipare a 14 giorni."
-✅ "Consistency 88 con solo 3 sessioni/settimana: quando nuoti, nuoti bene! Porta a 4/settimana per sbloccare livello successivo."
+✅ "Al ritmo attuale (2.8 km/sessione), raggiungerai 50km in 18 giorni. Una sessione extra a settimana anticiperebbe l'obiettivo a 14 giorni."
+✅ "Consistency 88 con solo 3 sessioni/settimana: quando nuoti, nuoti bene! Aumentare la frequenza a 4/settimana sbloccherebbe il livello successivo più velocemente."
 
 ESEMPI CATTIVI (DA EVITARE):
 ❌ "Hai nuotato 16.3 km in 6 sessioni" (RIPETE I DATI)
 ❌ "Il tuo SEI è 72/100" (RIPETE I DATI)
 ❌ "Continua così!" (TROPPO GENERICO)
 ❌ "Il tuo pace medio è 1:40/100m" (RIPETE I DATI)
+❌ "Nella prossima sessione fai 4x100m in Z3" (TROPPO SPECIFICO - È COMPITO DEL COACH)
+❌ "Aggiungi 500m di tecnica ogni 3 sessioni" (ALLENAMENTO SPECIFICO - NON È IL TUO RUOLO)
 
 Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
 
