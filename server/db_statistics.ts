@@ -328,23 +328,29 @@ export async function getAdvancedMetrics(
   const userLevel = profile[0]?.level || 1;
   const userXp = profile[0]?.totalXp || 0;
 
-  // Calculate HR zones and SWOLF
-  const hrActivities = currentActivities.filter(a => a.avgHeartRate && a.avgHeartRate > 0);
+  // Calculate HR zones from real Garmin data (time in seconds per zone)
+  const hrActivities = currentActivities.filter(a => 
+    a.hrZone1Seconds || a.hrZone2Seconds || a.hrZone3Seconds || a.hrZone4Seconds || a.hrZone5Seconds
+  );
   let hrZones = undefined;
   if (hrActivities.length > 0) {
-    const zone1 = hrActivities.filter(a => a.avgHeartRate! < 120).length;
-    const zone2 = hrActivities.filter(a => a.avgHeartRate! >= 120 && a.avgHeartRate! < 140).length;
-    const zone3 = hrActivities.filter(a => a.avgHeartRate! >= 140 && a.avgHeartRate! < 160).length;
-    const zone4 = hrActivities.filter(a => a.avgHeartRate! >= 160 && a.avgHeartRate! < 180).length;
-    const zone5 = hrActivities.filter(a => a.avgHeartRate! >= 180).length;
-    const total = hrActivities.length;
-    hrZones = {
-      zone1: Math.round((zone1 / total) * 100),
-      zone2: Math.round((zone2 / total) * 100),
-      zone3: Math.round((zone3 / total) * 100),
-      zone4: Math.round((zone4 / total) * 100),
-      zone5: Math.round((zone5 / total) * 100),
-    };
+    // Sum up total seconds in each zone across all activities
+    const zone1Total = hrActivities.reduce((sum, a) => sum + (a.hrZone1Seconds || 0), 0);
+    const zone2Total = hrActivities.reduce((sum, a) => sum + (a.hrZone2Seconds || 0), 0);
+    const zone3Total = hrActivities.reduce((sum, a) => sum + (a.hrZone3Seconds || 0), 0);
+    const zone4Total = hrActivities.reduce((sum, a) => sum + (a.hrZone4Seconds || 0), 0);
+    const zone5Total = hrActivities.reduce((sum, a) => sum + (a.hrZone5Seconds || 0), 0);
+    const totalSeconds = zone1Total + zone2Total + zone3Total + zone4Total + zone5Total;
+    
+    if (totalSeconds > 0) {
+      hrZones = {
+        zone1: Math.round((zone1Total / totalSeconds) * 100),
+        zone2: Math.round((zone2Total / totalSeconds) * 100),
+        zone3: Math.round((zone3Total / totalSeconds) * 100),
+        zone4: Math.round((zone4Total / totalSeconds) * 100),
+        zone5: Math.round((zone5Total / totalSeconds) * 100),
+      };
+    }
   }
 
   const swolfActivities = currentActivities.filter(a => a.avgSwolf && a.avgSwolf > 0);

@@ -435,6 +435,11 @@ export async function syncGarminActivities(
         swolfScore: activity.swolf_score,
         lapsCount: activity.laps_count,
         isOpenWater: activity.is_open_water,
+        hrZone1Seconds: activity.hr_zone_1_seconds,
+        hrZone2Seconds: activity.hr_zone_2_seconds,
+        hrZone3Seconds: activity.hr_zone_3_seconds,
+        hrZone4Seconds: activity.hr_zone_4_seconds,
+        hrZone5Seconds: activity.hr_zone_5_seconds,
         xpEarned: activityXp,
       });
 

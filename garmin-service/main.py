@@ -95,6 +95,11 @@ class SwimmingActivity(BaseModel):
     swolf_score: Optional[int] = None
     laps_count: Optional[int] = None
     is_open_water: bool = False
+    hr_zone_1_seconds: Optional[int] = None
+    hr_zone_2_seconds: Optional[int] = None
+    hr_zone_3_seconds: Optional[int] = None
+    hr_zone_4_seconds: Optional[int] = None
+    hr_zone_5_seconds: Optional[int] = None
 
 
 class SyncRequest(BaseModel):
@@ -180,7 +185,7 @@ def is_swimming_activity(activity: dict) -> bool:
     return "swim" in activity_type or "pool" in activity_type
 
 
-def parse_swimming_activity(activity: dict) -> SwimmingActivity:
+def parse_swimming_activity(activity: dict, hr_zones_data: Optional[dict] = None) -> SwimmingActivity:
     """Parse Garmin activity into SwimmingActivity model"""
     activity_type = activity.get("activityType", {}).get("typeKey", "").lower()
     is_open_water = "open_water" in activity_type or "openwater" in activity_type
@@ -216,7 +221,12 @@ def parse_swimming_activity(activity: dict) -> SwimmingActivity:
         max_heart_rate=activity.get("maxHR"),
         swolf_score=activity.get("avgSwolf"),
         laps_count=activity.get("lapCount") or activity.get("totalLaps"),
-        is_open_water=is_open_water
+        is_open_water=is_open_water,
+        hr_zone_1_seconds=hr_zones_data.get("zone1") if hr_zones_data else None,
+        hr_zone_2_seconds=hr_zones_data.get("zone2") if hr_zones_data else None,
+        hr_zone_3_seconds=hr_zones_data.get("zone3") if hr_zones_data else None,
+        hr_zone_4_seconds=hr_zones_data.get("zone4") if hr_zones_data else None,
+        hr_zone_5_seconds=hr_zones_data.get("zone5") if hr_zones_data else None
     )
 
 
@@ -623,7 +633,26 @@ async def get_swimming_activities(
                     try:
                         act_dt = datetime.fromisoformat(activity_date.replace("Z", "+00:00"))
                         if act_dt.replace(tzinfo=None) >= start_date:
-                            swimming_activities.append(parse_swimming_activity(activity))
+                            # Fetch HR zones data for this activity
+                            hr_zones_data = None
+                            try:
+                                activity_id = activity.get("activityId")
+                                if activity_id:
+                                    hr_zones_response = client.get_activity_hr_in_timezones(activity_id)
+                                    if hr_zones_response:
+                                        # Extract zone times in seconds
+                                        hr_zones_data = {
+                                            "zone1": hr_zones_response.get("zone1TimeInSeconds", 0),
+                                            "zone2": hr_zones_response.get("zone2TimeInSeconds", 0),
+                                            "zone3": hr_zones_response.get("zone3TimeInSeconds", 0),
+                                            "zone4": hr_zones_response.get("zone4TimeInSeconds", 0),
+                                            "zone5": hr_zones_response.get("zone5TimeInSeconds", 0)
+                                        }
+                                        logger.info(f"HR zones for activity {activity_id}: {hr_zones_data}")
+                            except Exception as hr_err:
+                                logger.warning(f"Could not fetch HR zones for activity {activity.get('activityId')}: {hr_err}")
+                            
+                            swimming_activities.append(parse_swimming_activity(activity, hr_zones_data))
                     except Exception:
                         swimming_activities.append(parse_swimming_activity(activity))
         
