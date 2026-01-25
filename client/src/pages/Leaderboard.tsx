@@ -33,13 +33,16 @@ interface NormalizedEntry {
 function normalizeEntry(entry: any): NormalizedEntry {
   // Handle both formats: { profile: {...}, userName } and flat { userId, name, level, ... }
   const profile = entry.profile || entry;
+  const userId = profile.userId ?? entry.userId ?? 0;
+  const userName = entry.userName ?? entry.name ?? "Nuotatore";
+  
   return {
-    id: profile.id || entry.id || 0,
-    userId: profile.userId || entry.userId || "",
-    userName: entry.userName || entry.name || "Nuotatore",
-    level: profile.level || entry.level || 1,
-    totalXp: profile.totalXp || entry.totalXp || 0,
-    badgeCount: entry.badgeCount || 0,
+    id: profile.id ?? entry.id ?? 0,
+    userId: String(userId),
+    userName,
+    level: profile.level ?? entry.level ?? 1,
+    totalXp: profile.totalXp ?? entry.totalXp ?? 0,
+    badgeCount: entry.badgeCount ?? 0,
   };
 }
 
