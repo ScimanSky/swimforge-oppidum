@@ -190,6 +190,12 @@ export default function Statistics() {
                             borderRadius: "8px",
                             color: "white",
                           }}
+                          labelStyle={{
+                            color: "white",
+                          }}
+                          itemStyle={{
+                            color: "white",
+                          }}
                           formatter={(value: number) => `${value}%`}
                         />
                       </PieChart>

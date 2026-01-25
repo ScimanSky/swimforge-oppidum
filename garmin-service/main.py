@@ -772,6 +772,53 @@ async def get_activity_hr_zones(
         )
 
 
+@app.get("/activity/{activity_id}/details")
+async def get_activity_details(
+    activity_id: str,
+    user_id: str = Header(None, alias="user-id"),
+    api_key: str = Depends(verify_api_key)
+):
+    """Get detailed data for a specific activity including SWOLF"""
+    if not user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="user-id header is required"
+        )
+    
+    client = get_garmin_client(user_id)
+    
+    if not client:
+        raise HTTPException(
+            status_code=401,
+            detail="Non autenticato. Effettua prima il login."
+        )
+    
+    try:
+        logger.info(f"Fetching details for activity {activity_id}")
+        activity_details = client.get_activity_evaluation(activity_id)
+        
+        logger.info(f"Activity details: {activity_details}")
+        
+        if not activity_details:
+            return {
+                "swolf_score": None
+            }
+        
+        # Extract SWOLF score
+        swolf_score = activity_details.get("averageSwolf")
+        
+        return {
+            "swolf_score": swolf_score
+        }
+        
+    except Exception as e:
+        logger.error(f"Error fetching details for activity {activity_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Errore nel recupero dei dettagli: {str(e)}"
+        )
+
+
 @app.post("/sync", response_model=SyncResponse)
 async def sync_activities(request: SyncRequest, api_key: str = Depends(verify_api_key)):
     """Sync swimming activities from Garmin Connect"""

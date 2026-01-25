@@ -855,7 +855,33 @@ export async function migrateHrZones(userId: number): Promise<{
 
         const hrZones = await response.json();
 
-        // Update activity with HR zones data (round to integers)
+        // Fetch activity details (including SWOLF)
+        let swolfScore = activity.swolfScore; // Keep existing value if fetch fails
+        try {
+          const detailsResponse = await fetch(
+            `${GARMIN_SERVICE_URL}/activity/${activity.garminActivityId}/details`,
+            {
+              headers: {
+                "user-id": userId.toString(),
+                "X-API-Key": GARMIN_SERVICE_SECRET,
+              },
+            }
+          );
+          
+          if (detailsResponse.ok) {
+            const details = await detailsResponse.json();
+            if (details.swolf_score !== null && details.swolf_score !== undefined) {
+              swolfScore = details.swolf_score;
+            }
+          }
+        } catch (detailsError) {
+          console.warn(
+            `[Garmin] Could not fetch details for activity ${activity.garminActivityId}:`,
+            detailsError
+          );
+        }
+
+        // Update activity with HR zones data and SWOLF (round to integers)
         await db
           .update(swimmingActivities)
           .set({
@@ -864,6 +890,7 @@ export async function migrateHrZones(userId: number): Promise<{
             hrZone3Seconds: Math.round(hrZones.zone3 || 0),
             hrZone4Seconds: Math.round(hrZones.zone4 || 0),
             hrZone5Seconds: Math.round(hrZones.zone5 || 0),
+            swolfScore: swolfScore,
           })
           .where(eq(swimmingActivities.id, activity.id));
 
