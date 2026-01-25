@@ -19,6 +19,8 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, ChevronLeft } from "lucide-react";
 import { Link } from "wouter";
+import { MetricBox } from "@/components/MetricBox";
+import { metricsDefinitions } from "@/data/metricsDefinitions";
 
 const PERIOD_OPTIONS = [
   { value: 7, label: "7 giorni" },
@@ -292,34 +294,20 @@ export default function Statistics() {
                   ━━━ ANALISI AVANZATE ━━━
                 </h2>
 
-                {/* Scores */}
+                {/* Core Metrics */}
                 <div className="grid grid-cols-3 gap-3">
-                  <div
-                    className="rounded-xl p-4 text-center"
-                    style={{
-                      background: "oklch(0.18 0.03 250)",
-                      border: "1px solid oklch(0.25 0.03 250)",
-                    }}
-                  >
-                    <div className="text-sm text-[oklch(0.70_0.05_250)]">Performance</div>
-                    <div className="text-3xl font-bold text-[oklch(0.90_0.05_220)]">
-                      {advanced.performanceIndex}
-                    </div>
-                    <div className="text-xs text-[oklch(0.60_0.05_250)]">/100</div>
-                  </div>
-                  <div
-                    className="rounded-xl p-4 text-center"
-                    style={{
-                      background: "oklch(0.18 0.03 250)",
-                      border: "1px solid oklch(0.25 0.03 250)",
-                    }}
-                  >
-                    <div className="text-sm text-[oklch(0.70_0.05_250)]">Consistency</div>
-                    <div className="text-3xl font-bold text-[oklch(0.90_0.05_220)]">
-                      {advanced.consistencyScore}
-                    </div>
-                    <div className="text-xs text-[oklch(0.60_0.05_250)]">/100</div>
-                  </div>
+                  <MetricBox
+                    label="Performance"
+                    value={advanced.performanceIndex}
+                    icon="📊"
+                    info={metricsDefinitions.performanceIndex}
+                  />
+                  <MetricBox
+                    label="Consistency"
+                    value={advanced.consistencyScore}
+                    icon="📅"
+                    info={metricsDefinitions.consistencyScore}
+                  />
                   <div
                     className="rounded-xl p-4 text-center"
                     style={{
@@ -366,6 +354,52 @@ export default function Statistics() {
                         {advanced.streak.record} giorni
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                {/* Advanced Swimming Metrics */}
+                <div>
+                  <h3 className="text-md font-semibold text-[oklch(0.80_0.05_220)] mb-3">
+                    🏊 Metriche Avanzate
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <MetricBox
+                      label="SEI"
+                      value={advanced.swimmingEfficiencyIndex}
+                      icon="⚡"
+                      info={metricsDefinitions.sei}
+                    />
+                    <MetricBox
+                      label="TCI"
+                      value={advanced.technicalConsistencyIndex}
+                      icon="🎯"
+                      info={metricsDefinitions.tci}
+                    />
+                    <MetricBox
+                      label="SER"
+                      value={advanced.strokeEfficiencyRating}
+                      icon="🏊"
+                      info={metricsDefinitions.ser}
+                    />
+                    <MetricBox
+                      label="ACS"
+                      value={advanced.aerobicCapacityScore}
+                      icon="❤️"
+                      info={metricsDefinitions.acs}
+                    />
+                    <MetricBox
+                      label="RRS"
+                      value={advanced.recoveryReadinessScore}
+                      icon="💤"
+                      info={metricsDefinitions.rrs}
+                    />
+                    <MetricBox
+                      label="POI"
+                      value={advanced.progressiveOverloadIndex}
+                      max={200}
+                      icon="📈"
+                      info={metricsDefinitions.poi}
+                    />
                   </div>
                 </div>
 
