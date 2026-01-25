@@ -16,7 +16,7 @@
 
 import { getDb } from "./db";
 import { garminTokens, swimmingActivities, swimmerProfiles, xpTransactions, badgeDefinitions, userBadges } from "../drizzle/schema";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
 
 // Garmin microservice configuration
@@ -448,15 +448,15 @@ export async function syncGarminActivities(
         maxHeartRate: activity.max_heart_rate,
         swolfScore: activity.swolf_score,
         lapsCount: activity.laps_count,
-        avgStrokeDistance: activity.avg_stroke_distance,
-        avgStrokes: activity.avg_strokes,
-        avgStrokeCadence: activity.avg_stroke_cadence,
-        trainingEffect: activity.training_effect,
-        anaerobicTrainingEffect: activity.anaerobic_training_effect,
-        vo2MaxValue: activity.vo2_max_value,
-        recoveryTimeHours: activity.recovery_time_hours,
-        restingHeartRate: activity.resting_heart_rate,
-        avgStress: activity.avg_stress,
+        avgStrokeDistance: activity.avg_stroke_distance ? Math.round(activity.avg_stroke_distance * 100) / 100 : undefined,
+        avgStrokes: activity.avg_strokes ? Math.round(activity.avg_strokes) : undefined,
+        avgStrokeCadence: activity.avg_stroke_cadence ? Math.round(activity.avg_stroke_cadence) : undefined,
+        trainingEffect: activity.training_effect ? Math.round(activity.training_effect * 10) / 10 : undefined,
+        anaerobicTrainingEffect: activity.anaerobic_training_effect ? Math.round(activity.anaerobic_training_effect * 10) / 10 : undefined,
+        vo2MaxValue: activity.vo2_max_value ? Math.round(activity.vo2_max_value) : undefined,
+        recoveryTimeHours: activity.recovery_time_hours ? Math.round(activity.recovery_time_hours) : undefined,
+        restingHeartRate: activity.resting_heart_rate ? Math.round(activity.resting_heart_rate) : undefined,
+        avgStress: activity.avg_stress ? Math.round(activity.avg_stress) : undefined,
         isOpenWater: activity.is_open_water,
         hrZone1Seconds: activity.hr_zone_1_seconds ? Math.round(activity.hr_zone_1_seconds) : undefined,
         hrZone2Seconds: activity.hr_zone_2_seconds ? Math.round(activity.hr_zone_2_seconds) : undefined,
@@ -830,7 +830,7 @@ export async function migrateHrZones(userId: number): Promise<{
       .where(
         and(
           eq(swimmingActivities.userId, userId),
-          sql`${swimmingActivities.hrZone1Seconds} IS NULL`
+          isNull(swimmingActivities.hrZone1Seconds)
         )
       );
 
