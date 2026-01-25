@@ -128,6 +128,11 @@ async function generateWorkout(
  * Fetch comprehensive user statistics for workout generation
  */
 async function fetchUserStats(userId: number): Promise<any> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
   // Get swimmer profile
   const profile = await db.query.swimmerProfiles.findFirst({
     where: (profiles, { eq }) => eq(profiles.userId, userId),
