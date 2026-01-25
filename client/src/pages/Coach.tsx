@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { trpc } from "../lib/trpc";
-import { RefreshCw, Dumbbell, Waves, Info, Clock, TrendingUp, ChevronLeft } from "lucide-react";
+import { RefreshCw, Waves, Info, Clock, TrendingUp, ChevronLeft, Activity } from "lucide-react";
 import { Link } from "wouter";
 import MobileNav from "@/components/MobileNav";
 
@@ -18,6 +18,7 @@ type WorkoutExercise = {
   duration?: string;
   rest?: string;
   intensity?: string;
+  equipment?: string;
   notes?: string;
 };
 
@@ -83,7 +84,7 @@ export default function Coach() {
                 </button>
               </Link>
               <div className="flex items-center gap-3">
-                <Dumbbell className="w-6 h-6 text-[oklch(0.70_0.18_220)]" />
+                <Waves className="w-6 h-6 text-[oklch(0.70_0.18_220)]" />
                 <h1 className="text-xl font-bold text-[oklch(0.95_0.01_220)]">AI Coach</h1>
               </div>
             </div>
@@ -125,7 +126,7 @@ export default function Coach() {
                   : "bg-[oklch(0.18_0.03_250)] text-[oklch(0.65_0.03_220)] hover:bg-[oklch(0.20_0.03_250)]"
               }`}
             >
-              <Dumbbell className="w-5 h-5" />
+              <Activity className="w-5 h-5" />
               <span>Fuori Vasca</span>
             </button>
           </div>
@@ -241,6 +242,13 @@ export default function Coach() {
                           </div>
                         )}
                       </div>
+
+                      {exercise.equipment && (
+                        <div className="text-sm mb-2 px-3 py-1.5 bg-[oklch(0.70_0.18_220_/_0.2)] rounded-full inline-block border border-[oklch(0.70_0.18_220_/_0.4)]">
+                          <span className="font-semibold text-[oklch(0.70_0.18_220)]">🏊 Attrezzo:</span>{" "}
+                          <span className="text-[oklch(0.95_0.01_220)]">{exercise.equipment}</span>
+                        </div>
+                      )}
 
                       {exercise.notes && (
                         <div className="text-sm text-[oklch(0.75_0.03_220)] italic bg-[oklch(0.70_0.18_220_/_0.15)] rounded p-2 border-l-2 border-[oklch(0.70_0.18_220)]">

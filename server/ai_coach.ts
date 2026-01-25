@@ -323,8 +323,14 @@ ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
 3. Includi esercizi tecnici specifici basati su SEI, TCI, SER
 4. Bilancia intensità basandoti su ACS, RRS${userStats.hrZones.hasData ? ', zone HR' : ''}
 5. **IMPORTANTE: Per ogni serie con ripetizioni (es. 4x100), specifica SEMPRE il tempo di ripartenza (es. "a 1:50", "a 1:20", "a 0:50") basandoti sul passo medio del nuotatore (${userStats.recent.avgPace} sec/100m). Aggiungi 10-20 secondi al passo per serie tecniche, 5-10 secondi per serie di resistenza.**
-6. Fornisci note tecniche dettagliate per ogni serie
-7. L'allenamento deve essere sfidante ma adatto al livello del nuotatore
+6. **ATTREZZI: Includi nell'allenamento l'uso di attrezzi specifici:**
+   - **Pinne**: Per migliorare propulsione e tecnica di gambe (specialmente il venerdì)
+   - **Palette**: Per aumentare forza e migliorare la presa dell'acqua
+   - **Pull buoy**: Per isolare il lavoro delle braccia e migliorare la posizione
+   - **Tavoletta**: Per esercizi di gambe e tecnica
+   - Specifica l'attrezzo nel campo "equipment" di ogni esercizio che lo richiede
+7. Fornisci note tecniche dettagliate per ogni serie
+8. L'allenamento deve essere sfidante ma adatto al livello del nuotatore
 
 **FORMATO RICHIESTO (JSON):**
 {
@@ -354,6 +360,7 @@ ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
           "distance": "100m",
           "rest": "a 1:50" (tempo di ripartenza basato sul passo),
           "intensity": "Moderata",
+          "equipment": "Palette" (opzionale: Pinne, Palette, Pull buoy, Tavoletta),
           "notes": "Focus su aspetto tecnico specifico"
         }
       ],
@@ -368,6 +375,7 @@ ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
           "distance": "50m",
           "rest": "a 0:50" (tempo di ripartenza),
           "intensity": "Alta - Zona 4",
+          "equipment": "Pinne" (se venerdì),
           "notes": "Mantenere ritmo costante"
         }
       ]
