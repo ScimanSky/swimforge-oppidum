@@ -17,7 +17,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { TrendingUp, TrendingDown, Minus, ChevronLeft } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ChevronLeft, Info } from "lucide-react";
 import { Link } from "wouter";
 import { MetricBox } from "@/components/MetricBox";
 import { metricsDefinitions } from "@/data/metricsDefinitions";
@@ -102,9 +102,17 @@ export default function Statistics() {
           <>
             {/* Progress Timeline */}
             <section className="space-y-3">
-              <h2 className="text-lg font-semibold text-[oklch(0.85_0.05_220)]">
-                ━━━ PROGRESS TIMELINE ━━━
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-[oklch(0.85_0.05_220)]">
+                  ━━━ PROGRESS TIMELINE ━━━
+                </h2>
+                <div className="group relative">
+                  <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)] cursor-help" />
+                  <div className="absolute left-0 top-6 w-64 p-2 bg-[oklch(0.20_0.03_250)] border border-[oklch(0.30_0.03_250)] rounded-lg text-xs text-[oklch(0.85_0.05_220)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                    Visualizza l'andamento della distanza percorsa e del pace medio nel periodo selezionato. Utile per identificare trend e progressi nel tempo.
+                  </div>
+                </div>
+              </div>
               <div
                 className="rounded-xl p-4"
                 style={{
@@ -168,7 +176,15 @@ export default function Statistics() {
                     border: "1px solid oklch(0.25 0.03 250)",
                   }}
                 >
-                  <h3 className="font-semibold mb-3">Zone Frequenza Cardiaca</h3>
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="font-semibold">Zone Frequenza Cardiaca</h3>
+                    <div className="group relative">
+                      <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)] cursor-help" />
+                      <div className="absolute left-0 top-6 w-72 p-2 bg-[oklch(0.20_0.03_250)] border border-[oklch(0.30_0.03_250)] rounded-lg text-xs text-[oklch(0.85_0.05_220)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                        Mostra la distribuzione percentuale del tempo trascorso in ciascuna zona di frequenza cardiaca. Z1: Recupero, Z2: Aerobica, Z3: Soglia, Z4: Anaerobica, Z5: Massima.
+                      </div>
+                    </div>
+                  </div>
                   <div className="flex flex-col md:flex-row items-center gap-4">
                     <ResponsiveContainer width="100%" height={200}>
                       <PieChart>
@@ -228,7 +244,15 @@ export default function Statistics() {
                     border: "1px solid oklch(0.25 0.03 250)",
                   }}
                 >
-                  <h3 className="font-semibold mb-3">Distribuzione Pace</h3>
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="font-semibold">Distribuzione Pace</h3>
+                    <div className="group relative">
+                      <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)] cursor-help" />
+                      <div className="absolute left-0 top-6 w-72 p-2 bg-[oklch(0.20_0.03_250)] border border-[oklch(0.30_0.03_250)] rounded-lg text-xs text-[oklch(0.85_0.05_220)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                        Mostra quante sessioni hai completato in ciascun range di pace (min/100m). Ti aiuta a capire a quale velocità nuoti più frequentemente.
+                      </div>
+                    </div>
+                  </div>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={performance.paceDistribution}>
                       <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.25 0.03 250)" />
