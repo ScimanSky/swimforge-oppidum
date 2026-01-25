@@ -640,14 +640,31 @@ async def get_swimming_activities(
                                 if activity_id:
                                     hr_zones_response = client.get_activity_hr_in_timezones(activity_id)
                                     if hr_zones_response:
-                                        # Extract zone times in seconds
-                                        hr_zones_data = {
-                                            "zone1": hr_zones_response.get("zone1TimeInSeconds", 0),
-                                            "zone2": hr_zones_response.get("zone2TimeInSeconds", 0),
-                                            "zone3": hr_zones_response.get("zone3TimeInSeconds", 0),
-                                            "zone4": hr_zones_response.get("zone4TimeInSeconds", 0),
-                                            "zone5": hr_zones_response.get("zone5TimeInSeconds", 0)
-                                        }
+                                        # Handle both list and dict responses
+                                        if isinstance(hr_zones_response, list):
+                                            # If it's a list, convert it to a dict by zone number
+                                            hr_zones_data = {
+                                                "zone1": 0,
+                                                "zone2": 0,
+                                                "zone3": 0,
+                                                "zone4": 0,
+                                                "zone5": 0
+                                            }
+                                            for zone in hr_zones_response:
+                                                if isinstance(zone, dict):
+                                                    zone_num = zone.get("zoneNumber")
+                                                    time_in_seconds = zone.get("secsInZone", 0)
+                                                    if zone_num and 1 <= zone_num <= 5:
+                                                        hr_zones_data[f"zone{zone_num}"] = time_in_seconds
+                                        elif isinstance(hr_zones_response, dict):
+                                            # If it's a dict, extract directly
+                                            hr_zones_data = {
+                                                "zone1": hr_zones_response.get("zone1TimeInSeconds", 0),
+                                                "zone2": hr_zones_response.get("zone2TimeInSeconds", 0),
+                                                "zone3": hr_zones_response.get("zone3TimeInSeconds", 0),
+                                                "zone4": hr_zones_response.get("zone4TimeInSeconds", 0),
+                                                "zone5": hr_zones_response.get("zone5TimeInSeconds", 0)
+                                            }
                                         logger.info(f"HR zones for activity {activity_id}: {hr_zones_data}")
                             except Exception as hr_err:
                                 logger.warning(f"Could not fetch HR zones for activity {activity.get('activityId')}: {hr_err}")
@@ -697,6 +714,9 @@ async def get_activity_hr_zones(
         logger.info(f"Fetching HR zones for activity {activity_id}")
         hr_zones_response = client.get_activity_hr_in_timezones(activity_id)
         
+        logger.info(f"HR zones response type: {type(hr_zones_response)}")
+        logger.info(f"HR zones response: {hr_zones_response}")
+        
         if not hr_zones_response:
             return {
                 "zone1": 0,
@@ -706,13 +726,40 @@ async def get_activity_hr_zones(
                 "zone5": 0
             }
         
-        hr_zones_data = {
-            "zone1": hr_zones_response.get("zone1TimeInSeconds", 0),
-            "zone2": hr_zones_response.get("zone2TimeInSeconds", 0),
-            "zone3": hr_zones_response.get("zone3TimeInSeconds", 0),
-            "zone4": hr_zones_response.get("zone4TimeInSeconds", 0),
-            "zone5": hr_zones_response.get("zone5TimeInSeconds", 0)
-        }
+        # Handle both list and dict responses
+        if isinstance(hr_zones_response, list):
+            # If it's a list, convert it to a dict by zone number
+            hr_zones_data = {
+                "zone1": 0,
+                "zone2": 0,
+                "zone3": 0,
+                "zone4": 0,
+                "zone5": 0
+            }
+            for zone in hr_zones_response:
+                if isinstance(zone, dict):
+                    zone_num = zone.get("zoneNumber")
+                    time_in_seconds = zone.get("secsInZone", 0)
+                    if zone_num and 1 <= zone_num <= 5:
+                        hr_zones_data[f"zone{zone_num}"] = time_in_seconds
+        elif isinstance(hr_zones_response, dict):
+            # If it's a dict, extract directly
+            hr_zones_data = {
+                "zone1": hr_zones_response.get("zone1TimeInSeconds", 0),
+                "zone2": hr_zones_response.get("zone2TimeInSeconds", 0),
+                "zone3": hr_zones_response.get("zone3TimeInSeconds", 0),
+                "zone4": hr_zones_response.get("zone4TimeInSeconds", 0),
+                "zone5": hr_zones_response.get("zone5TimeInSeconds", 0)
+            }
+        else:
+            # Unknown format, return zeros
+            hr_zones_data = {
+                "zone1": 0,
+                "zone2": 0,
+                "zone3": 0,
+                "zone4": 0,
+                "zone5": 0
+            }
         
         logger.info(f"HR zones for activity {activity_id}: {hr_zones_data}")
         return hr_zones_data
