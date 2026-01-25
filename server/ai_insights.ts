@@ -189,11 +189,18 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
     const response = result.response;
     const text = response.text();
 
+    console.log(`[AI Insights] Raw response from Gemini (first 500 chars):`, text.substring(0, 500));
+
     // Parse insights (split by newlines, filter empty)
     const insights = text
       .split("\n")
       .map((line) => line.trim())
       .filter((line) => line.length > 0 && line.match(/^[🔥⚡💪🎯📈🏊🔄🌟🚀💯🏆❤️📊🎉👍🚀]/));
+
+    console.log(`[AI Insights] Parsed ${insights.length} insights from response`);
+    if (insights.length === 0) {
+      console.warn(`[AI Insights] No insights matched regex. Full response:`, text);
+    }
 
     // Return first 8 insights and save to cache
     if (insights.length > 0) {
