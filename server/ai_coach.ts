@@ -7,6 +7,13 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getDb } from "./db";
 import { aiCoachWorkouts } from "../drizzle/schema";
 import { eq, and, gt } from "drizzle-orm";
+import { 
+  calculateSEI, 
+  calculateTCI, 
+  calculateSER, 
+  calculateACS, 
+  calculateRRS 
+} from "./advanced_metrics";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
@@ -185,37 +192,44 @@ async function fetchUserStats(userId: number): Promise<any> {
     recentActivities.reduce((sum, a) => sum + (a.avgSwolf || 0), 0) /
     (recentActivities.length || 1);
 
-  // Calculate advanced metrics averages
-  const avgSEI =
-    recentActivities.reduce(
-      (sum, a) => sum + (a.strokeEfficiencyIndex || 0),
-      0
-    ) / (recentActivities.length || 1);
-  const avgTCI =
-    recentActivities.reduce(
-      (sum, a) => sum + (a.technicalConsistencyIndex || 0),
-      0
-    ) / (recentActivities.length || 1);
-  const avgSER =
-    recentActivities.reduce(
-      (sum, a) => sum + (a.strokeEfficiencyRatio || 0),
-      0
-    ) / (recentActivities.length || 1);
-  const avgACS =
-    recentActivities.reduce(
-      (sum, a) => sum + (a.aerobicCapacityScore || 0),
-      0
-    ) / (recentActivities.length || 1);
-  const avgRRS =
-    recentActivities.reduce(
-      (sum, a) => sum + (a.recoveryReadinessScore || 0),
-      0
-    ) / (recentActivities.length || 1);
-  const avgPOI =
-    recentActivities.reduce(
-      (sum, a) => sum + (a.performanceOptimizationIndex || 0),
-      0
-    ) / (recentActivities.length || 1);
+  // Calculate advanced metrics using same functions as Statistics
+  // SEI: Average across all activities
+  const seiScores = recentActivities
+    .map(a => calculateSEI(a))
+    .filter((s): s is number => s !== null);
+  const avgSEI = seiScores.length > 0
+    ? Math.round(seiScores.reduce((sum, s) => sum + s, 0) / seiScores.length)
+    : 0;
+
+  // TCI: Consistency across activities
+  const avgTCI = calculateTCI(recentActivities) || 0;
+
+  // SER: Average across all activities
+  const serScores = recentActivities
+    .map(a => calculateSER(a))
+    .filter((s): s is number => s !== null);
+  const avgSER = serScores.length > 0
+    ? Math.round(serScores.reduce((sum, s) => sum + s, 0) / serScores.length)
+    : 0;
+
+  // ACS: Average across all activities
+  const acsScores = recentActivities
+    .map(a => calculateACS(a))
+    .filter((s): s is number => s !== null);
+  const avgACS = acsScores.length > 0
+    ? Math.round(acsScores.reduce((sum, s) => sum + s, 0) / acsScores.length)
+    : 0;
+
+  // RRS: Average across all activities
+  const rrsScores = recentActivities
+    .map(a => calculateRRS(a))
+    .filter((s): s is number => s !== null);
+  const avgRRS = rrsScores.length > 0
+    ? Math.round(rrsScores.reduce((sum, s) => sum + s, 0) / rrsScores.length)
+    : 0;
+
+  // POI: Simplified (would need previous period for proper calculation)
+  const avgPOI = 0;
 
   // HR zones analysis - only from activities with HR data (using hrZoneXSeconds)
   const activitiesWithHR = recentActivities.filter(a => 
@@ -258,12 +272,12 @@ async function fetchUserStats(userId: number): Promise<any> {
       sessionsPerWeek: sessionsPerWeek.toFixed(1),
     },
     advancedMetrics: {
-      sei: avgSEI.toFixed(2),
-      tci: avgTCI.toFixed(2),
-      ser: avgSER.toFixed(2),
-      acs: avgACS.toFixed(2),
-      rrs: avgRRS.toFixed(2),
-      poi: avgPOI.toFixed(2),
+      sei: avgSEI,
+      tci: avgTCI,
+      ser: avgSER,
+      acs: avgACS,
+      rrs: avgRRS,
+      poi: avgPOI,
     },
     hrZones: {
       hasData: hasHRData,
@@ -290,7 +304,7 @@ async function fetchUserStats(userId: number): Promise<any> {
  * Build prompt for pool workout generation
  */
 function buildPoolWorkoutPrompt(userStats: any): string {
-  return `Sei un allenatore olimpico di nuoto esperto. Genera un allenamento personalizzato IN VASCA per un nuotatore basato sulle sue statistiche.
+  return `Sei un ALLENATORE OLIMPICO DI NUOTO con 20+ anni di esperienza nell'allenamento di atleti di livello mondiale. Genera un allenamento personalizzato IN VASCA completo e vario per un nuotatore basato sulle sue statistiche.
 
 **STATISTICHE NUOTATORE:**
 - Livello: ${userStats.profile.level}
@@ -317,20 +331,39 @@ ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
 - Zona 5 (Massimale): ${userStats.hrZones.zone5}%
 - Dati disponibili da ${userStats.hrZones.activitiesWithHR} attività` : '- Dati HR non disponibili (il nuotatore dovrebbe monitorare HR nelle prossime sessioni)'}
 
-**ISTRUZIONI:**
-1. Analizza TUTTE le metriche per identificare punti di forza e debolezza
-2. Crea un allenamento strutturato: Riscaldamento → Serie Principali → Defaticamento
-3. Includi esercizi tecnici specifici basati su SEI, TCI, SER
-4. Bilancia intensità basandoti su ACS, RRS${userStats.hrZones.hasData ? ', zone HR' : ''}
-5. **IMPORTANTE: Per ogni serie con ripetizioni (es. 4x100), specifica SEMPRE il tempo di ripartenza (es. "a 1:50", "a 1:20", "a 0:50") basandoti sul passo medio del nuotatore (${userStats.recent.avgPace} sec/100m). Aggiungi 10-20 secondi al passo per serie tecniche, 5-10 secondi per serie di resistenza.**
-6. **ATTREZZI: Includi nell'allenamento l'uso di attrezzi specifici:**
-   - **Pinne**: Per migliorare propulsione e tecnica di gambe (specialmente il venerdì)
-   - **Palette**: Per aumentare forza e migliorare la presa dell'acqua
-   - **Pull buoy**: Per isolare il lavoro delle braccia e migliorare la posizione
-   - **Tavoletta**: Per esercizi di gambe e tecnica
-   - Specifica l'attrezzo nel campo "equipment" di ogni esercizio che lo richiede
-7. Fornisci note tecniche dettagliate per ogni serie
-8. L'allenamento deve essere sfidante ma adatto al livello del nuotatore
+**ISTRUZIONI FONDAMENTALI:**
+
+1. **STRUTTURA ALLENAMENTO** (4 fasi obbligatorie):
+   - **Riscaldamento** (400-600m): Nuoto facile, mobilità articolare
+   - **Attivazione** (200-400m): Esercizi tecnici, drill, progressivi
+   - **Allenamento Principale** (1500-2500m): Serie intensive con obiettivi specifici
+   - **Defaticamento** (200-400m): Nuoto lento, stretching in acqua
+
+2. **VARIETÀ DI STILI** (OBBLIGATORIO):
+   - Includi ALMENO 3 stili diversi nell'allenamento: Stile Libero, Dorso, Rana, Farfalla
+   - Usa serie miste (es. "4x100 misti", "200 stile + 100 dorso")
+   - Varia gli stili nelle diverse fasi (riscaldamento, attivazione, principale)
+   - Focus principale su Stile Libero, ma integra altri stili per completezza
+
+3. **ANALISI METRICHE**:
+   - Se SEI, TCI, SER sono 0 o bassi: NON menzionare negativamente, concentrati su tecnica base e costruzione fondamentali
+   - Se metriche > 0: Usa per personalizzare esercizi tecnici specifici
+   - Bilancia intensità basandoti su ACS, RRS${userStats.hrZones.hasData ? ', zone HR' : ''}
+
+4. **TEMPI DI RIPARTENZA** (OBBLIGATORIO):
+   - Per ogni serie con ripetizioni (es. 4x100), specifica SEMPRE il tempo di ripartenza
+   - Formato: "a 1:50", "a 1:20", "a 0:50"
+   - Calcolo: Passo medio (${userStats.recent.avgPace} sec/100m) + 10-20 sec (tecnica) o + 5-10 sec (resistenza)
+
+5. **ATTREZZI** (usa frequentemente):
+   - **Pinne**: Propulsione, tecnica gambe (specialmente venerdì)
+   - **Palette**: Forza, presa acqua
+   - **Pull buoy**: Isolamento braccia, posizione
+   - **Tavoletta**: Gambe, tecnica
+
+6. **NOTE TECNICHE**: Fornisci indicazioni dettagliate per ogni serie (focus, respirazione, ritmo)
+
+7. **LIVELLO**: Allenamento sfidante ma adatto al nuotatore
 
 **FORMATO RICHIESTO (JSON):**
 {
