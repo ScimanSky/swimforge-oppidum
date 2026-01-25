@@ -230,8 +230,28 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
       return finalInsights;
     }
 
-    // Return empty array if parsing fails (no fallback)
-    console.warn("[AI Insights] Failed to parse AI response");
+    // If parsing fails, try to use cache as fallback
+    console.warn("[AI Insights] Failed to parse AI response, trying cache fallback");
+    try {
+      const cached = await db
+        .select()
+        .from(aiInsightsCache)
+        .where(
+          and(
+            eq(aiInsightsCache.userId, userId),
+            eq(aiInsightsCache.periodDays, userData.periodDays)
+          )
+        )
+        .limit(1);
+
+      if (cached.length > 0 && cached[0].insights.length > 0) {
+        console.log(`[AI Insights] Using cached insights (parsing failed) for user ${userId}`);
+        return cached[0].insights;
+      }
+    } catch (cacheError) {
+      console.warn("[AI Insights] Cache table not available for fallback");
+    }
+    
     return [];
   } catch (error) {
     console.error("[AI Insights] Error generating AI insights:", error);
