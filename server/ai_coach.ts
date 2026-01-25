@@ -217,27 +217,27 @@ async function fetchUserStats(userId: number): Promise<any> {
       0
     ) / (recentActivities.length || 1);
 
-  // HR zones analysis - only from activities with HR data
+  // HR zones analysis - only from activities with HR data (using hrZoneXSeconds)
   const activitiesWithHR = recentActivities.filter(a => 
-    (a.hrZone1Pct || 0) + (a.hrZone2Pct || 0) + (a.hrZone3Pct || 0) + (a.hrZone4Pct || 0) + (a.hrZone5Pct || 0) > 0
+    (a.hrZone1Seconds || 0) + (a.hrZone2Seconds || 0) + (a.hrZone3Seconds || 0) + (a.hrZone4Seconds || 0) + (a.hrZone5Seconds || 0) > 0
   );
   
   const hasHRData = activitiesWithHR.length > 0;
-  const avgHRZone1Pct = hasHRData
-    ? activitiesWithHR.reduce((sum, a) => sum + (a.hrZone1Pct || 0), 0) / activitiesWithHR.length
-    : 0;
-  const avgHRZone2Pct = hasHRData
-    ? activitiesWithHR.reduce((sum, a) => sum + (a.hrZone2Pct || 0), 0) / activitiesWithHR.length
-    : 0;
-  const avgHRZone3Pct = hasHRData
-    ? activitiesWithHR.reduce((sum, a) => sum + (a.hrZone3Pct || 0), 0) / activitiesWithHR.length
-    : 0;
-  const avgHRZone4Pct = hasHRData
-    ? activitiesWithHR.reduce((sum, a) => sum + (a.hrZone4Pct || 0), 0) / activitiesWithHR.length
-    : 0;
-  const avgHRZone5Pct = hasHRData
-    ? activitiesWithHR.reduce((sum, a) => sum + (a.hrZone5Pct || 0), 0) / activitiesWithHR.length
-    : 0;
+  
+  // Calculate total seconds in each zone across all activities with HR data
+  const zone1Total = activitiesWithHR.reduce((sum, a) => sum + (a.hrZone1Seconds || 0), 0);
+  const zone2Total = activitiesWithHR.reduce((sum, a) => sum + (a.hrZone2Seconds || 0), 0);
+  const zone3Total = activitiesWithHR.reduce((sum, a) => sum + (a.hrZone3Seconds || 0), 0);
+  const zone4Total = activitiesWithHR.reduce((sum, a) => sum + (a.hrZone4Seconds || 0), 0);
+  const zone5Total = activitiesWithHR.reduce((sum, a) => sum + (a.hrZone5Seconds || 0), 0);
+  const totalHRSeconds = zone1Total + zone2Total + zone3Total + zone4Total + zone5Total;
+  
+  // Convert to percentages
+  const avgHRZone1Pct = totalHRSeconds > 0 ? (zone1Total / totalHRSeconds) * 100 : 0;
+  const avgHRZone2Pct = totalHRSeconds > 0 ? (zone2Total / totalHRSeconds) * 100 : 0;
+  const avgHRZone3Pct = totalHRSeconds > 0 ? (zone3Total / totalHRSeconds) * 100 : 0;
+  const avgHRZone4Pct = totalHRSeconds > 0 ? (zone4Total / totalHRSeconds) * 100 : 0;
+  const avgHRZone5Pct = totalHRSeconds > 0 ? (zone5Total / totalHRSeconds) * 100 : 0;
 
   // Training frequency
   const sessionsPerWeek = (recentActivities.length / 30) * 7;
