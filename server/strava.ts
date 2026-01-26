@@ -444,6 +444,8 @@ export async function syncStravaActivities(
         const durationMinutes = activity.duration_seconds / 60;
         const xpEarned = Math.round((distanceKm * 100) + (durationMinutes * 5));
 
+        console.log(`[Strava] Importing activity ${activity.activity_id}: ${distanceKm}km, ${durationMinutes}min, ${xpEarned} XP`);
+
         // Insert activity
         await db.insert(swimmingActivities).values({
           userId,
@@ -465,6 +467,8 @@ export async function syncStravaActivities(
           createdAt: new Date(),
         });
 
+        console.log(`[Strava] Activity ${activity.activity_id} inserted successfully`);
+
         // Add XP transaction
         await db.insert(xpTransactions).values({
           userId,
@@ -473,6 +477,8 @@ export async function syncStravaActivities(
           description: `Attività nuoto: ${activity.activity_name}`,
           createdAt: new Date(),
         });
+
+        console.log(`[Strava] XP transaction created for activity ${activity.activity_id}`);
 
         importedCount++;
         totalNewXp += xpEarned;
