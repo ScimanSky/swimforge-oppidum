@@ -133,9 +133,9 @@ export function StravaSection() {
                   variant="outline" 
                   size="sm"
                   onClick={handleConnectStrava}
-                  disabled={isConnecting || getAuthorizeUrlQuery.isFetching}
+                  disabled={isConnecting || getAuthorizeUrlMutation.isPending}
                 >
-                  {isConnecting || getAuthorizeUrlQuery.isFetching ? (
+                  {isConnecting || getAuthorizeUrlMutation.isPending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     "Collega"
