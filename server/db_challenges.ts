@@ -118,8 +118,8 @@ export async function getActiveChallenges(userId: number): Promise<any[]> {
   await db.execute(sql`
     UPDATE challenges
     SET status = CASE
-      WHEN start_date <= NOW() AND end_date >= NOW() THEN 'active'::challenge_status
-      WHEN end_date < NOW() THEN 'completed'::challenge_status
+      WHEN start_date <= NOW() AND (end_date IS NULL OR end_date >= NOW()) THEN 'active'::challenge_status
+      WHEN end_date IS NOT NULL AND end_date < NOW() THEN 'completed'::challenge_status
       ELSE 'pending'::challenge_status
     END
     WHERE status != 'completed'::challenge_status
