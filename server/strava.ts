@@ -440,11 +440,27 @@ export async function syncStravaActivities(
         }
 
         // Calculate XP (same formula as Garmin)
-        const distanceKm = activity.distance_meters / 1000;
-        const durationMinutes = activity.duration_seconds / 60;
-        const xpEarned = Math.round((distanceKm * 100) + (durationMinutes * 5));
+        let xpEarned = 0;
+        
+        // Base XP: 1 XP per 100 meters
+        xpEarned += Math.floor(activity.distance_meters / 100);
+        
+        // Bonus for session completion
+        xpEarned += 50;
+        
+        // Bonus for longer sessions (over 3km)
+        if (activity.distance_meters >= 3000) {
+          xpEarned += 25;
+        }
+        
+        // Bonus for very long sessions (over 4km)
+        if (activity.distance_meters >= 4000) {
+          xpEarned += 25;
+        }
+        
+        // Note: Strava doesn't provide open water flag, so we can't add that bonus
 
-        console.log(`[Strava] Importing activity ${activity.activity_id}: ${distanceKm}km, ${durationMinutes}min, ${xpEarned} XP`);
+        console.log(`[Strava] Importing activity ${activity.activity_id}: ${activity.distance_meters}m, ${xpEarned} XP`);
 
         // Insert activity
         await db.insert(swimmingActivities).values({
