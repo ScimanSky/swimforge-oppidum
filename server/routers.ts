@@ -637,7 +637,8 @@ export const appRouter = router({
     }),
     
     getAuthorizeUrl: protectedProcedure.mutation(async ({ ctx }) => {
-      return await strava.getStravaAuthorizeUrl(ctx.user.id);
+      const authorizeUrl = await strava.getStravaAuthorizeUrl(ctx.user.id);
+      return { authorizeUrl };
     }),
     
     exchangeToken: protectedProcedure
