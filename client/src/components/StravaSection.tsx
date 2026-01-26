@@ -13,10 +13,8 @@ export function StravaSection() {
   // Get Strava status
   const { data: stravaStatus, isLoading: statusLoading } = trpc.strava.status.useQuery();
 
-  // Get authorize URL
-  const getAuthorizeUrlQuery = trpc.strava.getAuthorizeUrl.useQuery(undefined, {
-    enabled: false,
-  });
+  // Get authorize URL mutation
+  const getAuthorizeUrlMutation = trpc.strava.getAuthorizeUrl.useMutation();
 
   // Disconnect mutation
   const disconnectMutation = trpc.strava.disconnect.useMutation({
@@ -49,9 +47,9 @@ export function StravaSection() {
   const handleConnectStrava = async () => {
     try {
       setIsConnecting(true);
-      const result = await getAuthorizeUrlQuery.refetch();
-      if (result.data?.authorizeUrl) {
-        window.location.href = result.data.authorizeUrl;
+      const result = await getAuthorizeUrlMutation.mutateAsync();
+      if (result?.authorizeUrl) {
+        window.location.href = result.authorizeUrl;
       } else {
         toast.error("Errore nella generazione dell'URL di autorizzazione");
         setIsConnecting(false);
