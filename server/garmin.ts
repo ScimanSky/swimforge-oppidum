@@ -411,8 +411,8 @@ export async function syncGarminActivities(
 
     // Process each activity
     for (const activity of result.activities) {
-      // Check if activity already exists
-      const existing = await db
+      // Check if activity already exists (by Garmin ID)
+      const existingGarmin = await db
         .select()
         .from(swimmingActivities)
         .where(
@@ -423,12 +423,41 @@ export async function syncGarminActivities(
         )
         .limit(1);
 
-      if (existing.length > 0) {
+      if (existingGarmin.length > 0) {
         continue; // Skip already synced activities
       }
 
-      // Parse activity date
+      // Check for cross-platform duplicates (Strava)
+      // Match by timestamp (±5 min), distance (±10%), and duration (±10%)
       const activityDate = new Date(activity.start_time);
+      const timeWindowStart = new Date(activityDate.getTime() - 5 * 60 * 1000); // -5 min
+      const timeWindowEnd = new Date(activityDate.getTime() + 5 * 60 * 1000); // +5 min
+      const distanceMin = activity.distance_meters * 0.9;
+      const distanceMax = activity.distance_meters * 1.1;
+      const durationMin = activity.duration_seconds * 0.9;
+      const durationMax = activity.duration_seconds * 1.1;
+
+      const [existingCrossPlatform] = await db
+        .select()
+        .from(swimmingActivities)
+        .where(
+          and(
+            eq(swimmingActivities.userId, userId),
+            sql`${swimmingActivities.activityDate} >= ${timeWindowStart}`,
+            sql`${swimmingActivities.activityDate} <= ${timeWindowEnd}`,
+            sql`${swimmingActivities.distanceMeters} >= ${distanceMin}`,
+            sql`${swimmingActivities.distanceMeters} <= ${distanceMax}`,
+            sql`${swimmingActivities.durationSeconds} >= ${durationMin}`,
+            sql`${swimmingActivities.durationSeconds} <= ${durationMax}`,
+            eq(swimmingActivities.activitySource, "strava")
+          )
+        )
+        .limit(1);
+
+      if (existingCrossPlatform) {
+        console.log(`[Garmin] Activity ${activity.activity_id} is a duplicate of Strava activity ${existingCrossPlatform.id}, skipping`);
+        continue;
+      }
 
       // Calculate XP for this activity
       const activityXp = calculateActivityXp(activity);
