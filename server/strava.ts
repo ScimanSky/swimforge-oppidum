@@ -473,9 +473,8 @@ export async function syncStravaActivities(
         await db.insert(xpTransactions).values({
           userId,
           amount: xpEarned,
-          source: "swimming_activity",
-          description: `Attività nuoto: ${activity.activity_name}`,
-          createdAt: new Date(),
+          reason: "activity",
+          description: `Attività: ${activity.activity_name} - ${Math.round(activity.distance_meters)}m`,
         });
 
         console.log(`[Strava] XP transaction created for activity ${activity.activity_id}`);
