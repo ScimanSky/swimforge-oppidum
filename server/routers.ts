@@ -636,8 +636,8 @@ export const appRouter = router({
       return await strava.getStravaStatus(ctx.user.id);
     }),
     
-    getAuthorizeUrl: protectedProcedure.query(async () => {
-      return await strava.getStravaAuthorizeUrl();
+    getAuthorizeUrl: protectedProcedure.query(async ({ ctx }) => {
+      return await strava.getStravaAuthorizeUrl(ctx.user.id);
     }),
     
     exchangeToken: protectedProcedure
