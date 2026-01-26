@@ -64,7 +64,18 @@ export default function Home() {
         <div className="relative container py-20 md:py-32">
           <div className="flex flex-col items-center text-center">
             {/* Logo */}
-            {/* Logo rimosso - solo testo SwimForge */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="mb-6"
+            >
+              <img 
+                src="/swimforge-logo.png" 
+                alt="SwimForge Logo" 
+                className="h-24 md:h-32 w-auto"
+              />
+            </motion.div>
 
             {/* Title */}
             <motion.h1
