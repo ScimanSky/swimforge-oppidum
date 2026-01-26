@@ -1,5 +1,6 @@
 /**
  * Strava Integration Service
+ * Updated: 2026-01-26
  * 
  * This module handles the integration with Strava through a dedicated
  * Python microservice that uses the stravalib library.
