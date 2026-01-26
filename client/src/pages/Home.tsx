@@ -11,7 +11,10 @@ import {
   ChevronRight,
   Zap,
   Medal,
-  TrendingUp
+  TrendingUp,
+  Sparkles,
+  Award,
+  Activity
 } from "lucide-react";
 import { useLocation, Redirect } from "wouter";
 
@@ -29,30 +32,84 @@ export default function Home() {
       icon: Zap,
       title: "Guadagna XP",
       description: "Ogni metro nuotato ti avvicina al prossimo livello. Da Novizio a Poseidone!",
+      gradient: "from-yellow-500/10 to-orange-500/10",
+      iconColor: "text-yellow-500"
     },
     {
       icon: Medal,
       title: "Sblocca Badge",
       description: "40+ badge da collezionare per distanza, costanza, acque libere e traguardi speciali.",
+      gradient: "from-purple-500/10 to-pink-500/10",
+      iconColor: "text-purple-500"
     },
     {
       icon: TrendingUp,
       title: "Traccia i Progressi",
       description: "Sincronizza automaticamente i tuoi allenamenti da Garmin Connect.",
+      gradient: "from-cyan-500/10 to-blue-500/10",
+      iconColor: "text-cyan-500"
     },
     {
       icon: Users,
       title: "Sfida i Compagni",
       description: "Classifica interna per vedere chi è il nuotatore più dedicato della società.",
+      gradient: "from-green-500/10 to-emerald-500/10",
+      iconColor: "text-green-500"
     },
+  ];
+
+  const benefits = [
+    {
+      icon: Trophy,
+      title: "Sistema di Livelli",
+      description: "20 livelli progressivi che premiano la tua dedizione"
+    },
+    {
+      icon: Sparkles,
+      title: "Challenge Mensili",
+      description: "Obiettivi mensili per mantenere alta la motivazione"
+    },
+    {
+      icon: Award,
+      title: "Riconoscimenti",
+      description: "Badge esclusivi per traguardi speciali e milestone"
+    },
+    {
+      icon: Activity,
+      title: "Statistiche Dettagliate",
+      description: "Analisi approfondite dei tuoi progressi nel tempo"
+    }
   ];
 
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section */}
       <section className="relative overflow-hidden">
-        {/* Background gradient */}
+        {/* Animated gradient background */}
         <div className="absolute inset-0 bg-gradient-to-br from-[var(--navy)] via-[var(--navy-light)] to-[var(--azure)] opacity-95" />
+        
+        {/* Animated particles effect */}
+        <div className="absolute inset-0 overflow-hidden">
+          {[...Array(20)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute w-2 h-2 bg-white/20 rounded-full"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+              }}
+              animate={{
+                y: [0, -30, 0],
+                opacity: [0.2, 0.5, 0.2],
+              }}
+              transition={{
+                duration: 3 + Math.random() * 2,
+                repeat: Infinity,
+                delay: Math.random() * 2,
+              }}
+            />
+          ))}
+        </div>
         
         {/* Wave pattern overlay */}
         <div className="absolute inset-0 opacity-10">
@@ -63,26 +120,37 @@ export default function Home() {
 
         <div className="relative container py-20 md:py-32">
           <div className="flex flex-col items-center text-center">
-            {/* Logo */}
+            {/* Logo with pulse animation */}
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6, delay: 0.1 }}
-              className="mb-6"
+              className="mb-6 relative"
             >
+              <motion.div
+                className="absolute inset-0 bg-cyan-500/20 rounded-full blur-2xl"
+                animate={{
+                  scale: [1, 1.2, 1],
+                  opacity: [0.3, 0.5, 0.3],
+                }}
+                transition={{
+                  duration: 3,
+                  repeat: Infinity,
+                }}
+              />
               <img 
                 src="/swimforge-logo.png" 
                 alt="SwimForge Logo" 
-                className="h-24 md:h-32 w-auto"
+                className="h-24 md:h-32 w-auto relative z-10"
               />
             </motion.div>
 
-            {/* Title */}
+            {/* Title with gradient */}
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.2 }}
-              className="text-4xl md:text-6xl font-bold text-white mb-4"
+              className="text-5xl md:text-7xl font-bold text-white mb-4 bg-gradient-to-r from-white via-cyan-200 to-white bg-clip-text text-transparent"
             >
               SwimForge
             </motion.h1>
@@ -91,7 +159,7 @@ export default function Home() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.3 }}
-              className="text-xl md:text-2xl text-white/90 mb-2"
+              className="text-xl md:text-3xl text-white/90 mb-3 font-semibold"
             >
               Forgia il tuo percorso, vasca dopo vasca
             </motion.p>
@@ -100,45 +168,63 @@ export default function Home() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.4 }}
-              className="text-lg text-white/70 mb-8 max-w-2xl"
+              className="text-lg md:text-xl text-white/70 mb-10 max-w-2xl"
             >
               La piattaforma esclusiva per nuotatori di tutte le età.
-              Trasforma ogni allenamento in un'avventura.
+              Trasforma ogni allenamento in un'avventura epica.
             </motion.p>
 
-            {/* CTA Button */}
+            {/* CTA Button with enhanced animation */}
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6, delay: 0.5 }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
             >
               <Link href="/auth">
                 <Button
                   size="lg"
-                  className="bg-[var(--gold)] hover:bg-[var(--gold-light)] text-[var(--navy)] font-semibold text-lg px-8 py-6 rounded-xl shadow-lg hover:shadow-xl transition-all"
+                  className="bg-[var(--gold)] hover:bg-[var(--gold-light)] text-[var(--navy)] font-bold text-lg px-10 py-7 rounded-2xl shadow-2xl hover:shadow-[0_0_30px_rgba(251,191,36,0.5)] transition-all relative overflow-hidden group"
                 >
-                  Inizia l'Avventura
-                  <ChevronRight className="ml-2 h-5 w-5" />
+                  <span className="relative z-10 flex items-center">
+                    Inizia l'Avventura
+                    <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                  </span>
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-yellow-400 to-orange-400"
+                    initial={{ x: "-100%" }}
+                    whileHover={{ x: "100%" }}
+                    transition={{ duration: 0.6 }}
+                  />
                 </Button>
               </Link>
             </motion.div>
 
-            {/* Stats preview */}
+            {/* Enhanced stats preview */}
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6, delay: 0.7 }}
-              className="mt-12 grid grid-cols-3 gap-8 md:gap-16"
+              className="mt-16 grid grid-cols-3 gap-8 md:gap-20"
             >
               {[
-                { value: "20", label: "Livelli" },
-                { value: "40+", label: "Badge" },
-                { value: "∞", label: "XP da guadagnare" },
+                { value: "20", label: "Livelli", icon: Trophy },
+                { value: "40+", label: "Badge", icon: Medal },
+                { value: "∞", label: "XP da guadagnare", icon: Zap },
               ].map((stat, i) => (
-                <div key={i} className="text-center">
-                  <div className="text-3xl md:text-4xl font-bold text-[var(--gold)]">{stat.value}</div>
-                  <div className="text-sm text-white/70">{stat.label}</div>
-                </div>
+                <motion.div 
+                  key={i} 
+                  className="text-center"
+                  whileHover={{ scale: 1.1 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
+                  <div className="flex justify-center mb-2">
+                    <stat.icon className="h-6 w-6 md:h-8 md:w-8 text-[var(--gold)]" />
+                  </div>
+                  <div className="text-4xl md:text-5xl font-bold text-[var(--gold)] mb-1">{stat.value}</div>
+                  <div className="text-sm md:text-base text-white/70 font-medium">{stat.label}</div>
+                </motion.div>
               ))}
             </motion.div>
           </div>
@@ -152,21 +238,31 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Features Section */}
-      <section className="py-16 md:py-24">
+      {/* Features Section - Enhanced */}
+      <section className="py-20 md:py-28">
         <div className="container">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="text-center mb-12"
+            className="text-center mb-16"
           >
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            <motion.div
+              initial={{ scale: 0 }}
+              whileInView={{ scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--azure)]/10 border border-[var(--azure)]/20 mb-6"
+            >
+              <Sparkles className="h-4 w-4 text-[var(--azure)]" />
+              <span className="text-sm font-semibold text-[var(--azure)]">Funzionalità Principali</span>
+            </motion.div>
+            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
               Come Funziona
             </h2>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              SwimForge trasforma i tuoi allenamenti in un'esperienza di gioco coinvolgente
+            <p className="text-muted-foreground text-lg md:text-xl max-w-3xl mx-auto">
+              SwimForge trasforma i tuoi allenamenti in un'esperienza di gioco coinvolgente e motivante
             </p>
           </motion.div>
 
@@ -178,14 +274,20 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
+                whileHover={{ y: -8 }}
               >
-                <Card className="h-full card-hover border-border/50 bg-card">
-                  <CardContent className="p-6">
-                    <div className="w-12 h-12 rounded-xl bg-[var(--azure)]/10 flex items-center justify-center mb-4">
-                      <feature.icon className="h-6 w-6 text-[var(--azure)]" />
-                    </div>
-                    <h3 className="font-semibold text-lg mb-2 text-card-foreground">{feature.title}</h3>
-                    <p className="text-muted-foreground text-sm">{feature.description}</p>
+                <Card className={`h-full card-hover border-border/50 bg-gradient-to-br ${feature.gradient} backdrop-blur-sm relative overflow-hidden group`}>
+                  <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <CardContent className="p-6 relative z-10">
+                    <motion.div 
+                      className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${feature.gradient} flex items-center justify-center mb-5 shadow-lg`}
+                      whileHover={{ rotate: 360 }}
+                      transition={{ duration: 0.6 }}
+                    >
+                      <feature.icon className={`h-7 w-7 ${feature.iconColor}`} />
+                    </motion.div>
+                    <h3 className="font-bold text-xl mb-3 text-card-foreground">{feature.title}</h3>
+                    <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -194,54 +296,51 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Levels Preview Section */}
-      <section className="py-16 bg-muted/30">
+      {/* Benefits Section - NEW */}
+      <section className="py-20 bg-gradient-to-b from-muted/30 to-background">
         <div className="container">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="text-center mb-12"
+            className="text-center mb-16"
           >
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-              Il Tuo Percorso
+            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
+              Perché SwimForge?
             </h2>
-            <p className="text-muted-foreground text-lg">
-              Da Novizio a Poseidone: 20 livelli di crescita
+            <p className="text-muted-foreground text-lg md:text-xl max-w-3xl mx-auto">
+              Un sistema completo per monitorare, migliorare e celebrare i tuoi progressi
             </p>
           </motion.div>
 
-          <div className="flex flex-wrap justify-center gap-3 max-w-4xl mx-auto">
-            {[
-              { level: 1, title: "Novizio", color: "#9ca3af" },
-              { level: 5, title: "Atleta", color: "#3b82f6" },
-              { level: 10, title: "Gran Maestro", color: "#f59e0b" },
-              { level: 15, title: "Mito", color: "#06b6d4" },
-              { level: 20, title: "Poseidone", color: "#1e40af" },
-            ].map((level, index) => (
+          <div className="grid md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+            {benefits.map((benefit, index) => (
               <motion.div
-                key={level.level}
-                initial={{ opacity: 0, scale: 0.8 }}
-                whileInView={{ opacity: 1, scale: 1 }}
+                key={benefit.title}
+                initial={{ opacity: 0, x: index % 2 === 0 ? -20 : 20 }}
+                whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.4, delay: index * 0.1 }}
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border shadow-sm"
+                transition={{ duration: 0.5, delay: index * 0.1 }}
               >
-                <div 
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                  style={{ backgroundColor: level.color }}
-                >
-                  {level.level}
-                </div>
-                <span className="font-medium text-card-foreground">{level.title}</span>
+                <Card className="border-border/50 bg-card/50 backdrop-blur-sm hover:bg-card transition-colors">
+                  <CardContent className="p-6 flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-[var(--azure)]/10 flex items-center justify-center flex-shrink-0">
+                      <benefit.icon className="h-6 w-6 text-[var(--azure)]" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg mb-2 text-card-foreground">{benefit.title}</h3>
+                      <p className="text-muted-foreground">{benefit.description}</p>
+                    </div>
+                  </CardContent>
+                </Card>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* Levels Preview Section - Enhanced */}
       <section className="py-20">
         <div className="container">
           <motion.div
@@ -249,39 +348,112 @@ export default function Home() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="text-center"
+            className="text-center mb-16"
           >
-            <Waves className="h-12 w-12 text-[var(--azure)] mx-auto mb-6" />
-            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
+              Il Tuo Percorso di Crescita
+            </h2>
+            <p className="text-muted-foreground text-lg md:text-xl max-w-3xl mx-auto">
+              Da Novizio a Poseidone: 20 livelli progressivi che premiano la tua dedizione
+            </p>
+          </motion.div>
+
+          <div className="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto">
+            {[
+              { level: 1, title: "Novizio", color: "#9ca3af", description: "Inizio del viaggio" },
+              { level: 5, title: "Atleta", color: "#3b82f6", description: "Costanza premiata" },
+              { level: 10, title: "Gran Maestro", color: "#f59e0b", description: "Esperienza consolidata" },
+              { level: 15, title: "Mito", color: "#06b6d4", description: "Leggenda vivente" },
+              { level: 20, title: "Poseidone", color: "#1e40af", description: "Dio del mare" },
+            ].map((level, index) => (
+              <motion.div
+                key={level.level}
+                initial={{ opacity: 0, scale: 0.8 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: index * 0.1 }}
+                whileHover={{ scale: 1.05, y: -5 }}
+                className="flex flex-col items-center gap-3 px-6 py-4 rounded-2xl bg-card border border-border shadow-lg hover:shadow-xl transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <motion.div 
+                    className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-lg"
+                    style={{ backgroundColor: level.color }}
+                    whileHover={{ rotate: 360 }}
+                    transition={{ duration: 0.6 }}
+                  >
+                    {level.level}
+                  </motion.div>
+                  <div className="text-left">
+                    <div className="font-bold text-lg text-card-foreground">{level.title}</div>
+                    <div className="text-xs text-muted-foreground">{level.description}</div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA Section - Enhanced */}
+      <section className="py-24 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--navy)]/5 to-[var(--azure)]/5" />
+        <div className="container relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-center max-w-3xl mx-auto"
+          >
+            <motion.div
+              animate={{
+                y: [0, -10, 0],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+              }}
+            >
+              <Waves className="h-16 w-16 text-[var(--azure)] mx-auto mb-8" />
+            </motion.div>
+            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
               Pronto a Tuffarti?
             </h2>
-            <p className="text-muted-foreground text-lg mb-8 max-w-xl mx-auto">
+            <p className="text-muted-foreground text-lg md:text-xl mb-10">
               Unisciti ai tuoi compagni di squadra e inizia a guadagnare XP oggi stesso.
+              La tua avventura acquatica ti aspetta!
             </p>
-            <Link href="/auth">
-              <Button
-                size="lg"
-                className="bg-[var(--navy)] hover:bg-[var(--navy-light)] text-white font-semibold text-lg px-8 py-6 rounded-xl"
-              >
-                Accedi o Registrati
-                <ChevronRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <Link href="/auth">
+                <Button
+                  size="lg"
+                  className="bg-[var(--navy)] hover:bg-[var(--navy-light)] text-white font-bold text-lg px-10 py-7 rounded-2xl shadow-xl hover:shadow-2xl transition-all"
+                >
+                  Accedi o Registrati
+                  <ChevronRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+            </motion.div>
           </motion.div>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-8 border-t border-border">
+      {/* Footer - Enhanced */}
+      <footer className="py-10 border-t border-border bg-muted/30">
         <div className="container">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">
+              <img src="/swimforge-logo.png" alt="SwimForge" className="h-8 w-auto" />
+              <span className="text-sm text-muted-foreground font-medium">
                 SwimForge © {new Date().getFullYear()}
               </span>
             </div>
-            <div className="text-sm text-muted-foreground">
-              Nuota. Guadagna. Conquista.
+            <div className="text-sm text-muted-foreground font-semibold">
+              🏊‍♂️ Nuota. Guadagna. Conquista.
             </div>
           </div>
         </div>
