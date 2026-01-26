@@ -1,14 +1,21 @@
 import { useState } from "react";
-import { trpc } from "../lib/trpc";
+import { trpc } from "@/lib/trpc";
 import { motion } from "framer-motion";
-import { Activity, CheckCircle, XCircle, Loader2, Settings as SettingsIcon } from "lucide-react";
-import Layout from "../components/Layout";
+import { Activity, CheckCircle, XCircle, Loader2, Settings as SettingsIcon, ChevronLeft } from "lucide-react";
+import { useLocation, Link } from "wouter";
+import MobileNav from "@/components/MobileNav";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Settings() {
   const [isConnecting, setIsConnecting] = useState(false);
+  const { user, isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
   
   // Get Strava status
-  const { data: stravaStatus, isLoading: statusLoading, refetch } = trpc.strava.status.useQuery();
+  const { data: stravaStatus, isLoading: statusLoading, refetch } = trpc.strava.status.useQuery(
+    undefined,
+    { enabled: isAuthenticated }
+  );
   
   // Get authorize URL
   const getAuthorizeUrlQuery = trpc.strava.getAuthorizeUrl.useQuery(undefined, {
@@ -42,64 +49,81 @@ export default function Settings() {
     }
   };
 
-  return (
-    <Layout>
-      <div className="max-w-4xl mx-auto p-6">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-            <SettingsIcon className="w-8 h-8" />
-            Impostazioni
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-2">
-            Gestisci le tue integrazioni e preferenze
-          </p>
-        </div>
+  if (!isAuthenticated) {
+    setLocation("/auth");
+    return null;
+  }
 
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 pb-20">
+      {/* Header */}
+      <div className="sticky top-0 z-40 bg-gray-900/80 backdrop-blur-lg border-b border-gray-800">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard">
+              <button className="p-2 hover:bg-gray-800 rounded-lg transition">
+                <ChevronLeft className="w-6 h-6 text-white" />
+              </button>
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+                <SettingsIcon className="w-7 h-7" />
+                Impostazioni
+              </h1>
+              <p className="text-sm text-gray-400 mt-1">
+                Gestisci le tue integrazioni
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-4xl mx-auto p-4 pt-6">
         {/* Strava Integration Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-lg border border-gray-200 dark:border-gray-700"
+          className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-6 shadow-xl border border-gray-700"
         >
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-4">
-              <div className="p-3 bg-orange-100 dark:bg-orange-900/30 rounded-xl">
-                <Activity className="w-8 h-8 text-orange-600 dark:text-orange-400" />
+          <div className="flex items-start justify-between flex-col sm:flex-row gap-4">
+            <div className="flex items-start gap-4 flex-1">
+              <div className="p-3 bg-orange-500/20 rounded-xl">
+                <Activity className="w-8 h-8 text-orange-400" />
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              <div className="flex-1">
+                <h2 className="text-xl font-bold text-white mb-2">
                   Integrazione Strava
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
+                <p className="text-gray-400 mb-4 text-sm">
                   Connetti il tuo account Strava per sincronizzare automaticamente le tue attività di nuoto
                 </p>
 
                 {/* Status */}
                 {statusLoading ? (
-                  <div className="flex items-center gap-2 text-gray-500">
+                  <div className="flex items-center gap-2 text-gray-400">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Caricamento...</span>
+                    <span className="text-sm">Caricamento...</span>
                   </div>
                 ) : stravaStatus?.connected ? (
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                    <div className="flex items-center gap-2 text-green-400">
                       <CheckCircle className="w-5 h-5" />
                       <span className="font-medium">Connesso</span>
                     </div>
                     {stravaStatus.displayName && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Account: <span className="font-medium">{stravaStatus.displayName}</span>
+                      <p className="text-sm text-gray-400">
+                        Account: <span className="font-medium text-white">{stravaStatus.displayName}</span>
                       </p>
                     )}
                     {stravaStatus.lastSync && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-gray-400">
                         Ultima sincronizzazione: {new Date(stravaStatus.lastSync).toLocaleString('it-IT')}
                       </p>
                     )}
                   </div>
                 ) : (
-                  <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center gap-2 text-gray-400">
                     <XCircle className="w-5 h-5" />
                     <span>Non connesso</span>
                   </div>
@@ -108,12 +132,12 @@ export default function Settings() {
             </div>
 
             {/* Action Button */}
-            <div>
+            <div className="w-full sm:w-auto">
               {stravaStatus?.connected ? (
                 <button
                   onClick={handleDisconnectStrava}
                   disabled={disconnectMutation.isPending}
-                  className="px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {disconnectMutation.isPending ? "Disconnessione..." : "Disconnetti"}
                 </button>
@@ -121,16 +145,16 @@ export default function Settings() {
                 <button
                   onClick={handleConnectStrava}
                   disabled={isConnecting || getAuthorizeUrlQuery.isFetching}
-                  className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="w-full sm:w-auto px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isConnecting || getAuthorizeUrlQuery.isFetching ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-5 h-5 animate-spin" />
                       Connessione...
                     </>
                   ) : (
                     <>
-                      <Activity className="w-4 h-4" />
+                      <Activity className="w-5 h-5" />
                       Connetti Strava
                     </>
                   )}
@@ -140,16 +164,16 @@ export default function Settings() {
           </div>
 
           {/* Info Box */}
-          <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-            <p className="text-sm text-blue-900 dark:text-blue-100">
+          <div className="mt-6 p-4 bg-blue-500/10 rounded-xl border border-blue-500/30">
+            <p className="text-sm text-blue-200">
               <strong>Nota:</strong> Dopo aver connesso Strava, le tue attività di nuoto verranno sincronizzate automaticamente ogni 6 ore quando effettui il login.
             </p>
           </div>
         </motion.div>
-
-        {/* Future sections can be added here */}
-        {/* Example: Notifications, Privacy, Account */}
       </div>
-    </Layout>
+
+      {/* Mobile Navigation */}
+      <MobileNav />
+    </div>
   );
 }
