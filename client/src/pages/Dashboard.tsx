@@ -117,8 +117,8 @@ export default function Dashboard() {
       <main className="container py-6 space-y-6">
         {/* Welcome & Level Card */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, y: 30, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.5 }}
           whileHover={{ scale: 1.02, y: -5 }}
           style={{ transformStyle: "preserve-3d" }}
@@ -244,8 +244,9 @@ export default function Dashboard() {
           ].map((stat, index) => (
             <motion.div 
               key={stat.label} 
-              className="stat-card"
-              whileHover={{ scale: 1.05, y: -5 }}
+              className="stat-card bg-[oklch(0.18_0.03_250)] p-4 rounded-xl border border-[oklch(0.30_0.04_250)] text-center cursor-pointer"
+              whileHover={{ scale: 1.05, rotateY: 5 }}
+              whileTap={{ scale: 0.98 }}
               transition={{ type: "spring", stiffness: 300 }}
             >
               <motion.div 
@@ -411,6 +412,7 @@ export default function Dashboard() {
                     key={challenge.id} 
                     className="p-3 rounded-lg bg-[oklch(0.18_0.03_250)] border border-[oklch(0.30_0.04_250)] cursor-pointer"
                     whileHover={{ scale: 1.03, x: 5 }}
+                    whileTap={{ scale: 0.97 }}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.1, type: "spring", stiffness: 300 }}
@@ -504,7 +506,8 @@ export default function Dashboard() {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.1 }}
-                    whileHover={{ scale: 1.02, x: 5 }}
+                    whileHover={{ scale: 1.03, x: 5 }}
+                  whileTap={{ scale: 0.97 }}
                   >
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${

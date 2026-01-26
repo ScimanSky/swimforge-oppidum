@@ -213,10 +213,11 @@ export default function Leaderboard() {
               return (
                 <motion.div
                   key={entry.id || index}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
+                  initial={{ opacity: 0, x: -30, scale: 0.95 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  transition={{ delay: index * 0.05, type: "spring", stiffness: 200 }}
                   whileHover={{ scale: 1.02, x: 5 }}
+                  whileTap={{ scale: 0.98 }}
                 >
                   <Card className={`${isCurrentUser ? "ring-2 ring-[var(--azure)] bg-[var(--azure)]/5" : ""}`}>
                     <CardContent className="p-4">

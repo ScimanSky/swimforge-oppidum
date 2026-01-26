@@ -307,10 +307,11 @@ export default function Activities() {
             {activities.map((activity, index) => (
               <motion.div
                 key={activity.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
+                initial={{ opacity: 0, x: -30, scale: 0.95 }}
+                animate={{ opacity: 1, x: 0, scale: 1 }}
+                transition={{ delay: index * 0.05, type: "spring", stiffness: 200 }}
                 whileHover={{ scale: 1.02, x: 5 }}
+                whileTap={{ scale: 0.98 }}
               >
                 <Card className="overflow-hidden cursor-pointer">
                   <CardContent className="p-4">

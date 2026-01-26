@@ -277,10 +277,11 @@ export default function Challenges() {
             {challenges.map((challenge: any, idx: number) => (
               <motion.div
                 key={challenge.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.1 }}
+                initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: idx * 0.1, type: "spring", stiffness: 200 }}
                 whileHover={{ scale: 1.02, y: -5 }}
+                whileTap={{ scale: 0.98 }}
                 className="neon-card p-6 cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-4">

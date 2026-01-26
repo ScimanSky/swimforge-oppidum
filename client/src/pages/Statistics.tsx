@@ -121,9 +121,9 @@ export default function Statistics() {
             {/* Progress Timeline */}
             <motion.section 
               className="space-y-3"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
+              initial={{ opacity: 0, y: 30, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
             >
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold text-[oklch(0.85_0.05_220)]">
@@ -187,9 +187,9 @@ export default function Statistics() {
             {/* Analisi Prestazioni */}
             <motion.section 
               className="space-y-3"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+              initial={{ opacity: 0, y: 30, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
             >
               <h2 className="text-lg font-semibold text-[oklch(0.85_0.05_220)]">
                 ━━━ ANALISI PRESTAZIONI ━━━
@@ -343,9 +343,9 @@ export default function Statistics() {
             {advanced && (
               <motion.section 
                 className="space-y-3"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
+                initial={{ opacity: 0, y: 30, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
               >
                 <h2 className="text-lg font-semibold text-[oklch(0.85_0.05_220)]">
                   ━━━ ANALISI AVANZATE ━━━
