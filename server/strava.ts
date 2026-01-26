@@ -397,10 +397,10 @@ export async function syncStravaActivities(
         const activityDate = new Date(activity.start_time);
         const timeWindowStart = new Date(activityDate.getTime() - 5 * 60 * 1000); // -5 min
         const timeWindowEnd = new Date(activityDate.getTime() + 5 * 60 * 1000); // +5 min
-        const distanceMin = activity.distance_meters * 0.9;
-        const distanceMax = activity.distance_meters * 1.1;
-        const durationMin = activity.duration_seconds * 0.9;
-        const durationMax = activity.duration_seconds * 1.1;
+        const distanceMin = Math.floor(activity.distance_meters * 0.9);
+        const distanceMax = Math.ceil(activity.distance_meters * 1.1);
+        const durationMin = Math.floor(activity.duration_seconds * 0.9);
+        const durationMax = Math.ceil(activity.duration_seconds * 1.1);
 
         const [existingCrossPlatform] = await db
           .select()
