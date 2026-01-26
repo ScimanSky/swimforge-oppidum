@@ -31,11 +31,38 @@ export default function ChallengeDetail() {
         endDate = new Date(challenge.end_date);
       }
       
-      // Check if date is valid
+      // Check if date is valid - if not, calculate from start_date + duration
       if (isNaN(endDate.getTime())) {
-        console.error('Invalid end_date:', challenge.end_date);
-        setTimeLeft("Data non valida");
-        return;
+        console.warn('Invalid end_date, calculating from start_date + duration:', challenge.end_date);
+        
+        // Parse start date
+        const startDate = new Date(challenge.start_date);
+        if (isNaN(startDate.getTime())) {
+          console.error('Invalid start_date:', challenge.start_date);
+          setTimeLeft("Data non valida");
+          return;
+        }
+        
+        // Calculate end date based on duration
+        endDate = new Date(startDate);
+        switch (challenge.duration) {
+          case '3_days':
+            endDate.setDate(endDate.getDate() + 3);
+            break;
+          case '1_week':
+            endDate.setDate(endDate.getDate() + 7);
+            break;
+          case '2_weeks':
+            endDate.setDate(endDate.getDate() + 14);
+            break;
+          case '1_month':
+            endDate.setMonth(endDate.getMonth() + 1);
+            break;
+          default:
+            console.error('Unknown duration:', challenge.duration);
+            setTimeLeft("Data non valida");
+            return;
+        }
       }
       
       const diff = endDate.getTime() - now.getTime();
