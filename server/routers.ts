@@ -7,6 +7,7 @@ import { z } from "zod";
 import * as db from "./db";
 import { getDb } from "./db";
 import * as garmin from "./garmin";
+import * as strava from "./strava";
 import { sql } from "drizzle-orm";
 import { swimmerProfiles } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
@@ -627,6 +628,33 @@ export const appRouter = router({
     migrateHrZones: protectedProcedure.mutation(async ({ ctx }) => {
       return await garmin.migrateHrZones(ctx.user.id);
     }),
+  }),
+
+  // Strava Integration
+  strava: router({
+    status: protectedProcedure.query(async ({ ctx }) => {
+      return await strava.getStravaStatus(ctx.user.id);
+    }),
+    
+    getAuthorizeUrl: protectedProcedure.query(async () => {
+      return await strava.getStravaAuthorizeUrl();
+    }),
+    
+    exchangeToken: protectedProcedure
+      .input(z.object({ code: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        return await strava.exchangeStravaToken(ctx.user.id, input.code);
+      }),
+    
+    disconnect: protectedProcedure.mutation(async ({ ctx }) => {
+      return await strava.disconnectStrava(ctx.user.id);
+    }),
+    
+    sync: protectedProcedure
+      .input(z.object({ daysBack: z.number().min(1).max(365).default(7) }))
+      .mutation(async ({ ctx, input }) => {
+        return await strava.syncStravaActivities(ctx.user.id, input.daysBack);
+      }),
   }),
 
   // Challenges: User challenges system

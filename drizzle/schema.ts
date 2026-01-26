@@ -44,6 +44,7 @@ export const swimmerProfiles = pgTable("swimmer_profiles", {
   garminTokenEncrypted: text("garmin_token_encrypted"),
   garminLastSync: timestamp("garmin_last_sync"),
   lastGarminSyncAt: timestamp("last_garmin_sync_at"),
+  stravaConnected: boolean("strava_connected").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -55,6 +56,9 @@ export const swimmingActivities = pgTable("swimming_activities", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   garminActivityId: varchar("garmin_activity_id", { length: 64 }),
+  stravaActivityId: varchar("strava_activity_id", { length: 64 }),
+  activitySource: varchar("activity_source", { length: 20 }).default("manual"), // 'manual', 'garmin', 'strava'
+  activityName: varchar("activity_name", { length: 255 }),
   activityDate: timestamp("activity_date").notNull(),
   distanceMeters: integer("distance_meters").notNull(),
   durationSeconds: integer("duration_seconds").notNull(),
@@ -194,6 +198,23 @@ export const garminTokens = pgTable("garmin_tokens", {
   oauth2Token: text("oauth2_token"),
   tokenExpiresAt: timestamp("token_expires_at"),
   lastSyncAt: timestamp("last_sync_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// STRAVA TOKENS
+// ============================================
+export const stravaTokens = pgTable("strava_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().unique(),
+  accessToken: text("access_token").notNull(),
+  refreshToken: text("refresh_token").notNull(),
+  expiresAt: integer("expires_at"), // Unix timestamp
+  athleteId: integer("athlete_id"),
+  username: varchar("username", { length: 255 }),
+  displayName: varchar("display_name", { length: 255 }),
+  lastSync: timestamp("last_sync"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
