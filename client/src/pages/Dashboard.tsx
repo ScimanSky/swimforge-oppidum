@@ -102,7 +102,7 @@ export default function Dashboard() {
         <div className="container py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <img src="/swimforge-logo.png" alt="SwimForge" className="h-8 w-auto" />
+              <img src="/swimforge-logo.png" alt="SwimForge" className="h-12 w-auto" />
               <span className="font-bold text-lg text-[oklch(0.95_0.01_220)]">SwimForge</span>
             </div>
 

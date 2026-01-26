@@ -144,7 +144,7 @@ export default function Home() {
               <img 
                 src="/swimforge-logo.png" 
                 alt="SwimForge Logo" 
-                className="h-24 md:h-32 w-auto relative z-10"
+                className="h-32 md:h-48 w-auto relative z-10"
               />
             </motion.div>
 
@@ -553,7 +553,7 @@ export default function Home() {
         <div className="container">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <img src="/swimforge-logo.png" alt="SwimForge" className="h-8 w-auto" />
+              <img src="/swimforge-logo.png" alt="SwimForge" className="h-12 w-auto" />
               <span className="text-sm text-muted-foreground font-medium">
                 SwimForge © {new Date().getFullYear()}
               </span>
