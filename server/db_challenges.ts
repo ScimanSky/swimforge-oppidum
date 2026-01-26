@@ -149,6 +149,8 @@ export async function getActiveChallenges(userId: number): Promise<any[]> {
     FROM challenges c
     LEFT JOIN challenge_participants cp ON c.id = cp.challenge_id AND cp.user_id = ${userId}
     WHERE c.status IN ('pending', 'active')
+      AND c.start_date IS NOT NULL
+      AND c.end_date IS NOT NULL
     ORDER BY c.start_date DESC
   `);
 

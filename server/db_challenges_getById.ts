@@ -7,14 +7,41 @@ export async function getChallengeById(challengeId: number) {
   const db = await getDb();
   if (!db) return null;
 
-  // Get challenge details
-  const challenge = await db
-    .select()
+  // Get challenge details with explicit field mapping
+  const challengeResult = await db
+    .select({
+      id: challenges.id,
+      name: challenges.name,
+      description: challenges.description,
+      creator_id: challenges.creatorId,
+      type: challenges.type,
+      objective: challenges.objective,
+      duration: challenges.duration,
+      start_date: challenges.startDate,
+      end_date: challenges.endDate,
+      status: challenges.status,
+      min_participants: challenges.minParticipants,
+      max_participants: challenges.maxParticipants,
+      badge_image_url: challenges.badgeImageUrl,
+      badge_name: challenges.badgeName,
+      prize_description: challenges.prizeDescription,
+      rules: challenges.rules,
+      created_at: challenges.createdAt,
+      updated_at: challenges.updatedAt,
+    })
     .from(challenges)
     .where(eq(challenges.id, challengeId))
     .limit(1);
 
-  if (!challenge || challenge.length === 0) {
+  if (!challengeResult || challengeResult.length === 0) {
+    return null;
+  }
+
+  const challenge = challengeResult[0];
+
+  // Validate dates - if NULL, skip this challenge
+  if (!challenge.start_date || !challenge.end_date) {
+    console.warn(`[getChallengeById] Challenge ${challengeId} has NULL dates, skipping`);
     return null;
   }
 
@@ -43,7 +70,7 @@ export async function getChallengeById(challengeId: number) {
   const participants = participantsResult.rows as any[];
 
   return {
-    ...challenge[0],
+    ...challenge,
     participants,
   };
 }

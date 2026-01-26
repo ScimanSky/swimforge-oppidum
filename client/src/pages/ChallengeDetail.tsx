@@ -22,6 +22,12 @@ export default function ChallengeDetail() {
     const updateCountdown = () => {
       const now = new Date();
       
+      // Check if dates exist
+      if (!challenge.end_date || !challenge.start_date) {
+        setTimeLeft("Date non disponibili");
+        return;
+      }
+      
       // Parse end date - handle both string and Date object
       let endDate: Date;
       if (typeof challenge.end_date === 'string') {
@@ -36,12 +42,9 @@ export default function ChallengeDetail() {
       
       // Check if date is valid - if not, calculate from start_date + duration
       if (isNaN(endDate.getTime())) {
-        console.warn('Invalid end_date, calculating from start_date + duration:', challenge.end_date);
-        
         // Parse start date
         const startDate = new Date(challenge.start_date);
         if (isNaN(startDate.getTime())) {
-          console.error('Invalid start_date:', challenge.start_date);
           setTimeLeft("Data non valida");
           return;
         }
