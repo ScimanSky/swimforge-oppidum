@@ -105,11 +105,7 @@ export default function Dashboard() {
               <img src="/swimforge-logo.png" alt="SwimForge" className="h-8 w-auto" />
               <span className="font-bold text-lg text-[oklch(0.95_0.01_220)]">SwimForge</span>
             </div>
-            <Link href="/profile">
-              <Button variant="ghost" size="icon" className="text-[oklch(0.70_0.18_220)] hover:bg-[oklch(0.70_0.18_220_/_0.1)]">
-                <User className="h-5 w-5" />
-              </Button>
-            </Link>
+
           </div>
         </div>
       </header>
@@ -131,8 +127,18 @@ export default function Dashboard() {
               </div>
             ) : (
               <>
-                <p className="text-[oklch(0.60_0.03_220)] text-sm">Bentornato,</p>
-                <h1 className="text-2xl font-bold mb-6 text-[oklch(0.95_0.01_220)]">{user?.name || "Nuotatore"}</h1>
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <p className="text-[oklch(0.60_0.03_220)] text-sm">Bentornato,</p>
+                    <h1 className="text-2xl font-bold text-[oklch(0.95_0.01_220)]">{user?.name || "Nuotatore"}</h1>
+                  </div>
+                  <Link href="/profile">
+                    <Button className="bg-[oklch(0.70_0.18_220)] hover:bg-[oklch(0.65_0.18_220)] text-white flex items-center gap-2">
+                      <User className="h-5 w-5" />
+                      Profilo
+                    </Button>
+                  </Link>
+                </div>
                 
                 {/* Level Badge */}
                 <div className="flex items-center gap-4 mb-6">
