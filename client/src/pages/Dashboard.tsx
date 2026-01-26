@@ -20,6 +20,7 @@ import { Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import { useBadgeNotifications } from "@/hooks/useBadgeNotifications";
 import { useEffect } from "react";
+import CountUp from "react-countup";
 
 export default function Dashboard() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
@@ -119,6 +120,8 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
+          whileHover={{ scale: 1.02, y: -5 }}
+          style={{ transformStyle: "preserve-3d" }}
         >
           <div className="neon-card p-6">
             {isLoading ? (
@@ -210,38 +213,65 @@ export default function Dashboard() {
             {
               icon: Waves,
               label: "Distanza",
-              value: isLoading ? "..." : formatDistance(profile?.totalDistanceMeters || 0),
+              value: profile?.totalDistanceMeters || 0,
+              rawValue: profile?.totalDistanceMeters || 0,
+              format: (val: number) => val >= 1000 ? `${(val / 1000).toFixed(1)} km` : `${val} m`,
               color: "oklch(0.70 0.18 220)",
               glowColor: "oklch(0.70 0.18 220 / 0.3)",
             },
             {
               icon: Clock,
               label: "Tempo",
-              value: isLoading ? "..." : formatTime(profile?.totalTimeSeconds || 0),
+              value: Math.floor((profile?.totalTimeSeconds || 0) / 60),
+              rawValue: profile?.totalTimeSeconds || 0,
+              format: (val: number) => {
+                const hours = Math.floor(val / 60);
+                const minutes = val % 60;
+                return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+              },
               color: "oklch(0.82 0.18 85)",
               glowColor: "oklch(0.82 0.18 85 / 0.3)",
             },
             {
               icon: Target,
               label: "Sessioni",
-              value: isLoading ? "..." : profile?.totalSessions?.toString() || "0",
+              value: profile?.totalSessions || 0,
+              rawValue: profile?.totalSessions || 0,
+              format: (val: number) => val.toString(),
               color: "oklch(0.70 0.20 145)",
               glowColor: "oklch(0.70 0.20 145 / 0.3)",
             },
-          ].map((stat) => (
-            <div key={stat.label} className="stat-card">
-              <div 
+          ].map((stat, index) => (
+            <motion.div 
+              key={stat.label} 
+              className="stat-card"
+              whileHover={{ scale: 1.05, y: -5 }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
+              <motion.div 
                 className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2"
                 style={{ 
                   backgroundColor: `${stat.glowColor}`,
                   boxShadow: `0 0 15px ${stat.glowColor}`,
                 }}
+                whileHover={{ rotate: 360 }}
+                transition={{ duration: 0.6 }}
               >
                 <stat.icon className="h-5 w-5" style={{ color: stat.color }} />
-              </div>
-              <p className="text-lg font-bold text-[oklch(0.95_0.01_220)]">{stat.value}</p>
+              </motion.div>
+              <p className="text-lg font-bold text-[oklch(0.95_0.01_220)]">
+                {isLoading ? "..." : (
+                  <CountUp
+                    end={stat.value}
+                    duration={2}
+                    delay={index * 0.2}
+                    formattingFn={stat.format}
+                    preserveValue
+                  />
+                )}
+              </p>
               <p className="text-xs text-[oklch(0.50_0.03_220)]">{stat.label}</p>
-            </div>
+            </motion.div>
           ))}
         </motion.div>
 
@@ -250,6 +280,7 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.15 }}
+          whileHover={{ scale: 1.02, y: -5 }}
         >
           <div className="neon-card p-4">
             <h3 className="text-lg font-bold flex items-center gap-2 mb-4 text-[oklch(0.95_0.01_220)]">
@@ -258,7 +289,23 @@ export default function Dashboard() {
             </h3>
             
             {activitiesLoading ? (
-              <Skeleton className="h-48 w-full bg-[oklch(0.20_0.03_250)]" />
+              <div className="h-48 flex items-end justify-between gap-2 px-2">
+                {[...Array(7)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="flex-1 rounded-t-lg bg-[oklch(0.20_0.03_250)]"
+                    animate={{ 
+                      height: [`${20 + Math.random() * 60}%`, `${30 + Math.random() * 50}%`],
+                      opacity: [0.3, 0.6, 0.3]
+                    }}
+                    transition={{ 
+                      duration: 1.5, 
+                      repeat: Infinity,
+                      delay: i * 0.1
+                    }}
+                  />
+                ))}
+              </div>
             ) : activities && activities.length > 0 ? (
               <div className="h-48 flex items-end justify-between gap-2 px-2">
                 {activities.slice(0, 7).reverse().map((activity, idx) => {
@@ -298,9 +345,24 @@ export default function Dashboard() {
                 })}
               </div>
             ) : (
-              <div className="h-48 flex items-center justify-center">
-                <p className="text-sm text-[oklch(0.50_0.03_220)]">Nessuna attività recente</p>
-              </div>
+              <motion.div 
+                className="h-48 flex flex-col items-center justify-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5 }}
+              >
+                <motion.div
+                  animate={{ 
+                    y: [0, -10, 0],
+                    rotate: [0, 5, -5, 0]
+                  }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  <Activity className="h-16 w-16 text-[oklch(0.70_0.18_220)]/30 mb-4" />
+                </motion.div>
+                <p className="text-sm text-[oklch(0.60_0.03_220)] mb-2">Nessuna attività recente</p>
+                <p className="text-xs text-[oklch(0.50_0.03_220)]">Inizia a nuotare per vedere i tuoi progressi!</p>
+              </motion.div>
             )}
           </div>
         </motion.div>
@@ -310,6 +372,7 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2 }}
+          whileHover={{ scale: 1.02, y: -5 }}
         >
           <div className="neon-card p-4">
             <div className="flex items-center justify-between mb-4">
@@ -327,12 +390,32 @@ export default function Dashboard() {
             
             <div className="space-y-3">
               {challengesLoading ? (
-                <div className="text-center py-4">
-                  <p className="text-sm text-[oklch(0.60_0.03_220)]">Caricamento...</p>
+                <div className="space-y-3">
+                  {[...Array(2)].map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="p-3 rounded-lg bg-[oklch(0.18_0.03_250)] border border-[oklch(0.30_0.04_250)]"
+                      animate={{ opacity: [0.3, 0.6, 0.3] }}
+                      transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.2 }}
+                    >
+                      <div className="space-y-2">
+                        <div className="h-4 bg-[oklch(0.25_0.03_250)] rounded w-3/4" />
+                        <div className="h-3 bg-[oklch(0.25_0.03_250)] rounded w-1/2" />
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
               ) : challenges && challenges.length > 0 ? (
-                challenges.slice(0, 2).map((challenge: any) => (
-                  <div key={challenge.id} className="p-3 rounded-lg bg-[oklch(0.18_0.03_250)] border border-[oklch(0.30_0.04_250)]">
+                challenges.slice(0, 2).map((challenge: any, idx: number) => (
+                  <motion.div 
+                    key={challenge.id} 
+                    className="p-3 rounded-lg bg-[oklch(0.18_0.03_250)] border border-[oklch(0.30_0.04_250)] cursor-pointer"
+                    whileHover={{ scale: 1.03, x: 5 }}
+                    transition={{ type: "spring", stiffness: 300 }}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                  >
                     <div className="flex items-start justify-between mb-2">
                       <h4 className="font-semibold text-[oklch(0.95_0.01_220)] text-sm">{challenge.name}</h4>
                       <span className="text-xs text-[oklch(0.70_0.18_85)] font-medium">
@@ -354,19 +437,34 @@ export default function Dashboard() {
                         </Button>
                       </Link>
                     </div>
-                  </div>
+                  </motion.div>
                 ))
               ) : (
-                <div className="text-center py-8">
-                  <Trophy className="h-12 w-12 mx-auto mb-3 text-[oklch(0.70_0.18_220)]" />
+                <motion.div 
+                  className="text-center py-8"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <motion.div
+                    animate={{ 
+                      scale: [1, 1.1, 1],
+                      rotate: [0, 5, -5, 0]
+                    }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                  >
+                    <Trophy className="h-12 w-12 mx-auto mb-3 text-[oklch(0.82_0.18_85)]" />
+                  </motion.div>
                   <p className="text-sm text-[oklch(0.60_0.03_220)] mb-4">Nessuna sfida attiva al momento</p>
                   <Link href="/challenges">
-                    <Button className="bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] hover:opacity-90">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Crea la Tua Prima Sfida
-                    </Button>
+                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                      <Button className="bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] hover:opacity-90">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Crea la Tua Prima Sfida
+                      </Button>
+                    </motion.div>
                   </Link>
-                </div>
+                </motion.div>
               )}
             </div>
           </div>
@@ -400,10 +498,14 @@ export default function Dashboard() {
               </div>
             ) : activities && activities.length > 0 ? (
               <div className="space-y-3">
-                {activities.map((activity) => (
-                  <div
+                {activities.map((activity, idx) => (
+                  <motion.div
                     key={activity.id}
                     className="flex items-center justify-between p-3 rounded-lg bg-[oklch(0.18_0.03_250)] hover:bg-[oklch(0.20_0.03_250)] transition-colors border border-[oklch(0.25_0.03_250)]"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    whileHover={{ scale: 1.02, x: 5 }}
                   >
                     <div className="flex items-center gap-3">
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
@@ -432,7 +534,7 @@ export default function Dashboard() {
                         +{activity.xpEarned}
                       </span>
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             ) : (
