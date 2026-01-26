@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useState } from "react";
 import { trpc } from "../lib/trpc";
 import { RefreshCw, Waves, Info, Clock, TrendingUp, ChevronLeft, Activity } from "lucide-react";
@@ -36,6 +37,14 @@ export default function Coach() {
   const [activeTab, setActiveTab] = useState<"pool" | "dryland">("pool");
   const [forceRegenerate, setForceRegenerate] = useState(false);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('[Coach] Component state:', {
+      activeTab,
+      forceRegenerate,
+    });
+  }, [activeTab, forceRegenerate]);
+
   // Query for pool workout
   const poolWorkoutQuery = trpc.aiCoach.getPoolWorkout.useQuery(
     { forceRegenerate },
@@ -57,6 +66,18 @@ export default function Coach() {
   const currentQuery = activeTab === "pool" ? poolWorkoutQuery : drylandWorkoutQuery;
   const workout = currentQuery.data as GeneratedWorkout | undefined;
   const isRegenerating = forceRegenerate && currentQuery.isLoading;
+
+  // Debug logging for query state
+  useEffect(() => {
+    console.log('[Coach] Query state:', {
+      activeTab,
+      isLoading: currentQuery.isLoading,
+      isError: currentQuery.isError,
+      hasData: !!currentQuery.data,
+      workout: currentQuery.data,
+      error: currentQuery.error,
+    });
+  }, [activeTab, currentQuery.isLoading, currentQuery.isError, currentQuery.data, currentQuery.error]);
 
   const handleRegenerate = async () => {
     setForceRegenerate(true);
