@@ -316,7 +316,7 @@ export default function Challenges() {
                   <div>
                     <p className="text-xs text-[oklch(0.50_0.03_220)] mb-1">Stato</p>
                     <p className="text-sm font-medium text-[oklch(0.70_0.18_85)]">
-                      {challenge.status === 'active' ? '✅ Attiva' : challenge.status === 'upcoming' ? '⏳ In Arrivo' : '🏁 Completata'}
+                      {challenge.status === 'active' ? '✅ Attiva' : challenge.status === 'pending' ? '⏳ In Arrivo' : '🏁 Completata'}
                     </p>
                   </div>
                 </div>
