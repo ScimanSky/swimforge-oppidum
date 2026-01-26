@@ -95,21 +95,6 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
     },
   });
 
-  const migrateHrZonesMutation = trpc.garmin.migrateHrZones.useMutation({
-    onSuccess: (data) => {
-      if (data.success) {
-        toast.success(data.message);
-        utils.activities.list.invalidate();
-        utils.profile.get.invalidate();
-      } else {
-        toast.error(data.message);
-      }
-    },
-    onError: (error) => {
-      toast.error("Errore nella migrazione: " + error.message);
-    },
-  });
-
   const resetDialog = () => {
     setIsConnectDialogOpen(false);
     setEmail("");
@@ -193,20 +178,6 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <RefreshCw className="h-4 w-4" />
-                    )}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => migrateHrZonesMutation.mutate()}
-                    disabled={migrateHrZonesMutation.isPending}
-                    title="Aggiorna zone HR"
-                    className="text-blue-600 hover:text-blue-700"
-                  >
-                    {migrateHrZonesMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <span className="text-xs font-semibold">HR</span>
                     )}
                   </Button>
                   <Button

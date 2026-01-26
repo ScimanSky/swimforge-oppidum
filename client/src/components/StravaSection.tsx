@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { motion } from "framer-motion";
-import { Activity, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Activity, CheckCircle, XCircle, Loader2, RefreshCw } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function StravaSection() {
@@ -21,6 +21,13 @@ export default function StravaSection() {
   
   // Disconnect mutation
   const disconnectMutation = trpc.strava.disconnect.useMutation({
+    onSuccess: () => {
+      refetch();
+    },
+  });
+
+  // Sync mutation
+  const syncMutation = trpc.strava.sync.useMutation({
     onSuccess: () => {
       refetch();
     },
@@ -97,16 +104,35 @@ export default function StravaSection() {
           </div>
         </div>
 
-        {/* Action Button */}
-        <div className="w-full sm:w-auto">
+        {/* Action Buttons */}
+        <div className="w-full sm:w-auto flex flex-col gap-3">
           {stravaStatus?.connected ? (
-            <button
-              onClick={handleDisconnectStrava}
-              disabled={disconnectMutation.isPending}
-              className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {disconnectMutation.isPending ? "Disconnessione..." : "Disconnetti"}
-            </button>
+            <>
+              <button
+                onClick={() => syncMutation.mutate({ daysBack: 30 })}
+                disabled={syncMutation.isPending}
+                className="w-full sm:w-auto px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {syncMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Sincronizzazione...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-5 h-5" />
+                    Sincronizza Attività
+                  </>
+                )}
+              </button>
+              <button
+                onClick={handleDisconnectStrava}
+                disabled={disconnectMutation.isPending}
+                className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {disconnectMutation.isPending ? "Disconnessione..." : "Disconnetti"}
+              </button>
+            </>
           ) : (
             <button
               onClick={handleConnectStrava}
