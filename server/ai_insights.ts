@@ -53,13 +53,37 @@ export async function generateAIInsights(
     return [];
   }
 
+  // 🔥 PRIORITY: Check cache FIRST (before API call)
+  try {
+    const cached = await db
+      .select()
+      .from(aiInsightsCache)
+      .where(
+        and(
+          eq(aiInsightsCache.userId, userId),
+          eq(aiInsightsCache.periodDays, userData.periodDays),
+          gt(aiInsightsCache.expiresAt, new Date()) // Not expired
+        )
+      )
+      .limit(1);
+
+    if (cached.length > 0 && cached[0].insights.length > 0) {
+      console.log(`[AI Insights] ✅ Using valid cached insights for user ${userId} (expires: ${cached[0].expiresAt})`);
+      return cached[0].insights;
+    }
+    
+    console.log(`[AI Insights] 🔄 No valid cache found, generating new insights...`);
+  } catch (cacheError) {
+    console.warn("[AI Insights] Cache check failed, proceeding with generation:", cacheError);
+  }
+
   const client = getGeminiClient();
   
-  // If no API key, try to use cache as fallback
+  // If no API key, try to use ANY cache as fallback (even expired)
   if (!client) {
-    console.warn("[AI Insights] No Gemini API key configured, trying cache fallback");
+    console.warn("[AI Insights] No Gemini API key configured, trying ANY cache fallback");
     try {
-      const cached = await db
+      const anyCached = await db
         .select()
         .from(aiInsightsCache)
         .where(
@@ -70,9 +94,9 @@ export async function generateAIInsights(
         )
         .limit(1);
 
-      if (cached.length > 0 && cached[0].insights.length > 0) {
-        console.log(`[AI Insights] Using cached insights (no API key) for user ${userId}`);
-        return cached[0].insights;
+      if (anyCached.length > 0 && anyCached[0].insights.length > 0) {
+        console.log(`[AI Insights] Using ANY cached insights (no API key) for user ${userId}`);
+        return anyCached[0].insights;
       }
     } catch (cacheError) {
       console.warn("[AI Insights] Cache table not available");
@@ -223,9 +247,9 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
     if (insights.length > 0) {
       const finalInsights = insights.slice(0, 8);
       
-      // Save to cache (expires in 1 hour for fresher insights)
+      // Save to cache (expires in 24 hours as per user preference)
       const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 1);
+      expiresAt.setHours(expiresAt.getHours() + 24);
       
       try {
         // Delete old cache

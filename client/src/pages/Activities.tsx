@@ -310,8 +310,9 @@ export default function Activities() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
+                whileHover={{ scale: 1.02, x: 5 }}
               >
-                <Card className="overflow-hidden">
+                <Card className="overflow-hidden cursor-pointer">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
                       {/* Icon */}

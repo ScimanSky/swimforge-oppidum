@@ -411,10 +411,9 @@ export default function Dashboard() {
                     key={challenge.id} 
                     className="p-3 rounded-lg bg-[oklch(0.18_0.03_250)] border border-[oklch(0.30_0.04_250)] cursor-pointer"
                     whileHover={{ scale: 1.03, x: 5 }}
-                    transition={{ type: "spring", stiffness: 300 }}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.1 }}
+                    transition={{ delay: idx * 0.1, type: "spring", stiffness: 300 }}
                   >
                     <div className="flex items-start justify-between mb-2">
                       <h4 className="font-semibold text-[oklch(0.95_0.01_220)] text-sm">{challenge.name}</h4>

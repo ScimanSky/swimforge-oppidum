@@ -19,6 +19,7 @@ import {
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, ChevronLeft, Info } from "lucide-react";
 import { Link } from "wouter";
+import { motion } from "framer-motion";
 import { MetricBox } from "@/components/MetricBox";
 import { metricsDefinitions } from "@/data/metricsDefinitions";
 
@@ -35,9 +36,21 @@ const PACE_COLORS = ["#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1", "#8b5cf6"];
 export default function Statistics() {
   const [period, setPeriod] = useState(30);
 
-  const { data: timeline, isLoading: timelineLoading } = trpc.statistics.getTimeline.useQuery({ days: period });
-  const { data: performance, isLoading: performanceLoading } = trpc.statistics.getPerformance.useQuery({ days: period });
-  const { data: advanced, isLoading: advancedLoading } = trpc.statistics.getAdvanced.useQuery({ days: period });
+  const { data: timeline, isLoading: timelineLoading } = trpc.statistics.getTimeline.useQuery(
+    { days: period },
+    { staleTime: 5 * 60 * 1000 } // Cache for 5 minutes
+  );
+  const { data: performance, isLoading: performanceLoading } = trpc.statistics.getPerformance.useQuery(
+    { days: period },
+    { staleTime: 5 * 60 * 1000 } // Cache for 5 minutes
+  );
+  const { data: advanced, isLoading: advancedLoading } = trpc.statistics.getAdvanced.useQuery(
+    { days: period },
+    { 
+      staleTime: 24 * 60 * 60 * 1000, // Cache for 24 hours (AI insights)
+      cacheTime: 24 * 60 * 60 * 1000  // Keep in cache for 24 hours
+    }
+  );
 
   const isLoading = timelineLoading || performanceLoading || advancedLoading;
 
@@ -106,7 +119,12 @@ export default function Statistics() {
         ) : (
           <>
             {/* Progress Timeline */}
-            <section className="space-y-3">
+            <motion.section 
+              className="space-y-3"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+            >
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold text-[oklch(0.85_0.05_220)]">
                   ━━━ PROGRESS TIMELINE ━━━
@@ -164,10 +182,15 @@ export default function Statistics() {
                   </p>
                 )}
               </div>
-            </section>
+            </motion.section>
 
             {/* Analisi Prestazioni */}
-            <section className="space-y-3">
+            <motion.section 
+              className="space-y-3"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
               <h2 className="text-lg font-semibold text-[oklch(0.85_0.05_220)]">
                 ━━━ ANALISI PRESTAZIONI ━━━
               </h2>
@@ -314,11 +337,16 @@ export default function Statistics() {
                   )}
                 </div>
               )}
-            </section>
+              </motion.section>
 
             {/* Analisi Avanzate */}
             {advanced && (
-              <section className="space-y-3">
+              <motion.section 
+                className="space-y-3"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
                 <h2 className="text-lg font-semibold text-[oklch(0.85_0.05_220)]">
                   ━━━ ANALISI AVANZATE ━━━
                 </h2>
@@ -478,7 +506,7 @@ export default function Statistics() {
                     </p>
                   </div>
                 )}
-              </section>
+              </motion.section>
             )}
           </>
         )}

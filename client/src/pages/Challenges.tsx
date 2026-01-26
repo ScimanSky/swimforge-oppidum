@@ -274,12 +274,14 @@ export default function Challenges() {
           </div>
         ) : challenges && challenges.length > 0 ? (
           <div className="space-y-4">
-            {challenges.map((challenge: any) => (
+            {challenges.map((challenge: any, idx: number) => (
               <motion.div
                 key={challenge.id}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="neon-card p-6"
+                transition={{ delay: idx * 0.1 }}
+                whileHover={{ scale: 1.02, y: -5 }}
+                className="neon-card p-6 cursor-pointer"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div>
@@ -359,22 +361,36 @@ export default function Challenges() {
             ))}
           </div>
         ) : (
-          <div className="neon-card p-12 text-center">
-            <Trophy className="h-16 w-16 mx-auto mb-4 text-[oklch(0.70_0.18_220)]" />
+          <motion.div 
+            className="neon-card p-12 text-center"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <motion.div
+              animate={{ 
+                scale: [1, 1.1, 1],
+                rotate: [0, 5, -5, 0]
+              }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <Trophy className="h-16 w-16 mx-auto mb-4 text-[oklch(0.82_0.18_85)]" />
+            </motion.div>
             <h3 className="text-xl font-bold text-[oklch(0.95_0.01_220)] mb-2">Nessuna Sfida Attiva</h3>
             <p className="text-[oklch(0.60_0.03_220)] mb-6">
               Crea la tua prima sfida e invita altri nuotatori a competere!
             </p>
             {!showCreateForm && (
-              <Button
-                onClick={() => setShowCreateForm(true)}
-                className="bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] hover:opacity-90"
-              >
-                <Plus className="h-4 w-4 mr-2" />
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button
+                  onClick={() => setShowCreateForm(true)}
+                  className="bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] hover:opacity-90"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
                 Crea la Tua Prima Sfida
               </Button>
+              </motion.div>
             )}
-          </div>
+          </motion.div>
         )}
       </div>
 

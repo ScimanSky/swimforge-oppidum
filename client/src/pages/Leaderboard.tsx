@@ -216,6 +216,7 @@ export default function Leaderboard() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.05 }}
+                  whileHover={{ scale: 1.02, x: 5 }}
                 >
                   <Card className={`${isCurrentUser ? "ring-2 ring-[var(--azure)] bg-[var(--azure)]/5" : ""}`}>
                     <CardContent className="p-4">
