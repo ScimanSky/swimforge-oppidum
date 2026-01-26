@@ -114,6 +114,10 @@ export async function getActiveChallenges(userId: number): Promise<any[]> {
   const db = await getDb();
   if (!db) return [];
 
+  // Log challenges before update
+  const beforeUpdate = await db.execute(sql`SELECT id, name, start_date, end_date, status, duration FROM challenges`);
+  console.log('[getActiveChallenges] BEFORE UPDATE:', JSON.stringify(beforeUpdate.rows, null, 2));
+
   // Auto-update challenge statuses based on dates
   await db.execute(sql`
     UPDATE challenges
@@ -124,6 +128,10 @@ export async function getActiveChallenges(userId: number): Promise<any[]> {
     END
     WHERE status != 'completed'::challenge_status
   `);
+
+  // Log challenges after update
+  const afterUpdate = await db.execute(sql`SELECT id, name, start_date, end_date, status, duration FROM challenges`);
+  console.log('[getActiveChallenges] AFTER UPDATE:', JSON.stringify(afterUpdate.rows, null, 2));
 
   const result = await db.execute(sql`
     SELECT 
