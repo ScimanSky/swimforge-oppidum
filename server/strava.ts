@@ -98,7 +98,7 @@ export async function getStravaStatus(userId: number): Promise<{
   displayName?: string;
   lastSync?: Date;
 }> {
-  const db = getDb();
+  const db = await getDb();
   
   try {
     const [tokens] = await db
@@ -187,7 +187,7 @@ export async function exchangeStravaToken(
   username?: string;
   error?: string;
 }> {
-  const db = getDb();
+  const db = await getDb();
   
   try {
     // Call microservice to exchange code
@@ -261,7 +261,7 @@ export async function exchangeStravaToken(
  * Refresh Strava access token
  */
 export async function refreshStravaToken(userId: number): Promise<boolean> {
-  const db = getDb();
+  const db = await getDb();
   
   try {
     // Get current tokens
@@ -319,7 +319,7 @@ export async function syncStravaActivities(
   count: number;
   message?: string;
 }> {
-  const db = getDb();
+  const db = await getDb();
   
   try {
     // Get tokens
@@ -464,7 +464,7 @@ export async function syncStravaActivities(
  * Disconnect Strava account
  */
 export async function disconnectStrava(userId: number): Promise<boolean> {
-  const db = getDb();
+  const db = await getDb();
   
   try {
     // Delete tokens
@@ -490,7 +490,7 @@ export async function disconnectStrava(userId: number): Promise<boolean> {
  * Check and award badges based on activities
  */
 async function checkAndAwardBadges(userId: number): Promise<void> {
-  const db = getDb();
+  const db = await getDb();
   
   try {
     // Get all badge definitions
@@ -588,7 +588,7 @@ async function checkAndAwardBadges(userId: number): Promise<void> {
  * Auto-sync Strava activities on login (if last sync > 6 hours ago)
  */
 export async function autoSyncStrava(userId: number): Promise<void> {
-  const db = getDb();
+  const db = await getDb();
   
   try {
     const [tokens] = await db
