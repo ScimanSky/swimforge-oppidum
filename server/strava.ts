@@ -322,6 +322,17 @@ export async function syncStravaActivities(
   const db = await getDb();
   
   try {
+    // Get user profile
+    const [profile] = await db
+      .select()
+      .from(swimmerProfiles)
+      .where(eq(swimmerProfiles.userId, userId))
+      .limit(1);
+
+    if (!profile) {
+      throw new Error("User profile not found");
+    }
+
     // Get tokens
     const [tokens] = await db
       .select()
@@ -373,6 +384,10 @@ export async function syncStravaActivities(
 
     // Import activities to database
     let importedCount = 0;
+    let totalNewXp = 0;
+    let totalNewDistance = 0;
+    let totalNewDuration = 0;
+    
     for (const activity of response.activities) {
       try {
         // Check if activity already exists (by Strava ID)
@@ -460,10 +475,46 @@ export async function syncStravaActivities(
         });
 
         importedCount++;
+        totalNewXp += xpEarned;
+        totalNewDistance += activity.distance_meters;
+        totalNewDuration += activity.duration_seconds;
         console.log(`[Strava] Imported activity ${activity.activity_id} (+${xpEarned} XP)`);
       } catch (error) {
         console.error(`[Strava] Error importing activity ${activity.activity_id}:`, error);
       }
+    }
+
+    // Update profile totals
+    if (importedCount > 0) {
+      const newTotalXp = (profile.totalXp || 0) + totalNewXp;
+      const newTotalDistance = (profile.totalDistanceMeters || 0) + totalNewDistance;
+      const newTotalTime = (profile.totalTimeSeconds || 0) + totalNewDuration;
+      const newTotalSessions = (profile.totalSessions || 0) + importedCount;
+
+      // Calculate new level
+      const newLevel = calculateLevel(newTotalXp);
+
+      await db
+        .update(swimmerProfiles)
+        .set({
+          totalXp: newTotalXp,
+          level: newLevel,
+          totalDistanceMeters: newTotalDistance,
+          totalTimeSeconds: newTotalTime,
+          totalSessions: newTotalSessions,
+        })
+        .where(eq(swimmerProfiles.userId, userId));
+
+      console.log(`[Strava] Updated profile for user ${userId}: +${totalNewXp} XP, Level ${newLevel}, ${newTotalSessions} sessions`);
+
+      // Check and award badges with updated stats
+      await checkAndAwardBadges(userId, {
+        totalDistance: newTotalDistance,
+        totalSessions: newTotalSessions,
+        totalXp: newTotalXp,
+        level: newLevel,
+        totalTime: newTotalTime,
+      });
     }
 
     // Update last sync time
@@ -471,9 +522,6 @@ export async function syncStravaActivities(
       .update(stravaTokens)
       .set({ lastSync: new Date() })
       .where(eq(stravaTokens.userId, userId));
-
-    // Check and award badges
-    await checkAndAwardBadges(userId);
 
     console.log(`[Strava] Sync complete for user ${userId}: ${importedCount}/${response.count} activities imported`);
 
@@ -521,7 +569,16 @@ export async function disconnectStrava(userId: number): Promise<boolean> {
 /**
  * Check and award badges based on activities
  */
-async function checkAndAwardBadges(userId: number): Promise<void> {
+async function checkAndAwardBadges(
+  userId: number,
+  stats?: {
+    totalDistance: number;
+    totalSessions: number;
+    totalXp: number;
+    level: number;
+    totalTime?: number;
+  }
+): Promise<void> {
   const db = await getDb();
   
   try {
@@ -547,22 +604,38 @@ async function checkAndAwardBadges(userId: number): Promise<void> {
       let earned = false;
 
       if (badge.criteriaType === "total_distance") {
-        const [result] = await db
-          .select({ total: sql<number>`COALESCE(SUM(${swimmingActivities.distanceMeters}), 0)` })
-          .from(swimmingActivities)
-          .where(eq(swimmingActivities.userId, userId));
-        
-        if (result && result.total >= (badge.criteriaValue || 0)) {
-          earned = true;
+        if (stats) {
+          // Use provided stats
+          if (stats.totalDistance >= (badge.criteriaValue || 0)) {
+            earned = true;
+          }
+        } else {
+          // Query database
+          const [result] = await db
+            .select({ total: sql<number>`COALESCE(SUM(${swimmingActivities.distanceMeters}), 0)` })
+            .from(swimmingActivities)
+            .where(eq(swimmingActivities.userId, userId));
+          
+          if (result && result.total >= (badge.criteriaValue || 0)) {
+            earned = true;
+          }
         }
       } else if (badge.criteriaType === "activity_count") {
-        const [result] = await db
-          .select({ count: sql<number>`COUNT(*)` })
-          .from(swimmingActivities)
-          .where(eq(swimmingActivities.userId, userId));
-        
-        if (result && result.count >= (badge.criteriaValue || 0)) {
-          earned = true;
+        if (stats) {
+          // Use provided stats
+          if (stats.totalSessions >= (badge.criteriaValue || 0)) {
+            earned = true;
+          }
+        } else {
+          // Query database
+          const [result] = await db
+            .select({ count: sql<number>`COUNT(*)` })
+            .from(swimmingActivities)
+            .where(eq(swimmingActivities.userId, userId));
+          
+          if (result && result.count >= (badge.criteriaValue || 0)) {
+            earned = true;
+          }
         }
       } else if (badge.criteriaType === "consecutive_days") {
         // Check consecutive days logic (simplified)
@@ -646,4 +719,41 @@ export async function autoSyncStrava(userId: number): Promise<void> {
   } catch (error) {
     console.error("[Strava] Error in auto-sync:", error);
   }
+}
+
+
+/**
+ * Calculate level from XP
+ */
+function calculateLevel(totalXp: number): number {
+  // Level thresholds (cumulative XP needed)
+  const levelThresholds = [
+    0,      // Level 1
+    500,    // Level 2
+    1200,   // Level 3
+    2100,   // Level 4
+    3200,   // Level 5
+    4500,   // Level 6
+    6000,   // Level 7
+    7700,   // Level 8
+    9600,   // Level 9
+    11700,  // Level 10
+    14000,  // Level 11
+    16500,  // Level 12
+    19200,  // Level 13
+    22100,  // Level 14
+    25200,  // Level 15
+    28500,  // Level 16
+    32000,  // Level 17
+    35700,  // Level 18
+    39600,  // Level 19
+    43700,  // Level 20
+  ];
+
+  for (let i = levelThresholds.length - 1; i >= 0; i--) {
+    if (totalXp >= levelThresholds[i]) {
+      return i + 1;
+    }
+  }
+  return 1;
 }
