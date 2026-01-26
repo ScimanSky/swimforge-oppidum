@@ -65,19 +65,22 @@ export default function Coach() {
 
   const currentQuery = activeTab === "pool" ? poolWorkoutQuery : drylandWorkoutQuery;
   const workout = currentQuery.data as GeneratedWorkout | undefined;
-  const isRegenerating = forceRegenerate && currentQuery.isLoading;
+  
+  // Use isFetching instead of isLoading to handle re-fetches correctly
+  const isLoading = currentQuery.isFetching;
+  const isRegenerating = forceRegenerate && isLoading;
 
   // Debug logging for query state
   useEffect(() => {
     console.log('[Coach] Query state:', {
       activeTab,
       isLoading: currentQuery.isLoading,
+      isFetching: currentQuery.isFetching,
       isError: currentQuery.isError,
       hasData: !!currentQuery.data,
-      workout: currentQuery.data,
       error: currentQuery.error,
     });
-  }, [activeTab, currentQuery.isLoading, currentQuery.isError, currentQuery.data, currentQuery.error]);
+  }, [activeTab, currentQuery.isLoading, currentQuery.isFetching, currentQuery.isError, currentQuery.data, currentQuery.error]);
 
   const handleRegenerate = async () => {
     setForceRegenerate(true);
@@ -156,14 +159,18 @@ export default function Coach() {
 
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Loading State */}
-        {currentQuery.isLoading && (
-          <div className="neon-card p-12 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[oklch(0.70_0.18_220)] mx-auto mb-4"></div>
+        {isLoading && (
+          <div className="neon-card p-12 flex flex-col items-center justify-center text-center">
+            <div className="w-16 h-16 border-4 border-[oklch(0.70_0.18_220)] border-t-transparent rounded-full animate-spin mb-6"></div>
             <p className="text-[oklch(0.75_0.03_220)] font-semibold">
               Generazione allenamento personalizzato...
             </p>
             <p className="text-[oklch(0.55_0.03_220)] text-sm mt-2">
               Sto analizzando le tue metriche avanzate
+            </p>
+            {/* Debug info for mobile users if stuck */}
+            <p className="text-[oklch(0.40_0.03_220)] text-[10px] mt-8 opacity-30">
+              Status: {currentQuery.status} | Fetching: {String(currentQuery.isFetching)}
             </p>
           </div>
         )}
@@ -187,7 +194,7 @@ export default function Coach() {
         )}
 
         {/* Workout Display */}
-        {workout && !currentQuery.isLoading && (
+        {workout && !isLoading && (
           <div className="space-y-6">
             {/* Workout Header */}
             <div className="neon-card p-6">

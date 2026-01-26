@@ -572,10 +572,18 @@ function parseWorkoutResponse(
   try {
     // Remove markdown code blocks if present
     let cleanText = text.trim();
-    if (cleanText.startsWith("```json")) {
-      cleanText = cleanText.replace(/```json\n?/g, "").replace(/```\n?/g, "");
-    } else if (cleanText.startsWith("```")) {
-      cleanText = cleanText.replace(/```\n?/g, "");
+    
+    // More robust markdown block removal
+    const jsonMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/) || 
+                      cleanText.match(/```\s*([\s\S]*?)\s*```/);
+    
+    if (jsonMatch) {
+      cleanText = jsonMatch[1];
+    } else {
+      // Fallback: strip any backticks and common text before/after
+      cleanText = cleanText.replace(/```json/g, "")
+                          .replace(/```/g, "")
+                          .trim();
     }
 
     // Parse JSON
