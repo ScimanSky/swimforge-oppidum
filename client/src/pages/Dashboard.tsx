@@ -101,7 +101,6 @@ export default function Dashboard() {
         <div className="container py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <img src="/oppidum-logo.png" alt="Oppidum" className="h-8 w-auto" />
               <span className="font-bold text-lg text-[oklch(0.95_0.01_220)]">SwimForge</span>
             </div>
             <Link href="/profile">

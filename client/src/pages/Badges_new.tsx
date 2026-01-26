@@ -131,7 +131,7 @@ function getBadgeCode(name: string): string {
     "Lupo di Mare": "sea_wolf",
     "Esploratore Marino": "marine_explorer",
     "Attraversatore": "crosser",
-    "Membro Oppidum": "oppidum_member",
+    "Nuotatore Certificato": "oppidum_member",
     "Polpo d'Oro": "golden_octopus",
     "Prime 10 Ore": "first_10_hours",
     "50 Ore di Dedizione": "fifty_hours",

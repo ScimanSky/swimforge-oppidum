@@ -43,10 +43,10 @@
 }
 
 :root {
-  /* SwimForge Oppidum Dark Gaming Theme */
+  /* SwimForge Dark Gaming Theme */
   --radius: 0.75rem;
   
-  /* Oppidum Brand Colors - Neon Gaming Style */
+  /* SwimForge Brand Colors - Neon Gaming Style */
   --navy-deep: oklch(0.12 0.03 250);
   --navy: oklch(0.18 0.04 250);
   --navy-light: oklch(0.25 0.05 250);

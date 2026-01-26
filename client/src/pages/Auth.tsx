@@ -120,7 +120,7 @@ export default function Auth() {
           <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-full flex items-center justify-center">
             <Waves className="w-8 h-8 text-white" />
           </div>
-          <CardTitle className="text-2xl font-bold text-white">SwimForge Oppidum</CardTitle>
+          <CardTitle className="text-2xl font-bold text-white">SwimForge</CardTitle>
           <CardDescription className="text-slate-400">
             Accedi o registrati per iniziare a tracciare i tuoi progressi
           </CardDescription>

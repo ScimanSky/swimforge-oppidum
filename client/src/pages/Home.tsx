@@ -64,18 +64,7 @@ export default function Home() {
         <div className="relative container py-20 md:py-32">
           <div className="flex flex-col items-center text-center">
             {/* Logo */}
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="mb-8"
-            >
-              <img 
-                src="/oppidum-logo.png" 
-                alt="Oppidum" 
-                className="h-24 md:h-32 w-auto drop-shadow-2xl"
-              />
-            </motion.div>
+            {/* Logo rimosso - solo testo SwimForge */}
 
             {/* Title */}
             <motion.h1
@@ -102,7 +91,7 @@ export default function Home() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="text-lg text-white/70 mb-8 max-w-2xl"
             >
-              La piattaforma di gamification esclusiva per i nuotatori master di Oppidum.
+              La piattaforma esclusiva per nuotatori di tutte le età.
               Trasforma ogni allenamento in un'avventura.
             </motion.p>
 
@@ -276,9 +265,8 @@ export default function Home() {
         <div className="container">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <img src="/oppidum-logo.png" alt="Oppidum" className="h-8 w-auto" />
               <span className="text-sm text-muted-foreground">
-                SwimForge © {new Date().getFullYear()} - Società Sportiva Oppidum
+                SwimForge © {new Date().getFullYear()}
               </span>
             </div>
             <div className="text-sm text-muted-foreground">
