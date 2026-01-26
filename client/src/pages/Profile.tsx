@@ -15,6 +15,7 @@ import {
 import { useLocation, Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import GarminSection from "@/components/GarminSection";
+import StravaSection from "@/components/StravaSection";
 import { toast } from "sonner";
 import { useEffect } from "react";
 
@@ -212,7 +213,8 @@ export default function Profile() {
 
 
         {/* Garmin Connection */}
-        <GarminSection garminConnected={profile?.garminConnected || false} />
+      <GarminSection garminConnected={profile?.garminConnected || false} />
+            <StravaSection />
 
         {/* Badge Recalculation */}
         <motion.div
