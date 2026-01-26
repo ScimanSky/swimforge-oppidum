@@ -15,7 +15,7 @@ import {
 import { useLocation, Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import GarminSection from "@/components/GarminSection";
-import StravaSection from "@/components/StravaSection";
+import { StravaSection } from "@/components/StravaSection";
 import { toast } from "sonner";
 import { useEffect } from "react";
 
