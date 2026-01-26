@@ -1,166 +1,153 @@
 import { useState } from "react";
-import { trpc } from "@/lib/trpc";
+import { trpc } from "../lib/trpc";
+import { Card, CardContent } from "./ui/card";
+import { Button } from "./ui/button";
+import { Activity, CheckCircle, XCircle, Loader2, RefreshCw, Unlink } from "lucide-react";
+import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Activity, CheckCircle, XCircle, Loader2, RefreshCw } from "lucide-react";
-import { useAuth } from "@/_core/hooks/useAuth";
 
-export default function StravaSection() {
+export function StravaSection() {
+  const utils = trpc.useUtils();
   const [isConnecting, setIsConnecting] = useState(false);
-  const { isAuthenticated } = useAuth();
-  
+
   // Get Strava status
-  const { data: stravaStatus, isLoading: statusLoading, refetch } = trpc.strava.status.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
-  
+  const { data: stravaStatus, isLoading: statusLoading } = trpc.strava.status.useQuery();
+
   // Get authorize URL
   const getAuthorizeUrlQuery = trpc.strava.getAuthorizeUrl.useQuery(undefined, {
-    enabled: false, // Don't auto-fetch
+    enabled: false,
   });
-  
+
   // Disconnect mutation
   const disconnectMutation = trpc.strava.disconnect.useMutation({
     onSuccess: () => {
-      refetch();
+      toast.success("Account Strava disconnesso con successo!");
+      utils.strava.status.invalidate();
+    },
+    onError: (error) => {
+      toast.error("Errore nella disconnessione: " + error.message);
     },
   });
 
   // Sync mutation
   const syncMutation = trpc.strava.sync.useMutation({
-    onSuccess: () => {
-      refetch();
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success(`Sincronizzate ${data.count} attività da Strava!`);
+        utils.activities.list.invalidate();
+        utils.profile.get.invalidate();
+        utils.strava.status.invalidate();
+      } else {
+        toast.error(data.error || "Errore nella sincronizzazione");
+      }
+    },
+    onError: (error) => {
+      toast.error("Errore nella sincronizzazione: " + error.message);
     },
   });
 
   const handleConnectStrava = async () => {
-    setIsConnecting(true);
     try {
+      setIsConnecting(true);
       const result = await getAuthorizeUrlQuery.refetch();
-      if (result.data) {
-        // Redirect to Strava authorization page
-        window.location.href = result.data;
+      if (result.data?.authorizeUrl) {
+        window.location.href = result.data.authorizeUrl;
+      } else {
+        toast.error("Errore nella generazione dell'URL di autorizzazione");
+        setIsConnecting(false);
       }
     } catch (error) {
-      console.error("Error getting Strava authorize URL:", error);
+      toast.error("Errore nella connessione a Strava");
       setIsConnecting(false);
     }
   };
 
   const handleDisconnectStrava = () => {
-    if (confirm("Sei sicuro di voler disconnettere Strava?")) {
+    if (confirm("Sei sicuro di voler disconnettere il tuo account Strava?")) {
       disconnectMutation.mutate();
     }
   };
+
+  const isConnected = stravaStatus?.connected || false;
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="bg-card rounded-2xl p-6 shadow-lg border border-border mt-6"
+      transition={{ delay: 0.5 }}
     >
-      <div className="flex items-start justify-between flex-col sm:flex-row gap-4">
-        <div className="flex items-start gap-4 flex-1">
-          <div className="p-3 bg-orange-500/20 rounded-xl">
-            <Activity className="w-8 h-8 text-orange-500" />
-          </div>
-          <div className="flex-1">
-            <h2 className="text-xl font-bold mb-2">
-              Integrazione Strava
-            </h2>
-            <p className="text-muted-foreground mb-4 text-sm">
-              Connetti il tuo account Strava per sincronizzare automaticamente le tue attività di nuoto
-            </p>
-
-            {/* Status */}
-            {statusLoading ? (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm">Caricamento...</span>
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                isConnected ? "bg-green-500/10" : "bg-orange-500/10"
+              }`}>
+                <Activity className={`h-5 w-5 ${
+                  isConnected ? "text-green-500" : "text-orange-500"
+                }`} />
               </div>
-            ) : stravaStatus?.connected ? (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-green-600">
-                  <CheckCircle className="w-5 h-5" />
-                  <span className="font-medium">Connesso</span>
-                </div>
-                {stravaStatus.displayName && (
-                  <p className="text-sm text-muted-foreground">
-                    Account: <span className="font-medium text-foreground">{stravaStatus.displayName}</span>
-                  </p>
-                )}
-                {stravaStatus.lastSync && (
-                  <p className="text-sm text-muted-foreground">
-                    Ultima sincronizzazione: {new Date(stravaStatus.lastSync).toLocaleString("it-IT")}
+              <div>
+                <p className="font-medium text-card-foreground">Strava</p>
+                <p className="text-xs text-muted-foreground">
+                  {isConnected 
+                    ? `Collegato${stravaStatus?.displayName ? ` (${stravaStatus.displayName})` : ""}`
+                    : "Non collegato"
+                  }
+                </p>
+                {isConnected && stravaStatus?.lastSync && (
+                  <p className="text-xs text-muted-foreground">
+                    Ultimo sync: {new Date(stravaStatus.lastSync).toLocaleDateString("it-IT")}
                   </p>
                 )}
               </div>
-            ) : (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <XCircle className="w-5 h-5" />
-                <span>Non connesso</span>
-              </div>
-            )}
-          </div>
-        </div>
+            </div>
 
-        {/* Action Buttons */}
-        <div className="w-full sm:w-auto flex flex-col gap-3">
-          {stravaStatus?.connected ? (
-            <>
-              <button
-                onClick={() => syncMutation.mutate({ daysBack: 30 })}
-                disabled={syncMutation.isPending}
-                className="w-full sm:w-auto px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {syncMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Sincronizzazione...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="w-5 h-5" />
-                    Sincronizza Attività
-                  </>
-                )}
-              </button>
-              <button
-                onClick={handleDisconnectStrava}
-                disabled={disconnectMutation.isPending}
-                className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {disconnectMutation.isPending ? "Disconnessione..." : "Disconnetti"}
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={handleConnectStrava}
-              disabled={isConnecting || getAuthorizeUrlQuery.isFetching}
-              className="w-full sm:w-auto px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isConnecting || getAuthorizeUrlQuery.isFetching ? (
+            <div className="flex gap-2">
+              {isConnected ? (
                 <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Connessione...
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => syncMutation.mutate({ daysBack: 30 })}
+                    disabled={syncMutation.isPending}
+                    title="Sincronizza attività"
+                  >
+                    {syncMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDisconnectStrava}
+                    disabled={disconnectMutation.isPending}
+                    className="text-destructive hover:text-destructive"
+                    title="Scollega Strava"
+                  >
+                    <Unlink className="h-4 w-4" />
+                  </Button>
                 </>
               ) : (
-                <>
-                  <Activity className="w-5 h-5" />
-                  Connetti Strava
-                </>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleConnectStrava}
+                  disabled={isConnecting || getAuthorizeUrlQuery.isFetching}
+                >
+                  {isConnecting || getAuthorizeUrlQuery.isFetching ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    "Collega"
+                  )}
+                </Button>
               )}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Info Box */}
-      <div className="mt-6 p-4 bg-blue-500/10 rounded-xl border border-blue-500/30">
-        <p className="text-sm text-blue-600 dark:text-blue-400">
-          <strong>Nota:</strong> Dopo aver connesso Strava, le tue attività di nuoto verranno sincronizzate automaticamente ogni 6 ore quando effettui il login.
-        </p>
-      </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </motion.div>
   );
 }
