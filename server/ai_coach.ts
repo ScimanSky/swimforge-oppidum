@@ -111,24 +111,44 @@ async function generateWorkout(
   userId: number,
   workoutType: "pool" | "dryland"
 ): Promise<GeneratedWorkout> {
-  // Fetch user statistics
-  const userStats = await fetchUserStats(userId);
+  try {
+    console.log(`[AI Coach] Starting workout generation for user ${userId}, type: ${workoutType}`);
+    
+    // Fetch user statistics
+    console.log(`[AI Coach] Fetching user stats for user ${userId}`);
+    const userStats = await fetchUserStats(userId);
+    console.log(`[AI Coach] User stats fetched successfully`);
 
-  // Build prompt based on workout type
-  const prompt =
-    workoutType === "pool"
-      ? buildPoolWorkoutPrompt(userStats)
-      : buildDrylandWorkoutPrompt(userStats);
+    // Build prompt based on workout type
+    const prompt =
+      workoutType === "pool"
+        ? buildPoolWorkoutPrompt(userStats)
+        : buildDrylandWorkoutPrompt(userStats);
+    console.log(`[AI Coach] Prompt built, length: ${prompt.length} chars`);
 
-  // Call Gemini API
-  const result = await model.generateContent(prompt);
-  const response = result.response;
-  const text = response.text();
+    // Call Gemini API with timeout
+    console.log(`[AI Coach] Calling Gemini API...`);
+    const result = await Promise.race([
+      model.generateContent(prompt),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Gemini API timeout after 30s')), 30000)
+      )
+    ]) as any;
+    
+    const response = result.response;
+    const text = response.text();
+    console.log(`[AI Coach] Gemini response received, length: ${text.length} chars`);
 
-  // Parse the response
-  const workout = parseWorkoutResponse(text, workoutType);
+    // Parse the response
+    console.log(`[AI Coach] Parsing workout response...`);
+    const workout = parseWorkoutResponse(text, workoutType);
+    console.log(`[AI Coach] Workout generated successfully with ${workout.sections.length} sections`);
 
-  return workout;
+    return workout;
+  } catch (error) {
+    console.error(`[AI Coach] Error generating workout for user ${userId}:`, error);
+    throw error;
+  }
 }
 
 /**
