@@ -598,6 +598,17 @@ export async function syncGarminActivities(
 
     console.log(`[Garmin Sync] Updated last_garmin_sync_at for user ${userId}`);
 
+    // Auto-migrate HR zones for activities that don't have them
+    if (syncedCount > 0) {
+      console.log(`[Garmin Sync] Starting automatic HR zones migration for ${syncedCount} new activities`);
+      try {
+        const migrationResult = await migrateHrZones(userId);
+        console.log(`[Garmin Sync] HR zones migration result: ${migrationResult.message}`);
+      } catch (error) {
+        console.error(`[Garmin Sync] HR zones migration failed:`, error);
+      }
+    }
+
     return { synced: syncedCount, newXp: totalNewXp };
   } catch (error: any) {
     console.error("[Garmin] Sync failed:", error);
