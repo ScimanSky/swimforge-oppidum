@@ -17,6 +17,7 @@ import Coach from "./pages/Coach";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import StravaConnect from "./pages/StravaConnect";
+import Settings from "./pages/Settings";
 import BadgeUnlockNotification from "./components/BadgeUnlockNotification";
 import { useBadgeNotifications } from "./hooks/useBadgeNotifications";
 
@@ -37,6 +38,7 @@ function Router() {
       <Route path="/statistics" component={Statistics} />
       <Route path="/coach" component={Coach} />
       <Route path="/profile" component={Profile} />
+      <Route path="/settings" component={Settings} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
