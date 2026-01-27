@@ -8,6 +8,8 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { completeChallenges } from "../cron_challenges";
+import { setupSwagger } from "../swagger-setup";
+import { connectRedis } from "../lib/cache";
 
 // Security middleware
 import { initSentry, requestLogger, errorHandler } from "../middleware/logger";
@@ -37,6 +39,9 @@ async function startServer() {
   // Initialize Sentry for error tracking
   initSentry();
 
+  // Connect to Redis
+  await connectRedis();
+
   const app = express();
   const server = createServer(app);
 
@@ -48,6 +53,9 @@ async function startServer() {
 
   // Request logging
   app.use(requestLogger);
+
+  // Setup Swagger documentation
+  setupSwagger(app);
 
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
