@@ -184,31 +184,17 @@ export const helmetConfig = {
 
 /**
  * Middleware per loggare richieste sospette
+ * 
+ * DISABILITATO: Troppi falsi positivi su richieste tRPC batch e API valide.
+ * Implementare un pattern più sofisticato in futuro.
  */
 export function suspiciousRequestLogger(
   req: Request,
   res: Response,
   next: NextFunction
 ) {
-  const sqlInjectionPatterns = [
-    /(\bOR\b|\bAND\b|\bUNION\b|\bSELECT\b|\bDROP\b|\bINSERT\b)/i,
-    /['";]/,
-  ];
-
-  const bodyStr = JSON.stringify(req.body);
-  const queryStr = JSON.stringify(req.query);
-
-  for (const pattern of sqlInjectionPatterns) {
-    if (pattern.test(bodyStr) || pattern.test(queryStr)) {
-      console.warn('[SECURITY] Suspicious SQL pattern detected', {
-        ip: req.ip,
-        path: req.path,
-        method: req.method,
-      });
-      break;
-    }
-  }
-
+  // Disabilitato temporaneamente - troppi falsi positivi
+  // TODO: Implementare pattern più accurato per SQL injection detection
   next();
 }
 
