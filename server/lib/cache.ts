@@ -29,16 +29,24 @@ redis.on('connect', () => {
   });
 });
 
-// Connect to Redis
+// Connect to Redis (non-blocking)
 export async function connectRedis() {
   try {
-    await redis.connect();
-    logger.info({ event: 'redis:ready', message: 'Redis ready' });
+    // Set a timeout for connection attempt
+    const connectionPromise = redis.connect();
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Redis connection timeout')), 5000)
+    );
+
+    await Promise.race([connectionPromise, timeoutPromise]);
+    logger.info({ event: 'redis:ready', message: 'Redis connected successfully' });
   } catch (error) {
-    logger.error({
-      event: 'redis:connection_failed',
-      error: error instanceof Error ? error.message : 'Unknown error',
+    logger.warn({
+      event: 'redis:connection_warning',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      note: 'Continuing without Redis cache',
     });
+    // Don't throw - allow app to continue without Redis
   }
 }
 
@@ -59,6 +67,7 @@ export const CACHE_TTL = {
  */
 export async function getCached<T>(key: string): Promise<T | null> {
   try {
+    if (!redis.isOpen) return null; // Redis not connected
     const cached = await redis.get(key);
     if (!cached) return null;
 
@@ -87,6 +96,7 @@ export async function setCached<T>(
   ttl: number = 3600
 ): Promise<void> {
   try {
+    if (!redis.isOpen) return; // Redis not connected
     await redis.setEx(key, ttl, JSON.stringify(value));
 
     logger.debug({
@@ -108,6 +118,7 @@ export async function setCached<T>(
  */
 export async function deleteCached(key: string): Promise<void> {
   try {
+    if (!redis.isOpen) return; // Redis not connected
     await redis.del(key);
 
     logger.debug({
@@ -128,8 +139,7 @@ export async function deleteCached(key: string): Promise<void> {
  */
 export async function deleteMultipleCached(keys: string[]): Promise<void> {
   try {
-    if (keys.length === 0) return;
-
+    if (!redis.isOpen || keys.length === 0) return; // Redis not connected
     await redis.del(keys);
 
     logger.debug({
@@ -170,6 +180,7 @@ export async function getOrSetCached<T>(
  */
 export async function invalidateCachePattern(pattern: string): Promise<void> {
   try {
+    if (!redis.isOpen) return; // Redis not connected
     const keys = await redis.keys(pattern);
     if (keys.length > 0) {
       await redis.del(keys);
@@ -230,6 +241,9 @@ export async function invalidateLeaderboardCache(): Promise<void> {
  */
 export async function getCacheStats() {
   try {
+    if (!redis.isOpen) {
+      return { keys: 0, info: 'Redis not connected' };
+    }
     const info = await redis.info('stats');
     const keys = await redis.dbSize();
 

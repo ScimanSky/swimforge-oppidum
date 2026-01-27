@@ -36,11 +36,16 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
-  // Connect to Redis
-  await connectRedis();
+  // Connect to Redis (non-blocking - continue even if it fails)
+  connectRedis().catch(err => {
+    console.warn('[Redis] Connection failed, continuing without cache:', err.message);
+  });
 
   const app = express();
   const server = createServer(app);
+
+  // Give Redis a moment to connect in background
+  await new Promise(resolve => setTimeout(resolve, 500));
 
   // Apply security middleware (CORS, headers, etc.)
   app.use(...applySecurityMiddleware());
