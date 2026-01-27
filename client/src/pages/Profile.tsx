@@ -18,6 +18,7 @@ import GarminSection from "@/components/GarminSection";
 import { StravaSection } from "@/components/StravaSection";
 import { toast } from "sonner";
 import { useEffect } from "react";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
@@ -96,7 +97,8 @@ export default function Profile() {
 
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <AppLayout showBubbles={true} bubbleIntensity="low">
+    <div className="pb-20">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-white">
         <div className="container py-4">
@@ -302,5 +304,6 @@ export default function Profile() {
 
       <MobileNav />
     </div>
+    </AppLayout>
   );
 }

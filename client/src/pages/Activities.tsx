@@ -26,6 +26,7 @@ import { useLocation, Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import { useState } from "react";
 import { toast } from "sonner";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function Activities() {
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -155,7 +156,8 @@ export default function Activities() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <AppLayout showBubbles={true} bubbleIntensity="low">
+    <div className="pb-20">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-white">
         <div className="container py-4">
@@ -422,5 +424,6 @@ export default function Activities() {
 
       <MobileNav />
     </div>
+    </AppLayout>
   );
 }

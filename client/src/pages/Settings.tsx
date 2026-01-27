@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Activity, CheckCircle, XCircle, Loader2, Settings as SettingsIcon, ChevronLeft } from "lucide-react";
 import { useLocation, Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function Settings() {
   const [isConnecting, setIsConnecting] = useState(false);
@@ -55,7 +56,8 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <AppLayout showBubbles={true} bubbleIntensity="low">
+    <div className="pb-20">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-white">
         <div className="container mx-auto px-4 py-4">
@@ -175,5 +177,6 @@ export default function Settings() {
       {/* Mobile Navigation */}
       <MobileNav />
     </div>
+    </AppLayout>
   );
 }

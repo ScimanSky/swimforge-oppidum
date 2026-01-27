@@ -1,3 +1,4 @@
+import { AppLayout } from "@/components/AppLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -101,7 +102,8 @@ export default function Leaderboard() {
   console.log('[Leaderboard] isLoading:', isLoading);
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <AppLayout showBubbles={true} bubbleIntensity="low">
+    <div className="pb-20">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-white">
         <div className="container py-4">
@@ -271,5 +273,6 @@ export default function Leaderboard() {
 
       <MobileNav />
     </div>
+    </AppLayout>
   );
 }

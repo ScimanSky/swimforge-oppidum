@@ -11,6 +11,7 @@ import { Trophy, Plus, Calendar, Target, Users, Award, Medal } from "lucide-reac
 import { Link, useLocation } from "wouter";
 import MobileNav from "@/components/MobileNav";
 import { toast } from "sonner";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function Challenges() {
   const [, setLocation] = useLocation();
@@ -119,7 +120,8 @@ export default function Challenges() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[oklch(0.15_0.03_250)] via-[oklch(0.12_0.035_250)] to-[oklch(0.10_0.04_250)] pb-20">
+    <AppLayout showBubbles={true} bubbleIntensity="low">
+    <div className="pb-20">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[oklch(0.12_0.035_250_/_0.95)] backdrop-blur-lg border-b border-[oklch(0.30_0.04_250)]">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -397,5 +399,6 @@ export default function Challenges() {
 
       <MobileNav />
     </div>
+    </AppLayout>
   );
 }

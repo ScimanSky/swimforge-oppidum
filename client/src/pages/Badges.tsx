@@ -15,6 +15,7 @@ import MobileNav from "@/components/MobileNav";
 import { useState, useRef, useCallback } from "react";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
 import { toast } from "sonner";
+import { AppLayout } from "@/components/AppLayout";
 
 // Badge images are now handled by getBadgeImageUrl from badgeImages.ts
 
@@ -146,7 +147,8 @@ export default function Badges() {
   };
 
   return (
-    <div className="min-h-screen pb-24">
+    <AppLayout showBubbles={true} bubbleIntensity="low">
+    <div className="pb-24">
       {/* Hidden audio element for badge sounds (dynamic source) */}
       <audio ref={audioRef} preload="auto" />
 
@@ -517,5 +519,6 @@ export default function Badges() {
 
       <MobileNav />
     </div>
+    </AppLayout>
   );
 }

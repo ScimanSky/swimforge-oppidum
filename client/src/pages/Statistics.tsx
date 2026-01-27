@@ -22,6 +22,7 @@ import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { MetricBox } from "@/components/MetricBox";
 import { metricsDefinitions } from "@/data/metricsDefinitions";
+import { AppLayout } from "@/components/AppLayout";
 
 const PERIOD_OPTIONS = [
   { value: 7, label: "7 giorni" },
@@ -74,7 +75,8 @@ export default function Statistics() {
   }));
 
   return (
-    <div className="min-h-screen bg-[oklch(0.15_0.02_250)] text-white pb-20 overflow-x-hidden">
+    <AppLayout showBubbles={true} bubbleIntensity="low" className="text-white">
+    <div className="pb-20 overflow-x-hidden">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[oklch(0.18_0.03_250)] border-b border-[oklch(0.25_0.03_250)] px-4 py-4">
         <div className="flex items-center gap-3">
@@ -514,5 +516,6 @@ export default function Statistics() {
 
       <MobileNav />
     </div>
+    </AppLayout>
   );
 }

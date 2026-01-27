@@ -1,5 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { AppLayout } from "@/components/AppLayout";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -96,7 +97,8 @@ export default function Dashboard() {
     : 0;
 
   return (
-    <div className="min-h-screen pb-24">
+    <AppLayout showBubbles={true} bubbleIntensity="low">
+    <div className="pb-24">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-[var(--navy)]/95 backdrop-blur-lg border-b border-[oklch(0.30_0.04_250_/_0.5)]">
         <div className="container py-4">
@@ -561,5 +563,6 @@ export default function Dashboard() {
       {/* Mobile Navigation */}
       <MobileNav />
     </div>
+    </AppLayout>
   );
 }

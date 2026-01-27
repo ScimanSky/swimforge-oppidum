@@ -4,6 +4,7 @@ import { trpc } from "../lib/trpc";
 import { RefreshCw, Waves, Info, Clock, TrendingUp, ChevronLeft, Activity } from "lucide-react";
 import { Link } from "wouter";
 import MobileNav from "@/components/MobileNav";
+import { AppLayout } from "@/components/AppLayout";
 
 type WorkoutSection = {
   title: string;
@@ -96,7 +97,8 @@ export default function Coach() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[oklch(0.15_0.03_250)] via-[oklch(0.12_0.035_250)] to-[oklch(0.10_0.04_250)] text-white pb-20">
+    <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
+    <div className="pb-20">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[oklch(0.12_0.035_250_/_0.95)] backdrop-blur-lg border-b border-[oklch(0.30_0.04_250)]">
         <div className="max-w-4xl mx-auto px-4 py-4">
@@ -329,5 +331,6 @@ export default function Coach() {
 
       <MobileNav />
     </div>
+    </AppLayout>
   );
 }
