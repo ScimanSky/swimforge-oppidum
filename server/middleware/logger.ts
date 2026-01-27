@@ -3,7 +3,7 @@
  * 
  * Implementa:
  * - Winston Logger per file logging
- * - Sentry per error tracking
+ * - Sentry per error tracking (opzionale)
  * - Audit logging per azioni critiche
  * - Performance monitoring
  */
@@ -17,37 +17,43 @@ import { Request, Response, NextFunction } from 'express';
 // ============================================================================
 
 /**
- * Inizializza Sentry per error tracking
+ * Inizializza Sentry per error tracking (opzionale)
  */
 export function initSentry() {
-  Sentry.init({
-    dsn: process.env.SENTRY_DSN,
-    environment: process.env.NODE_ENV,
-    tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-    integrations: [
-      new Sentry.Integrations.Http({ tracing: true }),
-      new Sentry.Integrations.Express({
-        request: true,
-        serverName: true,
-        transaction: true,
-      }),
-      new Sentry.Integrations.OnUncaughtException(),
-      new Sentry.Integrations.OnUnhandledRejection(),
-    ],
-    beforeSend(event, hint) {
-      // Filtra errori non critici
-      if (event.exception) {
-        const error = hint.originalException;
-        
-        // Non tracciare errori di validazione
-        if (error instanceof Error && error.message.includes('Validation')) {
-          return null;
-        }
-      }
+  // Solo se SENTRY_DSN è configurato
+  if (!process.env.SENTRY_DSN) {
+    console.log('[Logger] Sentry DSN non configurato, skipping initialization');
+    return;
+  }
 
-      return event;
-    },
-  });
+  try {
+    Sentry.init({
+      dsn: process.env.SENTRY_DSN,
+      environment: process.env.NODE_ENV,
+      tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+      integrations: [
+        new Sentry.Integrations.Http({ tracing: true }),
+        new Sentry.Integrations.OnUncaughtException(),
+        new Sentry.Integrations.OnUnhandledRejection(),
+      ],
+      beforeSend(event, hint) {
+        // Filtra errori non critici
+        if (event.exception) {
+          const error = hint.originalException;
+          
+          // Non tracciare errori di validazione
+          if (error instanceof Error && error.message.includes('Validation')) {
+            return null;
+          }
+        }
+
+        return event;
+      },
+    });
+    console.log('[Logger] Sentry initialized successfully');
+  } catch (error) {
+    console.warn('[Logger] Failed to initialize Sentry:', error);
+  }
 }
 
 // ============================================================================
@@ -80,6 +86,14 @@ export function createLogger() {
       environment: process.env.NODE_ENV,
     },
     transports: [
+      // Console output
+      new winston.transports.Console({
+        format: winston.format.combine(
+          winston.format.colorize(),
+          winston.format.simple()
+        ),
+      }),
+
       // Error log file
       new winston.transports.File({
         filename: 'logs/error.log',
@@ -100,70 +114,62 @@ export function createLogger() {
         filename: 'logs/audit.log',
         level: 'info',
         maxsize: 10485760, // 10MB
-        maxFiles: 30, // Mantieni 30 giorni
+        maxFiles: 10,
       }),
     ],
   });
 
-  // Aggiungi console transport in development
-  if (process.env.NODE_ENV !== 'production') {
-    logger.add(
-      new winston.transports.Console({
-        format: winston.format.combine(
-          winston.format.colorize(),
-          winston.format.simple()
-        ),
-      })
-    );
-  }
-
   return logger;
 }
 
+// Crea istanza globale del logger
 export const logger = createLogger();
 
 // ============================================================================
-// REQUEST LOGGING MIDDLEWARE
+// REQUEST LOGGING
 // ============================================================================
 
 /**
- * Middleware per loggare tutte le richieste HTTP
+ * Middleware per loggare richieste HTTP
  */
-export function requestLogger(req: Request, res: Response, next: NextFunction) {
-  const start = Date.now();
-  const requestId = req.headers['x-request-id'] || generateRequestId();
+export function requestLogger(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  const startTime = Date.now();
 
-  // Aggiungi requestId al logger context
-  (req as any).requestId = requestId;
-
-  // Loga richiesta
-  logger.info('Incoming Request', {
-    requestId,
+  // Log richiesta in ingresso
+  logger.info('Incoming request', {
     method: req.method,
     path: req.path,
-    query: req.query,
     ip: req.ip,
     userAgent: req.headers['user-agent'],
-    userId: (req as any).user?.id,
   });
 
   // Intercetta response
   const originalSend = res.send;
   res.send = function (data) {
-    const duration = Date.now() - start;
+    const duration = Date.now() - startTime;
 
-    // Loga risposta
-    logger.info('Outgoing Response', {
-      requestId,
+    // Log risposta
+    logger.info('Outgoing response', {
       method: req.method,
       path: req.path,
-      status: res.statusCode,
+      statusCode: res.statusCode,
       duration: `${duration}ms`,
-      contentLength: res.get('content-length'),
-      userId: (req as any).user?.id,
+      ip: req.ip,
     });
 
-    // Chiama send originale
+    // Segnala se richiesta è lenta
+    if (duration > 5000) {
+      logger.warn('Slow request detected', {
+        method: req.method,
+        path: req.path,
+        duration: `${duration}ms`,
+      });
+    }
+
     return originalSend.call(this, data);
   };
 
@@ -171,65 +177,42 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
 }
 
 // ============================================================================
-// ERROR LOGGING
+// ERROR HANDLING
 // ============================================================================
 
 /**
- * Loga errori critici
- */
-export function logError(
-  error: Error,
-  context: Record<string, any> = {}
-) {
-  logger.error('Application Error', {
-    message: error.message,
-    stack: error.stack,
-    name: error.name,
-    ...context,
-  });
-
-  // Invia a Sentry
-  Sentry.captureException(error, {
-    contexts: {
-      application: context,
-    },
-  });
-}
-
-/**
- * Middleware per error handling
+ * Middleware per gestire errori
  */
 export function errorHandler(
-  err: Error,
+  err: any,
   req: Request,
   res: Response,
   next: NextFunction
 ) {
-  const requestId = (req as any).requestId;
-
-  logger.error('Request Error', {
-    requestId,
+  // Log errore
+  logger.error('Request error', {
     method: req.method,
     path: req.path,
-    status: res.statusCode,
-    error: err.message,
+    statusCode: err.statusCode || 500,
+    message: err.message,
     stack: err.stack,
-    userId: (req as any).user?.id,
+    ip: req.ip,
   });
 
-  // Invia a Sentry
-  Sentry.captureException(err, {
-    tags: {
-      requestId,
-      path: req.path,
-    },
-  });
+  // Invia a Sentry se configurato
+  if (process.env.SENTRY_DSN) {
+    try {
+      Sentry.captureException(err);
+    } catch (sentryError) {
+      console.warn('[Logger] Failed to send error to Sentry:', sentryError);
+    }
+  }
 
-  // Rispondi con errore generico (non esporre dettagli)
-  res.status(500).json({
-    error: 'Internal Server Error',
-    message: 'Si è verificato un errore interno',
-    requestId, // Utile per debugging
+  // Risposta al client
+  res.status(err.statusCode || 500).json({
+    error: err.message || 'Internal Server Error',
+    statusCode: err.statusCode || 500,
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
   });
 }
 
@@ -238,80 +221,18 @@ export function errorHandler(
 // ============================================================================
 
 /**
- * Loga azioni critiche per compliance
+ * Log azioni critiche per audit trail
  */
 export function auditLog(
   action: string,
-  userId: string | null,
-  details: Record<string, any> = {},
-  severity: 'info' | 'warning' | 'critical' = 'info'
+  userId: number | string | undefined,
+  details: Record<string, any>
 ) {
-  logger.info('Audit Log', {
-    type: 'AUDIT',
-    action,
+  logger.info(`[AUDIT] ${action}`, {
     userId,
-    severity,
-    details,
+    ...details,
     timestamp: new Date().toISOString(),
   });
-
-  // Invia a Sentry se critical
-  if (severity === 'critical') {
-    Sentry.captureMessage(`Audit: ${action}`, 'warning', {
-      contexts: {
-        audit: {
-          userId,
-          details,
-        },
-      },
-    });
-  }
-}
-
-/**
- * Loga accessi utente
- */
-export function logUserLogin(userId: string, method: string, ip: string) {
-  auditLog('USER_LOGIN', userId, { method, ip }, 'info');
-}
-
-/**
- * Loga logout utente
- */
-export function logUserLogout(userId: string) {
-  auditLog('USER_LOGOUT', userId, {}, 'info');
-}
-
-/**
- * Loga accesso non autorizzato
- */
-export function logUnauthorizedAccess(userId: string | null, resource: string) {
-  auditLog('UNAUTHORIZED_ACCESS', userId, { resource }, 'warning');
-}
-
-/**
- * Loga modifica dati sensibili
- */
-export function logSensitiveDataChange(
-  userId: string,
-  dataType: string,
-  changes: Record<string, any>
-) {
-  auditLog('SENSITIVE_DATA_CHANGE', userId, { dataType, changes }, 'critical');
-}
-
-/**
- * Loga sincronizzazione Garmin
- */
-export function logGarminSync(userId: string, status: 'success' | 'failure', details: any) {
-  auditLog('GARMIN_SYNC', userId, { status, details }, 'info');
-}
-
-/**
- * Loga richiesta AI Coach
- */
-export function logAiCoachRequest(userId: string, workoutType: string) {
-  auditLog('AI_COACH_REQUEST', userId, { workoutType }, 'info');
 }
 
 // ============================================================================
@@ -319,63 +240,24 @@ export function logAiCoachRequest(userId: string, workoutType: string) {
 // ============================================================================
 
 /**
- * Loga query database lente
+ * Monitora performance di operazioni critiche
  */
-export function logSlowQuery(query: string, duration: number, threshold: number = 1000) {
-  if (duration > threshold) {
-    logger.warn('Slow Database Query', {
-      query: query.substring(0, 200), // Limita lunghezza
-      duration: `${duration}ms`,
-      threshold: `${threshold}ms`,
-    });
-
-    // Invia a Sentry
-    Sentry.captureMessage('Slow Query Detected', 'warning', {
-      contexts: {
-        database: {
-          duration,
-          threshold,
-        },
-      },
-    });
-  }
-}
-
-/**
- * Loga API call lenta
- */
-export function logSlowApiCall(
-  service: string,
-  endpoint: string,
+export function performanceMonitor(
+  operationName: string,
   duration: number,
-  threshold: number = 5000
+  metadata: Record<string, any> = {}
 ) {
-  if (duration > threshold) {
-    logger.warn('Slow API Call', {
-      service,
-      endpoint,
+  if (duration > 1000) {
+    logger.warn(`[PERFORMANCE] Slow operation: ${operationName}`, {
       duration: `${duration}ms`,
-      threshold: `${threshold}ms`,
+      ...metadata,
+    });
+  } else {
+    logger.debug(`[PERFORMANCE] ${operationName}`, {
+      duration: `${duration}ms`,
+      ...metadata,
     });
   }
-}
-
-// ============================================================================
-// UTILITIES
-// ============================================================================
-
-/**
- * Genera unique request ID
- */
-function generateRequestId(): string {
-  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-}
-
-/**
- * Formatta log per leggibilità
- */
-export function formatLog(data: Record<string, any>): string {
-  return JSON.stringify(data, null, 2);
 }
 
 // ============================================================================
@@ -388,16 +270,6 @@ export default {
   logger,
   requestLogger,
   errorHandler,
-  logError,
   auditLog,
-  logUserLogin,
-  logUserLogout,
-  logUnauthorizedAccess,
-  logSensitiveDataChange,
-  logGarminSync,
-  logAiCoachRequest,
-  logSlowQuery,
-  logSlowApiCall,
-  generateRequestId,
-  formatLog,
+  performanceMonitor,
 };
