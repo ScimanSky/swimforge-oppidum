@@ -8,7 +8,7 @@
  * - CSRF Protection
  */
 
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import cors from 'cors';
 import helmet from 'helmet';
 import { Request, Response, NextFunction } from 'express';
@@ -35,8 +35,8 @@ export const loginLimiter = rateLimit({
     return req.ip === process.env.ADMIN_IP;
   },
   keyGenerator: (req) => {
-    // Usa email come chiave se disponibile, altrimenti IP
-    return req.body?.email || req.ip || 'unknown';
+    // Usa email come chiave se disponibile, altrimenti IP (supporta IPv6)
+    return req.body?.email || ipKeyGenerator(req) || 'unknown';
   },
 });
 
@@ -52,7 +52,7 @@ export const registrationLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.ip || 'unknown',
+  keyGenerator: (req) => ipKeyGenerator(req) || 'unknown',
 });
 
 /**
@@ -72,6 +72,7 @@ export const apiLimiter = rateLimit({
     // Skip per endpoint pubblici non critici
     return req.path === '/health' || req.path === '/status';
   },
+  keyGenerator: (req) => ipKeyGenerator(req) || 'unknown',
 });
 
 /**
@@ -87,7 +88,7 @@ export const garminSyncLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.id || req.ip || 'unknown',
+  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req) || 'unknown',
 });
 
 /**
@@ -103,7 +104,7 @@ export const aiCoachLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.id || req.ip || 'unknown',
+  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req) || 'unknown',
 });
 
 // ============================================================================
@@ -156,15 +157,8 @@ export const corsOptions: cors.CorsOptions = {
 
 /**
  * Helmet configuration - Imposta security headers
- * 
- * Headers implementati:
- * - X-Content-Type-Options: nosniff (previene MIME sniffing)
- * - X-Frame-Options: DENY (previene clickjacking)
- * - X-XSS-Protection: 1; mode=block (XSS protection)
- * - Strict-Transport-Security: HSTS (forza HTTPS)
- * - Content-Security-Policy: CSP (previene XSS/injection)
  */
-export const helmetConfig = helmet({
+export const helmetConfig = {
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -186,7 +180,7 @@ export const helmetConfig = helmet({
   noSniff: true,
   xssFilter: true,
   frameguard: { action: 'deny' },
-});
+};
 
 // ============================================================================
 // CSRF PROTECTION
@@ -264,7 +258,7 @@ export function suspiciousRequestLogger(
         ip: req.ip,
         path: req.path,
         method: req.method,
-        userId: req.user?.id,
+        userId: (req as any).user?.id,
       });
       break;
     }
@@ -341,7 +335,7 @@ export function payloadSizeLimit(
  */
 export function applySecurityMiddleware() {
   return [
-    helmet(helmetConfig),
+    helmet(helmetConfig as any),
     cors(corsOptions),
     userAgentValidation,
     suspiciousRequestLogger,
