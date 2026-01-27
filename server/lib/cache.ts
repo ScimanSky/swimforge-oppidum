@@ -18,7 +18,8 @@ export const redis = createClient({
 redis.on('error', (err) => {
   logger.error({
     event: 'redis:error',
-    message: err.message,
+    message: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
   });
 });
 
@@ -81,7 +82,7 @@ export async function getCached<T>(key: string): Promise<T | null> {
     logger.error({
       event: 'cache:get_failed',
       key,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : String(error),
     });
     return null;
   }
@@ -108,7 +109,7 @@ export async function setCached<T>(
     logger.error({
       event: 'cache:set_failed',
       key,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : String(error),
     });
   }
 }
@@ -129,7 +130,7 @@ export async function deleteCached(key: string): Promise<void> {
     logger.error({
       event: 'cache:delete_failed',
       key,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : String(error),
     });
   }
 }
@@ -147,9 +148,10 @@ export async function deleteMultipleCached(keys: string[]): Promise<void> {
       count: keys.length,
     });
   } catch (error) {
-    logger.error({
-      event: 'cache:delete_multiple_failed',
-      error: error instanceof Error ? error.message : 'Unknown error',
+    logger.warn({
+      event: 'redis:connection_warning',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
     });
   }
 }
@@ -194,7 +196,7 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
     logger.error({
       event: 'cache:invalidate_pattern_failed',
       pattern,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : String(error),
     });
   }
 }
@@ -254,7 +256,7 @@ export async function getCacheStats() {
   } catch (error) {
     logger.error({
       event: 'cache:stats_failed',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : String(error),
     });
     return null;
   }

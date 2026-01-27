@@ -69,10 +69,16 @@ export function createLogger() {
     winston.format.errors({ stack: true }),
     winston.format.json(),
     winston.format.printf(({ timestamp, level, message, ...meta }) => {
+      // Ensure message is always a string
+      let finalMessage = message;
+      if (typeof message === 'object' && message !== null) {
+        finalMessage = JSON.stringify(message);
+      }
+      
       return JSON.stringify({
         timestamp,
         level,
-        message,
+        message: finalMessage,
         ...meta,
       });
     })
@@ -190,21 +196,22 @@ export function errorHandler(
   next: NextFunction
 ) {
   // Log errore
-  logger.error('Request error', {
+  logger.error({
+    event: 'request:error',
     method: req.method,
     path: req.path,
     statusCode: err.statusCode || 500,
-    message: err.message,
-    stack: err.stack,
+    message: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
     ip: req.ip,
   });
 
-  // Invia a Sentry se configurato
-  if (process.env.SENTRY_DSN) {
+  // Rollbar error tracking (if configured)
+  if (process.env.ROLLBAR_ACCESS_TOKEN) {
     try {
-      Sentry.captureException(err);
-    } catch (sentryError) {
-      console.warn('[Logger] Failed to send error to Sentry:', sentryError);
+      // Rollbar will be called by the middleware in index.ts
+    } catch (rollbarError) {
+      console.warn('[Logger] Failed to send error to Rollbar:', rollbarError);
     }
   }
 

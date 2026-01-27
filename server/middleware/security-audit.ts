@@ -47,7 +47,7 @@ export async function logSecurityEvent(
       event: 'security:audit_failed',
       action,
       userId,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : String(error),
     });
   }
 }
@@ -106,7 +106,7 @@ export async function detectAnomalousAccess(
     logger.error({
       event: 'security:anomaly_detection_failed',
       userId,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : String(error),
     });
     return false;
   }
@@ -162,7 +162,7 @@ export async function getUserAuditLogs(
     logger.error({
       event: 'security:get_audit_logs_failed',
       userId,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : String(error),
     });
     throw error;
   }
@@ -224,7 +224,7 @@ export async function checkSuspiciousActivity(userId: string) {
     logger.error({
       event: 'security:check_suspicious_failed',
       userId,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : String(error),
     });
     return { suspicious: false };
   }

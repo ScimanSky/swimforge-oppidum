@@ -50,7 +50,7 @@ export async function batchLoadUsers(userIds: string[]) {
     logger.error({
       event: 'batch:load_users_failed',
       count: userIds.length,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : String(error),
     });
     return userIds.map(() => null);
   }
@@ -92,7 +92,7 @@ export async function batchLoadUserBadges(userIds: string[]) {
     logger.error({
       event: 'batch:load_badges_failed',
       count: userIds.length,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : String(error),
     });
     return new Map();
   }
@@ -125,7 +125,7 @@ export async function batchLoadBadgeDefinitions(badgeIds: string[]) {
     logger.error({
       event: 'batch:load_badge_definitions_failed',
       count: badgeIds.length,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : String(error),
     });
     return [];
   }
@@ -177,7 +177,7 @@ export async function getLeaderboardOptimized(limit: number = 100, offset: numbe
   } catch (error) {
     logger.error({
       event: 'query:leaderboard_optimized_failed',
-      error: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : String(error),
     });
     return [];
   }
@@ -228,7 +228,7 @@ export async function getUserStatsOptimized(userId: string) {
     logger.error({
       event: 'query:user_stats_optimized_failed',
       userId,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : String(error),
     });
     return {
       totalActivities: 0,
@@ -279,7 +279,7 @@ export async function getUserBadgesOptimized(userId: string) {
     logger.error({
       event: 'query:user_badges_optimized_failed',
       userId,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      message: error instanceof Error ? error.message : String(error),
     });
     return [];
   }
