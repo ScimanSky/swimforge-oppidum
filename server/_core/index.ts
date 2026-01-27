@@ -9,6 +9,10 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { completeChallenges } from "../cron_challenges";
 
+// Security middleware
+import { initSentry, requestLogger, errorHandler } from "../middleware/logger";
+import { applySecurityMiddleware, applyRateLimiting, loginLimiter } from "../middleware/security";
+
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
@@ -29,11 +33,25 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  // Initialize Sentry for error tracking
+  initSentry();
+
   const app = express();
   const server = createServer(app);
+
+  // Apply security middleware (CORS, headers, etc.)
+  app.use(...applySecurityMiddleware());
+
+  // Apply rate limiting
+  app.use(...applyRateLimiting());
+
+  // Request logging
+  app.use(requestLogger);
+
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // tRPC API
@@ -61,6 +79,9 @@ async function startServer() {
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
   });
+
+  // Error handling middleware (must be last)
+  app.use(errorHandler);
 
   // Start cron job for challenge completion (runs every hour)
   setInterval(async () => {
