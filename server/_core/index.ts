@@ -12,7 +12,7 @@ import { setupSwagger } from "../swagger-setup";
 import { connectRedis } from "../lib/cache";
 
 // Security middleware
-import { initSentry, requestLogger, errorHandler } from "../middleware/logger";
+import { requestLogger, errorHandler } from "../middleware/logger";
 import { applySecurityMiddleware, applyRateLimiting, loginLimiter } from "../middleware/security";
 import { rollbar, captureError } from "../middleware/rollbar-init";
 
@@ -36,9 +36,6 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
-  // Initialize Sentry for error tracking
-  initSentry();
-
   // Connect to Redis
   await connectRedis();
 

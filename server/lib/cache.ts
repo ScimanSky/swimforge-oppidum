@@ -6,7 +6,7 @@
  */
 
 import { createClient } from 'redis';
-import { logger } from './logger';
+import { logger } from '../middleware/logger';
 
 export const redis = createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',

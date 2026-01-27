@@ -11,7 +11,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../db';
 import { securityAuditLog } from '../db/schema';
-import { logger } from '../lib/logger';
+import { logger } from '../middleware/logger';
 
 /**
  * Log security-relevant actions

@@ -8,7 +8,7 @@
 import { db } from '../db';
 import { users, userBadges, badgeDefinitions } from '../db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { logger } from './logger';
+import { logger } from '../middleware/logger';
 
 /**
  * Batch load users by IDs
