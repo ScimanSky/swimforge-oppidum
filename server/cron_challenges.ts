@@ -76,7 +76,13 @@ export async function completeChallenges(): Promise<{
             ON CONFLICT (user_id, badge_id) DO NOTHING
           `);
         } catch (error) {
-          console.log(`[Cron] Badge ${badgeName} not found in database, skipping award`);
+          // Badge not found is expected, just log as info
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          if (errorMessage.includes('not found') || errorMessage.includes('no rows')) {
+            console.log(`[Cron] Badge ${badgeName} not found in database, skipping award`);
+          } else {
+            console.warn(`[Cron] Unexpected error awarding badge ${badgeName}:`, errorMessage);
+          }
         }
 
         // Award bonus XP to winner (500 XP)
@@ -110,7 +116,13 @@ export async function completeChallenges(): Promise<{
     console.log(`[Cron] Completed ${completedCount} challenges, ${winnersCount} winners determined`);
     return { completed: completedCount, winners: winnersCount };
   } catch (error) {
-    console.error("[Cron] Error completing challenges:", error);
+    // Log error with proper message extraction
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("[Cron] Error completing challenges:", {
+      message: errorMessage,
+      stack: errorStack,
+    });
     return { completed: 0, winners: 0 };
   }
 }
@@ -134,7 +146,13 @@ export async function triggerChallengeCompletion(challengeId: number): Promise<b
     await completeChallenges();
     return true;
   } catch (error) {
-    console.error("[Cron] Error triggering challenge completion:", error);
+    // Log error with proper message extraction
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("[Cron] Error triggering challenge completion:", {
+      message: errorMessage,
+      stack: errorStack,
+    });
     return false;
   }
 }
