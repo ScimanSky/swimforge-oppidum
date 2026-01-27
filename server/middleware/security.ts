@@ -34,7 +34,7 @@ export const loginLimiter = rateLimit({
     // Skip per IP admin
     return req.ip === process.env.ADMIN_IP;
   },
-  keyGenerator: (req) => {
+  keyGenerator: (req: any) => {
     // Usa email come chiave se disponibile, altrimenti IP (supporta IPv6)
     return req.body?.email || ipKeyGenerator(req) || 'unknown';
   },
@@ -52,7 +52,7 @@ export const registrationLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => ipKeyGenerator(req) || 'unknown',
+  keyGenerator: (req: any) => ipKeyGenerator(req) || 'unknown',
 });
 
 /**
@@ -72,7 +72,7 @@ export const apiLimiter = rateLimit({
     // Skip per endpoint pubblici non critici
     return req.path === '/health' || req.path === '/status';
   },
-  keyGenerator: (req) => ipKeyGenerator(req) || 'unknown',
+  keyGenerator: (req: any) => ipKeyGenerator(req) || 'unknown',
 });
 
 /**
@@ -88,7 +88,7 @@ export const garminSyncLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req) || 'unknown',
+  keyGenerator: (req: any) => (req as any).user?.id || ipKeyGenerator(req) || 'unknown',
 });
 
 /**
@@ -104,7 +104,7 @@ export const aiCoachLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.user?.id || ipKeyGenerator(req) || 'unknown',
+  keyGenerator: (req: any) => (req as any).user?.id || ipKeyGenerator(req) || 'unknown',
 });
 
 // ============================================================================
@@ -122,7 +122,7 @@ export const aiCoachLimiter = rateLimit({
  */
 export const corsOptions: cors.CorsOptions = {
   // Origini consentite
-  origin: (origin, callback) => {
+  origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     const allowedOrigins = (
       process.env.ALLOWED_ORIGINS || 'https://swimforge-frontend.onrender.com'
     ).split(',');
@@ -158,7 +158,7 @@ export const corsOptions: cors.CorsOptions = {
 /**
  * Helmet configuration - Imposta security headers
  */
-export const helmetConfig = {
+export const helmetConfig: Parameters<typeof helmet>[0] = {
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
@@ -166,12 +166,12 @@ export const helmetConfig = {
       styleSrc: ["'self'", "'unsafe-inline'", 'fonts.googleapis.com'],
       fontSrc: ["'self'", 'fonts.gstatic.com'],
       imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'", 'api.garmin.com', 'api.strava.com'],
+      connectSrc: ["'self'", 'api.garmin.com', 'api.strava.com', 'https://sentry.io'],
       frameSrc: ["'none'"],
       objectSrc: ["'none'"],
     },
   },
-  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' } as any,
   hsts: {
     maxAge: 31536000, // 1 anno
     includeSubDomains: true,
@@ -221,7 +221,7 @@ export function csrfProtection(
 
   // Valida token (implementazione semplificata)
   // In produzione, usa una libreria come csurf
-  if (token !== req.session?.csrfToken) {
+  if (token !== (req as any).session?.csrfToken) {
     return res.status(403).json({
       error: 'CSRF Validation Failed',
       message: 'CSRF token non valido',
@@ -335,7 +335,7 @@ export function payloadSizeLimit(
  */
 export function applySecurityMiddleware() {
   return [
-    helmet(helmetConfig as any),
+    helmet(helmetConfig),
     cors(corsOptions),
     userAgentValidation,
     suspiciousRequestLogger,
