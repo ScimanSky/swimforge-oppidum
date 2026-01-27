@@ -34,20 +34,15 @@ export async function logSecurityEvent(
       createdAt: new Date(),
     });
 
-    logger.info({
+    logger.info(`Security audit: ${action} on ${tableName} by user ${userId}`, {
       event: 'security:audit',
-      action,
-      userId,
-      tableName,
       resourceId,
       ip: req?.ip,
     });
   } catch (error) {
-    logger.error({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Security audit failed for ${action} on ${tableName} by user ${userId}: ${message}`, {
       event: 'security:audit_failed',
-      action,
-      userId,
-      message: error instanceof Error ? error.message : String(error),
     });
   }
 }
@@ -90,11 +85,8 @@ export async function detectAnomalousAccess(
 
     // Alert if access is 10x faster than average (potential attack)
     if (Math.abs(lastTimeDiff) < avgTimeDiff / 10) {
-      logger.warn({
+      logger.warn(`Anomalous access detected: ${action} on ${tableName} by user ${userId}`, {
         event: 'security:anomalous_access',
-        userId,
-        tableName,
-        action,
         avgTimeDiff,
         lastTimeDiff,
       });
@@ -103,10 +95,9 @@ export async function detectAnomalousAccess(
 
     return false;
   } catch (error) {
-    logger.error({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Anomaly detection failed for user ${userId}: ${message}`, {
       event: 'security:anomaly_detection_failed',
-      userId,
-      message: error instanceof Error ? error.message : String(error),
     });
     return false;
   }
@@ -159,10 +150,9 @@ export async function getUserAuditLogs(
 
     return logs;
   } catch (error) {
-    logger.error({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Get audit logs failed for user ${userId}: ${message}`, {
       event: 'security:get_audit_logs_failed',
-      userId,
-      message: error instanceof Error ? error.message : String(error),
     });
     throw error;
   }
@@ -186,11 +176,8 @@ export async function checkSuspiciousActivity(userId: string) {
 
     // Alert if more than 100 accesses in 1 hour
     if (recentAccess.length > 100) {
-      logger.error({
+      logger.error(`Suspicious activity detected: user ${userId} made ${recentAccess.length} accesses in 1 hour`, {
         event: 'security:suspicious_activity',
-        userId,
-        accessCount: recentAccess.length,
-        timeWindow: '1 hour',
       });
 
       return {
@@ -206,10 +193,8 @@ export async function checkSuspiciousActivity(userId: string) {
     );
 
     if (stravaAccess.length > 10) {
-      logger.warn({
+      logger.warn(`Excessive Strava token access: user ${userId} accessed ${stravaAccess.length} times`, {
         event: 'security:excessive_strava_access',
-        userId,
-        accessCount: stravaAccess.length,
       });
 
       return {
@@ -221,10 +206,9 @@ export async function checkSuspiciousActivity(userId: string) {
 
     return { suspicious: false };
   } catch (error) {
-    logger.error({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Check suspicious activity failed for user ${userId}: ${message}`, {
       event: 'security:check_suspicious_failed',
-      userId,
-      message: error instanceof Error ? error.message : String(error),
     });
     return { suspicious: false };
   }

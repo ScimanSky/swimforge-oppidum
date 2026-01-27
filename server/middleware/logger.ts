@@ -231,12 +231,9 @@ export function errorHandler(
     return;
   }
   
-  logger.error({
+  logger.error(`Request error: ${req.method} ${req.path} - ${errorMessage}`, {
     event: 'request:error',
-    method: req.method,
-    path: req.path,
     statusCode: err.statusCode || 500,
-    message: errorMessage,
     stack: err instanceof Error ? err.stack : undefined,
     ip: req.ip,
   });

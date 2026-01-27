@@ -16,17 +16,16 @@ export const redis = createClient({
 });
 
 redis.on('error', (err) => {
-  logger.error({
+  const message = err instanceof Error ? err.message : String(err);
+  logger.error(`Redis error: ${message}`, {
     event: 'redis:error',
-    message: err instanceof Error ? err.message : String(err),
     stack: err instanceof Error ? err.stack : undefined,
   });
 });
 
 redis.on('connect', () => {
-  logger.info({
+  logger.info('Connected to Redis', {
     event: 'redis:connected',
-    message: 'Connected to Redis',
   });
 });
 
@@ -40,12 +39,11 @@ export async function connectRedis() {
     );
 
     await Promise.race([connectionPromise, timeoutPromise]);
-    logger.info({ event: 'redis:ready', message: 'Redis connected successfully' });
+    logger.info('Redis connected successfully', { event: 'redis:ready' });
   } catch (error) {
-    logger.warn({
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.warn(`Redis connection warning: ${message}. Continuing without Redis cache`, {
       event: 'redis:connection_warning',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      note: 'Continuing without Redis cache',
     });
     // Don't throw - allow app to continue without Redis
   }
@@ -72,17 +70,15 @@ export async function getCached<T>(key: string): Promise<T | null> {
     const cached = await redis.get(key);
     if (!cached) return null;
 
-    logger.debug({
+    logger.debug(`Cache hit: ${key}`, {
       event: 'cache:hit',
-      key,
     });
 
     return JSON.parse(cached) as T;
   } catch (error) {
-    logger.error({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Cache get failed for key ${key}: ${message}`, {
       event: 'cache:get_failed',
-      key,
-      message: error instanceof Error ? error.message : String(error),
     });
     return null;
   }
@@ -100,16 +96,13 @@ export async function setCached<T>(
     if (!redis.isOpen) return; // Redis not connected
     await redis.setEx(key, ttl, JSON.stringify(value));
 
-    logger.debug({
+    logger.debug(`Cache set: ${key} (TTL: ${ttl}s)`, {
       event: 'cache:set',
-      key,
-      ttl,
     });
   } catch (error) {
-    logger.error({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Cache set failed for key ${key}: ${message}`, {
       event: 'cache:set_failed',
-      key,
-      message: error instanceof Error ? error.message : String(error),
     });
   }
 }
@@ -122,15 +115,13 @@ export async function deleteCached(key: string): Promise<void> {
     if (!redis.isOpen) return; // Redis not connected
     await redis.del(key);
 
-    logger.debug({
+    logger.debug(`Cache delete: ${key}`, {
       event: 'cache:delete',
-      key,
     });
   } catch (error) {
-    logger.error({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Cache delete failed for key ${key}: ${message}`, {
       event: 'cache:delete_failed',
-      key,
-      message: error instanceof Error ? error.message : String(error),
     });
   }
 }
@@ -143,14 +134,13 @@ export async function deleteMultipleCached(keys: string[]): Promise<void> {
     if (!redis.isOpen || keys.length === 0) return; // Redis not connected
     await redis.del(keys);
 
-    logger.debug({
+    logger.debug(`Cache delete multiple: ${keys.length} keys`, {
       event: 'cache:delete_multiple',
-      count: keys.length,
     });
   } catch (error) {
-    logger.warn({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`Redis connection warning: ${message}`, {
       event: 'redis:connection_warning',
-      message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
     });
   }
@@ -186,17 +176,14 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
     const keys = await redis.keys(pattern);
     if (keys.length > 0) {
       await redis.del(keys);
-      logger.debug({
+      logger.debug(`Cache invalidate pattern: ${pattern} (${keys.length} keys)`, {
         event: 'cache:invalidate_pattern',
-        pattern,
-        count: keys.length,
       });
     }
   } catch (error) {
-    logger.error({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Cache invalidate pattern failed for ${pattern}: ${message}`, {
       event: 'cache:invalidate_pattern_failed',
-      pattern,
-      message: error instanceof Error ? error.message : String(error),
     });
   }
 }
@@ -254,9 +241,9 @@ export async function getCacheStats() {
       info,
     };
   } catch (error) {
-    logger.error({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Cache stats failed: ${message}`, {
       event: 'cache:stats_failed',
-      message: error instanceof Error ? error.message : String(error),
     });
     return null;
   }

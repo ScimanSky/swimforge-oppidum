@@ -36,10 +36,8 @@ export async function batchLoadUsers(userIds: string[]) {
 
     const duration = Date.now() - startTime;
 
-    logger.debug({
+    logger.debug(`Batch load users: ${userIds.length} users in ${duration}ms`, {
       event: 'batch:load_users',
-      count: userIds.length,
-      duration,
     });
 
     // Return in same order as requested
@@ -47,10 +45,9 @@ export async function batchLoadUsers(userIds: string[]) {
       (id) => loadedUsers.find((u) => u.id === id) || null
     );
   } catch (error) {
-    logger.error({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Batch load users failed (${userIds.length} users): ${message}`, {
       event: 'batch:load_users_failed',
-      count: userIds.length,
-      message: error instanceof Error ? error.message : String(error),
     });
     return userIds.map(() => null);
   }
@@ -72,10 +69,8 @@ export async function batchLoadUserBadges(userIds: string[]) {
 
     const duration = Date.now() - startTime;
 
-    logger.debug({
+    logger.debug(`Batch load badges: ${userIds.length} users in ${duration}ms`, {
       event: 'batch:load_badges',
-      count: userIds.length,
-      duration,
     });
 
     // Group by user ID
@@ -89,10 +84,9 @@ export async function batchLoadUserBadges(userIds: string[]) {
 
     return badgesByUser;
   } catch (error) {
-    logger.error({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Batch load badges failed (${userIds.length} users): ${message}`, {
       event: 'batch:load_badges_failed',
-      count: userIds.length,
-      message: error instanceof Error ? error.message : String(error),
     });
     return new Map();
   }
@@ -114,18 +108,15 @@ export async function batchLoadBadgeDefinitions(badgeIds: string[]) {
 
     const duration = Date.now() - startTime;
 
-    logger.debug({
+    logger.debug(`Batch load badge definitions: ${badgeIds.length} badges in ${duration}ms`, {
       event: 'batch:load_badge_definitions',
-      count: badgeIds.length,
-      duration,
     });
 
     return defs;
   } catch (error) {
-    logger.error({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Batch load badge definitions failed (${badgeIds.length} badges): ${message}`, {
       event: 'batch:load_badge_definitions_failed',
-      count: badgeIds.length,
-      message: error instanceof Error ? error.message : String(error),
     });
     return [];
   }
@@ -167,17 +158,15 @@ export async function getLeaderboardOptimized(limit: number = 100, offset: numbe
 
     const duration = Date.now() - startTime;
 
-    logger.debug({
+    logger.debug(`Leaderboard query optimized: ${leaderboard.length} entries in ${duration}ms`, {
       event: 'query:leaderboard_optimized',
-      count: leaderboard.length,
-      duration,
     });
 
     return leaderboard;
   } catch (error) {
-    logger.error({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`Leaderboard query failed: ${message}`, {
       event: 'query:leaderboard_optimized_failed',
-      message: error instanceof Error ? error.message : String(error),
     });
     return [];
   }
@@ -204,10 +193,8 @@ export async function getUserStatsOptimized(userId: string) {
 
     const duration = Date.now() - startTime;
 
-    logger.debug({
+    logger.debug(`User stats query optimized for ${userId}: ${duration}ms`, {
       event: 'query:user_stats_optimized',
-      userId,
-      duration,
     });
 
     // Calculate aggregates
@@ -225,10 +212,9 @@ export async function getUserStatsOptimized(userId: string) {
       avgPace,
     };
   } catch (error) {
-    logger.error({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`User stats query failed for ${userId}: ${message}`, {
       event: 'query:user_stats_optimized_failed',
-      userId,
-      message: error instanceof Error ? error.message : String(error),
     });
     return {
       totalActivities: 0,
@@ -267,19 +253,15 @@ export async function getUserBadgesOptimized(userId: string) {
 
     const duration = Date.now() - startTime;
 
-    logger.debug({
+    logger.debug(`User badges query optimized for ${userId}: ${badges.length} badges in ${duration}ms`, {
       event: 'query:user_badges_optimized',
-      userId,
-      count: badges.length,
-      duration,
     });
 
     return badges;
   } catch (error) {
-    logger.error({
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`User badges query failed for ${userId}: ${message}`, {
       event: 'query:user_badges_optimized_failed',
-      userId,
-      message: error instanceof Error ? error.message : String(error),
     });
     return [];
   }
@@ -296,12 +278,9 @@ export function logQueryPerformance(
 ) {
   const improvement = ((expectedBefore - expectedAfter) / expectedBefore * 100).toFixed(0);
 
-  logger.info({
+  logger.info(`Query optimized: ${queryName} (${improvement}% improvement, ${duration}ms)`, {
     event: 'performance:query_optimized',
-    query: queryName,
-    duration,
     expectedBefore,
     expectedAfter,
-    improvement: `${improvement}%`,
   });
 }
