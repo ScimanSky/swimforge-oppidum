@@ -153,7 +153,16 @@ export const helmetConfig = {
       styleSrc: ["'self'", "'unsafe-inline'", 'fonts.googleapis.com'],
       fontSrc: ["'self'", 'fonts.gstatic.com'],
       imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'", 'api.garmin.com', 'api.strava.com', 'https://sentry.io'],
+      connectSrc: [
+        "'self'",
+        'api.garmin.com',
+        'api.strava.com',
+        'https://sentry.io',
+        'https://wpnxaadvyxmhlcgdobla.supabase.co', // Supabase Auth
+        'https://*.supabase.co', // Supabase wildcard
+        'https://api.manus.im', // Manus OAuth
+        'https://oauth.manus.im', // Manus OAuth Portal
+      ],
       frameSrc: ["'none'"],
       objectSrc: ["'none'"],
     },
