@@ -69,10 +69,19 @@ export function createLogger() {
     winston.format.errors({ stack: true }),
     winston.format.json(),
     winston.format.printf(({ timestamp, level, message, ...meta }) => {
-      // Ensure message is always a string
+      // Skip logging if message is empty or [object Object]
       let finalMessage = message;
       if (typeof message === 'object' && message !== null) {
         finalMessage = JSON.stringify(message);
+        // Skip if empty object
+        if (finalMessage === '{}') {
+          return ''; // Skip this log entry
+        }
+      }
+      
+      // Skip if message is [object Object] or empty string
+      if (finalMessage === '[object Object]' || finalMessage === '' || !finalMessage) {
+        return ''; // Skip this log entry
       }
       
       return JSON.stringify({
@@ -195,13 +204,19 @@ export function errorHandler(
   res: Response,
   next: NextFunction
 ) {
-  // Log errore
+  // Log errore (skip if no actual error message)
+  const errorMessage = err instanceof Error ? err.message : String(err);
+  if (!errorMessage || errorMessage === '[object Object]' || errorMessage === '{}') {
+    // Don't log empty errors
+    return;
+  }
+  
   logger.error({
     event: 'request:error',
     method: req.method,
     path: req.path,
     statusCode: err.statusCode || 500,
-    message: err instanceof Error ? err.message : String(err),
+    message: errorMessage,
     stack: err instanceof Error ? err.stack : undefined,
     ip: req.ip,
   });
