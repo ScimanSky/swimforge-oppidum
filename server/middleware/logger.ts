@@ -110,7 +110,22 @@ export function createLogger() {
       new winston.transports.Console({
         format: winston.format.combine(
           winston.format.colorize(),
-          winston.format.simple()
+          winston.format.printf(({ level, message, timestamp, ...meta }) => {
+            // Se message è un oggetto, serializzalo correttamente
+            let msg: string;
+            if (typeof message === 'object' && message !== null) {
+              msg = JSON.stringify(message);
+            } else {
+              msg = String(message || '');
+            }
+            
+            // Se ci sono metadati significativi, aggiungili
+            const metaStr = Object.keys(meta).length > 0 
+              ? ` ${JSON.stringify(meta)}` 
+              : '';
+            
+            return `${level}: ${msg}${metaStr}`;
+          })
         ),
       }),
 
