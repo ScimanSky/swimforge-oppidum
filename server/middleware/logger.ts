@@ -84,6 +84,11 @@ export function createLogger() {
         return ''; // Skip this log entry
       }
       
+      // Skip error level logs that don't have meaningful content
+      if (level === 'error' && (!meta || Object.keys(meta).length === 0)) {
+        return ''; // Skip error logs with no metadata
+      }
+      
       return JSON.stringify({
         timestamp,
         level,
