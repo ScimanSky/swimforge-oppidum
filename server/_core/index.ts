@@ -12,6 +12,7 @@ import { completeChallenges } from "../cron_challenges";
 // Security middleware
 import { initSentry, requestLogger, errorHandler } from "../middleware/logger";
 import { applySecurityMiddleware, applyRateLimiting, loginLimiter } from "../middleware/security";
+import { rollbar, captureError } from "../middleware/rollbar-init";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -82,6 +83,17 @@ async function startServer() {
 
   // Error handling middleware (must be last)
   app.use(errorHandler);
+
+  // Rollbar error handler (must be after other error handlers)
+  app.use((err: any, req: any, res: any, next: any) => {
+    captureError(err, {
+      url: req.url,
+      method: req.method,
+      ip: req.ip,
+    });
+    // Don't send error details to client
+    res.status(500).json({ error: "Internal Server Error" });
+  });
 
   // Start cron job for challenge completion (runs every hour)
   setInterval(async () => {
