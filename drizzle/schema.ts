@@ -255,6 +255,10 @@ export const aiCoachWorkouts = pgTable("ai_coach_workouts", {
   workoutData: text("workout_data").notNull(), // JSON string containing workout structure
   generatedAt: timestamp("generated_at").defaultNow().notNull(),
   expiresAt: timestamp("expires_at").notNull(), // Workouts expire after 24 hours
+}, (table) => {
+  return {
+    userWorkoutUnique: unique().on(table.userId, table.workoutType),
+  };
 });
 
 // Type exports
