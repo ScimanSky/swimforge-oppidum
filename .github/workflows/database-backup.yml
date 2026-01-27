@@ -1,0 +1,77 @@
+name: Database Backup
+
+on:
+  schedule:
+    # Run every day at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create backup directory
+        run: mkdir -p backups
+
+      - name: Backup PostgreSQL database
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          # Extract connection details from DATABASE_URL
+          # Format: postgresql://user:password@host:port/database
+          
+          # Install PostgreSQL client
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          
+          # Create backup with timestamp
+          BACKUP_FILE="backups/swimforge-backup-$(date +%Y%m%d-%H%M%S).sql"
+          
+          # Dump database
+          pg_dump "$DATABASE_URL" > "$BACKUP_FILE"
+          
+          # Compress backup
+          gzip "$BACKUP_FILE"
+          
+          echo "BACKUP_FILE=${BACKUP_FILE}.gz" >> $GITHUB_ENV
+
+      - name: Upload backup to GitHub Releases
+        uses: softprops/action-gh-release@v1
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        with:
+          files: backups/*.sql.gz
+          tag_name: backup-$(date +%Y%m%d)
+          body: |
+            Automated database backup
+            Date: $(date)
+            
+            To restore this backup:
+            ```bash
+            gunzip swimforge-backup-*.sql.gz
+            psql $DATABASE_URL < swimforge-backup-*.sql
+            ```
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup old backups
+        run: |
+          # Keep only last 30 days of backups
+          find backups -name "*.sql.gz" -mtime +30 -delete
+
+      - name: Notify on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ Database backup failed! Check the workflow logs.'
+            })
