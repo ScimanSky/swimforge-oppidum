@@ -131,7 +131,7 @@ async function generateWorkout(
     const result = await Promise.race([
       model.generateContent(prompt),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Gemini API timeout after 30s')), 30000)
+        setTimeout(() => reject(new Error('Gemini API timeout after 60s')), 60000)
       )
     ]) as any;
     
