@@ -23,7 +23,10 @@ import { updateUserProfileBadge } from "./db_profile_badges";
 
 // Strava microservice configuration
 const STRAVA_SERVICE_URL = process.env.STRAVA_SERVICE_URL || "https://swimforge-strava-service.onrender.com";
-const STRAVA_SERVICE_SECRET = process.env.STRAVA_SERVICE_SECRET || "swimforge-strava-secret-key-2026";
+const STRAVA_SERVICE_SECRET = process.env.STRAVA_SERVICE_SECRET;
+if (!STRAVA_SERVICE_SECRET) {
+  throw new Error("STRAVA_SERVICE_SECRET is required");
+}
 
 interface StravaServiceActivity {
   activity_id: string;

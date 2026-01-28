@@ -21,7 +21,10 @@ import { updateUserProfileBadge } from "./db_profile_badges";
 
 // Garmin microservice configuration
 const GARMIN_SERVICE_URL = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
-const GARMIN_SERVICE_SECRET = process.env.GARMIN_SERVICE_SECRET || "swimforge-garmin-secret-key";
+const GARMIN_SERVICE_SECRET = process.env.GARMIN_SERVICE_SECRET;
+if (!GARMIN_SERVICE_SECRET) {
+  throw new Error("GARMIN_SERVICE_SECRET is required");
+}
 
 interface GarminServiceActivity {
   activity_id: string;
