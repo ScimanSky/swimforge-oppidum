@@ -108,23 +108,31 @@ export default function Badges() {
   const earnedCount = badgeProgress?.filter((b) => b.earned).length || 0;
   const totalCount = badgeProgress?.length || 0;
 
+  const soundBasePath = "/sounds/badges";
+  const soundGroups = {
+    splash: [1, 7, 13, 19, 25, 31, 37, 43, 49],
+    bubbles: [2, 8, 14, 20, 26, 32, 38, 44, 50],
+    waves: [3, 9, 15, 21, 27, 33, 39, 45],
+    bells: [4, 10, 16, 22, 28, 34, 40, 46],
+    drops: [5, 11, 17, 23, 29, 35, 41, 47],
+    dives: [6, 12, 18, 24, 30, 36, 42, 48],
+  };
+
+  const raritySoundPools: Record<string, number[]> = {
+    common: [...soundGroups.drops, ...soundGroups.bubbles],
+    uncommon: [...soundGroups.bubbles, ...soundGroups.waves],
+    rare: [...soundGroups.bells, ...soundGroups.waves],
+    epic: [...soundGroups.splash, ...soundGroups.dives],
+    legendary: [...soundGroups.splash, ...soundGroups.dives],
+  };
+
   // Get sound URL based on badge number and rarity
   const getBadgeSoundUrl = useCallback((badgeNumber: number, rarity: string): string => {
-    // Legendary badges always get epic sound
-    if (rarity === 'legendary') {
-      return 'https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3';
-    }
-    
-    // Otherwise use badge number for progression
-    if (badgeNumber <= 10) {
-      return 'https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3'; // Quick Win
-    } else if (badgeNumber <= 20) {
-      return 'https://assets.mixkit.co/active_storage/sfx/2000/2000-preview.mp3'; // Bonus Earned
-    } else if (badgeNumber <= 30) {
-      return 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3'; // Achievement Unlocked
-    } else {
-      return 'https://assets.mixkit.co/active_storage/sfx/2018/2018-preview.mp3'; // Epic Win
-    }
+    const pool = raritySoundPools[rarity] || raritySoundPools.common;
+    const safeIndex = pool.length > 0 ? (Math.max(badgeNumber, 1) - 1) % pool.length : 0;
+    const soundNumber = pool[safeIndex] || 1;
+    const padded = String(soundNumber).padStart(2, "0");
+    return `${soundBasePath}/badge_unlock_${padded}.wav`;
   }, []);
 
   // Play sound effect with dynamic URL
