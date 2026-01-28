@@ -83,6 +83,7 @@ Aggiungi queste variabili in Vercel:
 | `GARMIN_SERVICE_SECRET` | La stessa chiave usata in Render |
 | `STRAVA_SERVICE_SECRET` | La stessa chiave usata nel servizio Strava |
 | `TOKEN_ENCRYPTION_KEY` | Chiave 32 byte per cifrare token |
+| `ENABLE_SWAGGER` | Abilita Swagger in produzione | `true` (solo se necessario) |
 
 ### 3.4 Deploy
 1. Clicca **Deploy**

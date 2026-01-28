@@ -123,7 +123,10 @@ export const corsOptions: cors.CorsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     const allowedOrigins = (
       process.env.ALLOWED_ORIGINS || 'https://swimforge-frontend.onrender.com'
-    ).split(',');
+    )
+      .split(',')
+      .map(value => value.trim())
+      .filter(Boolean);
 
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);

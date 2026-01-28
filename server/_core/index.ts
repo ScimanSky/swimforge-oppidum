@@ -62,8 +62,12 @@ async function startServer() {
   // Request logging
   app.use(requestLogger);
 
-  // Setup Swagger documentation
-  setupSwagger(app);
+  // Setup Swagger documentation (disable in production unless explicitly enabled)
+  const enableSwagger =
+    process.env.NODE_ENV !== "production" || process.env.ENABLE_SWAGGER === "true";
+  if (enableSwagger) {
+    setupSwagger(app);
+  }
 
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
