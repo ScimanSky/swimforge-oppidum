@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { Trophy, ArrowLeft, Calendar, Target, Users, Medal, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
 import MobileNav from "@/components/MobileNav";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function ChallengeDetail() {
   const params = useParams<{ id: string }>();
@@ -100,23 +101,27 @@ export default function ChallengeDetail() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[oklch(0.20_0.05_220)] via-[oklch(0.15_0.03_220)] to-[oklch(0.10_0.02_220)] pb-24">
-        <div className="container mx-auto px-4 py-8">
-          <p className="text-center text-[oklch(0.60_0.03_220)]">Caricamento...</p>
+      <AppLayout showBubbles={true} bubbleIntensity="low">
+        <div className="pb-24">
+          <div className="container mx-auto px-4 py-8">
+            <p className="text-center text-[oklch(0.60_0.03_220)]">Caricamento...</p>
+          </div>
+          <MobileNav />
         </div>
-        <MobileNav />
-      </div>
+      </AppLayout>
     );
   }
 
   if (!challenge) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[oklch(0.20_0.05_220)] via-[oklch(0.15_0.03_220)] to-[oklch(0.10_0.02_220)] pb-24">
-        <div className="container mx-auto px-4 py-8">
-          <p className="text-center text-[oklch(0.60_0.03_220)]">Sfida non trovata</p>
+      <AppLayout showBubbles={true} bubbleIntensity="low">
+        <div className="pb-24">
+          <div className="container mx-auto px-4 py-8">
+            <p className="text-center text-[oklch(0.60_0.03_220)]">Sfida non trovata</p>
+          </div>
+          <MobileNav />
         </div>
-        <MobileNav />
-      </div>
+      </AppLayout>
     );
   }
 
@@ -167,8 +172,9 @@ export default function ChallengeDetail() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[oklch(0.20_0.05_220)] via-[oklch(0.15_0.03_220)] to-[oklch(0.10_0.02_220)] pb-24">
-      <div className="container mx-auto px-4 py-8 space-y-8">
+    <AppLayout showBubbles={true} bubbleIntensity="low">
+      <div className="pb-24">
+        <div className="container mx-auto px-4 py-8 space-y-8">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button
@@ -290,9 +296,9 @@ export default function ChallengeDetail() {
             )}
           </div>
         </motion.div>
+        </div>
+        <MobileNav />
       </div>
-
-      <MobileNav />
-    </div>
+    </AppLayout>
   );
 }
