@@ -156,8 +156,8 @@
   /* Gaming Card Style - Glassmorphism with Neon Border */
   .game-card {
     background: linear-gradient(135deg, 
-      oklch(0.18 0.04 250 / 0.65) 0%, 
-      oklch(0.14 0.035 250 / 0.55) 100%
+      oklch(0.18 0.04 250 / 0.55) 0%, 
+      oklch(0.14 0.035 250 / 0.45) 100%
     );
     backdrop-filter: blur(10px);
     border: 1px solid oklch(0.35 0.06 250 / 0.3);
@@ -182,7 +182,7 @@
 
   /* Neon Glow Card */
   .neon-card {
-    background: oklch(0.16 0.035 250 / 0.7);
+    background: oklch(0.16 0.035 250 / 0.55);
     border: 1px solid oklch(0.70 0.18 220 / 0.3);
     border-radius: 1rem;
     box-shadow: 

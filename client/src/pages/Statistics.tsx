@@ -78,7 +78,7 @@ export default function Statistics() {
     <AppLayout showBubbles={true} bubbleIntensity="low" className="text-white">
     <div className="pb-20 overflow-x-hidden">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[oklch(0.18_0.03_250)] border-b border-[oklch(0.25_0.03_250)] px-4 py-4">
+      <div className="sticky top-0 z-10 bg-[oklch(0.18_0.03_250_/_0.55)] border-b border-[oklch(0.25_0.03_250)] px-4 py-4">
         <div className="flex items-center gap-3">
           <Link href="/dashboard">
             <button className="p-2 hover:bg-white/10 rounded-lg transition-colors">
@@ -97,7 +97,7 @@ export default function Statistics() {
               className={`px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
                 period === option.value
                   ? "bg-[oklch(0.55_0.20_220)] text-white"
-                  : "bg-[oklch(0.20_0.03_250)] text-[oklch(0.70_0.05_250)] hover:bg-[oklch(0.25_0.03_250)]"
+                  : "bg-[oklch(0.20_0.03_250_/_0.55)] text-[oklch(0.70_0.05_250)] hover:bg-[oklch(0.25_0.03_250)]"
               }`}
             >
               {option.label}
@@ -133,7 +133,7 @@ export default function Statistics() {
                 </h2>
                 <div className="group relative">
                   <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)] cursor-help" />
-                  <div className="absolute left-0 top-6 w-64 p-2 bg-[oklch(0.20_0.03_250)] border border-[oklch(0.30_0.03_250)] rounded-lg text-xs text-[oklch(0.85_0.05_220)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                  <div className="absolute left-0 top-6 w-64 p-2 bg-[oklch(0.20_0.03_250_/_0.55)] border border-[oklch(0.30_0.03_250)] rounded-lg text-xs text-[oklch(0.85_0.05_220)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                     Visualizza l'andamento della distanza percorsa e del pace medio nel periodo selezionato. Utile per identificare trend e progressi nel tempo.
                   </div>
                 </div>
@@ -210,7 +210,7 @@ export default function Statistics() {
                     <h3 className="font-semibold">Zone Frequenza Cardiaca</h3>
                     <div className="group relative">
                       <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)] cursor-help" />
-                      <div className="absolute left-0 top-6 w-72 p-2 bg-[oklch(0.20_0.03_250)] border border-[oklch(0.30_0.03_250)] rounded-lg text-xs text-[oklch(0.85_0.05_220)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                      <div className="absolute left-0 top-6 w-72 p-2 bg-[oklch(0.20_0.03_250_/_0.55)] border border-[oklch(0.30_0.03_250)] rounded-lg text-xs text-[oklch(0.85_0.05_220)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                         Mostra la distribuzione percentuale del tempo trascorso in ciascuna zona di frequenza cardiaca. Z1: Recupero, Z2: Aerobica, Z3: Soglia, Z4: Anaerobica, Z5: Massima.
                       </div>
                     </div>
@@ -278,7 +278,7 @@ export default function Statistics() {
                     <h3 className="font-semibold">Distribuzione Pace</h3>
                     <div className="group relative">
                       <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)] cursor-help" />
-                      <div className="absolute left-0 top-6 w-72 p-2 bg-[oklch(0.20_0.03_250)] border border-[oklch(0.30_0.03_250)] rounded-lg text-xs text-[oklch(0.85_0.05_220)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                      <div className="absolute left-0 top-6 w-72 p-2 bg-[oklch(0.20_0.03_250_/_0.55)] border border-[oklch(0.30_0.03_250)] rounded-lg text-xs text-[oklch(0.85_0.05_220)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                         Mostra quante sessioni hai completato in ciascun range di pace (min/100m). Ti aiuta a capire a quale velocità nuoti più frequentemente.
                       </div>
                     </div>
@@ -475,7 +475,7 @@ export default function Statistics() {
                     {advanced.insights.map((insight, index) => (
                       <div
                         key={index}
-                        className="text-sm text-[oklch(0.80_0.05_220)] bg-[oklch(0.20_0.03_250)] rounded-lg p-3"
+                        className="text-sm text-[oklch(0.80_0.05_220)] bg-[oklch(0.20_0.03_250_/_0.55)] rounded-lg p-3"
                       >
                         {insight}
                       </div>

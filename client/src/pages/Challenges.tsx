@@ -133,7 +133,7 @@ export default function Challenges() {
             <Link href="/leaderboard">
               <Button
                 variant="outline"
-                className="border-[oklch(0.30_0.04_250)] text-[oklch(0.95_0.01_220)] hover:bg-[oklch(0.18_0.03_250)]"
+                className="border-[oklch(0.30_0.04_250)] text-[oklch(0.95_0.01_220)] hover:bg-[oklch(0.18_0.03_250_/_0.55)]"
               >
                 <Users className="h-4 w-4 mr-2" />
                 Classifica
@@ -171,7 +171,7 @@ export default function Challenges() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Es: Sfida dei 100km"
-                className="bg-[oklch(0.18_0.03_250)] border-[oklch(0.30_0.04_250)] text-[oklch(0.95_0.01_220)]"
+                className="bg-[oklch(0.18_0.03_250_/_0.55)] border-[oklch(0.30_0.04_250)] text-[oklch(0.95_0.01_220)]"
               />
             </div>
 
@@ -183,7 +183,7 @@ export default function Challenges() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Aggiungi una descrizione per la sfida..."
-                className="bg-[oklch(0.18_0.03_250)] border-[oklch(0.30_0.04_250)] text-[oklch(0.95_0.01_220)]"
+                className="bg-[oklch(0.18_0.03_250_/_0.55)] border-[oklch(0.30_0.04_250)] text-[oklch(0.95_0.01_220)]"
                 rows={3}
               />
             </div>
@@ -211,7 +211,7 @@ export default function Challenges() {
             <div className="space-y-2">
               <Label htmlFor="objective" className="text-[oklch(0.85_0.01_220)]">Obiettivo</Label>
               <Select value={objective} onValueChange={(v) => setObjective(v as typeof objective)}>
-                <SelectTrigger className="bg-[oklch(0.18_0.03_250)] border-[oklch(0.30_0.04_250)] text-[oklch(0.95_0.01_220)]">
+                <SelectTrigger className="bg-[oklch(0.18_0.03_250_/_0.55)] border-[oklch(0.30_0.04_250)] text-[oklch(0.95_0.01_220)]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -226,7 +226,7 @@ export default function Challenges() {
             <div className="space-y-2">
               <Label htmlFor="duration" className="text-[oklch(0.85_0.01_220)]">Durata</Label>
               <Select value={duration} onValueChange={(v) => setDuration(v as typeof duration)}>
-                <SelectTrigger className="bg-[oklch(0.18_0.03_250)] border-[oklch(0.30_0.04_250)] text-[oklch(0.95_0.01_220)]">
+                <SelectTrigger className="bg-[oklch(0.18_0.03_250_/_0.55)] border-[oklch(0.30_0.04_250)] text-[oklch(0.95_0.01_220)]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -245,7 +245,7 @@ export default function Challenges() {
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="bg-[oklch(0.18_0.03_250)] border-[oklch(0.30_0.04_250)] text-[oklch(0.95_0.01_220)]"
+                className="bg-[oklch(0.18_0.03_250_/_0.55)] border-[oklch(0.30_0.04_250)] text-[oklch(0.95_0.01_220)]"
               />
             </div>
 

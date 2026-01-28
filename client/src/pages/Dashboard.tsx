@@ -253,7 +253,7 @@ export default function Dashboard() {
           ].map((stat, index) => (
             <motion.div 
               key={stat.label} 
-              className="stat-card bg-[oklch(0.18_0.03_250)] p-4 rounded-xl border border-[oklch(0.30_0.04_250)] text-center cursor-pointer"
+              className="stat-card bg-[oklch(0.18_0.03_250_/_0.55)] p-4 rounded-xl border border-[oklch(0.30_0.04_250)] text-center cursor-pointer"
               whileHover={{ scale: 1.05, rotateY: 5 }}
               whileTap={{ scale: 0.98 }}
               transition={{ type: "spring", stiffness: 300 }}
@@ -303,7 +303,7 @@ export default function Dashboard() {
                 {[...Array(7)].map((_, i) => (
                   <motion.div
                     key={i}
-                    className="flex-1 rounded-t-lg bg-[oklch(0.20_0.03_250)]"
+                    className="flex-1 rounded-t-lg bg-[oklch(0.20_0.03_250_/_0.55)]"
                     animate={{ 
                       height: [`${20 + Math.random() * 60}%`, `${30 + Math.random() * 50}%`],
                       opacity: [0.3, 0.6, 0.3]
@@ -343,7 +343,7 @@ export default function Dashboard() {
                       >
                         {/* Tooltip on hover */}
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                          <div className="bg-[oklch(0.15_0.03_250)] px-2 py-1 rounded text-xs whitespace-nowrap border border-[oklch(0.30_0.04_250)]">
+                          <div className="bg-[oklch(0.15_0.03_250_/_0.45)] px-2 py-1 rounded text-xs whitespace-nowrap border border-[oklch(0.30_0.04_250)]">
                             <p className="font-bold text-[oklch(0.95_0.01_220)]">{(activity.distanceMeters / 1000).toFixed(1)} km</p>
                             <p className="text-[oklch(0.60_0.03_220)]">{formatDate(activity.activityDate)}</p>
                           </div>
@@ -404,7 +404,7 @@ export default function Dashboard() {
                   {[...Array(2)].map((_, i) => (
                     <motion.div
                       key={i}
-                      className="p-3 rounded-lg bg-[oklch(0.18_0.03_250)] border border-[oklch(0.30_0.04_250)]"
+                      className="p-3 rounded-lg bg-[oklch(0.18_0.03_250_/_0.55)] border border-[oklch(0.30_0.04_250)]"
                       animate={{ opacity: [0.3, 0.6, 0.3] }}
                       transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.2 }}
                     >
@@ -419,7 +419,7 @@ export default function Dashboard() {
                 challenges.slice(0, 2).map((challenge: any, idx: number) => (
                   <motion.div 
                     key={challenge.id} 
-                    className="p-3 rounded-lg bg-[oklch(0.18_0.03_250)] border border-[oklch(0.30_0.04_250)] cursor-pointer"
+                    className="p-3 rounded-lg bg-[oklch(0.18_0.03_250_/_0.55)] border border-[oklch(0.30_0.04_250)] cursor-pointer"
                     whileHover={{ scale: 1.03, x: 5 }}
                     whileTap={{ scale: 0.97 }}
                     initial={{ opacity: 0, x: -20 }}
@@ -503,7 +503,7 @@ export default function Dashboard() {
             {activitiesLoading ? (
               <div className="space-y-3">
                 {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-16 w-full bg-[oklch(0.20_0.03_250)]" />
+                  <Skeleton key={i} className="h-16 w-full bg-[oklch(0.20_0.03_250_/_0.55)]" />
                 ))}
               </div>
             ) : activities && activities.length > 0 ? (
@@ -511,7 +511,7 @@ export default function Dashboard() {
                 {activities.map((activity, idx) => (
                   <motion.div
                     key={activity.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-[oklch(0.18_0.03_250)] hover:bg-[oklch(0.20_0.03_250)] transition-colors border border-[oklch(0.25_0.03_250)]"
+                    className="flex items-center justify-between p-3 rounded-lg bg-[oklch(0.18_0.03_250_/_0.55)] hover:bg-[oklch(0.20_0.03_250_/_0.55)] transition-colors border border-[oklch(0.25_0.03_250)]"
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.1 }}

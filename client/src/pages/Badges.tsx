@@ -296,8 +296,8 @@ export default function Badges() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
             {[...Array(12)].map((_, i) => (
               <div key={i} className="flex flex-col items-center gap-3">
-                <Skeleton className="w-24 h-24 rounded-full bg-[oklch(0.20_0.03_250)]" />
-                <Skeleton className="h-4 w-24 bg-[oklch(0.20_0.03_250)]" />
+                <Skeleton className="w-24 h-24 rounded-full bg-[oklch(0.20_0.03_250_/_0.55)]" />
+                <Skeleton className="h-4 w-24 bg-[oklch(0.20_0.03_250_/_0.55)]" />
               </div>
             ))}
           </div>
@@ -377,7 +377,7 @@ export default function Badges() {
                     {/* Progress Bar for Locked Badges */}
                     {!isEarned && badge.progress > 0 && (
                       <div className="w-16 mt-2">
-                        <div className="h-1 bg-[oklch(0.20_0.03_250)] rounded-full overflow-hidden">
+                        <div className="h-1 bg-[oklch(0.20_0.03_250_/_0.55)] rounded-full overflow-hidden">
                           <div 
                             className="h-full rounded-full"
                             style={{ 
@@ -507,7 +507,7 @@ export default function Badges() {
                         <span className="text-[oklch(0.60_0.03_220)]">Progresso</span>
                         <span className="text-[oklch(0.70_0.18_220)]">{selectedBadge.progress}%</span>
                       </div>
-                      <div className="h-2 bg-[oklch(0.20_0.03_250)] rounded-full overflow-hidden">
+                      <div className="h-2 bg-[oklch(0.20_0.03_250_/_0.55)] rounded-full overflow-hidden">
                         <div 
                           className="h-full rounded-full transition-all duration-500"
                           style={{ 

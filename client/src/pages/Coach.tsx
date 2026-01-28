@@ -118,7 +118,7 @@ export default function Coach() {
               <button
                 onClick={handleRegenerate}
                 disabled={isRegenerating}
-                className="p-2 text-[oklch(0.70_0.18_220)] hover:bg-[oklch(0.18_0.03_250)] rounded-lg transition-colors disabled:opacity-50"
+                className="p-2 text-[oklch(0.70_0.18_220)] hover:bg-[oklch(0.18_0.03_250_/_0.55)] rounded-lg transition-colors disabled:opacity-50"
                 title="Rigenera allenamento"
               >
                 <RefreshCw
@@ -138,7 +138,7 @@ export default function Coach() {
               className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
                 activeTab === "pool"
                   ? "bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] text-white shadow-lg"
-                  : "bg-[oklch(0.18_0.03_250)] text-[oklch(0.65_0.03_220)] hover:bg-[oklch(0.20_0.03_250)]"
+                  : "bg-[oklch(0.18_0.03_250_/_0.55)] text-[oklch(0.65_0.03_220)] hover:bg-[oklch(0.20_0.03_250_/_0.55)]"
               }`}
             >
               <Waves className="w-5 h-5" />
@@ -149,7 +149,7 @@ export default function Coach() {
               className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
                 activeTab === "dryland"
                   ? "bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] text-white shadow-lg"
-                  : "bg-[oklch(0.18_0.03_250)] text-[oklch(0.65_0.03_220)] hover:bg-[oklch(0.20_0.03_250)]"
+                  : "bg-[oklch(0.18_0.03_250_/_0.55)] text-[oklch(0.65_0.03_220)] hover:bg-[oklch(0.20_0.03_250_/_0.55)]"
               }`}
             >
               <Activity className="w-5 h-5" />
@@ -230,7 +230,7 @@ export default function Coach() {
                   {section.exercises.map((exercise, exerciseIdx) => (
                     <div
                       key={exerciseIdx}
-                      className="bg-[oklch(0.18_0.03_250)] rounded-lg p-4 hover:bg-[oklch(0.20_0.03_250)] transition-colors border border-[oklch(0.25_0.03_250)]"
+                      className="bg-[oklch(0.18_0.03_250_/_0.55)] rounded-lg p-4 hover:bg-[oklch(0.20_0.03_250_/_0.55)] transition-colors border border-[oklch(0.25_0.03_250)]"
                     >
                       <div className="font-semibold text-[oklch(0.95_0.01_220)] mb-2">
                         {exercise.name}
