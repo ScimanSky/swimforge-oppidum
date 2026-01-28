@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Waves, Loader2 } from "lucide-react";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function AuthCallback() {
   const [, navigate] = useLocation();
@@ -94,17 +95,18 @@ export default function AuthCallback() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 flex items-center justify-center p-4">
-      {/* Background effects */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
-      </div>
-
-      <div className="relative z-10 text-center space-y-6">
-        <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-full flex items-center justify-center">
-          <Waves className="w-10 h-10 text-white" />
+    <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4">
+      <div className="relative w-full max-w-md">
+        {/* Local glow accents */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-10 -left-10 w-48 h-48 bg-blue-500/10 rounded-full blur-3xl" />
+          <div className="absolute -bottom-12 -right-12 w-52 h-52 bg-cyan-500/10 rounded-full blur-3xl" />
         </div>
+
+        <div className="relative z-10 text-center space-y-6">
+          <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-full flex items-center justify-center">
+            <Waves className="w-10 h-10 text-white" />
+          </div>
 
         {status === "loading" && (
           <>
@@ -130,7 +132,8 @@ export default function AuthCallback() {
             <p className="text-slate-500 text-sm">Reindirizzamento alla pagina di login...</p>
           </>
         )}
+        </div>
       </div>
-    </div>
+    </AppLayout>
   );
 }

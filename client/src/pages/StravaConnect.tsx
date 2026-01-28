@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { trpc } from "../lib/trpc";
 import { motion } from "framer-motion";
 import { Activity, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function StravaConnect() {
   const [, setLocation] = useLocation();
@@ -42,11 +43,11 @@ export default function StravaConnect() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 flex items-center justify-center p-4">
+    <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="bg-gray-800/50 backdrop-blur-lg rounded-2xl p-8 max-w-md w-full border border-gray-700 shadow-2xl"
+        className="bg-[oklch(0.15_0.03_220_/_0.7)] backdrop-blur-lg rounded-2xl p-8 max-w-md w-full border border-[oklch(0.25_0.05_220)] shadow-2xl"
       >
         {/* Icon */}
         <div className="flex justify-center mb-6">
@@ -112,6 +113,6 @@ export default function StravaConnect() {
           </div>
         )}
       </motion.div>
-    </div>
+    </AppLayout>
   );
 }
