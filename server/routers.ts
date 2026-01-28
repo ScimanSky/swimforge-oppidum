@@ -14,8 +14,46 @@ import { eq } from "drizzle-orm";
 import { initializeAllUserProfileBadges } from "./db_profile_badges";
 import { TRPCError } from "@trpc/server";
 import { verifySupabaseAccessToken } from "./_core/supabase";
+import type { Request, Response } from "express";
+import { loginLimiter, registrationLimiter } from "./middleware/security";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+
+async function applyRateLimit(
+  limiter: (req: Request, res: Response, next: (err?: any) => void) => void,
+  req: Request,
+  res: Response
+): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const done = (err?: any) => {
+      if (settled) return;
+      settled = true;
+      if (err) return reject(err);
+      if (res.headersSent) {
+        return reject(
+          new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: "Rate limit exceeded",
+          })
+        );
+      }
+      resolve();
+    };
+    limiter(req, res, done);
+    setImmediate(() => {
+      if (!settled && res.headersSent) {
+        settled = true;
+        reject(
+          new TRPCError({
+            code: "TOO_MANY_REQUESTS",
+            message: "Rate limit exceeded",
+          })
+        );
+      }
+    });
+  });
+}
 
 export const appRouter = router({
   system: systemRouter,
@@ -31,6 +69,7 @@ export const appRouter = router({
         name: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
+        await applyRateLimit(registrationLimiter, ctx.req, ctx.res);
         const result = await db.registerUser(input.email, input.password, input.name);
         
         if (!result.success || !result.user) {
@@ -59,6 +98,7 @@ export const appRouter = router({
         password: z.string().min(1),
       }))
       .mutation(async ({ ctx, input }) => {
+        await applyRateLimit(loginLimiter, ctx.req, ctx.res);
         const result = await db.loginUser(input.email, input.password);
         
         if (!result.success || !result.user) {

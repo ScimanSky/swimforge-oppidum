@@ -46,6 +46,8 @@ async function startServer() {
   });
 
   const app = express();
+  // Ensure correct client IPs behind Render/other proxies
+  app.set("trust proxy", 1);
   const server = createServer(app);
 
   // Give Redis a moment to connect in background
