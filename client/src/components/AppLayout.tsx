@@ -34,7 +34,7 @@ export function AppLayout({
       {/* Wave overlay */}
       <div className="absolute inset-0 pointer-events-none">
         <svg
-          className="absolute bottom-0 left-0 w-full h-56 opacity-10 text-white"
+          className="absolute bottom-0 left-0 w-full h-56 opacity-20 text-white"
           viewBox="0 0 1440 320"
           preserveAspectRatio="none"
         >
