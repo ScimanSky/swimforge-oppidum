@@ -112,6 +112,23 @@ Aggiungi queste variabili in Vercel:
 - Assicurati che la password non contenga caratteri speciali non escapati
 - Controlla che SSL sia abilitato (aggiungere `?sslmode=require` se necessario)
 
+---
+
+## Migrazioni Database (workflow consigliato)
+
+Le migrazioni **non** vengono più eseguite automaticamente a runtime.
+
+Quando aggiungi nuove migrazioni:
+1. Genera migrazione (se usi Drizzle)
+   ```
+   pnpm db:generate
+   ```
+2. Applica migrazioni al DB (una tantum)
+   ```
+   DATABASE_URL="..." pnpm db:migrate
+   ```
+3. Poi esegui il deploy dell'app.
+
 ### Errore "Garmin service unavailable"
 - Verifica che il servizio Render sia attivo
 - Controlla i log in Render per errori
