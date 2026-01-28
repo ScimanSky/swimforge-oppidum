@@ -337,7 +337,10 @@ export async function disconnectGarmin(userId: number): Promise<boolean> {
 /**
  * Auto-sync Garmin activities on login (if last sync > interval hours)
  */
-export async function autoSyncGarmin(userId: number): Promise<void> {
+export async function autoSyncGarmin(
+  userId: number,
+  options: { force?: boolean } = {}
+): Promise<void> {
   const db = await getDb();
   if (!db) return;
 
@@ -360,6 +363,7 @@ export async function autoSyncGarmin(userId: number): Promise<void> {
     }
 
     const shouldSync =
+      options.force ||
       syncIntervalHours <= 0 ||
       !lastSync ||
       now.getTime() - new Date(lastSync).getTime() >

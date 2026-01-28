@@ -719,7 +719,10 @@ async function checkAndAwardBadges(
 /**
  * Auto-sync Strava activities on login (if last sync > 6 hours ago)
  */
-export async function autoSyncStrava(userId: number): Promise<void> {
+export async function autoSyncStrava(
+  userId: number,
+  options: { force?: boolean } = {}
+): Promise<void> {
   const db = await getDb();
   
   try {
@@ -733,20 +736,24 @@ export async function autoSyncStrava(userId: number): Promise<void> {
       return; // Not connected to Strava
     }
 
-    let syncIntervalHours = Number.parseFloat(
-      process.env.STRAVA_AUTO_SYNC_INTERVAL_HOURS || "6"
-    );
-    if (!Number.isFinite(syncIntervalHours)) {
-      syncIntervalHours = 6;
-    }
+    if (!options.force) {
+      let syncIntervalHours = Number.parseFloat(
+        process.env.STRAVA_AUTO_SYNC_INTERVAL_HOURS || "6"
+      );
+      if (!Number.isFinite(syncIntervalHours)) {
+        syncIntervalHours = 6;
+      }
 
-    if (syncIntervalHours > 0 && tokens.lastSync) {
-      const threshold = new Date(Date.now() - syncIntervalHours * 60 * 60 * 1000);
-      if (tokens.lastSync > threshold) {
-        console.log(
-          `[Strava] Auto-sync skipped for user ${userId} (last sync: ${tokens.lastSync})`
+      if (syncIntervalHours > 0 && tokens.lastSync) {
+        const threshold = new Date(
+          Date.now() - syncIntervalHours * 60 * 60 * 1000
         );
-        return;
+        if (tokens.lastSync > threshold) {
+          console.log(
+            `[Strava] Auto-sync skipped for user ${userId} (last sync: ${tokens.lastSync})`
+          );
+          return;
+        }
       }
     }
 

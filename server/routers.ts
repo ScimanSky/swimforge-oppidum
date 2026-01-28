@@ -19,15 +19,15 @@ import { loginLimiter, registrationLimiter } from "./middleware/security";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
-async function runAutoSync(userId: number) {
+async function runAutoSync(userId: number, options: { force?: boolean } = {}) {
   await Promise.allSettled([
-    garmin.autoSyncGarmin(userId),
-    strava.autoSyncStrava(userId),
+    garmin.autoSyncGarmin(userId, options),
+    strava.autoSyncStrava(userId, options),
   ]);
 }
 
 function triggerAutoSync(userId: number) {
-  void runAutoSync(userId).catch((error) => {
+  void runAutoSync(userId, { force: true }).catch((error) => {
     console.error(`[Auto-Sync] Failed for user ${userId}:`, error);
   });
 }
@@ -610,10 +610,12 @@ export const appRouter = router({
 
   // Auto sync Garmin + Strava (login/app open)
   sync: router({
-    auto: protectedProcedure.mutation(async ({ ctx }) => {
-      await runAutoSync(ctx.user.id);
-      return { success: true } as const;
-    }),
+    auto: protectedProcedure
+      .input(z.object({ force: z.boolean().optional() }).optional())
+      .mutation(async ({ ctx, input }) => {
+        await runAutoSync(ctx.user.id, { force: input?.force });
+        return { success: true } as const;
+      }),
   }),
 
   // Leaderboard

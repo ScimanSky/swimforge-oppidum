@@ -67,7 +67,7 @@ export default function Dashboard() {
   // Auto-sync when app opens and then on interval
   useEffect(() => {
     if (!isAuthenticated) return;
-    autoSyncMutation.mutate();
+    autoSyncMutation.mutate({ force: true });
 
     if (!Number.isFinite(syncIntervalHours) || syncIntervalHours <= 0) {
       return;
@@ -75,7 +75,7 @@ export default function Dashboard() {
 
     const intervalMs = syncIntervalHours * 60 * 60 * 1000;
     const id = window.setInterval(() => {
-      autoSyncMutation.mutate();
+      autoSyncMutation.mutate({ force: false });
     }, intervalMs);
 
     return () => window.clearInterval(id);
