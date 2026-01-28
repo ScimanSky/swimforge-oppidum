@@ -253,7 +253,7 @@ export async function calculateChallengeProgress(challengeId: number): Promise<v
             AND activity_date >= ${challenge.start_date}
             AND activity_date <= ${challenge.end_date}
             AND (${challenge.type === "both"} OR 
-                 (${challenge.type === "pool"} AND is_open_water = false) OR
+                 (${challenge.type === "pool"} AND (is_open_water = false OR is_open_water IS NULL)) OR
                  (${challenge.type === "open_water"} AND is_open_water = true))
         `);
         progress = (result.rows[0] as any)?.total || 0;
@@ -268,7 +268,7 @@ export async function calculateChallengeProgress(challengeId: number): Promise<v
             AND activity_date >= ${challenge.start_date}
             AND activity_date <= ${challenge.end_date}
             AND (${challenge.type === "both"} OR 
-                 (${challenge.type === "pool"} AND is_open_water = false) OR
+                 (${challenge.type === "pool"} AND (is_open_water = false OR is_open_water IS NULL)) OR
                  (${challenge.type === "open_water"} AND is_open_water = true))
         `);
         progress = (result.rows[0] as any)?.total || 0;
@@ -283,7 +283,7 @@ export async function calculateChallengeProgress(challengeId: number): Promise<v
             AND activity_date >= ${challenge.start_date}
             AND activity_date <= ${challenge.end_date}
             AND (${challenge.type === "both"} OR 
-                 (${challenge.type === "pool"} AND is_open_water = false) OR
+                 (${challenge.type === "pool"} AND (is_open_water = false OR is_open_water IS NULL)) OR
                  (${challenge.type === "open_water"} AND is_open_water = true))
         `);
         progress = (result.rows[0] as any)?.total || 0;
@@ -298,7 +298,7 @@ export async function calculateChallengeProgress(challengeId: number): Promise<v
             AND activity_date >= ${challenge.start_date}
             AND activity_date <= ${challenge.end_date}
             AND (${challenge.type === "both"} OR 
-                 (${challenge.type === "pool"} AND is_open_water = false) OR
+                 (${challenge.type === "pool"} AND (is_open_water = false OR is_open_water IS NULL)) OR
                  (${challenge.type === "open_water"} AND is_open_water = true))
         `);
         progress = (result.rows[0] as any)?.total || 0;
@@ -313,7 +313,7 @@ export async function calculateChallengeProgress(challengeId: number): Promise<v
             AND activity_date >= ${challenge.start_date}
             AND activity_date <= ${challenge.end_date}
             AND (${challenge.type === "both"} OR 
-                 (${challenge.type === "pool"} AND is_open_water = false) OR
+                 (${challenge.type === "pool"} AND (is_open_water = false OR is_open_water IS NULL)) OR
                  (${challenge.type === "open_water"} AND is_open_water = true))
         `);
         progress = (result.rows[0] as any)?.total || 0;
@@ -329,7 +329,7 @@ export async function calculateChallengeProgress(challengeId: number): Promise<v
             AND activity_date <= ${challenge.end_date}
             AND avg_pace_per_100m IS NOT NULL
             AND (${challenge.type === "both"} OR 
-                 (${challenge.type === "pool"} AND is_open_water = false) OR
+                 (${challenge.type === "pool"} AND (is_open_water = false OR is_open_water IS NULL)) OR
                  (${challenge.type === "open_water"} AND is_open_water = true))
         `);
         // For avg_pace, lower is better, so invert
