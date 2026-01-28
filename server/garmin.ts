@@ -342,9 +342,11 @@ export async function autoSyncGarmin(userId: number): Promise<void> {
   if (!db) return;
 
   try {
-    const profile = await db.query.swimmerProfiles.findFirst({
-      where: eq(swimmerProfiles.userId, userId),
-    });
+    const [profile] = await db
+      .select()
+      .from(swimmerProfiles)
+      .where(eq(swimmerProfiles.userId, userId))
+      .limit(1);
 
     if (!profile || !profile.garminConnected) return;
 
