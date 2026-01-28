@@ -19,6 +19,19 @@ import { loginLimiter, registrationLimiter } from "./middleware/security";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
+function triggerAutoSync(userId: number) {
+  void (async () => {
+    try {
+      await Promise.allSettled([
+        garmin.autoSyncGarmin(userId),
+        strava.autoSyncStrava(userId),
+      ]);
+    } catch (error) {
+      console.error(`[Auto-Sync] Failed for user ${userId}:`, error);
+    }
+  })();
+}
+
 async function applyRateLimit(
   limiter: (req: Request, res: Response, next: (err?: any) => void) => void,
   req: Request,
@@ -117,32 +130,8 @@ export const appRouter = router({
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
         
-        // Auto-sync Garmin activities in background if needed
-        (async () => {
-          try {
-            const database = await getDb();
-            if (!database) return;
-
-            const profile = await database.query.swimmerProfiles.findFirst({
-              where: eq(swimmerProfiles.userId, result.user.id)
-            });
-
-            if (!profile || !profile.garminConnected) return;
-
-            const now = new Date();
-            const lastSync = profile.lastGarminSyncAt;
-            const syncIntervalHours = parseInt(process.env.GARMIN_AUTO_SYNC_INTERVAL_HOURS || '6');
-
-            if (!lastSync || (now.getTime() - new Date(lastSync).getTime()) > syncIntervalHours * 60 * 60 * 1000) {
-              console.log(`[Auto-Sync] Triggering Garmin sync for user ${result.user.id}`);
-              await garmin.syncGarminActivities(result.user.id);
-            } else {
-              console.log(`[Auto-Sync] Skipping sync for user ${result.user.id}, last synced ${Math.round((now.getTime() - new Date(lastSync).getTime()) / (60 * 60 * 1000))}h ago`);
-            }
-          } catch (error) {
-            console.error(`[Auto-Sync] Failed for user ${result.user.id}:`, error);
-          }
-        })();
+        // Auto-sync Garmin + Strava activities in background if needed
+        triggerAutoSync(result.user.id);
         
         return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
       }),
@@ -235,6 +224,8 @@ export const appRouter = router({
         
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+        // Auto-sync Garmin + Strava activities in background if needed
+        triggerAutoSync(user.id);
         return { success: true, user: { id: user.id, email: user.email, name: user.name } };
       }),
   }),

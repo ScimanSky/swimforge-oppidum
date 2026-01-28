@@ -335,6 +335,45 @@ export async function disconnectGarmin(userId: number): Promise<boolean> {
 }
 
 /**
+ * Auto-sync Garmin activities on login (if last sync > interval hours)
+ */
+export async function autoSyncGarmin(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  try {
+    const profile = await db.query.swimmerProfiles.findFirst({
+      where: eq(swimmerProfiles.userId, userId),
+    });
+
+    if (!profile || !profile.garminConnected) return;
+
+    const now = new Date();
+    const lastSync = profile.lastGarminSyncAt;
+    const syncIntervalHours = parseInt(
+      process.env.GARMIN_AUTO_SYNC_INTERVAL_HOURS || "6"
+    );
+
+    if (
+      !lastSync ||
+      now.getTime() - new Date(lastSync).getTime() >
+        syncIntervalHours * 60 * 60 * 1000
+    ) {
+      console.log(`[Auto-Sync] Triggering Garmin sync for user ${userId}`);
+      await syncGarminActivities(userId);
+    } else {
+      console.log(
+        `[Auto-Sync] Skipping Garmin sync for user ${userId}, last synced ${Math.round(
+          (now.getTime() - new Date(lastSync).getTime()) / (60 * 60 * 1000)
+        )}h ago`
+      );
+    }
+  } catch (error) {
+    console.error(`[Auto-Sync] Garmin failed for user ${userId}:`, error);
+  }
+}
+
+/**
  * Calculate XP for a swimming activity
  */
 function calculateActivityXp(activity: GarminServiceActivity): number {
