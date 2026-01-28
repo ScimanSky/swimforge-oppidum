@@ -733,11 +733,21 @@ export async function autoSyncStrava(userId: number): Promise<void> {
       return; // Not connected to Strava
     }
 
-    // Check if last sync was more than 6 hours ago
-    const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
-    if (tokens.lastSync && tokens.lastSync > sixHoursAgo) {
-      console.log(`[Strava] Auto-sync skipped for user ${userId} (last sync: ${tokens.lastSync})`);
-      return;
+    let syncIntervalHours = Number.parseFloat(
+      process.env.STRAVA_AUTO_SYNC_INTERVAL_HOURS || "6"
+    );
+    if (!Number.isFinite(syncIntervalHours)) {
+      syncIntervalHours = 6;
+    }
+
+    if (syncIntervalHours > 0 && tokens.lastSync) {
+      const threshold = new Date(Date.now() - syncIntervalHours * 60 * 60 * 1000);
+      if (tokens.lastSync > threshold) {
+        console.log(
+          `[Strava] Auto-sync skipped for user ${userId} (last sync: ${tokens.lastSync})`
+        );
+        return;
+      }
     }
 
     // Sync activities (last 7 days)

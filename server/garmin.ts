@@ -352,15 +352,20 @@ export async function autoSyncGarmin(userId: number): Promise<void> {
 
     const now = new Date();
     const lastSync = profile.lastGarminSyncAt;
-    const syncIntervalHours = parseInt(
+    let syncIntervalHours = Number.parseFloat(
       process.env.GARMIN_AUTO_SYNC_INTERVAL_HOURS || "6"
     );
+    if (!Number.isFinite(syncIntervalHours)) {
+      syncIntervalHours = 6;
+    }
 
-    if (
+    const shouldSync =
+      syncIntervalHours <= 0 ||
       !lastSync ||
       now.getTime() - new Date(lastSync).getTime() >
-        syncIntervalHours * 60 * 60 * 1000
-    ) {
+        syncIntervalHours * 60 * 60 * 1000;
+
+    if (shouldSync) {
       console.log(`[Auto-Sync] Triggering Garmin sync for user ${userId}`);
       await syncGarminActivities(userId);
     } else {

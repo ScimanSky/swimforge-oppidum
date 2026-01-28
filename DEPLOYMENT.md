@@ -84,6 +84,8 @@ Aggiungi queste variabili in Vercel:
 | `STRAVA_SERVICE_SECRET` | La stessa chiave usata nel servizio Strava |
 | `TOKEN_ENCRYPTION_KEY` | Chiave 32 byte per cifrare token |
 | `ENABLE_SWAGGER` | Abilita Swagger in produzione | `true` (solo se necessario) |
+| `GARMIN_AUTO_SYNC_INTERVAL_HOURS` | Intervallo auto-sync Garmin (ore) | `0` = sempre |
+| `STRAVA_AUTO_SYNC_INTERVAL_HOURS` | Intervallo auto-sync Strava (ore) | `0` = sempre |
 
 ### 3.4 Deploy
 1. Clicca **Deploy**
