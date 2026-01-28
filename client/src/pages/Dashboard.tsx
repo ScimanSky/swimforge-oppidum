@@ -26,6 +26,10 @@ import CountUp from "react-countup";
 export default function Dashboard() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const { addBadges } = useBadgeNotifications();
+  const autoSyncMutation = trpc.sync.auto.useMutation();
+  const syncIntervalHours = Number(
+    import.meta.env.VITE_AUTO_SYNC_INTERVAL_HOURS || "6"
+  );
 
   const { data: profile, isLoading: profileLoading } = trpc.profile.get.useQuery(
     undefined,
@@ -59,6 +63,23 @@ export default function Dashboard() {
       addBadges(newBadges);
     }
   }, [newBadges, addBadges]);
+
+  // Auto-sync when app opens and then on interval
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    autoSyncMutation.mutate();
+
+    if (!Number.isFinite(syncIntervalHours) || syncIntervalHours <= 0) {
+      return;
+    }
+
+    const intervalMs = syncIntervalHours * 60 * 60 * 1000;
+    const id = window.setInterval(() => {
+      autoSyncMutation.mutate();
+    }, intervalMs);
+
+    return () => window.clearInterval(id);
+  }, [isAuthenticated, syncIntervalHours]);
 
   // Redirect to home if not authenticated
   if (!authLoading && !isAuthenticated) {

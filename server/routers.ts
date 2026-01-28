@@ -19,17 +19,17 @@ import { loginLimiter, registrationLimiter } from "./middleware/security";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
+async function runAutoSync(userId: number) {
+  await Promise.allSettled([
+    garmin.autoSyncGarmin(userId),
+    strava.autoSyncStrava(userId),
+  ]);
+}
+
 function triggerAutoSync(userId: number) {
-  void (async () => {
-    try {
-      await Promise.allSettled([
-        garmin.autoSyncGarmin(userId),
-        strava.autoSyncStrava(userId),
-      ]);
-    } catch (error) {
-      console.error(`[Auto-Sync] Failed for user ${userId}:`, error);
-    }
-  })();
+  void runAutoSync(userId).catch((error) => {
+    console.error(`[Auto-Sync] Failed for user ${userId}:`, error);
+  });
 }
 
 async function applyRateLimit(
@@ -605,6 +605,14 @@ export const appRouter = router({
           badge: definition,
         };
       });
+    }),
+  }),
+
+  // Auto sync Garmin + Strava (login/app open)
+  sync: router({
+    auto: protectedProcedure.mutation(async ({ ctx }) => {
+      await runAutoSync(ctx.user.id);
+      return { success: true } as const;
     }),
   }),
 

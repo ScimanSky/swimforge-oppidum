@@ -86,6 +86,7 @@ Aggiungi queste variabili in Vercel:
 | `ENABLE_SWAGGER` | Abilita Swagger in produzione | `true` (solo se necessario) |
 | `GARMIN_AUTO_SYNC_INTERVAL_HOURS` | Intervallo auto-sync Garmin (ore) | `0` = sempre |
 | `STRAVA_AUTO_SYNC_INTERVAL_HOURS` | Intervallo auto-sync Strava (ore) | `0` = sempre |
+| `VITE_AUTO_SYNC_INTERVAL_HOURS` | Intervallo auto-sync client (ore) | `6` |
 
 ### 3.4 Deploy
 1. Clicca **Deploy**
