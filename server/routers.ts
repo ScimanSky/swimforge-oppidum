@@ -13,6 +13,7 @@ import { swimmerProfiles } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { initializeAllUserProfileBadges } from "./db_profile_badges";
 import { TRPCError } from "@trpc/server";
+import { verifySupabaseAccessToken } from "./_core/supabase";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -123,34 +124,67 @@ export const appRouter = router({
         }),
       }))
       .mutation(async ({ ctx, input }) => {
-        console.log('[syncSupabaseUser] Called with:', { email: input.user.email, name: input.user.name, userId: input.user.id });
-        
+        let supabaseUser;
+        try {
+          supabaseUser = await verifySupabaseAccessToken(input.accessToken);
+        } catch {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Invalid Supabase access token",
+          });
+        }
+
+        const supabaseEmail = supabaseUser.email;
+        if (!supabaseEmail) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Supabase user email missing",
+          });
+        }
+
+        if (input.user.id && input.user.id !== supabaseUser.id) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "Supabase user mismatch",
+          });
+        }
+
+        const loginMethod =
+          (supabaseUser.app_metadata as Record<string, unknown> | undefined)?.provider ??
+          "oauth";
+        const userMetadata = supabaseUser.user_metadata as Record<string, unknown> | undefined;
+        const displayNameRaw =
+          userMetadata?.full_name ||
+          userMetadata?.name ||
+          input.user.name;
+        const displayName =
+          typeof displayNameRaw === "string" && displayNameRaw.trim().length > 0
+            ? displayNameRaw
+            : null;
+
         // Verifica che l'utente esista o crealo
-        let user = await db.getUserByEmail(input.user.email);
-        console.log('[syncSupabaseUser] Existing user:', user ? { id: user.id, email: user.email } : 'null');
-        
+        let user = await db.getUserByEmail(supabaseEmail);
+
         if (!user) {
           // Crea nuovo utente da OAuth
           const result = await db.createOAuthUser({
-            email: input.user.email,
-            name: input.user.name || null,
-            supabaseId: input.user.id,
-            loginMethod: 'google',
+            email: supabaseEmail,
+            name: displayName,
+            supabaseId: supabaseUser.id,
+            loginMethod: String(loginMethod),
           });
-          
+
           if (!result.success || !result.user) {
-            throw new TRPCError({ 
-              code: "INTERNAL_SERVER_ERROR", 
-              message: "Failed to create user" 
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: "Failed to create user",
             });
           }
-          
+
           user = result.user;
-          console.log('[syncSupabaseUser] User created:', { id: user.id, email: user.email });
         } else {
           // Aggiorna last signed in
           await db.updateUserLastSignedIn(user.id);
-          console.log('[syncSupabaseUser] User last signed in updated');
         }
         
         // Crea session token
@@ -161,8 +195,6 @@ export const appRouter = router({
         
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-        console.log('[syncSupabaseUser] Cookie set, returning success');
-        
         return { success: true, user: { id: user.id, email: user.email, name: user.name } };
       }),
   }),

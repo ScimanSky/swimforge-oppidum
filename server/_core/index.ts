@@ -10,6 +10,7 @@ import { serveStatic, setupVite } from "./vite";
 import { completeChallenges } from "../cron_challenges";
 import { setupSwagger } from "../swagger-setup";
 import { connectRedis } from "../lib/cache";
+import { assertAuthEnv } from "./env";
 
 // Security middleware
 import { requestLogger, errorHandler } from "../middleware/logger";
@@ -36,6 +37,9 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  if (process.env.NODE_ENV === "production") {
+    assertAuthEnv();
+  }
   // Connect to Redis (non-blocking - continue even if it fails)
   connectRedis().catch(err => {
     console.warn('[Redis] Connection failed, continuing without cache:', err.message);

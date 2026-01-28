@@ -7,4 +7,19 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  supabaseUrl: process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? "",
+  supabaseAnonKey:
+    process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? "",
 };
+
+export function assertAuthEnv() {
+  if (!ENV.cookieSecret) {
+    throw new Error("JWT_SECRET is required.");
+  }
+}
+
+export function assertSupabaseEnv() {
+  if (!ENV.supabaseUrl || !ENV.supabaseAnonKey) {
+    throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY are required.");
+  }
+}
