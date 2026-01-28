@@ -3,7 +3,10 @@ const { Pool } = pkg;
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-const DATABASE_URL = 'postgresql://postgres.wpnxaadvyxmhlcgdobla:SwimForge2026Oppidum@aws-1-eu-north-1.pooler.supabase.com:5432/postgres';
+const DATABASE_URL = process.env.DATABASE_URL;
+if (!DATABASE_URL) {
+  throw new Error('DATABASE_URL is required');
+}
 
 async function runMigration() {
   const pool = new Pool({
