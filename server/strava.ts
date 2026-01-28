@@ -542,6 +542,9 @@ export async function syncStravaActivities(
         level: newLevel,
         totalTime: newTotalTime,
       });
+
+      // Auto-update challenge progress for active challenges
+      await updateActiveChallengesProgress(userId);
     }
 
     // Update last sync time
@@ -564,6 +567,38 @@ export async function syncStravaActivities(
       count: 0,
       message: error.message
     };
+  }
+}
+
+/**
+ * Update progress for all active challenges the user is participating in
+ */
+async function updateActiveChallengesProgress(userId: number): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+
+    // Get all active challenges the user is participating in
+    const result = await db.execute(sql`
+      SELECT DISTINCT c.id
+      FROM challenges c
+      INNER JOIN challenge_participants cp ON c.id = cp.challenge_id
+      WHERE cp.user_id = ${userId}
+        AND c.status = 'active'
+        AND c.end_date >= NOW()
+    `);
+
+    const challenges = result.rows as any[];
+
+    // Update progress for each challenge
+    for (const challenge of challenges) {
+      const challengesDb = await import("./db_challenges");
+      await challengesDb.calculateChallengeProgress(challenge.id);
+    }
+
+    console.log(`[Strava] Updated progress for ${challenges.length} active challenges for user ${userId}`);
+  } catch (error) {
+    console.error("[Strava] Error updating challenge progress:", error);
   }
 }
 
