@@ -22,6 +22,7 @@ import MobileNav from "@/components/MobileNav";
 import { useBadgeNotifications } from "@/hooks/useBadgeNotifications";
 import { useEffect } from "react";
 import CountUp from "react-countup";
+import { toast } from "sonner";
 
 export default function Dashboard() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
@@ -30,6 +31,8 @@ export default function Dashboard() {
   const syncIntervalHours = Number(
     import.meta.env.VITE_AUTO_SYNC_INTERVAL_HOURS || "6"
   );
+  const AUTO_SYNC_DEBOUNCE_MS = 2 * 60 * 1000;
+  const LAST_AUTO_SYNC_KEY = "swimforge:autoSync:last";
 
   const { data: profile, isLoading: profileLoading } = trpc.profile.get.useQuery(
     undefined,
@@ -67,7 +70,29 @@ export default function Dashboard() {
   // Auto-sync when app opens and then on interval
   useEffect(() => {
     if (!isAuthenticated) return;
-    autoSyncMutation.mutate({ force: true });
+    const triggerAutoSync = (force: boolean) => {
+      if (autoSyncMutation.isPending) return;
+      const lastSync = Number(localStorage.getItem(LAST_AUTO_SYNC_KEY) || 0);
+      const now = Date.now();
+      if (now - lastSync < AUTO_SYNC_DEBOUNCE_MS) {
+        return;
+      }
+      localStorage.setItem(LAST_AUTO_SYNC_KEY, String(now));
+      const toastId = toast.loading("Sincronizzazione in corso...");
+      autoSyncMutation.mutate(
+        { force },
+        {
+          onSuccess: () => {
+            toast.success("Sincronizzazione completata", { id: toastId });
+          },
+          onError: () => {
+            toast.error("Errore nella sincronizzazione", { id: toastId });
+          },
+        }
+      );
+    };
+
+    triggerAutoSync(true);
 
     if (!Number.isFinite(syncIntervalHours) || syncIntervalHours <= 0) {
       return;
@@ -75,7 +100,7 @@ export default function Dashboard() {
 
     const intervalMs = syncIntervalHours * 60 * 60 * 1000;
     const id = window.setInterval(() => {
-      autoSyncMutation.mutate({ force: false });
+      triggerAutoSync(false);
     }, intervalMs);
 
     return () => window.clearInterval(id);
