@@ -85,6 +85,16 @@ export default function Profile() {
     setLocation("/");
   };
 
+  const handleResetBadgeNotifications = () => {
+    if (!user?.id) {
+      toast.error("Utente non disponibile");
+      return;
+    }
+    localStorage.removeItem(`seenBadges:${user.id}`);
+    localStorage.removeItem(`seenAchievementBadges:${user.id}`);
+    toast.success("Notifiche badge resettate");
+  };
+
   const isLoading = authLoading || profileLoading;
 
 
@@ -242,6 +252,13 @@ export default function Profile() {
                 disabled={recalculateBadges.isPending}
               >
                 {recalculateBadges.isPending ? "Ricalcolo..." : "Ricalcola Badge"}
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full mt-2"
+                onClick={handleResetBadgeNotifications}
+              >
+                Reset Notifiche Badge
               </Button>
             </CardContent>
           </Card>
