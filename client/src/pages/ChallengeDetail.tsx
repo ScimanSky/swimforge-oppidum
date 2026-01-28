@@ -142,6 +142,30 @@ export default function ChallengeDetail() {
     "1_month": "1 Mese",
   };
 
+  const formatPace = (seconds: number) => {
+    if (!Number.isFinite(seconds) || seconds <= 0) return "0:00 /100m";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")} /100m`;
+  };
+
+  const formatProgress = (value: number) => {
+    switch (challenge.objective) {
+      case "total_distance":
+      case "longest_session":
+        return `${(value / 1000).toFixed(2)} km`;
+      case "total_time":
+        return `${(value / 3600).toFixed(2)} h`;
+      case "avg_pace":
+        return formatPace(value);
+      case "total_sessions":
+      case "consistency":
+        return `${Math.round(value)}`;
+      default:
+        return value.toFixed(2);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[oklch(0.20_0.05_220)] via-[oklch(0.15_0.03_220)] to-[oklch(0.10_0.02_220)] pb-24">
       <div className="container mx-auto px-4 py-8 space-y-8">
@@ -255,7 +279,7 @@ export default function ChallengeDetail() {
 
                   {/* Progress */}
                   <span className="text-[oklch(0.70_0.18_220)] font-bold">
-                    {participant.progress?.toFixed(2) || 0}
+                    {formatProgress(participant.progress || 0)}
                   </span>
                 </motion.div>
               ))

@@ -20,6 +20,7 @@ import StravaConnect from "./pages/StravaConnect";
 import Settings from "./pages/Settings";
 import BadgeUnlockNotification from "./components/BadgeUnlockNotification";
 import { useBadgeNotifications } from "./hooks/useBadgeNotifications";
+import AutoSync from "./components/AutoSync";
 
 function Router() {
   return (
@@ -53,6 +54,7 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster richColors position="top-center" />
+          <AutoSync />
           <Router />
           {isShowing && pendingBadges.length > 0 && (
             <BadgeUnlockNotification
