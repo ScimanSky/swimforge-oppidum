@@ -81,6 +81,9 @@ export default function Dashboard() {
     localStorage.setItem(key, JSON.stringify([...updated]));
   }, [recentBadges, user, addBadges]);
 
+  const normalizeBadgeUrl = (url: string) =>
+    url.startsWith("/badges/") ? url.replace("/badges/", "/badges_new/") : url;
+
   // Show badge notifications for newly earned achievement badges
   useEffect(() => {
     if (!achievementBadges || !user) return;
@@ -97,7 +100,10 @@ export default function Dashboard() {
         code: `achievement_${entry.badgeId}`,
         name: entry.badge?.name || "Achievement",
         description: entry.badge?.description || "",
-        image_url: entry.badge?.iconUrl || entry.badge?.icon_url || "",
+        image_url: (() => {
+          const raw = entry.badge?.iconUrl || entry.badge?.icon_url || "";
+          return raw ? normalizeBadgeUrl(raw) : "";
+        })(),
       })));
     }
 

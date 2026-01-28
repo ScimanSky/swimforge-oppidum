@@ -21,9 +21,12 @@ export default function BadgeUnlockNotification({ badges, onComplete }: BadgeUnl
   const [isVisible, setIsVisible] = useState(true);
 
   const currentBadge = badges[currentIndex];
-  const resolvedImageUrl =
-    currentBadge?.image_url ||
-    (currentBadge?.code ? getBadgeImageUrl(currentBadge.code) : "");
+  const normalizeBadgeUrl = (url: string) =>
+    url.startsWith("/badges/") ? url.replace("/badges/", "/badges_new/") : url;
+  const resolvedImageUrl = currentBadge?.image_url
+    ? normalizeBadgeUrl(currentBadge.image_url)
+    : (currentBadge?.code ? getBadgeImageUrl(currentBadge.code) : "");
+  const fallbackImageUrl = "/badges_new/oppidum_member.png";
 
   // Play celebration sound using Web Audio API
   const playCelebrationSound = () => {
@@ -188,6 +191,12 @@ export default function BadgeUnlockNotification({ badges, onComplete }: BadgeUnl
                     src={resolvedImageUrl}
                     alt={currentBadge.name}
                     className="relative w-48 h-48 object-contain drop-shadow-2xl"
+                    onError={(e) => {
+                      const img = e.currentTarget as HTMLImageElement;
+                      if (img.dataset.fallbackApplied) return;
+                      img.dataset.fallbackApplied = "true";
+                      img.src = fallbackImageUrl;
+                    }}
                   />
                 </div>
               </motion.div>

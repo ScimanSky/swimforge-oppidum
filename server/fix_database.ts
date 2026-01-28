@@ -136,14 +136,14 @@ async function fixDatabase() {
         // Insert initial badges
         await db.execute(sql`
           INSERT INTO achievement_badge_definitions (name, description, icon_url, criteria_type, criteria_json) VALUES
-          ('Maratoneta', 'Nuota almeno 5km in una singola sessione', '/badges/marathon.png', 'single_activity', '{"metric": "distance", "operator": ">=", "value": 5000}'),
-          ('SWOLF Master', 'Raggiungi un SWOLF di 30 o inferiore', '/badges/swolf_master.png', 'single_activity', '{"metric": "swolf_score", "operator": "<=", "value": 30}'),
-          ('Centomila', 'Nuota un totale di 100km', '/badges/100k.png', 'aggregate_total', '{"metric": "total_distance", "operator": ">=", "value": 100000}'),
-          ('Velocista', 'Nuota 100m con un pace inferiore a 1:30/100m (90 secondi)', '/badges/sprinter.png', 'single_activity', '{"metric": "avg_pace_per_100m", "operator": "<=", "value": 90}'),
-          ('Costanza di Ferro', 'Nuota almeno 3 volte a settimana per 4 settimane consecutive', '/badges/consistency.png', 'consistency', '{"min_activities_per_week": 3, "consecutive_weeks": 4}'),
-          ('Cardio King', 'Raggiungi una frequenza cardiaca massima di 180 bpm', '/badges/cardio.png', 'single_activity', '{"metric": "max_heart_rate", "operator": ">=", "value": 180}'),
-          ('Efficienza Suprema', 'Raggiungi un SEI (Swimming Efficiency Index) di 85 o superiore', '/badges/efficiency.png', 'metric_peak', '{"metric": "sei", "operator": ">=", "value": 85}'),
-          ('Primo Tuffo', 'Completa la tua prima attività di nuoto', '/badges/first_swim.png', 'single_activity', '{"metric": "distance", "operator": ">", "value": 0}')
+          ('Maratoneta', 'Nuota almeno 5km in una singola sessione', '/badges_new/marathon.png', 'single_activity', '{"metric": "distance", "operator": ">=", "value": 5000}'),
+          ('SWOLF Master', 'Raggiungi un SWOLF di 30 o inferiore', '/badges_new/swolf_master.png', 'single_activity', '{"metric": "swolf_score", "operator": "<=", "value": 30}'),
+          ('Centomila', 'Nuota un totale di 100km', '/badges_new/100k.png', 'aggregate_total', '{"metric": "total_distance", "operator": ">=", "value": 100000}'),
+          ('Velocista', 'Nuota 100m con un pace inferiore a 1:30/100m (90 secondi)', '/badges_new/sprinter.png', 'single_activity', '{"metric": "avg_pace_per_100m", "operator": "<=", "value": 90}'),
+          ('Costanza di Ferro', 'Nuota almeno 3 volte a settimana per 4 settimane consecutive', '/badges_new/consistency.png', 'consistency', '{"min_activities_per_week": 3, "consecutive_weeks": 4}'),
+          ('Cardio King', 'Raggiungi una frequenza cardiaca massima di 180 bpm', '/badges_new/cardio.png', 'single_activity', '{"metric": "max_heart_rate", "operator": ">=", "value": 180}'),
+          ('Efficienza Suprema', 'Raggiungi un SEI (Swimming Efficiency Index) di 85 o superiore', '/badges_new/efficiency.png', 'metric_peak', '{"metric": "sei", "operator": ">=", "value": 85}'),
+          ('Primo Tuffo', 'Completa la tua prima attività di nuoto', '/badges_new/first_swim.png', 'single_activity', '{"metric": "distance", "operator": ">", "value": 0}')
           ON CONFLICT DO NOTHING
         `);
 
