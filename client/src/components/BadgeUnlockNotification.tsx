@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import confetti from "canvas-confetti";
+import { getBadgeImageUrl } from "@/lib/badgeImages";
 
 interface Badge {
   id: number;
@@ -20,6 +21,9 @@ export default function BadgeUnlockNotification({ badges, onComplete }: BadgeUnl
   const [isVisible, setIsVisible] = useState(true);
 
   const currentBadge = badges[currentIndex];
+  const resolvedImageUrl =
+    currentBadge?.image_url ||
+    (currentBadge?.code ? getBadgeImageUrl(currentBadge.code) : "");
 
   // Play celebration sound using Web Audio API
   const playCelebrationSound = () => {
@@ -181,7 +185,7 @@ export default function BadgeUnlockNotification({ badges, onComplete }: BadgeUnl
                   />
                   
                   <img
-                    src={currentBadge.image_url}
+                    src={resolvedImageUrl}
                     alt={currentBadge.name}
                     className="relative w-48 h-48 object-contain drop-shadow-2xl"
                   />

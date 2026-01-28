@@ -47,18 +47,63 @@ export default function Dashboard() {
     { enabled: isAuthenticated }
   );
 
-  // Check for newly unlocked badges
-  const { data: newBadges } = trpc.badges.checkNewBadges.useQuery(
+  // Ensure server-side badge awarding runs (no UI directly from this query)
+  trpc.badges.checkNewBadges.useQuery(undefined, { enabled: isAuthenticated, refetchOnMount: true });
+
+  const { data: achievementBadges } = trpc.badges.getUserAchievementBadges.useQuery(
     undefined,
-    { enabled: isAuthenticated, refetchOnMount: true }
+    { enabled: isAuthenticated }
   );
 
-  // Show badge notifications when new badges are unlocked
+  // Show badge notifications for newly earned standard badges
   useEffect(() => {
-    if (newBadges && newBadges.length > 0) {
-      addBadges(newBadges);
+    if (!recentBadges || !user) return;
+    if (typeof window === "undefined") return;
+
+    const key = `seenBadges:${user.id}`;
+    const seenIds = new Set<number>(JSON.parse(localStorage.getItem(key) || "[]"));
+
+    const newlyEarned = recentBadges
+      .map((entry: any) => entry?.badge)
+      .filter((badge: any) => badge && !seenIds.has(badge.id));
+
+    if (newlyEarned.length > 0) {
+      addBadges(newlyEarned.map((badge: any) => ({
+        id: badge.id,
+        code: badge.code,
+        name: badge.name,
+        description: badge.description,
+        image_url: getBadgeImageUrl(badge.code),
+      })));
     }
-  }, [newBadges, addBadges]);
+
+    const updated = new Set([...seenIds, ...newlyEarned.map((b: any) => b.id)]);
+    localStorage.setItem(key, JSON.stringify([...updated]));
+  }, [recentBadges, user, addBadges]);
+
+  // Show badge notifications for newly earned achievement badges
+  useEffect(() => {
+    if (!achievementBadges || !user) return;
+    if (typeof window === "undefined") return;
+
+    const key = `seenAchievementBadges:${user.id}`;
+    const seenIds = new Set<number>(JSON.parse(localStorage.getItem(key) || "[]"));
+
+    const newlyEarned = achievementBadges.filter((entry: any) => !seenIds.has(entry.badgeId));
+
+    if (newlyEarned.length > 0) {
+      addBadges(newlyEarned.map((entry: any) => ({
+        id: entry.badgeId,
+        code: `achievement_${entry.badgeId}`,
+        name: entry.badge?.name || "Achievement",
+        description: entry.badge?.description || "",
+        image_url: entry.badge?.iconUrl || entry.badge?.icon_url || "",
+      })));
+    }
+
+    const updated = new Set([...seenIds, ...newlyEarned.map((b: any) => b.badgeId)]);
+    localStorage.setItem(key, JSON.stringify([...updated]));
+  }, [achievementBadges, user, addBadges]);
 
 
   // Redirect to home if not authenticated
