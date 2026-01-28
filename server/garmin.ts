@@ -18,6 +18,7 @@ import { getDb } from "./db";
 import { garminTokens, swimmingActivities, swimmerProfiles, xpTransactions, badgeDefinitions, userBadges } from "../drizzle/schema";
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
+import { encryptForStorage } from "./lib/tokenCrypto";
 
 // Garmin microservice configuration
 const GARMIN_SERVICE_URL = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
@@ -200,22 +201,22 @@ export async function connectGarmin(
     await db.insert(garminTokens).values({
       userId,
       garminEmail: email,
-      oauth1Token: JSON.stringify({ 
+      oauth1Token: encryptForStorage(JSON.stringify({ 
         connected: true, 
         service_user_id: String(userId),
         connected_at: new Date().toISOString()
-      }),
+      })),
       oauth2Token: null,
       tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     }).onConflictDoUpdate({
       target: garminTokens.userId,
       set: {
         garminEmail: email,
-        oauth1Token: JSON.stringify({ 
+        oauth1Token: encryptForStorage(JSON.stringify({ 
           connected: true, 
           service_user_id: String(userId),
           connected_at: new Date().toISOString()
-        }),
+        })),
         tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         updatedAt: new Date(),
       },
@@ -265,24 +266,24 @@ export async function completeMfa(
     await db.insert(garminTokens).values({
       userId,
       garminEmail: email,
-      oauth1Token: JSON.stringify({ 
+      oauth1Token: encryptForStorage(JSON.stringify({ 
         connected: true, 
         service_user_id: String(userId),
         connected_at: new Date().toISOString(),
         mfa_completed: true
-      }),
+      })),
       oauth2Token: null,
       tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     }).onConflictDoUpdate({
       target: garminTokens.userId,
       set: {
         garminEmail: email,
-        oauth1Token: JSON.stringify({ 
+        oauth1Token: encryptForStorage(JSON.stringify({ 
           connected: true, 
           service_user_id: String(userId),
           connected_at: new Date().toISOString(),
           mfa_completed: true
-        }),
+        })),
         tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         updatedAt: new Date(),
       },

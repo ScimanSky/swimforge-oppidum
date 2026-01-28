@@ -81,6 +81,8 @@ Aggiungi queste variabili in Vercel:
 | `NODE_ENV` | `production` |
 | `GARMIN_SERVICE_URL` | URL del servizio Render |
 | `GARMIN_SERVICE_SECRET` | La stessa chiave usata in Render |
+| `STRAVA_SERVICE_SECRET` | La stessa chiave usata nel servizio Strava |
+| `TOKEN_ENCRYPTION_KEY` | Chiave 32 byte per cifrare token |
 
 ### 3.4 Deploy
 1. Clicca **Deploy**
@@ -114,6 +116,8 @@ Aggiungi queste variabili in Vercel:
 - Verifica che il servizio Render sia attivo
 - Controlla i log in Render per errori
 - Verifica che `GARMIN_SERVICE_URL` e `GARMIN_SERVICE_SECRET` corrispondano
+- Verifica che `STRAVA_SERVICE_SECRET` corrisponda al servizio Strava
+- Verifica che `TOKEN_ENCRYPTION_KEY` sia presente (32 byte)
 
 ### Errore "Build failed" su Vercel
 - Verifica che tutte le dipendenze siano nel `package.json`
@@ -129,6 +133,8 @@ Aggiungi queste variabili in Vercel:
 | `JWT_SECRET` | Chiave per firmare i JWT | Genera con `openssl rand -base64 32` |
 | `GARMIN_SERVICE_URL` | URL del microservizio Python | Render dopo il deploy |
 | `GARMIN_SERVICE_SECRET` | Chiave condivisa per auth | Scegli una stringa sicura |
+| `STRAVA_SERVICE_SECRET` | Chiave condivisa per auth | Scegli una stringa sicura |
+| `TOKEN_ENCRYPTION_KEY` | Chiave 32 byte | `openssl rand -base64 32` |
 | `VITE_APP_ID` | ID dell'applicazione | `swimforge-oppidum` |
 | `VITE_APP_TITLE` | Titolo visualizzato | `SwimForge Oppidum` |
 | `NODE_ENV` | Ambiente di esecuzione | `production` |

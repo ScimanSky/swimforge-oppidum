@@ -20,6 +20,7 @@ import { getDb } from "./db";
 import { stravaTokens, swimmingActivities, swimmerProfiles, xpTransactions, badgeDefinitions, userBadges } from "../drizzle/schema";
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
+import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
 
 // Strava microservice configuration
 const STRAVA_SERVICE_URL = process.env.STRAVA_SERVICE_URL || "https://swimforge-strava-service.onrender.com";
@@ -212,8 +213,8 @@ export async function exchangeStravaToken(
       .insert(stravaTokens)
       .values({
         userId,
-        accessToken: response.access_token,
-        refreshToken: response.refresh_token,
+        accessToken: encryptForStorage(response.access_token),
+        refreshToken: encryptForStorage(response.refresh_token),
         expiresAt: response.expires_at || null,
         athleteId: response.athlete?.id || null,
         username: response.athlete?.username || null,
@@ -226,8 +227,8 @@ export async function exchangeStravaToken(
       .onConflictDoUpdate({
         target: stravaTokens.userId,
         set: {
-          accessToken: response.access_token,
-          refreshToken: response.refresh_token,
+          accessToken: encryptForStorage(response.access_token),
+          refreshToken: encryptForStorage(response.refresh_token),
           expiresAt: response.expires_at || null,
           athleteId: response.athlete?.id || null,
           username: response.athlete?.username || null,
@@ -277,6 +278,7 @@ export async function refreshStravaToken(userId: number): Promise<boolean> {
     if (!tokens || !tokens.refreshToken) {
       throw new Error("No refresh token found");
     }
+    const refreshToken = decryptIfNeeded(tokens.refreshToken);
 
     // Call microservice to refresh
     const response: StravaServiceResponse = await callStravaService(
@@ -284,7 +286,7 @@ export async function refreshStravaToken(userId: number): Promise<boolean> {
       "POST",
       {
         user_id: userId.toString(),
-        refresh_token: tokens.refreshToken
+        refresh_token: refreshToken
       }
     );
 
@@ -296,8 +298,8 @@ export async function refreshStravaToken(userId: number): Promise<boolean> {
     await db
       .update(stravaTokens)
       .set({
-        accessToken: response.access_token,
-        refreshToken: response.refresh_token || tokens.refreshToken,
+        accessToken: encryptForStorage(response.access_token),
+        refreshToken: encryptForStorage(response.refresh_token || refreshToken),
         expiresAt: response.expires_at || null,
         updatedAt: new Date(),
       })
@@ -346,6 +348,7 @@ export async function syncStravaActivities(
     if (!tokens || !tokens.accessToken) {
       throw new Error("No Strava connection found");
     }
+    let accessToken = decryptIfNeeded(tokens.accessToken);
 
     // Check if token is expired
     const now = Math.floor(Date.now() / 1000);
@@ -367,7 +370,7 @@ export async function syncStravaActivities(
         throw new Error("Failed to get updated tokens");
       }
       
-      tokens.accessToken = updatedTokens.accessToken;
+      accessToken = decryptIfNeeded(updatedTokens.accessToken);
     }
 
     // Call microservice to sync
@@ -376,7 +379,7 @@ export async function syncStravaActivities(
       "POST",
       {
         user_id: userId.toString(),
-        access_token: tokens.accessToken,
+        access_token: accessToken,
         days_back: daysBack
       }
     );
