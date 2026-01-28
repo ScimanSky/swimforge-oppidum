@@ -47,8 +47,16 @@ export async function getDb() {
       });
       _db = drizzle(_pool);
       
-      // Run migrations on first connection
-      await runMigrations(_pool);
+      const shouldRunMigrations =
+        process.env.NODE_ENV !== "production" ||
+        process.env.RUN_MIGRATIONS === "true";
+
+      if (shouldRunMigrations) {
+        // Run migrations on first connection (opt-in in production)
+        await runMigrations(_pool);
+      } else {
+        console.log("[Database] Migrations skipped (set RUN_MIGRATIONS=true to enable)");
+      }
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
