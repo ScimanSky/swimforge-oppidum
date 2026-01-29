@@ -100,11 +100,12 @@ export async function getProgressTimeline(
   const startDate = getDaysAgo(days);
 
   const db = await getDb();
-  const activities = await db
+  const rows = await db
     .select({
-      date: swimmingActivities.activityDate,
-      distance: swimmingActivities.distanceMeters,
-      pace: swimmingActivities.avgPacePer100m,
+      date: sql<string>`date(${swimmingActivities.activityDate})`,
+      distanceMeters: sql<number>`sum(${swimmingActivities.distanceMeters})`,
+      sessions: sql<number>`count(*)`,
+      avgPace: sql<number | null>`round(avg(${swimmingActivities.avgPacePer100m}))`,
     })
     .from(swimmingActivities)
     .where(
@@ -113,38 +114,15 @@ export async function getProgressTimeline(
         gte(swimmingActivities.activityDate, startDate)
       )
     )
-    .orderBy(swimmingActivities.activityDate);
+    .groupBy(sql`date(${swimmingActivities.activityDate})`)
+    .orderBy(sql`date(${swimmingActivities.activityDate})`);
 
-  // Group by date
-  const grouped = new Map<string, { distance: number; pace: number[]; sessions: number }>();
-
-  for (const activity of activities) {
-    const dateStr = formatDate(new Date(activity.date));
-    const existing = grouped.get(dateStr) || { distance: 0, pace: [], sessions: 0 };
-
-    existing.distance += activity.distance;
-    existing.sessions += 1;
-    if (activity.pace) {
-      existing.pace.push(activity.pace);
-    }
-
-    grouped.set(dateStr, existing);
-  }
-
-  // Convert to array
-  const timeline: TimelineDataPoint[] = [];
-  for (const [date, data] of grouped.entries()) {
-    timeline.push({
-      date,
-      distance: Math.round(data.distance / 10) / 100, // meters to km, 2 decimals
-      pace: data.pace.length > 0 
-        ? Math.round(data.pace.reduce((a, b) => a + b, 0) / data.pace.length)
-        : null,
-      sessions: data.sessions,
-    });
-  }
-
-  return timeline.sort((a, b) => a.date.localeCompare(b.date));
+  return rows.map(row => ({
+    date: row.date,
+    distance: Math.round((Number(row.distanceMeters || 0) / 1000) * 100) / 100,
+    pace: row.avgPace ? Number(row.avgPace) : null,
+    sessions: Number(row.sessions || 0),
+  }));
 }
 
 // ============================================
@@ -158,8 +136,18 @@ export async function getPerformanceAnalysis(
   const startDate = getDaysAgo(days);
 
   const db = await getDb();
-  const activities = await db
-    .select()
+  const aggregates = await db
+    .select({
+      zone1: sql<number>`coalesce(sum(${swimmingActivities.hrZone1Seconds}), 0)`,
+      zone2: sql<number>`coalesce(sum(${swimmingActivities.hrZone2Seconds}), 0)`,
+      zone3: sql<number>`coalesce(sum(${swimmingActivities.hrZone3Seconds}), 0)`,
+      zone4: sql<number>`coalesce(sum(${swimmingActivities.hrZone4Seconds}), 0)`,
+      zone5: sql<number>`coalesce(sum(${swimmingActivities.hrZone5Seconds}), 0)`,
+      caloriesTotal: sql<number>`coalesce(sum(${swimmingActivities.calories}), 0)`,
+      sessions: sql<number>`count(*)`,
+      swolfAvg: sql<number | null>`round(avg(${swimmingActivities.avgSwolf}))`,
+      avgCaloriesPerSession: sql<number | null>`round(avg(${swimmingActivities.calories}))`,
+    })
     .from(swimmingActivities)
     .where(
       and(
@@ -168,69 +156,52 @@ export async function getPerformanceAnalysis(
       )
     );
 
-  // HR Zones - Use real data from database instead of calculating from average HR
-  const hrZonesSeconds = { zone1: 0, zone2: 0, zone3: 0, zone4: 0, zone5: 0 };
-
-  for (const activity of activities) {
-    // Sum up the actual time spent in each zone
-    hrZonesSeconds.zone1 += activity.hrZone1Seconds || 0;
-    hrZonesSeconds.zone2 += activity.hrZone2Seconds || 0;
-    hrZonesSeconds.zone3 += activity.hrZone3Seconds || 0;
-    hrZonesSeconds.zone4 += activity.hrZone4Seconds || 0;
-    hrZonesSeconds.zone5 += activity.hrZone5Seconds || 0;
-  }
-
-  // Calculate total time across all zones
-  const totalHrSeconds = Object.values(hrZonesSeconds).reduce((sum, val) => sum + val, 0);
-
-  // Convert to percentages based on actual time spent in each zone
-  const hrZonesPercent = {
-    zone1: totalHrSeconds > 0 ? Math.round((hrZonesSeconds.zone1 / totalHrSeconds) * 100) : 0,
-    zone2: totalHrSeconds > 0 ? Math.round((hrZonesSeconds.zone2 / totalHrSeconds) * 100) : 0,
-    zone3: totalHrSeconds > 0 ? Math.round((hrZonesSeconds.zone3 / totalHrSeconds) * 100) : 0,
-    zone4: totalHrSeconds > 0 ? Math.round((hrZonesSeconds.zone4 / totalHrSeconds) * 100) : 0,
-    zone5: totalHrSeconds > 0 ? Math.round((hrZonesSeconds.zone5 / totalHrSeconds) * 100) : 0,
+  const row = aggregates[0] ?? {
+    zone1: 0, zone2: 0, zone3: 0, zone4: 0, zone5: 0,
+    caloriesTotal: 0, sessions: 0, swolfAvg: null, avgCaloriesPerSession: null,
   };
 
-  // Pace Distribution
-  const paceRanges: { [key: string]: number } = {};
-  for (const activity of activities) {
-    if (activity.avgPacePer100m) {
-      const pace = activity.avgPacePer100m;
-      let range = '';
-      if (pace < 90) range = '< 1:30';
-      else if (pace < 120) range = '1:30-2:00';
-      else if (pace < 150) range = '2:00-2:30';
-      else if (pace < 180) range = '2:30-3:00';
-      else range = '> 3:00';
+  const totalHrSeconds = (row.zone1 || 0) + (row.zone2 || 0) + (row.zone3 || 0) + (row.zone4 || 0) + (row.zone5 || 0);
 
-      paceRanges[range] = (paceRanges[range] || 0) + 1;
-    }
-  }
+  const hrZonesPercent = {
+    zone1: totalHrSeconds > 0 ? Math.round((row.zone1 / totalHrSeconds) * 100) : 0,
+    zone2: totalHrSeconds > 0 ? Math.round((row.zone2 / totalHrSeconds) * 100) : 0,
+    zone3: totalHrSeconds > 0 ? Math.round((row.zone3 / totalHrSeconds) * 100) : 0,
+    zone4: totalHrSeconds > 0 ? Math.round((row.zone4 / totalHrSeconds) * 100) : 0,
+    zone5: totalHrSeconds > 0 ? Math.round((row.zone5 / totalHrSeconds) * 100) : 0,
+  };
 
-  const paceDistribution = Object.entries(paceRanges).map(([range, count]) => ({
-    range,
-    count,
+  const paceDistributionRows = await db
+    .select({
+      range: sql<string>`case
+        when ${swimmingActivities.avgPacePer100m} < 90 then '< 1:30'
+        when ${swimmingActivities.avgPacePer100m} < 120 then '1:30-2:00'
+        when ${swimmingActivities.avgPacePer100m} < 150 then '2:00-2:30'
+        when ${swimmingActivities.avgPacePer100m} < 180 then '2:30-3:00'
+        else '> 3:00' end`,
+      count: sql<number>`count(*)`,
+    })
+    .from(swimmingActivities)
+    .where(
+      and(
+        eq(swimmingActivities.userId, userId),
+        gte(swimmingActivities.activityDate, startDate),
+        sql`${swimmingActivities.avgPacePer100m} is not null`
+      )
+    )
+    .groupBy(sql`1`);
+
+  const paceDistribution = paceDistributionRows.map(row => ({
+    range: row.range,
+    count: Number(row.count || 0),
   }));
-
-  // Calories
-  const caloriesTotal = activities.reduce((sum, a) => sum + (a.calories || 0), 0);
-  const avgCaloriesPerSession = activities.length > 0 
-    ? Math.round(caloriesTotal / activities.length)
-    : 0;
-
-  // SWOLF
-  const swolfValues = activities.filter(a => a.swolfScore).map(a => a.swolfScore!);
-  const swolfAvg = swolfValues.length > 0
-    ? Math.round(swolfValues.reduce((a, b) => a + b, 0) / swolfValues.length)
-    : null;
 
   return {
     hrZones: hrZonesPercent,
     paceDistribution,
-    caloriesTotal,
-    avgCaloriesPerSession,
-    swolfAvg,
+    caloriesTotal: Number(row.caloriesTotal || 0),
+    avgCaloriesPerSession: Number(row.avgCaloriesPerSession || 0),
+    swolfAvg: row.swolfAvg ? Number(row.swolfAvg) : null,
   };
 }
 
