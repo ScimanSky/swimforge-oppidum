@@ -34,6 +34,10 @@ export default function Activities() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [offset, setOffset] = useState(0);
   const limit = 20;
+  const [source, setSource] = useState<"all" | "garmin" | "strava" | "manual">("all");
+  const [openWater, setOpenWater] = useState<"all" | "pool" | "open">("all");
+  const [strokeTypeFilter, setStrokeTypeFilter] = useState<"all" | "freestyle" | "backstroke" | "breaststroke" | "butterfly" | "mixed">("all");
+  const [distanceFilter, setDistanceFilter] = useState<"all" | "short" | "medium" | "long">("all");
 
   // Form state
   const [formData, setFormData] = useState({
@@ -50,7 +54,20 @@ export default function Activities() {
   const utils = trpc.useUtils();
 
   const { data: activities, isLoading } = trpc.activities.list.useQuery(
-    { limit, offset },
+    {
+      limit,
+      offset,
+      source,
+      openWater: openWater === "all" ? undefined : openWater === "open",
+      strokeType: strokeTypeFilter === "all" ? undefined : strokeTypeFilter,
+      minDistanceMeters:
+        distanceFilter === "short" ? 0 :
+        distanceFilter === "medium" ? 1000 :
+        distanceFilter === "long" ? 3000 : undefined,
+      maxDistanceMeters:
+        distanceFilter === "short" ? 1000 :
+        distanceFilter === "medium" ? 3000 : undefined,
+    },
     { enabled: isAuthenticated }
   );
 
@@ -298,6 +315,69 @@ export default function Activities() {
       )}
 
       <main className="container py-6 space-y-4">
+        {/* Filters */}
+        <div className="grid gap-3 md:grid-cols-4">
+          <div className="space-y-1.5">
+            <Label>Fonte</Label>
+            <Select value={source} onValueChange={(v) => setSource(v as any)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Tutte" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutte</SelectItem>
+                <SelectItem value="garmin">Garmin</SelectItem>
+                <SelectItem value="strava">Strava</SelectItem>
+                <SelectItem value="manual">Manuale</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Tipo</Label>
+            <Select value={openWater} onValueChange={(v) => setOpenWater(v as any)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Tutte" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutte</SelectItem>
+                <SelectItem value="pool">Piscina</SelectItem>
+                <SelectItem value="open">Acque libere</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Stile</Label>
+            <Select value={strokeTypeFilter} onValueChange={(v) => setStrokeTypeFilter(v as any)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Tutti" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutti</SelectItem>
+                <SelectItem value="freestyle">Stile libero</SelectItem>
+                <SelectItem value="backstroke">Dorso</SelectItem>
+                <SelectItem value="breaststroke">Rana</SelectItem>
+                <SelectItem value="butterfly">Delfino</SelectItem>
+                <SelectItem value="mixed">Misto</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Distanza</Label>
+            <Select value={distanceFilter} onValueChange={(v) => setDistanceFilter(v as any)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Tutte" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tutte</SelectItem>
+                <SelectItem value="short">0 - 1 km</SelectItem>
+                <SelectItem value="medium">1 - 3 km</SelectItem>
+                <SelectItem value="long">> 3 km</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         {isLoading ? (
           <div className="space-y-3">
             {[...Array(5)].map((_, i) => (

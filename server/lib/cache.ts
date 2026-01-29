@@ -197,8 +197,8 @@ export const cacheKeys = {
   userStats: (userId: string) => `user:stats:${userId}`,
   userProfile: (userId: string) => `user:profile:${userId}`,
   badges: (userId: string) => `user:badges:${userId}`,
-  activities: (userId: string, limit: number, offset: number) =>
-    `user:activities:${userId}:${limit}:${offset}`,
+  activities: (key: string, limit: number, offset: number) =>
+    `user:activities:${key}:${limit}:${offset}`,
   search: (query: string) => `search:${query}`,
   badgeDefinitions: () => 'badge:definitions',
 };

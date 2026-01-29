@@ -303,11 +303,34 @@ export const appRouter = router({
       .input(z.object({
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
+        source: z.enum(["all", "garmin", "strava", "manual"]).optional().default("all"),
+        openWater: z.boolean().optional(),
+        strokeType: z.enum(["freestyle", "backstroke", "breaststroke", "butterfly", "mixed"]).optional(),
+        minDistanceMeters: z.number().min(0).optional(),
+        maxDistanceMeters: z.number().min(0).optional(),
       }))
       .query(async ({ ctx, input }) => {
+        const cacheKey = [
+          String(ctx.user.id),
+          input.limit,
+          input.offset,
+          input.source ?? "all",
+          input.openWater ?? "any",
+          input.strokeType ?? "any",
+          input.minDistanceMeters ?? "min",
+          input.maxDistanceMeters ?? "max",
+        ].join(":");
+
         return await getOrSetCached(
-          cacheKeys.activities(String(ctx.user.id), input.limit, input.offset),
-          () => db.getActivities(ctx.user.id, input.limit, input.offset),
+          cacheKeys.activities(cacheKey, input.limit, input.offset),
+          () =>
+            db.getActivities(ctx.user.id, input.limit, input.offset, {
+              source: input.source,
+              openWater: input.openWater,
+              strokeType: input.strokeType,
+              minDistanceMeters: input.minDistanceMeters,
+              maxDistanceMeters: input.maxDistanceMeters,
+            }),
           CACHE_TTL.ACTIVITIES
         );
       }),

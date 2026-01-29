@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import bcrypt from "bcryptjs";
@@ -310,13 +310,42 @@ export async function createActivity(data: InsertSwimmingActivity) {
   return result[0]?.id || null;
 }
 
-export async function getActivities(userId: number, limit = 20, offset = 0) {
+export async function getActivities(
+  userId: number,
+  limit = 20,
+  offset = 0,
+  filters: {
+    source?: "all" | "garmin" | "strava" | "manual";
+    openWater?: boolean;
+    strokeType?: "freestyle" | "backstroke" | "breaststroke" | "butterfly" | "mixed";
+    minDistanceMeters?: number;
+    maxDistanceMeters?: number;
+  } = {}
+) {
   const db = await getDb();
   if (!db) return [];
+  const conditions = [eq(swimmingActivities.userId, userId)];
+
+  if (filters.source && filters.source !== "all") {
+    conditions.push(eq(swimmingActivities.activitySource, filters.source));
+  }
+  if (filters.openWater !== undefined) {
+    conditions.push(eq(swimmingActivities.isOpenWater, filters.openWater));
+  }
+  if (filters.strokeType) {
+    conditions.push(eq(swimmingActivities.strokeType, filters.strokeType));
+  }
+  if (filters.minDistanceMeters !== undefined) {
+    conditions.push(gte(swimmingActivities.distanceMeters, filters.minDistanceMeters));
+  }
+  if (filters.maxDistanceMeters !== undefined) {
+    conditions.push(lte(swimmingActivities.distanceMeters, filters.maxDistanceMeters));
+  }
+
   return await db
     .select()
     .from(swimmingActivities)
-    .where(eq(swimmingActivities.userId, userId))
+    .where(and(...conditions))
     .orderBy(desc(swimmingActivities.activityDate))
     .limit(limit)
     .offset(offset);
