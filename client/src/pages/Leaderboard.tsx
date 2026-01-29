@@ -20,6 +20,7 @@ import MobileNav from "@/components/MobileNav";
 import { useState } from "react";
 
 type OrderBy = "level" | "totalXp" | "badges";
+type Period = "all" | "week" | "month";
 
 // Helper to normalize leaderboard entry data from different query formats
 interface NormalizedEntry {
@@ -29,6 +30,8 @@ interface NormalizedEntry {
   level: number;
   totalXp: number;
   badgeCount?: number;
+  periodXp?: number;
+  periodBadgeCount?: number;
 }
 
 function normalizeEntry(entry: any): NormalizedEntry {
@@ -44,15 +47,18 @@ function normalizeEntry(entry: any): NormalizedEntry {
     level: profile.level ?? entry.level ?? 1,
     totalXp: profile.totalXp ?? entry.totalXp ?? 0,
     badgeCount: entry.badgeCount ?? 0,
+    periodXp: entry.periodXp ?? 0,
+    periodBadgeCount: entry.badgeCount ?? 0,
   };
 }
 
 export default function Leaderboard() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [orderBy, setOrderBy] = useState<OrderBy>("totalXp");
+  const [period, setPeriod] = useState<Period>("all");
 
   const { data: leaderboard, isLoading } = trpc.leaderboard.get.useQuery(
-    { orderBy, limit: 50 },
+    { orderBy, period, limit: 50 },
     { enabled: isAuthenticated }
   );
 
@@ -82,12 +88,14 @@ export default function Leaderboard() {
   // Format value based on orderBy
   const formatValue = (entry: NormalizedEntry): string => {
     if (orderBy === "badges") {
-      return `${entry.badgeCount || 0} badge`;
+      const value = period === "all" ? entry.badgeCount || 0 : entry.periodBadgeCount || 0;
+      return `${value} badge`;
     }
     if (orderBy === "level") {
       return `Lv. ${entry.level}`;
     }
-    return `${entry.totalXp.toLocaleString()} XP`;
+    const xpValue = period === "all" ? entry.totalXp : entry.periodXp || 0;
+    return `${xpValue.toLocaleString()} XP`;
   };
 
   // Normalize all entries
@@ -122,6 +130,15 @@ export default function Leaderboard() {
       </header>
 
       <main className="container py-6 space-y-6">
+        {/* Period Tabs */}
+        <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="all">Sempre</TabsTrigger>
+            <TabsTrigger value="month">Mese</TabsTrigger>
+            <TabsTrigger value="week">Settimana</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         {/* Order Tabs */}
         <Tabs value={orderBy} onValueChange={(v) => setOrderBy(v as OrderBy)}>
           <TabsList className="grid w-full grid-cols-3">

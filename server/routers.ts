@@ -627,12 +627,13 @@ export const appRouter = router({
     get: protectedProcedure
       .input(z.object({
         orderBy: z.enum(["level", "totalXp", "badges"]).default("totalXp"),
+        period: z.enum(["all", "week", "month"]).default("all"),
         limit: z.number().min(1).max(100).default(50),
       }))
       .query(async ({ input }) => {
         return await getOrSetCached(
-          cacheKeys.leaderboard(input.orderBy, input.limit, 0),
-          () => db.getLeaderboard(input.orderBy, input.limit),
+          cacheKeys.leaderboard(input.orderBy, input.period, input.limit, 0),
+          () => db.getLeaderboard(input.orderBy, input.limit, input.period),
           CACHE_TTL.LEADERBOARD
         );
       }),

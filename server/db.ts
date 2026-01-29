@@ -217,49 +217,87 @@ export async function updateSwimmerProfile(userId: number, data: Partial<InsertS
   await db.update(swimmerProfiles).set({ ...data, updatedAt: new Date() }).where(eq(swimmerProfiles.userId, userId));
 }
 
-export async function getLeaderboard(orderBy: 'level' | 'totalXp' | 'badges' = 'totalXp', limit: number = 50) {
-  console.log('[getLeaderboard] Called with orderBy:', orderBy, 'limit:', limit);
+export async function getLeaderboard(
+  orderBy: 'level' | 'totalXp' | 'badges' = 'totalXp',
+  limit: number = 50,
+  period: 'all' | 'week' | 'month' = 'all'
+) {
+  console.log('[getLeaderboard] Called with orderBy:', orderBy, 'limit:', limit, 'period:', period);
   const db = await getDb();
   if (!db) {
     console.log('[getLeaderboard] DB not available');
     return [];
   }  
-  if (orderBy === 'badges') {
-    // Use subquery for badge count
-    const result = await db.execute(sql`
-      SELECT 
-        sp.id,
-        sp.user_id as "userId",
-        sp.level,
-        sp.total_xp as "totalXp",
-        sp.total_distance_meters as "totalDistanceMeters",
-        sp.total_time_seconds as "totalTimeSeconds",
-        sp.total_sessions as "totalSessions",
-        sp.garmin_connected as "garminConnected",
-        sp.created_at as "createdAt",
-        sp.updated_at as "updatedAt",
-        u.name,
-        u.email,
-        COALESCE((SELECT COUNT(*) FROM user_badges WHERE user_id = sp.user_id), 0) as "badgeCount"
-      FROM swimmer_profiles sp
-      JOIN users u ON sp.user_id = u.id
-      ORDER BY "badgeCount" DESC, sp.total_xp DESC
-      LIMIT ${limit}
-    `);
-    return result.rows || [];
+  if (period === 'all') {
+    if (orderBy === 'badges') {
+      // Use subquery for badge count
+      const result = await db.execute(sql`
+        SELECT 
+          sp.id,
+          sp.user_id as "userId",
+          sp.level,
+          sp.total_xp as "totalXp",
+          sp.total_distance_meters as "totalDistanceMeters",
+          sp.total_time_seconds as "totalTimeSeconds",
+          sp.total_sessions as "totalSessions",
+          sp.garmin_connected as "garminConnected",
+          sp.created_at as "createdAt",
+          sp.updated_at as "updatedAt",
+          u.name,
+          u.email,
+          COALESCE((SELECT COUNT(*) FROM user_badges WHERE user_id = sp.user_id), 0) as "badgeCount"
+        FROM swimmer_profiles sp
+        JOIN users u ON sp.user_id = u.id
+        ORDER BY "badgeCount" DESC, sp.total_xp DESC
+        LIMIT ${limit}
+      `);
+      return result.rows || [];
+    }
+
+    const orderColumn = orderBy === 'level' ? swimmerProfiles.level : swimmerProfiles.totalXp;
+    return await db
+      .select({
+        profile: swimmerProfiles,
+        userName: users.name,
+        userEmail: users.email,
+      })
+      .from(swimmerProfiles)
+      .innerJoin(users, eq(swimmerProfiles.userId, users.id))
+      .orderBy(desc(orderColumn))
+      .limit(limit);
   }
-  
-  const orderColumn = orderBy === 'level' ? swimmerProfiles.level : swimmerProfiles.totalXp;
-  return await db
-    .select({
-      profile: swimmerProfiles,
-      userName: users.name,
-      userEmail: users.email,
-    })
-    .from(swimmerProfiles)
-    .innerJoin(users, eq(swimmerProfiles.userId, users.id))
-    .orderBy(desc(orderColumn))
-    .limit(limit);
+
+  const now = new Date();
+  const startDate = new Date(now);
+  if (period === 'week') startDate.setDate(startDate.getDate() - 7);
+  if (period === 'month') startDate.setDate(startDate.getDate() - 30);
+
+  const result = await db.execute(sql`
+    SELECT 
+      sp.id,
+      sp.user_id as "userId",
+      sp.level,
+      sp.total_xp as "totalXp",
+      sp.total_distance_meters as "totalDistanceMeters",
+      sp.total_time_seconds as "totalTimeSeconds",
+      sp.total_sessions as "totalSessions",
+      sp.garmin_connected as "garminConnected",
+      sp.created_at as "createdAt",
+      sp.updated_at as "updatedAt",
+      u.name,
+      u.email,
+      COALESCE((SELECT COUNT(*) FROM user_badges WHERE user_id = sp.user_id AND earned_at >= ${startDate}), 0) as "badgeCount",
+      COALESCE((SELECT SUM(amount) FROM xp_transactions WHERE user_id = sp.user_id AND created_at >= ${startDate}), 0) as "periodXp"
+    FROM swimmer_profiles sp
+    JOIN users u ON sp.user_id = u.id
+    ORDER BY 
+      ${orderBy === 'badges' ? sql`"badgeCount" DESC, "periodXp" DESC` :
+        orderBy === 'totalXp' ? sql`"periodXp" DESC, sp.total_xp DESC` :
+        sql`sp.level DESC, sp.total_xp DESC`}
+    LIMIT ${limit}
+  `);
+
+  return result.rows || [];
 }
 
 // ============================================
