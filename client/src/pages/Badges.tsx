@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
 import MobileNav from "@/components/MobileNav";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useMemo } from "react";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
@@ -27,6 +27,7 @@ const categoryLabels: Record<string, string> = {
   open_water: "Acque Libere",
   special: "Speciali",
   milestone: "Traguardi",
+  achievement: "Achievement",
 };
 
 const rarityLabels: Record<string, string> = {
@@ -84,6 +85,10 @@ export default function Badges() {
     undefined,
     { enabled: isAuthenticated }
   );
+  const { data: achievementDefinitions, isLoading: achievementsLoading } =
+    trpc.badges.getAchievementBadgeDefinitions.useQuery(undefined, { enabled: isAuthenticated });
+  const { data: userAchievementBadges } =
+    trpc.badges.getUserAchievementBadges.useQuery(undefined, { enabled: isAuthenticated });
 
   const fixBadgeUrls = trpc.admin.fixBadgeUrls.useMutation({
     onSuccess: () => {
@@ -99,14 +104,42 @@ export default function Badges() {
     return <Redirect to="/" />;
   }
 
+  const achievementBadges = useMemo(() => {
+    if (!achievementDefinitions) return [];
+    const earnedById = new Map(
+      (userAchievementBadges || []).map((entry: any) => [entry.badgeId, entry])
+    );
+    return achievementDefinitions.map((def: any) => {
+      const earnedEntry = earnedById.get(def.id);
+      return {
+        id: `ach-${def.id}`,
+        code: `achievement_${def.id}`,
+        name: def.name,
+        description: def.description,
+        category: "achievement",
+        rarity: "uncommon",
+        requirementType: "manual",
+        requirementValue: 1,
+        earned: Boolean(earnedEntry),
+        progress: earnedEntry ? 100 : 0,
+        earnedAt: earnedEntry?.awardedAt,
+        image_url: def.iconUrl,
+      };
+    });
+  }, [achievementDefinitions, userAchievementBadges]);
+
+  const allBadges = useMemo(() => {
+    return [...(badgeProgress || []), ...achievementBadges];
+  }, [badgeProgress, achievementBadges]);
+
   // Filter badges by category
-  const filteredBadges = badgeProgress?.filter(
+  const filteredBadges = allBadges.filter(
     (b) => selectedCategory === "all" || b.category === selectedCategory
   );
 
   // Count earned badges
-  const earnedCount = badgeProgress?.filter((b) => b.earned).length || 0;
-  const totalCount = badgeProgress?.length || 0;
+  const earnedCount = allBadges.filter((b) => b.earned).length || 0;
+  const totalCount = allBadges.length || 0;
 
   const soundBasePath = "/sounds/badges_new";
   const badgeSounds = [
@@ -288,7 +321,7 @@ export default function Badges() {
         </div>
 
         {/* Badge Grid */}
-        {isLoading ? (
+        {isLoading || achievementsLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
             {[...Array(12)].map((_, i) => (
               <div key={i} className="flex flex-col items-center gap-3">
@@ -306,7 +339,7 @@ export default function Badges() {
               {filteredBadges?.map((badge, index) => {
                 const isEarned = badge.earned;
                 const colors = rarityColors[badge.rarity] || rarityColors.common;
-                const pngPath = getBadgeImageUrl(badge.code);
+                const pngPath = badge.image_url || getBadgeImageUrl(badge.code);
 
                 return (
                   <motion.div
@@ -317,7 +350,7 @@ export default function Badges() {
                     exit={{ opacity: 0, scale: 0.8 }}
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => handleBadgeClick(badge, badgeProgress?.indexOf(badge) || index)}
+                    onClick={() => handleBadgeClick(badge, allBadges.indexOf(badge) >= 0 ? allBadges.indexOf(badge) : index)}
                     className="cursor-pointer flex flex-col items-center"
                   >
                     {/* Badge Container */}
