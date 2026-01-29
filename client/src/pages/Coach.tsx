@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { useState } from "react";
 import { trpc } from "../lib/trpc";
 import { RefreshCw, Waves, Info, Clock, TrendingUp, ChevronLeft, Activity } from "lucide-react";
@@ -38,14 +37,6 @@ export default function Coach() {
   const [activeTab, setActiveTab] = useState<"pool" | "dryland">("pool");
   const [forceRegenerate, setForceRegenerate] = useState(false);
 
-  // Debug logging
-  useEffect(() => {
-    console.log('[Coach] Component state:', {
-      activeTab,
-      forceRegenerate,
-    });
-  }, [activeTab, forceRegenerate]);
-
   // Query for pool workout
   const poolWorkoutQuery = trpc.aiCoach.getPoolWorkout.useQuery(
     { forceRegenerate },
@@ -71,17 +62,10 @@ export default function Coach() {
   const isLoading = currentQuery.isFetching;
   const isRegenerating = forceRegenerate && isLoading;
 
-  // Debug logging for query state
-  useEffect(() => {
-    console.log('[Coach] Query state:', {
-      activeTab,
-      isLoading: currentQuery.isLoading,
-      isFetching: currentQuery.isFetching,
-      isError: currentQuery.isError,
-      hasData: !!currentQuery.data,
-      error: currentQuery.error,
-    });
-  }, [activeTab, currentQuery.isLoading, currentQuery.isFetching, currentQuery.isError, currentQuery.data, currentQuery.error]);
+  const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
+    { days: 30 },
+    { staleTime: 24 * 60 * 60 * 1000 }
+  );
 
   const handleRegenerate = async () => {
     setForceRegenerate(true);
@@ -111,7 +95,12 @@ export default function Coach() {
               </Link>
               <div className="flex items-center gap-3">
                 <Waves className="w-6 h-6 text-[oklch(0.70_0.18_220)]" />
-                <h1 className="text-xl font-bold text-[oklch(0.95_0.01_220)]">AI Coach</h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold text-[oklch(0.95_0.01_220)]">AI Coach</h1>
+                  <span className="px-2 py-0.5 text-[10px] rounded-full bg-[oklch(0.30_0.10_230)] text-[oklch(0.95_0.01_220)] border border-[oklch(0.40_0.10_230)]">
+                    Premium
+                  </span>
+                </div>
               </div>
             </div>
             {workout && (
@@ -196,126 +185,181 @@ export default function Coach() {
         )}
 
         {/* Workout Display */}
-        {workout && !isLoading && (
+        {!isLoading && (
           <div className="space-y-6">
-            {/* Workout Header */}
-            <div className="neon-card p-6">
-              <h2 className="text-2xl font-bold text-[oklch(0.95_0.01_220)] mb-2">
-                {workout.title}
-              </h2>
-              <p className="text-[oklch(0.75_0.03_220)] mb-4">{workout.description}</p>
+            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+              {/* Premium AI Insights */}
+              <div className="neon-card p-6 bg-gradient-to-br from-[oklch(0.20_0.08_235_/_0.55)] to-[oklch(0.12_0.04_250_/_0.75)] border border-[oklch(0.35_0.08_235)]">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-1 text-[10px] rounded-full bg-[oklch(0.30_0.10_230)] text-[oklch(0.95_0.01_220)] border border-[oklch(0.40_0.10_230)]">
+                      AI Insights
+                    </span>
+                    <span className="text-xs text-[oklch(0.70_0.05_220)]">Analisi Premium</span>
+                  </div>
+                  <span className="text-[10px] text-[oklch(0.60_0.05_250)]">Ultime 24h</span>
+                </div>
+                {advanced?.insights?.length ? (
+                  <>
+                    <div className="text-[oklch(0.95_0.02_220)] text-base leading-relaxed font-medium">
+                      {advanced.insights[0]}
+                    </div>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      {advanced.insights.slice(1, 5).map((insight, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-xl p-3 text-sm text-[oklch(0.85_0.05_220)] bg-[oklch(0.16_0.03_250_/_0.55)] border border-[oklch(0.28_0.03_250)]"
+                        >
+                          {insight}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm text-[oklch(0.65_0.03_220)]">
+                    Nessun insight disponibile. Completa più sessioni per ottenere analisi personalizzate.
+                  </div>
+                )}
+                {advanced?.predictions && (
+                  <div className="mt-4 rounded-xl p-3 bg-[oklch(0.18_0.03_250_/_0.55)] border border-[oklch(0.28_0.03_250)] text-xs text-[oklch(0.80_0.05_220)]">
+                    Proiezione: {advanced.predictions.targetKm}km entro{" "}
+                    {new Date(advanced.predictions.estimatedDate).toLocaleDateString("it-IT")} (
+                    {advanced.predictions.daysRemaining}g)
+                  </div>
+                )}
+              </div>
 
-              <div className="flex flex-wrap gap-4 text-sm">
-                <div className="flex items-center gap-2 text-[oklch(0.75_0.03_220)]">
-                  <Clock className="w-4 h-4 text-[oklch(0.70_0.18_220)]" />
-                  <span className="font-semibold">Durata:</span>
-                  <span>{workout.duration}</span>
-                </div>
-                <div className="flex items-center gap-2 text-[oklch(0.75_0.03_220)]">
-                  <TrendingUp className="w-4 h-4 text-[oklch(0.70_0.18_220)]" />
-                  <span className="font-semibold">Difficoltà:</span>
-                  <span>{workout.difficulty}</span>
-                </div>
+              {/* Workout Summary */}
+              <div className="neon-card p-6">
+                {workout ? (
+                  <>
+                    <h2 className="text-2xl font-bold text-[oklch(0.95_0.01_220)] mb-2">
+                      {workout.title}
+                    </h2>
+                    <p className="text-[oklch(0.75_0.03_220)] mb-4">{workout.description}</p>
+
+                    <div className="flex flex-wrap gap-4 text-sm">
+                      <div className="flex items-center gap-2 text-[oklch(0.75_0.03_220)]">
+                        <Clock className="w-4 h-4 text-[oklch(0.70_0.18_220)]" />
+                        <span className="font-semibold">Durata:</span>
+                        <span>{workout.duration}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[oklch(0.75_0.03_220)]">
+                        <TrendingUp className="w-4 h-4 text-[oklch(0.70_0.18_220)]" />
+                        <span className="font-semibold">Difficoltà:</span>
+                        <span>{workout.difficulty}</span>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm text-[oklch(0.65_0.03_220)]">
+                    Nessun allenamento disponibile al momento.
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Workout Sections */}
-            {workout.sections.map((section, sectionIdx) => (
-              <div key={sectionIdx} className="neon-card p-6">
-                <h3 className="text-xl font-bold text-[oklch(0.95_0.01_220)] mb-4 pb-2 border-b-2 border-[oklch(0.70_0.18_220)]">
-                  {section.title}
-                </h3>
+            {workout && (
+              <>
+                {workout.sections.map((section, sectionIdx) => (
+                  <div key={sectionIdx} className="neon-card p-6">
+                    <h3 className="text-xl font-bold text-[oklch(0.95_0.01_220)] mb-4 pb-2 border-b-2 border-[oklch(0.70_0.18_220)]">
+                      {section.title}
+                    </h3>
 
-                <div className="space-y-4">
-                  {section.exercises.map((exercise, exerciseIdx) => (
-                    <div
-                      key={exerciseIdx}
-                      className="bg-[oklch(0.18_0.03_250_/_0.55)] rounded-lg p-4 hover:bg-[oklch(0.20_0.03_250_/_0.55)] transition-colors border border-[oklch(0.25_0.03_250)]"
-                    >
-                      <div className="font-semibold text-[oklch(0.95_0.01_220)] mb-2">
-                        {exercise.name}
-                      </div>
+                    <div className="space-y-4">
+                      {section.exercises.map((exercise, exerciseIdx) => (
+                        <div
+                          key={exerciseIdx}
+                          className="bg-[oklch(0.18_0.03_250_/_0.55)] rounded-lg p-4 hover:bg-[oklch(0.20_0.03_250_/_0.55)] transition-colors border border-[oklch(0.25_0.03_250)]"
+                        >
+                          <div className="font-semibold text-[oklch(0.95_0.01_220)] mb-2">
+                            {exercise.name}
+                          </div>
 
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-[oklch(0.75_0.03_220)] mb-2">
-                        {exercise.sets && (
-                          <div>
-                            <span className="font-medium text-[oklch(0.85_0.01_220)]">Serie:</span> {exercise.sets}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-[oklch(0.75_0.03_220)] mb-2">
+                            {exercise.sets && (
+                              <div>
+                                <span className="font-medium text-[oklch(0.85_0.01_220)]">Serie:</span> {exercise.sets}
+                              </div>
+                            )}
+                            {exercise.reps && (
+                              <div>
+                                <span className="font-medium text-[oklch(0.85_0.01_220)]">Rip:</span> {exercise.reps}
+                              </div>
+                            )}
+                            {exercise.distance && (
+                              <div>
+                                <span className="font-medium text-[oklch(0.85_0.01_220)]">Distanza:</span>{" "}
+                                {exercise.distance}
+                              </div>
+                            )}
+                            {exercise.duration && (
+                              <div>
+                                <span className="font-medium text-[oklch(0.85_0.01_220)]">Durata:</span>{" "}
+                                {exercise.duration}
+                              </div>
+                            )}
+                            {exercise.rest && (
+                              <div>
+                                <span className="font-medium text-[oklch(0.85_0.01_220)]">Ripartenza:</span>{" "}
+                                {exercise.rest}
+                              </div>
+                            )}
+                            {exercise.intensity && (
+                              <div>
+                                <span className="font-medium text-[oklch(0.85_0.01_220)]">Intensità:</span>{" "}
+                                {exercise.intensity}
+                              </div>
+                            )}
                           </div>
-                        )}
-                        {exercise.reps && (
-                          <div>
-                            <span className="font-medium text-[oklch(0.85_0.01_220)]">Rip:</span> {exercise.reps}
-                          </div>
-                        )}
-                        {exercise.distance && (
-                          <div>
-                            <span className="font-medium text-[oklch(0.85_0.01_220)]">Distanza:</span>{" "}
-                            {exercise.distance}
-                          </div>
-                        )}
-                        {exercise.duration && (
-                          <div>
-                            <span className="font-medium text-[oklch(0.85_0.01_220)]">Durata:</span>{" "}
-                            {exercise.duration}
-                          </div>
-                        )}
-                        {exercise.rest && (
-                          <div>
-                            <span className="font-medium text-[oklch(0.85_0.01_220)]">Ripartenza:</span>{" "}
-                            {exercise.rest}
-                          </div>
-                        )}
-                        {exercise.intensity && (
-                          <div>
-                            <span className="font-medium text-[oklch(0.85_0.01_220)]">Intensità:</span>{" "}
-                            {exercise.intensity}
-                          </div>
-                        )}
-                      </div>
 
-                      {exercise.equipment && (
-                        <div className="text-sm mb-2 px-3 py-1.5 bg-[oklch(0.70_0.18_220_/_0.2)] rounded-full inline-block border border-[oklch(0.70_0.18_220_/_0.4)]">
-                          <span className="font-semibold text-[oklch(0.70_0.18_220)]">🏊 Attrezzo:</span>{" "}
-                          <span className="text-[oklch(0.95_0.01_220)]">{exercise.equipment}</span>
+                          {exercise.equipment && (
+                            <div className="text-sm mb-2 px-3 py-1.5 bg-[oklch(0.70_0.18_220_/_0.2)] rounded-full inline-block border border-[oklch(0.70_0.18_220_/_0.4)]">
+                              <span className="font-semibold text-[oklch(0.70_0.18_220)]">🏊 Attrezzo:</span>{" "}
+                              <span className="text-[oklch(0.95_0.01_220)]">{exercise.equipment}</span>
+                            </div>
+                          )}
+
+                          {exercise.notes && (
+                            <div className="text-sm text-[oklch(0.75_0.03_220)] italic bg-[oklch(0.70_0.18_220_/_0.15)] rounded p-2 border-l-2 border-[oklch(0.70_0.18_220)]">
+                              💡 {exercise.notes}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      ))}
+                    </div>
 
-                      {exercise.notes && (
-                        <div className="text-sm text-[oklch(0.75_0.03_220)] italic bg-[oklch(0.70_0.18_220_/_0.15)] rounded p-2 border-l-2 border-[oklch(0.70_0.18_220)]">
-                          💡 {exercise.notes}
+                    {section.notes && (
+                      <div className="mt-4 p-3 bg-[oklch(0.70_0.18_220_/_0.15)] rounded-lg border-l-4 border-[oklch(0.70_0.18_220)]">
+                        <div className="flex items-start gap-2">
+                          <Info className="w-4 h-4 text-[oklch(0.70_0.18_220)] mt-0.5 flex-shrink-0" />
+                          <p className="text-sm text-[oklch(0.75_0.03_220)]">{section.notes}</p>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
 
-                {section.notes && (
-                  <div className="mt-4 p-3 bg-[oklch(0.70_0.18_220_/_0.15)] rounded-lg border-l-4 border-[oklch(0.70_0.18_220)]">
-                    <div className="flex items-start gap-2">
-                      <Info className="w-4 h-4 text-[oklch(0.70_0.18_220)] mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-[oklch(0.75_0.03_220)]">{section.notes}</p>
-                    </div>
+                {/* Coach Notes */}
+                {workout.coachNotes && workout.coachNotes.length > 0 && (
+                  <div className="neon-card p-6 bg-gradient-to-br from-[oklch(0.70_0.18_220_/_0.15)] to-[oklch(0.70_0.15_195_/_0.15)] border-2 border-[oklch(0.70_0.18_220_/_0.3)]">
+                    <h3 className="text-xl font-bold text-[oklch(0.95_0.01_220)] mb-4 flex items-center gap-2">
+                      <Info className="w-5 h-5 text-[oklch(0.70_0.18_220)]" />
+                      Note del Coach
+                    </h3>
+                    <ul className="space-y-2">
+                      {workout.coachNotes.map((note, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-[oklch(0.70_0.18_220)] font-bold">•</span>
+                          <span className="text-[oklch(0.85_0.01_220)]">{note}</span>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 )}
-              </div>
-            ))}
-
-            {/* Coach Notes */}
-            {workout.coachNotes && workout.coachNotes.length > 0 && (
-              <div className="neon-card p-6 bg-gradient-to-br from-[oklch(0.70_0.18_220_/_0.15)] to-[oklch(0.70_0.15_195_/_0.15)] border-2 border-[oklch(0.70_0.18_220_/_0.3)]">
-                <h3 className="text-xl font-bold text-[oklch(0.95_0.01_220)] mb-4 flex items-center gap-2">
-                  <Info className="w-5 h-5 text-[oklch(0.70_0.18_220)]" />
-                  Note del Coach
-                </h3>
-                <ul className="space-y-2">
-                  {workout.coachNotes.map((note, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-[oklch(0.70_0.18_220)] font-bold">•</span>
-                      <span className="text-[oklch(0.85_0.01_220)]">{note}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              </>
             )}
 
             {/* Cache Info */}

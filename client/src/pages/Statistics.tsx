@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import MobileNav from "@/components/MobileNav";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -300,11 +300,6 @@ function StreakRing({
 
 export default function Statistics() {
   const [period, setPeriod] = useState(30);
-  const aiLayout = useMemo(() => {
-    if (typeof window === "undefined") return "current";
-    const param = new URLSearchParams(window.location.search).get("aiLayout");
-    return param || "current";
-  }, []);
 
   const { data: timeline, isLoading: timelineLoading } = trpc.statistics.getTimeline.useQuery(
     { days: period },
@@ -343,106 +338,6 @@ export default function Statistics() {
     sessioni: point.sessions,
   }));
 
-  const renderInsights = () => {
-    if (!advanced || advanced.insights.length === 0) return null;
-
-    if (aiLayout === "hero") {
-      const [primary, ...rest] = advanced.insights;
-      const secondary = rest.slice(0, 3);
-      return (
-        <div className="rounded-2xl p-5 bg-[oklch(0.16_0.04_240)] border border-[oklch(0.30_0.05_230)] shadow-[0_0_40px_rgba(30,120,255,0.15)]">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <span className="px-2 py-1 text-[10px] rounded-full bg-[oklch(0.25_0.12_230)] text-[oklch(0.90_0.05_220)]">AI Coach</span>
-              <h3 className="font-semibold text-[oklch(0.95_0.02_220)]">Insights in evidenza</h3>
-            </div>
-            <span className="text-[10px] text-[oklch(0.60_0.05_250)]">Aggiornati oggi</span>
-          </div>
-          <div className="text-[oklch(0.92_0.03_220)] text-base leading-relaxed">
-            {primary}
-          </div>
-          {secondary.length > 0 && (
-            <div className="mt-4 grid gap-2 sm:grid-cols-2">
-              {secondary.map((insight, idx) => (
-                <div
-                  key={idx}
-                  className="rounded-xl p-3 text-sm text-[oklch(0.85_0.05_220)] bg-[oklch(0.20_0.03_250_/_0.6)] border border-[oklch(0.28_0.03_250)]"
-                >
-                  {insight}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (aiLayout === "sidebar") {
-      return (
-        <div className="rounded-2xl p-4 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-semibold text-[oklch(0.92_0.03_220)]">AI Insights</h3>
-            <span className="text-[10px] px-2 py-1 rounded-full bg-[oklch(0.25_0.12_230)] text-[oklch(0.90_0.05_220)]">Focus</span>
-          </div>
-          <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
-            <div className="text-sm text-[oklch(0.85_0.05_220)] leading-relaxed">
-              {advanced.insights[0]}
-            </div>
-            <div className="flex flex-col gap-2">
-              {advanced.insights.slice(1, 5).map((insight, idx) => (
-                <div
-                  key={idx}
-                  className="rounded-lg px-3 py-2 text-xs text-[oklch(0.80_0.05_220)] bg-[oklch(0.20_0.03_250_/_0.55)] border border-[oklch(0.28_0.03_250)]"
-                >
-                  {insight}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (aiLayout === "timeline") {
-      return (
-        <div className="rounded-2xl p-4 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]">
-          <h3 className="font-semibold text-[oklch(0.92_0.03_220)] mb-4">AI Insights</h3>
-          <div className="relative pl-5 space-y-4">
-            <div className="absolute left-2 top-1 bottom-1 w-px bg-[oklch(0.30_0.03_250)]" />
-            {advanced.insights.map((insight, idx) => (
-              <div key={idx} className="relative">
-                <div className="absolute -left-1.5 top-1.5 w-2.5 h-2.5 rounded-full bg-[oklch(0.60_0.18_220)]" />
-                <div className="text-sm text-[oklch(0.85_0.05_220)] bg-[oklch(0.20_0.03_250_/_0.55)] border border-[oklch(0.28_0.03_250)] rounded-lg p-3">
-                  {insight}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
-
-    // current layout (default)
-    return (
-      <div
-        className="rounded-xl p-4 space-y-2"
-        style={{
-          background: "oklch(0.18 0.03 250)",
-          border: "1px solid oklch(0.25 0.03 250)",
-        }}
-      >
-        <h3 className="font-semibold">💡 Insights Intelligenti</h3>
-        {advanced.insights.map((insight, index) => (
-          <div
-            key={index}
-            className="text-sm text-[oklch(0.80_0.05_220)] bg-[oklch(0.20_0.03_250_/_0.55)] rounded-lg p-3"
-          >
-            {insight}
-          </div>
-        ))}
-      </div>
-    );
-  };
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="low" className="text-white">
@@ -792,9 +687,6 @@ export default function Statistics() {
                     />
                   </div>
                 </div>
-
-                {/* Insights */}
-                {renderInsights()}
 
                 {/* Predictions */}
                 {advanced.predictions && (
