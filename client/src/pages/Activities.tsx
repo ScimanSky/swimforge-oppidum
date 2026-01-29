@@ -316,7 +316,7 @@ export default function Activities() {
 
       <main className="container py-6 space-y-4">
         {/* Filters */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1.5">
             <Label className="text-xs sm:text-sm">Fonte</Label>
             <Select value={source} onValueChange={(v) => setSource(v as any)}>
