@@ -38,7 +38,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Configuration
-API_SECRET_KEY = os.getenv("GARMIN_SERVICE_SECRET", "swimforge-garmin-secret-key")
+API_SECRET_KEY = os.getenv("GARMIN_SERVICE_SECRET")
+if not API_SECRET_KEY:
+    raise RuntimeError("GARMIN_SERVICE_SECRET is required")
 MAIN_API_URL = os.getenv("MAIN_API_URL", "http://localhost:3000")
 TOKEN_STORE_DIR = Path(os.getenv("TOKEN_STORE_DIR", "/tmp/garmin_tokens"))
 
