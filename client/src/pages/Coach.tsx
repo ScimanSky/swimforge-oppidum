@@ -1,7 +1,23 @@
 import { useMemo, useState } from "react";
-import { trpc } from "../lib/trpc";
-import { RefreshCw, Waves, Info, Clock, TrendingUp, ChevronLeft, Activity } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "wouter";
+import { motion } from "framer-motion";
+import {
+  ChevronLeft,
+  Activity,
+  Brain,
+  Waves,
+  Dumbbell,
+  Timer,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle2,
+  Zap,
+  Flame,
+  RefreshCw,
+} from "lucide-react";
+import { trpc } from "../lib/trpc";
 import MobileNav from "@/components/MobileNav";
 import { AppLayout } from "@/components/AppLayout";
 
@@ -33,34 +49,30 @@ type GeneratedWorkout = {
   coachNotes: string[];
 };
 
+type InsightItem = {
+  type: "warning" | "success" | "info";
+  title: string;
+  message: string;
+  metric: string;
+};
+
 export default function Coach() {
-  const [activeTab, setActiveTab] = useState<"pool" | "dryland">("pool");
-  const [forceRegenerate, setForceRegenerate] = useState(false);
+  const [poolRegenerate, setPoolRegenerate] = useState(false);
+  const [dryRegenerate, setDryRegenerate] = useState(false);
 
-  // Query for pool workout
   const poolWorkoutQuery = trpc.aiCoach.getPoolWorkout.useQuery(
-    { forceRegenerate },
-    { 
-      enabled: activeTab === "pool",
-      staleTime: forceRegenerate ? 0 : 1000 * 60 * 60 * 24, // No cache if regenerating
+    { forceRegenerate: poolRegenerate },
+    {
+      staleTime: poolRegenerate ? 0 : 1000 * 60 * 60 * 24,
     }
   );
 
-  // Query for dryland workout
   const drylandWorkoutQuery = trpc.aiCoach.getDrylandWorkout.useQuery(
-    { forceRegenerate },
-    { 
-      enabled: activeTab === "dryland",
-      staleTime: forceRegenerate ? 0 : 1000 * 60 * 60 * 24, // No cache if regenerating
+    { forceRegenerate: dryRegenerate },
+    {
+      staleTime: dryRegenerate ? 0 : 1000 * 60 * 60 * 24,
     }
   );
-
-  const currentQuery = activeTab === "pool" ? poolWorkoutQuery : drylandWorkoutQuery;
-  const workout = currentQuery.data as GeneratedWorkout | undefined;
-  
-  // Use isFetching instead of isLoading to handle re-fetches correctly
-  const isLoading = currentQuery.isFetching;
-  const isRegenerating = forceRegenerate && isLoading;
 
   const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
@@ -72,6 +84,9 @@ export default function Coach() {
   );
   const { data: garminStatus } = trpc.garmin.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
   const { data: stravaStatus } = trpc.strava.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
+
+  const poolWorkout = poolWorkoutQuery.data as GeneratedWorkout | undefined;
+  const drylandWorkout = drylandWorkoutQuery.data as GeneratedWorkout | undefined;
 
   const lastSyncDate = useMemo(() => {
     const garmin = garminStatus?.lastSync ? new Date(garminStatus.lastSync) : null;
@@ -90,16 +105,6 @@ export default function Coach() {
     return "Equilibrio";
   }, [advanced]);
 
-  const focusColor = focusLabel === "Potenza"
-    ? "text-red-400"
-    : focusLabel === "Resistenza"
-    ? "text-emerald-400"
-    : focusLabel === "Tecnica"
-    ? "text-cyan-400"
-    : focusLabel === "Efficienza"
-    ? "text-amber-400"
-    : "text-[oklch(0.70_0.18_220)]";
-
   const conditionLabel = useMemo(() => {
     const rrs = advanced?.recoveryReadinessScore;
     if (rrs === null || rrs === undefined) return "—";
@@ -108,406 +113,367 @@ export default function Coach() {
     return "Recupero";
   }, [advanced?.recoveryReadinessScore]);
 
-  const conditionColor = conditionLabel === "Ottima"
-    ? "text-emerald-400"
-    : conditionLabel === "Buona"
-    ? "text-yellow-400"
-    : "text-red-400";
+  const insights = useMemo<InsightItem[]>(() => {
+    const raw = advanced?.insights ?? [];
+    if (!raw.length) return [];
+    const metrics = [
+      advanced?.technicalConsistencyIndex !== null && advanced?.technicalConsistencyIndex !== undefined
+        ? `TCI ${Math.round(advanced.technicalConsistencyIndex)}`
+        : undefined,
+      advanced?.swimmingEfficiencyIndex !== null && advanced?.swimmingEfficiencyIndex !== undefined
+        ? `SEI ${Math.round(advanced.swimmingEfficiencyIndex)}`
+        : undefined,
+      advanced?.recoveryReadinessScore !== null && advanced?.recoveryReadinessScore !== undefined
+        ? `RRS ${Math.round(advanced.recoveryReadinessScore)}`
+        : undefined,
+      advanced?.strokeEfficiencyRating !== null && advanced?.strokeEfficiencyRating !== undefined
+        ? `SER ${Math.round(advanced.strokeEfficiencyRating)}`
+        : undefined,
+    ].filter(Boolean) as string[];
 
-  const sparklinePath = (values: number[] | undefined) => {
-    if (!values || values.length < 2) return "";
-    const max = Math.max(...values);
-    const min = Math.min(...values);
-    const width = 120;
-    const height = 32;
-    const range = max - min || 1;
-    return values
-      .map((v, i) => {
-        const x = (i / (values.length - 1)) * width;
-        const y = height - ((v - min) / range) * height;
-        return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-      })
-      .join(" ");
+    return raw.slice(0, 3).map((message, idx) => {
+      const type = idx === 0 ? "warning" : idx === 1 ? "success" : "info";
+      const title = idx === 0 ? "Punto di attenzione" : idx === 1 ? "Punto di forza" : "Nota coach";
+      return {
+        type,
+        title,
+        message,
+        metric: metrics[idx] ?? "—",
+      };
+    });
+  }, [advanced]);
+
+  const handleRegeneratePool = async () => {
+    setPoolRegenerate(true);
+    try {
+      await poolWorkoutQuery.refetch();
+    } finally {
+      setPoolRegenerate(false);
+    }
   };
 
-  const distanceSpark = sparklinePath(timeline?.map((p) => p.distance));
-  const paceSpark = sparklinePath(timeline?.map((p) => p.pace ?? 0));
-
-  const handleRegenerate = async () => {
-    setForceRegenerate(true);
+  const handleRegenerateDryland = async () => {
+    setDryRegenerate(true);
     try {
-      if (activeTab === "pool") {
-        await poolWorkoutQuery.refetch();
-      } else {
-        await drylandWorkoutQuery.refetch();
-      }
+      await drylandWorkoutQuery.refetch();
     } finally {
-      setForceRegenerate(false);
+      setDryRegenerate(false);
     }
+  };
+
+  const renderSectionContent = (section: WorkoutSection) => {
+    if (!section.exercises?.length) return section.notes || "";
+    return section.exercises
+      .map((exercise) => {
+        const detail = exercise.distance || exercise.duration || exercise.reps || "";
+        return detail ? `${detail} ${exercise.name}`.trim() : exercise.name;
+      })
+      .join(" • ");
   };
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
-    <div className="pb-20">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-[oklch(0.12_0.035_250_/_0.95)] backdrop-blur-lg border-b border-[oklch(0.30_0.04_250)]">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard">
-                <button className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
-              </Link>
-              <div className="flex items-center gap-3">
-                <Waves className="w-6 h-6 text-[oklch(0.70_0.18_220)]" />
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold text-[oklch(0.95_0.01_220)]">AI Coach</h1>
-                  <span className="px-2 py-0.5 text-[10px] rounded-full bg-[oklch(0.30_0.10_230)] text-[oklch(0.95_0.01_220)] border border-[oklch(0.40_0.10_230)]">
-                    Premium
-                  </span>
-                </div>
-              </div>
-            </div>
-            {workout && (
-              <button
-                onClick={handleRegenerate}
-                disabled={isRegenerating}
-                className="p-2 text-[oklch(0.70_0.18_220)] hover:bg-[oklch(0.18_0.03_250_/_0.55)] rounded-lg transition-colors disabled:opacity-50"
-                title="Rigenera allenamento"
-              >
-                <RefreshCw
-                  className={`w-5 h-5 ${isRegenerating ? "animate-spin" : ""}`}
-                />
-              </button>
-            )}
-          </div>
-          <p className="text-[oklch(0.65_0.03_220)] text-sm mb-4">
-            Allenamenti personalizzati basati sulle tue statistiche e metriche avanzate
-          </p>
-
-          {/* Tabs */}
-          <div className="flex gap-2">
-            <button
-              onClick={() => setActiveTab("pool")}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
-                activeTab === "pool"
-                  ? "bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] text-white shadow-lg"
-                  : "bg-[oklch(0.18_0.03_250_/_0.55)] text-[oklch(0.65_0.03_220)] hover:bg-[oklch(0.20_0.03_250_/_0.55)]"
-              }`}
-            >
-              <Waves className="w-5 h-5" />
-              <span>In Vasca</span>
-            </button>
-            <button
-              onClick={() => setActiveTab("dryland")}
-              className={`flex-1 py-3 px-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 ${
-                activeTab === "dryland"
-                  ? "bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] text-white shadow-lg"
-                  : "bg-[oklch(0.18_0.03_250_/_0.55)] text-[oklch(0.65_0.03_220)] hover:bg-[oklch(0.20_0.03_250_/_0.55)]"
-              }`}
-            >
-              <Activity className="w-5 h-5" />
-              <span>Fuori Vasca</span>
-            </button>
-          </div>
+      <div className="min-h-screen overflow-x-hidden font-sans text-foreground relative pb-24">
+        {/* Background Image with low opacity */}
+        <div className="fixed inset-0 opacity-10 pointer-events-none -z-40">
+          <img
+            src="/images/ai_coach_digital.webp"
+            alt="Background"
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[var(--navy)]/80 via-[var(--navy)]/50 to-[var(--navy)]" />
         </div>
-      </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* Pulse Header */}
-        <div className="neon-card p-5 mb-6 bg-gradient-to-r from-[oklch(0.16_0.05_235_/_0.85)] to-[oklch(0.12_0.04_250_/_0.85)] border border-[oklch(0.30_0.08_235)]">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[oklch(0.30_0.12_230_/_0.4)] border border-[oklch(0.40_0.12_230)] flex items-center justify-center">
-                <span className="text-lg">🧠</span>
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-[oklch(0.95_0.02_220)]">Analisi Completata</span>
-                  <span className="px-2 py-0.5 text-[10px] rounded-full bg-[oklch(0.25_0.12_230)] text-[oklch(0.95_0.01_220)] border border-[oklch(0.40_0.10_230)]">
-                    Active
-                  </span>
-                </div>
-                <div className="text-xs text-[oklch(0.65_0.05_220)]">
-                  {lastSyncDate
-                    ? `Ultimo sync: ${lastSyncDate.toLocaleDateString("it-IT")} • ${lastSyncDate.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`
-                    : "Ultimo sync: non disponibile"}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1 px-2">
-              <div className="text-[10px] uppercase tracking-wider text-[oklch(0.60_0.05_250)] mb-2">
-                Focus oggi
-              </div>
-              <div className="rounded-full bg-[oklch(0.20_0.04_250)] border border-[oklch(0.30_0.05_250)] h-9 flex items-center px-4">
-                <div className={`text-sm font-semibold ${focusColor}`}>{focusLabel}</div>
-              </div>
-            </div>
-
-            <div className="rounded-xl px-4 py-2 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]">
-              <div className="text-[10px] uppercase tracking-wider text-[oklch(0.60_0.05_250)]">Condition</div>
-              <div className={`text-sm font-semibold ${conditionColor}`}>{conditionLabel}</div>
-            </div>
-          </div>
+        {/* Animated particles effect */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none -z-30">
+          {[...Array(15)].map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute w-2 h-2 bg-white/20 rounded-full"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+              }}
+              animate={{
+                y: [0, -30, 0],
+                opacity: [0.1, 0.3, 0.1],
+              }}
+              transition={{
+                duration: 4 + Math.random() * 3,
+                repeat: Infinity,
+                delay: Math.random() * 2,
+              }}
+            />
+          ))}
         </div>
-        {/* Loading State */}
-        {isLoading && (
-          <div className="neon-card p-12 flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 border-4 border-[oklch(0.70_0.18_220)] border-t-transparent rounded-full animate-spin mb-6"></div>
-            <p className="text-[oklch(0.75_0.03_220)] font-semibold">
-              Generazione allenamento personalizzato...
-            </p>
-            <p className="text-[oklch(0.55_0.03_220)] text-sm mt-2">
-              Sto analizzando le tue metriche avanzate
-            </p>
-            {/* Debug info for mobile users if stuck */}
-            <p className="text-[oklch(0.40_0.03_220)] text-[10px] mt-8 opacity-30">
-              Status: {currentQuery.status} | Fetching: {String(currentQuery.isFetching)}
-            </p>
-          </div>
-        )}
 
-        {/* Error State */}
-        {currentQuery.isError && (
-          <div className="neon-card p-6 text-center border-2 border-red-500/30">
-            <p className="text-red-400 font-semibold mb-2">
-              Errore nel caricamento dell'allenamento
-            </p>
-            <p className="text-red-300/70 text-sm mb-4">
-              {currentQuery.error?.message || "Riprova più tardi"}
-            </p>
-            <button
-              onClick={() => currentQuery.refetch()}
-              className="px-4 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition-colors border border-red-500/50"
-            >
-              Riprova
-            </button>
+        <div className="container py-8 md:py-12">
+          {/* Navigation & Header */}
+          <div className="flex items-center gap-4 mb-8">
+            <Link href="/dashboard">
+              <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10">
+                <ChevronLeft className="h-5 w-5 mr-1" />
+                Dashboard
+              </Button>
+            </Link>
+            <h1 className="text-2xl font-bold text-white">AI Coach Dashboard</h1>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold)]/30">Premium</span>
           </div>
-        )}
 
-        {/* Workout Display */}
-        {!isLoading && (
-          <div className="space-y-6">
-            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-              {/* Premium AI Insights */}
-              <div className="neon-card p-6 bg-[oklch(0.14_0.04_240_/_0.75)] border border-[oklch(0.30_0.06_235)]">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-1 text-[10px] rounded-full bg-[oklch(0.25_0.12_230)] text-[oklch(0.95_0.01_220)] border border-[oklch(0.40_0.10_230)]">
-                      Insights & Analisi
+          {/* 1. Header "Pulse" */}
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-card/30 backdrop-blur-md border border-white/10 rounded-2xl p-6 mb-8 relative overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50 animate-pulse" />
+
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-cyan-500 blur-lg opacity-40 animate-pulse" />
+                  <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 flex items-center justify-center relative z-10">
+                    <Brain className="h-8 w-8 text-cyan-400" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold text-white flex flex-wrap items-center gap-2">
+                    Analisi Completata
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/20 whitespace-nowrap">
+                      Active
                     </span>
-                    <span className="text-xs text-[oklch(0.70_0.05_220)]">Tactical Board</span>
-                  </div>
-                  <span className="text-[10px] text-[oklch(0.60_0.05_250)]">Ultime 24h</span>
+                  </h2>
+                  <p className="text-white/60 text-sm flex items-center gap-2 mt-1">
+                    <Activity className="h-3 w-3" />
+                    {lastSyncDate
+                      ? `Ultimo sync: ${lastSyncDate.toLocaleDateString("it-IT")} • ${lastSyncDate.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`
+                      : "Ultimo sync: non disponibile"}
+                  </p>
                 </div>
-                {advanced?.insights?.length ? (
-                  <>
-                    <div className="space-y-4">
-                      <div>
-                        <div className="text-[10px] uppercase tracking-wider text-[oklch(0.60_0.05_250)] mb-1">
-                          Il Verdetto
-                        </div>
-                        <div className="text-[oklch(0.95_0.02_220)] text-lg leading-relaxed font-semibold">
-                          {advanced.insights[0]}
-                        </div>
-                      </div>
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-xl p-3 bg-[oklch(0.16_0.03_250_/_0.55)] border border-[oklch(0.28_0.03_250)]">
-                          <div className="text-[10px] uppercase tracking-wider text-[oklch(0.60_0.05_250)] mb-2">
-                            Evidence • Distanza
-                          </div>
-                          {distanceSpark ? (
-                            <svg viewBox="0 0 120 32" className="w-full h-8">
-                              <path d={distanceSpark} fill="none" stroke="#38bdf8" strokeWidth="2" />
-                            </svg>
-                          ) : (
-                            <div className="text-xs text-[oklch(0.60_0.05_250)]">Dati non sufficienti</div>
-                          )}
-                        </div>
-                        <div className="rounded-xl p-3 bg-[oklch(0.16_0.03_250_/_0.55)] border border-[oklch(0.28_0.03_250)]">
-                          <div className="text-[10px] uppercase tracking-wider text-[oklch(0.60_0.05_250)] mb-2">
-                            Evidence • Pace
-                          </div>
-                          {paceSpark ? (
-                            <svg viewBox="0 0 120 32" className="w-full h-8">
-                              <path d={paceSpark} fill="none" stroke="#22c55e" strokeWidth="2" />
-                            </svg>
-                          ) : (
-                            <div className="text-xs text-[oklch(0.60_0.05_250)]">Dati non sufficienti</div>
-                          )}
-                        </div>
-                      </div>
-
-                      {advanced.insights[1] && (
-                        <div className="rounded-xl p-3 text-sm text-[oklch(0.85_0.05_220)] bg-[oklch(0.16_0.03_250_/_0.55)] border border-[oklch(0.28_0.03_250)]">
-                          {advanced.insights[1]}
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-sm text-[oklch(0.65_0.03_220)]">
-                    Nessun insight disponibile. Completa più sessioni per ottenere analisi personalizzate.
-                  </div>
-                )}
-                {advanced?.predictions && (
-                  <div className="mt-4 rounded-xl p-3 bg-[oklch(0.18_0.03_250_/_0.55)] border border-[oklch(0.28_0.03_250)] text-xs text-[oklch(0.80_0.05_220)]">
-                    Proiezione: {advanced.predictions.targetKm}km entro{" "}
-                    {new Date(advanced.predictions.estimatedDate).toLocaleDateString("it-IT")} (
-                    {advanced.predictions.daysRemaining}g)
-                  </div>
-                )}
               </div>
 
-              {/* Workout Summary */}
-              <div className="neon-card p-6">
-                {workout ? (
-                  <>
-                    <h2 className="text-2xl font-bold text-[oklch(0.95_0.01_220)] mb-2">
-                      {workout.title}
-                    </h2>
-                    <p className="text-[oklch(0.75_0.03_220)] mb-4">{workout.description}</p>
-
-                    <div className="flex flex-wrap gap-4 text-sm">
-                      <div className="flex items-center gap-2 text-[oklch(0.75_0.03_220)]">
-                        <Clock className="w-4 h-4 text-[oklch(0.70_0.18_220)]" />
-                        <span className="font-semibold">Durata:</span>
-                        <span>{workout.duration}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-[oklch(0.75_0.03_220)]">
-                        <TrendingUp className="w-4 h-4 text-[oklch(0.70_0.18_220)]" />
-                        <span className="font-semibold">Difficoltà:</span>
-                        <span>{workout.difficulty}</span>
-                      </div>
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-sm text-[oklch(0.65_0.03_220)]">
-                    Nessun allenamento disponibile al momento.
+              <div className="flex gap-4 w-full md:w-auto">
+                <div className="bg-white/5 rounded-lg p-3 px-5 flex-1 md:flex-none border border-white/5">
+                  <div className="text-xs text-white/50 uppercase tracking-wider mb-1">Focus Oggi</div>
+                  <div className="text-lg font-bold text-[var(--gold)] flex items-center gap-2">
+                    <Zap className="h-4 w-4" />
+                    {focusLabel}
                   </div>
-                )}
+                </div>
+                <div className="bg-white/5 rounded-lg p-3 px-5 flex-1 md:flex-none border border-white/5">
+                  <div className="text-xs text-white/50 uppercase tracking-wider mb-1">Condition</div>
+                  <div className="text-lg font-bold text-green-400 flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4" />
+                    {conditionLabel}
+                  </div>
+                </div>
               </div>
             </div>
+          </motion.div>
 
-            {/* Workout Sections */}
-            {workout && (
-              <>
-                {workout.sections.map((section, sectionIdx) => (
-                  <div key={sectionIdx} className="neon-card p-6">
-                    <h3 className="text-xl font-bold text-[oklch(0.95_0.01_220)] mb-4 pb-2 border-b-2 border-[oklch(0.70_0.18_220)]">
-                      {section.title}
-                    </h3>
+          <div className="grid lg:grid-cols-12 gap-8">
+            {/* 2. Colonna Sinistra: AI Insights */}
+            <div className="lg:col-span-4 space-y-6">
+              <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <Activity className="h-5 w-5 text-purple-400" />
+                Insights & Analisi
+              </h3>
 
-                    <div className="space-y-4">
-                      {section.exercises.map((exercise, exerciseIdx) => (
-                        <div
-                          key={exerciseIdx}
-                          className="bg-[oklch(0.18_0.03_250_/_0.55)] rounded-lg p-4 hover:bg-[oklch(0.20_0.03_250_/_0.55)] transition-colors border border-[oklch(0.25_0.03_250)]"
-                        >
-                          <div className="font-semibold text-[oklch(0.95_0.01_220)] mb-2">
-                            {exercise.name}
-                          </div>
-
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm text-[oklch(0.75_0.03_220)] mb-2">
-                            {exercise.sets && (
-                              <div>
-                                <span className="font-medium text-[oklch(0.85_0.01_220)]">Serie:</span> {exercise.sets}
-                              </div>
-                            )}
-                            {exercise.reps && (
-                              <div>
-                                <span className="font-medium text-[oklch(0.85_0.01_220)]">Rip:</span> {exercise.reps}
-                              </div>
-                            )}
-                            {exercise.distance && (
-                              <div>
-                                <span className="font-medium text-[oklch(0.85_0.01_220)]">Distanza:</span>{" "}
-                                {exercise.distance}
-                              </div>
-                            )}
-                            {exercise.duration && (
-                              <div>
-                                <span className="font-medium text-[oklch(0.85_0.01_220)]">Durata:</span>{" "}
-                                {exercise.duration}
-                              </div>
-                            )}
-                            {exercise.rest && (
-                              <div>
-                                <span className="font-medium text-[oklch(0.85_0.01_220)]">Ripartenza:</span>{" "}
-                                {exercise.rest}
-                              </div>
-                            )}
-                            {exercise.intensity && (
-                              <div>
-                                <span className="font-medium text-[oklch(0.85_0.01_220)]">Intensità:</span>{" "}
-                                {exercise.intensity}
-                              </div>
+              {insights.length ? (
+                insights.map((insight, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                  >
+                    <Card className="bg-card/20 backdrop-blur-sm border-white/10 hover:bg-card/30 transition-colors">
+                      <CardContent className="p-5">
+                        <div className="flex justify-between items-start mb-2">
+                          <div
+                            className={`p-2 rounded-lg ${
+                              insight.type === "warning"
+                                ? "bg-orange-500/20 text-orange-400"
+                                : insight.type === "success"
+                                ? "bg-green-500/20 text-green-400"
+                                : "bg-blue-500/20 text-blue-400"
+                            }`}
+                          >
+                            {insight.type === "warning" ? (
+                              <AlertCircle className="h-5 w-5" />
+                            ) : insight.type === "success" ? (
+                              <CheckCircle2 className="h-5 w-5" />
+                            ) : (
+                              <Activity className="h-5 w-5" />
                             )}
                           </div>
-
-                          {exercise.equipment && (
-                            <div className="text-sm mb-2 px-3 py-1.5 bg-[oklch(0.70_0.18_220_/_0.2)] rounded-full inline-block border border-[oklch(0.70_0.18_220_/_0.4)]">
-                              <span className="font-semibold text-[oklch(0.70_0.18_220)]">🏊 Attrezzo:</span>{" "}
-                              <span className="text-[oklch(0.95_0.01_220)]">{exercise.equipment}</span>
-                            </div>
-                          )}
-
-                          {exercise.notes && (
-                            <div className="text-sm text-[oklch(0.75_0.03_220)] italic bg-[oklch(0.70_0.18_220_/_0.15)] rounded p-2 border-l-2 border-[oklch(0.70_0.18_220)]">
-                              💡 {exercise.notes}
-                            </div>
-                          )}
+                          <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded text-white/70">
+                            {insight.metric}
+                          </span>
                         </div>
-                      ))}
-                    </div>
+                        <h4 className="font-bold text-white mb-1">{insight.title}</h4>
+                        <p className="text-sm text-white/70 leading-relaxed">{insight.message}</p>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))
+              ) : (
+                <Card className="bg-card/20 backdrop-blur-sm border-white/10">
+                  <CardContent className="p-5 text-sm text-white/70">
+                    Nessun insight disponibile. Completa più sessioni per ottenere analisi personalizzate.
+                  </CardContent>
+                </Card>
+              )}
 
-                    {section.notes && (
-                      <div className="mt-4 p-3 bg-[oklch(0.70_0.18_220_/_0.15)] rounded-lg border-l-4 border-[oklch(0.70_0.18_220)]">
-                        <div className="flex items-start gap-2">
-                          <Info className="w-4 h-4 text-[oklch(0.70_0.18_220)] mt-0.5 flex-shrink-0" />
-                          <p className="text-sm text-[oklch(0.75_0.03_220)]">{section.notes}</p>
+              {timeline?.length ? (
+                <Card className="bg-gradient-to-br from-purple-900/40 to-indigo-900/40 border-purple-500/20">
+                  <CardContent className="p-5 text-center">
+                    <p className="text-purple-200 text-sm mb-3">
+                      Analizzati {timeline.length} allenamenti recenti
+                    </p>
+                    <Button variant="outline" className="w-full border-purple-500/50 text-purple-300 hover:bg-purple-500/20 hover:text-purple-100">
+                      Approfondisci Analisi
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : null}
+            </div>
+
+            {/* 3. Colonna Destra: Workout Plan */}
+            <div className="lg:col-span-8 space-y-8">
+              {/* Pool Workout */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Waves className="h-5 w-5 text-cyan-400" />
+                    Allenamento in Vasca
+                  </h3>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleRegeneratePool}
+                    disabled={poolRegenerate || poolWorkoutQuery.isFetching}
+                    className="text-cyan-200 hover:text-white hover:bg-white/10"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${poolRegenerate ? "animate-spin" : ""}`} />
+                    Rigenera
+                  </Button>
+                </div>
+
+                <Card className="bg-card/20 backdrop-blur-sm border-white/10 overflow-hidden">
+                  <div className="bg-gradient-to-r from-cyan-900/40 to-blue-900/40 p-6 border-b border-white/5">
+                    {poolWorkout ? (
+                      <div className="flex flex-wrap justify-between items-center gap-4">
+                        <div>
+                          <h2 className="text-2xl font-bold text-white mb-1">{poolWorkout.title}</h2>
+                          <div className="flex gap-4 text-sm text-cyan-200/80">
+                            <span className="flex items-center gap-1"><Timer className="h-4 w-4" /> {poolWorkout.duration}</span>
+                            <span className="flex items-center gap-1"><Waves className="h-4 w-4" /> {poolWorkout.description}</span>
+                          </div>
+                        </div>
+                        <div className="px-4 py-2 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 font-bold text-sm uppercase tracking-wide">
+                          {poolWorkout.difficulty}
                         </div>
                       </div>
+                    ) : (
+                      <div className="text-white/70">Allenamento in vasca non disponibile.</div>
                     )}
                   </div>
-                ))}
 
-                {/* Coach Notes */}
-                {workout.coachNotes && workout.coachNotes.length > 0 && (
-                  <div className="neon-card p-6 bg-gradient-to-br from-[oklch(0.70_0.18_220_/_0.15)] to-[oklch(0.70_0.15_195_/_0.15)] border-2 border-[oklch(0.70_0.18_220_/_0.3)]">
-                    <h3 className="text-xl font-bold text-[oklch(0.95_0.01_220)] mb-4 flex items-center gap-2">
-                      <Info className="w-5 h-5 text-[oklch(0.70_0.18_220)]" />
-                      Note del Coach
-                    </h3>
-                    <ul className="space-y-2">
-                      {workout.coachNotes.map((note, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="text-[oklch(0.70_0.18_220)] font-bold">•</span>
-                          <span className="text-[oklch(0.85_0.01_220)]">{note}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </>
-            )}
+                  <CardContent className="p-0">
+                    {poolWorkoutQuery.isFetching && (
+                      <div className="p-5 text-white/60">Sto preparando l'allenamento...</div>
+                    )}
+                    {poolWorkoutQuery.isError && (
+                      <div className="p-5 text-red-300">Errore nel caricamento dell'allenamento.</div>
+                    )}
+                    {poolWorkout?.sections?.map((section, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-4 md:p-5 border-b border-white/5 last:border-0 flex flex-col sm:flex-row gap-2 sm:gap-4 hover:bg-white/5 transition-colors ${
+                          section.title.toLowerCase().includes("main") ? "bg-cyan-500/5" : ""
+                        }`}
+                      >
+                        <div className="w-full sm:w-28 flex-shrink-0">
+                          <span
+                            className={`text-xs font-bold uppercase tracking-wider px-2 py-1 rounded ${
+                              section.title.toLowerCase().includes("warm")
+                                ? "bg-yellow-500/20 text-yellow-400"
+                                : section.title.toLowerCase().includes("main")
+                                ? "bg-cyan-500/20 text-cyan-400"
+                                : section.title.toLowerCase().includes("drill")
+                                ? "bg-purple-500/20 text-purple-400"
+                                : "bg-green-500/20 text-green-400"
+                            }`}
+                          >
+                            {section.title}
+                          </span>
+                        </div>
+                        <div className="text-white/90 font-medium">
+                          {renderSectionContent(section)}
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
 
-            {/* Cache Info */}
-            <div className="text-center text-sm text-[oklch(0.55_0.03_220)]">
-              <p>
-                💡 Gli allenamenti vengono rigenerati ogni 24 ore in base alle tue
-                ultime statistiche
-              </p>
+              {/* Dryland Workout */}
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                    <Dumbbell className="h-5 w-5 text-[var(--gold)]" />
+                    Fuori Vasca (Dryland)
+                  </h3>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleRegenerateDryland}
+                    disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
+                    className="text-[var(--gold)]/80 hover:text-white hover:bg-white/10"
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${dryRegenerate ? "animate-spin" : ""}`} />
+                    Rigenera
+                  </Button>
+                </div>
+
+                <Card className="bg-card/20 backdrop-blur-sm border-white/10">
+                  <CardContent className="p-6">
+                    {drylandWorkout ? (
+                      <div className="flex flex-col md:flex-row gap-6">
+                        <div className="md:w-1/3 bg-white/5 rounded-xl p-5 border border-white/5 flex flex-col justify-center items-center text-center">
+                          <div className="w-12 h-12 bg-[var(--gold)]/20 rounded-full flex items-center justify-center mb-3">
+                            <Flame className="h-6 w-6 text-[var(--gold)]" />
+                          </div>
+                          <h4 className="text-white font-bold text-lg mb-1">{drylandWorkout.title}</h4>
+                          <p className="text-white/60 text-sm">{drylandWorkout.duration} • {drylandWorkout.difficulty}</p>
+                        </div>
+
+                        <div className="md:w-2/3 grid gap-3">
+                          {drylandWorkout.sections?.map((section, idx) => (
+                            <div key={idx} className="p-3 bg-white/5 rounded-lg border border-white/5">
+                              <div className="text-xs text-[var(--gold)] uppercase tracking-wider mb-1">
+                                {section.title}
+                              </div>
+                              <div className="text-white font-medium text-sm">
+                                {renderSectionContent(section)}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-white/60">Workout dryland non disponibile.</div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
 
-      <MobileNav />
-    </div>
+        <MobileNav />
+      </div>
     </AppLayout>
   );
 }
