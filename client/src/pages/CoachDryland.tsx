@@ -488,15 +488,17 @@ export default function CoachDryland() {
                         </div>
                       );
                     })}
-
-                    {drylandWorkout ? (
-                      <div className="p-5 border-t border-white/5 bg-white/5">
-                        <div className="text-xs uppercase tracking-wider text-[var(--gold)] mb-2">Nota Coach Dryland</div>
-                        {renderCoachNotes(drylandWorkout.coachNotes)}
-                      </div>
-                    ) : null}
                   </CardContent>
                 </Card>
+
+                {drylandWorkout ? (
+                  <Card className="mt-6 bg-[var(--gold)]/10 border border-[var(--gold)]/30">
+                    <CardContent className="p-5 space-y-3">
+                      <div className="text-xs uppercase tracking-wider text-[var(--gold)]">Nota Coach Dryland</div>
+                      {renderCoachNotes(drylandWorkout.coachNotes)}
+                    </CardContent>
+                  </Card>
+                ) : null}
               </div>
             </div>
           </div>
