@@ -475,7 +475,7 @@ export default function Badges() {
                   >
                     {selectedBadge.earned ? (
                       <img 
-                        src={getBadgeImageUrl(selectedBadge.code)} 
+                        src={selectedBadge.image_url || getBadgeImageUrl(selectedBadge.code)} 
                         alt={selectedBadge.name}
                         className="w-full h-full object-contain"
                         onContextMenu={(e) => e.preventDefault()}
