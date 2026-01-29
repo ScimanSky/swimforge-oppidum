@@ -503,6 +503,7 @@ export const appRouter = router({
       const earnedBadgeIds = new Set(userBadges.map(ub => ub.badge.id));
       
       let newBadgesCount = 0;
+      let updatedTotalXp = profile.totalXp;
 
       for (const badge of allBadges) {
         if (earnedBadgeIds.has(badge.id)) continue;
@@ -546,13 +547,16 @@ export const appRouter = router({
             description: `Badge sbloccato: ${badge.name}`,
           });
           
-          // Update total XP
-          await db.updateSwimmerProfile(ctx.user.id, {
-            totalXp: profile.totalXp + badge.xpReward,
-          });
+          updatedTotalXp += badge.xpReward;
 
           newBadgesCount++;
         }
+      }
+
+      if (newBadgesCount > 0) {
+        await db.updateSwimmerProfile(ctx.user.id, {
+          totalXp: updatedTotalXp,
+        });
       }
 
       return { success: true, newBadges: newBadgesCount };
@@ -923,6 +927,7 @@ async function checkAndAwardBadges(userId: number): Promise<any[]> {
   
   const allBadges = await db.getAllBadgeDefinitions();
   const newlyAwardedBadges: any[] = [];
+  let updatedTotalXp = profile.totalXp;
   
   for (const badge of allBadges) {
     const hasBadge = await db.hasUserBadge(userId, badge.id);
@@ -967,16 +972,19 @@ async function checkAndAwardBadges(userId: number): Promise<any[]> {
         description: `Badge sbloccato: ${badge.name}`,
       });
       
-      // Update total XP
-      await db.updateSwimmerProfile(userId, {
-        totalXp: profile.totalXp + badge.xpReward,
-      });
+      updatedTotalXp += badge.xpReward;
       
       // Add to newly awarded badges
       newlyAwardedBadges.push(badge);
     }
   }
   
+  if (newlyAwardedBadges.length > 0) {
+    await db.updateSwimmerProfile(userId, {
+      totalXp: updatedTotalXp,
+    });
+  }
+
   return newlyAwardedBadges;
 }
 
