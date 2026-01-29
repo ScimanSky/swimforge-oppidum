@@ -104,6 +104,9 @@ jspm_packages/
 tmp/
 temp/
 
+# Local landing drafts (do not commit)
+assets/landing_drafts/
+
 # Database
 *.db
 *.sqlite

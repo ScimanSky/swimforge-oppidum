@@ -290,6 +290,11 @@
     100% { transform: translateX(100%); }
   }
 
+  .mask-image-gradient {
+    -webkit-mask-image: linear-gradient(to left, black, transparent);
+    mask-image: linear-gradient(to left, black, transparent);
+  }
+
   /* Badge Container - Hexagonal Style */
   .badge-container {
     width: 100px;
