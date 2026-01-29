@@ -20,7 +20,6 @@ import {
 import { TrendingUp, TrendingDown, Minus, ChevronLeft, Info } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { MetricBox } from "@/components/MetricBox";
 import { metricsDefinitions } from "@/data/metricsDefinitions";
 import { AppLayout } from "@/components/AppLayout";
 
@@ -33,6 +32,211 @@ const PERIOD_OPTIONS = [
 
 const HR_ZONE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#dc2626"];
 const PACE_COLORS = ["#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1", "#8b5cf6"];
+
+function MetricInfoButton({ info }: { info: any }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="p-1 rounded-md hover:bg-[oklch(0.25_0.03_250)] transition-colors"
+        title="Info"
+      >
+        <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)]" />
+      </button>
+      {open && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            style={{
+              background: "oklch(0.15 0.03 250)",
+              border: "1px solid oklch(0.25 0.03 250)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="sticky top-0 border-b p-6"
+              style={{
+                background: "oklch(0.15 0.03 250)",
+                borderColor: "oklch(0.25 0.03 250)",
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-[oklch(0.90_0.05_220)]">
+                  {info.title}
+                </h2>
+                <button
+                  onClick={() => setOpen(false)}
+                  className="text-[oklch(0.60_0.05_250)] hover:text-[oklch(0.80_0.05_220)]"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-4 text-sm text-[oklch(0.80_0.05_220)]">
+              <p>{info.description}</p>
+              <div className="rounded-lg p-3 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)] text-xs whitespace-pre-line">
+                {info.formula}
+              </div>
+              <div>
+                <h3 className="font-semibold text-[oklch(0.90_0.05_220)] mb-2">Interpretazione</h3>
+                <ul className="space-y-1">
+                  <li><strong>Ottimo:</strong> {info.interpretation.excellent}</li>
+                  <li><strong>Buono:</strong> {info.interpretation.good}</li>
+                  <li><strong>Discreto:</strong> {info.interpretation.fair}</li>
+                  <li><strong>Scarso:</strong> {info.interpretation.poor}</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold text-[oklch(0.90_0.05_220)] mb-2">Come migliorare</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  {info.howToImprove.map((tip: string, idx: number) => (
+                    <li key={idx}>{tip}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function RingMetric({
+  label,
+  value,
+  max = 100,
+  color,
+  info,
+}: {
+  label: string;
+  value: number | null;
+  max?: number;
+  color: string;
+  info: any;
+}) {
+  const safeValue = value ?? null;
+  const pct = safeValue !== null ? Math.max(0, Math.min(100, (safeValue / max) * 100)) : 0;
+  const radius = 38;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - pct / 100);
+
+  return (
+    <div className="rounded-2xl p-4 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-xs uppercase tracking-wide text-[oklch(0.65_0.05_250)]">{label}</div>
+        <MetricInfoButton info={info} />
+      </div>
+      <div className="flex items-center gap-4">
+        <div className="relative w-24 h-24">
+          <svg viewBox="0 0 100 100" className="w-full h-full">
+            <circle
+              cx="50"
+              cy="50"
+              r={radius}
+              stroke="oklch(0.28 0.03 250)"
+              strokeWidth="8"
+              fill="none"
+            />
+            <circle
+              cx="50"
+              cy="50"
+              r={radius}
+              stroke={color}
+              strokeWidth="8"
+              fill="none"
+              strokeDasharray={circumference}
+              strokeDashoffset={offset}
+              strokeLinecap="round"
+              transform="rotate(-90 50 50)"
+              style={{ filter: `drop-shadow(0 0 10px ${color}55)` }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div className="text-xl font-bold text-[oklch(0.92_0.05_220)]">
+              {safeValue !== null ? Math.round(safeValue) : "N/D"}
+            </div>
+            <div className="text-[10px] text-[oklch(0.60_0.05_250)]">/{max}</div>
+          </div>
+        </div>
+        <div className="text-xs text-[oklch(0.65_0.05_250)] leading-snug">
+          {safeValue !== null ? `${Math.round(pct)}%` : "Dato non disponibile"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GaugeMetric({
+  label,
+  value,
+  min = -100,
+  max = 100,
+  info,
+}: {
+  label: string;
+  value: number | null;
+  min?: number;
+  max?: number;
+  info: any;
+}) {
+  const safeValue = value ?? null;
+  const clamped = safeValue !== null ? Math.max(min, Math.min(max, safeValue)) : null;
+  const pct = clamped !== null ? ((clamped - min) / (max - min)) * 100 : 0;
+  const color =
+    clamped === null
+      ? "oklch(0.60_0.05_250)"
+      : clamped > 20
+      ? "#22c55e"
+      : clamped > 0
+      ? "#f59e0b"
+      : "#ef4444";
+
+  return (
+    <div className="rounded-2xl p-4 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-xs uppercase tracking-wide text-[oklch(0.65_0.05_250)]">{label}</div>
+        <MetricInfoButton info={info} />
+      </div>
+      <div className="relative">
+        <svg viewBox="0 0 200 120" className="w-full h-28">
+          <path
+            d="M10 110 A90 90 0 0 1 190 110"
+            fill="none"
+            stroke="oklch(0.28 0.03 250)"
+            strokeWidth="12"
+            pathLength={100}
+            strokeLinecap="round"
+          />
+          <path
+            d="M10 110 A90 90 0 0 1 190 110"
+            fill="none"
+            stroke={color}
+            strokeWidth="12"
+            pathLength={100}
+            strokeDasharray={100}
+            strokeDashoffset={100 - pct}
+            strokeLinecap="round"
+            style={{ filter: `drop-shadow(0 0 12px ${color}66)` }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center pt-6">
+          <div className="text-2xl font-bold text-[oklch(0.92_0.05_220)]">
+            {safeValue !== null ? `${Math.round(safeValue)}%` : "N/D"}
+          </div>
+          <div className="text-[10px] text-[oklch(0.60_0.05_250)]">
+            {min}% — {max}%
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Statistics() {
   const [period, setPeriod] = useState(30);
@@ -353,43 +557,26 @@ export default function Statistics() {
                   ━━━ ANALISI AVANZATE ━━━
                 </h2>
 
-                {/* Core Metrics */}
-                <div className="grid grid-cols-3 gap-3">
-                  <MetricBox
+                {/* Core Rings */}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <RingMetric
                     label="Performance"
                     value={advanced.performanceIndex}
-                    icon="📊"
+                    color="#38bdf8"
                     info={metricsDefinitions.performanceIndex}
                   />
-                  <MetricBox
+                  <RingMetric
                     label="Consistency"
                     value={advanced.consistencyScore}
-                    icon="📅"
+                    color="#22c55e"
                     info={metricsDefinitions.consistencyScore}
                   />
-                  <div
-                    className="rounded-xl p-4 text-center"
-                    style={{
-                      background: "oklch(0.18 0.03 250)",
-                      border: "1px solid oklch(0.25 0.03 250)",
-                    }}
-                  >
-                    <div className="text-sm text-[oklch(0.70_0.05_250)]">Trend</div>
-                    <div className="flex items-center justify-center gap-1 text-2xl font-bold">
-                      {advanced.trendIndicator.direction === "up" && (
-                        <TrendingUp className="w-6 h-6 text-green-500" />
-                      )}
-                      {advanced.trendIndicator.direction === "down" && (
-                        <TrendingDown className="w-6 h-6 text-red-500" />
-                      )}
-                      {advanced.trendIndicator.direction === "stable" && (
-                        <Minus className="w-6 h-6 text-yellow-500" />
-                      )}
-                      <span className="text-[oklch(0.90_0.05_220)]">
-                        {advanced.trendIndicator.percentage}%
-                      </span>
-                    </div>
-                  </div>
+                  <RingMetric
+                    label="Recovery"
+                    value={advanced.recoveryReadinessScore}
+                    color="#06b6d4"
+                    info={metricsDefinitions.rrs}
+                  />
                 </div>
 
                 {/* Streak */}
@@ -417,48 +604,66 @@ export default function Statistics() {
                 </div>
 
                 {/* Advanced Swimming Metrics */}
-                <div>
-                  <h3 className="text-md font-semibold text-[oklch(0.80_0.05_220)] mb-3">
+                <div className="space-y-3">
+                  <h3 className="text-md font-semibold text-[oklch(0.80_0.05_220)]">
                     🏊 Metriche Avanzate
                   </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    <MetricBox
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <RingMetric
                       label="SEI"
                       value={advanced.swimmingEfficiencyIndex}
-                      icon="⚡"
+                      color="#a855f7"
                       info={metricsDefinitions.sei}
                     />
-                    <MetricBox
+                    <RingMetric
                       label="TCI"
                       value={advanced.technicalConsistencyIndex}
-                      icon="🎯"
+                      color="#f59e0b"
                       info={metricsDefinitions.tci}
                     />
-                    <MetricBox
+                    <RingMetric
                       label="SER"
                       value={advanced.strokeEfficiencyRating}
-                      icon="🏊"
+                      color="#f97316"
                       info={metricsDefinitions.ser}
                     />
-                    <MetricBox
+                    <RingMetric
                       label="ACS"
                       value={advanced.aerobicCapacityScore}
-                      icon="❤️"
+                      color="#84cc16"
                       info={metricsDefinitions.acs}
                     />
-                    <MetricBox
-                      label="RRS"
-                      value={advanced.recoveryReadinessScore}
-                      icon="💤"
-                      info={metricsDefinitions.rrs}
-                    />
-                    <MetricBox
-                      label="POI"
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <GaugeMetric
+                      label="Progressive Overload"
                       value={advanced.progressiveOverloadIndex}
-                      max={200}
-                      icon="📈"
                       info={metricsDefinitions.poi}
                     />
+                    <div
+                      className="rounded-2xl p-4 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs uppercase tracking-wide text-[oklch(0.65_0.05_250)]">Trend</div>
+                      </div>
+                      <div className="flex items-center gap-2 text-2xl font-bold">
+                        {advanced.trendIndicator.direction === "up" && (
+                          <TrendingUp className="w-6 h-6 text-green-500" />
+                        )}
+                        {advanced.trendIndicator.direction === "down" && (
+                          <TrendingDown className="w-6 h-6 text-red-500" />
+                        )}
+                        {advanced.trendIndicator.direction === "stable" && (
+                          <Minus className="w-6 h-6 text-yellow-500" />
+                        )}
+                        <span className="text-[oklch(0.92_0.05_220)]">
+                          {advanced.trendIndicator.percentage}%
+                        </span>
+                      </div>
+                      <div className="text-xs text-[oklch(0.60_0.05_250)] mt-1">
+                        Direzione complessiva nel periodo
+                      </div>
+                    </div>
                   </div>
                 </div>
 
