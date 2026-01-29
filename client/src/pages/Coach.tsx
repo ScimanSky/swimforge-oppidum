@@ -213,6 +213,20 @@ export default function Coach() {
       exercise.equipment && `Attrezzi: ${exercise.equipment}`,
     ].filter(Boolean) as string[];
 
+  const renderCoachNotes = (notes?: string[]) =>
+    notes?.length ? (
+      <ul className="text-sm text-white/80 space-y-1">
+        {notes.map((note, noteIdx) => (
+          <li key={noteIdx} className="flex items-start gap-2">
+            <span className="text-[var(--gold)]">•</span>
+            <span>{note}</span>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <div className="text-white/60 text-sm">Nota coach non disponibile.</div>
+    );
+
   return (
     <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
       <div className="min-h-screen overflow-x-hidden font-sans text-foreground relative pb-24">
@@ -385,6 +399,27 @@ export default function Coach() {
                   </CardContent>
                 </Card>
               ) : null}
+
+
+              {drylandWorkout ? (
+                <div className="hidden lg:block">
+                  <Card className="bg-[var(--gold)]/10 border border-[var(--gold)]/30">
+                    <CardContent className="p-5 space-y-4">
+                      <div className="text-xs uppercase tracking-wider text-[var(--gold)]">Nota Coach Dryland</div>
+                      {renderCoachNotes(drylandWorkout.coachNotes)}
+                      <Button
+                        onClick={handleRegenerateDryland}
+                        disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
+                        variant="outline"
+                        className="w-full border-purple-500/50 text-purple-300 hover:bg-purple-500/20 hover:text-purple-100"
+                      >
+                        <RefreshCw className={`h-4 w-4 mr-2 ${dryRegenerate ? "animate-spin" : ""}`} />
+                        Rigenera Allenamento Dryland
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : null}
             </div>
 
             {/* 3. Colonna Destra: Workout Plan */}
@@ -464,6 +499,27 @@ export default function Coach() {
                                         ))}
                                       </div>
                                     ) : null}
+
+
+              {drylandWorkout ? (
+                <div className="hidden lg:block">
+                  <Card className="bg-[var(--gold)]/10 border border-[var(--gold)]/30">
+                    <CardContent className="p-5 space-y-4">
+                      <div className="text-xs uppercase tracking-wider text-[var(--gold)]">Nota Coach Dryland</div>
+                      {renderCoachNotes(drylandWorkout.coachNotes)}
+                      <Button
+                        onClick={handleRegenerateDryland}
+                        disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
+                        variant="outline"
+                        className="w-full border-purple-500/50 text-purple-300 hover:bg-purple-500/20 hover:text-purple-100"
+                      >
+                        <RefreshCw className={`h-4 w-4 mr-2 ${dryRegenerate ? "animate-spin" : ""}`} />
+                        Rigenera Allenamento Dryland
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : null}
                                     {exercise.notes && (
                                       <div className="mt-2 text-xs text-cyan-100/80">💡 {exercise.notes}</div>
                                     )}
@@ -495,90 +551,77 @@ export default function Coach() {
                 <Card className="bg-card/20 backdrop-blur-sm border-white/10">
                   <CardContent className="p-6">
                     {drylandWorkout ? (
-                      <div className="flex flex-col lg:grid lg:grid-cols-[1fr_2fr] gap-6">
-                        <div className="order-2 lg:order-none space-y-4">
-                          {drylandWorkout.coachNotes?.length ? (
-                            <div className="rounded-lg bg-[var(--gold)]/10 border border-[var(--gold)]/30 p-4">
-                              <div className="text-xs uppercase tracking-wider text-[var(--gold)] mb-2">Nota Coach</div>
-                              <ul className="text-sm text-white/80 space-y-1">
-                                {drylandWorkout.coachNotes.map((note, noteIdx) => (
-                                  <li key={noteIdx} className="flex items-start gap-2">
-                                    <span className="text-[var(--gold)]">•</span>
-                                    <span>{note}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          ) : (
-                            <div className="rounded-lg bg-white/5 border border-white/10 p-4 text-white/60 text-sm">
-                              Nota coach non disponibile.
-                            </div>
+                      <div className="space-y-4">
+                        <div className="bg-white/5 rounded-xl p-5 border border-white/5 text-center">
+                          <div className="w-12 h-12 bg-[var(--gold)]/20 rounded-full flex items-center justify-center mb-3 mx-auto">
+                            <Flame className="h-6 w-6 text-[var(--gold)]" />
+                          </div>
+                          <h4 className="text-white font-bold text-lg mb-1">{drylandWorkout.title}</h4>
+                          <p className="text-white/60 text-sm">{drylandWorkout.duration} • {drylandWorkout.difficulty}</p>
+                          {drylandWorkout.description && (
+                            <p className="text-white/50 text-xs mt-2">{drylandWorkout.description}</p>
                           )}
-
-                          <Button
-                            onClick={handleRegenerateDryland}
-                            disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
-                            variant="outline"
-                            className="w-full border-purple-500/50 text-purple-300 hover:bg-purple-500/20 hover:text-purple-100"
-                          >
-                            <RefreshCw className={`h-4 w-4 mr-2 ${dryRegenerate ? "animate-spin" : ""}`} />
-                            Rigenera Allenamento Dryland
-                          </Button>
                         </div>
 
-                        <div className="order-1 lg:order-none space-y-4">
-                          <div className="bg-white/5 rounded-xl p-5 border border-white/5 text-center">
-                            <div className="w-12 h-12 bg-[var(--gold)]/20 rounded-full flex items-center justify-center mb-3 mx-auto">
-                              <Flame className="h-6 w-6 text-[var(--gold)]" />
-                            </div>
-                            <h4 className="text-white font-bold text-lg mb-1">{drylandWorkout.title}</h4>
-                            <p className="text-white/60 text-sm">{drylandWorkout.duration} • {drylandWorkout.difficulty}</p>
-                            {drylandWorkout.description && (
-                              <p className="text-white/50 text-xs mt-2">{drylandWorkout.description}</p>
-                            )}
-                          </div>
-
-                          <div className="space-y-3">
-                            {drylandWorkout.sections?.map((section, idx) => {
-                              const sectionLabel = formatSectionTitle(section.title);
-                              const pillClass = getSectionPillClass(section.title);
-                              return (
-                                <div key={idx} className="p-3 bg-white/5 rounded-lg border border-white/5">
-                                  <div className={`inline-flex text-xs font-semibold tracking-wide px-2 py-1 rounded ${pillClass} mb-2`}>
-                                    {sectionLabel}
-                                  </div>
-                                  {section.exercises?.length ? (
-                                    <div className="space-y-2">
-                                      {section.exercises.map((exercise, exIdx) => {
-                                        const details = getExerciseDetails(exercise);
-                                        return (
-                                          <div key={exIdx} className="rounded-lg bg-white/5 px-3 py-2 border border-white/5">
-                                            <div className="text-white font-medium text-sm">{exercise.name}</div>
-                                            {details.length ? (
-                                              <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-white/60">
-                                                {details.map((detail, detailIdx) => (
-                                                  <span key={detailIdx}>{detail}</span>
-                                                ))}
-                                              </div>
-                                            ) : null}
-                                            {exercise.notes && (
-                                              <div className="mt-2 text-xs text-cyan-100/80">💡 {exercise.notes}</div>
-                                            )}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  ) : section.notes ? (
-                                    <div className="text-white/70 text-sm">{section.notes}</div>
-                                  ) : (
-                                    <div className="text-white/50 text-sm">Dettagli non disponibili</div>
-                                  )}
+                        <div className="space-y-3">
+                          {drylandWorkout.sections?.map((section, idx) => {
+                            const sectionLabel = formatSectionTitle(section.title);
+                            const pillClass = getSectionPillClass(section.title);
+                            return (
+                              <div key={idx} className="p-3 bg-white/5 rounded-lg border border-white/5">
+                                <div className={`inline-flex text-xs font-semibold tracking-wide px-2 py-1 rounded ${pillClass} mb-2`}>
+                                  {sectionLabel}
                                 </div>
-                              );
-                            })}
-                          </div>
+                                {section.exercises?.length ? (
+                                  <div className="space-y-2">
+                                    {section.exercises.map((exercise, exIdx) => {
+                                      const details = getExerciseDetails(exercise);
+                                      return (
+                                        <div key={exIdx} className="rounded-lg bg-white/5 px-3 py-2 border border-white/5">
+                                          <div className="text-white font-medium text-sm">{exercise.name}</div>
+                                          {details.length ? (
+                                            <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-white/60">
+                                              {details.map((detail, detailIdx) => (
+                                                <span key={detailIdx}>{detail}</span>
+                                              ))}
+                                            </div>
+                                          ) : null}
+                                          {exercise.notes && (
+                                            <div className="mt-2 text-xs text-cyan-100/80">💡 {exercise.notes}</div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : section.notes ? (
+                                  <div className="text-white/70 text-sm">{section.notes}</div>
+                                ) : (
+                                  <div className="text-white/50 text-sm">Dettagli non disponibili</div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="lg:hidden">
+                          <Card className="bg-[var(--gold)]/10 border border-[var(--gold)]/30">
+                            <CardContent className="p-5 space-y-4">
+                              <div className="text-xs uppercase tracking-wider text-[var(--gold)]">Nota Coach Dryland</div>
+                              {renderCoachNotes(drylandWorkout.coachNotes)}
+                              <Button
+                                onClick={handleRegenerateDryland}
+                                disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
+                                variant="outline"
+                                className="w-full border-purple-500/50 text-purple-300 hover:bg-purple-500/20 hover:text-purple-100"
+                              >
+                                <RefreshCw className={`h-4 w-4 mr-2 ${dryRegenerate ? "animate-spin" : ""}`} />
+                                Rigenera Allenamento Dryland
+                              </Button>
+                            </CardContent>
+                          </Card>
                         </div>
                       </div>
+
                     ) : (
                       <div className="text-white/60">Workout dryland non disponibile.</div>
                     )}
