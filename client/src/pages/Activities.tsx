@@ -316,8 +316,8 @@ export default function Activities() {
 
       <main className="container py-6 space-y-4">
         {/* Filters */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="space-y-1.5">
+        <div className="flex gap-4 overflow-x-auto pb-2 sm:grid sm:grid-cols-4 sm:overflow-visible">
+          <div className="space-y-1.5 min-w-[150px]">
             <Label className="text-xs sm:text-sm">Fonte</Label>
             <Select value={source} onValueChange={(v) => setSource(v as any)}>
               <SelectTrigger className="h-9">
@@ -332,7 +332,7 @@ export default function Activities() {
             </Select>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 min-w-[150px]">
             <Label className="text-xs sm:text-sm">Tipo</Label>
             <Select value={openWater} onValueChange={(v) => setOpenWater(v as any)}>
               <SelectTrigger className="h-9">
@@ -346,7 +346,7 @@ export default function Activities() {
             </Select>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 min-w-[150px]">
             <Label className="text-xs sm:text-sm">Stile</Label>
             <Select value={strokeTypeFilter} onValueChange={(v) => setStrokeTypeFilter(v as any)}>
               <SelectTrigger className="h-9">
@@ -363,7 +363,7 @@ export default function Activities() {
             </Select>
           </div>
 
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 min-w-[150px]">
             <Label className="text-xs sm:text-sm">Distanza</Label>
             <Select value={distanceFilter} onValueChange={(v) => setDistanceFilter(v as any)}>
               <SelectTrigger className="h-9">
