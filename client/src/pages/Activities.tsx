@@ -327,7 +327,6 @@ export default function Activities() {
                 <SelectItem value="all">Tutte</SelectItem>
                 <SelectItem value="garmin">Garmin</SelectItem>
                 <SelectItem value="strava">Strava</SelectItem>
-                <SelectItem value="manual">Manuale</SelectItem>
               </SelectContent>
             </Select>
           </div>
