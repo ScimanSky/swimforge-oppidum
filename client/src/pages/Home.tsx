@@ -158,11 +158,11 @@ export default function Home() {
                   repeat: Infinity,
                 }}
               />
-              <div className="h-32 w-32 md:h-48 md:w-48 rounded-full bg-white flex items-center justify-center relative z-10 shadow-[0_0_40px_rgba(14,165,233,0.4)] border-4 border-white/10 overflow-hidden">
+              <div className="relative z-10">
                 <img 
                   src="/swimforge-logo.png" 
                   alt="SwimForge Logo" 
-                  className="w-full h-full object-contain p-2"
+                  className="h-32 md:h-48 w-auto drop-shadow-[0_0_30px_rgba(14,165,233,0.45)]"
                 />
               </div>
             </motion.div>
@@ -703,9 +703,11 @@ export default function Home() {
         <div className="container">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center">
-                <Waves className="h-4 w-4 text-white" />
-              </div>
+              <img
+                src="/swimforge-logo.png"
+                alt="SwimForge"
+                className="h-8 w-auto drop-shadow-[0_0_10px_rgba(14,165,233,0.35)]"
+              />
               <span className="text-sm text-muted-foreground font-medium">
                 SwimForge © {new Date().getFullYear()}
               </span>
