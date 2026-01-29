@@ -75,6 +75,28 @@ async function startServer() {
 
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+
+  // Cron endpoint for external scheduler (Render/cron-job.org)
+  app.post("/api/cron/complete-challenges", async (req, res) => {
+    const cronSecret = process.env.CRON_SECRET;
+    if (process.env.NODE_ENV === "production" && !cronSecret) {
+      return res.status(503).json({ success: false, error: "CRON_SECRET not configured" });
+    }
+
+    const authHeader = req.headers["authorization"];
+    const token = authHeader?.toString().replace(/^Bearer\s+/i, "");
+    if (process.env.NODE_ENV === "production" && token !== cronSecret) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
+    try {
+      const result = await completeChallenges();
+      return res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error("[Cron] Failed to complete challenges:", error);
+      return res.status(500).json({ success: false, error: "Cron execution failed" });
+    }
+  });
   // tRPC API
   app.use(
     "/api/trpc",
@@ -115,17 +137,7 @@ async function startServer() {
     res.status(500).json({ error: "Internal Server Error" });
   });
 
-  // Start cron job for challenge completion (runs every hour)
-  setInterval(async () => {
-    console.log("[Cron] Running challenge completion job...");
-    await completeChallenges();
-  }, 60 * 60 * 1000); // Every hour
-
-  // Run once on startup
-  setTimeout(async () => {
-    console.log("[Cron] Initial challenge completion check...");
-    await completeChallenges();
-  }, 5000); // 5 seconds after startup
+  // Cron moved to external scheduler via /api/cron/complete-challenges
 }
 
 startServer().catch(console.error);
