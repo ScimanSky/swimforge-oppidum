@@ -500,26 +500,6 @@ export default function Coach() {
                                       </div>
                                     ) : null}
 
-
-              {drylandWorkout ? (
-                <div className="hidden lg:block">
-                  <Card className="bg-[var(--gold)]/10 border border-[var(--gold)]/30">
-                    <CardContent className="p-5 space-y-4">
-                      <div className="text-xs uppercase tracking-wider text-[var(--gold)]">Nota Coach Dryland</div>
-                      {renderCoachNotes(drylandWorkout.coachNotes)}
-                      <Button
-                        onClick={handleRegenerateDryland}
-                        disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
-                        variant="outline"
-                        className="w-full border-purple-500/50 text-purple-300 hover:bg-purple-500/20 hover:text-purple-100"
-                      >
-                        <RefreshCw className={`h-4 w-4 mr-2 ${dryRegenerate ? "animate-spin" : ""}`} />
-                        Rigenera Allenamento Dryland
-                      </Button>
-                    </CardContent>
-                  </Card>
-                </div>
-              ) : null}
                                     {exercise.notes && (
                                       <div className="mt-2 text-xs text-cyan-100/80">💡 {exercise.notes}</div>
                                     )}
