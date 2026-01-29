@@ -19,6 +19,7 @@ import { garminTokens, swimmingActivities, swimmerProfiles, xpTransactions, badg
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
 import { encryptForStorage } from "./lib/tokenCrypto";
+import { invalidateUserCache } from "./lib/cache";
 
 // Garmin microservice configuration
 const GARMIN_SERVICE_URL = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
@@ -636,6 +637,9 @@ export async function syncGarminActivities(
 
       // Auto-update challenge progress for active challenges
       await updateActiveChallengesProgress(userId);
+
+      // Invalidate cached data for this user
+      await invalidateUserCache(String(userId));
     }
 
     // Update last sync time

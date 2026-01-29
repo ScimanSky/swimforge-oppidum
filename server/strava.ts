@@ -21,6 +21,7 @@ import { stravaTokens, swimmingActivities, swimmerProfiles, xpTransactions, badg
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
 import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
+import { invalidateUserCache } from "./lib/cache";
 
 // Strava microservice configuration
 const STRAVA_SERVICE_URL = process.env.STRAVA_SERVICE_URL || "https://swimforge-strava-service.onrender.com";
@@ -545,6 +546,9 @@ export async function syncStravaActivities(
 
       // Auto-update challenge progress for active challenges
       await updateActiveChallengesProgress(userId);
+
+      // Invalidate cached data for this user
+      await invalidateUserCache(String(userId));
     }
 
     // Update last sync time

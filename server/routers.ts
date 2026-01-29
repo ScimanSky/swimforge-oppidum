@@ -305,7 +305,11 @@ export const appRouter = router({
         offset: z.number().min(0).default(0),
       }))
       .query(async ({ ctx, input }) => {
-        return await db.getActivities(ctx.user.id, input.limit, input.offset);
+        return await getOrSetCached(
+          cacheKeys.activities(String(ctx.user.id), input.limit, input.offset),
+          () => db.getActivities(ctx.user.id, input.limit, input.offset),
+          CACHE_TTL.ACTIVITIES
+        );
       }),
     
     get: protectedProcedure
@@ -425,7 +429,11 @@ export const appRouter = router({
     }),
     
     userBadges: protectedProcedure.query(async ({ ctx }) => {
-      return await db.getUserBadges(ctx.user.id);
+      return await getOrSetCached(
+        cacheKeys.badges(String(ctx.user.id)),
+        () => db.getUserBadges(ctx.user.id),
+        CACHE_TTL.BADGES
+      );
     }),
     
     progress: protectedProcedure.query(async ({ ctx }) => {
