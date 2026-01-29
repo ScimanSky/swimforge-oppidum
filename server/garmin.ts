@@ -521,6 +521,7 @@ export async function syncGarminActivities(
       await db.insert(swimmingActivities).values({
         userId,
         garminActivityId: activity.activity_id,
+        activitySource: "garmin",
         activityDate,
         distanceMeters: activity.distance_meters,
         durationSeconds: activity.duration_seconds,
