@@ -238,24 +238,52 @@ function GaugeMetric({
   );
 }
 
-function StreakCard({
+function StreakRing({
   current,
   record,
 }: {
   current: number;
   record: number;
 }) {
+  const max = Math.max(record || 0, 7);
   return (
     <div className="rounded-2xl p-3 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]">
       <div className="flex items-center justify-between mb-3">
         <div className="text-xs uppercase tracking-wide text-[oklch(0.65_0.05_250)]">Streak</div>
         <div className="text-[10px] text-[oklch(0.60_0.05_250)]">Record {record}g</div>
       </div>
-      <div className="flex items-center gap-3">
-        <div className="text-2xl">🔥</div>
-        <div>
-          <div className="text-xl font-bold text-[oklch(0.92_0.05_220)]">{current} giorni</div>
-          <div className="text-[10px] text-[oklch(0.60_0.05_250)]">Consecutivi attuali</div>
+      <div className="flex items-center gap-4">
+        <div className="relative w-20 h-20">
+          <svg viewBox="0 0 100 100" className="w-full h-full">
+            <circle
+              cx="50"
+              cy="50"
+              r={32}
+              stroke="oklch(0.28 0.03 250)"
+              strokeWidth="7"
+              fill="none"
+            />
+            <circle
+              cx="50"
+              cy="50"
+              r={32}
+              stroke="#f97316"
+              strokeWidth="7"
+              fill="none"
+              strokeDasharray={2 * Math.PI * 32}
+              strokeDashoffset={(2 * Math.PI * 32) * (1 - Math.min(1, current / max))}
+              strokeLinecap="round"
+              transform="rotate(-90 50 50)"
+              style={{ filter: "drop-shadow(0 0 10px #f9731655)" }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div className="text-lg font-bold text-[oklch(0.92_0.05_220)]">{current}</div>
+            <div className="text-[10px] text-[oklch(0.60_0.05_250)]">giorni</div>
+          </div>
+        </div>
+        <div className="text-xs text-[oklch(0.60_0.05_250)] leading-snug">
+          🔥 Consecutivi attuali
         </div>
       </div>
     </div>
@@ -601,7 +629,7 @@ export default function Statistics() {
                     color="#06b6d4"
                     info={metricsDefinitions.rrs}
                   />
-                  <StreakCard current={advanced.streak.current} record={advanced.streak.record} />
+                  <StreakRing current={advanced.streak.current} record={advanced.streak.record} />
                 </div>
 
                 {/* Advanced Swimming Metrics */}
@@ -641,30 +669,13 @@ export default function Statistics() {
                       value={advanced.progressiveOverloadIndex}
                       info={metricsDefinitions.poi}
                     />
-                    <div
-                      className="rounded-2xl p-4 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="text-xs uppercase tracking-wide text-[oklch(0.65_0.05_250)]">Trend</div>
-                      </div>
-                      <div className="flex items-center gap-2 text-2xl font-bold">
-                        {advanced.trendIndicator.direction === "up" && (
-                          <TrendingUp className="w-6 h-6 text-green-500" />
-                        )}
-                        {advanced.trendIndicator.direction === "down" && (
-                          <TrendingDown className="w-6 h-6 text-red-500" />
-                        )}
-                        {advanced.trendIndicator.direction === "stable" && (
-                          <Minus className="w-6 h-6 text-yellow-500" />
-                        )}
-                        <span className="text-[oklch(0.92_0.05_220)]">
-                          {advanced.trendIndicator.percentage}%
-                        </span>
-                      </div>
-                      <div className="text-xs text-[oklch(0.60_0.05_250)] mt-1">
-                        Direzione complessiva nel periodo
-                      </div>
-                    </div>
+                    <GaugeMetric
+                      label="Trend"
+                      value={advanced.trendIndicator.percentage}
+                      min={-50}
+                      max={50}
+                      info={metricsDefinitions.performanceIndex}
+                    />
                   </div>
                 </div>
 
