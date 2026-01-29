@@ -8,6 +8,7 @@
 import { getDb } from "./db";
 import { achievementBadgeDefinitions, userAchievementBadges, swimmingActivities, swimmerProfiles } from "../drizzle/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
+import { calculateSEI, calculateSER, calculateTCI } from "./advanced_metrics";
 
 interface BadgeCriteria {
   metric: string;
@@ -210,13 +211,80 @@ async function evaluateMetricPeakCriteria(criteria: BadgeCriteria, userId: numbe
   const db = await getDb();
   if (!db) return false;
 
-  // For now, we'll calculate SEI from the most recent activities
-  // In a real implementation, you might want to cache these values
-  
-  // This is a placeholder - you would need to implement the actual metric calculation
-  // based on your metrics in db_statistics.ts
-  
-  return false; // TODO: Implement metric peak evaluation
+  const activities = await db
+    .select()
+    .from(swimmingActivities)
+    .where(eq(swimmingActivities.userId, userId))
+    .limit(500);
+
+  if (activities.length === 0) return false;
+
+  if (criteria.metric === "sei") {
+    const seiValues = activities
+      .map(a =>
+        calculateSEI({
+          distanceMeters: a.distanceMeters,
+          durationSeconds: a.durationSeconds,
+          avgPacePer100m: a.avgPacePer100m ?? undefined,
+          swolfScore: a.avgSwolf ?? undefined,
+          avgStrokeDistance: a.avgStrokeDistance ?? undefined,
+          avgStrokes: a.avgStrokes ?? undefined,
+          avgStrokeCadence: a.avgStrokeCadence ?? undefined,
+          poolLengthMeters: a.poolLengthMeters ?? undefined,
+        })
+      )
+      .filter((v): v is number => v !== null && v !== undefined);
+
+    if (seiValues.length === 0) return false;
+    const peak = Math.max(...seiValues);
+    return evaluateOperator(peak, criteria.operator, criteria.value);
+  }
+
+  if (criteria.metric === "ser") {
+    const serValues = activities
+      .map(a =>
+        calculateSER({
+          distanceMeters: a.distanceMeters,
+          durationSeconds: a.durationSeconds,
+          avgPacePer100m: a.avgPacePer100m ?? undefined,
+          swolfScore: a.avgSwolf ?? undefined,
+          avgStrokeDistance: a.avgStrokeDistance ?? undefined,
+          avgStrokes: a.avgStrokes ?? undefined,
+          avgStrokeCadence: a.avgStrokeCadence ?? undefined,
+          poolLengthMeters: a.poolLengthMeters ?? undefined,
+        })
+      )
+      .filter((v): v is number => v !== null && v !== undefined);
+
+    if (serValues.length === 0) return false;
+    const peak = Math.max(...serValues);
+    return evaluateOperator(peak, criteria.operator, criteria.value);
+  }
+
+  if (criteria.metric === "tci") {
+    const tci = calculateTCI(
+      activities.map(a => ({
+        distanceMeters: a.distanceMeters,
+        durationSeconds: a.durationSeconds,
+        avgPacePer100m: a.avgPacePer100m ?? undefined,
+        swolfScore: a.avgSwolf ?? undefined,
+        avgStrokeDistance: a.avgStrokeDistance ?? undefined,
+        avgStrokes: a.avgStrokes ?? undefined,
+        avgStrokeCadence: a.avgStrokeCadence ?? undefined,
+        poolLengthMeters: a.poolLengthMeters ?? undefined,
+      }))
+    );
+    if (tci === null) return false;
+    return evaluateOperator(tci, criteria.operator, criteria.value);
+  }
+
+  // Fallback: use direct activity metrics and evaluate peak
+  const values = activities
+    .map(a => getActivityValue(a, criteria.metric))
+    .filter((v): v is number => v !== null && v !== undefined);
+  if (values.length === 0) return false;
+  const peak = Math.max(...values);
+  return evaluateOperator(peak, criteria.operator, criteria.value);
 }
 
 /**
@@ -229,7 +297,7 @@ function getActivityValue(activity: any, metric: string): number | null {
     case 'duration':
       return activity.durationSeconds;
     case 'swolf_score':
-      return activity.swolfScore;
+      return activity.swolfScore ?? activity.avgSwolf ?? null;
     case 'avg_pace_per_100m':
       return activity.avgPacePer100m;
     case 'max_heart_rate':
