@@ -161,14 +161,19 @@ export async function getPerformanceAnalysis(
     caloriesTotal: 0, sessions: 0, swolfAvg: null, avgCaloriesPerSession: null,
   };
 
-  const totalHrSeconds = (row.zone1 || 0) + (row.zone2 || 0) + (row.zone3 || 0) + (row.zone4 || 0) + (row.zone5 || 0);
+  const zone1 = Number(row.zone1 ?? 0);
+  const zone2 = Number(row.zone2 ?? 0);
+  const zone3 = Number(row.zone3 ?? 0);
+  const zone4 = Number(row.zone4 ?? 0);
+  const zone5 = Number(row.zone5 ?? 0);
+  const totalHrSeconds = zone1 + zone2 + zone3 + zone4 + zone5;
 
   const hrZonesPercent = {
-    zone1: totalHrSeconds > 0 ? Math.round((row.zone1 / totalHrSeconds) * 100) : 0,
-    zone2: totalHrSeconds > 0 ? Math.round((row.zone2 / totalHrSeconds) * 100) : 0,
-    zone3: totalHrSeconds > 0 ? Math.round((row.zone3 / totalHrSeconds) * 100) : 0,
-    zone4: totalHrSeconds > 0 ? Math.round((row.zone4 / totalHrSeconds) * 100) : 0,
-    zone5: totalHrSeconds > 0 ? Math.round((row.zone5 / totalHrSeconds) * 100) : 0,
+    zone1: totalHrSeconds > 0 ? Math.round((zone1 / totalHrSeconds) * 100) : 0,
+    zone2: totalHrSeconds > 0 ? Math.round((zone2 / totalHrSeconds) * 100) : 0,
+    zone3: totalHrSeconds > 0 ? Math.round((zone3 / totalHrSeconds) * 100) : 0,
+    zone4: totalHrSeconds > 0 ? Math.round((zone4 / totalHrSeconds) * 100) : 0,
+    zone5: totalHrSeconds > 0 ? Math.round((zone5 / totalHrSeconds) * 100) : 0,
   };
 
   const paceDistributionRows = await db
