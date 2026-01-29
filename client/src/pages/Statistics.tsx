@@ -122,25 +122,25 @@ function RingMetric({
 }) {
   const safeValue = value ?? null;
   const pct = safeValue !== null ? Math.max(0, Math.min(100, (safeValue / max) * 100)) : 0;
-  const radius = 38;
+  const radius = 32;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - pct / 100);
 
   return (
-    <div className="rounded-2xl p-4 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]">
+    <div className="rounded-2xl p-3 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]">
       <div className="flex items-center justify-between mb-3">
         <div className="text-xs uppercase tracking-wide text-[oklch(0.65_0.05_250)]">{label}</div>
         <MetricInfoButton info={info} />
       </div>
       <div className="flex items-center gap-4">
-        <div className="relative w-24 h-24">
+        <div className="relative w-20 h-20">
           <svg viewBox="0 0 100 100" className="w-full h-full">
             <circle
               cx="50"
               cy="50"
               r={radius}
               stroke="oklch(0.28 0.03 250)"
-              strokeWidth="8"
+              strokeWidth="7"
               fill="none"
             />
             <circle
@@ -148,7 +148,7 @@ function RingMetric({
               cy="50"
               r={radius}
               stroke={color}
-              strokeWidth="8"
+              strokeWidth="7"
               fill="none"
               strokeDasharray={circumference}
               strokeDashoffset={offset}
@@ -558,7 +558,7 @@ export default function Statistics() {
                 </h2>
 
                 {/* Core Rings */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                   <RingMetric
                     label="Performance"
                     value={advanced.performanceIndex}
@@ -608,7 +608,7 @@ export default function Statistics() {
                   <h3 className="text-md font-semibold text-[oklch(0.80_0.05_220)]">
                     🏊 Metriche Avanzate
                   </h3>
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                     <RingMetric
                       label="SEI"
                       value={advanced.swimmingEfficiencyIndex}
