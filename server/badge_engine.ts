@@ -177,21 +177,27 @@ function evaluateConsistencyCriteria(criteria: BadgeCriteria, activities: any[])
     weeklyActivities.set(weekKey, (weeklyActivities.get(weekKey) || 0) + 1);
   }
 
-  // Check for consecutive weeks meeting the minimum
-  const weeks = Array.from(weeklyActivities.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  
+  // Check for consecutive weeks meeting the minimum, including missing weeks as breaks
+  const weeks = Array.from(weeklyActivities.keys()).sort((a, b) => a.localeCompare(b));
+  if (weeks.length === 0) return false;
+
   let consecutiveCount = 0;
   let maxConsecutive = 0;
 
-  for (let i = 0; i < weeks.length; i++) {
-    const [weekKey, count] = weeks[i];
+  let cursor = weeks[0];
+  const last = weeks[weeks.length - 1];
 
+  while (cursor <= last) {
+    const count = weeklyActivities.get(cursor) || 0;
     if (count >= criteria.min_activities_per_week) {
       consecutiveCount++;
       maxConsecutive = Math.max(maxConsecutive, consecutiveCount);
     } else {
       consecutiveCount = 0;
     }
+
+    if (cursor === last) break;
+    cursor = getNextWeekKey(cursor);
   }
 
   return maxConsecutive >= criteria.consecutive_weeks;
@@ -265,4 +271,24 @@ function getWeekKey(date: Date): string {
   const onejan = new Date(year, 0, 1);
   const week = Math.ceil((((date.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
   return `${year}-${String(week).padStart(2, '0')}`;
+}
+
+function parseWeekKey(weekKey: string): { year: number; week: number } {
+  const [yearStr, weekStr] = weekKey.split("-");
+  return { year: Number(yearStr), week: Number(weekStr) };
+}
+
+function getWeeksInYear(year: number): number {
+  const lastDay = new Date(year, 11, 31);
+  const key = getWeekKey(lastDay);
+  return parseWeekKey(key).week;
+}
+
+function getNextWeekKey(weekKey: string): string {
+  const { year, week } = parseWeekKey(weekKey);
+  const weeksInYear = getWeeksInYear(year);
+  if (week >= weeksInYear) {
+    return `${year + 1}-01`;
+  }
+  return `${year}-${String(week + 1).padStart(2, '0')}`;
 }
