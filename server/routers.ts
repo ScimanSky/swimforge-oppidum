@@ -16,6 +16,7 @@ import { TRPCError } from "@trpc/server";
 import { verifySupabaseAccessToken } from "./_core/supabase";
 import type { Request, Response } from "express";
 import { loginLimiter, registrationLimiter } from "./middleware/security";
+import { getOrSetCached, cacheKeys, CACHE_TTL } from "./lib/cache";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -272,32 +273,25 @@ export const appRouter = router({
     
     refreshStats: protectedProcedure
       .mutation(async ({ ctx }) => {
-        // Recalculate all stats from activities
-        const activities = await db.getActivities(ctx.user.id, 10000, 0); // Get all activities
-        
-        const totalDistance = activities.reduce((sum, a) => sum + a.distanceMeters, 0);
-        const totalTime = activities.reduce((sum, a) => sum + a.durationSeconds, 0);
-        const totalSessions = activities.length;
-        const openWaterActivities = activities.filter(a => a.isOpenWater);
-        const totalOpenWaterSessions = openWaterActivities.length;
-        const totalOpenWaterMeters = openWaterActivities.reduce((sum, a) => sum + a.distanceMeters, 0);
+        // Recalculate all stats from activities (DB aggregates)
+        const aggregates = await db.getActivityAggregates(ctx.user.id);
         
         await db.updateSwimmerProfile(ctx.user.id, {
-          totalDistanceMeters: totalDistance,
-          totalTimeSeconds: totalTime,
-          totalSessions: totalSessions,
-          totalOpenWaterSessions: totalOpenWaterSessions,
-          totalOpenWaterMeters: totalOpenWaterMeters,
+          totalDistanceMeters: aggregates.totalDistance,
+          totalTimeSeconds: aggregates.totalTime,
+          totalSessions: aggregates.totalSessions,
+          totalOpenWaterSessions: aggregates.totalOpenWaterSessions,
+          totalOpenWaterMeters: aggregates.totalOpenWaterMeters,
         });
         
         return { 
           success: true, 
           stats: {
-            totalDistance,
-            totalTime,
-            totalSessions,
-            totalOpenWaterSessions,
-            totalOpenWaterMeters,
+            totalDistance: aggregates.totalDistance,
+            totalTime: aggregates.totalTime,
+            totalSessions: aggregates.totalSessions,
+            totalOpenWaterSessions: aggregates.totalOpenWaterSessions,
+            totalOpenWaterMeters: aggregates.totalOpenWaterMeters,
           }
         };
       }),
@@ -423,7 +417,11 @@ export const appRouter = router({
   // Badges
   badges: router({
     definitions: publicProcedure.query(async () => {
-      return await db.getAllBadgeDefinitions();
+      return await getOrSetCached(
+        cacheKeys.badgeDefinitions(),
+        () => db.getAllBadgeDefinitions(),
+        CACHE_TTL.BADGES
+      );
     }),
     
     userBadges: protectedProcedure.query(async ({ ctx }) => {
@@ -437,10 +435,7 @@ export const appRouter = router({
       const earnedBadgeIds = new Set(userBadges.map(ub => ub.badge.id));
       
       // Get longest session distance for single_session_distance_km badges
-      const allActivities = await db.getActivities(ctx.user.id, 10000, 0);
-      const longestSessionMeters = allActivities.length > 0 
-        ? Math.max(...allActivities.map(a => a.distanceMeters))
-        : 0;
+      const longestSessionMeters = await db.getMaxSessionDistance(ctx.user.id);
       
       return allBadges.map(badge => {
         const earned = earnedBadgeIds.has(badge.id);
@@ -493,10 +488,7 @@ export const appRouter = router({
       }
 
       // Get longest session distance
-      const allActivities = await db.getActivities(ctx.user.id, 10000, 0);
-      const longestSessionDistance = allActivities.length > 0 
-        ? Math.max(...allActivities.map(a => a.distanceMeters))
-        : 0;
+      const longestSessionDistance = await db.getMaxSessionDistance(ctx.user.id);
 
       const allBadges = await db.getAllBadgeDefinitions();
       const userBadges = await db.getUserBadges(ctx.user.id);
@@ -630,11 +622,11 @@ export const appRouter = router({
         limit: z.number().min(1).max(100).default(50),
       }))
       .query(async ({ input }) => {
-        const result = await db.getLeaderboard(input.orderBy, input.limit);
-        console.log('[Leaderboard Backend] Query result:', result);
-        console.log('[Leaderboard Backend] Result length:', result?.length);
-        console.log('[Leaderboard Backend] OrderBy:', input.orderBy);
-        return result;
+        return await getOrSetCached(
+          cacheKeys.leaderboard(input.orderBy, input.limit, 0),
+          () => db.getLeaderboard(input.orderBy, input.limit),
+          CACHE_TTL.LEADERBOARD
+        );
       }),
   }),
 
@@ -657,7 +649,11 @@ export const appRouter = router({
   // Level Thresholds (public for display)
   levels: router({
     all: publicProcedure.query(async () => {
-      return await db.getAllLevelThresholds();
+      return await getOrSetCached(
+        "level:thresholds",
+        () => db.getAllLevelThresholds(),
+        CACHE_TTL.BADGES
+      );
     }),
   }),
 

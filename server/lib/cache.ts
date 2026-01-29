@@ -192,8 +192,8 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
  * Cache key builders
  */
 export const cacheKeys = {
-  leaderboard: (limit: number, offset: number) =>
-    `leaderboard:${limit}:${offset}`,
+  leaderboard: (orderBy: string, limit: number, offset: number) =>
+    `leaderboard:${orderBy}:${limit}:${offset}`,
   userStats: (userId: string) => `user:stats:${userId}`,
   userProfile: (userId: string) => `user:profile:${userId}`,
   badges: (userId: string) => `user:badges:${userId}`,

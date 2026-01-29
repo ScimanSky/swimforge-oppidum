@@ -284,6 +284,57 @@ export async function getActivities(userId: number, limit = 20, offset = 0) {
     .offset(offset);
 }
 
+export async function getMaxSessionDistance(userId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db
+    .select({
+      maxDistance: sql<number>`coalesce(max(${swimmingActivities.distanceMeters}), 0)`,
+    })
+    .from(swimmingActivities)
+    .where(eq(swimmingActivities.userId, userId));
+  return Number(result[0]?.maxDistance ?? 0);
+}
+
+export async function getActivityAggregates(userId: number): Promise<{
+  totalDistance: number;
+  totalTime: number;
+  totalSessions: number;
+  totalOpenWaterSessions: number;
+  totalOpenWaterMeters: number;
+}> {
+  const db = await getDb();
+  if (!db) {
+    return {
+      totalDistance: 0,
+      totalTime: 0,
+      totalSessions: 0,
+      totalOpenWaterSessions: 0,
+      totalOpenWaterMeters: 0,
+    };
+  }
+
+  const result = await db
+    .select({
+      totalDistance: sql<number>`coalesce(sum(${swimmingActivities.distanceMeters}), 0)`,
+      totalTime: sql<number>`coalesce(sum(${swimmingActivities.durationSeconds}), 0)`,
+      totalSessions: sql<number>`count(*)`,
+      totalOpenWaterSessions: sql<number>`coalesce(sum(case when ${swimmingActivities.isOpenWater} then 1 else 0 end), 0)`,
+      totalOpenWaterMeters: sql<number>`coalesce(sum(case when ${swimmingActivities.isOpenWater} then ${swimmingActivities.distanceMeters} else 0 end), 0)`,
+    })
+    .from(swimmingActivities)
+    .where(eq(swimmingActivities.userId, userId));
+
+  const row = result[0];
+  return {
+    totalDistance: Number(row?.totalDistance ?? 0),
+    totalTime: Number(row?.totalTime ?? 0),
+    totalSessions: Number(row?.totalSessions ?? 0),
+    totalOpenWaterSessions: Number(row?.totalOpenWaterSessions ?? 0),
+    totalOpenWaterMeters: Number(row?.totalOpenWaterMeters ?? 0),
+  };
+}
+
 export async function getActivityById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
