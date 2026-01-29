@@ -1,4 +1,4 @@
-import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean, json, serial } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean, json, serial, unique } from "drizzle-orm/pg-core";
 
 // ============================================
 // ENUMS for PostgreSQL
@@ -124,7 +124,9 @@ export const userBadges = pgTable("user_badges", {
   badgeId: integer("badge_id").notNull(),
   earnedAt: timestamp("earned_at").defaultNow().notNull(),
   activityId: integer("activity_id"),
-});
+}, (table) => ({
+  userBadgeUnique: unique().on(table.userId, table.badgeId),
+}));
 
 // ============================================
 // ACHIEVEMENT BADGE DEFINITIONS (Auto-awarded badges)

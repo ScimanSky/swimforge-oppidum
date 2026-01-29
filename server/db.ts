@@ -348,7 +348,13 @@ export async function hasUserBadge(userId: number, badgeId: number) {
 export async function awardBadge(data: InsertUserBadge) {
   const db = await getDb();
   if (!db) return null;
-  const result = await db.insert(userBadges).values(data).returning({ id: userBadges.id });
+  const result = await db
+    .insert(userBadges)
+    .values(data)
+    .onConflictDoNothing({
+      target: [userBadges.userId, userBadges.badgeId],
+    })
+    .returning({ id: userBadges.id });
   return result[0]?.id || null;
 }
 
