@@ -373,7 +373,7 @@ export default function Activities() {
                 <SelectItem value="all">Tutte</SelectItem>
                 <SelectItem value="short">0 - 1 km</SelectItem>
                 <SelectItem value="medium">1 - 3 km</SelectItem>
-                <SelectItem value="long">> 3 km</SelectItem>
+                <SelectItem value="long">&gt; 3 km</SelectItem>
               </SelectContent>
             </Select>
           </div>
