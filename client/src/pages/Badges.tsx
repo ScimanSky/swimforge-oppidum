@@ -108,31 +108,27 @@ export default function Badges() {
   const earnedCount = badgeProgress?.filter((b) => b.earned).length || 0;
   const totalCount = badgeProgress?.length || 0;
 
-  const soundBasePath = "/sounds/badges";
-  const soundGroups = {
-    splash: [1, 7, 13, 19, 25, 31, 37, 43, 49],
-    bubbles: [2, 8, 14, 20, 26, 32, 38, 44, 50],
-    waves: [3, 9, 15, 21, 27, 33, 39, 45],
-    bells: [4, 10, 16, 22, 28, 34, 40, 46],
-    drops: [5, 11, 17, 23, 29, 35, 41, 47],
-    dives: [6, 12, 18, 24, 30, 36, 42, 48],
-  };
+  const soundBasePath = "/sounds/badges_new";
+  const badgeSounds = [
+    "2vbt055jjna-splash-sfx-4.mp3",
+    "bathwater-splash-large-betacut-1-00-02.mp3",
+    "jep7k98gxvq-splash-sfx-3.mp3",
+    "mixkit-fish-flapping-2457.wav",
+    "mixkit-gore-video-game-blood-splash-263.wav",
+    "mixkit-jump-into-the-water-1180.wav",
+    "mixkit-sea-water-splash-1198.wav",
+    "mixkit-water-drop-splashes-in-cave-3179.wav",
+    "mixkit-water-splash-1311.wav",
+    "sgq1v8w7cp-splash-sfx-6.mp3",
+    "splash-small-rock-thrown-in-water-mechanical-wave-14-00-01.mp3",
+    "whoosh-water-betacut-1-00-03.mp3",
+  ];
 
-  const raritySoundPools: Record<string, number[]> = {
-    common: [...soundGroups.drops, ...soundGroups.bubbles],
-    uncommon: [...soundGroups.bubbles, ...soundGroups.waves],
-    rare: [...soundGroups.bells, ...soundGroups.waves],
-    epic: [...soundGroups.splash, ...soundGroups.dives],
-    legendary: [...soundGroups.splash, ...soundGroups.dives],
-  };
-
-  // Get sound URL based on badge number and rarity
-  const getBadgeSoundUrl = useCallback((badgeNumber: number, rarity: string): string => {
-    const pool = raritySoundPools[rarity] || raritySoundPools.common;
-    const safeIndex = pool.length > 0 ? (Math.max(badgeNumber, 1) - 1) % pool.length : 0;
-    const soundNumber = pool[safeIndex] || 1;
-    const padded = String(soundNumber).padStart(2, "0");
-    return `${soundBasePath}/badge_unlock_${padded}.wav`;
+  // Get sound URL based on badge number (stable rotation)
+  const getBadgeSoundUrl = useCallback((badgeNumber: number): string => {
+    if (!badgeSounds.length) return "";
+    const safeIndex = (Math.max(badgeNumber, 1) - 1) % badgeSounds.length;
+    return `${soundBasePath}/${badgeSounds[safeIndex]}`;
   }, []);
 
   // Play sound effect with dynamic URL
@@ -147,7 +143,7 @@ export default function Badges() {
   const handleBadgeClick = (badge: any, badgeIndex: number) => {
     setSelectedBadge(badge);
     if (badge.earned) {
-      const soundUrl = getBadgeSoundUrl(badgeIndex + 1, badge.rarity);
+      const soundUrl = getBadgeSoundUrl(badgeIndex + 1);
       playSound(soundUrl);
       setShowUnlockAnimation(true);
       setTimeout(() => setShowUnlockAnimation(false), 1200);

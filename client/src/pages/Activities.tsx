@@ -36,7 +36,6 @@ export default function Activities() {
   const limit = 20;
   const [source, setSource] = useState<"all" | "garmin" | "strava" | "manual">("all");
   const [openWater, setOpenWater] = useState<"all" | "pool" | "open">("all");
-  const [strokeTypeFilter, setStrokeTypeFilter] = useState<"all" | "freestyle" | "backstroke" | "breaststroke" | "butterfly" | "mixed">("all");
   const [distanceFilter, setDistanceFilter] = useState<"all" | "short" | "medium" | "long">("all");
 
   // Form state
@@ -59,7 +58,6 @@ export default function Activities() {
       offset,
       source,
       openWater: openWater === "all" ? undefined : openWater === "open",
-      strokeType: strokeTypeFilter === "all" ? undefined : strokeTypeFilter,
       minDistanceMeters:
         distanceFilter === "short" ? 0 :
         distanceFilter === "medium" ? 1000 :
@@ -345,22 +343,6 @@ export default function Activities() {
             </Select>
           </div>
 
-          <div className="space-y-1.5 min-w-[150px]">
-            <Label className="text-xs sm:text-sm">Stile</Label>
-            <Select value={strokeTypeFilter} onValueChange={(v) => setStrokeTypeFilter(v as any)}>
-              <SelectTrigger className="h-9">
-                <SelectValue placeholder="Tutti" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tutti</SelectItem>
-                <SelectItem value="freestyle">Stile libero</SelectItem>
-                <SelectItem value="backstroke">Dorso</SelectItem>
-                <SelectItem value="breaststroke">Rana</SelectItem>
-                <SelectItem value="butterfly">Delfino</SelectItem>
-                <SelectItem value="mixed">Misto</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
 
           <div className="space-y-1.5 min-w-[150px]">
             <Label className="text-xs sm:text-sm">Distanza</Label>
