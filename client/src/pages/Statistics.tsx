@@ -238,6 +238,30 @@ function GaugeMetric({
   );
 }
 
+function StreakCard({
+  current,
+  record,
+}: {
+  current: number;
+  record: number;
+}) {
+  return (
+    <div className="rounded-2xl p-3 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-xs uppercase tracking-wide text-[oklch(0.65_0.05_250)]">Streak</div>
+        <div className="text-[10px] text-[oklch(0.60_0.05_250)]">Record {record}g</div>
+      </div>
+      <div className="flex items-center gap-3">
+        <div className="text-2xl">🔥</div>
+        <div>
+          <div className="text-xl font-bold text-[oklch(0.92_0.05_220)]">{current} giorni</div>
+          <div className="text-[10px] text-[oklch(0.60_0.05_250)]">Consecutivi attuali</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Statistics() {
   const [period, setPeriod] = useState(30);
 
@@ -558,7 +582,7 @@ export default function Statistics() {
                 </h2>
 
                 {/* Core Rings */}
-                <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                   <RingMetric
                     label="Performance"
                     value={advanced.performanceIndex}
@@ -577,30 +601,7 @@ export default function Statistics() {
                     color="#06b6d4"
                     info={metricsDefinitions.rrs}
                   />
-                </div>
-
-                {/* Streak */}
-                <div
-                  className="rounded-xl p-4"
-                  style={{
-                    background: "oklch(0.18 0.03 250)",
-                    border: "1px solid oklch(0.25 0.03 250)",
-                  }}
-                >
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <div className="text-sm text-[oklch(0.70_0.05_250)]">Streak Attuale</div>
-                      <div className="text-2xl font-bold text-[oklch(0.90_0.05_220)]">
-                        🔥 {advanced.streak.current} giorni
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm text-[oklch(0.70_0.05_250)]">Record</div>
-                      <div className="text-2xl font-bold text-[oklch(0.90_0.05_220)]">
-                        {advanced.streak.record} giorni
-                      </div>
-                    </div>
-                  </div>
+                  <StreakCard current={advanced.streak.current} record={advanced.streak.record} />
                 </div>
 
                 {/* Advanced Swimming Metrics */}
@@ -608,7 +609,7 @@ export default function Statistics() {
                   <h3 className="text-md font-semibold text-[oklch(0.80_0.05_220)]">
                     🏊 Metriche Avanzate
                   </h3>
-                  <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
+                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                     <RingMetric
                       label="SEI"
                       value={advanced.swimmingEfficiencyIndex}
