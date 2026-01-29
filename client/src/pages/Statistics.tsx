@@ -558,7 +558,7 @@ export default function Statistics() {
                 </h2>
 
                 {/* Core Rings */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
                   <RingMetric
                     label="Performance"
                     value={advanced.performanceIndex}
@@ -608,7 +608,7 @@ export default function Statistics() {
                   <h3 className="text-md font-semibold text-[oklch(0.80_0.05_220)]">
                     🏊 Metriche Avanzate
                   </h3>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
                     <RingMetric
                       label="SEI"
                       value={advanced.swimmingEfficiencyIndex}
