@@ -14,6 +14,9 @@ build/
 .env.test.local
 .env.production.local
 
+# Supabase CLI local metadata
+supabase/
+
 # IDE and editor files
 .vscode/
 .idea/
