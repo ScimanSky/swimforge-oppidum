@@ -59,6 +59,7 @@ type InsightItem = {
 export default function Coach() {
   const [poolRegenerate, setPoolRegenerate] = useState(false);
   const [dryRegenerate, setDryRegenerate] = useState(false);
+  const [insightsRefreshing, setInsightsRefreshing] = useState(false);
 
   const poolWorkoutQuery = trpc.aiCoach.getPoolWorkout.useQuery(
     { forceRegenerate: poolRegenerate },
@@ -74,14 +75,16 @@ export default function Coach() {
     }
   );
 
-  const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
+  const advancedQuery = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
     { staleTime: 24 * 60 * 60 * 1000 }
   );
-  const { data: timeline } = trpc.statistics.getTimeline.useQuery(
+  const timelineQuery = trpc.statistics.getTimeline.useQuery(
     { days: 14 },
     { staleTime: 5 * 60 * 1000 }
   );
+  const advanced = advancedQuery.data;
+  const timeline = timelineQuery.data;
   const { data: garminStatus } = trpc.garmin.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
   const { data: stravaStatus } = trpc.strava.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
 
@@ -112,6 +115,12 @@ export default function Coach() {
     if (rrs >= 50) return "Buona";
     return "Recupero";
   }, [advanced?.recoveryReadinessScore]);
+
+  const conditionClass = conditionLabel === "Ottima"
+    ? "text-cyan-200"
+    : conditionLabel === "Buona"
+    ? "text-amber-300"
+    : "text-rose-300";
 
   const insights = useMemo<InsightItem[]>(() => {
     const raw = advanced?.insights ?? [];
@@ -161,15 +170,48 @@ export default function Coach() {
     }
   };
 
-  const renderSectionContent = (section: WorkoutSection) => {
-    if (!section.exercises?.length) return section.notes || "";
-    return section.exercises
-      .map((exercise) => {
-        const detail = exercise.distance || exercise.duration || exercise.reps || "";
-        return detail ? `${detail} ${exercise.name}`.trim() : exercise.name;
-      })
-      .join(" • ");
+  const handleRefreshInsights = async () => {
+    setInsightsRefreshing(true);
+    try {
+      await Promise.all([advancedQuery.refetch(), timelineQuery.refetch()]);
+    } finally {
+      setInsightsRefreshing(false);
+    }
   };
+
+  const formatSectionTitle = (title: string) =>
+    title
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/(^|\s)\S/g, (char) => char.toUpperCase());
+
+  const getSectionPillClass = (title: string) => {
+    const key = title.toLowerCase();
+    if (key.includes("warm") || key.includes("riscald")) {
+      return "bg-[var(--gold)]/15 text-[var(--gold)] border border-[var(--gold)]/40";
+    }
+    if (key.includes("main") || key.includes("principale")) {
+      return "bg-cyan-500/15 text-cyan-200 border border-cyan-400/40";
+    }
+    if (key.includes("drill") || key.includes("tecnica") || key.includes("attivazione")) {
+      return "bg-purple-500/15 text-purple-200 border border-purple-400/40";
+    }
+    if (key.includes("cool") || key.includes("defatic")) {
+      return "bg-sky-500/15 text-sky-200 border border-sky-400/40";
+    }
+    return "bg-white/10 text-white/70 border border-white/10";
+  };
+
+  const getExerciseDetails = (exercise: WorkoutExercise) =>
+    [
+      exercise.sets && `Serie: ${exercise.sets}`,
+      exercise.reps && `Rip: ${exercise.reps}`,
+      exercise.distance && `Distanza: ${exercise.distance}`,
+      exercise.duration && `Durata: ${exercise.duration}`,
+      exercise.rest && `Ripartenza: ${exercise.rest}`,
+      exercise.intensity && `Intensità: ${exercise.intensity}`,
+      exercise.equipment && `Attrezzi: ${exercise.equipment}`,
+    ].filter(Boolean) as string[];
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
@@ -239,7 +281,7 @@ export default function Coach() {
                 <div className="flex-1">
                   <h2 className="text-xl font-bold text-white flex flex-wrap items-center gap-2">
                     Analisi Completata
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400 border border-green-500/20 whitespace-nowrap">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 whitespace-nowrap">
                       Active
                     </span>
                   </h2>
@@ -262,7 +304,7 @@ export default function Coach() {
                 </div>
                 <div className="bg-white/5 rounded-lg p-3 px-5 flex-1 md:flex-none border border-white/5">
                   <div className="text-xs text-white/50 uppercase tracking-wider mb-1">Condition</div>
-                  <div className="text-lg font-bold text-green-400 flex items-center gap-2">
+                  <div className={`text-lg font-bold ${conditionClass} flex items-center gap-2`}>
                     <TrendingUp className="h-4 w-4" />
                     {conditionLabel}
                   </div>
@@ -331,8 +373,14 @@ export default function Coach() {
                     <p className="text-purple-200 text-sm mb-3">
                       Analizzati {timeline.length} allenamenti recenti
                     </p>
-                    <Button variant="outline" className="w-full border-purple-500/50 text-purple-300 hover:bg-purple-500/20 hover:text-purple-100">
-                      Approfondisci Analisi
+                    <Button
+                      variant="outline"
+                      onClick={handleRefreshInsights}
+                      disabled={insightsRefreshing}
+                      className="w-full border-purple-500/50 text-purple-300 hover:bg-purple-500/20 hover:text-purple-100"
+                    >
+                      <RefreshCw className={`h-4 w-4 mr-2 ${insightsRefreshing ? "animate-spin" : ""}`} />
+                      Rigenera Insights
                     </Button>
                   </CardContent>
                 </Card>
@@ -387,33 +435,50 @@ export default function Coach() {
                     {poolWorkoutQuery.isError && (
                       <div className="p-5 text-red-300">Errore nel caricamento dell'allenamento.</div>
                     )}
-                    {poolWorkout?.sections?.map((section, idx) => (
-                      <div
-                        key={idx}
-                        className={`p-4 md:p-5 border-b border-white/5 last:border-0 flex flex-col sm:flex-row gap-2 sm:gap-4 hover:bg-white/5 transition-colors ${
-                          section.title.toLowerCase().includes("main") ? "bg-cyan-500/5" : ""
-                        }`}
-                      >
-                        <div className="w-full sm:w-28 flex-shrink-0">
-                          <span
-                            className={`text-xs font-bold uppercase tracking-wider px-2 py-1 rounded ${
-                              section.title.toLowerCase().includes("warm")
-                                ? "bg-yellow-500/20 text-yellow-400"
-                                : section.title.toLowerCase().includes("main")
-                                ? "bg-cyan-500/20 text-cyan-400"
-                                : section.title.toLowerCase().includes("drill")
-                                ? "bg-purple-500/20 text-purple-400"
-                                : "bg-green-500/20 text-green-400"
-                            }`}
-                          >
-                            {section.title}
-                          </span>
+                    {poolWorkout?.sections?.map((section, idx) => {
+                      const sectionLabel = formatSectionTitle(section.title);
+                      const pillClass = getSectionPillClass(section.title);
+                      return (
+                        <div
+                          key={idx}
+                          className={`p-4 md:p-5 border-b border-white/5 last:border-0 flex flex-col sm:flex-row gap-3 sm:gap-4 hover:bg-white/5 transition-colors ${
+                            section.title.toLowerCase().includes("main") ? "bg-cyan-500/5" : ""
+                          }`}
+                        >
+                          <div className="w-full sm:w-32 flex-shrink-0">
+                            <span className={`text-xs font-semibold tracking-wide px-2 py-1 rounded ${pillClass}`}>
+                              {sectionLabel}
+                            </span>
+                          </div>
+                          <div className="flex-1 space-y-2 text-white/90">
+                            {section.exercises?.length ? (
+                              section.exercises.map((exercise, exIdx) => {
+                                const details = getExerciseDetails(exercise);
+                                return (
+                                  <div key={exIdx} className="rounded-lg bg-white/5 px-3 py-2 border border-white/5">
+                                    <div className="font-medium">{exercise.name}</div>
+                                    {details.length ? (
+                                      <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-white/60">
+                                        {details.map((detail, detailIdx) => (
+                                          <span key={detailIdx}>{detail}</span>
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                    {exercise.notes && (
+                                      <div className="mt-2 text-xs text-cyan-100/80">💡 {exercise.notes}</div>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            ) : section.notes ? (
+                              <div className="text-white/70 text-sm">{section.notes}</div>
+                            ) : (
+                              <div className="text-white/50 text-sm">Dettagli non disponibili</div>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-white/90 font-medium">
-                          {renderSectionContent(section)}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </CardContent>
                 </Card>
               </div>
@@ -425,16 +490,6 @@ export default function Coach() {
                     <Dumbbell className="h-5 w-5 text-[var(--gold)]" />
                     Fuori Vasca (Dryland)
                   </h3>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleRegenerateDryland}
-                    disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
-                    className="text-[var(--gold)]/80 hover:text-white hover:bg-white/10"
-                  >
-                    <RefreshCw className={`h-4 w-4 mr-2 ${dryRegenerate ? "animate-spin" : ""}`} />
-                    Rigenera
-                  </Button>
                 </div>
 
                 <Card className="bg-card/20 backdrop-blur-sm border-white/10">
@@ -447,19 +502,73 @@ export default function Coach() {
                           </div>
                           <h4 className="text-white font-bold text-lg mb-1">{drylandWorkout.title}</h4>
                           <p className="text-white/60 text-sm">{drylandWorkout.duration} • {drylandWorkout.difficulty}</p>
+                          {drylandWorkout.description && (
+                            <p className="text-white/50 text-xs mt-2">{drylandWorkout.description}</p>
+                          )}
                         </div>
 
-                        <div className="md:w-2/3 grid gap-3">
-                          {drylandWorkout.sections?.map((section, idx) => (
-                            <div key={idx} className="p-3 bg-white/5 rounded-lg border border-white/5">
-                              <div className="text-xs text-[var(--gold)] uppercase tracking-wider mb-1">
-                                {section.title}
+                        <div className="md:w-2/3 space-y-3">
+                          {drylandWorkout.sections?.map((section, idx) => {
+                            const sectionLabel = formatSectionTitle(section.title);
+                            const pillClass = getSectionPillClass(section.title);
+                            return (
+                              <div key={idx} className="p-3 bg-white/5 rounded-lg border border-white/5">
+                                <div className={`inline-flex text-xs font-semibold tracking-wide px-2 py-1 rounded ${pillClass} mb-2`}>
+                                  {sectionLabel}
+                                </div>
+                                {section.exercises?.length ? (
+                                  <div className="space-y-2">
+                                    {section.exercises.map((exercise, exIdx) => {
+                                      const details = getExerciseDetails(exercise);
+                                      return (
+                                        <div key={exIdx} className="rounded-lg bg-white/5 px-3 py-2 border border-white/5">
+                                          <div className="text-white font-medium text-sm">{exercise.name}</div>
+                                          {details.length ? (
+                                            <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-white/60">
+                                              {details.map((detail, detailIdx) => (
+                                                <span key={detailIdx}>{detail}</span>
+                                              ))}
+                                            </div>
+                                          ) : null}
+                                          {exercise.notes && (
+                                            <div className="mt-2 text-xs text-cyan-100/80">💡 {exercise.notes}</div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : section.notes ? (
+                                  <div className="text-white/70 text-sm">{section.notes}</div>
+                                ) : (
+                                  <div className="text-white/50 text-sm">Dettagli non disponibili</div>
+                                )}
                               </div>
-                              <div className="text-white font-medium text-sm">
-                                {renderSectionContent(section)}
-                              </div>
+                            );
+                          })}
+
+                          {drylandWorkout.coachNotes?.length ? (
+                            <div className="mt-2 rounded-lg bg-[var(--gold)]/10 border border-[var(--gold)]/30 p-4">
+                              <div className="text-xs uppercase tracking-wider text-[var(--gold)] mb-2">Nota Coach</div>
+                              <ul className="text-sm text-white/80 space-y-1">
+                                {drylandWorkout.coachNotes.map((note, noteIdx) => (
+                                  <li key={noteIdx} className="flex items-start gap-2">
+                                    <span className="text-[var(--gold)]">•</span>
+                                    <span>{note}</span>
+                                  </li>
+                                ))}
+                              </ul>
                             </div>
-                          ))}
+                          ) : null}
+
+                          <Button
+                            onClick={handleRegenerateDryland}
+                            disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
+                            variant="outline"
+                            className="w-full border-[var(--gold)]/50 text-[var(--gold)] hover:bg-[var(--gold)]/20"
+                          >
+                            <RefreshCw className={`h-4 w-4 mr-2 ${dryRegenerate ? "animate-spin" : ""}`} />
+                            Rigenera Allenamento Dryland
+                          </Button>
                         </div>
                       </div>
                     ) : (
