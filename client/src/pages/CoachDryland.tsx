@@ -7,12 +7,13 @@ import {
   ChevronLeft,
   Activity,
   Brain,
-  Waves,
+  Dumbbell,
   Timer,
   TrendingUp,
   AlertCircle,
   CheckCircle2,
   Zap,
+  Flame,
   RefreshCw,
 } from "lucide-react";
 import { trpc } from "../lib/trpc";
@@ -54,14 +55,14 @@ type InsightItem = {
   metric: string;
 };
 
-export default function Coach() {
-  const [poolRegenerate, setPoolRegenerate] = useState(false);
+export default function CoachDryland() {
+  const [dryRegenerate, setDryRegenerate] = useState(false);
   const [insightsRefreshing, setInsightsRefreshing] = useState(false);
 
-  const poolWorkoutQuery = trpc.aiCoach.getPoolWorkout.useQuery(
-    { forceRegenerate: poolRegenerate },
+  const drylandWorkoutQuery = trpc.aiCoach.getDrylandWorkout.useQuery(
+    { forceRegenerate: dryRegenerate },
     {
-      staleTime: poolRegenerate ? 0 : 1000 * 60 * 60 * 24,
+      staleTime: dryRegenerate ? 0 : 1000 * 60 * 60 * 24,
     }
   );
 
@@ -78,7 +79,7 @@ export default function Coach() {
   const { data: garminStatus } = trpc.garmin.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
   const { data: stravaStatus } = trpc.strava.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
 
-  const poolWorkout = poolWorkoutQuery.data as GeneratedWorkout | undefined;
+  const drylandWorkout = drylandWorkoutQuery.data as GeneratedWorkout | undefined;
 
   const lastSyncDate = useMemo(() => {
     const garmin = garminStatus?.lastSync ? new Date(garminStatus.lastSync) : null;
@@ -89,12 +90,11 @@ export default function Coach() {
   }, [garminStatus?.lastSync, stravaStatus?.lastSync]);
 
   const focusLabel = useMemo(() => {
-    if (!advanced) return "Equilibrio";
+    if (!advanced) return "Forza & Cardio";
     if (advanced.progressiveOverloadIndex !== null && advanced.progressiveOverloadIndex > 15) return "Potenza";
-    if (advanced.aerobicCapacityScore !== null && advanced.aerobicCapacityScore < 55) return "Resistenza";
-    if (advanced.technicalConsistencyIndex !== null && advanced.technicalConsistencyIndex < 60) return "Tecnica";
-    if (advanced.strokeEfficiencyRating !== null && advanced.strokeEfficiencyRating < 60) return "Efficienza";
-    return "Equilibrio";
+    if (advanced.aerobicCapacityScore !== null && advanced.aerobicCapacityScore < 55) return "Cardio";
+    if (advanced.technicalConsistencyIndex !== null && advanced.technicalConsistencyIndex < 60) return "Stabilità";
+    return "Forza & Cardio";
   }, [advanced]);
 
   const conditionLabel = useMemo(() => {
@@ -111,42 +111,60 @@ export default function Coach() {
     ? "text-amber-300"
     : "text-rose-300";
 
-  const insights = useMemo<InsightItem[]>(() => {
-    const raw = advanced?.insights ?? [];
-    if (!raw.length) return [];
-    const metrics = [
-      advanced?.technicalConsistencyIndex !== null && advanced?.technicalConsistencyIndex !== undefined
-        ? `TCI ${Math.round(advanced.technicalConsistencyIndex)}`
-        : undefined,
-      advanced?.swimmingEfficiencyIndex !== null && advanced?.swimmingEfficiencyIndex !== undefined
-        ? `SEI ${Math.round(advanced.swimmingEfficiencyIndex)}`
-        : undefined,
-      advanced?.recoveryReadinessScore !== null && advanced?.recoveryReadinessScore !== undefined
-        ? `RRS ${Math.round(advanced.recoveryReadinessScore)}`
-        : undefined,
-      advanced?.strokeEfficiencyRating !== null && advanced?.strokeEfficiencyRating !== undefined
-        ? `SER ${Math.round(advanced.strokeEfficiencyRating)}`
-        : undefined,
-    ].filter(Boolean) as string[];
+  const drylandInsights = useMemo<InsightItem[]>(() => {
+    if (!advanced) return [];
 
-    return raw.slice(0, 3).map((message, idx) => {
-      const type = idx === 0 ? "warning" : idx === 1 ? "success" : "info";
-      const title = idx === 0 ? "Punto di attenzione" : idx === 1 ? "Punto di forza" : "Nota coach";
-      return {
-        type,
-        title,
-        message,
-        metric: metrics[idx] ?? "—",
-      };
-    });
+    const cardioScore = advanced.aerobicCapacityScore;
+    const strengthScore = advanced.progressiveOverloadIndex;
+    const recoveryScore = advanced.recoveryReadinessScore;
+
+    const cardioMetric = cardioScore === null || cardioScore === undefined ? "—" : `${Math.round(cardioScore)}/100`;
+    const strengthMetric = strengthScore === null || strengthScore === undefined ? "—" : `${Math.round(strengthScore)} POI`;
+    const recoveryMetric = recoveryScore === null || recoveryScore === undefined ? "—" : `RRS ${Math.round(recoveryScore)}`;
+
+    return [
+      {
+        type: cardioScore !== null && cardioScore !== undefined && cardioScore < 55 ? "warning" : "success",
+        title: "Capacità Cardio",
+        message:
+          cardioScore === null || cardioScore === undefined
+            ? "Dati insufficienti: completa più sessioni per stimare la base aerobica."
+            : cardioScore < 55
+            ? "Base aerobica da rinforzare: inserisci blocchi cardio continui e recuperi controllati."
+            : "Buona base cardio: mantieni volume costante e lavora su progressioni graduali.",
+        metric: cardioMetric,
+      },
+      {
+        type: strengthScore !== null && strengthScore !== undefined && strengthScore < 0 ? "warning" : "info",
+        title: "Forza & Potenza",
+        message:
+          strengthScore === null || strengthScore === undefined
+            ? "Mancano dati per la progressione di carico."
+            : strengthScore < 0
+            ? "Progressione ridotta: integra sessioni di forza con carichi gestibili e tecnica pulita."
+            : "Buona spinta: continua con esercizi multiarticolari e controllo del core.",
+        metric: strengthMetric,
+      },
+      {
+        type: recoveryScore !== null && recoveryScore !== undefined && recoveryScore < 50 ? "warning" : "success",
+        title: "Recupero & Prontezza",
+        message:
+          recoveryScore === null || recoveryScore === undefined
+            ? "Recupero non stimabile: servono più dati HR/sonno."
+            : recoveryScore < 50
+            ? "Recupero basso: scegli intensità moderate e cura mobilità e sonno."
+            : "Recupero solido: ottimo momento per una seduta secca intensa.",
+        metric: recoveryMetric,
+      },
+    ];
   }, [advanced]);
 
-  const handleRegeneratePool = async () => {
-    setPoolRegenerate(true);
+  const handleRegenerateDryland = async () => {
+    setDryRegenerate(true);
     try {
-      await poolWorkoutQuery.refetch();
+      await drylandWorkoutQuery.refetch();
     } finally {
-      setPoolRegenerate(false);
+      setDryRegenerate(false);
     }
   };
 
@@ -193,6 +211,20 @@ export default function Coach() {
       exercise.equipment && `Attrezzi: ${exercise.equipment}`,
     ].filter(Boolean) as string[];
 
+  const renderCoachNotes = (notes?: string[]) =>
+    notes?.length ? (
+      <ul className="text-sm text-white/80 space-y-1">
+        {notes.map((note, noteIdx) => (
+          <li key={noteIdx} className="flex items-start gap-2">
+            <span className="text-[var(--gold)]">•</span>
+            <span>{note}</span>
+          </li>
+        ))}
+      </ul>
+    ) : (
+      <div className="text-white/60 text-sm">Nota coach non disponibile.</div>
+    );
+
   return (
     <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
       <div className="min-h-screen overflow-x-hidden font-sans text-foreground relative pb-24">
@@ -232,19 +264,14 @@ export default function Coach() {
         <div className="container py-8 md:py-12">
           {/* Navigation & Header */}
           <div className="flex items-center gap-4 mb-8">
-            <Link href="/dashboard">
+            <Link href="/coach">
               <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10">
                 <ChevronLeft className="h-5 w-5 mr-1" />
-                Dashboard
+                Coach
               </Button>
             </Link>
-            <h1 className="text-2xl font-bold text-white">AI Coach Dashboard</h1>
+            <h1 className="text-2xl font-bold text-white">Dryland Coach</h1>
             <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold)]/30">Premium</span>
-            <Link href="/coach-dryland" className="ml-auto">
-              <Button variant="outline" className="border-cyan-400/40 text-cyan-100 hover:bg-cyan-500/10">
-                Coach Dryland
-              </Button>
-            </Link>
           </div>
 
           {/* 1. Header "Pulse" */}
@@ -265,7 +292,7 @@ export default function Coach() {
                 </div>
                 <div className="flex-1">
                   <h2 className="text-xl font-bold text-white flex flex-wrap items-center gap-2">
-                    Analisi Completata
+                    Analisi Dryland Attiva
                     <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 whitespace-nowrap">
                       Active
                     </span>
@@ -299,15 +326,15 @@ export default function Coach() {
           </motion.div>
 
           <div className="grid lg:grid-cols-12 gap-8">
-            {/* 2. Colonna Sinistra: AI Insights */}
+            {/* 2. Colonna Sinistra: AI Insights Cardio & Forza */}
             <div className="lg:col-span-4 space-y-6">
               <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <Activity className="h-5 w-5 text-purple-400" />
-                Insights & Analisi
+                <Dumbbell className="h-5 w-5 text-[var(--gold)]" />
+                Insights Cardio & Forza
               </h3>
 
-              {insights.length ? (
-                insights.map((insight, idx) => (
+              {drylandInsights.length ? (
+                drylandInsights.map((insight, idx) => (
                   <motion.div
                     key={idx}
                     initial={{ opacity: 0, x: -20 }}
@@ -370,66 +397,62 @@ export default function Coach() {
                   </CardContent>
                 </Card>
               ) : null}
-
             </div>
 
-            {/* 3. Colonna Destra: Workout Plan */}
+            {/* 3. Colonna Destra: Dryland Workout */}
             <div className="lg:col-span-8 space-y-8">
-              {/* Pool Workout */}
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Waves className="h-5 w-5 text-cyan-400" />
-                    Allenamento in Vasca
+                    <Dumbbell className="h-5 w-5 text-[var(--gold)]" />
+                    Fuori Vasca (Dryland)
                   </h3>
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={handleRegeneratePool}
-                    disabled={poolRegenerate || poolWorkoutQuery.isFetching}
-                    className="text-cyan-200 hover:text-white hover:bg-white/10"
+                    onClick={handleRegenerateDryland}
+                    disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
+                    className="text-[var(--gold)] hover:text-white hover:bg-white/10"
                   >
-                    <RefreshCw className={`h-4 w-4 mr-2 ${poolRegenerate ? "animate-spin" : ""}`} />
+                    <RefreshCw className={`h-4 w-4 mr-2 ${dryRegenerate ? "animate-spin" : ""}`} />
                     Rigenera
                   </Button>
                 </div>
 
                 <Card className="bg-card/20 backdrop-blur-sm border-white/10 overflow-hidden">
-                  <div className="bg-gradient-to-r from-cyan-900/40 to-blue-900/40 p-6 border-b border-white/5">
-                    {poolWorkout ? (
+                  <div className="bg-gradient-to-r from-[var(--gold)]/20 to-amber-900/30 p-6 border-b border-white/5">
+                    {drylandWorkout ? (
                       <div className="flex flex-wrap justify-between items-center gap-4">
                         <div>
-                          <h2 className="text-2xl font-bold text-white mb-1">{poolWorkout.title}</h2>
-                          <div className="flex gap-4 text-sm text-cyan-200/80">
-                            <span className="flex items-center gap-1"><Timer className="h-4 w-4" /> {poolWorkout.duration}</span>
-                            <span className="flex items-center gap-1"><Waves className="h-4 w-4" /> {poolWorkout.description}</span>
+                          <h2 className="text-2xl font-bold text-white mb-1">{drylandWorkout.title}</h2>
+                          <div className="flex gap-4 text-sm text-[var(--gold)]/80">
+                            <span className="flex items-center gap-1"><Timer className="h-4 w-4" /> {drylandWorkout.duration}</span>
+                            <span className="flex items-center gap-1"><Flame className="h-4 w-4" /> {drylandWorkout.description}</span>
                           </div>
                         </div>
-                        <div className="px-4 py-2 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 font-bold text-sm uppercase tracking-wide">
-                          {poolWorkout.difficulty}
+                        <div className="px-4 py-2 bg-red-500/20 border border-red-500/30 rounded-lg text-red-300 font-bold text-sm uppercase tracking-wide">
+                          {drylandWorkout.difficulty}
                         </div>
                       </div>
                     ) : (
-                      <div className="text-white/70">Allenamento in vasca non disponibile.</div>
+                      <div className="text-white/70">Allenamento dryland non disponibile.</div>
                     )}
                   </div>
 
                   <CardContent className="p-0">
-                    {poolWorkoutQuery.isFetching && (
+                    {drylandWorkoutQuery.isFetching && (
                       <div className="p-5 text-white/60">Sto preparando l'allenamento...</div>
                     )}
-                    {poolWorkoutQuery.isError && (
+                    {drylandWorkoutQuery.isError && (
                       <div className="p-5 text-red-300">Errore nel caricamento dell'allenamento.</div>
                     )}
-                    {poolWorkout?.sections?.map((section, idx) => {
+                    {drylandWorkout?.sections?.map((section, idx) => {
                       const sectionLabel = formatSectionTitle(section.title);
                       const pillClass = getSectionPillClass(section.title);
                       return (
                         <div
                           key={idx}
-                          className={`p-4 md:p-5 border-b border-white/5 last:border-0 flex flex-col sm:flex-row gap-3 sm:gap-4 hover:bg-white/5 transition-colors ${
-                            section.title.toLowerCase().includes("main") ? "bg-cyan-500/5" : ""
-                          }`}
+                          className="p-4 md:p-5 border-b border-white/5 last:border-0 flex flex-col sm:flex-row gap-3 sm:gap-4 hover:bg-white/5 transition-colors"
                         >
                           <div className="w-full sm:w-56 lg:w-64 flex-shrink-0">
                             <span className={`inline-flex text-xs font-semibold tracking-wide px-2 py-1 rounded ${pillClass} leading-snug break-words`}>
@@ -450,7 +473,6 @@ export default function Coach() {
                                         ))}
                                       </div>
                                     ) : null}
-
                                     {exercise.notes && (
                                       <div className="mt-2 text-xs text-cyan-100/80">💡 {exercise.notes}</div>
                                     )}
@@ -466,10 +488,16 @@ export default function Coach() {
                         </div>
                       );
                     })}
+
+                    {drylandWorkout ? (
+                      <div className="p-5 border-t border-white/5 bg-white/5">
+                        <div className="text-xs uppercase tracking-wider text-[var(--gold)] mb-2">Nota Coach Dryland</div>
+                        {renderCoachNotes(drylandWorkout.coachNotes)}
+                      </div>
+                    ) : null}
                   </CardContent>
                 </Card>
               </div>
-
             </div>
           </div>
         </div>

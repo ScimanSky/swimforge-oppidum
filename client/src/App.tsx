@@ -14,6 +14,7 @@ import Activities from "./pages/Activities";
 import Profile from "./pages/Profile";
 import Statistics from "./pages/Statistics";
 import Coach from "./pages/Coach";
+import CoachDryland from "./pages/CoachDryland";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import StravaConnect from "./pages/StravaConnect";
@@ -38,6 +39,7 @@ function Router() {
       <Route path="/activities" component={Activities} />
       <Route path="/statistics" component={Statistics} />
       <Route path="/coach" component={Coach} />
+      <Route path="/coach-dryland" component={CoachDryland} />
       <Route path="/profile" component={Profile} />
       <Route path="/settings" component={Settings} />
       <Route path="/404" component={NotFound} />
