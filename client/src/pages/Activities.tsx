@@ -316,11 +316,11 @@ export default function Activities() {
 
       <main className="container py-6 space-y-4">
         {/* Filters */}
-        <div className="grid gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="space-y-1.5">
-            <Label>Fonte</Label>
+            <Label className="text-xs sm:text-sm">Fonte</Label>
             <Select value={source} onValueChange={(v) => setSource(v as any)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-9">
                 <SelectValue placeholder="Tutte" />
               </SelectTrigger>
               <SelectContent>
@@ -333,9 +333,9 @@ export default function Activities() {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Tipo</Label>
+            <Label className="text-xs sm:text-sm">Tipo</Label>
             <Select value={openWater} onValueChange={(v) => setOpenWater(v as any)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-9">
                 <SelectValue placeholder="Tutte" />
               </SelectTrigger>
               <SelectContent>
@@ -347,9 +347,9 @@ export default function Activities() {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Stile</Label>
+            <Label className="text-xs sm:text-sm">Stile</Label>
             <Select value={strokeTypeFilter} onValueChange={(v) => setStrokeTypeFilter(v as any)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-9">
                 <SelectValue placeholder="Tutti" />
               </SelectTrigger>
               <SelectContent>
@@ -364,9 +364,9 @@ export default function Activities() {
           </div>
 
           <div className="space-y-1.5">
-            <Label>Distanza</Label>
+            <Label className="text-xs sm:text-sm">Distanza</Label>
             <Select value={distanceFilter} onValueChange={(v) => setDistanceFilter(v as any)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-9">
                 <SelectValue placeholder="Tutte" />
               </SelectTrigger>
               <SelectContent>
