@@ -54,8 +54,8 @@ export function BubbleAnimation({
   return (
     <div className={`absolute inset-0 overflow-hidden pointer-events-none ${className}`}>
       {[...Array(count)].map((_, i) => {
-        // Randomize bubble size (2px to 8px)
-        const size = 2 + Math.random() * 6;
+        // Randomize bubble size (4px to 14px) for better visibility
+        const size = 4 + Math.random() * 10;
         
         return (
           <motion.div
