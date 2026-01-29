@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import MobileNav from "@/components/MobileNav";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -35,6 +35,13 @@ const PACE_COLORS = ["#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1", "#8b5cf6"];
 
 function MetricInfoButton({ info }: { info: any }) {
   const [open, setOpen] = useState(false);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (open && contentRef.current) {
+      contentRef.current.scrollTop = 0;
+    }
+  }, [open]);
 
   return (
     <>
@@ -56,6 +63,7 @@ function MetricInfoButton({ info }: { info: any }) {
               background: "oklch(0.15 0.03 250)",
               border: "1px solid oklch(0.25 0.03 250)",
             }}
+            ref={contentRef}
             onClick={(e) => e.stopPropagation()}
           >
             <div
@@ -490,8 +498,8 @@ export default function Statistics() {
               transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
             >
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold text-[oklch(0.85_0.05_220)]">
-                  ━━━ PROGRESS TIMELINE ━━━
+                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[oklch(0.70_0.08_220)]">
+                  Progress Timeline
                 </h2>
                 <div className="group relative">
                   <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)] cursor-help" />
@@ -555,8 +563,8 @@ export default function Statistics() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
             >
-              <h2 className="text-lg font-semibold text-[oklch(0.85_0.05_220)]">
-                ━━━ ANALISI PRESTAZIONI ━━━
+              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[oklch(0.70_0.08_220)]">
+                Analisi Prestazioni
               </h2>
 
               {/* HR Zones */}
@@ -711,8 +719,8 @@ export default function Statistics() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
               >
-                <h2 className="text-lg font-semibold text-[oklch(0.85_0.05_220)]">
-                  ━━━ ANALISI AVANZATE ━━━
+                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[oklch(0.70_0.08_220)]">
+                  Analisi Avanzate
                 </h2>
 
                 {/* Core Rings */}
@@ -740,8 +748,8 @@ export default function Statistics() {
 
                 {/* Advanced Swimming Metrics */}
                 <div className="space-y-3">
-                  <h3 className="text-md font-semibold text-[oklch(0.80_0.05_220)]">
-                    🏊 Metriche Avanzate
+                  <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-[oklch(0.70_0.08_220)]">
+                    Metriche Avanzate
                   </h3>
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                     <RingMetric
