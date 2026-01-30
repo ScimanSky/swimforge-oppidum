@@ -163,7 +163,7 @@ export default function Home() {
               />
               <div className="h-32 w-32 md:h-48 md:w-48 rounded-full bg-white/5 flex items-center justify-center relative z-10 shadow-[0_0_40px_rgba(14,165,233,0.35)] border border-white/20 backdrop-blur-md overflow-hidden">
                 <img 
-                  src="/images/logo.svg" 
+                  src="/swimforge-logo.png" 
                   alt="SwimForge Logo" 
                   className="w-full h-full object-contain p-2"
                 />
@@ -864,8 +864,8 @@ export default function Home() {
         <div className="container">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center">
-                <Waves className="h-4 w-4 text-white" />
+              <div className="h-10 w-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden">
+                <img src="/swimforge-logo.png" alt="SwimForge Logo" className="w-full h-full object-contain p-1" />
               </div>
               <span className="text-sm text-muted-foreground font-medium">
                 SwimForge © {new Date().getFullYear()}
