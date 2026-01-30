@@ -49,31 +49,80 @@ function extractRawActivity(rawData: any) {
 }
 
 function normalizeActivity(activity: any) {
-  const raw = extractRawActivity(activity.rawData);
-  const distanceMeters = activity.distanceMeters ?? raw?.distance ?? null;
+  const rawData = activity.rawData ?? activity.raw_data ?? null;
+  const raw = extractRawActivity(rawData);
+  const distanceMeters =
+    activity.distanceMeters ?? activity.distance_meters ?? raw?.distance ?? null;
   const durationSeconds =
-    activity.durationSeconds ?? raw?.movingDuration ?? raw?.duration ?? null;
+    activity.durationSeconds ??
+    activity.duration_seconds ??
+    raw?.movingDuration ??
+    raw?.duration ??
+    null;
   const avgPacePer100m =
     activity.avgPacePer100m ??
+    activity.avg_pace_per_100m ??
     (distanceMeters && durationSeconds ? (durationSeconds / distanceMeters) * 100 : null);
 
-  const avgHeartRate = activity.avgHeartRate ?? raw?.averageHR ?? raw?.avgHeartRate ?? raw?.average_heartrate ?? null;
-  const maxHeartRate = activity.maxHeartRate ?? raw?.maxHR ?? raw?.maxHeartRate ?? raw?.max_heartrate ?? null;
-  const avgSwolf = activity.avgSwolf ?? raw?.averageSwolf ?? raw?.avgSwolf ?? raw?.swolf ?? null;
+  const avgHeartRate =
+    activity.avgHeartRate ??
+    activity.avg_heart_rate ??
+    raw?.averageHR ??
+    raw?.avgHeartRate ??
+    raw?.average_heartrate ??
+    null;
+  const maxHeartRate =
+    activity.maxHeartRate ??
+    activity.max_heart_rate ??
+    raw?.maxHR ??
+    raw?.maxHeartRate ??
+    raw?.max_heartrate ??
+    null;
+  const avgSwolf =
+    activity.avgSwolf ??
+    activity.swolf_score ??
+    raw?.averageSwolf ??
+    raw?.avgSwolf ??
+    raw?.swolf ??
+    null;
   const avgStrokeCadence =
-    activity.avgStrokeCadence ?? raw?.averageSwimCadenceInStrokesPerMinute ?? raw?.avgStrokeCadenceRpm ?? raw?.avgStrokeCadence ?? null;
-  const avgStrokeDistance = activity.avgStrokeDistance ?? raw?.avgStrokeDistance ?? null;
-  const trainingEffect = activity.trainingEffect ?? raw?.aerobicTrainingEffect ?? null;
-  const anaerobicTrainingEffect = activity.anaerobicTrainingEffect ?? raw?.anaerobicTrainingEffect ?? null;
-  const vo2MaxValue = activity.vo2MaxValue ?? raw?.vO2MaxValue ?? raw?.vo2_max_value ?? null;
+    activity.avgStrokeCadence ??
+    activity.avg_stroke_cadence ??
+    raw?.averageSwimCadenceInStrokesPerMinute ??
+    raw?.avgStrokeCadenceRpm ??
+    raw?.avgStrokeCadence ??
+    null;
+  const avgStrokeDistance =
+    activity.avgStrokeDistance ??
+    activity.avg_stroke_distance ??
+    raw?.avgStrokeDistance ??
+    null;
+  const trainingEffect =
+    activity.trainingEffect ??
+    activity.training_effect ??
+    raw?.aerobicTrainingEffect ??
+    null;
+  const anaerobicTrainingEffect =
+    activity.anaerobicTrainingEffect ??
+    activity.anaerobic_training_effect ??
+    raw?.anaerobicTrainingEffect ??
+    null;
+  const vo2MaxValue =
+    activity.vo2MaxValue ??
+    activity.vo2_max_value ??
+    raw?.vO2MaxValue ??
+    raw?.vo2_max_value ??
+    null;
 
   const isOpenWater =
     activity.isOpenWater ??
+    activity.is_open_water ??
     (typeof raw?.activityType?.typeKey === "string" &&
       raw.activityType.typeKey.toLowerCase().includes("open_water"));
 
   const strokeType =
     activity.strokeType ??
+    activity.stroke_type ??
     (typeof raw?.activityName === "string" ? raw.activityName : null) ??
     "n/d";
 
