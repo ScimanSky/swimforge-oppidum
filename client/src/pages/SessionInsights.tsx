@@ -44,11 +44,17 @@ export default function SessionInsights() {
 
   const insights = useMemo(() => {
     const data = listQuery.data ?? [];
-    return [...data].sort((a: any, b: any) => {
-      const aDate = new Date(a.generated_at ?? a.activity_date ?? 0).getTime();
-      const bDate = new Date(b.generated_at ?? b.activity_date ?? 0).getTime();
-      return bDate - aDate;
-    });
+    const getTs = (item: any) => {
+      const raw =
+        item.generated_at ??
+        item.generatedAt ??
+        item.activity_date ??
+        item.activityDate ??
+        0;
+      const ts = new Date(raw).getTime();
+      return Number.isFinite(ts) ? ts : 0;
+    };
+    return [...data].sort((a: any, b: any) => getTs(b) - getTs(a));
   }, [listQuery.data]);
 
   return (
