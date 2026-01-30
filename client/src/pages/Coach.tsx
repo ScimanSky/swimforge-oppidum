@@ -258,6 +258,16 @@ export default function Coach() {
                   <h2 className="text-xl font-bold text-white mb-2">
                     Livello {profile.aiSkillLabel ?? "aggiornato"}
                   </h2>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-white/60 mb-3">
+                    <span className="px-2 py-0.5 rounded-full bg-white/10 border border-white/10">
+                      Stima AI settimanale
+                    </span>
+                    {profile.aiSkillConfidence !== null && profile.aiSkillConfidence !== undefined && (
+                      <span className="px-2 py-0.5 rounded-full bg-white/10 border border-white/10">
+                        Confidenza {profile.aiSkillConfidence}%
+                      </span>
+                    )}
+                  </div>
                   <p className="text-white/70 text-sm leading-relaxed mb-4">
                     {profile.aiSkillMessage ??
                       "Il tuo livello stimato è stato aggiornato in base alle ultime sessioni."}

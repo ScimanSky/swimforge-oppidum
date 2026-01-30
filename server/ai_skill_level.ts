@@ -16,13 +16,13 @@ const LEVEL_LABELS: Record<number, string> = {
 };
 
 const BASE_THRESHOLDS_100 = [
-  { level: 7, max: 66 }, // < 1'07"
-  { level: 6, max: 71 }, // 1'07"-1'11"
-  { level: 5, max: 77 }, // 1'12"-1'17"
-  { level: 4, max: 83 }, // 1'18"-1'23"
-  { level: 3, max: 89 }, // 1'24"-1'29"
-  { level: 2, max: 99 }, // 1'30"-1'39"
-  { level: 1, max: 9999 }, // > 1'40"
+  { level: 7, max: 64 }, // < 1'05"
+  { level: 6, max: 69 }, // 1'05"-1'09"
+  { level: 5, max: 75 }, // 1'10"-1'15"
+  { level: 4, max: 82 }, // 1'16"-1'22"
+  { level: 3, max: 90 }, // 1'23"-1'30"
+  { level: 2, max: 102 }, // 1'31"-1'42"
+  { level: 1, max: 9999 }, // > 1'42"
 ];
 
 const SWOLF_THRESHOLDS = [
@@ -36,9 +36,9 @@ const SWOLF_THRESHOLDS = [
 ];
 
 const TRAINING_MULTIPLIERS: Record<IntensityBand, number> = {
-  low: 1.25,
-  medium: 1.15,
-  high: 1.08,
+  low: 1.12,
+  medium: 1.08,
+  high: 1.04,
 };
 
 function extractRawActivity(rawData: any) {
@@ -128,12 +128,12 @@ function clampLevel(level: number) {
 
 function buildMessage(change: "promoted" | "demoted" | "unchanged", label: string) {
   if (change === "promoted") {
-    return `Complimenti! La tua performance media ti colloca ora in fascia ${label}. Continua così: stai consolidando un livello superiore.`;
+    return `Stima aggiornata: i dati di allenamento indicano una fascia ${label}. Continua così, stai consolidando un livello superiore.`;
   }
   if (change === "demoted") {
-    return `Nessun problema: la stima attuale ti colloca in fascia ${label}. Focalizzati su continuità e tecnica per risalire.`;
+    return `Stima aggiornata: i dati di allenamento ti collocano in fascia ${label}. Focalizzati su continuità e tecnica per risalire.`;
   }
-  return `Stima stabile: resti in fascia ${label}. Ottimo equilibrio tra qualità e costanza.`;
+  return `Stima stabile: resti in fascia ${label}. Buon equilibrio tra qualità e costanza in allenamento.`;
 }
 
 export async function evaluateUserSkillLevel(userId: number) {
@@ -185,9 +185,14 @@ export async function evaluateUserSkillLevel(userId: number) {
   const swolfLevel = swolfMedian ? getLevelFromSwolf(swolfMedian) : timeLevel;
 
   const blended = Math.round(timeLevel * 0.7 + swolfLevel * 0.3);
-  const newLevel = clampLevel(blended);
+  let newLevel = clampLevel(blended);
 
   const currentLevel = currentProfile.aiSkillLevel ?? null;
+  if (currentLevel !== null) {
+    if (newLevel > currentLevel + 1) newLevel = currentLevel + 1;
+    if (newLevel < currentLevel - 1) newLevel = currentLevel - 1;
+  }
+
   const change: "promoted" | "demoted" | "unchanged" =
     currentLevel === null
       ? "promoted"
