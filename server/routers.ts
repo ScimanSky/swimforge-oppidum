@@ -480,6 +480,7 @@ export const appRouter = router({
       return allBadges.map(badge => {
         const earned = earnedBadgeIds.has(badge.id);
         let progress = 0;
+        const bestSessionKm = longestSessionMeters / 1000;
         
         if (!earned && profile) {
           switch (badge.requirementType) {
@@ -487,7 +488,7 @@ export const appRouter = router({
               progress = Math.min(100, (profile.totalDistanceMeters / 1000 / badge.requirementValue) * 100);
               break;
             case "single_session_distance_km":
-              progress = Math.min(100, (longestSessionMeters / 1000 / badge.requirementValue) * 100);
+              progress = Math.min(100, (bestSessionKm / badge.requirementValue) * 100);
               break;
             case "total_sessions":
               progress = Math.min(100, (profile.totalSessions / badge.requirementValue) * 100);
@@ -516,6 +517,7 @@ export const appRouter = router({
           earned,
           progress: earned ? 100 : Math.floor(progress),
           earnedAt: userBadges.find(ub => ub.badge.id === badge.id)?.userBadge.earnedAt,
+          bestSessionKm: badge.requirementType === "single_session_distance_km" ? bestSessionKm : undefined,
         };
       });
     }),

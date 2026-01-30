@@ -521,9 +521,15 @@ export default function Badges() {
                     {selectedBadge.rarity === 'legendary' && <Sparkles className="w-3 h-3" />}
                   </span>
                   
-                  <p className="text-[oklch(0.70_0.03_220)] text-sm mb-4">
+                  <p className="text-[oklch(0.70_0.03_220)] text-sm mb-2">
                     {selectedBadge.description}
                   </p>
+                  {selectedBadge.requirementType === "single_session_distance_km" &&
+                    typeof selectedBadge.bestSessionKm === "number" && (
+                      <p className="text-[oklch(0.55_0.03_220)] text-xs mb-3">
+                        Miglior sessione: {selectedBadge.bestSessionKm.toFixed(2)} km
+                      </p>
+                    )}
 
                   {/* Progress or Earned Date */}
                   {selectedBadge.earned ? (
