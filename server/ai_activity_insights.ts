@@ -282,7 +282,7 @@ export async function listActivityInsights(userId: number, limit = 20, offset = 
     FROM activity_ai_insights i
     LEFT JOIN swimming_activities a ON a.id = i.activity_id
     WHERE i.user_id = ${userId}
-    ORDER BY i.generated_at DESC
+    ORDER BY a.activity_date DESC NULLS LAST, i.generated_at DESC
     LIMIT ${limit}
     OFFSET ${offset}
   `);
