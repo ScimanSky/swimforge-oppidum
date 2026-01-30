@@ -18,6 +18,7 @@ import type { Request, Response } from "express";
 import { loginLimiter, registrationLimiter } from "./middleware/security";
 import { getOrSetCached, cacheKeys, CACHE_TTL } from "./lib/cache";
 import { addComment, getComments, getSocialFeed, setActivityShare, toggleSplash, upsertActivityPost } from "./db_social";
+import { getPendingActivityInsights, markActivityInsightSeen } from "./ai_activity_insights";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -1015,6 +1016,21 @@ export const appRouter = router({
       .query(async ({ ctx, input }) => {
         const { getOrGenerateWorkout } = await import("./ai_coach");
         return await getOrGenerateWorkout(ctx.user.id, "dryland", input.forceRegenerate);
+      }),
+  }),
+
+  activityInsights: router({
+    pending: protectedProcedure
+      .input(z.object({ limit: z.number().min(1).max(5).optional() }).optional())
+      .query(async ({ ctx, input }) => {
+        const limit = input?.limit ?? 3;
+        return getPendingActivityInsights(ctx.user.id, limit);
+      }),
+    markSeen: protectedProcedure
+      .input(z.object({ activityId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await markActivityInsightSeen(ctx.user.id, input.activityId);
+        return { success: true };
       }),
   }),
 });

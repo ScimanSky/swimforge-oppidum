@@ -23,6 +23,7 @@ import Settings from "./pages/Settings";
 import BadgeUnlockNotification from "./components/BadgeUnlockNotification";
 import { useBadgeNotifications } from "./hooks/useBadgeNotifications";
 import AutoSync from "./components/AutoSync";
+import ActivityInsightNotification from "./components/ActivityInsightNotification";
 
 function Router() {
   return (
@@ -60,6 +61,7 @@ function App() {
           <Toaster richColors position="top-center" />
           <AutoSync />
           <Router />
+          <ActivityInsightNotification />
           {isShowing && pendingBadges.length > 0 && (
             <BadgeUnlockNotification
               badges={pendingBadges}

@@ -292,6 +292,21 @@ export const aiInsightsCache = pgTable("ai_insights_cache", {
 });
 
 // ============================================
+// ACTIVITY AI INSIGHTS (single-session analysis)
+// ============================================
+export const activityAiInsights = pgTable("activity_ai_insights", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  activityId: integer("activity_id").notNull().unique(),
+  title: text("title").notNull(),
+  summary: text("summary").notNull(),
+  bullets: json("bullets").notNull(),
+  tags: json("tags").notNull(),
+  generatedAt: timestamp("generated_at").defaultNow().notNull(),
+  seenAt: timestamp("seen_at"),
+});
+
+// ============================================
 // AI COACH WORKOUTS CACHE
 // ============================================
 export const aiCoachWorkouts = pgTable("ai_coach_workouts", {
@@ -326,5 +341,7 @@ export type LevelThreshold = typeof levelThresholds.$inferSelect;
 export type WeeklyStats = typeof weeklyStats.$inferSelect;
 export type AiInsightsCache = typeof aiInsightsCache.$inferSelect;
 export type InsertAiInsightsCache = typeof aiInsightsCache.$inferInsert;
+export type ActivityAiInsight = typeof activityAiInsights.$inferSelect;
+export type InsertActivityAiInsight = typeof activityAiInsights.$inferInsert;
 export type AiCoachWorkout = typeof aiCoachWorkouts.$inferSelect;
 export type InsertAiCoachWorkout = typeof aiCoachWorkouts.$inferInsert;
