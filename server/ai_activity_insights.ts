@@ -42,11 +42,69 @@ function formatRawData(rawData: unknown) {
   }
 }
 
+function extractRawActivity(rawData: any) {
+  if (!rawData) return null;
+  if (rawData.activity) return rawData.activity;
+  return rawData;
+}
+
+function normalizeActivity(activity: any) {
+  const raw = extractRawActivity(activity.rawData);
+  const distanceMeters = activity.distanceMeters ?? raw?.distance ?? null;
+  const durationSeconds =
+    activity.durationSeconds ?? raw?.movingDuration ?? raw?.duration ?? null;
+  const avgPacePer100m =
+    activity.avgPacePer100m ??
+    (distanceMeters && durationSeconds ? (durationSeconds / distanceMeters) * 100 : null);
+
+  const avgHeartRate = activity.avgHeartRate ?? raw?.averageHR ?? raw?.avgHeartRate ?? raw?.average_heartrate ?? null;
+  const maxHeartRate = activity.maxHeartRate ?? raw?.maxHR ?? raw?.maxHeartRate ?? raw?.max_heartrate ?? null;
+  const avgSwolf = activity.avgSwolf ?? raw?.averageSwolf ?? raw?.avgSwolf ?? raw?.swolf ?? null;
+  const avgStrokeCadence =
+    activity.avgStrokeCadence ?? raw?.averageSwimCadenceInStrokesPerMinute ?? raw?.avgStrokeCadenceRpm ?? raw?.avgStrokeCadence ?? null;
+  const avgStrokeDistance = activity.avgStrokeDistance ?? raw?.avgStrokeDistance ?? null;
+  const trainingEffect = activity.trainingEffect ?? raw?.aerobicTrainingEffect ?? null;
+  const anaerobicTrainingEffect = activity.anaerobicTrainingEffect ?? raw?.anaerobicTrainingEffect ?? null;
+  const vo2MaxValue = activity.vo2MaxValue ?? raw?.vO2MaxValue ?? raw?.vo2_max_value ?? null;
+
+  const isOpenWater =
+    activity.isOpenWater ??
+    (typeof raw?.activityType?.typeKey === "string" &&
+      raw.activityType.typeKey.toLowerCase().includes("open_water"));
+
+  const strokeType =
+    activity.strokeType ??
+    (typeof raw?.activityName === "string" ? raw.activityName : null) ??
+    "n/d";
+
+  return {
+    distanceMeters,
+    durationSeconds,
+    avgPacePer100m,
+    avgHeartRate,
+    maxHeartRate,
+    avgSwolf,
+    avgStrokeCadence,
+    avgStrokeDistance,
+    trainingEffect,
+    anaerobicTrainingEffect,
+    vo2MaxValue,
+    isOpenWater,
+    strokeType,
+    raw,
+  };
+}
+
 export async function generateActivityInsight(activity: any) {
   const client = getGeminiClient();
   if (!client) return null;
 
   const model = client.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const normalized = normalizeActivity(activity);
+
+  if (!normalized.distanceMeters && !normalized.durationSeconds) {
+    return null;
+  }
 
   const prompt = `Sei un analista di performance di nuoto. Analizza UNA singola sessione.
 
@@ -59,20 +117,20 @@ REGOLE:
 - Se possibile, deduci 1-2 metriche derivate basate SOLO sui dati della sessione (es: efficienza, intensità, coerenza ritmo).
 
 DATI SESSIONE:
-- Distanza: ${activity.distanceMeters} m
-- Durata: ${activity.durationSeconds} s
-- Pace medio: ${formatPace(activity.avgPacePer100m)}
-- Stroke: ${activity.strokeType || "n/d"}
-- Open water: ${activity.isOpenWater ? "sì" : "no"}
-- HR medio: ${activity.avgHeartRate ?? "n/d"}
-- HR max: ${activity.maxHeartRate ?? "n/d"}
-- SWOLF medio: ${activity.avgSwolf ?? "n/d"}
-- Stroke cadence: ${activity.avgStrokeCadence ?? "n/d"}
-- Stroke distance: ${activity.avgStrokeDistance ?? "n/d"}
-- Training effect: ${activity.trainingEffect ?? "n/d"}
-- Anaerobic TE: ${activity.anaerobicTrainingEffect ?? "n/d"}
-- VO2max: ${activity.vo2MaxValue ?? "n/d"}
-- Raw data (JSON): ${formatRawData(activity.rawData)}
+- Distanza: ${normalized.distanceMeters ?? "n/d"} m
+- Durata: ${normalized.durationSeconds ?? "n/d"} s
+- Pace medio: ${formatPace(normalized.avgPacePer100m)}
+- Stroke: ${normalized.strokeType || "n/d"}
+- Open water: ${normalized.isOpenWater ? "sì" : "no"}
+- HR medio: ${normalized.avgHeartRate ?? "n/d"}
+- HR max: ${normalized.maxHeartRate ?? "n/d"}
+- SWOLF medio: ${normalized.avgSwolf ?? "n/d"}
+- Stroke cadence: ${normalized.avgStrokeCadence ?? "n/d"}
+- Stroke distance: ${normalized.avgStrokeDistance ?? "n/d"}
+- Training effect: ${normalized.trainingEffect ?? "n/d"}
+- Anaerobic TE: ${normalized.anaerobicTrainingEffect ?? "n/d"}
+- VO2max: ${normalized.vo2MaxValue ?? "n/d"}
+- Raw data (JSON): ${formatRawData(normalized.raw)}
 
 FORMAT JSON richiesto:
 {
