@@ -140,6 +140,14 @@ export async function evaluateUserSkillLevel(userId: number) {
   const db = await getDb();
   if (!db) return null;
 
+  const [countRow] = await db
+    .select({ total: sql<number>`count(*)` })
+    .from(swimmingActivities)
+    .where(eq(swimmingActivities.userId, userId));
+
+  const totalSessions = Number(countRow?.total ?? 0);
+  const maxAllowedLevel = totalSessions < 30 ? 4 : 7;
+
   const profile = await db
     .select()
     .from(swimmerProfiles)
@@ -185,7 +193,7 @@ export async function evaluateUserSkillLevel(userId: number) {
   const swolfLevel = swolfMedian ? getLevelFromSwolf(swolfMedian) : timeLevel;
 
   const blended = Math.round(timeLevel * 0.7 + swolfLevel * 0.3);
-  let newLevel = clampLevel(blended);
+  let newLevel = clampLevel(Math.min(blended, maxAllowedLevel));
 
   const currentLevel = currentProfile.aiSkillLevel ?? null;
   if (currentLevel !== null) {
