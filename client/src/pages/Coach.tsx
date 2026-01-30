@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Link } from "wouter";
@@ -18,6 +18,7 @@ import {
 import { trpc } from "../lib/trpc";
 import MobileNav from "@/components/MobileNav";
 import { AppLayout } from "@/components/AppLayout";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 type WorkoutSection = {
   title: string;
@@ -57,6 +58,7 @@ type InsightItem = {
 export default function Coach() {
   const [poolRegenerate, setPoolRegenerate] = useState(false);
   const [insightsRefreshing, setInsightsRefreshing] = useState(false);
+  const [showSkillModal, setShowSkillModal] = useState(false);
 
   const poolWorkoutQuery = trpc.aiCoach.getPoolWorkout.useQuery(
     { forceRegenerate: poolRegenerate },
@@ -64,6 +66,8 @@ export default function Coach() {
       staleTime: poolRegenerate ? 0 : 1000 * 60 * 60 * 24,
     }
   );
+  const { user } = useAuth();
+  const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 60 * 1000 });
   const pendingSessionInsights = trpc.activityInsights.pending.useQuery(
     { limit: 3 },
     { staleTime: 60 * 1000 }
@@ -83,6 +87,17 @@ export default function Coach() {
   const { data: stravaStatus } = trpc.strava.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
 
   const poolWorkout = poolWorkoutQuery.data as GeneratedWorkout | undefined;
+  const profile = profileQuery.data as any;
+
+  useEffect(() => {
+    if (!profile || !user) return;
+    if (!profile.aiSkillLastEvaluatedAt) return;
+    const change = profile.aiSkillChange;
+    if (!change || change === "unchanged") return;
+    const key = `aiSkillSeen:${user.id}:${profile.aiSkillLastEvaluatedAt}`;
+    if (localStorage.getItem(key)) return;
+    setShowSkillModal(true);
+  }, [profile, user]);
 
   const lastSyncDate = useMemo(() => {
     const garmin = garminStatus?.lastSync ? new Date(garminStatus.lastSync) : null;
@@ -234,6 +249,33 @@ export default function Coach() {
         </div>
 
         <div className="container py-8 md:py-12">
+          {showSkillModal && profile && user && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+              <div className="relative max-w-lg w-full mx-4">
+                <div className="absolute inset-0 bg-gradient-to-br from-[var(--gold)]/20 via-cyan-500/10 to-purple-500/20 rounded-3xl blur-2xl" />
+                <div className="relative bg-gradient-to-br from-[oklch(0.23_0.07_220)] to-[oklch(0.12_0.05_220)] rounded-3xl p-6 border border-[var(--gold)]/30 shadow-2xl">
+                  <div className="text-xs uppercase tracking-wider text-[var(--gold)] mb-2">Coach Update</div>
+                  <h2 className="text-xl font-bold text-white mb-2">
+                    Livello {profile.aiSkillLabel ?? "aggiornato"}
+                  </h2>
+                  <p className="text-white/70 text-sm leading-relaxed mb-4">
+                    {profile.aiSkillMessage ??
+                      "Il tuo livello stimato è stato aggiornato in base alle ultime sessioni."}
+                  </p>
+                  <Button
+                    className="w-full bg-[var(--gold)] text-[var(--navy)] hover:bg-[var(--gold-light)]"
+                    onClick={() => {
+                      const key = `aiSkillSeen:${user.id}:${profile.aiSkillLastEvaluatedAt}`;
+                      localStorage.setItem(key, "1");
+                      setShowSkillModal(false);
+                    }}
+                  >
+                    Continua
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
           {/* Navigation & Header */}
           <div className="flex flex-col gap-3 mb-8 md:flex-row md:items-center md:gap-4">
             <div className="flex items-center gap-3">

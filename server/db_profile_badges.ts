@@ -61,6 +61,25 @@ export async function updateUserProfileBadge(userId: number, totalXP: number): P
   `);
 }
 
+export async function updateUserProfileBadgeByLevel(userId: number, badgeLevel: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  const badgeResult = await db.execute(sql`
+    SELECT id FROM profile_badges WHERE level = ${badgeLevel}
+  `);
+
+  if (badgeResult.rows.length === 0) return;
+
+  const badgeId = (badgeResult.rows[0] as any).id;
+
+  await db.execute(sql`
+    UPDATE swimmer_profiles
+    SET profile_badge_id = ${badgeId}
+    WHERE user_id = ${userId}
+  `);
+}
+
 /**
  * Get profile badge info for a user
  */

@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { completeChallenges } from "../cron_challenges";
+import { evaluateAllUsersWeekly } from "../ai_skill_level";
 import { setupSwagger } from "../swagger-setup";
 import { connectRedis } from "../lib/cache";
 import { assertAuthEnv } from "./env";
@@ -94,6 +95,28 @@ async function startServer() {
       return res.json({ success: true, ...result });
     } catch (error: any) {
       console.error("[Cron] Failed to complete challenges:", error);
+      return res.status(500).json({ success: false, error: "Cron execution failed" });
+    }
+  });
+
+  // Weekly AI skill level evaluation
+  app.post("/api/cron/evaluate-skill-level", async (req, res) => {
+    const cronSecret = process.env.CRON_SECRET;
+    if (process.env.NODE_ENV === "production" && !cronSecret) {
+      return res.status(503).json({ success: false, error: "CRON_SECRET not configured" });
+    }
+
+    const authHeader = req.headers["authorization"];
+    const token = authHeader?.toString().replace(/^Bearer\s+/i, "");
+    if (process.env.NODE_ENV === "production" && token !== cronSecret) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
+    try {
+      const result = await evaluateAllUsersWeekly();
+      return res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error("[Cron] Failed to evaluate skill level:", error);
       return res.status(500).json({ success: false, error: "Cron execution failed" });
     }
   });

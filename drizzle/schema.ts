@@ -45,6 +45,12 @@ export const swimmerProfiles = pgTable("swimmer_profiles", {
   garminLastSync: timestamp("garmin_last_sync"),
   lastGarminSyncAt: timestamp("last_garmin_sync_at"),
   stravaConnected: boolean("strava_connected").default(false).notNull(),
+  aiSkillLevel: integer("ai_skill_level"),
+  aiSkillLabel: text("ai_skill_label"),
+  aiSkillConfidence: integer("ai_skill_confidence"),
+  aiSkillLastEvaluatedAt: timestamp("ai_skill_last_evaluated_at"),
+  aiSkillChange: text("ai_skill_change"),
+  aiSkillMessage: text("ai_skill_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
