@@ -57,6 +57,7 @@ interface GarminServiceActivity {
   hr_zone_3_seconds?: number;
   hr_zone_4_seconds?: number;
   hr_zone_5_seconds?: number;
+  raw_data?: unknown;
 }
 
 interface GarminServiceResponse {
@@ -548,6 +549,7 @@ export async function syncGarminActivities(
         hrZone3Seconds: activity.hr_zone_3_seconds ? Math.round(activity.hr_zone_3_seconds) : undefined,
         hrZone4Seconds: activity.hr_zone_4_seconds ? Math.round(activity.hr_zone_4_seconds) : undefined,
         hrZone5Seconds: activity.hr_zone_5_seconds ? Math.round(activity.hr_zone_5_seconds) : undefined,
+        rawData: activity.raw_data ?? undefined,
         xpEarned: activityXp,
       });
 

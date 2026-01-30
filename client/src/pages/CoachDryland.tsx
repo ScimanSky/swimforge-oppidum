@@ -276,11 +276,18 @@ export default function CoachDryland() {
                 <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold)]/30">Premium</span>
               </div>
             </div>
-            <Link href="/coach" className="md:ml-auto w-full md:w-auto">
-              <Button variant="outline" className="w-full md:w-auto border-cyan-400/40 text-cyan-100 hover:bg-cyan-500/10">
-                Allenamento in Vasca
-              </Button>
-            </Link>
+            <div className="md:ml-auto w-full md:w-auto flex flex-col sm:flex-row gap-2">
+              <Link href="/session-iq" className="w-full sm:w-auto">
+                <Button variant="outline" className="w-full sm:w-auto border-[var(--gold)]/40 text-[var(--gold)] hover:bg-[var(--gold)]/10">
+                  Session IQ
+                </Button>
+              </Link>
+              <Link href="/coach" className="w-full sm:w-auto">
+                <Button variant="outline" className="w-full sm:w-auto border-cyan-400/40 text-cyan-100 hover:bg-cyan-500/10">
+                  Allenamento in Vasca
+                </Button>
+              </Link>
+            </div>
           </div>
 
           {/* 1. Header "Pulse" */}

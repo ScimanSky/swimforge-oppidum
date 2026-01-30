@@ -15,6 +15,7 @@ import Profile from "./pages/Profile";
 import Statistics from "./pages/Statistics";
 import Coach from "./pages/Coach";
 import CoachDryland from "./pages/CoachDryland";
+import SessionInsights from "./pages/SessionInsights";
 import Community from "./pages/Community";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
@@ -42,6 +43,7 @@ function Router() {
       <Route path="/statistics" component={Statistics} />
       <Route path="/coach" component={Coach} />
       <Route path="/coach-dryland" component={CoachDryland} />
+      <Route path="/session-iq" component={SessionInsights} />
       <Route path="/community" component={Community} />
       <Route path="/profile" component={Profile} />
       <Route path="/settings" component={Settings} />

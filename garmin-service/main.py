@@ -111,6 +111,7 @@ class SwimmingActivity(BaseModel):
     hr_zone_3_seconds: Optional[int] = None
     hr_zone_4_seconds: Optional[int] = None
     hr_zone_5_seconds: Optional[int] = None
+    raw_data: Optional[dict] = None
 
 
 class SyncRequest(BaseModel):
@@ -254,6 +255,11 @@ def parse_swimming_activity(activity: dict, hr_zones_data: Optional[dict] = None
     if avg_stress:
         avg_stress = int(round(avg_stress))
     
+    raw_data = {
+        "activity": activity,
+        "hr_zones": hr_zones_data or {},
+    }
+
     return SwimmingActivity(
         activity_id=str(activity.get("activityId", "")),
         activity_name=activity.get("activityName", "Swimming"),
@@ -285,7 +291,8 @@ def parse_swimming_activity(activity: dict, hr_zones_data: Optional[dict] = None
         hr_zone_2_seconds=hr_zones_data.get("zone2") if hr_zones_data else None,
         hr_zone_3_seconds=hr_zones_data.get("zone3") if hr_zones_data else None,
         hr_zone_4_seconds=hr_zones_data.get("zone4") if hr_zones_data else None,
-        hr_zone_5_seconds=hr_zones_data.get("zone5") if hr_zones_data else None
+        hr_zone_5_seconds=hr_zones_data.get("zone5") if hr_zones_data else None,
+        raw_data=raw_data
     )
 
 

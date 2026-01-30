@@ -41,6 +41,7 @@ interface StravaServiceActivity {
   calories?: number;
   average_heartrate?: number;
   max_heartrate?: number;
+  raw_data?: unknown;
 }
 
 interface StravaServiceResponse {
@@ -483,6 +484,7 @@ export async function syncStravaActivities(
           calories: activity.calories || null,
           avgHeartRate: activity.average_heartrate || null,
           maxHeartRate: activity.max_heartrate || null,
+          rawData: activity.raw_data ?? activity,
           xpEarned,
           activitySource: "strava",
           stravaActivityId: activity.activity_id,

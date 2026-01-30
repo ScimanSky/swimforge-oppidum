@@ -125,55 +125,58 @@ export default function ActivityInsightNotification() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 via-blue-500/10 to-purple-500/20 rounded-3xl blur-2xl" />
-            <div className="relative bg-gradient-to-br from-[oklch(0.23_0.07_220)] to-[oklch(0.12_0.05_220)] rounded-3xl p-6 border border-cyan-400/30 shadow-2xl">
-              <div className="flex items-center gap-2 text-cyan-200 text-xs uppercase tracking-wider mb-4">
-                <Sparkles className="h-4 w-4" />
-                Analisi sessione
+            <div className="relative bg-gradient-to-br from-[oklch(0.23_0.07_220)] to-[oklch(0.12_0.05_220)] rounded-3xl border border-cyan-400/30 shadow-2xl max-h-[80vh] flex flex-col">
+              <div className="p-6 pb-2 overflow-y-auto">
+                <div className="flex items-center gap-2 text-cyan-200 text-xs uppercase tracking-wider mb-4">
+                  <Sparkles className="h-4 w-4" />
+                  Analisi sessione
+                </div>
+                <h2 className="text-xl font-bold text-white mb-2">{current.title}</h2>
+                <p className="text-white/70 text-sm leading-relaxed mb-4">{current.summary}</p>
+
+                {(distance || duration || date) && (
+                  <div className="flex flex-wrap gap-3 text-xs text-white/60 mb-4">
+                    {distance && <span>🏊 {distance}</span>}
+                    {duration && <span>⏱ {duration}</span>}
+                    {date && <span>📅 {date}</span>}
+                  </div>
+                )}
+
+                {bullets.length > 0 && (
+                  <ul className="space-y-2 text-sm text-white/80 mb-4">
+                    {bullets.map((item: string, idx: number) => (
+                      <li key={idx} className="flex items-start gap-2">
+                        <span className="text-cyan-300">•</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {tags.map((tag: string, idx: number) => (
+                      <span
+                        key={idx}
+                        className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/70"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-              <h2 className="text-xl font-bold text-white mb-2">{current.title}</h2>
-              <p className="text-white/70 text-sm leading-relaxed mb-4">{current.summary}</p>
-
-              {(distance || duration || date) && (
-                <div className="flex flex-wrap gap-3 text-xs text-white/60 mb-4">
-                  {distance && <span>🏊 {distance}</span>}
-                  {duration && <span>⏱ {duration}</span>}
-                  {date && <span>📅 {date}</span>}
-                </div>
-              )}
-
-              {bullets.length > 0 && (
-                <ul className="space-y-2 text-sm text-white/80 mb-4">
-                  {bullets.map((item: string, idx: number) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="text-cyan-300">•</span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {tags.map((tag: string, idx: number) => (
-                    <span
-                      key={idx}
-                      className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/70"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <Button className="w-full bg-[var(--gold)] text-[var(--navy)] hover:bg-[var(--gold-light)]" onClick={handleNext}>
-                Continua
-              </Button>
-              {queue.length > 1 && (
-                <div className="mt-2 text-center text-xs text-white/50">
-                  {currentIndex + 1} / {queue.length}
-                </div>
-              )}
-              <div className="mt-2 text-center text-xs text-white/40">Tocca per continuare</div>
+              <div className="p-6 pt-2">
+                <Button className="w-full bg-[var(--gold)] text-[var(--navy)] hover:bg-[var(--gold-light)]" onClick={handleNext}>
+                  Continua
+                </Button>
+                {queue.length > 1 && (
+                  <div className="mt-2 text-center text-xs text-white/50">
+                    {currentIndex + 1} / {queue.length}
+                  </div>
+                )}
+                <div className="mt-2 text-center text-xs text-white/40">Tocca per continuare</div>
+              </div>
             </div>
           </motion.div>
         </motion.div>

@@ -18,7 +18,7 @@ import type { Request, Response } from "express";
 import { loginLimiter, registrationLimiter } from "./middleware/security";
 import { getOrSetCached, cacheKeys, CACHE_TTL } from "./lib/cache";
 import { addComment, getComments, getSocialFeed, setActivityShare, toggleSplash, upsertActivityPost } from "./db_social";
-import { getPendingActivityInsights, markActivityInsightSeen } from "./ai_activity_insights";
+import { getPendingActivityInsights, listActivityInsights, markActivityInsightSeen } from "./ai_activity_insights";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -1031,6 +1031,16 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         await markActivityInsightSeen(ctx.user.id, input.activityId);
         return { success: true };
+      }),
+    list: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(50).optional(),
+        offset: z.number().min(0).optional(),
+      }).optional())
+      .query(async ({ ctx, input }) => {
+        const limit = input?.limit ?? 20;
+        const offset = input?.offset ?? 0;
+        return listActivityInsights(ctx.user.id, limit, offset);
       }),
   }),
 });
