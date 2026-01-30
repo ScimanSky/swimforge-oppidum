@@ -60,25 +60,31 @@ export default function Dashboard() {
     if (!recentBadges || !user) return;
     if (typeof window === "undefined") return;
 
-    const key = `seenBadges:${user.id}`;
-    const seenIds = new Set<number>(JSON.parse(localStorage.getItem(key) || "[]"));
+    const lastSeenKey = `lastBadgeSeenAt:${user.id}`;
+    const lastSeenAt = Number(localStorage.getItem(lastSeenKey) || 0);
 
-    const newlyEarned = recentBadges
-      .map((entry: any) => entry?.badge)
-      .filter((badge: any) => badge && !seenIds.has(badge.id));
+    const newlyEarned = recentBadges.filter((entry: any) => {
+      const earnedAt = new Date(entry?.userBadge?.earnedAt ?? entry?.userBadge?.earned_at ?? 0).getTime();
+      return earnedAt > lastSeenAt;
+    });
 
     if (newlyEarned.length > 0) {
-      addBadges(newlyEarned.map((badge: any) => ({
-        id: badge.id,
-        code: badge.code,
-        name: badge.name,
-        description: badge.description,
-        image_url: getBadgeImageUrl(badge.code),
+      addBadges(newlyEarned.map((entry: any) => ({
+        id: entry.badge.id,
+        code: entry.badge.code,
+        name: entry.badge.name,
+        description: entry.badge.description,
+        image_url: getBadgeImageUrl(entry.badge.code),
       })));
     }
 
-    const updated = new Set([...seenIds, ...newlyEarned.map((b: any) => b.id)]);
-    localStorage.setItem(key, JSON.stringify([...updated]));
+    const maxEarnedAt = Math.max(
+      lastSeenAt,
+      ...newlyEarned.map((entry: any) => new Date(entry?.userBadge?.earnedAt ?? entry?.userBadge?.earned_at ?? 0).getTime())
+    );
+    if (maxEarnedAt > lastSeenAt) {
+      localStorage.setItem(lastSeenKey, String(maxEarnedAt));
+    }
   }, [recentBadges, user, addBadges]);
 
   const normalizeBadgeUrl = (url: string) =>
@@ -89,10 +95,13 @@ export default function Dashboard() {
     if (!achievementBadges || !user) return;
     if (typeof window === "undefined") return;
 
-    const key = `seenAchievementBadges:${user.id}`;
-    const seenIds = new Set<number>(JSON.parse(localStorage.getItem(key) || "[]"));
+    const lastSeenKey = `lastAchievementBadgeSeenAt:${user.id}`;
+    const lastSeenAt = Number(localStorage.getItem(lastSeenKey) || 0);
 
-    const newlyEarned = achievementBadges.filter((entry: any) => !seenIds.has(entry.badgeId));
+    const newlyEarned = achievementBadges.filter((entry: any) => {
+      const earnedAt = new Date(entry?.earnedAt ?? entry?.earned_at ?? 0).getTime();
+      return earnedAt > lastSeenAt;
+    });
 
     if (newlyEarned.length > 0) {
       addBadges(newlyEarned.map((entry: any) => ({
@@ -107,8 +116,13 @@ export default function Dashboard() {
       })));
     }
 
-    const updated = new Set([...seenIds, ...newlyEarned.map((b: any) => b.badgeId)]);
-    localStorage.setItem(key, JSON.stringify([...updated]));
+    const maxEarnedAt = Math.max(
+      lastSeenAt,
+      ...newlyEarned.map((entry: any) => new Date(entry?.earnedAt ?? entry?.earned_at ?? 0).getTime())
+    );
+    if (maxEarnedAt > lastSeenAt) {
+      localStorage.setItem(lastSeenKey, String(maxEarnedAt));
+    }
   }, [achievementBadges, user, addBadges]);
 
 
