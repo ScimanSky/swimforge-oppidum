@@ -161,9 +161,12 @@ REGOLE:
 - Usa SOLO i dati forniti di questa sessione.
 - NON usare dati globali o storici.
 - Output in JSON puro, senza markdown.
-- Mantieni tono professionale e conciso.
-- 1 titolo, 1 summary, 3-5 bullet.
-- Se possibile, deduci 1-2 metriche derivate basate SOLO sui dati della sessione (es: efficienza, intensità, coerenza ritmo).
+- Mantieni tono professionale, mirato e non generico.
+- NON ripetere i dati grezzi (distanza, durata, HR) come elenco.
+- Deve emergere interpretazione: cosa indicano i numeri e perché.
+- 1 titolo, 1 summary, 3-5 bullet analitici.
+- Inserisci 1 consiglio pratico specifico per la prossima sessione.
+- Inserisci 1 focus tecnico (es: pacing, virata, bracciata, respirazione, coerenza).
 
 DATI SESSIONE:
 - Distanza: ${normalized.distanceMeters ?? "n/d"} m
@@ -186,7 +189,7 @@ FORMAT JSON richiesto:
   "title": "...",
   "summary": "...",
   "bullets": ["...", "...", "..."],
-  "tags": ["Tecnica", "Intensità", "Recupero"]
+  "tags": ["Tecnica", "Intensità", "Recupero", "Consiglio"]
 }`;
 
   const result = await model.generateContent(prompt);
