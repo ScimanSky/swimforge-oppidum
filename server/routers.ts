@@ -17,7 +17,7 @@ import { verifySupabaseAccessToken } from "./_core/supabase";
 import type { Request, Response } from "express";
 import { loginLimiter, registrationLimiter } from "./middleware/security";
 import { getOrSetCached, cacheKeys, CACHE_TTL } from "./lib/cache";
-import { addComment, getSocialFeed, setActivityShare, toggleSplash, upsertActivityPost } from "./db_social";
+import { addComment, getComments, getSocialFeed, setActivityShare, toggleSplash, upsertActivityPost } from "./db_social";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -922,6 +922,14 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const commentId = await addComment(ctx.user.id, input.postId, input.content);
         return { success: true, commentId };
+      }),
+
+    comments: protectedProcedure
+      .input(z.object({
+        postId: z.number(),
+      }))
+      .query(async ({ input }) => {
+        return getComments(input.postId);
       }),
   }),
 

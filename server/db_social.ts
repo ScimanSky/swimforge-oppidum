@@ -134,6 +134,14 @@ export async function toggleSplash(userId: number, postId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  const owner = await db.execute(sql`
+    SELECT user_id FROM social_posts WHERE id = ${postId} LIMIT 1
+  `);
+  const ownerId = (owner.rows[0] as any)?.user_id;
+  if (ownerId && ownerId === userId) {
+    throw new Error("Cannot splash your own post");
+  }
+
   const existing = await db
     .select({ id: socialSplashes.id })
     .from(socialSplashes)
@@ -159,4 +167,29 @@ export async function addComment(userId: number, postId: number, content: string
     .returning({ id: socialComments.id });
 
   return inserted[0]?.id ?? null;
+}
+
+export async function getComments(postId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db.execute(sql`
+    SELECT
+      c.id,
+      c.post_id,
+      c.user_id,
+      c.content,
+      c.created_at,
+      u.name AS user_name,
+      u.email AS user_email,
+      sp.avatar_url AS user_avatar
+    FROM social_comments c
+    JOIN users u ON u.id = c.user_id
+    LEFT JOIN swimmer_profiles sp ON sp.user_id = u.id
+    WHERE c.post_id = ${postId}
+    ORDER BY c.created_at ASC
+    LIMIT 50
+  `);
+
+  return result.rows;
 }
