@@ -17,6 +17,7 @@ import { verifySupabaseAccessToken } from "./_core/supabase";
 import type { Request, Response } from "express";
 import { loginLimiter, registrationLimiter } from "./middleware/security";
 import { getOrSetCached, cacheKeys, CACHE_TTL } from "./lib/cache";
+import { addComment, getSocialFeed, setActivityShare, toggleSplash, upsertActivityPost } from "./db_social";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -860,6 +861,68 @@ export const appRouter = router({
 
       return { success: true, updated: challenges.length };
     }),
+  }),
+
+  // Community: Social feed + splashes + comments
+  community: router({
+    feed: protectedProcedure
+      .input(z.object({
+        limit: z.number().min(1).max(50).optional(),
+        scope: z.enum(["global", "self"]).optional(),
+        before: z.string().datetime().optional(),
+      }).optional())
+      .query(async ({ ctx, input }) => {
+        const before = input?.before ? new Date(input.before) : undefined;
+        return getSocialFeed(ctx.user.id, {
+          limit: input?.limit,
+          scope: input?.scope,
+          before,
+        });
+      }),
+
+    createPost: protectedProcedure
+      .input(z.object({
+        activityId: z.number(),
+        content: z.string().max(2000).optional().nullable(),
+        mediaUrl: z.string().url().optional().nullable(),
+        visibility: z.enum(["public", "private"]).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const postId = await upsertActivityPost(ctx.user.id, input.activityId, {
+          content: input.content ?? null,
+          mediaUrl: input.mediaUrl ?? null,
+          visibility: input.visibility ?? "public",
+        });
+        return { success: true, postId };
+      }),
+
+    toggleShare: protectedProcedure
+      .input(z.object({
+        activityId: z.number(),
+        share: z.boolean(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        await setActivityShare(ctx.user.id, input.activityId, input.share);
+        return { success: true };
+      }),
+
+    toggleSplash: protectedProcedure
+      .input(z.object({
+        postId: z.number(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        return toggleSplash(ctx.user.id, input.postId);
+      }),
+
+    addComment: protectedProcedure
+      .input(z.object({
+        postId: z.number(),
+        content: z.string().min(1).max(1000),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const commentId = await addComment(ctx.user.id, input.postId, input.content);
+        return { success: true, commentId };
+      }),
   }),
 
   // Admin: Seed badges and levels
