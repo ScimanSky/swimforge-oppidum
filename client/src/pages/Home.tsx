@@ -17,7 +17,10 @@ import {
   Activity,
   Brain,
   MessageSquare,
-  BarChart3
+  BarChart3,
+  Droplet,
+  Flame,
+  Users2
 } from "lucide-react";
 
 export default function Home() {
@@ -158,11 +161,11 @@ export default function Home() {
                   repeat: Infinity,
                 }}
               />
-              <div className="relative z-10">
+              <div className="h-32 w-32 md:h-48 md:w-48 rounded-full bg-white/5 flex items-center justify-center relative z-10 shadow-[0_0_40px_rgba(14,165,233,0.35)] border border-white/20 backdrop-blur-md overflow-hidden">
                 <img 
-                  src="/swimforge-logo.png" 
+                  src="/images/logo.svg" 
                   alt="SwimForge Logo" 
-                  className="h-32 md:h-48 w-auto drop-shadow-[0_0_30px_rgba(14,165,233,0.45)]"
+                  className="w-full h-full object-contain p-2"
                 />
               </div>
             </motion.div>
@@ -388,6 +391,160 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Community Section - NEW Social Hub */}
+      <section className="py-20 md:py-28 bg-gradient-to-b from-muted/30 to-background relative overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute top-10 right-10 w-72 h-72 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="container relative z-10">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+            className="text-center mb-16"
+          >
+            <motion.div
+              initial={{ scale: 0 }}
+              whileInView={{ scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--azure)]/10 border border-[var(--azure)]/20 mb-6 backdrop-blur-sm"
+            >
+              <Users2 className="h-4 w-4 text-[var(--azure)]" />
+              <span className="text-sm font-semibold text-[var(--azure)]">Community Hub</span>
+            </motion.div>
+            <h2 className="text-4xl md:text-5xl font-bold text-foreground mb-6">
+              Unisciti alla Comunità
+            </h2>
+            <p className="text-muted-foreground text-lg md:text-xl max-w-3xl mx-auto">
+              Condividi i tuoi allenamenti, ricevi Splash dai compagni e sfida gli amici in Shadow Racing
+            </p>
+          </motion.div>
+
+          {/* Community Features Grid */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+            {/* Feed Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0 }}
+              whileHover={{ y: -8 }}
+            >
+              <Card className="h-full border-border/50 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 backdrop-blur-sm relative overflow-hidden group cursor-pointer">
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500">
+                  <img 
+                    src="/images/community_feed_mockup.png" 
+                    alt="Community Feed"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <CardContent className="p-6 relative z-10 flex flex-col h-full">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-blue-500/20 flex items-center justify-center mb-5 shadow-lg border border-white/5">
+                    <Waves className="h-7 w-7 text-cyan-500" />
+                  </div>
+                  <h3 className="font-bold text-xl mb-3 text-card-foreground group-hover:text-[var(--azure)] transition-colors">Social Feed</h3>
+                  <p className="text-muted-foreground leading-relaxed group-hover:text-foreground/90 transition-colors">Condividi i tuoi allenamenti con foto e dati in overlay. Mostra al mondo il tuo impegno!</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Splash Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              whileHover={{ y: -8 }}
+            >
+              <Card className="h-full border-border/50 bg-gradient-to-br from-blue-500/10 to-purple-500/10 backdrop-blur-sm relative overflow-hidden group cursor-pointer">
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500">
+                  <img 
+                    src="/images/splash_interaction.png" 
+                    alt="Splash Interaction"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <CardContent className="p-6 relative z-10 flex flex-col h-full">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center mb-5 shadow-lg border border-white/5">
+                    <Droplet className="h-7 w-7 text-blue-500" />
+                  </div>
+                  <h3 className="font-bold text-xl mb-3 text-card-foreground group-hover:text-[var(--azure)] transition-colors">Splash & Commenti</h3>
+                  <p className="text-muted-foreground leading-relaxed group-hover:text-foreground/90 transition-colors">Dai un Splash (come un like) agli allenamenti dei tuoi amici e lascia commenti motivanti!</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            {/* Shadow Racing Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              whileHover={{ y: -8 }}
+            >
+              <Card className="h-full border-border/50 bg-gradient-to-br from-orange-500/10 to-red-500/10 backdrop-blur-sm relative overflow-hidden group cursor-pointer">
+                <div className="absolute inset-0 opacity-0 group-hover:opacity-20 transition-opacity duration-500">
+                  <img 
+                    src="/images/shadow_racing_report.png" 
+                    alt="Shadow Racing"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <CardContent className="p-6 relative z-10 flex flex-col h-full">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500/20 to-red-500/20 flex items-center justify-center mb-5 shadow-lg border border-white/5">
+                    <Flame className="h-7 w-7 text-orange-500" />
+                  </div>
+                  <h3 className="font-bold text-xl mb-3 text-card-foreground group-hover:text-[var(--azure)] transition-colors">Shadow Racing</h3>
+                  <p className="text-muted-foreground leading-relaxed group-hover:text-foreground/90 transition-colors">Sfida gli allenamenti storici dei tuoi amici! Confronta il tuo passo e scopri dove hai vinto o perso terreno.</p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          </div>
+
+          {/* Clubs Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="bg-gradient-to-r from-card/50 to-muted/50 rounded-2xl p-8 md:p-12 border border-border/50 backdrop-blur-sm"
+          >
+            <div className="flex flex-col md:flex-row items-center gap-8">
+              <div className="flex-1">
+                <h3 className="text-3xl font-bold text-foreground mb-4">Unisciti a Club e Gruppi</h3>
+                <p className="text-muted-foreground text-lg mb-6">
+                  Crea o unisciti a club esclusivi per la tua squadra, la tua piscina o il tuo gruppo di allenamento. Partecipa a sfide di club e costruisci una comunità duratura.
+                </p>
+                <ul className="space-y-3 text-foreground/80">
+                  <li className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-[var(--azure)]" />
+                    Crea club privati con amministratori
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-[var(--azure)]" />
+                    Sfide esclusive per i membri del club
+                  </li>
+                  <li className="flex items-center gap-3">
+                    <div className="w-2 h-2 rounded-full bg-[var(--azure)]" />
+                    Scopri club per geolocalizzazione o interessi
+                  </li>
+                </ul>
+              </div>
+              <div className="flex-1">
+                <img 
+                  src="/images/community_clubs.png" 
+                  alt="Community Clubs"
+                  className="w-full h-auto rounded-xl shadow-lg"
+                />
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
       {/* AI Features Section - NEW with Coach Image */}
       <section className="py-20 bg-gradient-to-b from-background to-muted/30 relative overflow-hidden">
         {/* Abstract tech background elements */}
@@ -444,7 +601,8 @@ export default function Home() {
                 description: "Allenamenti personalizzati generati dall'AI in base al tuo livello e ai tuoi obiettivi",
                 gradient: "from-blue-500/10 to-cyan-500/10",
                 iconColor: "text-blue-500",
-                image: "/images/ai_coach_digital.webp"
+                image: "/images/ai_coach_digital.webp",
+                link: "/coach"
               },
               {
                 icon: BarChart3,
@@ -463,7 +621,10 @@ export default function Home() {
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 whileHover={{ y: -8 }}
               >
-                <Card className={`h-full border-border/50 bg-gradient-to-br ${feature.gradient} backdrop-blur-sm relative overflow-hidden group cursor-pointer`}>
+                <Card 
+                  className={`h-full border-border/50 bg-gradient-to-br ${feature.gradient} backdrop-blur-sm relative overflow-hidden group cursor-pointer`}
+                  onClick={() => feature.link && setLocation(feature.link)}
+                >
                   {/* Image Background with Parallax */}
                   <div className="absolute inset-0 opacity-0 group-hover:opacity-35 transition-opacity duration-500 ease-out overflow-hidden">
                     <motion.img 
@@ -703,11 +864,9 @@ export default function Home() {
         <div className="container">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <img
-                src="/swimforge-logo.png"
-                alt="SwimForge"
-                className="h-8 w-auto drop-shadow-[0_0_10px_rgba(14,165,233,0.35)]"
-              />
+              <div className="h-8 w-8 rounded-full bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center">
+                <Waves className="h-4 w-4 text-white" />
+              </div>
               <span className="text-sm text-muted-foreground font-medium">
                 SwimForge © {new Date().getFullYear()}
               </span>
