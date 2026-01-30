@@ -327,7 +327,8 @@ function buildPoolWorkoutPrompt(userStats: any): string {
   return `Sei un ALLENATORE OLIMPICO DI NUOTO con 20+ anni di esperienza nell'allenamento di atleti di livello mondiale. Genera un allenamento personalizzato IN VASCA completo e vario per un nuotatore basato sulle sue statistiche.
 
 **STATISTICHE NUOTATORE:**
-- Livello: ${userStats.profile.level}
+- Livello Coach: ${userStats.profile.aiSkillLabel ?? "n/d"}
+- Livello XP: ${userStats.profile.level}
 - Sessioni totali: ${userStats.profile.totalSessions}
 - Distanza totale: ${(userStats.profile.totalDistanceMeters / 1000).toFixed(1)} km
 - Ultimi 30 giorni: ${userStats.recent.activitiesCount} sessioni (${userStats.recent.sessionsPerWeek} a settimana)
@@ -462,7 +463,8 @@ function buildDrylandWorkoutPrompt(userStats: any): string {
   return `Sei un allenatore olimpico di nuoto e preparatore atletico esperto. Genera un allenamento FUORI VASCA (dryland) personalizzato per un nuotatore basato sulle sue statistiche.
 
 **STATISTICHE NUOTATORE:**
-- Livello: ${userStats.profile.level}
+- Livello Coach: ${userStats.profile.aiSkillLabel ?? "n/d"}
+- Livello XP: ${userStats.profile.level}
 - Sessioni totali: ${userStats.profile.totalSessions}
 - Frequenza allenamento: ${userStats.recent.sessionsPerWeek} sessioni/settimana
 - Passo medio: ${userStats.recent.avgPace} sec/100m

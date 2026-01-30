@@ -243,7 +243,7 @@ export default function Dashboard() {
                     )}
                   </motion.div>
                   <div>
-                    <p className="text-[oklch(0.60_0.03_220)] text-sm uppercase tracking-wider">Livello</p>
+                    <p className="text-[oklch(0.60_0.03_220)] text-sm uppercase tracking-wider">Livello Coach</p>
                     <p className="text-xl font-bold text-[oklch(0.70_0.18_220)]">
                       {profile?.aiSkillLabel || profile?.profileBadge?.name || profile?.levelTitle || "Novizio"}
                     </p>
@@ -258,6 +258,9 @@ export default function Dashboard() {
                       XP Totali
                     </span>
                     <span className="font-bold text-[oklch(0.82_0.18_85)]">{profile?.totalXp?.toLocaleString() || 0} XP</span>
+                  </div>
+                  <div className="text-xs text-[oklch(0.60_0.03_220)]">
+                    Livello XP {profile?.xpLevel ?? profile?.level ?? 1}
                   </div>
                   <div className="xp-bar-container">
                     <motion.div

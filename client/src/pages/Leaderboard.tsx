@@ -148,7 +148,7 @@ export default function Leaderboard() {
             </TabsTrigger>
             <TabsTrigger value="level" className="flex items-center gap-1">
               <TrendingUp className="h-4 w-4" />
-              <span className="hidden sm:inline">Livello</span>
+              <span className="hidden sm:inline">Livello XP</span>
             </TabsTrigger>
             <TabsTrigger value="badges" className="flex items-center gap-1">
               <Award className="h-4 w-4" />
@@ -260,7 +260,7 @@ export default function Leaderboard() {
                             {isCurrentUser && " (Tu)"}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Livello {entry.level}
+                            Livello XP {entry.level}
                           </p>
                         </div>
 

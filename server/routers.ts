@@ -245,12 +245,16 @@ export const appRouter = router({
       const currentLevelInfo = await db.getLevelForXp(profile.totalXp);
       
       // Get profile badge
-      const { getUserProfileBadge, updateUserProfileBadge } = await import("./db_profile_badges");
+      const { getUserProfileBadge, updateUserProfileBadge, updateUserProfileBadgeByLevel } = await import("./db_profile_badges");
       let profileBadge = await getUserProfileBadge(ctx.user.id);
       
-      // If user doesn't have a profile badge, assign one based on current XP
+      // If user doesn't have a profile badge, assign based on AI skill level if available; fallback to XP
       if (!profileBadge) {
-        await updateUserProfileBadge(ctx.user.id, profile.totalXp);
+        if (profile.aiSkillLevel) {
+          await updateUserProfileBadgeByLevel(ctx.user.id, profile.aiSkillLevel);
+        } else {
+          await updateUserProfileBadge(ctx.user.id, profile.totalXp);
+        }
         profileBadge = await getUserProfileBadge(ctx.user.id);
       }
       
@@ -258,6 +262,9 @@ export const appRouter = router({
         ...profile,
         levelTitle: currentLevelInfo.title,
         levelColor: currentLevelInfo.color,
+        xpLevelTitle: currentLevelInfo.title,
+        xpLevelColor: currentLevelInfo.color,
+        xpLevel: profile.level,
         nextLevelXp: nextLevel?.xpRequired || null,
         xpToNextLevel: nextLevel ? nextLevel.xpRequired - profile.totalXp : 0,
         profileBadge,

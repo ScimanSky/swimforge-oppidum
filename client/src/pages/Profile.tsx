@@ -189,7 +189,7 @@ export default function Profile() {
                         className="px-2 py-0.5 rounded-full text-xs font-medium"
                         style={{ backgroundColor: profile?.levelColor || "#3b82f6" }}
                       >
-                        Lv. {profile?.level || 1}
+                        XP Lv. {profile?.xpLevel ?? profile?.level ?? 1}
                       </span>
                       <span className="text-white/80 text-sm">
                         {profile?.aiSkillLabel || profile?.profileBadge?.name || profile?.levelTitle || "Novizio"}
@@ -204,7 +204,7 @@ export default function Profile() {
               {/* XP Progress */}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Progresso Livello</span>
+                  <span className="text-muted-foreground">Progresso XP</span>
                   <span className="font-semibold text-[var(--gold)]">
                     {profile?.totalXp?.toLocaleString() || 0} XP
                   </span>
@@ -212,7 +212,7 @@ export default function Profile() {
                 <Progress value={xpProgress} className="h-2" />
                 {profile?.nextLevelXp && (
                   <p className="text-xs text-muted-foreground text-right">
-                    {profile.xpToNextLevel.toLocaleString()} XP al livello {profile.level + 1}
+                    {profile.xpToNextLevel.toLocaleString()} XP al livello {(profile?.xpLevel ?? profile?.level ?? 1) + 1}
                   </p>
                 )}
               </div>
