@@ -44,17 +44,38 @@ export default function SessionInsights() {
 
   const insights = useMemo(() => {
     const data = listQuery.data ?? [];
-    const getTs = (item: any) => {
-      const raw =
-        item.generated_at ??
-        item.generatedAt ??
-        item.activity_date ??
-        item.activityDate ??
-        0;
-      const ts = new Date(raw).getTime();
-      return Number.isFinite(ts) ? ts : 0;
+    const getKey = (item: any) =>
+      item.activity_date ??
+      item.activityDate ??
+      item.generated_at ??
+      item.generatedAt ??
+      item.activity_id ??
+      item.activityId ??
+      item.id ??
+      0;
+    const toEpoch = (value: any) => {
+      if (typeof value === "number") return value;
+      if (value instanceof Date) return value.getTime();
+      if (typeof value === "string") {
+        const ts = Date.parse(value);
+        if (Number.isFinite(ts)) return ts;
+      }
+      return 0;
     };
-    return [...data].sort((a: any, b: any) => getTs(b) - getTs(a));
+    const sorted = [...data].sort((a: any, b: any) => {
+      const aKey = getKey(a);
+      const bKey = getKey(b);
+      const aTs = toEpoch(aKey);
+      const bTs = toEpoch(bKey);
+      if (aTs !== bTs) return bTs - aTs;
+      return String(bKey).localeCompare(String(aKey));
+    });
+    if (sorted.length >= 2) {
+      const first = toEpoch(getKey(sorted[0]));
+      const last = toEpoch(getKey(sorted[sorted.length - 1]));
+      if (first < last) return sorted.reverse();
+    }
+    return sorted;
   }, [listQuery.data]);
 
   return (
