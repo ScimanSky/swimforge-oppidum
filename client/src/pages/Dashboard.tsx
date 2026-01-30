@@ -244,7 +244,9 @@ export default function Dashboard() {
                   </motion.div>
                   <div>
                     <p className="text-[oklch(0.60_0.03_220)] text-sm uppercase tracking-wider">Livello</p>
-                    <p className="text-xl font-bold text-[oklch(0.70_0.18_220)]">{profile?.levelTitle || "Novizio"}</p>
+                    <p className="text-xl font-bold text-[oklch(0.70_0.18_220)]">
+                      {profile?.aiSkillLabel || profile?.profileBadge?.name || profile?.levelTitle || "Novizio"}
+                    </p>
                   </div>
                 </div>
 

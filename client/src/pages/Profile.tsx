@@ -191,7 +191,9 @@ export default function Profile() {
                       >
                         Lv. {profile?.level || 1}
                       </span>
-                      <span className="text-white/80 text-sm">{profile?.levelTitle || "Novizio"}</span>
+                      <span className="text-white/80 text-sm">
+                        {profile?.aiSkillLabel || profile?.profileBadge?.name || profile?.levelTitle || "Novizio"}
+                      </span>
                     </div>
                   </div>
                 </div>
