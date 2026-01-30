@@ -11,6 +11,7 @@ import {
   Waves,
   Clock,
   TrendingUp,
+  Crown,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -40,6 +41,19 @@ type FeedItem = {
   activity_stroke_type?: string | null;
 };
 
+type ClubItem = {
+  id: number;
+  name: string;
+  description?: string | null;
+  cover_image_url?: string | null;
+  is_private: boolean;
+  owner_id: number;
+  created_at: string;
+  member_count: number;
+  is_member: boolean;
+  member_role?: string | null;
+};
+
 export default function Community() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("feed");
@@ -47,6 +61,11 @@ export default function Community() {
   const [commentPostId, setCommentPostId] = useState<number | null>(null);
   const [commentText, setCommentText] = useState("");
   const [showCommentsFor, setShowCommentsFor] = useState<number | null>(null);
+  const [clubScope, setClubScope] = useState<"all" | "mine">("all");
+  const [clubSearch, setClubSearch] = useState("");
+  const [showCreateClub, setShowCreateClub] = useState(false);
+  const [clubName, setClubName] = useState("");
+  const [clubDescription, setClubDescription] = useState("");
 
   const utils = trpc.useUtils();
 
@@ -71,6 +90,28 @@ export default function Community() {
     { postId: showCommentsFor ?? 0 },
     { enabled: !!showCommentsFor }
   );
+
+  const clubsQuery = trpc.community.clubs.list.useQuery(
+    { scope: clubScope, search: clubSearch.trim() || undefined, limit: 50 },
+    { enabled: activeTab === "clubs" }
+  );
+
+  const createClub = trpc.community.clubs.create.useMutation({
+    onSuccess: () => {
+      setClubName("");
+      setClubDescription("");
+      setShowCreateClub(false);
+      utils.community.clubs.list.invalidate();
+    },
+  });
+
+  const joinClub = trpc.community.clubs.join.useMutation({
+    onSuccess: () => utils.community.clubs.list.invalidate(),
+  });
+
+  const leaveClub = trpc.community.clubs.leave.useMutation({
+    onSuccess: () => utils.community.clubs.list.invalidate(),
+  });
 
   const formatDistance = (meters?: number | null) => {
     if (!meters) return null;
@@ -111,6 +152,7 @@ export default function Community() {
   };
 
   const feedItems = useMemo(() => (feedQuery.data as FeedItem[]) || [], [feedQuery.data]);
+  const clubItems = useMemo(() => (clubsQuery.data as ClubItem[]) || [], [clubsQuery.data]);
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
@@ -134,10 +176,10 @@ export default function Community() {
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--azure)]/10 border border-[var(--azure)]/20 mb-6 backdrop-blur-sm"
               >
                 <Users className="h-4 w-4 text-[var(--azure)]" />
-                <span className="text-sm font-semibold text-[var(--azure)]">Community Hub</span>
+                <span className="text-sm font-semibold text-[var(--azure)]">Club Hub</span>
               </motion.div>
               <h1 className="text-5xl md:text-6xl font-bold text-white mb-4 bg-gradient-to-r from-white via-cyan-200 to-white bg-clip-text text-transparent">
-                Community
+                Club
               </h1>
               <p className="text-xl text-white/70 max-w-2xl mx-auto">
                 Condividi i tuoi allenamenti, ricevi Splash dai compagni e sfida gli amici in Shadow Racing
@@ -384,22 +426,151 @@ export default function Community() {
               {/* CLUBS TAB */}
               <TabsContent value="clubs" className="space-y-6">
                 <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-                  <CardContent className="p-6 text-muted-foreground">
-                    <div className="flex items-center gap-2 mb-3 text-foreground">
-                      <Users className="h-5 w-5 text-[var(--azure)]" />
-                      Club & Gruppi
+                  <CardContent className="p-6">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="flex items-center gap-2">
+                        <Users className="h-5 w-5 text-[var(--azure)]" />
+                        <div>
+                          <h2 className="text-xl font-semibold text-foreground">Club</h2>
+                          <p className="text-sm text-white/60">Entra in squadre locali o crea il tuo team.</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Input
+                          placeholder="Cerca club..."
+                          value={clubSearch}
+                          onChange={(e) => setClubSearch(e.target.value)}
+                          className="bg-white/5 border-white/10"
+                        />
+                        <Button
+                          className="bg-[var(--gold)] text-[var(--navy)]"
+                          onClick={() => setShowCreateClub((prev) => !prev)}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Crea Club
+                        </Button>
+                      </div>
                     </div>
-                    <p>
-                      Stiamo preparando i club: pagine dedicate, feed interni e sfide private. Presto potrai creare il tuo gruppo.
-                    </p>
-                    <div className="mt-4 flex gap-2">
-                      <Input placeholder="Cerca club..." disabled />
-                      <Button className="bg-[var(--gold)] text-[var(--navy)]" disabled>
-                        Crea Club
-                      </Button>
+
+                    {showCreateClub && (
+                      <div className="mt-4 rounded-xl border border-[var(--gold)]/30 bg-[var(--navy)]/40 p-4">
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <Input
+                            placeholder="Nome club"
+                            value={clubName}
+                            onChange={(e) => setClubName(e.target.value)}
+                          />
+                          <Input
+                            placeholder="Descrizione (opzionale)"
+                            value={clubDescription}
+                            onChange={(e) => setClubDescription(e.target.value)}
+                          />
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                          <Button
+                            className="bg-[var(--azure)] text-white"
+                            onClick={() =>
+                              createClub.mutate({
+                                name: clubName.trim(),
+                                description: clubDescription.trim() || null,
+                              })
+                            }
+                            disabled={createClub.isPending || clubName.trim().length < 3}
+                          >
+                            Crea ora
+                          </Button>
+                          <Button variant="outline" onClick={() => setShowCreateClub(false)}>
+                            Annulla
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-6 flex gap-2">
+                      {(["all", "mine"] as const).map((scopeOption) => (
+                        <Button
+                          key={scopeOption}
+                          variant={clubScope === scopeOption ? "default" : "outline"}
+                          onClick={() => setClubScope(scopeOption)}
+                          className={clubScope === scopeOption ? "bg-[var(--azure)]" : ""}
+                        >
+                          {scopeOption === "all" ? "Esplora" : "I miei"}
+                        </Button>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
+
+                {clubsQuery.isLoading ? (
+                  <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+                    <CardContent className="p-6 text-white/60">Caricamento club...</CardContent>
+                  </Card>
+                ) : clubItems.length === 0 ? (
+                  <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+                    <CardContent className="p-6 text-white/60">
+                      Nessun club trovato. Creane uno o cambia filtro.
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    {clubItems.map((club) => {
+                      const isOwner = club.member_role === "owner";
+                      return (
+                        <Card key={club.id} className="border-border/50 bg-card/60 backdrop-blur-sm overflow-hidden">
+                          <div className="h-28 bg-gradient-to-r from-[var(--navy)] to-[var(--azure)]/30 relative">
+                            {club.cover_image_url ? (
+                              <img
+                                src={club.cover_image_url}
+                                alt={club.name}
+                                className="absolute inset-0 h-full w-full object-cover opacity-70"
+                              />
+                            ) : (
+                              <div className="absolute inset-0 bg-[var(--navy)]/50" />
+                            )}
+                          </div>
+                          <CardContent className="p-5 space-y-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <h3 className="text-lg font-semibold">{club.name}</h3>
+                                <p className="text-sm text-white/60 line-clamp-2">
+                                  {club.description || "Club in crescita. Unisciti e porta energia!"}
+                                </p>
+                              </div>
+                              {isOwner && (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-[var(--gold)]/20 px-2 py-1 text-xs text-[var(--gold)]">
+                                  <Crown className="h-3 w-3" />
+                                  Owner
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center justify-between text-sm text-white/70">
+                              <span>{club.member_count} membri</span>
+                              <span>{club.is_private ? "Privato" : "Pubblico"}</span>
+                            </div>
+                            <div className="flex gap-2">
+                              {club.is_member ? (
+                                <Button
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={() => leaveClub.mutate({ clubId: club.id })}
+                                >
+                                  Lascia
+                                </Button>
+                              ) : (
+                                <Button
+                                  className="w-full bg-[var(--azure)] text-white"
+                                  onClick={() => joinClub.mutate({ clubId: club.id })}
+                                >
+                                  Entra
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
               </TabsContent>
 
               {/* SHADOW RACING TAB */}

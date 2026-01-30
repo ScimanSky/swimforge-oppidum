@@ -941,6 +941,50 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return getComments(input.postId);
       }),
+
+    clubs: router({
+      list: protectedProcedure
+        .input(z.object({
+          search: z.string().max(120).optional(),
+          scope: z.enum(["all", "mine"]).optional(),
+          limit: z.number().min(1).max(100).optional(),
+        }).optional())
+        .query(async ({ ctx, input }) => {
+          const { listClubs } = await import("./db_clubs");
+          return listClubs(ctx.user.id, {
+            search: input?.search,
+            scope: input?.scope,
+            limit: input?.limit,
+          });
+        }),
+
+      create: protectedProcedure
+        .input(z.object({
+          name: z.string().min(3).max(120),
+          description: z.string().max(500).optional().nullable(),
+          coverImageUrl: z.string().url().optional().nullable(),
+          isPrivate: z.boolean().optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const { createClub } = await import("./db_clubs");
+          const clubId = await createClub(ctx.user.id, input);
+          return { success: true, clubId };
+        }),
+
+      join: protectedProcedure
+        .input(z.object({ clubId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const { joinClub } = await import("./db_clubs");
+          return joinClub(ctx.user.id, input.clubId);
+        }),
+
+      leave: protectedProcedure
+        .input(z.object({ clubId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const { leaveClub } = await import("./db_clubs");
+          return leaveClub(ctx.user.id, input.clubId);
+        }),
+    }),
   }),
 
   // Admin: Seed badges and levels

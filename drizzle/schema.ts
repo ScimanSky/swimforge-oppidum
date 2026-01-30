@@ -192,6 +192,33 @@ export const socialFollows = pgTable("social_follows", {
 }));
 
 // ============================================
+// COMMUNITY CLUBS
+// ============================================
+export const communityClubs = pgTable("community_clubs", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 120 }).notNull(),
+  description: text("description"),
+  coverImageUrl: text("cover_image_url"),
+  ownerId: integer("owner_id").notNull(),
+  isPrivate: boolean("is_private").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueClubName: unique().on(table.name),
+}));
+
+export const communityClubMembers = pgTable("community_club_members", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  userId: integer("user_id").notNull(),
+  role: varchar("role", { length: 20 }).default("member").notNull(),
+  status: varchar("status", { length: 20 }).default("active").notNull(),
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueClubMember: unique().on(table.clubId, table.userId),
+}));
+
+// ============================================
 // USER ACHIEVEMENT BADGES (Earned achievement badges)
 // ============================================
 export const userAchievementBadges = pgTable("user_achievement_badges", {
