@@ -39,6 +39,12 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
       u.name AS user_name,
       u.email AS user_email,
       sp.avatar_url AS user_avatar,
+      a.distance_meters AS activity_distance_meters,
+      a.duration_seconds AS activity_duration_seconds,
+      a.activity_date AS activity_date,
+      a.activity_source AS activity_source,
+      a.stroke_type AS activity_stroke_type,
+      a.is_open_water AS activity_is_open_water,
       COALESCE((SELECT COUNT(*) FROM social_splashes s WHERE s.post_id = p.id), 0) AS splash_count,
       COALESCE((SELECT COUNT(*) FROM social_comments c WHERE c.post_id = p.id), 0) AS comment_count,
       EXISTS(
@@ -48,6 +54,7 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
     FROM social_posts p
     JOIN users u ON u.id = p.user_id
     LEFT JOIN swimmer_profiles sp ON sp.user_id = u.id
+    LEFT JOIN swimming_activities a ON a.id = p.activity_id
     WHERE ${whereClause}
     ORDER BY p.created_at DESC
     LIMIT ${limit}

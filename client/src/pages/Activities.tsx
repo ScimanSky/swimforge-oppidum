@@ -19,6 +19,7 @@ import {
   Zap,
   Heart,
   Activity,
+  Droplets,
   MapPin,
   FileText,
 } from "lucide-react";
@@ -34,7 +35,7 @@ export default function Activities() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [offset, setOffset] = useState(0);
   const limit = 20;
-  const [source, setSource] = useState<"all" | "garmin" | "strava" | "manual">("all");
+  const [source, setSource] = useState<"all" | "garmin" | "strava">("all");
   const [openWater, setOpenWater] = useState<"all" | "pool" | "open">("all");
   const [distanceFilter, setDistanceFilter] = useState<"all" | "short" | "medium" | "long">("all");
 
@@ -79,6 +80,16 @@ export default function Activities() {
     },
     onError: (error) => {
       toast.error("Errore nel salvare l'attività");
+    },
+  });
+
+  const toggleShare = trpc.community.toggleShare.useMutation({
+    onSuccess: () => {
+      utils.activities.list.invalidate();
+      utils.community.feed.invalidate();
+    },
+    onError: () => {
+      toast.error("Errore nel condividere l'attività");
     },
   });
 
@@ -451,6 +462,18 @@ export default function Activities() {
                             {activity.notes}
                           </div>
                         )}
+
+                        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
+                          <Switch
+                            checked={!!activity.shareToFeed}
+                            onCheckedChange={(checked) =>
+                              toggleShare.mutate({ activityId: activity.id, share: checked })
+                            }
+                            disabled={toggleShare.isPending}
+                          />
+                          <Droplets className="h-3 w-3 text-cyan-500" />
+                          <span>Condividi nel feed</span>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
