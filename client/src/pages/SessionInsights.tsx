@@ -42,7 +42,14 @@ export default function SessionInsights() {
     staleTime: 60 * 1000,
   });
 
-  const insights = useMemo(() => listQuery.data ?? [], [listQuery.data]);
+  const insights = useMemo(() => {
+    const data = listQuery.data ?? [];
+    return [...data].sort((a: any, b: any) => {
+      const aDate = new Date(a.generated_at ?? a.activity_date ?? 0).getTime();
+      const bDate = new Date(b.generated_at ?? b.activity_date ?? 0).getTime();
+      return bDate - aDate;
+    });
+  }, [listQuery.data]);
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
