@@ -263,15 +263,24 @@ export default function CoachDryland() {
 
         <div className="container py-8 md:py-12">
           {/* Navigation & Header */}
-          <div className="flex items-center gap-4 mb-8">
-            <Link href="/coach">
-              <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10">
-                <ChevronLeft className="h-5 w-5 mr-1" />
-                Coach
+          <div className="flex flex-col gap-3 mb-8 md:flex-row md:items-center md:gap-4">
+            <div className="flex items-center gap-3">
+              <Link href="/coach">
+                <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10 px-2">
+                  <ChevronLeft className="h-5 w-5" />
+                  <span className="ml-1 hidden sm:inline">Coach</span>
+                </Button>
+              </Link>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-bold text-white">Dryland Coach</h1>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold)]/30">Premium</span>
+              </div>
+            </div>
+            <Link href="/coach" className="md:ml-auto w-full md:w-auto">
+              <Button variant="outline" className="w-full md:w-auto border-cyan-400/40 text-cyan-100 hover:bg-cyan-500/10">
+                Allenamento in Vasca
               </Button>
             </Link>
-            <h1 className="text-2xl font-bold text-white">Dryland Coach</h1>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold)]/30">Premium</span>
           </div>
 
           {/* 1. Header "Pulse" */}
