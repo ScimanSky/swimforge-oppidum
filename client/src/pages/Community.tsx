@@ -112,7 +112,7 @@ export default function Community() {
         <div className="container py-8 md:py-10">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-bold text-white">Community</h1>
+              <h1 className="text-2xl font-bold text-white">Social</h1>
               <p className="text-white/60 text-sm">Condividi i tuoi allenamenti con la community</p>
             </div>
             <div className="hidden sm:flex items-center gap-2 text-xs text-white/60">
