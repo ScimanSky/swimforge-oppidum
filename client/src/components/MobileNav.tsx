@@ -16,14 +16,14 @@ export default function MobileNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-[var(--navy)]/95 backdrop-blur-lg border-t border-[oklch(0.30_0.04_250_/_0.5)] pb-safe">
-      <div className="flex items-center justify-around py-2 px-2 max-w-lg mx-auto">
+      <div className="flex items-center justify-between gap-1 py-2 px-2 max-w-lg mx-auto">
         {navItems.map((item) => {
           const isActive = location === item.href;
           return (
             <Link key={item.href} href={item.href}>
               <button
                 className={cn(
-                  "flex flex-col items-center gap-1 px-2 py-2 rounded-lg transition-all min-w-[56px] max-w-[64px]",
+                  "flex flex-1 min-w-0 flex-col items-center gap-1 px-1 py-2 rounded-lg transition-all",
                   isActive
                     ? "text-[oklch(0.70_0.18_220)]"
                     : "text-[oklch(0.50_0.03_220)] hover:text-[oklch(0.70_0.10_220)]"
@@ -39,7 +39,7 @@ export default function MobileNav() {
                     isActive && "drop-shadow-[0_0_8px_oklch(0.70_0.18_220_/_0.8)]"
                   )} 
                 />
-                <span className="text-xs font-medium">{item.label}</span>
+                <span className="text-[10px] font-medium truncate max-w-[52px]">{item.label}</span>
               </button>
             </Link>
           );
