@@ -89,6 +89,7 @@ export const swimmingActivities = pgTable("swimming_activities", {
   xpEarned: integer("xp_earned").default(0).notNull(),
   notes: text("notes"),
   rawData: json("raw_data"),
+  shareToFeed: boolean("share_to_feed").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -140,6 +141,49 @@ export const achievementBadgeDefinitions = pgTable("achievement_badge_definition
   criteriaJson: json("criteria_json").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ============================================
+// SOCIAL COMMUNITY (Posts / Splashes / Comments / Follows)
+// ============================================
+export const socialPosts = pgTable("social_posts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  activityId: integer("activity_id"),
+  content: text("content"),
+  mediaUrl: text("media_url"),
+  visibility: varchar("visibility", { length: 20 }).default("public").notNull(),
+  isDeleted: boolean("is_deleted").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const socialSplashes = pgTable("social_splashes", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").notNull(),
+  userId: integer("user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueSplash: unique().on(table.postId, table.userId),
+}));
+
+export const socialComments = pgTable("social_comments", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").notNull(),
+  userId: integer("user_id").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const socialFollows = pgTable("social_follows", {
+  id: serial("id").primaryKey(),
+  followerId: integer("follower_id").notNull(),
+  followingId: integer("following_id").notNull(),
+  status: varchar("status", { length: 20 }).default("accepted").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueFollow: unique().on(table.followerId, table.followingId),
+}));
 
 // ============================================
 // USER ACHIEVEMENT BADGES (Earned achievement badges)
