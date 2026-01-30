@@ -64,6 +64,10 @@ export default function Coach() {
       staleTime: poolRegenerate ? 0 : 1000 * 60 * 60 * 24,
     }
   );
+  const pendingSessionInsights = trpc.activityInsights.pending.useQuery(
+    { limit: 3 },
+    { staleTime: 60 * 1000 }
+  );
 
   const advancedQuery = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
@@ -316,6 +320,21 @@ export default function Coach() {
                 <Activity className="h-5 w-5 text-purple-400" />
                 Insights & Analisi
               </h3>
+
+              <div className="bg-gradient-to-br from-[oklch(0.24_0.08_230)] to-[oklch(0.14_0.06_230)] border border-[var(--gold)]/30 rounded-2xl p-5">
+                <div className="text-xs uppercase tracking-wider text-[var(--gold)] mb-2">Session IQ</div>
+                <div className="text-white font-semibold mb-1">Analisi sessioni disponibili</div>
+                <p className="text-white/70 text-sm">
+                  {pendingSessionInsights.data?.length
+                    ? `Hai ${pendingSessionInsights.data.length} nuove analisi pronte.`
+                    : "Nessuna nuova analisi, ma puoi rivedere le sessioni passate."}
+                </p>
+                <Link href="/session-iq">
+                  <Button className="mt-4 w-full bg-[var(--gold)] text-[var(--navy)] hover:bg-[var(--gold-light)]">
+                    Apri Session IQ
+                  </Button>
+                </Link>
+              </div>
 
               {insights.length ? (
                 insights.map((insight, idx) => (
