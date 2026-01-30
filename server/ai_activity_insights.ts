@@ -278,11 +278,12 @@ export async function listActivityInsights(userId: number, limit = 20, offset = 
 
   const result = await db.execute(sql`
     SELECT i.*, a.distance_meters AS activity_distance_meters, a.duration_seconds AS activity_duration_seconds,
-           a.activity_date AS activity_date, a.activity_source AS activity_source, a.stroke_type AS stroke_type
+           a.activity_date AS activity_date, a.activity_source AS activity_source, a.stroke_type AS stroke_type,
+           COALESCE(a.activity_date, i.generated_at) AS sort_ts
     FROM activity_ai_insights i
     LEFT JOIN swimming_activities a ON a.id = i.activity_id
     WHERE i.user_id = ${userId}
-    ORDER BY a.activity_date DESC NULLS LAST, i.generated_at DESC
+    ORDER BY sort_ts DESC NULLS LAST, i.generated_at DESC
     LIMIT ${limit}
     OFFSET ${offset}
   `);
