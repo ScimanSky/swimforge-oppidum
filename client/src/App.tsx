@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch } from "wouter";
+import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
@@ -25,6 +25,7 @@ import BadgeUnlockNotification from "./components/BadgeUnlockNotification";
 import { useBadgeNotifications } from "./hooks/useBadgeNotifications";
 import AutoSync from "./components/AutoSync";
 import ActivityInsightNotification from "./components/ActivityInsightNotification";
+import { useEffect } from "react";
 
 function Router() {
   return (
@@ -53,6 +54,16 @@ function Router() {
   );
 }
 
+function ScrollToTop() {
+  const [location] = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [location]);
+
+  return null;
+}
+
 function App() {
   const { pendingBadges, isShowing, clearBadges } = useBadgeNotifications();
 
@@ -62,6 +73,7 @@ function App() {
         <TooltipProvider>
           <Toaster richColors position="top-center" />
           <AutoSync />
+          <ScrollToTop />
           <Router />
           <ActivityInsightNotification />
           {isShowing && pendingBadges.length > 0 && (
