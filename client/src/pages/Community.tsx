@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import {
@@ -59,7 +59,8 @@ export default function Community() {
   const [activeTab, setActiveTab] = useState("feed");
   const [scope, setScope] = useState<"global" | "self">("global");
   const [openCommentsId, setOpenCommentsId] = useState<number | null>(null);
-  const [commentText, setCommentText] = useState("");
+  const [commentTextByPost, setCommentTextByPost] = useState<Record<number, string>>({});
+  const commentsEndRef = useRef<HTMLDivElement | null>(null);
   const [clubScope, setClubScope] = useState<"all" | "mine">("all");
   const [clubSearch, setClubSearch] = useState("");
   const [showCreateClub, setShowCreateClub] = useState(false);
@@ -79,7 +80,7 @@ export default function Community() {
 
   const addComment = trpc.community.addComment.useMutation({
     onSuccess: (_data, variables) => {
-      setCommentText("");
+      setCommentTextByPost((prev) => ({ ...prev, [variables.postId]: "" }));
       setOpenCommentsId(variables.postId);
       utils.community.feed.invalidate();
       utils.community.comments.invalidate({ postId: variables.postId });
@@ -90,6 +91,12 @@ export default function Community() {
     { postId: openCommentsId ?? 0 },
     { enabled: !!openCommentsId }
   );
+
+  useEffect(() => {
+    if (openCommentsId && commentsQuery.data && commentsEndRef.current) {
+      commentsEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [openCommentsId, commentsQuery.data]);
 
   const clubsQuery = trpc.community.clubs.list.useQuery(
     { scope: clubScope, search: clubSearch.trim() || undefined, limit: 50 },
@@ -356,7 +363,12 @@ export default function Community() {
                                   }}
                                 >
                                   <MessageCircle className="h-5 w-5" />
-                                  <span>Commenti ({post.comment_count})</span>
+                                  <span>Commenti</span>
+                                  {post.comment_count > 0 && (
+                                    <span className="ml-1 inline-flex items-center justify-center min-w-[22px] h-5 px-2 rounded-full bg-[var(--azure)]/20 text-[var(--azure)] text-xs font-semibold">
+                                      {post.comment_count}
+                                    </span>
+                                  )}
                                 </Button>
 
                                 <Button variant="outline" className="flex-1 flex items-center justify-center gap-2">
@@ -397,18 +409,26 @@ export default function Community() {
 
                                   <div className="flex flex-col sm:flex-row gap-2">
                                     <Input
-                                      value={commentText}
-                                      onChange={(e) => setCommentText(e.target.value)}
+                                      value={commentTextByPost[post.id] ?? ""}
+                                      onChange={(e) =>
+                                        setCommentTextByPost((prev) => ({ ...prev, [post.id]: e.target.value }))
+                                      }
                                       placeholder="Scrivi un commento..."
                                     />
                                     <Button
-                                      onClick={() => addComment.mutate({ postId: post.id, content: commentText })}
-                                      disabled={addComment.isPending || commentText.trim().length === 0}
+                                      onClick={() =>
+                                        addComment.mutate({
+                                          postId: post.id,
+                                          content: (commentTextByPost[post.id] ?? "").trim(),
+                                        })
+                                      }
+                                      disabled={addComment.isPending || (commentTextByPost[post.id] ?? "").trim().length === 0}
                                       className="bg-[var(--gold)] text-[var(--navy)]"
                                     >
                                       Pubblica
                                     </Button>
                                   </div>
+                                  <div ref={commentsEndRef} />
                                 </div>
                               )}
                             </CardContent>
