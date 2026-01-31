@@ -70,6 +70,20 @@ export default function Activities() {
     { enabled: isAuthenticated }
   );
 
+  const activitiesQueryInput = {
+    limit,
+    offset,
+    source,
+    openWater: openWater === "all" ? undefined : openWater === "open",
+    minDistanceMeters:
+      distanceFilter === "short" ? 0 :
+      distanceFilter === "medium" ? 1000 :
+      distanceFilter === "long" ? 3000 : undefined,
+    maxDistanceMeters:
+      distanceFilter === "short" ? 1000 :
+      distanceFilter === "medium" ? 3000 : undefined,
+  };
+
   const createActivity = trpc.activities.create.useMutation({
     onSuccess: (data) => {
       toast.success(`Attività registrata! +${data.xpEarned} XP`);
@@ -84,12 +98,30 @@ export default function Activities() {
   });
 
   const toggleShare = trpc.community.toggleShare.useMutation({
+    onMutate: async ({ activityId, share }) => {
+      await utils.activities.list.cancel(activitiesQueryInput);
+      const previous = utils.activities.list.getData(activitiesQueryInput);
+      if (previous) {
+        utils.activities.list.setData(
+          activitiesQueryInput,
+          previous.map((activity) =>
+            activity.id === activityId ? { ...activity, shareToFeed: share } : activity
+          )
+        );
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) {
+        utils.activities.list.setData(activitiesQueryInput, ctx.previous);
+      }
+      toast.error("Errore nel condividere l'attività");
+    },
     onSuccess: () => {
-      utils.activities.list.invalidate();
       utils.community.feed.invalidate();
     },
-    onError: () => {
-      toast.error("Errore nel condividere l'attività");
+    onSettled: () => {
+      utils.activities.list.invalidate();
     },
   });
 
@@ -469,7 +501,7 @@ export default function Activities() {
                             onCheckedChange={(checked) =>
                               toggleShare.mutate({ activityId: activity.id, share: checked })
                             }
-                            disabled={toggleShare.isPending}
+                            disabled={toggleShare.isPending && toggleShare.variables?.activityId === activity.id}
                           />
                           <Droplets className="h-3 w-3 text-cyan-500" />
                           <span>Condividi nel feed</span>
