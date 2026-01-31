@@ -22,6 +22,7 @@ import { AppLayout } from "@/components/AppLayout";
 import MobileNav from "@/components/MobileNav";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
 
 type FeedItem = {
   id: number;
@@ -69,6 +70,7 @@ export default function Community() {
   const [clubDescription, setClubDescription] = useState("");
   const [clubCoverUrl, setClubCoverUrl] = useState("");
   const [clubCoverPreview, setClubCoverPreview] = useState<string | null>(null);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
 
   const MAX_COVER_BYTES = 200 * 1024;
   const MAX_COVER_WIDTH = 1600;
@@ -192,20 +194,54 @@ export default function Community() {
         URL.revokeObjectURL(objectUrl);
         return;
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        setClubCoverUrl(result);
-        setClubCoverPreview(result);
+      uploadCoverToStorage(file).finally(() => {
         URL.revokeObjectURL(objectUrl);
-      };
-      reader.readAsDataURL(file);
+      });
     };
     img.onerror = () => {
       toast.error("Impossibile leggere l'immagine.");
       URL.revokeObjectURL(objectUrl);
     };
     img.src = objectUrl;
+  };
+
+  const uploadCoverToStorage = async (file: File) => {
+    if (!user?.id) {
+      toast.error("Devi essere autenticato per caricare una cover.");
+      return;
+    }
+    setIsUploadingCover(true);
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const filePath = `${user.id}/${Date.now()}_${safeName}`;
+      const { error: uploadError } = await supabase.storage
+        .from("club-covers")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType: file.type,
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: publicUrl } = supabase.storage
+        .from("club-covers")
+        .getPublicUrl(filePath);
+
+      if (!publicUrl?.publicUrl) {
+        throw new Error("Impossibile generare URL pubblico.");
+      }
+
+      setClubCoverUrl(publicUrl.publicUrl);
+      setClubCoverPreview(publicUrl.publicUrl);
+      toast.success("Cover caricata con successo.");
+    } catch (error) {
+      toast.error("Upload cover fallito. Riprova.");
+    } finally {
+      setIsUploadingCover(false);
+    }
   };
 
   return (
@@ -554,6 +590,7 @@ export default function Community() {
                                   const file = e.target.files?.[0];
                                   if (file) handleCoverFile(file);
                                 }}
+                                disabled={isUploadingCover}
                               />
                               <Button type="button" variant="outline" onClick={generateCover}>
                                 Genera cover (AI)
@@ -583,7 +620,11 @@ export default function Community() {
                                 coverImageUrl: clubCoverUrl.trim() || null,
                               })
                             }
-                            disabled={createClub.isPending || clubName.trim().length < 3}
+                            disabled={
+                              createClub.isPending ||
+                              clubName.trim().length < 3 ||
+                              isUploadingCover
+                            }
                           >
                             Crea ora
                           </Button>
