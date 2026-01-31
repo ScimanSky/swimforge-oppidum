@@ -581,6 +581,11 @@ export default function Community() {
                                   Entra
                                 </Button>
                               )}
+                              <Link href={`/community/club/${club.id}`}>
+                                <Button variant="outline" className="w-full">
+                                  Dettagli
+                                </Button>
+                              </Link>
                             </div>
                           </CardContent>
                         </Card>

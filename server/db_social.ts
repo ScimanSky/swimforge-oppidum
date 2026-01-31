@@ -15,7 +15,7 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
 
   const limit = options.limit ?? 20;
   const scope = options.scope ?? "global";
-  const filters = [sql`p.is_deleted = false`];
+  const filters = [sql`p.is_deleted = false`, sql`p.club_id IS NULL`];
 
   if (scope === "self") {
     filters.push(sql`p.user_id = ${userId}`);
@@ -31,6 +31,7 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
       p.id,
       p.user_id,
       p.activity_id,
+      p.club_id,
       p.content,
       p.media_url,
       p.visibility,
@@ -91,6 +92,7 @@ export async function upsertActivityPost(userId: number, activityId: number, dat
   const payload = {
     userId,
     activityId,
+    clubId: null,
     content: data.content ?? null,
     mediaUrl: data.mediaUrl ?? null,
     visibility: data.visibility ?? "public",

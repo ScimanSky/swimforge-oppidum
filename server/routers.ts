@@ -984,6 +984,73 @@ export const appRouter = router({
           const { leaveClub } = await import("./db_clubs");
           return leaveClub(ctx.user.id, input.clubId);
         }),
+
+      get: protectedProcedure
+        .input(z.object({ clubId: z.number() }))
+        .query(async ({ ctx, input }) => {
+          const { getClubById } = await import("./db_clubs");
+          const club = await getClubById(ctx.user.id, input.clubId);
+          if (!club) {
+            throw new TRPCError({ code: "NOT_FOUND" });
+          }
+          if (club.is_private && !club.is_member) {
+            throw new TRPCError({ code: "FORBIDDEN" });
+          }
+          return club;
+        }),
+
+      members: protectedProcedure
+        .input(z.object({ clubId: z.number() }))
+        .query(async ({ ctx, input }) => {
+          const { getClubById, listClubMembers } = await import("./db_clubs");
+          const club = await getClubById(ctx.user.id, input.clubId);
+          if (!club) {
+            throw new TRPCError({ code: "NOT_FOUND" });
+          }
+          if (club.is_private && !club.is_member) {
+            throw new TRPCError({ code: "FORBIDDEN" });
+          }
+          return listClubMembers(input.clubId);
+        }),
+
+      feed: protectedProcedure
+        .input(z.object({
+          clubId: z.number(),
+          limit: z.number().min(1).max(50).optional(),
+        }))
+        .query(async ({ ctx, input }) => {
+          const { getClubById, getClubFeed } = await import("./db_clubs");
+          const club = await getClubById(ctx.user.id, input.clubId);
+          if (!club) {
+            throw new TRPCError({ code: "NOT_FOUND" });
+          }
+          if (club.is_private && !club.is_member) {
+            throw new TRPCError({ code: "FORBIDDEN" });
+          }
+          return getClubFeed(ctx.user.id, input.clubId, input.limit ?? 20);
+        }),
+
+      createPost: protectedProcedure
+        .input(z.object({
+          clubId: z.number(),
+          content: z.string().min(1).max(1000).optional(),
+          mediaUrl: z.string().url().optional().nullable(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const { getClubById, createClubPost } = await import("./db_clubs");
+          const club = await getClubById(ctx.user.id, input.clubId);
+          if (!club) {
+            throw new TRPCError({ code: "NOT_FOUND" });
+          }
+          if (club.is_private && !club.is_member) {
+            throw new TRPCError({ code: "FORBIDDEN" });
+          }
+          const postId = await createClubPost(ctx.user.id, input.clubId, {
+            content: input.content ?? null,
+            mediaUrl: input.mediaUrl ?? null,
+          });
+          return { success: true, postId };
+        }),
     }),
   }),
 

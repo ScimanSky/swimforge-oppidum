@@ -155,6 +155,7 @@ export const socialPosts = pgTable("social_posts", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   activityId: integer("activity_id"),
+  clubId: integer("club_id"),
   content: text("content"),
   mediaUrl: text("media_url"),
   visibility: varchar("visibility", { length: 20 }).default("public").notNull(),
