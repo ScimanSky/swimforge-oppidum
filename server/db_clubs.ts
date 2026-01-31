@@ -30,8 +30,10 @@ export async function listClubs(userId: number, options: { search?: string; scop
       c.id,
       c.name,
       c.description,
+      c.rules,
       c.cover_image_url,
       c.is_private,
+      c.visibility,
       c.owner_id,
       c.created_at,
       COALESCE((SELECT COUNT(*) FROM community_club_members m WHERE m.club_id = c.id AND m.status = 'active'), 0) AS member_count,
@@ -58,8 +60,10 @@ export async function getClubById(userId: number, clubId: number) {
       c.id,
       c.name,
       c.description,
+      c.rules,
       c.cover_image_url,
       c.is_private,
+      c.visibility,
       c.owner_id,
       c.created_at,
       COALESCE((SELECT COUNT(*) FROM community_club_members m WHERE m.club_id = c.id AND m.status = 'active'), 0) AS member_count,
@@ -169,7 +173,7 @@ export async function createClubPost(userId: number, clubId: number, input: { co
   return inserted[0]?.id ?? null;
 }
 
-export async function createClub(userId: number, input: { name: string; description?: string | null; coverImageUrl?: string | null; isPrivate?: boolean }) {
+export async function createClub(userId: number, input: { name: string; description?: string | null; coverImageUrl?: string | null; isPrivate?: boolean; visibility?: "public" | "private" | "invite"; rules?: string | null }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -188,9 +192,11 @@ export async function createClub(userId: number, input: { name: string; descript
     .values({
       name: input.name,
       description: input.description ?? null,
+      rules: input.rules ?? null,
       coverImageUrl: input.coverImageUrl ?? null,
       ownerId: userId,
       isPrivate: input.isPrivate ?? false,
+      visibility: input.visibility ?? (input.isPrivate ? "private" : "public"),
       createdAt: new Date(),
       updatedAt: new Date(),
     })
@@ -215,12 +221,15 @@ export async function joinClub(userId: number, clubId: number) {
   if (!db) throw new Error("Database not available");
 
   const club = await db
-    .select({ id: communityClubs.id, isPrivate: communityClubs.isPrivate })
+    .select({ id: communityClubs.id, isPrivate: communityClubs.isPrivate, visibility: communityClubs.visibility })
     .from(communityClubs)
     .where(eq(communityClubs.id, clubId))
     .limit(1);
 
   if (!club.length) throw new Error("Club not found");
+  if (club[0].visibility && club[0].visibility !== "public") {
+    throw new Error("Club is invite-only");
+  }
   if (club[0].isPrivate) throw new Error("Club is private");
 
   const existing = await db
@@ -257,4 +266,50 @@ export async function leaveClub(userId: number, clubId: number) {
     .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)));
 
   return { left: true };
+}
+
+export async function updateClub(userId: number, clubId: number, input: { name?: string; description?: string | null; coverImageUrl?: string | null; visibility?: "public" | "private" | "invite"; rules?: string | null }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const club = await db
+    .select({ id: communityClubs.id, ownerId: communityClubs.ownerId })
+    .from(communityClubs)
+    .where(eq(communityClubs.id, clubId))
+    .limit(1);
+
+  if (!club.length) throw new Error("Club not found");
+  if (club[0].ownerId !== userId) throw new Error("Forbidden");
+
+  await db
+    .update(communityClubs)
+    .set({
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.description !== undefined ? { description: input.description } : {}),
+      ...(input.rules !== undefined ? { rules: input.rules } : {}),
+      ...(input.coverImageUrl !== undefined ? { coverImageUrl: input.coverImageUrl } : {}),
+      ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
+      ...(input.visibility !== undefined ? { isPrivate: input.visibility !== "public" } : {}),
+      updatedAt: new Date(),
+    })
+    .where(eq(communityClubs.id, clubId));
+
+  return { success: true };
+}
+
+export async function deleteClub(userId: number, clubId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const club = await db
+    .select({ id: communityClubs.id, ownerId: communityClubs.ownerId })
+    .from(communityClubs)
+    .where(eq(communityClubs.id, clubId))
+    .limit(1);
+
+  if (!club.length) throw new Error("Club not found");
+  if (club[0].ownerId !== userId) throw new Error("Forbidden");
+
+  await db.delete(communityClubs).where(eq(communityClubs.id, clubId));
+  return { success: true };
 }

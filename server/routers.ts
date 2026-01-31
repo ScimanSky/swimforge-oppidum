@@ -963,6 +963,8 @@ export const appRouter = router({
           name: z.string().min(3).max(120),
           description: z.string().max(500).optional().nullable(),
           coverImageUrl: z.string().max(5000).optional().nullable(),
+          rules: z.string().max(2000).optional().nullable(),
+          visibility: z.enum(["public", "private", "invite"]).optional(),
           isPrivate: z.boolean().optional(),
         }))
         .mutation(async ({ ctx, input }) => {
@@ -1057,6 +1059,40 @@ export const appRouter = router({
             mediaUrl: input.mediaUrl ?? null,
           });
           return { success: true, postId };
+        }),
+
+      update: protectedProcedure
+        .input(z.object({
+          clubId: z.number(),
+          name: z.string().min(3).max(120).optional(),
+          description: z.string().max(500).optional().nullable(),
+          coverImageUrl: z.string().max(5000).optional().nullable(),
+          rules: z.string().max(2000).optional().nullable(),
+          visibility: z.enum(["public", "private", "invite"]).optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const { updateClub } = await import("./db_clubs");
+          if (input.coverImageUrl) {
+            const isHttpUrl = /^https?:\/\//i.test(input.coverImageUrl);
+            const isDataImage = input.coverImageUrl.startsWith("data:image/");
+            if (!isHttpUrl && !isDataImage) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid cover image URL" });
+            }
+          }
+          return updateClub(ctx.user.id, input.clubId, {
+            name: input.name,
+            description: input.description ?? undefined,
+            coverImageUrl: input.coverImageUrl ?? undefined,
+            rules: input.rules ?? undefined,
+            visibility: input.visibility,
+          });
+        }),
+
+      delete: protectedProcedure
+        .input(z.object({ clubId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const { deleteClub } = await import("./db_clubs");
+          return deleteClub(ctx.user.id, input.clubId);
         }),
     }),
   }),

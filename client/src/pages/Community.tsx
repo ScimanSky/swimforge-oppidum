@@ -18,6 +18,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AppLayout } from "@/components/AppLayout";
 import MobileNav from "@/components/MobileNav";
 import { trpc } from "@/lib/trpc";
@@ -68,6 +70,8 @@ export default function Community() {
   const [showCreateClub, setShowCreateClub] = useState(false);
   const [clubName, setClubName] = useState("");
   const [clubDescription, setClubDescription] = useState("");
+  const [clubRules, setClubRules] = useState("");
+  const [clubVisibility, setClubVisibility] = useState<"public" | "private" | "invite">("public");
   const [clubCoverUrl, setClubCoverUrl] = useState("");
   const [clubCoverPreview, setClubCoverPreview] = useState<string | null>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
@@ -117,6 +121,8 @@ export default function Community() {
     onSuccess: () => {
       setClubName("");
       setClubDescription("");
+      setClubRules("");
+      setClubVisibility("public");
       setClubCoverUrl("");
       setClubCoverPreview(null);
       setShowCreateClub(false);
@@ -566,6 +572,24 @@ export default function Community() {
                             onChange={(e) => setClubDescription(e.target.value)}
                           />
                         </div>
+                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                          <Select value={clubVisibility} onValueChange={(value) => setClubVisibility(value as "public" | "private" | "invite")}>
+                            <SelectTrigger className="bg-white/5 border-white/10">
+                              <SelectValue placeholder="Visibilità club" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="public">Pubblico</SelectItem>
+                              <SelectItem value="private">Privato</SelectItem>
+                              <SelectItem value="invite">Solo su invito</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Textarea
+                            placeholder="Regole del club (opzionale)"
+                            value={clubRules}
+                            onChange={(e) => setClubRules(e.target.value)}
+                            className="min-h-[90px]"
+                          />
+                        </div>
                         <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto] items-start">
                           <div className="space-y-2">
                             <Label className="text-xs text-white/70">Immagine club</Label>
@@ -593,7 +617,7 @@ export default function Community() {
                                 disabled={isUploadingCover}
                               />
                               <Button type="button" variant="outline" onClick={generateCover}>
-                                Genera cover (AI)
+                                Auto-cover (pattern)
                               </Button>
                             </div>
                             <p className="text-[11px] text-white/50">
@@ -618,6 +642,8 @@ export default function Community() {
                                 name: clubName.trim(),
                                 description: clubDescription.trim() || null,
                                 coverImageUrl: clubCoverUrl.trim() || null,
+                                rules: clubRules.trim() || null,
+                                visibility: clubVisibility,
                               })
                             }
                             disabled={
@@ -694,7 +720,13 @@ export default function Community() {
                             </div>
                             <div className="flex items-center justify-between text-sm text-white/70">
                               <span>{club.member_count} membri</span>
-                              <span>{club.is_private ? "Privato" : "Pubblico"}</span>
+                              <span>
+                                {club.visibility === "invite"
+                                  ? "Su invito"
+                                  : club.visibility === "private"
+                                  ? "Privato"
+                                  : "Pubblico"}
+                              </span>
                             </div>
                             <div className="flex flex-col sm:flex-row gap-2">
                               {club.is_member ? (
@@ -709,8 +741,9 @@ export default function Community() {
                                 <Button
                                   className="w-full sm:flex-1 bg-[var(--azure)] text-white"
                                   onClick={() => joinClub.mutate({ clubId: club.id })}
+                                  disabled={club.visibility !== "public"}
                                 >
-                                  Entra
+                                  {club.visibility === "invite" ? "Su invito" : "Entra"}
                                 </Button>
                               )}
                               <Link href={`/community/club/${club.id}`}>

@@ -32,8 +32,10 @@ type Club = {
   id: number;
   name: string;
   description?: string | null;
+  rules?: string | null;
   cover_image_url?: string | null;
   is_private: boolean;
+  visibility?: "public" | "private" | "invite";
   owner_id: number;
   created_at: string;
   member_count: number;
@@ -79,6 +81,22 @@ export default function ClubDetail() {
       utils.community.clubs.list.invalidate();
     },
   });
+
+  const updateClub = trpc.community.clubs.update.useMutation({
+    onSuccess: () => {
+      utils.community.clubs.get.invalidate({ clubId });
+      utils.community.clubs.list.invalidate();
+    },
+  });
+
+  const deleteClub = trpc.community.clubs.delete.useMutation({
+    onSuccess: () => {
+      window.location.href = "/community";
+    },
+  });
+
+  const [rulesDraft, setRulesDraft] = useState("");
+  const [visibilityDraft, setVisibilityDraft] = useState<"public" | "private" | "invite">("public");
 
   const createPost = trpc.community.clubs.createPost.useMutation({
     onSuccess: () => {
@@ -150,6 +168,13 @@ export default function ClubDetail() {
   };
 
   const club = clubQuery.data as Club | undefined;
+
+  useEffect(() => {
+    if (club) {
+      setRulesDraft(club.rules ?? "");
+      setVisibilityDraft((club.visibility as any) ?? (club.is_private ? "private" : "public"));
+    }
+  }, [club]);
   const feedItems = useMemo(() => (feedQuery.data as FeedItem[]) || [], [feedQuery.data]);
   const members = useMemo(() => (membersQuery.data as any[]) || [], [membersQuery.data]);
 
@@ -190,8 +215,12 @@ export default function ClubDetail() {
                       Lascia Club
                     </Button>
                   ) : (
-                    <Button className="bg-[var(--azure)] text-white" onClick={() => joinClub.mutate({ clubId })}>
-                      Entra nel Club
+                    <Button
+                      className="bg-[var(--azure)] text-white"
+                      onClick={() => joinClub.mutate({ clubId })}
+                      disabled={club.visibility !== "public"}
+                    >
+                      {club.visibility === "invite" ? "Su invito" : "Entra nel Club"}
                     </Button>
                   )}
                 </div>
@@ -272,6 +301,63 @@ export default function ClubDetail() {
                     </CardContent>
                   </Card>
                 </div>
+
+                {club?.member_role === "owner" && (
+                  <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
+                    <CardContent className="p-6 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold">Impostazioni club</h3>
+                        <span className="text-xs text-white/60">Solo owner</span>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <label className="text-xs text-white/60">Visibilità</label>
+                          <select
+                            value={visibilityDraft}
+                            onChange={(e) => setVisibilityDraft(e.target.value as "public" | "private" | "invite")}
+                            className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm"
+                          >
+                            <option value="public">Pubblico</option>
+                            <option value="private">Privato</option>
+                            <option value="invite">Solo su invito</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs text-white/60">Regole del club</label>
+                          <textarea
+                            value={rulesDraft}
+                            onChange={(e) => setRulesDraft(e.target.value)}
+                            className="min-h-[90px] w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <Button
+                          className="bg-[var(--azure)] text-white"
+                          onClick={() =>
+                            updateClub.mutate({
+                              clubId,
+                              rules: rulesDraft.trim() || null,
+                              visibility: visibilityDraft,
+                            })
+                          }
+                        >
+                          Salva impostazioni
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          onClick={() => {
+                            if (confirm("Vuoi eliminare definitivamente questo club?")) {
+                              deleteClub.mutate({ clubId });
+                            }
+                          }}
+                        >
+                          Elimina club
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {feedQuery.isLoading ? (
                   <Card className="border-border/50 bg-card/50 backdrop-blur-sm">

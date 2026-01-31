@@ -199,9 +199,11 @@ export const communityClubs = pgTable("community_clubs", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 120 }).notNull(),
   description: text("description"),
+  rules: text("rules"),
   coverImageUrl: text("cover_image_url"),
   ownerId: integer("owner_id").notNull(),
   isPrivate: boolean("is_private").default(false).notNull(),
+  visibility: varchar("visibility", { length: 20 }).default("public").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
