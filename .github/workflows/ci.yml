@@ -25,3 +25,5 @@ jobs:
       # replace with `pnpm build` and keep this note for reviewers.
       - name: Tests
         run: pnpm test
+        env:
+          GARMIN_SERVICE_SECRET: ci_dummy_secret
