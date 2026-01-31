@@ -70,9 +70,10 @@ export default function Community() {
   const [clubCoverUrl, setClubCoverUrl] = useState("");
   const [clubCoverPreview, setClubCoverPreview] = useState<string | null>(null);
 
-  const MAX_COVER_BYTES = 300 * 1024;
+  const MAX_COVER_BYTES = 200 * 1024;
   const MAX_COVER_WIDTH = 1600;
   const MAX_COVER_HEIGHT = 900;
+  const MAX_DATA_URL_LENGTH = Math.floor(MAX_COVER_BYTES * 1.37);
 
   const utils = trpc.useUtils();
 
@@ -536,8 +537,13 @@ export default function Community() {
                               placeholder="Incolla URL immagine (opzionale)"
                               value={clubCoverUrl}
                               onChange={(e) => {
-                                setClubCoverUrl(e.target.value);
-                                setClubCoverPreview(e.target.value || null);
+                                const value = e.target.value;
+                                if (value.startsWith("data:image/") && value.length > MAX_DATA_URL_LENGTH) {
+                                  toast.error("Cover troppo pesante. Riduci l'immagine (max ~200KB).");
+                                  return;
+                                }
+                                setClubCoverUrl(value);
+                                setClubCoverPreview(value || null);
                               }}
                             />
                             <div className="flex flex-col sm:flex-row gap-2">
@@ -554,7 +560,7 @@ export default function Community() {
                               </Button>
                             </div>
                             <p className="text-[11px] text-white/50">
-                              Consigliato 1200x600px, max 1600x900px, max 300KB. Formati JPG/PNG.
+                              Consigliato 1200x600px, max 1600x900px, max 200KB. Formati JPG/PNG/WebP.
                             </p>
                           </div>
                           {clubCoverPreview && (
