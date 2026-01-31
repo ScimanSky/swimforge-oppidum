@@ -14,11 +14,11 @@ SwimForge helps swimmers track pool and open-water sessions, earn XP and badges,
 - Social hub + clubs + async challenges
 
 ## Current Status
-- OK Garmin integration via third‑party provider
-- OK Strava integration works for maintainer (dev mode)
-- Pending: Strava multi‑user approval
-- OK raw data storage + basic metrics
-- Roadmap: metrics engine v1, test coverage, docs improvements
+- ✅ Garmin integration via third‑party provider
+- ✅ Strava integration works for maintainer (dev mode)
+- ⚠️ Strava multi‑user approval pending
+- ✅ Raw data storage + basic metrics
+- 🔜 Metrics engine v1 + test coverage + docs improvements
 
 ## Provider Constraints & Mitigation
 - Strava: dev mode, multi‑user pending approval
@@ -55,6 +55,12 @@ pnpm dev
 - `drizzle/` schema + migrations
 - `garmin-service/` Python microservice for Garmin data
 - `shared/` shared types/helpers
+
+## Development workflow
+AI‑assisted development with human review.
+
+## Self‑hosting
+See `docs/SELF_HOST.md` for a minimal local Postgres setup.
 
 ## Roadmap
 See `docs/ROADMAP.md`.

@@ -111,7 +111,6 @@ assets/landing_drafts/
 *.db
 *.sqlite
 *.sqlite3
-.github/workflows/
 
 # Local coach drafts (do not commit)
 assets/coach_drafts/

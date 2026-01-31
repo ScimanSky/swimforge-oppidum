@@ -2,9 +2,12 @@
 
 ## Reporting a Vulnerability
 
-Se scopri una vulnerabilità di sicurezza in SwimForge Oppidum, **NON** creare un GitHub Issue pubblico. 
+Se scopri una vulnerabilità di sicurezza in SwimForge Oppidum, **NON** creare un GitHub Issue pubblico.
 
-Invece, invia un email a: **security@swimforge-oppidum.dev** con le seguenti informazioni:
+**Canale consigliato:** GitHub Security Advisories  
+https://github.com/ScimanSky/swimforge-oppidum/security/advisories
+
+Se preferisci, puoi anche aprire un’email (se monitorata dal maintainer): **security@swimforge-oppidum.dev**
 
 ### Informazioni Richieste:
 - **Titolo:** Breve descrizione della vulnerabilità
@@ -14,10 +17,10 @@ Invece, invia un email a: **security@swimforge-oppidum.dev** con le seguenti inf
 - **Suggerimenti di Fix:** (Opzionale) Proposte di soluzione
 - **Versione Interessata:** Quale versione di SwimForge è affetta
 
-### Timeframe di Risposta:
-- **Acknowledgment:** Entro 48 ore
-- **Fix:** Entro 7 giorni (per vulnerabilità critiche)
-- **Disclosure:** Entro 90 giorni dal fix (disclosure responsabile)
+### Timeframe di Risposta (obiettivi):
+- **Acknowledgment:** entro 72 ore
+- **Fix:** entro 14 giorni (per vulnerabilità critiche)
+- **Disclosure:** entro 90 giorni dal fix (disclosure responsabile)
 
 ### Esempio di Email:
 ```
@@ -113,7 +116,7 @@ Versione: 1.0.0
 
 ## Security Headers
 
-SwimForge implementa i seguenti security headers:
+SwimForge mira a implementare i seguenti security headers (a seconda del deploy):
 
 ```
 X-Content-Type-Options: nosniff
@@ -139,24 +142,11 @@ Referrer-Policy: strict-origin-when-cross-origin
 
 ---
 
-## Compliance
-
-SwimForge Oppidum si impegna a mantenere conformità con:
-
-- ✅ **OWASP Top 10** - Protezione da vulnerabilità comuni
-- ✅ **GDPR** - Protezione dati personali (EU)
-- ✅ **CCPA** - Protezione dati personali (California)
-- ✅ **PCI DSS** - Se gestisce pagamenti (Stripe)
-- ✅ **ISO 27001** - Gestione della sicurezza informatica
-
----
-
 ## Contacts
 
-- **Security Email:** security@swimforge-oppidum.dev
-- **GitHub Issues:** Per bug non-security
-- **Discord:** Community support
-- **Website:** https://swimforge-oppidum.dev
+- **Security Advisories:** https://github.com/ScimanSky/swimforge-oppidum/security/advisories
+- **Security Email (opzionale):** security@swimforge-oppidum.dev
+- **GitHub Issues:** Per bug non‑security
 
 ---
 

@@ -1,0 +1,17 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:15
+    container_name: swimforge-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: swimforge
+      POSTGRES_PASSWORD: swimforge
+      POSTGRES_DB: swimforge
+    ports:
+      - "5432:5432"
+    volumes:
+      - swimforge_pgdata:/var/lib/postgresql/data
+
+volumes:
+  swimforge_pgdata:
