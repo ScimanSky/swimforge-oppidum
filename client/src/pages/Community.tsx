@@ -58,9 +58,8 @@ export default function Community() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("feed");
   const [scope, setScope] = useState<"global" | "self">("global");
-  const [commentPostId, setCommentPostId] = useState<number | null>(null);
+  const [openCommentsId, setOpenCommentsId] = useState<number | null>(null);
   const [commentText, setCommentText] = useState("");
-  const [showCommentsFor, setShowCommentsFor] = useState<number | null>(null);
   const [clubScope, setClubScope] = useState<"all" | "mine">("all");
   const [clubSearch, setClubSearch] = useState("");
   const [showCreateClub, setShowCreateClub] = useState(false);
@@ -79,16 +78,17 @@ export default function Community() {
   });
 
   const addComment = trpc.community.addComment.useMutation({
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       setCommentText("");
-      setCommentPostId(null);
+      setOpenCommentsId(variables.postId);
       utils.community.feed.invalidate();
+      utils.community.comments.invalidate({ postId: variables.postId });
     },
   });
 
   const commentsQuery = trpc.community.comments.useQuery(
-    { postId: showCommentsFor ?? 0 },
-    { enabled: !!showCommentsFor }
+    { postId: openCommentsId ?? 0 },
+    { enabled: !!openCommentsId }
   );
 
   const clubsQuery = trpc.community.clubs.list.useQuery(
@@ -352,8 +352,7 @@ export default function Community() {
                                   variant="outline"
                                   className="flex-1 flex items-center justify-center gap-2"
                                   onClick={() => {
-                                    setCommentPostId(commentPostId === post.id ? null : post.id);
-                                    setShowCommentsFor(showCommentsFor === post.id ? null : post.id);
+                                    setOpenCommentsId(openCommentsId === post.id ? null : post.id);
                                   }}
                                 >
                                   <MessageCircle className="h-5 w-5" />
@@ -366,37 +365,35 @@ export default function Community() {
                                 </Button>
                               </div>
 
-                              {commentPostId === post.id && (
+                              {openCommentsId === post.id && (
                                 <div className="space-y-3">
-                                  {showCommentsFor === post.id && (
-                                    <div className="space-y-2 text-sm text-white/80">
-                                      {commentsQuery.isLoading ? (
-                                        <div className="text-white/50">Caricamento commenti...</div>
-                                      ) : commentsQuery.data && commentsQuery.data.length > 0 ? (
-                                        commentsQuery.data.map((comment: any) => (
-                                          <div key={comment.id} className="flex items-start gap-2">
-                                            {comment.user_avatar ? (
-                                              <img
-                                                src={comment.user_avatar}
-                                                alt={comment.user_name || comment.user_email}
-                                                className="h-6 w-6 rounded-full object-cover"
-                                              />
-                                            ) : (
-                                              <div className="h-6 w-6 rounded-full bg-white/10" />
-                                            )}
-                                            <div>
-                                              <div className="text-xs text-white/60">
-                                                {comment.user_name || comment.user_email}
-                                              </div>
-                                              <div>{comment.content}</div>
+                                  <div className="space-y-2 text-sm text-white/80">
+                                    {commentsQuery.isLoading ? (
+                                      <div className="text-white/50">Caricamento commenti...</div>
+                                    ) : commentsQuery.data && commentsQuery.data.length > 0 ? (
+                                      commentsQuery.data.map((comment: any) => (
+                                        <div key={comment.id} className="flex items-start gap-2">
+                                          {comment.user_avatar ? (
+                                            <img
+                                              src={comment.user_avatar}
+                                              alt={comment.user_name || comment.user_email}
+                                              className="h-6 w-6 rounded-full object-cover"
+                                            />
+                                          ) : (
+                                            <div className="h-6 w-6 rounded-full bg-white/10" />
+                                          )}
+                                          <div>
+                                            <div className="text-xs text-white/60">
+                                              {comment.user_name || comment.user_email}
                                             </div>
+                                            <div>{comment.content}</div>
                                           </div>
-                                        ))
-                                      ) : (
-                                        <div className="text-white/50">Nessun commento ancora.</div>
-                                      )}
-                                    </div>
-                                  )}
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="text-white/50">Nessun commento ancora.</div>
+                                    )}
+                                  </div>
 
                                   <div className="flex flex-col sm:flex-row gap-2">
                                     <Input
