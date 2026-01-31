@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { AppLayout } from "@/components/AppLayout";
 import MobileNav from "@/components/MobileNav";
 import { trpc } from "@/lib/trpc";
@@ -66,6 +67,12 @@ export default function Community() {
   const [showCreateClub, setShowCreateClub] = useState(false);
   const [clubName, setClubName] = useState("");
   const [clubDescription, setClubDescription] = useState("");
+  const [clubCoverUrl, setClubCoverUrl] = useState("");
+  const [clubCoverPreview, setClubCoverPreview] = useState<string | null>(null);
+
+  const MAX_COVER_BYTES = 300 * 1024;
+  const MAX_COVER_WIDTH = 1600;
+  const MAX_COVER_HEIGHT = 900;
 
   const utils = trpc.useUtils();
 
@@ -107,6 +114,8 @@ export default function Community() {
     onSuccess: () => {
       setClubName("");
       setClubDescription("");
+      setClubCoverUrl("");
+      setClubCoverPreview(null);
       setShowCreateClub(false);
       utils.community.clubs.list.invalidate();
     },
@@ -160,6 +169,43 @@ export default function Community() {
 
   const feedItems = useMemo(() => (feedQuery.data as FeedItem[]) || [], [feedQuery.data]);
   const clubItems = useMemo(() => (clubsQuery.data as ClubItem[]) || [], [clubsQuery.data]);
+
+  const generateCover = () => {
+    const seed = encodeURIComponent(clubName.trim() || "swimforge");
+    const url = `https://api.dicebear.com/7.x/shapes/svg?seed=${seed}&backgroundColor=0b1e2d,0b2a3a,0d3550`;
+    setClubCoverUrl(url);
+    setClubCoverPreview(url);
+  };
+
+  const handleCoverFile = (file: File) => {
+    if (file.size > MAX_COVER_BYTES) {
+      toast.error("Immagine troppo grande (max 300KB).");
+      return;
+    }
+
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      if (img.width > MAX_COVER_WIDTH || img.height > MAX_COVER_HEIGHT) {
+        toast.error("Dimensioni troppo grandi (max 1600x900).");
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        setClubCoverUrl(result);
+        setClubCoverPreview(result);
+        URL.revokeObjectURL(objectUrl);
+      };
+      reader.readAsDataURL(file);
+    };
+    img.onerror = () => {
+      toast.error("Impossibile leggere l'immagine.");
+      URL.revokeObjectURL(objectUrl);
+    };
+    img.src = objectUrl;
+  };
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
@@ -226,7 +272,7 @@ export default function Community() {
                   </Link>
                 </div>
 
-                <div className="flex gap-3 mb-6">
+                <div className="flex flex-wrap gap-3 mb-6">
                   {(["global", "self"] as const).map((f) => (
                     <Button
                       key={f}
@@ -339,7 +385,7 @@ export default function Community() {
                                 </div>
                               )}
 
-                              <div className="flex gap-3 mb-4">
+                <div className="flex flex-col sm:flex-row gap-3 mb-4">
                                 <motion.button
                                   whileHover={{ scale: 1.05 }}
                                   whileTap={{ scale: 0.95 }}
@@ -452,7 +498,7 @@ export default function Community() {
                           <p className="text-sm text-white/60">Entra in squadre locali o crea il tuo team.</p>
                         </div>
                       </div>
-                      <div className="flex flex-col sm:flex-row gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2 w-full lg:w-auto">
                         <Input
                           placeholder="Cerca club..."
                           value={clubSearch}
@@ -483,6 +529,44 @@ export default function Community() {
                             onChange={(e) => setClubDescription(e.target.value)}
                           />
                         </div>
+                        <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto] items-start">
+                          <div className="space-y-2">
+                            <Label className="text-xs text-white/70">Immagine club</Label>
+                            <Input
+                              placeholder="Incolla URL immagine (opzionale)"
+                              value={clubCoverUrl}
+                              onChange={(e) => {
+                                setClubCoverUrl(e.target.value);
+                                setClubCoverPreview(e.target.value || null);
+                              }}
+                            />
+                            <div className="flex flex-col sm:flex-row gap-2">
+                              <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleCoverFile(file);
+                                }}
+                              />
+                              <Button type="button" variant="outline" onClick={generateCover}>
+                                Genera cover (AI)
+                              </Button>
+                            </div>
+                            <p className="text-[11px] text-white/50">
+                              Consigliato 1200x600px, max 1600x900px, max 300KB. Formati JPG/PNG.
+                            </p>
+                          </div>
+                          {clubCoverPreview && (
+                            <div className="rounded-lg overflow-hidden border border-white/10 w-full lg:w-40 h-24 bg-white/5">
+                              <img
+                                src={clubCoverPreview}
+                                alt="Cover preview"
+                                className="h-full w-full object-cover"
+                              />
+                            </div>
+                          )}
+                        </div>
                         <div className="mt-3 flex gap-2">
                           <Button
                             className="bg-[var(--azure)] text-white"
@@ -490,6 +574,7 @@ export default function Community() {
                               createClub.mutate({
                                 name: clubName.trim(),
                                 description: clubDescription.trim() || null,
+                                coverImageUrl: clubCoverUrl.trim() || null,
                               })
                             }
                             disabled={createClub.isPending || clubName.trim().length < 3}
@@ -564,25 +649,25 @@ export default function Community() {
                               <span>{club.member_count} membri</span>
                               <span>{club.is_private ? "Privato" : "Pubblico"}</span>
                             </div>
-                            <div className="flex gap-2">
+                            <div className="flex flex-col sm:flex-row gap-2">
                               {club.is_member ? (
                                 <Button
                                   variant="outline"
-                                  className="w-full"
+                                  className="w-full sm:flex-1"
                                   onClick={() => leaveClub.mutate({ clubId: club.id })}
                                 >
                                   Lascia
                                 </Button>
                               ) : (
                                 <Button
-                                  className="w-full bg-[var(--azure)] text-white"
+                                  className="w-full sm:flex-1 bg-[var(--azure)] text-white"
                                   onClick={() => joinClub.mutate({ clubId: club.id })}
                                 >
                                   Entra
                                 </Button>
                               )}
                               <Link href={`/community/club/${club.id}`}>
-                                <Button variant="outline" className="w-full">
+                                <Button variant="outline" className="w-full sm:flex-1">
                                   Dettagli
                                 </Button>
                               </Link>

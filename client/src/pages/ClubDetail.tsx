@@ -356,7 +356,7 @@ export default function ClubDetail() {
                                 </div>
                               )}
 
-                              <div className="flex gap-3 mb-4">
+                              <div className="flex flex-col sm:flex-row gap-3 mb-4">
                                 <motion.button
                                   whileHover={{ scale: 1.05 }}
                                   whileTap={{ scale: 0.95 }}

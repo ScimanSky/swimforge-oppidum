@@ -962,11 +962,18 @@ export const appRouter = router({
         .input(z.object({
           name: z.string().min(3).max(120),
           description: z.string().max(500).optional().nullable(),
-          coverImageUrl: z.string().url().optional().nullable(),
+          coverImageUrl: z.string().max(5000).optional().nullable(),
           isPrivate: z.boolean().optional(),
         }))
         .mutation(async ({ ctx, input }) => {
           const { createClub } = await import("./db_clubs");
+          if (input.coverImageUrl) {
+            const isHttpUrl = /^https?:\/\//i.test(input.coverImageUrl);
+            const isDataImage = input.coverImageUrl.startsWith("data:image/");
+            if (!isHttpUrl && !isDataImage) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid cover image URL" });
+            }
+          }
           const clubId = await createClub(ctx.user.id, input);
           return { success: true, clubId };
         }),
