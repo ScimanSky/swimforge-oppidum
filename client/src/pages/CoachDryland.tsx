@@ -17,8 +17,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { trpc } from "../lib/trpc";
-import MobileNav from "@/components/MobileNav";
-import { AppLayout } from "@/components/AppLayout";
+import AuthenticatedLayout from "@/components/AuthenticatedLayout";
 
 type WorkoutSection = {
   title: string;
@@ -226,7 +225,7 @@ export default function CoachDryland() {
     );
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
+    <AuthenticatedLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
       <div className="min-h-screen overflow-x-hidden font-sans text-foreground relative pb-24">
         {/* Background Image with low opacity */}
         <div className="fixed inset-0 opacity-10 pointer-events-none -z-40">
@@ -516,12 +515,10 @@ export default function CoachDryland() {
                   </Card>
                 ) : null}
               </div>
-            </div>
           </div>
         </div>
-
-        <MobileNav />
       </div>
-    </AppLayout>
+    </div>
+  </AuthenticatedLayout>
   );
 }

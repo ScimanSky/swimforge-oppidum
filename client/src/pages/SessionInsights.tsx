@@ -3,9 +3,8 @@ import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { ChevronLeft, Sparkles, Waves, Activity } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { AppLayout } from "@/components/AppLayout";
+import AuthenticatedLayout from "@/components/AuthenticatedLayout";
 import { Button } from "@/components/ui/button";
-import MobileNav from "@/components/MobileNav";
 
 function formatDistance(meters?: number | null) {
   if (!meters) return null;
@@ -79,7 +78,7 @@ export default function SessionInsights() {
   }, [listQuery.data]);
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
+    <AuthenticatedLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
       <div className="min-h-screen overflow-x-hidden font-sans text-foreground relative pb-24">
         <div className="fixed inset-0 opacity-10 pointer-events-none -z-40">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.25),_transparent_60%)]" />
@@ -212,8 +211,7 @@ export default function SessionInsights() {
             </div>
           </div>
         </div>
-        <MobileNav />
       </div>
-    </AppLayout>
+    </AuthenticatedLayout>
   );
 }

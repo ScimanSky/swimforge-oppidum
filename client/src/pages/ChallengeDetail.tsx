@@ -4,8 +4,7 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Trophy, ArrowLeft, Calendar, Target, Users, Medal, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
-import MobileNav from "@/components/MobileNav";
-import { AppLayout } from "@/components/AppLayout";
+import AuthenticatedLayout from "@/components/AuthenticatedLayout";
 
 export default function ChallengeDetail() {
   const params = useParams<{ id: string }>();
@@ -101,27 +100,21 @@ export default function ChallengeDetail() {
 
   if (isLoading) {
     return (
-      <AppLayout showBubbles={true} bubbleIntensity="low">
-        <div className="pb-24">
-          <div className="container mx-auto px-4 py-8">
-            <p className="text-center text-[oklch(0.60_0.03_220)]">Caricamento...</p>
-          </div>
-          <MobileNav />
+      <AuthenticatedLayout showBubbles={true} bubbleIntensity="low">
+        <div className="container mx-auto px-4 py-8">
+          <p className="text-center text-muted-foreground">Caricamento...</p>
         </div>
-      </AppLayout>
+      </AuthenticatedLayout>
     );
   }
 
   if (!challenge) {
     return (
-      <AppLayout showBubbles={true} bubbleIntensity="low">
-        <div className="pb-24">
-          <div className="container mx-auto px-4 py-8">
-            <p className="text-center text-[oklch(0.60_0.03_220)]">Sfida non trovata</p>
-          </div>
-          <MobileNav />
+      <AuthenticatedLayout showBubbles={true} bubbleIntensity="low">
+        <div className="container mx-auto px-4 py-8">
+          <p className="text-center text-muted-foreground">Sfida non trovata</p>
         </div>
-      </AppLayout>
+      </AuthenticatedLayout>
     );
   }
 
@@ -172,7 +165,7 @@ export default function ChallengeDetail() {
   };
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low">
+    <AuthenticatedLayout showBubbles={true} bubbleIntensity="low">
       <div className="pb-24">
         <div className="container mx-auto px-4 py-8 space-y-8">
         {/* Header */}
@@ -297,8 +290,7 @@ export default function ChallengeDetail() {
           </div>
         </motion.div>
         </div>
-        <MobileNav />
       </div>
-    </AppLayout>
+    </AuthenticatedLayout>
   );
 }
