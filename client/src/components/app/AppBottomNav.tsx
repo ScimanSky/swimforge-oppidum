@@ -1,10 +1,11 @@
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { Home, Activity, Users, Trophy, User } from "lucide-react";
+import { Home, Activity, Users, Trophy, User, Award } from "lucide-react";
 
 const navItems = [
   { href: "/dashboard", icon: Home, label: "Home" },
   { href: "/activities", icon: Activity, label: "Attività" },
+  { href: "/badges", icon: Award, label: "Badge" },
   { href: "/community", icon: Users, label: "Club" },
   { href: "/challenges", icon: Trophy, label: "Sfide" },
   { href: "/profile", icon: User, label: "Profilo" },
@@ -28,7 +29,7 @@ export function AppBottomNav() {
               )}
             >
               <item.icon className={cn("w-5 h-5", isActive && "text-primary")} />
-              <span className="text-xs font-medium">{item.label}</span>
+              <span className="text-[10px] sm:text-xs font-medium">{item.label}</span>
             </Link>
           );
         })}

@@ -13,6 +13,7 @@ import {
   Waves,
   Brain,
   BarChart3,
+  Award,
   X,
 } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -21,6 +22,7 @@ import { trpc } from "@/lib/trpc";
 const mainNav = [
   { href: "/dashboard", icon: Home, label: "Dashboard" },
   { href: "/activities", icon: Activity, label: "Attività" },
+  { href: "/badges", icon: Award, label: "Badge" },
   { href: "/community", icon: Users, label: "Club" },
   { href: "/challenges", icon: Trophy, label: "Sfide" },
   { href: "/coach", icon: Brain, label: "AI Coach" },

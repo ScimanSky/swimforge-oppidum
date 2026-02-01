@@ -858,6 +858,14 @@ export default function ClubDetail() {
                                           onChange={(e) =>
                                             setCommentTextByPost((prev) => ({ ...prev, [post.id]: e.target.value }))
                                           }
+                                          onKeyDown={(event) => {
+                                            if (event.key === "Enter" && !event.shiftKey) {
+                                              event.preventDefault();
+                                              const content = (commentTextByPost[post.id] ?? "").trim();
+                                              if (!content || addComment.isPending) return;
+                                              addComment.mutate({ postId: post.id, content });
+                                            }
+                                          }}
                                           placeholder="Scrivi un commento..."
                                         />
                                         <Button

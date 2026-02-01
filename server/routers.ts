@@ -16,7 +16,7 @@ import { TRPCError } from "@trpc/server";
 import { verifySupabaseAccessToken } from "./_core/supabase";
 import type { Request, Response } from "express";
 import { loginLimiter, registrationLimiter } from "./middleware/security";
-import { getOrSetCached, cacheKeys, CACHE_TTL } from "./lib/cache";
+import { getOrSetCached, cacheKeys, CACHE_TTL, invalidateUserCache } from "./lib/cache";
 import { addComment, getComments, getSocialFeed, setActivityShare, toggleSplash, upsertActivityPost } from "./db_social";
 import { getPendingActivityInsights, listActivityInsights, markActivityInsightSeen } from "./ai_activity_insights";
 
@@ -913,6 +913,7 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         await setActivityShare(ctx.user.id, input.activityId, input.share);
+        await invalidateUserCache(String(ctx.user.id));
         return { success: true };
       }),
 
