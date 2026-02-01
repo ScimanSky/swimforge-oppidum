@@ -1,6 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import AuthenticatedLayout from "@/components/AuthenticatedLayout";
+import { AppLayout } from "@/components/AppLayout";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +18,7 @@ import {
   Trophy,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
+import MobileNav from "@/components/MobileNav";
 import { useBadgeNotifications } from "@/hooks/useBadgeNotifications";
 import { useEffect } from "react";
 import CountUp from "react-countup";
@@ -162,14 +163,15 @@ export default function Dashboard() {
     : 0;
 
   return (
-    <AuthenticatedLayout showBubbles={true} bubbleIntensity="low">
+    <AppLayout showBubbles={true} bubbleIntensity="low">
+    <div className="pb-24">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-sidebar/95 backdrop-blur-lg border-b border-border">
+      <header className="sticky top-0 z-40 bg-[var(--navy)]/95 backdrop-blur-lg border-b border-[oklch(0.30_0.04_250_/_0.5)]">
         <div className="container py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <img src="/swimforge-logo.png" alt="SwimForge" className="h-12 w-auto" />
-              <span className="font-bold text-lg text-foreground">SwimForge</span>
+              <span className="font-bold text-lg text-[oklch(0.95_0.01_220)]">SwimForge</span>
             </div>
 
           </div>
@@ -188,19 +190,19 @@ export default function Dashboard() {
           <div className="neon-card p-6">
             {isLoading ? (
               <div className="space-y-3">
-                <Skeleton className="h-6 w-32 bg-muted" />
-                <Skeleton className="h-8 w-48 bg-muted" />
+                <Skeleton className="h-6 w-32 bg-[oklch(0.25_0.03_250)]" />
+                <Skeleton className="h-8 w-48 bg-[oklch(0.25_0.03_250)]" />
               </div>
             ) : (
               <>
                 <div className="flex items-start justify-between mb-6">
                   <div>
-                    <p className="text-muted-foreground text-sm">Bentornato,</p>
-                    <h1 className="text-2xl font-bold text-foreground">{user?.name || "Nuotatore"}</h1>
+                    <p className="text-[oklch(0.60_0.03_220)] text-sm">Bentornato,</p>
+                    <h1 className="text-2xl font-bold text-[oklch(0.95_0.01_220)]">{user?.name || "Nuotatore"}</h1>
                   </div>
                   <Link href="/profile">
-                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground flex items-center gap-2">
-                      <User className="h-5 w-5" aria-hidden="true" />
+                    <Button className="bg-[oklch(0.70_0.18_220)] hover:bg-[oklch(0.65_0.18_220)] text-white flex items-center gap-2">
+                      <User className="h-5 w-5" />
                       Profilo
                     </Button>
                   </Link>
@@ -234,15 +236,15 @@ export default function Dashboard() {
                       />
                     ) : (
                       <div className="level-badge">
-                        <span className="text-2xl font-bold text-foreground">
+                        <span className="text-2xl font-bold text-[oklch(0.95_0.01_220)]">
                           {profile?.level || 1}
                         </span>
                       </div>
                     )}
                   </motion.div>
                   <div>
-                    <p className="text-muted-foreground text-sm uppercase tracking-wider">Livello Coach</p>
-                    <p className="text-xl font-bold text-primary">
+                    <p className="text-[oklch(0.60_0.03_220)] text-sm uppercase tracking-wider">Livello Coach</p>
+                    <p className="text-xl font-bold text-[oklch(0.70_0.18_220)]">
                       {profile?.aiSkillLabel || profile?.profileBadge?.name || profile?.levelTitle || "Novizio"}
                     </p>
                   </div>
@@ -251,16 +253,16 @@ export default function Dashboard() {
                 {/* XP Progress */}
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground flex items-center gap-1">
-                      <Zap className="h-4 w-4 text-accent" aria-hidden="true" />
+                    <span className="text-[oklch(0.60_0.03_220)] flex items-center gap-1">
+                      <Zap className="h-4 w-4 text-[oklch(0.82_0.18_85)]" />
                       XP Totali
                     </span>
-                    <span className="font-bold text-accent">{profile?.totalXp?.toLocaleString() || 0} XP</span>
+                    <span className="font-bold text-[oklch(0.82_0.18_85)]">{profile?.totalXp?.toLocaleString() || 0} XP</span>
                   </div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-[oklch(0.60_0.03_220)]">
                     Livello XP {profile?.xpLevel ?? profile?.level ?? 1}
                   </div>
-                  <div className="xp-bar-container" role="progressbar" aria-valuenow={Math.min(xpProgress, 100)} aria-valuemin={0} aria-valuemax={100}>
+                  <div className="xp-bar-container">
                     <motion.div
                       className="xp-bar-fill"
                       initial={{ width: 0 }}
@@ -269,7 +271,7 @@ export default function Dashboard() {
                     />
                   </div>
                   {profile?.nextLevelXp && (
-                    <p className="text-xs text-muted-foreground/70 text-right">
+                    <p className="text-xs text-[oklch(0.50_0.03_220)] text-right">
                       {profile.xpToNextLevel.toLocaleString()} XP al prossimo livello
                     </p>
                   )}
@@ -628,6 +630,10 @@ export default function Dashboard() {
 
 
       </main>
-    </AuthenticatedLayout>
+
+      {/* Mobile Navigation */}
+      <MobileNav />
+    </div>
+    </AppLayout>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
+import MobileNav from "@/components/MobileNav";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   LineChart,
@@ -20,7 +21,7 @@ import { TrendingUp, TrendingDown, Minus, ChevronLeft, Info } from "lucide-react
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { metricsDefinitions } from "@/data/metricsDefinitions";
-import AuthenticatedLayout from "@/components/AuthenticatedLayout";
+import { AppLayout } from "@/components/AppLayout";
 
 const PERIOD_OPTIONS = [
   { value: 7, label: "7 giorni" },
@@ -339,7 +340,7 @@ export default function Statistics() {
 
 
   return (
-    <AuthenticatedLayout showBubbles={true} bubbleIntensity="low" className="text-white">
+    <AppLayout showBubbles={true} bubbleIntensity="low" className="text-white">
     <div className="pb-20 overflow-x-hidden">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[oklch(0.18_0.03_250_/_0.55)] border-b border-[oklch(0.25_0.03_250)] px-4 py-4">
@@ -717,7 +718,9 @@ export default function Statistics() {
           </>
         )}
       </div>
+
+      <MobileNav />
     </div>
-    </AuthenticatedLayout>
+    </AppLayout>
   );
 }

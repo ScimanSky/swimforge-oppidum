@@ -11,10 +11,11 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
+import MobileNav from "@/components/MobileNav";
 import { useState, useRef, useCallback, useMemo } from "react";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
 import { toast } from "sonner";
-import AuthenticatedLayout from "@/components/AuthenticatedLayout";
+import { AppLayout } from "@/components/AppLayout";
 
 // Badge images are now handled by getBadgeImageUrl from badgeImages.ts
 
@@ -183,7 +184,8 @@ export default function Badges() {
   };
 
   return (
-    <AuthenticatedLayout showBubbles={true} bubbleIntensity="low">
+    <AppLayout showBubbles={true} bubbleIntensity="low">
+    <div className="pb-24">
       {/* Hidden audio element for badge sounds (dynamic source) */}
       <audio ref={audioRef} preload="auto" />
 
@@ -252,18 +254,18 @@ export default function Badges() {
       `}</style>
 
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-sidebar/95 backdrop-blur-lg border-b border-border">
+      <header className="sticky top-0 z-40 bg-[var(--navy)]/95 backdrop-blur-lg border-b border-[oklch(0.30_0.04_250_/_0.5)]">
         <div className="container py-4">
           <div className="flex items-center gap-3">
             <Link href="/dashboard">
-              <Button variant="ghost" size="icon" className="text-primary hover:bg-primary/10" aria-label="Torna alla dashboard">
-                <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+              <Button variant="ghost" size="icon" className="text-[oklch(0.70_0.18_220)] hover:bg-[oklch(0.70_0.18_220_/_0.1)]">
+                <ChevronLeft className="h-5 w-5" />
               </Button>
             </Link>
             <div className="flex-1">
-              <h1 className="font-bold text-lg text-foreground">Bacheca Badge</h1>
-              <p className="text-sm text-muted-foreground">
-                <span className="text-primary">{earnedCount}</span> / {totalCount} sbloccati
+              <h1 className="font-bold text-lg text-[oklch(0.95_0.01_220)]">Bacheca Badge</h1>
+              <p className="text-sm text-[oklch(0.60_0.03_220)]">
+                <span className="text-[oklch(0.70_0.18_220)]">{earnedCount}</span> / {totalCount} sbloccati
               </p>
             </div>
             <Button
@@ -557,6 +559,9 @@ export default function Badges() {
           )}
         </AnimatePresence>
       </main>
-    </AuthenticatedLayout>
+
+      <MobileNav />
+    </div>
+    </AppLayout>
   );
 }

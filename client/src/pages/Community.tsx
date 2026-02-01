@@ -20,7 +20,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import AuthenticatedLayout from "@/components/AuthenticatedLayout";
+import { AppLayout } from "@/components/AppLayout";
+import MobileNav from "@/components/MobileNav";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
@@ -259,8 +260,8 @@ export default function Community() {
   };
 
   return (
-    <AuthenticatedLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
-      <div className="min-h-screen">
+    <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
+      <div className="min-h-screen pb-24">
         {/* Hero */}
         <section className="relative py-16 bg-gradient-to-b from-[var(--navy)] to-background overflow-hidden">
           <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -802,7 +803,9 @@ export default function Community() {
             </Tabs>
           </div>
         </section>
+
+        <MobileNav />
       </div>
-    </AuthenticatedLayout>
+    </AppLayout>
   );
 }

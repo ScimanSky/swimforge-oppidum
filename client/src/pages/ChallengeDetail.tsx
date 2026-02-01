@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Trophy, ArrowLeft, Calendar, Target, Users, Medal, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
-import AuthenticatedLayout from "@/components/AuthenticatedLayout";
+import MobileNav from "@/components/MobileNav";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function ChallengeDetail() {
   const params = useParams<{ id: string }>();
@@ -100,21 +101,27 @@ export default function ChallengeDetail() {
 
   if (isLoading) {
     return (
-      <AuthenticatedLayout showBubbles={true} bubbleIntensity="low">
-        <div className="container mx-auto px-4 py-8">
-          <p className="text-center text-muted-foreground">Caricamento...</p>
+      <AppLayout showBubbles={true} bubbleIntensity="low">
+        <div className="pb-24">
+          <div className="container mx-auto px-4 py-8">
+            <p className="text-center text-[oklch(0.60_0.03_220)]">Caricamento...</p>
+          </div>
+          <MobileNav />
         </div>
-      </AuthenticatedLayout>
+      </AppLayout>
     );
   }
 
   if (!challenge) {
     return (
-      <AuthenticatedLayout showBubbles={true} bubbleIntensity="low">
-        <div className="container mx-auto px-4 py-8">
-          <p className="text-center text-muted-foreground">Sfida non trovata</p>
+      <AppLayout showBubbles={true} bubbleIntensity="low">
+        <div className="pb-24">
+          <div className="container mx-auto px-4 py-8">
+            <p className="text-center text-[oklch(0.60_0.03_220)]">Sfida non trovata</p>
+          </div>
+          <MobileNav />
         </div>
-      </AuthenticatedLayout>
+      </AppLayout>
     );
   }
 
@@ -165,8 +172,8 @@ export default function ChallengeDetail() {
   };
 
   return (
-    <AuthenticatedLayout showBubbles={true} bubbleIntensity="low">
-      <div>
+    <AppLayout showBubbles={true} bubbleIntensity="low">
+      <div className="pb-24">
         <div className="container mx-auto px-4 py-8 space-y-8">
         {/* Header */}
         <div className="flex items-center gap-4">
@@ -290,7 +297,8 @@ export default function ChallengeDetail() {
           </div>
         </motion.div>
         </div>
+        <MobileNav />
       </div>
-    </AuthenticatedLayout>
+    </AppLayout>
   );
 }

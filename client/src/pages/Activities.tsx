@@ -24,9 +24,10 @@ import {
   FileText,
 } from "lucide-react";
 import { useLocation, Link, Redirect } from "wouter";
+import MobileNav from "@/components/MobileNav";
 import { useState } from "react";
 import { toast } from "sonner";
-import AuthenticatedLayout from "@/components/AuthenticatedLayout";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function Activities() {
   const { isAuthenticated, loading: authLoading } = useAuth();
@@ -213,20 +214,21 @@ export default function Activities() {
   };
 
   return (
-    <AuthenticatedLayout showBubbles={true} bubbleIntensity="low">
+    <AppLayout showBubbles={true} bubbleIntensity="low">
+    <div className="pb-20">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-sidebar/95 backdrop-blur-lg border-b border-border">
+      <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-white">
         <div className="container py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Link href="/dashboard">
-                <Button variant="ghost" size="icon" className="text-foreground hover:bg-foreground/10" aria-label="Torna alla dashboard">
-                  <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
+                  <ChevronLeft className="h-5 w-5" />
                 </Button>
               </Link>
               <div>
-                <h1 className="font-semibold text-lg text-foreground">Attivita</h1>
-                <p className="text-sm text-muted-foreground">Registro allenamenti</p>
+                <h1 className="font-semibold text-lg">Attività</h1>
+                <p className="text-sm text-white/70">Registro allenamenti</p>
               </div>
             </div>
 
@@ -528,13 +530,16 @@ export default function Activities() {
             <p className="font-medium">Nessuna attività registrata</p>
             <p className="text-sm mt-1">Collega Garmin Connect per sincronizzare le tue attività</p>
             <Link href="/profile">
-              <Button className="mt-4 bg-accent hover:bg-accent/90 text-accent-foreground">
+              <Button className="mt-4 bg-[var(--gold)] hover:bg-[var(--gold-light)] text-[var(--navy)]">
                 Vai al Profilo
               </Button>
             </Link>
           </div>
         )}
       </main>
-    </AuthenticatedLayout>
+
+      <MobileNav />
+    </div>
+    </AppLayout>
   );
 }

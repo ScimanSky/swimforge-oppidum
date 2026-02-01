@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useRoute } from "wouter";
 import { motion } from "framer-motion";
 import { Users, ArrowLeft, Droplet, MessageCircle, Share2, Plus } from "lucide-react";
-import AuthenticatedLayout from "@/components/AuthenticatedLayout";
+import { AppLayout } from "@/components/AppLayout";
+import MobileNav from "@/components/MobileNav";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -271,8 +272,8 @@ export default function ClubDetail() {
   }
 
   return (
-    <AuthenticatedLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
-      <div className="min-h-screen">
+    <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
+      <div className="min-h-screen pb-24">
         <section className="relative py-12 bg-gradient-to-b from-[var(--navy)] to-background overflow-hidden">
           <div className="absolute top-0 right-0 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="container relative z-10 space-y-6">
@@ -887,7 +888,9 @@ export default function ClubDetail() {
             )}
           </div>
         </section>
+
+        <MobileNav />
       </div>
-    </AuthenticatedLayout>
+    </AppLayout>
   );
 }

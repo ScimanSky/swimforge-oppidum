@@ -4,7 +4,8 @@ import { trpc } from "@/lib/trpc";
 import { motion } from "framer-motion";
 import { Activity, CheckCircle, XCircle, Loader2, Settings as SettingsIcon, ChevronLeft } from "lucide-react";
 import { useLocation, Link, Redirect } from "wouter";
-import AuthenticatedLayout from "@/components/AuthenticatedLayout";
+import MobileNav from "@/components/MobileNav";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function Settings() {
   const [isConnecting, setIsConnecting] = useState(false);
@@ -55,7 +56,7 @@ export default function Settings() {
   }
 
   return (
-    <AuthenticatedLayout showBubbles={true} bubbleIntensity="low">
+    <AppLayout showBubbles={true} bubbleIntensity="low">
     <div className="pb-20">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-white">
@@ -172,7 +173,10 @@ export default function Settings() {
           </div>
         </motion.div>
       </div>
+
+      {/* Mobile Navigation */}
+      <MobileNav />
     </div>
-    </AuthenticatedLayout>
+    </AppLayout>
   );
 }

@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion";
 import { Trophy, Plus, Calendar, Target, Users, Award, Medal } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import MobileNav from "@/components/MobileNav";
 import { toast } from "sonner";
-import AuthenticatedLayout from "@/components/AuthenticatedLayout";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function Challenges() {
   const [, setLocation] = useLocation();
@@ -119,7 +120,7 @@ export default function Challenges() {
   };
 
   return (
-    <AuthenticatedLayout showBubbles={true} bubbleIntensity="low">
+    <AppLayout showBubbles={true} bubbleIntensity="low">
     <div className="pb-20">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-[oklch(0.12_0.035_250_/_0.95)] backdrop-blur-lg border-b border-[oklch(0.30_0.04_250)]">
@@ -395,7 +396,9 @@ export default function Challenges() {
           </motion.div>
         )}
       </div>
+
+      <MobileNav />
     </div>
-    </AuthenticatedLayout>
+    </AppLayout>
   );
 }

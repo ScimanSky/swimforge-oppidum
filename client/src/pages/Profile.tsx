@@ -13,11 +13,12 @@ import {
   Settings,
 } from "lucide-react";
 import { useLocation, Link, Redirect } from "wouter";
+import MobileNav from "@/components/MobileNav";
 import GarminSection from "@/components/GarminSection";
 import { StravaSection } from "@/components/StravaSection";
 import { toast } from "sonner";
 import { useEffect } from "react";
-import AuthenticatedLayout from "@/components/AuthenticatedLayout";
+import { AppLayout } from "@/components/AppLayout";
 
 export default function Profile() {
   const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
@@ -106,8 +107,8 @@ export default function Profile() {
 
 
   return (
-    <AuthenticatedLayout showBubbles={true} bubbleIntensity="low">
-    <div>
+    <AppLayout showBubbles={true} bubbleIntensity="low">
+    <div className="pb-20">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-white">
         <div className="container py-4">
@@ -319,7 +320,9 @@ export default function Profile() {
           Esci
         </Button>
       </main>
+
+      <MobileNav />
     </div>
-    </AuthenticatedLayout>
+    </AppLayout>
   );
 }
