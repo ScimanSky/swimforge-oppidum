@@ -27,16 +27,21 @@ export function AppLayout({
   className = "",
 }: AppLayoutProps) {
   return (
-    <div className={`min-h-screen bg-[var(--navy)] relative overflow-hidden ${className}`}>
-      {/* Animated gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[var(--navy)] via-[var(--navy-light)] to-[var(--azure)] opacity-95 pointer-events-none" />
+    <div className={`min-h-screen bg-background relative overflow-hidden ${className}`}>
+      {/* Animated gradient background - decorative */}
+      <div 
+        className="absolute inset-0 bg-gradient-to-br from-sidebar via-secondary to-primary/20 opacity-95 pointer-events-none"
+        aria-hidden="true"
+      />
 
-      {/* Wave overlay */}
-      <div className="absolute inset-0 pointer-events-none">
+      {/* Wave overlay - decorative */}
+      <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
         <svg
-          className="absolute bottom-0 left-0 w-full h-56 opacity-20 text-white"
+          className="absolute bottom-0 left-0 w-full h-56 opacity-20 text-foreground"
           viewBox="0 0 1440 320"
           preserveAspectRatio="none"
+          role="img"
+          aria-label="Decorative wave pattern"
         >
           <path
             fill="currentColor"
@@ -45,14 +50,16 @@ export function AppLayout({
         </svg>
       </div>
       
-      {/* Bubble animation background */}
+      {/* Bubble animation background - decorative, hidden from screen readers */}
       {showBubbles && (
-        <BubbleAnimation
-          count={20}
-          intensity={bubbleIntensity}
-          className="fixed inset-0 z-0"
-          bubbleColor="bg-white/20"
-        />
+        <div aria-hidden="true">
+          <BubbleAnimation
+            count={20}
+            intensity={bubbleIntensity}
+            className="fixed inset-0 z-0"
+            bubbleColor="bg-white/20"
+          />
+        </div>
       )}
       
       {/* Content */}
