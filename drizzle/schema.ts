@@ -234,19 +234,6 @@ export const communityClubInvites = pgTable("community_club_invites", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const communityClubInvites = pgTable("community_club_invites", {
-  id: serial("id").primaryKey(),
-  clubId: integer("club_id").notNull(),
-  inviterId: integer("inviter_id").notNull(),
-  code: text("code").notNull().unique(),
-  role: varchar("role", { length: 20 }).default("member").notNull(),
-  status: varchar("status", { length: 20 }).default("active").notNull(),
-  maxUses: integer("max_uses").default(1).notNull(),
-  usedCount: integer("used_count").default(0).notNull(),
-  expiresAt: timestamp("expires_at"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
 // ============================================
 // USER ACHIEVEMENT BADGES (Earned achievement badges)
 // ============================================
