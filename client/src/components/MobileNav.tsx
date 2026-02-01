@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", icon: Home, label: "Home" },
-  { href: "/activities", icon: Activity, label: "Attivita" },
+  { href: "/activities", icon: Activity, label: "Attività" },
   { href: "/badges", icon: Medal, label: "Badge" },
   { href: "/community", icon: Users, label: "Club" },
   { href: "/statistics", icon: BarChart3, label: "Stats" },

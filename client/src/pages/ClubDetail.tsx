@@ -272,7 +272,7 @@ export default function ClubDetail() {
 
   return (
     <AuthenticatedLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
-      <div className="min-h-screen pb-24">
+      <div className="min-h-screen">
         <section className="relative py-12 bg-gradient-to-b from-[var(--navy)] to-background overflow-hidden">
           <div className="absolute top-0 right-0 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="container relative z-10 space-y-6">

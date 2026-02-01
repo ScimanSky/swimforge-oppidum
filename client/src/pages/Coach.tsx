@@ -213,7 +213,7 @@ export default function Coach() {
 
   return (
     <AuthenticatedLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
-      <div className="min-h-screen overflow-x-hidden font-sans text-foreground relative pb-24">
+      <div className="min-h-screen overflow-x-hidden font-sans text-foreground relative">
         {/* Background Image with low opacity */}
         <div className="fixed inset-0 opacity-10 pointer-events-none -z-40">
           <img

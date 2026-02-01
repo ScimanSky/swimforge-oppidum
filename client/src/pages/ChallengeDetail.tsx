@@ -166,7 +166,7 @@ export default function ChallengeDetail() {
 
   return (
     <AuthenticatedLayout showBubbles={true} bubbleIntensity="low">
-      <div className="pb-24">
+      <div>
         <div className="container mx-auto px-4 py-8 space-y-8">
         {/* Header */}
         <div className="flex items-center gap-4">
