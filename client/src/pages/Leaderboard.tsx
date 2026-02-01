@@ -1,4 +1,3 @@
-import { AppLayout } from "@/components/AppLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -16,8 +15,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
-import MobileNav from "@/components/MobileNav";
 import { useState } from "react";
+import AuthenticatedLayout from "@/components/AuthenticatedLayout";
 
 type OrderBy = "level" | "totalXp" | "badges";
 type Period = "all" | "week" | "month";
@@ -110,7 +109,7 @@ export default function Leaderboard() {
   console.log('[Leaderboard] isLoading:', isLoading);
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low">
+    <AuthenticatedLayout showBubbles={true} bubbleIntensity="low">
     <div className="pb-20">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-white">
@@ -287,9 +286,7 @@ export default function Leaderboard() {
           </div>
         )}
       </main>
-
-      <MobileNav />
     </div>
-    </AppLayout>
+    </AuthenticatedLayout>
   );
 }

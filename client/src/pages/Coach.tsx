@@ -16,8 +16,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { trpc } from "../lib/trpc";
-import MobileNav from "@/components/MobileNav";
-import { AppLayout } from "@/components/AppLayout";
+import AuthenticatedLayout from "@/components/AuthenticatedLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 type WorkoutSection = {
@@ -213,8 +212,8 @@ export default function Coach() {
     ].filter(Boolean) as string[];
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
-      <div className="min-h-screen overflow-x-hidden font-sans text-foreground relative pb-24">
+    <AuthenticatedLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
+      <div className="min-h-screen overflow-x-hidden font-sans text-foreground relative">
         {/* Background Image with low opacity */}
         <div className="fixed inset-0 opacity-10 pointer-events-none -z-40">
           <img
@@ -552,12 +551,10 @@ export default function Coach() {
                 </Card>
               </div>
 
-            </div>
           </div>
         </div>
-
-        <MobileNav />
       </div>
-    </AppLayout>
+    </div>
+  </AuthenticatedLayout>
   );
 }
