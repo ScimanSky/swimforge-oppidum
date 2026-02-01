@@ -18,7 +18,6 @@ import {
   Trophy,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
-import MobileNav from "@/components/MobileNav";
 import { useBadgeNotifications } from "@/hooks/useBadgeNotifications";
 import { useEffect } from "react";
 import CountUp from "react-countup";
@@ -632,7 +631,6 @@ export default function Dashboard() {
       </main>
 
       {/* Mobile Navigation */}
-      <MobileNav />
     </div>
     </AppLayout>
   );

@@ -1,11 +1,13 @@
 import { ReactNode } from "react";
 import { BubbleAnimation } from "./BubbleAnimation";
+import { AppShell } from "./app/AppShell";
 
 interface AppLayoutProps {
   children: ReactNode;
   showBubbles?: boolean;
   bubbleIntensity?: "low" | "medium" | "high";
   className?: string;
+  withShell?: boolean;
 }
 
 /**
@@ -25,9 +27,18 @@ export function AppLayout({
   showBubbles = true,
   bubbleIntensity = "medium",
   className = "",
+  withShell = true,
 }: AppLayoutProps) {
+  if (withShell) {
+    return (
+      <div className={`min-h-screen bg-background ${className}`}>
+        <AppShell>{children}</AppShell>
+      </div>
+    );
+  }
+
   return (
-    <div className={`min-h-screen bg-[var(--navy)] relative overflow-hidden ${className}`}>
+    <div className={`min-h-screen bg-background relative overflow-hidden ${className}`}>
       {/* Animated gradient background */}
       <div className="absolute inset-0 bg-gradient-to-br from-[var(--navy)] via-[var(--navy-light)] to-[var(--azure)] opacity-95 pointer-events-none" />
 

@@ -109,7 +109,7 @@ export default function Auth() {
   };
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="medium" className="flex items-center justify-center p-4">
+    <AppLayout showBubbles={true} bubbleIntensity="medium" className="flex items-center justify-center p-4" withShell={false}>
     <div className="w-full flex items-center justify-center">
       {/* Background effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">

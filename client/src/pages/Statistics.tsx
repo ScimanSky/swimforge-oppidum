@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
-import MobileNav from "@/components/MobileNav";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   LineChart,
@@ -719,7 +718,6 @@ export default function Statistics() {
         )}
       </div>
 
-      <MobileNav />
     </div>
     </AppLayout>
   );

@@ -12,7 +12,7 @@ export default function NotFound() {
   };
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4">
+    <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4" withShell={false}>
       <Card className="w-full max-w-lg mx-4 shadow-2xl border border-[oklch(0.25_0.05_220)] bg-[oklch(0.15_0.03_220_/_0.7)] backdrop-blur-lg">
         <CardContent className="pt-8 pb-8 text-center">
           <div className="flex justify-center mb-6">

@@ -89,10 +89,7 @@ export async function upsertActivityPost(userId: number, activityId: number, dat
     .where(eq(socialPosts.activityId, activityId))
     .limit(1);
 
-  const payload = {
-    userId,
-    activityId,
-    clubId: null,
+  const basePayload = {
     content: data.content ?? null,
     mediaUrl: data.mediaUrl ?? null,
     visibility: data.visibility ?? "public",
@@ -101,11 +98,20 @@ export async function upsertActivityPost(userId: number, activityId: number, dat
   };
 
   if (existing.length) {
-    await db.update(socialPosts).set(payload).where(eq(socialPosts.id, existing[0].id));
+    await db.update(socialPosts).set(basePayload).where(eq(socialPosts.id, existing[0].id));
     return existing[0].id;
   }
 
-  const inserted = await db.insert(socialPosts).values({ ...payload, createdAt: new Date() }).returning({ id: socialPosts.id });
+  const inserted = await db
+    .insert(socialPosts)
+    .values({
+      userId,
+      activityId,
+      clubId: null,
+      ...basePayload,
+      createdAt: new Date(),
+    })
+    .returning({ id: socialPosts.id });
   return inserted[0]?.id ?? null;
 }
 

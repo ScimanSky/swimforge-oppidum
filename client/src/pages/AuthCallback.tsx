@@ -95,7 +95,7 @@ export default function AuthCallback() {
   }, []);
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4">
+    <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4" withShell={false}>
       <div className="relative w-full max-w-md">
         {/* Local glow accents */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">

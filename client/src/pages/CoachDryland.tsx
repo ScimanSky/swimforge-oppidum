@@ -17,7 +17,6 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { trpc } from "../lib/trpc";
-import MobileNav from "@/components/MobileNav";
 import { AppLayout } from "@/components/AppLayout";
 
 type WorkoutSection = {
@@ -520,7 +519,6 @@ export default function CoachDryland() {
           </div>
         </div>
 
-        <MobileNav />
       </div>
     </AppLayout>
   );

@@ -11,7 +11,6 @@ import {
   Sparkles,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
-import MobileNav from "@/components/MobileNav";
 import { useState, useRef, useCallback, useMemo } from "react";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
 import { toast } from "sonner";
@@ -560,7 +559,6 @@ export default function Badges() {
         </AnimatePresence>
       </main>
 
-      <MobileNav />
     </div>
     </AppLayout>
   );

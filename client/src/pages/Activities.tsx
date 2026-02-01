@@ -24,7 +24,6 @@ import {
   FileText,
 } from "lucide-react";
 import { useLocation, Link, Redirect } from "wouter";
-import MobileNav from "@/components/MobileNav";
 import { useState } from "react";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
@@ -538,7 +537,6 @@ export default function Activities() {
         )}
       </main>
 
-      <MobileNav />
     </div>
     </AppLayout>
   );

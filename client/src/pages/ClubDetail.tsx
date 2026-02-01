@@ -3,10 +3,10 @@ import { Link, useRoute } from "wouter";
 import { motion } from "framer-motion";
 import { Users, ArrowLeft, Droplet, MessageCircle, Share2, Plus } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
-import MobileNav from "@/components/MobileNav";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { renderMarkdownPreview } from "@/lib/markdownPreview";
 
@@ -727,8 +727,8 @@ export default function ClubDetail() {
                           transition={{ duration: 0.4 }}
                         >
                           <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                            <CardContent className="p-6">
-                              <div className="flex items-center gap-3 mb-4">
+                            <CardContent className="p-4 sm:p-6">
+                              <div className="flex flex-col sm:flex-row items-start gap-3 mb-4">
                                 {post.user_avatar ? (
                                   <img
                                     src={post.user_avatar}
@@ -801,21 +801,82 @@ export default function ClubDetail() {
                                   <span>Splash {post.splash_count > 0 ? `(${post.splash_count})` : ""}</span>
                                 </motion.button>
 
-                                <Button
-                                  variant="outline"
-                                  className="flex-1 flex items-center justify-center gap-2"
-                                  onClick={() => {
-                                    setOpenCommentsId(openCommentsId === post.id ? null : post.id);
-                                  }}
+                                <Dialog
+                                  open={openCommentsId === post.id}
+                                  onOpenChange={(open) => setOpenCommentsId(open ? post.id : null)}
                                 >
-                                  <MessageCircle className="h-5 w-5" />
-                                  <span>Commenti</span>
-                                  {post.comment_count > 0 && (
-                                    <span className="ml-1 inline-flex items-center justify-center min-w-[22px] h-5 px-2 rounded-full bg-[var(--azure)]/20 text-[var(--azure)] text-xs font-semibold">
-                                      {post.comment_count}
-                                    </span>
-                                  )}
-                                </Button>
+                                  <DialogTrigger asChild>
+                                    <Button
+                                      variant="outline"
+                                      className="flex-1 flex items-center justify-center gap-2"
+                                    >
+                                      <MessageCircle className="h-5 w-5" />
+                                      <span>Commenti</span>
+                                      {post.comment_count > 0 && (
+                                        <span className="ml-1 inline-flex items-center justify-center min-w-[22px] h-5 px-2 rounded-full bg-[var(--azure)]/20 text-[var(--azure)] text-xs font-semibold">
+                                          {post.comment_count}
+                                        </span>
+                                      )}
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-w-lg bg-[var(--navy)] text-white border border-white/10">
+                                    <DialogHeader>
+                                      <DialogTitle>Commenti</DialogTitle>
+                                    </DialogHeader>
+                                    <div className="space-y-3">
+                                      <div className="space-y-2 text-sm text-white/80 max-h-64 overflow-y-auto pr-1">
+                                        {commentsQuery.isLoading ? (
+                                          <div className="text-white/50">Caricamento commenti...</div>
+                                        ) : commentsQuery.data && commentsQuery.data.length > 0 ? (
+                                          commentsQuery.data.map((comment: any) => (
+                                            <div key={comment.id} className="flex items-start gap-2">
+                                              {comment.user_avatar ? (
+                                                <img
+                                                  src={comment.user_avatar}
+                                                  alt={comment.user_name || comment.user_email}
+                                                  className="h-6 w-6 rounded-full object-cover"
+                                                />
+                                              ) : (
+                                                <div className="h-6 w-6 rounded-full bg-white/10" />
+                                              )}
+                                              <div>
+                                                <div className="text-xs text-white/60">
+                                                  {comment.user_name || comment.user_email}
+                                                </div>
+                                                <div>{comment.content}</div>
+                                              </div>
+                                            </div>
+                                          ))
+                                        ) : (
+                                          <div className="text-white/50">Nessun commento ancora.</div>
+                                        )}
+                                      </div>
+
+                                      <div className="flex flex-col sm:flex-row gap-2">
+                                        <Input
+                                          value={commentTextByPost[post.id] ?? ""}
+                                          onChange={(e) =>
+                                            setCommentTextByPost((prev) => ({ ...prev, [post.id]: e.target.value }))
+                                          }
+                                          placeholder="Scrivi un commento..."
+                                        />
+                                        <Button
+                                          onClick={() =>
+                                            addComment.mutate({
+                                              postId: post.id,
+                                              content: (commentTextByPost[post.id] ?? "").trim(),
+                                            })
+                                          }
+                                          disabled={addComment.isPending || (commentTextByPost[post.id] ?? "").trim().length === 0}
+                                          className="bg-[var(--gold)] text-[var(--navy)]"
+                                        >
+                                          Pubblica
+                                        </Button>
+                                      </div>
+                                      <div ref={commentsEndRef} />
+                                    </div>
+                                  </DialogContent>
+                                </Dialog>
 
                                 <Button variant="outline" className="flex-1 flex items-center justify-center gap-2">
                                   <Share2 className="h-5 w-5" />
@@ -823,60 +884,6 @@ export default function ClubDetail() {
                                 </Button>
                               </div>
 
-                              {openCommentsId === post.id && (
-                                <div className="space-y-3">
-                                  <div className="space-y-2 text-sm text-white/80">
-                                    {commentsQuery.isLoading ? (
-                                      <div className="text-white/50">Caricamento commenti...</div>
-                                    ) : commentsQuery.data && commentsQuery.data.length > 0 ? (
-                                      commentsQuery.data.map((comment: any) => (
-                                        <div key={comment.id} className="flex items-start gap-2">
-                                          {comment.user_avatar ? (
-                                            <img
-                                              src={comment.user_avatar}
-                                              alt={comment.user_name || comment.user_email}
-                                              className="h-6 w-6 rounded-full object-cover"
-                                            />
-                                          ) : (
-                                            <div className="h-6 w-6 rounded-full bg-white/10" />
-                                          )}
-                                          <div>
-                                            <div className="text-xs text-white/60">
-                                              {comment.user_name || comment.user_email}
-                                            </div>
-                                            <div>{comment.content}</div>
-                                          </div>
-                                        </div>
-                                      ))
-                                    ) : (
-                                      <div className="text-white/50">Nessun commento ancora.</div>
-                                    )}
-                                  </div>
-
-                                  <div className="flex flex-col sm:flex-row gap-2">
-                                    <Input
-                                      value={commentTextByPost[post.id] ?? ""}
-                                      onChange={(e) =>
-                                        setCommentTextByPost((prev) => ({ ...prev, [post.id]: e.target.value }))
-                                      }
-                                      placeholder="Scrivi un commento..."
-                                    />
-                                    <Button
-                                      onClick={() =>
-                                        addComment.mutate({
-                                          postId: post.id,
-                                          content: (commentTextByPost[post.id] ?? "").trim(),
-                                        })
-                                      }
-                                      disabled={addComment.isPending || (commentTextByPost[post.id] ?? "").trim().length === 0}
-                                      className="bg-[var(--gold)] text-[var(--navy)]"
-                                    >
-                                      Pubblica
-                                    </Button>
-                                  </div>
-                                  <div ref={commentsEndRef} />
-                                </div>
-                              )}
                             </CardContent>
                           </Card>
                         </motion.div>
@@ -889,7 +896,6 @@ export default function ClubDetail() {
           </div>
         </section>
 
-        <MobileNav />
       </div>
     </AppLayout>
   );

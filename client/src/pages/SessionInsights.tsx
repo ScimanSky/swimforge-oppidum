@@ -5,7 +5,6 @@ import { ChevronLeft, Sparkles, Waves, Activity } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import MobileNav from "@/components/MobileNav";
 
 function formatDistance(meters?: number | null) {
   if (!meters) return null;
@@ -212,7 +211,6 @@ export default function SessionInsights() {
             </div>
           </div>
         </div>
-        <MobileNav />
       </div>
     </AppLayout>
   );

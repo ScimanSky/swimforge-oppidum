@@ -9,7 +9,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion } from "framer-motion";
 import { Trophy, Plus, Calendar, Target, Users, Award, Medal } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import MobileNav from "@/components/MobileNav";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 
@@ -397,7 +396,6 @@ export default function Challenges() {
         )}
       </div>
 
-      <MobileNav />
     </div>
     </AppLayout>
   );

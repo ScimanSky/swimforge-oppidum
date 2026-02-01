@@ -43,7 +43,7 @@ export default function StravaConnect() {
   }, []);
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4">
+    <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4" withShell={false}>
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}

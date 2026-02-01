@@ -16,7 +16,6 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { trpc } from "../lib/trpc";
-import MobileNav from "@/components/MobileNav";
 import { AppLayout } from "@/components/AppLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
 
@@ -556,7 +555,6 @@ export default function Coach() {
           </div>
         </div>
 
-        <MobileNav />
       </div>
     </AppLayout>
   );

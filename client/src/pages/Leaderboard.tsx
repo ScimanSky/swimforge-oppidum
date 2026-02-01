@@ -16,7 +16,6 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
-import MobileNav from "@/components/MobileNav";
 import { useState } from "react";
 
 type OrderBy = "level" | "totalXp" | "badges";
@@ -288,7 +287,6 @@ export default function Leaderboard() {
         )}
       </main>
 
-      <MobileNav />
     </div>
     </AppLayout>
   );

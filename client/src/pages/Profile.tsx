@@ -13,7 +13,6 @@ import {
   Settings,
 } from "lucide-react";
 import { useLocation, Link, Redirect } from "wouter";
-import MobileNav from "@/components/MobileNav";
 import GarminSection from "@/components/GarminSection";
 import { StravaSection } from "@/components/StravaSection";
 import { toast } from "sonner";
@@ -321,7 +320,6 @@ export default function Profile() {
         </Button>
       </main>
 
-      <MobileNav />
     </div>
     </AppLayout>
   );

@@ -4,7 +4,6 @@ import { trpc } from "@/lib/trpc";
 import { motion } from "framer-motion";
 import { Activity, CheckCircle, XCircle, Loader2, Settings as SettingsIcon, ChevronLeft } from "lucide-react";
 import { useLocation, Link, Redirect } from "wouter";
-import MobileNav from "@/components/MobileNav";
 import { AppLayout } from "@/components/AppLayout";
 
 export default function Settings() {
@@ -175,7 +174,6 @@ export default function Settings() {
       </div>
 
       {/* Mobile Navigation */}
-      <MobileNav />
     </div>
     </AppLayout>
   );

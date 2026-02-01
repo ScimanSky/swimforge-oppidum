@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { Trophy, ArrowLeft, Calendar, Target, Users, Medal, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
-import MobileNav from "@/components/MobileNav";
 import { AppLayout } from "@/components/AppLayout";
 
 export default function ChallengeDetail() {
@@ -106,7 +105,6 @@ export default function ChallengeDetail() {
           <div className="container mx-auto px-4 py-8">
             <p className="text-center text-[oklch(0.60_0.03_220)]">Caricamento...</p>
           </div>
-          <MobileNav />
         </div>
       </AppLayout>
     );
@@ -119,7 +117,6 @@ export default function ChallengeDetail() {
           <div className="container mx-auto px-4 py-8">
             <p className="text-center text-[oklch(0.60_0.03_220)]">Sfida non trovata</p>
           </div>
-          <MobileNav />
         </div>
       </AppLayout>
     );
@@ -297,7 +294,6 @@ export default function ChallengeDetail() {
           </div>
         </motion.div>
         </div>
-        <MobileNav />
       </div>
     </AppLayout>
   );
