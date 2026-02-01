@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/lib/trpc";
+import { renderMarkdownPreview } from "@/lib/markdownPreview";
 
 type FeedItem = {
   id: number;
@@ -63,6 +64,16 @@ export default function ClubDetail() {
     { enabled: !!clubQuery.data }
   );
 
+  const requestsQuery = trpc.community.clubs.requests.useQuery(
+    { clubId },
+    { enabled: !!clubQuery.data }
+  );
+
+  const bannedQuery = trpc.community.clubs.banned.useQuery(
+    { clubId },
+    { enabled: !!clubQuery.data }
+  );
+
   const feedQuery = trpc.community.clubs.feed.useQuery(
     { clubId, limit: 20 },
     { enabled: !!clubQuery.data }
@@ -92,6 +103,39 @@ export default function ClubDetail() {
   const deleteClub = trpc.community.clubs.delete.useMutation({
     onSuccess: () => {
       window.location.href = "/community";
+    },
+  });
+
+  const approveRequest = trpc.community.clubs.approveRequest.useMutation({
+    onSuccess: () => {
+      utils.community.clubs.requests.invalidate({ clubId });
+      utils.community.clubs.members.invalidate({ clubId });
+    },
+  });
+
+  const rejectRequest = trpc.community.clubs.rejectRequest.useMutation({
+    onSuccess: () => {
+      utils.community.clubs.requests.invalidate({ clubId });
+    },
+  });
+
+  const banMember = trpc.community.clubs.banMember.useMutation({
+    onSuccess: () => {
+      utils.community.clubs.members.invalidate({ clubId });
+      utils.community.clubs.banned.invalidate({ clubId });
+    },
+  });
+
+  const unbanMember = trpc.community.clubs.unbanMember.useMutation({
+    onSuccess: () => {
+      utils.community.clubs.banned.invalidate({ clubId });
+      utils.community.clubs.members.invalidate({ clubId });
+    },
+  });
+
+  const updateMemberRole = trpc.community.clubs.updateMemberRole.useMutation({
+    onSuccess: () => {
+      utils.community.clubs.members.invalidate({ clubId });
     },
   });
 
@@ -177,6 +221,11 @@ export default function ClubDetail() {
   }, [club]);
   const feedItems = useMemo(() => (feedQuery.data as FeedItem[]) || [], [feedQuery.data]);
   const members = useMemo(() => (membersQuery.data as any[]) || [], [membersQuery.data]);
+  const requests = useMemo(() => (requestsQuery.data as any[]) || [], [requestsQuery.data]);
+  const bannedMembers = useMemo(() => (bannedQuery.data as any[]) || [], [bannedQuery.data]);
+
+  const isStaff = club?.member_role && ["owner", "admin", "moderator"].includes(club.member_role);
+  const isOwner = club?.member_role === "owner";
 
   if (!match || !Number.isFinite(clubId)) {
     return null;
@@ -239,6 +288,17 @@ export default function ClubDetail() {
               </Card>
             ) : (
               <>
+                {club?.rules && (
+                  <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
+                    <CardContent className="p-6">
+                      <h3 className="text-lg font-semibold mb-3">Regole del club</h3>
+                      <div
+                        className="prose prose-invert prose-sm max-w-none"
+                        dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(club.rules) }}
+                      />
+                    </CardContent>
+                  </Card>
+                )}
                 <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
                   <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
                     <CardContent className="p-6 space-y-4">
@@ -292,8 +352,36 @@ export default function ClubDetail() {
                                 <div className="text-sm font-semibold">
                                   {member.user_name || member.user_email}
                                 </div>
-                                <div className="text-xs text-white/50">{member.role}</div>
+                                <div className="text-xs text-white/50">
+                                  {member.role === "moderator" ? "Moderatore" : member.role === "admin" ? "Admin" : member.role}
+                                </div>
                               </div>
+                              {isOwner && member.role !== "owner" && (
+                                <select
+                                  value={member.role}
+                                  onChange={(e) =>
+                                    updateMemberRole.mutate({
+                                      clubId,
+                                      userId: member.user_id,
+                                      role: e.target.value as "member" | "moderator" | "admin",
+                                    })
+                                  }
+                                  className="rounded-md bg-white/5 border border-white/10 px-2 py-1 text-xs"
+                                >
+                                  <option value="member">Membro</option>
+                                  <option value="moderator">Moderatore</option>
+                                  <option value="admin">Admin</option>
+                                </select>
+                              )}
+                              {isStaff && member.role !== "owner" && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => banMember.mutate({ clubId, userId: member.user_id })}
+                                >
+                                  Ban
+                                </Button>
+                              )}
                             </div>
                           ))
                         )}
@@ -302,12 +390,14 @@ export default function ClubDetail() {
                   </Card>
                 </div>
 
-                {club?.member_role === "owner" && (
+                {isStaff && (
                   <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
                     <CardContent className="p-6 space-y-4">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold">Impostazioni club</h3>
-                        <span className="text-xs text-white/60">Solo owner</span>
+                        <span className="text-xs text-white/60">
+                          {isOwner ? "Owner" : "Moderazione"}
+                        </span>
                       </div>
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="space-y-2">
@@ -315,6 +405,7 @@ export default function ClubDetail() {
                           <select
                             value={visibilityDraft}
                             onChange={(e) => setVisibilityDraft(e.target.value as "public" | "private" | "invite")}
+                            disabled={!isOwner}
                             className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm"
                           >
                             <option value="public">Pubblico</option>
@@ -331,6 +422,15 @@ export default function ClubDetail() {
                           />
                         </div>
                       </div>
+                      {rulesDraft.trim().length > 0 && (
+                        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                          <div className="text-xs text-white/60 mb-2">Anteprima regole</div>
+                          <div
+                            className="prose prose-invert prose-sm max-w-none"
+                            dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(rulesDraft) }}
+                          />
+                        </div>
+                      )}
                       <div className="flex flex-col sm:flex-row gap-2">
                         <Button
                           className="bg-[var(--azure)] text-white"
@@ -344,19 +444,108 @@ export default function ClubDetail() {
                         >
                           Salva impostazioni
                         </Button>
-                        <Button
-                          variant="destructive"
-                          onClick={() => {
-                            if (confirm("Vuoi eliminare definitivamente questo club?")) {
-                              deleteClub.mutate({ clubId });
-                            }
-                          }}
-                        >
-                          Elimina club
-                        </Button>
+                        {isOwner && (
+                          <Button
+                            variant="destructive"
+                            onClick={() => {
+                              if (confirm("Vuoi eliminare definitivamente questo club?")) {
+                                deleteClub.mutate({ clubId });
+                              }
+                            }}
+                          >
+                            Elimina club
+                          </Button>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
+                )}
+
+                {isStaff && (
+                  <div className="grid gap-6 lg:grid-cols-2">
+                    <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
+                      <CardContent className="p-6 space-y-4">
+                        <h3 className="text-lg font-semibold">Richieste di ingresso</h3>
+                        {requests.length === 0 ? (
+                          <div className="text-white/60 text-sm">Nessuna richiesta in attesa.</div>
+                        ) : (
+                          <div className="space-y-3">
+                            {requests.map((member) => (
+                              <div key={member.user_id} className="flex items-center gap-3">
+                                {member.user_avatar ? (
+                                  <img
+                                    src={member.user_avatar}
+                                    alt={member.user_name || member.user_email}
+                                    className="h-8 w-8 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-8 w-8 rounded-full bg-white/10" />
+                                )}
+                                <div className="flex-1">
+                                  <div className="text-sm font-semibold">
+                                    {member.user_name || member.user_email}
+                                  </div>
+                                  <div className="text-xs text-white/50">Richiesta in attesa</div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  className="bg-[var(--azure)] text-white"
+                                  onClick={() => approveRequest.mutate({ clubId, userId: member.user_id })}
+                                >
+                                  Approva
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => rejectRequest.mutate({ clubId, userId: member.user_id })}
+                                >
+                                  Rifiuta
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
+                      <CardContent className="p-6 space-y-4">
+                        <h3 className="text-lg font-semibold">Utenti bannati</h3>
+                        {bannedMembers.length === 0 ? (
+                          <div className="text-white/60 text-sm">Nessun utente bannato.</div>
+                        ) : (
+                          <div className="space-y-3">
+                            {bannedMembers.map((member) => (
+                              <div key={member.user_id} className="flex items-center gap-3">
+                                {member.user_avatar ? (
+                                  <img
+                                    src={member.user_avatar}
+                                    alt={member.user_name || member.user_email}
+                                    className="h-8 w-8 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-8 w-8 rounded-full bg-white/10" />
+                                )}
+                                <div className="flex-1">
+                                  <div className="text-sm font-semibold">
+                                    {member.user_name || member.user_email}
+                                  </div>
+                                  <div className="text-xs text-white/50">Bannato</div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => unbanMember.mutate({ clubId, userId: member.user_id })}
+                                >
+                                  Riammetti
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
                 )}
 
                 {feedQuery.isLoading ? (

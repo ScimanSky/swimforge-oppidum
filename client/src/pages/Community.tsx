@@ -25,6 +25,7 @@ import MobileNav from "@/components/MobileNav";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { supabase } from "@/lib/supabase";
+import { renderMarkdownPreview } from "@/lib/markdownPreview";
 
 type FeedItem = {
   id: number;
@@ -49,13 +50,16 @@ type ClubItem = {
   id: number;
   name: string;
   description?: string | null;
+  rules?: string | null;
   cover_image_url?: string | null;
   is_private: boolean;
+  visibility?: "public" | "private" | "invite";
   owner_id: number;
   created_at: string;
   member_count: number;
   is_member: boolean;
   member_role?: string | null;
+  member_status?: string | null;
 };
 
 export default function Community() {
@@ -131,7 +135,12 @@ export default function Community() {
   });
 
   const joinClub = trpc.community.clubs.join.useMutation({
-    onSuccess: () => utils.community.clubs.list.invalidate(),
+    onSuccess: (data) => {
+      utils.community.clubs.list.invalidate();
+      if ((data as any)?.requested) {
+        toast.success("Richiesta di ingresso inviata.");
+      }
+    },
   });
 
   const leaveClub = trpc.community.clubs.leave.useMutation({
@@ -590,6 +599,15 @@ export default function Community() {
                             className="min-h-[90px]"
                           />
                         </div>
+                        {clubRules.trim().length > 0 && (
+                          <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3">
+                            <div className="text-xs text-white/60 mb-2">Anteprima regole</div>
+                            <div
+                              className="prose prose-invert prose-sm max-w-none"
+                              dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(clubRules) }}
+                            />
+                          </div>
+                        )}
                         <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto] items-start">
                           <div className="space-y-2">
                             <Label className="text-xs text-white/70">Immagine club</Label>
@@ -741,9 +759,13 @@ export default function Community() {
                                 <Button
                                   className="w-full sm:flex-1 bg-[var(--azure)] text-white"
                                   onClick={() => joinClub.mutate({ clubId: club.id })}
-                                  disabled={club.visibility !== "public"}
+                                  disabled={club.member_status === "pending"}
                                 >
-                                  {club.visibility === "invite" ? "Su invito" : "Entra"}
+                                  {club.visibility === "public"
+                                    ? "Entra"
+                                    : club.member_status === "pending"
+                                    ? "Richiesta inviata"
+                                    : "Richiedi"}
                                 </Button>
                               )}
                               <Link href={`/community/club/${club.id}`}>

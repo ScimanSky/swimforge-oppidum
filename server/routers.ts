@@ -1022,6 +1022,32 @@ export const appRouter = router({
           return listClubMembers(input.clubId);
         }),
 
+      requests: protectedProcedure
+        .input(z.object({ clubId: z.number() }))
+        .query(async ({ ctx, input }) => {
+          const { getClubById, listClubMembersByStatus, getClubMemberRole } = await import("./db_clubs");
+          const club = await getClubById(ctx.user.id, input.clubId);
+          if (!club) throw new TRPCError({ code: "NOT_FOUND" });
+          const role = await getClubMemberRole(ctx.user.id, input.clubId);
+          if (!role || role.status !== "active" || !["owner", "admin", "moderator"].includes(role.role)) {
+            throw new TRPCError({ code: "FORBIDDEN" });
+          }
+          return listClubMembersByStatus(input.clubId, "pending");
+        }),
+
+      banned: protectedProcedure
+        .input(z.object({ clubId: z.number() }))
+        .query(async ({ ctx, input }) => {
+          const { getClubById, listClubMembersByStatus, getClubMemberRole } = await import("./db_clubs");
+          const club = await getClubById(ctx.user.id, input.clubId);
+          if (!club) throw new TRPCError({ code: "NOT_FOUND" });
+          const role = await getClubMemberRole(ctx.user.id, input.clubId);
+          if (!role || role.status !== "active" || !["owner", "admin", "moderator"].includes(role.role)) {
+            throw new TRPCError({ code: "FORBIDDEN" });
+          }
+          return listClubMembersByStatus(input.clubId, "banned");
+        }),
+
       feed: protectedProcedure
         .input(z.object({
           clubId: z.number(),
@@ -1093,6 +1119,41 @@ export const appRouter = router({
         .mutation(async ({ ctx, input }) => {
           const { deleteClub } = await import("./db_clubs");
           return deleteClub(ctx.user.id, input.clubId);
+        }),
+
+      approveRequest: protectedProcedure
+        .input(z.object({ clubId: z.number(), userId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const { approveJoinRequest } = await import("./db_clubs");
+          return approveJoinRequest(ctx.user.id, input.clubId, input.userId);
+        }),
+
+      rejectRequest: protectedProcedure
+        .input(z.object({ clubId: z.number(), userId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const { rejectJoinRequest } = await import("./db_clubs");
+          return rejectJoinRequest(ctx.user.id, input.clubId, input.userId);
+        }),
+
+      banMember: protectedProcedure
+        .input(z.object({ clubId: z.number(), userId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const { banMember } = await import("./db_clubs");
+          return banMember(ctx.user.id, input.clubId, input.userId);
+        }),
+
+      unbanMember: protectedProcedure
+        .input(z.object({ clubId: z.number(), userId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const { unbanMember } = await import("./db_clubs");
+          return unbanMember(ctx.user.id, input.clubId, input.userId);
+        }),
+
+      updateMemberRole: protectedProcedure
+        .input(z.object({ clubId: z.number(), userId: z.number(), role: z.enum(["member", "moderator", "admin"]) }))
+        .mutation(async ({ ctx, input }) => {
+          const { updateMemberRole } = await import("./db_clubs");
+          return updateMemberRole(ctx.user.id, input.clubId, input.userId, input.role);
         }),
     }),
   }),

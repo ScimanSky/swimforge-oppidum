@@ -41,7 +41,8 @@ export async function listClubs(userId: number, options: { search?: string; scop
         SELECT 1 FROM community_club_members m
         WHERE m.club_id = c.id AND m.user_id = ${userId} AND m.status = 'active'
       ) AS is_member,
-      (SELECT m.role FROM community_club_members m WHERE m.club_id = c.id AND m.user_id = ${userId} LIMIT 1) AS member_role
+      (SELECT m.role FROM community_club_members m WHERE m.club_id = c.id AND m.user_id = ${userId} LIMIT 1) AS member_role,
+      (SELECT m.status FROM community_club_members m WHERE m.club_id = c.id AND m.user_id = ${userId} LIMIT 1) AS member_status
     FROM community_clubs c
     ${whereClause}
     ORDER BY c.created_at DESC
@@ -71,7 +72,8 @@ export async function getClubById(userId: number, clubId: number) {
         SELECT 1 FROM community_club_members m
         WHERE m.club_id = c.id AND m.user_id = ${userId} AND m.status = 'active'
       ) AS is_member,
-      (SELECT m.role FROM community_club_members m WHERE m.club_id = c.id AND m.user_id = ${userId} LIMIT 1) AS member_role
+      (SELECT m.role FROM community_club_members m WHERE m.club_id = c.id AND m.user_id = ${userId} LIMIT 1) AS member_role,
+      (SELECT m.status FROM community_club_members m WHERE m.club_id = c.id AND m.user_id = ${userId} LIMIT 1) AS member_status
     FROM community_clubs c
     WHERE c.id = ${clubId}
     LIMIT 1
@@ -88,6 +90,7 @@ export async function listClubMembers(clubId: number) {
     SELECT
       m.user_id,
       m.role,
+      m.status,
       m.joined_at,
       u.name AS user_name,
       u.email AS user_email,
@@ -100,6 +103,45 @@ export async function listClubMembers(clubId: number) {
   `);
 
   return result.rows;
+}
+
+export async function listClubMembersByStatus(clubId: number, status: "pending" | "banned") {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db.execute(sql`
+    SELECT
+      m.user_id,
+      m.role,
+      m.status,
+      m.joined_at,
+      u.name AS user_name,
+      u.email AS user_email,
+      sp.avatar_url AS user_avatar
+    FROM community_club_members m
+    JOIN users u ON u.id = m.user_id
+    LEFT JOIN swimmer_profiles sp ON sp.user_id = u.id
+    WHERE m.club_id = ${clubId} AND m.status = ${status}
+    ORDER BY m.joined_at ASC
+  `);
+
+  return result.rows;
+}
+
+export async function getClubMemberRole(userId: number, clubId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db
+    .select({
+      role: communityClubMembers.role,
+      status: communityClubMembers.status,
+    })
+    .from(communityClubMembers)
+    .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)))
+    .limit(1);
+
+  return result[0] ?? null;
 }
 
 export async function getClubFeed(userId: number, clubId: number, limit = 20) {
@@ -149,7 +191,11 @@ export async function createClubPost(userId: number, clubId: number, input: { co
   const isMember = await db
     .select({ id: communityClubMembers.id })
     .from(communityClubMembers)
-    .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)))
+    .where(and(
+      eq(communityClubMembers.clubId, clubId),
+      eq(communityClubMembers.userId, userId),
+      eq(communityClubMembers.status, "active")
+    ))
     .limit(1);
 
   if (!isMember.length) {
@@ -227,18 +273,24 @@ export async function joinClub(userId: number, clubId: number) {
     .limit(1);
 
   if (!club.length) throw new Error("Club not found");
-  if (club[0].visibility && club[0].visibility !== "public") {
-    throw new Error("Club is invite-only");
-  }
-  if (club[0].isPrivate) throw new Error("Club is private");
 
   const existing = await db
-    .select({ id: communityClubMembers.id })
+    .select({ id: communityClubMembers.id, status: communityClubMembers.status })
     .from(communityClubMembers)
     .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)))
     .limit(1);
 
   if (existing.length) {
+    if (existing[0].status === "banned") {
+      throw new Error("Banned");
+    }
+    if (club[0].visibility !== "public") {
+      await db
+        .update(communityClubMembers)
+        .set({ status: "pending" })
+        .where(eq(communityClubMembers.id, existing[0].id));
+      return { requested: true };
+    }
     await db
       .update(communityClubMembers)
       .set({ status: "active" })
@@ -250,11 +302,11 @@ export async function joinClub(userId: number, clubId: number) {
     clubId,
     userId,
     role: "member",
-    status: "active",
+    status: club[0].visibility === "public" ? "active" : "pending",
     joinedAt: new Date(),
   });
 
-  return { joined: true };
+  return club[0].visibility === "public" ? { joined: true } : { requested: true };
 }
 
 export async function leaveClub(userId: number, clubId: number) {
@@ -266,6 +318,106 @@ export async function leaveClub(userId: number, clubId: number) {
     .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)));
 
   return { left: true };
+}
+
+export async function approveJoinRequest(actorId: number, clubId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const actor = await getClubMemberRole(actorId, clubId);
+  if (!actor || actor.status !== "active" || !["owner", "admin", "moderator"].includes(actor.role)) {
+    throw new Error("Forbidden");
+  }
+
+  await db
+    .update(communityClubMembers)
+    .set({ status: "active", joinedAt: new Date() })
+    .where(and(
+      eq(communityClubMembers.clubId, clubId),
+      eq(communityClubMembers.userId, userId),
+      eq(communityClubMembers.status, "pending")
+    ));
+
+  return { approved: true };
+}
+
+export async function rejectJoinRequest(actorId: number, clubId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const actor = await getClubMemberRole(actorId, clubId);
+  if (!actor || actor.status !== "active" || !["owner", "admin", "moderator"].includes(actor.role)) {
+    throw new Error("Forbidden");
+  }
+
+  await db
+    .delete(communityClubMembers)
+    .where(and(
+      eq(communityClubMembers.clubId, clubId),
+      eq(communityClubMembers.userId, userId),
+      eq(communityClubMembers.status, "pending")
+    ));
+
+  return { rejected: true };
+}
+
+export async function banMember(actorId: number, clubId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const actor = await getClubMemberRole(actorId, clubId);
+  if (!actor || actor.status !== "active" || !["owner", "admin", "moderator"].includes(actor.role)) {
+    throw new Error("Forbidden");
+  }
+
+  const target = await getClubMemberRole(userId, clubId);
+  if (!target) throw new Error("User not found");
+  if (target.role === "owner") throw new Error("Cannot ban owner");
+
+  await db
+    .update(communityClubMembers)
+    .set({ status: "banned" })
+    .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)));
+
+  return { banned: true };
+}
+
+export async function unbanMember(actorId: number, clubId: number, userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const actor = await getClubMemberRole(actorId, clubId);
+  if (!actor || actor.status !== "active" || !["owner", "admin", "moderator"].includes(actor.role)) {
+    throw new Error("Forbidden");
+  }
+
+  await db
+    .update(communityClubMembers)
+    .set({ status: "active" })
+    .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)));
+
+  return { unbanned: true };
+}
+
+export async function updateMemberRole(actorId: number, clubId: number, userId: number, role: "member" | "moderator" | "admin") {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const actor = await getClubMemberRole(actorId, clubId);
+  if (!actor || actor.status !== "active" || actor.role !== "owner") {
+    throw new Error("Forbidden");
+  }
+
+  const target = await getClubMemberRole(userId, clubId);
+  if (!target) throw new Error("User not found");
+  if (target.role === "owner") throw new Error("Cannot change owner");
+
+  await db
+    .update(communityClubMembers)
+    .set({ role })
+    .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)));
+
+  return { updated: true };
 }
 
 export async function updateClub(userId: number, clubId: number, input: { name?: string; description?: string | null; coverImageUrl?: string | null; visibility?: "public" | "private" | "invite"; rules?: string | null }) {
