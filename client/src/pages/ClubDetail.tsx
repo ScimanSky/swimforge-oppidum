@@ -572,35 +572,35 @@ export default function ClubDetail() {
                               invite.expires_at && new Date(invite.expires_at).getTime() < Date.now();
                             const isUsedUp = invite.used_count >= invite.max_uses;
                             const statusLabel = isExpired
-                              ? \"Scaduto\"
+                              ? "Scaduto"
                               : isUsedUp
-                              ? \"Esaurito\"
-                              : invite.status === \"revoked\"
-                              ? \"Revocato\"
-                              : \"Attivo\";
+                              ? "Esaurito"
+                              : invite.status === "revoked"
+                              ? "Revocato"
+                              : "Attivo";
                             return (
                               <div
                                 key={invite.id}
-                                className=\"flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2\"
+                                className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2"
                               >
-                                <div className=\"text-sm\">
-                                  <div className=\"font-semibold\">{invite.code}</div>
-                                  <div className=\"text-xs text-white/60\">
+                                <div className="text-sm">
+                                  <div className="font-semibold">{invite.code}</div>
+                                  <div className="text-xs text-white/60">
                                     Ruolo: {invite.role} · Usati {invite.used_count}/{invite.max_uses} · {statusLabel}
                                   </div>
                                 </div>
-                                <div className=\"flex items-center gap-2\">
+                                <div className="flex items-center gap-2">
                                   <Button
-                                    size=\"sm\"
-                                    variant=\"outline\"
+                                    size="sm"
+                                    variant="outline"
                                     onClick={() => copyInviteLink(invite.code)}
                                   >
                                     Copia link
                                   </Button>
-                                  {invite.status === \"active\" && !isExpired && !isUsedUp && (
+                                  {invite.status === "active" && !isExpired && !isUsedUp && (
                                     <Button
-                                      size=\"sm\"
-                                      variant=\"destructive\"
+                                      size="sm"
+                                      variant="destructive"
                                       onClick={() => revokeInvite.mutate({ clubId, inviteId: invite.id })}
                                     >
                                       Revoca
