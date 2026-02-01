@@ -93,6 +93,15 @@ export default function ClubDetail() {
     { enabled: !!clubQuery.data }
   );
 
+  const club = clubQuery.data as Club | undefined;
+  const isStaff = club?.member_role && ["owner", "admin", "moderator"].includes(club.member_role);
+  const isOwner = club?.member_role === "owner";
+
+  const invitesQuery = trpc.community.clubs.invites.useQuery(
+    { clubId },
+    { enabled: !!clubQuery.data && !!isStaff }
+  );
+
   const joinClub = trpc.community.clubs.join.useMutation({
     onSuccess: () => {
       utils.community.clubs.get.invalidate({ clubId });
@@ -246,8 +255,6 @@ export default function ClubDetail() {
     }
   };
 
-  const club = clubQuery.data as Club | undefined;
-
   useEffect(() => {
     if (club) {
       setRulesDraft(club.rules ?? "");
@@ -259,14 +266,6 @@ export default function ClubDetail() {
   const requests = useMemo(() => (requestsQuery.data as any[]) || [], [requestsQuery.data]);
   const bannedMembers = useMemo(() => (bannedQuery.data as any[]) || [], [bannedQuery.data]);
   const invites = useMemo(() => (invitesQuery.data as ClubInvite[]) || [], [invitesQuery.data]);
-
-  const isStaff = club?.member_role && ["owner", "admin", "moderator"].includes(club.member_role);
-  const isOwner = club?.member_role === "owner";
-
-  const invitesQuery = trpc.community.clubs.invites.useQuery(
-    { clubId },
-    { enabled: !!clubQuery.data && !!isStaff }
-  );
 
   if (!match || !Number.isFinite(clubId)) {
     return null;
