@@ -1,6 +1,6 @@
 import { and, eq, ilike, sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { communityClubs, communityClubMembers, socialPosts, swimmingActivities } from "../drizzle/schema";
+import { communityClubInvites, communityClubs, communityClubMembers, socialPosts, swimmingActivities } from "../drizzle/schema";
 
 export type ClubScope = "all" | "mine";
 
@@ -418,6 +418,140 @@ export async function updateMemberRole(actorId: number, clubId: number, userId: 
     .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)));
 
   return { updated: true };
+}
+
+export async function listClubInvites(actorId: number, clubId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const actor = await getClubMemberRole(actorId, clubId);
+  if (!actor || actor.status !== "active" || !["owner", "admin", "moderator"].includes(actor.role)) {
+    throw new Error("Forbidden");
+  }
+
+  const result = await db.execute(sql`
+    SELECT
+      i.id,
+      i.code,
+      i.role,
+      i.status,
+      i.max_uses,
+      i.used_count,
+      i.expires_at,
+      i.created_at
+    FROM community_club_invites i
+    WHERE i.club_id = ${clubId}
+    ORDER BY i.created_at DESC
+  `);
+
+  return result.rows;
+}
+
+export async function createClubInvite(actorId: number, clubId: number, input: { role?: "member" | "moderator"; maxUses?: number; expiresAt?: Date | null }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const actor = await getClubMemberRole(actorId, clubId);
+  if (!actor || actor.status !== "active" || !["owner", "admin", "moderator"].includes(actor.role)) {
+    throw new Error("Forbidden");
+  }
+
+  if (input.role === "moderator" && actor.role !== "owner" && actor.role !== "admin") {
+    throw new Error("Forbidden");
+  }
+
+  const { nanoid } = await import("nanoid");
+  const code = nanoid(10);
+
+  const inserted = await db
+    .insert(communityClubInvites)
+    .values({
+      clubId,
+      inviterId: actorId,
+      code,
+      role: input.role ?? "member",
+      status: "active",
+      maxUses: input.maxUses ?? 1,
+      usedCount: 0,
+      expiresAt: input.expiresAt ?? null,
+      createdAt: new Date(),
+    })
+    .returning({ id: communityClubInvites.id, code: communityClubInvites.code });
+
+  return inserted[0] ?? null;
+}
+
+export async function revokeClubInvite(actorId: number, clubId: number, inviteId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const actor = await getClubMemberRole(actorId, clubId);
+  if (!actor || actor.status !== "active" || !["owner", "admin", "moderator"].includes(actor.role)) {
+    throw new Error("Forbidden");
+  }
+
+  await db
+    .update(communityClubInvites)
+    .set({ status: "revoked" })
+    .where(and(eq(communityClubInvites.id, inviteId), eq(communityClubInvites.clubId, clubId)));
+
+  return { revoked: true };
+}
+
+export async function acceptClubInvite(userId: number, code: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const inviteResult = await db
+    .select()
+    .from(communityClubInvites)
+    .where(eq(communityClubInvites.code, code))
+    .limit(1);
+
+  const invite = inviteResult[0];
+  if (!invite) throw new Error("Invite not found");
+
+  if (invite.status !== "active") {
+    throw new Error("Invite inactive");
+  }
+  if (invite.expiresAt && invite.expiresAt.getTime() < Date.now()) {
+    throw new Error("Invite expired");
+  }
+  if (invite.usedCount >= invite.maxUses) {
+    throw new Error("Invite exhausted");
+  }
+
+  const existing = await db
+    .select({ id: communityClubMembers.id, status: communityClubMembers.status })
+    .from(communityClubMembers)
+    .where(and(eq(communityClubMembers.clubId, invite.clubId), eq(communityClubMembers.userId, userId)))
+    .limit(1);
+
+  if (existing.length && existing[0].status === "banned") {
+    throw new Error("Banned");
+  }
+
+  if (!existing.length) {
+    await db.insert(communityClubMembers).values({
+      clubId: invite.clubId,
+      userId,
+      role: invite.role ?? "member",
+      status: "active",
+      joinedAt: new Date(),
+    });
+  } else {
+    await db
+      .update(communityClubMembers)
+      .set({ status: "active", role: invite.role ?? "member", joinedAt: new Date() })
+      .where(eq(communityClubMembers.id, existing[0].id));
+  }
+
+  await db
+    .update(communityClubInvites)
+    .set({ usedCount: invite.usedCount + 1 })
+    .where(eq(communityClubInvites.id, invite.id));
+
+  return { joined: true, clubId: invite.clubId };
 }
 
 export async function updateClub(userId: number, clubId: number, input: { name?: string; description?: string | null; coverImageUrl?: string | null; visibility?: "public" | "private" | "invite"; rules?: string | null }) {

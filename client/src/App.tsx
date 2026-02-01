@@ -17,6 +17,7 @@ import Coach from "./pages/Coach";
 import CoachDryland from "./pages/CoachDryland";
 import SessionInsights from "./pages/SessionInsights";
 import Community from "./pages/Community";
+import ClubInvite from "./pages/ClubInvite";
 import ClubDetail from "./pages/ClubDetail";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
@@ -47,6 +48,7 @@ function Router() {
       <Route path="/coach-dryland" component={CoachDryland} />
       <Route path="/session-iq" component={SessionInsights} />
       <Route path="/community" component={Community} />
+      <Route path="/community/invite/:code" component={ClubInvite} />
       <Route path="/community/club/:id" component={ClubDetail} />
       <Route path="/profile" component={Profile} />
       <Route path="/settings" component={Settings} />

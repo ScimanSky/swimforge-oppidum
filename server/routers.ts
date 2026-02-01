@@ -1048,6 +1048,44 @@ export const appRouter = router({
           return listClubMembersByStatus(input.clubId, "banned");
         }),
 
+      invites: protectedProcedure
+        .input(z.object({ clubId: z.number() }))
+        .query(async ({ ctx, input }) => {
+          const { listClubInvites } = await import("./db_clubs");
+          return listClubInvites(ctx.user.id, input.clubId);
+        }),
+
+      createInvite: protectedProcedure
+        .input(z.object({
+          clubId: z.number(),
+          role: z.enum(["member", "moderator"]).optional(),
+          maxUses: z.number().min(1).max(100).optional(),
+          expiresAt: z.date().optional().nullable(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const { createClubInvite } = await import("./db_clubs");
+          const invite = await createClubInvite(ctx.user.id, input.clubId, {
+            role: input.role,
+            maxUses: input.maxUses,
+            expiresAt: input.expiresAt ?? null,
+          });
+          return { success: true, invite };
+        }),
+
+      revokeInvite: protectedProcedure
+        .input(z.object({ clubId: z.number(), inviteId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const { revokeClubInvite } = await import("./db_clubs");
+          return revokeClubInvite(ctx.user.id, input.clubId, input.inviteId);
+        }),
+
+      acceptInvite: protectedProcedure
+        .input(z.object({ code: z.string().min(6).max(32) }))
+        .mutation(async ({ ctx, input }) => {
+          const { acceptClubInvite } = await import("./db_clubs");
+          return acceptClubInvite(ctx.user.id, input.code);
+        }),
+
       feed: protectedProcedure
         .input(z.object({
           clubId: z.number(),

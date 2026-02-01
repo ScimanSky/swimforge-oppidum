@@ -44,6 +44,17 @@ type Club = {
   member_role?: string | null;
 };
 
+type ClubInvite = {
+  id: number;
+  code: string;
+  role: string;
+  status: string;
+  max_uses: number;
+  used_count: number;
+  expires_at?: string | null;
+  created_at: string;
+};
+
 export default function ClubDetail() {
   const [match, params] = useRoute("/community/club/:id");
   const clubId = Number(params?.id);
@@ -51,6 +62,9 @@ export default function ClubDetail() {
   const [commentTextByPost, setCommentTextByPost] = useState<Record<number, string>>({});
   const commentsEndRef = useRef<HTMLDivElement | null>(null);
   const [postText, setPostText] = useState("");
+  const [inviteRole, setInviteRole] = useState<"member" | "moderator">("member");
+  const [inviteMaxUses, setInviteMaxUses] = useState(1);
+  const [inviteExpiryDays, setInviteExpiryDays] = useState<number | "">("");
 
   const utils = trpc.useUtils();
 
@@ -139,6 +153,18 @@ export default function ClubDetail() {
     },
   });
 
+  const createInvite = trpc.community.clubs.createInvite.useMutation({
+    onSuccess: () => {
+      utils.community.clubs.invites.invalidate({ clubId });
+    },
+  });
+
+  const revokeInvite = trpc.community.clubs.revokeInvite.useMutation({
+    onSuccess: () => {
+      utils.community.clubs.invites.invalidate({ clubId });
+    },
+  });
+
   const [rulesDraft, setRulesDraft] = useState("");
   const [visibilityDraft, setVisibilityDraft] = useState<"public" | "private" | "invite">("public");
 
@@ -211,6 +237,15 @@ export default function ClubDetail() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
+  const copyInviteLink = async (code: string) => {
+    const url = `${window.location.origin}/community/invite/${code}`;
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch (_err) {
+      // no-op
+    }
+  };
+
   const club = clubQuery.data as Club | undefined;
 
   useEffect(() => {
@@ -223,9 +258,15 @@ export default function ClubDetail() {
   const members = useMemo(() => (membersQuery.data as any[]) || [], [membersQuery.data]);
   const requests = useMemo(() => (requestsQuery.data as any[]) || [], [requestsQuery.data]);
   const bannedMembers = useMemo(() => (bannedQuery.data as any[]) || [], [bannedQuery.data]);
+  const invites = useMemo(() => (invitesQuery.data as ClubInvite[]) || [], [invitesQuery.data]);
 
   const isStaff = club?.member_role && ["owner", "admin", "moderator"].includes(club.member_role);
   const isOwner = club?.member_role === "owner";
+
+  const invitesQuery = trpc.community.clubs.invites.useQuery(
+    { clubId },
+    { enabled: !!clubQuery.data && !!isStaff }
+  );
 
   if (!match || !Number.isFinite(clubId)) {
     return null;
@@ -457,6 +498,120 @@ export default function ClubDetail() {
                           </Button>
                         )}
                       </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {isStaff && (
+                  <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
+                    <CardContent className="p-6 space-y-4">
+                      <h3 className="text-lg font-semibold">Inviti</h3>
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <div className="space-y-2">
+                          <label className="text-xs text-white/60">Ruolo</label>
+                          <select
+                            value={inviteRole}
+                            onChange={(e) => setInviteRole(e.target.value as "member" | "moderator")}
+                            className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm"
+                          >
+                            <option value="member">Membro</option>
+                            {(isOwner || club?.member_role === "admin") && (
+                              <option value="moderator">Moderatore</option>
+                            )}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs text-white/60">Utilizzi max</label>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={inviteMaxUses}
+                            onChange={(e) => setInviteMaxUses(Number(e.target.value) || 1)}
+                            className="bg-white/5 border-white/10"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-xs text-white/60">Scadenza (giorni)</label>
+                          <Input
+                            type="number"
+                            min={1}
+                            placeholder="Nessuna"
+                            value={inviteExpiryDays}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setInviteExpiryDays(value ? Number(value) : "");
+                            }}
+                            className="bg-white/5 border-white/10"
+                          />
+                        </div>
+                      </div>
+                      <Button
+                        className="bg-[var(--gold)] text-[var(--navy)]"
+                        disabled={createInvite.isPending}
+                        onClick={() => {
+                          const days = typeof inviteExpiryDays === "number" ? inviteExpiryDays : 0;
+                          const expiresAt = days ? new Date(Date.now() + days * 24 * 60 * 60 * 1000) : null;
+                          createInvite.mutate({
+                            clubId,
+                            role: inviteRole,
+                            maxUses: inviteMaxUses,
+                            expiresAt,
+                          });
+                        }}
+                      >
+                        Crea invito
+                      </Button>
+
+                      {invites.length === 0 ? (
+                        <div className="text-sm text-white/60">Nessun invito attivo.</div>
+                      ) : (
+                        <div className="space-y-3">
+                          {invites.map((invite) => {
+                            const isExpired =
+                              invite.expires_at && new Date(invite.expires_at).getTime() < Date.now();
+                            const isUsedUp = invite.used_count >= invite.max_uses;
+                            const statusLabel = isExpired
+                              ? \"Scaduto\"
+                              : isUsedUp
+                              ? \"Esaurito\"
+                              : invite.status === \"revoked\"
+                              ? \"Revocato\"
+                              : \"Attivo\";
+                            return (
+                              <div
+                                key={invite.id}
+                                className=\"flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2\"
+                              >
+                                <div className=\"text-sm\">
+                                  <div className=\"font-semibold\">{invite.code}</div>
+                                  <div className=\"text-xs text-white/60\">
+                                    Ruolo: {invite.role} · Usati {invite.used_count}/{invite.max_uses} · {statusLabel}
+                                  </div>
+                                </div>
+                                <div className=\"flex items-center gap-2\">
+                                  <Button
+                                    size=\"sm\"
+                                    variant=\"outline\"
+                                    onClick={() => copyInviteLink(invite.code)}
+                                  >
+                                    Copia link
+                                  </Button>
+                                  {invite.status === \"active\" && !isExpired && !isUsedUp && (
+                                    <Button
+                                      size=\"sm\"
+                                      variant=\"destructive\"
+                                      onClick={() => revokeInvite.mutate({ clubId, inviteId: invite.id })}
+                                    >
+                                      Revoca
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 )}
