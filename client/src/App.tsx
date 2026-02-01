@@ -11,6 +11,7 @@ import Challenges from "./pages/Challenges";
 import ChallengeDetail from "./pages/ChallengeDetail";
 import Leaderboard from "./pages/Leaderboard";
 import Activities from "./pages/Activities";
+import Goals from "./pages/Goals";
 import Profile from "./pages/Profile";
 import Statistics from "./pages/Statistics";
 import Coach from "./pages/Coach";
@@ -21,6 +22,8 @@ import ClubInvite from "./pages/ClubInvite";
 import ClubDetail from "./pages/ClubDetail";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
 import StravaConnect from "./pages/StravaConnect";
 import Settings from "./pages/Settings";
 import BadgeUnlockNotification from "./components/BadgeUnlockNotification";
@@ -36,13 +39,16 @@ function Router() {
       <Route path="/auth" component={Auth} />
       <Route path="/auth/callback" component={AuthCallback} />
       <Route path="/strava/callback" component={StravaConnect} />
-      <Route path="/login" component={Auth} />
+      <Route path="/login" component={Login} />
+      <Route path="/register" component={Register} />
+      <Route path="/signup" component={Register} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/badges" component={Badges} />
       <Route path="/challenges" component={Challenges} />
       <Route path="/challenges/:id" component={ChallengeDetail} />
       <Route path="/leaderboard" component={Leaderboard} />
       <Route path="/activities" component={Activities} />
+      <Route path="/goals" component={Goals} />
       <Route path="/statistics" component={Statistics} />
       <Route path="/coach" component={Coach} />
       <Route path="/coach-dryland" component={CoachDryland} />
@@ -73,7 +79,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <ThemeProvider defaultTheme="light">
+      <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster richColors position="top-center" />
           <AutoSync />

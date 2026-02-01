@@ -107,6 +107,9 @@ temp/
 
 # Local landing drafts (do not commit)
 assets/landing_drafts/
+assets/_swim-forge-v0/
+assets/swim-forge.zip
+assets/swim-forge.zip:Zone.Identifier
 
 # Database
 *.db

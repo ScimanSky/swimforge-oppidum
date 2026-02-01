@@ -1,326 +1,318 @@
-import { useAuth } from "@/_core/hooks/useAuth";
-import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Separator } from "@/components/ui/separator";
-import { motion } from "framer-motion";
+import AppLayout from "@/components/AppLayout"
+import Image from "next/image"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  User,
-  ChevronLeft,
-  LogOut,
   Settings,
-} from "lucide-react";
-import { useLocation, Link, Redirect } from "wouter";
-import GarminSection from "@/components/GarminSection";
-import { StravaSection } from "@/components/StravaSection";
-import { toast } from "sonner";
-import { useEffect } from "react";
-import { AppLayout } from "@/components/AppLayout";
+  Share2,
+  Trophy,
+  Flame,
+  Target,
+  Droplets,
+  Clock,
+  Calendar,
+  Award,
+  TrendingUp,
+  Star,
+  Zap,
+  Medal,
+  Shield,
+  Sunrise,
+  Timer,
+} from "lucide-react"
+
+const stats = {
+  totalDistance: "1,234 km",
+  totalTime: "187 hours",
+  totalSessions: 342,
+  avgPace: "1:42/100m",
+  longestSwim: "8.5 km",
+  currentStreak: 12,
+  bestStreak: 45,
+}
+
+const badges = [
+  { icon: Flame, name: "Streak Master", description: "30 day streak", earned: true, color: "text-orange-500" },
+  { icon: Trophy, name: "Champion", description: "Win 10 challenges", earned: true, color: "text-chart-4" },
+  { icon: Sunrise, name: "Early Bird", description: "50 morning swims", earned: true, color: "text-yellow-500" },
+  { icon: Shield, name: "Ironman", description: "Complete an Ironman", earned: true, color: "text-primary" },
+  { icon: Star, name: "All-Star", description: "Top 10 leaderboard", earned: true, color: "text-purple-500" },
+  { icon: Timer, name: "Speed Demon", description: "Sub 1:30 pace", earned: false, color: "text-muted-foreground" },
+  { icon: Target, name: "Goal Crusher", description: "Hit 100 goals", earned: false, color: "text-muted-foreground" },
+  { icon: Medal, name: "Veteran", description: "500 sessions", earned: false, color: "text-muted-foreground" },
+]
+
+const achievements = [
+  { title: "First 100km", date: "Jan 15, 2025", xp: 500 },
+  { title: "Level 40 Reached", date: "Jan 10, 2025", xp: 1000 },
+  { title: "30 Day Streak", date: "Dec 28, 2024", xp: 300 },
+  { title: "Open Water Pro", date: "Dec 15, 2024", xp: 250 },
+]
 
 export default function Profile() {
-  const { user, isAuthenticated, loading: authLoading, logout } = useAuth();
-  const [, setLocation] = useLocation();
-  const utils = trpc.useUtils();
-
-  const { data: profile, isLoading: profileLoading } = trpc.profile.get.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
-
-  const recalculateBadges = trpc.badges.recalculate.useMutation({
-    onSuccess: (data) => {
-      if (data.newBadges > 0) {
-        toast.success(`${data.newBadges} nuovi badge sbloccati!`);
-        // Refresh profile and badges
-        utils.profile.get.invalidate();
-        utils.badges.progress.invalidate();
-        utils.badges.userBadges.invalidate();
-      } else {
-        toast.success("Tutti i badge sono aggiornati!");
-      }
-    },
-    onError: () => {
-      toast.error("Errore nel ricalcolo badge");
-    },
-  });
-
-  const initializeProfileBadges = trpc.badges.initializeProfileBadges.useMutation({
-    onSuccess: (data) => {
-      toast.success(`Badge profilo inizializzati per ${data.updated} utenti!`);
-      utils.profile.get.invalidate();
-    },
-    onError: () => {
-      toast.error("Errore nell'inizializzazione badge profilo");
-    },
-  });
-
-  const recalculateChallengesProgress = trpc.challenges.recalculateAllProgress.useMutation({
-    onSuccess: (data) => {
-      toast.success(`Progresso ricalcolato per ${data.updated} sfide attive!`);
-    },
-    onError: () => {
-      toast.error("Errore nel ricalcolo progresso sfide");
-    },
-  });
-
-  const seedData = trpc.admin.seedData.useMutation({
-    onSuccess: () => {
-      toast.success("Dati inizializzati con successo!");
-    },
-    onError: () => {
-      toast.error("Errore nell'inizializzazione");
-    },
-  });
-
-  // Redirect if not authenticated - use Redirect component instead of setLocation during render
-  if (!authLoading && !isAuthenticated) {
-    return <Redirect to="/" />;
-  }
-
-  const handleLogout = async () => {
-    await logout();
-    setLocation("/");
-  };
-
-  const handleResetBadgeNotifications = () => {
-    if (!user?.id) {
-      toast.error("Utente non disponibile");
-      return;
-    }
-    localStorage.removeItem(`seenBadges:${user.id}`);
-    localStorage.removeItem(`seenAchievementBadges:${user.id}`);
-    toast.success("Notifiche badge resettate");
-  };
-
-  const isLoading = authLoading || profileLoading;
-
-
-
-  // Calculate XP progress
-  const xpProgress = profile && profile.nextLevelXp
-    ? ((profile.totalXp - (profile.nextLevelXp - profile.xpToNextLevel)) / profile.xpToNextLevel) * 100
-    : 0;
-
-
-
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low">
-    <div className="pb-20">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-white">
-        <div className="container py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard">
-                <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
-                  <ChevronLeft className="h-5 w-5" />
-                </Button>
-              </Link>
-              <h1 className="font-semibold text-lg">Profilo</h1>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/10"
-              onClick={handleLogout}
-            >
-              <LogOut className="h-5 w-5" />
-            </Button>
-          </div>
+    <AppLayout>
+    <div className="p-4 lg:p-6 space-y-6">
+      {/* Profile Header */}
+      <Card className="bg-card border-border overflow-hidden">
+        <div className="relative h-32 sm:h-48">
+          <Image
+            src="/images/pool-lanes.jpg"
+            alt="Cover"
+            fill
+            className="object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
         </div>
-      </header>
-
-      <main className="container py-6 space-y-6">
-        {/* Profile Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <Card className="overflow-hidden">
-            <div className="bg-gradient-to-br from-[var(--navy)] to-[var(--azure)] p-6 text-white">
-              {isLoading ? (
-                <div className="flex items-center gap-4">
-                  <Skeleton className="w-20 h-20 rounded-full bg-white/20" />
-                  <div className="space-y-2">
-                    <Skeleton className="h-6 w-32 bg-white/20" />
-                    <Skeleton className="h-4 w-48 bg-white/20" />
-                  </div>
+        <CardContent className="relative px-4 sm:px-6 pb-6">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-12 sm:-mt-16">
+            <Avatar className="w-24 h-24 sm:w-32 sm:h-32 border-4 border-card">
+              <AvatarImage src="/images/athlete-1.jpg" alt="Sarah Chen" />
+              <AvatarFallback className="text-2xl">SC</AvatarFallback>
+            </Avatar>
+            
+            <div className="flex-1">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                <h1 className="text-2xl font-display font-bold text-foreground">
+                  Sarah Chen
+                </h1>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-primary text-primary-foreground">
+                    <Zap className="w-3 h-3 mr-1" />
+                    Level 42
+                  </Badge>
+                  <Badge variant="outline" className="border-accent text-accent">
+                    <Flame className="w-3 h-3 mr-1" />
+                    12 day streak
+                  </Badge>
                 </div>
-              ) : (
-                <div className="flex items-center gap-4">
-                  {/* Profile Badge */}
-                  <motion.div 
-                    className="w-32 h-32 flex items-center justify-center"
-                    animate={{ rotateY: 360 }}
-                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                    style={{ transformStyle: "preserve-3d" }}
-                  >
-                    {profile?.profileBadge?.badge_image_url ? (
-                      <img 
-                        src={profile.profileBadge.badge_image_url} 
-                        alt={profile.profileBadge.name}
-                        className="w-full h-full object-contain drop-shadow-2xl"
-                        onContextMenu={(e) => e.preventDefault()}
-                        draggable={false}
-                        style={{ 
-                          WebkitTouchCallout: 'none',
-                          WebkitUserSelect: 'none',
-                          userSelect: 'none',
-                          touchAction: 'manipulation'
-                        }}
-                      />
-                    ) : (
-                      <div 
-                        className="w-full h-full rounded-full flex items-center justify-center text-3xl font-bold border-4 border-white/30"
-                        style={{ backgroundColor: profile?.levelColor || "#3b82f6" }}
-                      >
-                        {(user?.name || "N")[0].toUpperCase()}
-                      </div>
-                    )}
-                  </motion.div>
-                  <div>
-                    <h2 className="text-xl font-bold">{user?.name || "Nuotatore"}</h2>
-                    <p className="text-white/70 text-sm">{user?.email}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <span 
-                        className="px-2 py-0.5 rounded-full text-xs font-medium"
-                        style={{ backgroundColor: profile?.levelColor || "#3b82f6" }}
-                      >
-                        XP Lv. {profile?.xpLevel ?? profile?.level ?? 1}
-                      </span>
-                      <span className="text-white/80 text-sm">
-                        {profile?.aiSkillLabel || profile?.profileBadge?.name || profile?.levelTitle || "Novizio"}
-                      </span>
-                    </div>
-                  </div>
+              </div>
+              <p className="text-muted-foreground mt-1">Olympic Trialist | Bay Area Masters</p>
+              
+              {/* XP Progress */}
+              <div className="mt-4 max-w-md">
+                <div className="flex items-center justify-between text-sm mb-2">
+                  <span className="text-muted-foreground">Progress to Level 43</span>
+                  <span className="text-foreground font-medium">2,450 / 3,000 XP</span>
                 </div>
-              )}
+                <Progress value={82} className="h-2" />
+              </div>
             </div>
 
-            <CardContent className="p-4">
-              {/* XP Progress */}
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Progresso XP</span>
-                  <span className="font-semibold text-[var(--gold)]">
-                    {profile?.totalXp?.toLocaleString() || 0} XP
-                  </span>
-                </div>
-                <Progress value={xpProgress} className="h-2" />
-                {profile?.nextLevelXp && (
-                  <p className="text-xs text-muted-foreground text-right">
-                    {profile.xpToNextLevel.toLocaleString()} XP al livello {(profile?.xpLevel ?? profile?.level ?? 1) + 1}
-                  </p>
-                )}
+            <div className="flex gap-2 sm:self-start">
+              <Button variant="outline" size="icon">
+                <Share2 className="w-4 h-4" />
+              </Button>
+              <Button variant="outline" size="icon">
+                <Settings className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <Card className="bg-card border-border">
+          <CardContent className="p-4 text-center">
+            <Droplets className="w-6 h-6 text-primary mx-auto mb-2" />
+            <p className="text-2xl font-display font-bold text-foreground">
+              {stats.totalDistance}
+            </p>
+            <p className="text-xs text-muted-foreground">Total Distance</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardContent className="p-4 text-center">
+            <Clock className="w-6 h-6 text-primary mx-auto mb-2" />
+            <p className="text-2xl font-display font-bold text-foreground">
+              {stats.totalTime}
+            </p>
+            <p className="text-xs text-muted-foreground">Time in Water</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardContent className="p-4 text-center">
+            <Calendar className="w-6 h-6 text-primary mx-auto mb-2" />
+            <p className="text-2xl font-display font-bold text-foreground">
+              {stats.totalSessions}
+            </p>
+            <p className="text-xs text-muted-foreground">Total Sessions</p>
+          </CardContent>
+        </Card>
+        <Card className="bg-card border-border">
+          <CardContent className="p-4 text-center">
+            <TrendingUp className="w-6 h-6 text-accent mx-auto mb-2" />
+            <p className="text-2xl font-display font-bold text-foreground">
+              {stats.avgPace}
+            </p>
+            <p className="text-xs text-muted-foreground">Average Pace</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Tabs defaultValue="badges" className="space-y-6">
+        <TabsList className="bg-secondary/50">
+          <TabsTrigger value="badges">Badges</TabsTrigger>
+          <TabsTrigger value="achievements">Achievements</TabsTrigger>
+          <TabsTrigger value="stats">Detailed Stats</TabsTrigger>
+        </TabsList>
+
+        {/* Badges Tab */}
+        <TabsContent value="badges">
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-display font-bold text-foreground">
+                  Badges Collection
+                </CardTitle>
+                <span className="text-sm text-muted-foreground">
+                  5 / 8 earned
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {badges.map((badge, index) => (
+                  <div
+                    key={index}
+                    className={`p-4 rounded-xl text-center transition-all ${
+                      badge.earned
+                        ? "bg-secondary/50"
+                        : "bg-secondary/20 opacity-50"
+                    }`}
+                  >
+                    <div
+                      className={`w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center ${
+                        badge.earned ? "bg-background" : "bg-muted"
+                      }`}
+                    >
+                      <badge.icon className={`w-6 h-6 ${badge.color}`} />
+                    </div>
+                    <h4 className="font-medium text-foreground text-sm">
+                      {badge.name}
+                    </h4>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {badge.description}
+                    </p>
+                    {!badge.earned && (
+                      <Badge variant="outline" className="mt-2 text-xs">
+                        Locked
+                      </Badge>
+                    )}
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
-        </motion.div>
+        </TabsContent>
 
-
-
-
-
-
-
-        {/* Garmin Connection */}
-      <GarminSection garminConnected={profile?.garminConnected || false} />
-            <StravaSection />
-
-        {/* Badge Recalculation */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-        >
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Ricalcola Badge
+        {/* Achievements Tab */}
+        <TabsContent value="achievements">
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="text-lg font-display font-bold text-foreground">
+                Recent Achievements
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-0">
-              <p className="text-sm text-muted-foreground mb-3">
-                Se hai notato badge mancanti, usa questo pulsante per ricalcolare tutti i badge in base alle tue statistiche attuali.
-              </p>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => recalculateBadges.mutate()}
-                disabled={recalculateBadges.isPending}
-              >
-                {recalculateBadges.isPending ? "Ricalcolo..." : "Ricalcola Badge"}
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full mt-2"
-                onClick={handleResetBadgeNotifications}
-              >
-                Reset Notifiche Badge
-              </Button>
+            <CardContent className="space-y-3">
+              {achievements.map((achievement, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-4 p-4 rounded-xl bg-secondary/30"
+                >
+                  <div className="w-12 h-12 rounded-full bg-chart-4/10 flex items-center justify-center flex-shrink-0">
+                    <Award className="w-6 h-6 text-chart-4" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-medium text-foreground">
+                      {achievement.title}
+                    </h4>
+                    <p className="text-xs text-muted-foreground">
+                      {achievement.date}
+                    </p>
+                  </div>
+                  <Badge className="bg-accent/20 text-accent">
+                    +{achievement.xp} XP
+                  </Badge>
+                </div>
+              ))}
             </CardContent>
           </Card>
-        </motion.div>
+        </TabsContent>
 
-        {/* Admin Section */}
-        {user?.role === "admin" && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-          >
-            <Card className="border-orange-500/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base flex items-center gap-2 text-orange-500">
-                  <Settings className="h-5 w-5" />
-                  Amministrazione
+        {/* Detailed Stats Tab */}
+        <TabsContent value="stats">
+          <div className="grid md:grid-cols-2 gap-6">
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="text-lg font-display font-bold text-foreground">
+                  Personal Records
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-0 space-y-2">
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => seedData.mutate()}
-                  disabled={seedData.isPending}
-                >
-                  {seedData.isPending ? "Inizializzazione..." : "Inizializza Badge e Livelli"}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => initializeProfileBadges.mutate()}
-                  disabled={initializeProfileBadges.isPending}
-                >
-                  {initializeProfileBadges.isPending ? "Inizializzazione..." : "Inizializza Badge Profilo"}
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() => recalculateChallengesProgress.mutate()}
-                  disabled={recalculateChallengesProgress.isPending}
-                >
-                  {recalculateChallengesProgress.isPending ? "Ricalcolo..." : "Ricalcola Progresso Sfide"}
-                </Button>
+              <CardContent className="space-y-4">
+                {[
+                  { label: "Longest Swim", value: stats.longestSwim, icon: Droplets },
+                  { label: "Best 100m Pace", value: "1:28/100m", icon: Timer },
+                  { label: "Best Streak", value: `${stats.bestStreak} days`, icon: Flame },
+                  { label: "Most XP in Day", value: "450 XP", icon: Zap },
+                ].map((record, index) => (
+                  <div
+                    key={index}
+                    className="flex items-center justify-between p-3 rounded-lg bg-secondary/30"
+                  >
+                    <div className="flex items-center gap-3">
+                      <record.icon className="w-5 h-5 text-primary" />
+                      <span className="text-sm text-muted-foreground">
+                        {record.label}
+                      </span>
+                    </div>
+                    <span className="font-display font-bold text-foreground">
+                      {record.value}
+                    </span>
+                  </div>
+                ))}
               </CardContent>
             </Card>
-          </motion.div>
-        )}
 
-        {/* Logout Button */}
-        <Button
-          variant="outline"
-          className="w-full text-destructive hover:text-destructive"
-          onClick={handleLogout}
-        >
-          <LogOut className="h-4 w-4 mr-2" />
-          Esci
-        </Button>
-      </main>
-
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="text-lg font-display font-bold text-foreground">
+                  Swimming Style Breakdown
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {[
+                  { style: "Freestyle", percentage: 65, color: "bg-primary" },
+                  { style: "Backstroke", percentage: 15, color: "bg-accent" },
+                  { style: "Breaststroke", percentage: 12, color: "bg-chart-4" },
+                  { style: "Butterfly", percentage: 8, color: "bg-chart-5" },
+                ].map((style, index) => (
+                  <div key={index}>
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-foreground">{style.style}</span>
+                      <span className="text-muted-foreground">
+                        {style.percentage}%
+                      </span>
+                    </div>
+                    <div className="h-2 bg-secondary rounded-full overflow-hidden">
+                      <div
+                        className={`h-full ${style.color} rounded-full transition-all`}
+                        style={{ width: `${style.percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
     </AppLayout>
-  );
+  )
 }
