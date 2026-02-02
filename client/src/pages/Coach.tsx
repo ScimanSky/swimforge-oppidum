@@ -117,6 +117,7 @@ export default function Coach() {
   const [message, setMessage] = useState("")
   const [poolRegenerate, setPoolRegenerate] = useState(false)
   const [dryRegenerate, setDryRegenerate] = useState(false)
+  const [activeInsightIndex, setActiveInsightIndex] = useState(0)
 
   const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
@@ -150,6 +151,11 @@ export default function Coach() {
       }
     })
   }, [advanced?.insights])
+
+  const safeInsightIndex = insightCards.length
+    ? Math.min(activeInsightIndex, insightCards.length - 1)
+    : 0
+  const activeInsight = insightCards[safeInsightIndex]
 
   const keyMetricCards = useMemo(() => {
     const performance = advanced?.performanceIndex ?? 0
@@ -382,35 +388,47 @@ export default function Coach() {
             </div>
 
             {insightCards.length > 0 ? (
-              insightCards.map((insight, index) => (
-                <Card key={index} className="bg-card/80 border-border/60 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      <div className="p-2 rounded-lg bg-primary/10">
-                        <Sparkles className="w-5 h-5 text-primary" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-medium text-foreground">
-                            {insight.title}
-                          </h3>
-                          {insight.metric ? (
-                            <Badge
-                              variant="secondary"
-                              className="bg-primary/10 text-primary"
-                            >
-                              {insight.metric}
-                            </Badge>
-                          ) : null}
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {insight.description}
-                        </p>
-                      </div>
+              <Card className="bg-card/80 border-border/60 shadow-sm">
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {insightCards.map((_, index) => (
+                      <Button
+                        key={index}
+                        type="button"
+                        size="sm"
+                        variant={index === safeInsightIndex ? "default" : "outline"}
+                        className="h-8 w-8 rounded-full p-0"
+                        onClick={() => setActiveInsightIndex(index)}
+                      >
+                        {index + 1}
+                      </Button>
+                    ))}
+                  </div>
+                  <div className="flex items-start gap-4">
+                    <div className="p-2 rounded-lg bg-primary/10">
+                      <Sparkles className="w-5 h-5 text-primary" />
                     </div>
-                  </CardContent>
-                </Card>
-              ))
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-medium text-foreground">
+                          {activeInsight?.title ?? "Insight"}
+                        </h3>
+                        {activeInsight?.metric ? (
+                          <Badge
+                            variant="secondary"
+                            className="bg-primary/10 text-primary"
+                          >
+                            {activeInsight.metric}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {activeInsight?.description ?? "Seleziona un insight per leggerlo."}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             ) : (
               <Card className="bg-card/80 border-border/60 shadow-sm">
                 <CardContent className="p-6 text-sm text-muted-foreground">
