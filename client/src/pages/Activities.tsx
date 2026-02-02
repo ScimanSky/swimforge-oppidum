@@ -1,12 +1,13 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import {
   Select,
   SelectContent,
@@ -26,7 +27,7 @@ import {
   Waves,
   MapPin,
 } from "lucide-react"
-import Link from "next/link"
+import { Link } from "wouter"
 import { trpc } from "@/lib/trpc"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -69,26 +70,48 @@ export default function Activities() {
   const [filter, setFilter] = useState("all")
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState("recent")
+  const [shareOverrides, setShareOverrides] = useState<Record<number, boolean>>({})
+  const [pendingShareId, setPendingShareId] = useState<number | null>(null)
 
   const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
   const advancedQuery = trpc.statistics.getAdvanced.useQuery({ days: 30 })
+  const utils = trpc.useContext()
+
+  const toggleShareMutation = trpc.community.toggleShare.useMutation({
+    onMutate: ({ activityId, share }) => {
+      setPendingShareId(activityId)
+      setShareOverrides((prev) => ({ ...prev, [activityId]: share }))
+    },
+    onError: (_error, variables) => {
+      setShareOverrides((prev) => ({
+        ...prev,
+        [variables.activityId]: !variables.share,
+      }))
+    },
+    onSettled: async () => {
+      setPendingShareId(null)
+      await utils.activities.list.invalidate()
+    },
+  })
 
   const activities = activitiesQuery.data ?? []
 
-  const filteredActivities = activities
-    .filter((activity) => {
+  const filteredActivities = useMemo(() => {
+    return activities
+      .filter((activity) => {
       const activityType = activity.isOpenWater ? "open-water" : "pool"
       if (filter !== "all" && activityType !== filter) return false
       if (search && !(activity.activityName || "").toLowerCase().includes(search.toLowerCase()))
         return false
       return true
-    })
-    .sort((a, b) => {
+      })
+      .sort((a, b) => {
       if (sort === "distance") return (b.distanceMeters || 0) - (a.distanceMeters || 0)
       if (sort === "duration") return (b.durationSeconds || 0) - (a.durationSeconds || 0)
       if (sort === "xp") return (b.xpEarned || 0) - (a.xpEarned || 0)
       return new Date(b.activityDate).getTime() - new Date(a.activityDate).getTime()
-    })
+      })
+  }, [activities, filter, search, sort])
 
   const monthStart = new Date()
   monthStart.setDate(monthStart.getDate() - 30)
@@ -98,6 +121,13 @@ export default function Activities() {
   const totalTime = monthActivities.reduce((sum, a) => sum + (a.durationSeconds || 0), 0)
   const totalXp = monthActivities.reduce((sum, a) => sum + (a.xpEarned || 0), 0)
   const avgEfficiency = advancedQuery.data?.swimmingEfficiencyIndex
+
+  const getShareState = (activity: any) =>
+    shareOverrides[activity.id] ?? activity.shareToFeed ?? false
+
+  const handleShareToggle = (activityId: number, share: boolean) => {
+    toggleShareMutation.mutate({ activityId, share })
+  }
 
   return (
     <AppLayout>
@@ -112,10 +142,10 @@ export default function Activities() {
             Track and manage all your swim sessions
           </p>
         </div>
-        <Button asChild>
-          <Link href="/activities/new">
+        <Button variant="outline" asChild>
+          <Link href="/profile">
             <Plus className="w-4 h-4 mr-2" />
-            Log Activity
+            Collega dispositivi
           </Link>
         </Button>
       </div>
@@ -244,84 +274,100 @@ export default function Activities() {
         ) : (
           filteredActivities.map((activity) => {
             const isOpenWater = Boolean(activity.isOpenWater)
+            const shareChecked = getShareState(activity)
+            const shareDisabled = pendingShareId === activity.id
             return (
-              <Link key={activity.id} href={`/activities/${activity.id}`}>
-                <Card className="bg-card border-border hover:border-primary/50 transition-all">
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-4">
-                      {/* Activity Icon */}
-                      <div
-                        className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                          isOpenWater ? "bg-accent/10" : "bg-primary/10"
-                        }`}
-                      >
-                        {isOpenWater ? (
-                          <MapPin className="w-6 h-6 text-accent" />
-                        ) : (
-                          <Waves className="w-6 h-6 text-primary" />
-                        )}
-                      </div>
-
-                      {/* Activity Details */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-foreground truncate">
-                            {activity.activityName || "Swim Session"}
-                          </h3>
-                          <Badge
-                            variant="secondary"
-                            className={`text-xs flex-shrink-0 ${
-                              isOpenWater
-                                ? "bg-accent/20 text-accent"
-                                : "bg-primary/20 text-primary"
-                            }`}
-                          >
-                            {isOpenWater ? "Open Water" : "Pool"}
-                          </Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDate(activity.activityDate)} at {formatTime(activity.activityDate)}
-                        </p>
-
-                        {/* Stats Grid */}
-                        <div className="grid grid-cols-4 gap-4 mt-4">
-                          <div>
-                            <p className="text-lg font-display font-bold text-foreground">
-                              {formatDistance(activity.distanceMeters)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">Distance</p>
-                          </div>
-                          <div>
-                            <p className="text-lg font-display font-bold text-foreground">
-                              {formatDuration(activity.durationSeconds)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">Duration</p>
-                          </div>
-                          <div>
-                            <p className="text-lg font-display font-bold text-foreground">
-                              {formatPace(
-                                activity.avgPacePer100m,
-                                activity.distanceMeters,
-                                activity.durationSeconds
-                              )}
-                            </p>
-                            <p className="text-xs text-muted-foreground">Pace</p>
-                          </div>
-                          <div>
-                            <p className="text-lg font-display font-bold text-accent">
-                              +{activity.xpEarned}
-                            </p>
-                            <p className="text-xs text-muted-foreground">XP</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Arrow */}
-                      <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+              <Card key={activity.id} className="bg-card border-border hover:border-primary/50 transition-all">
+                <CardContent className="p-4">
+                  <div className="flex items-start gap-4">
+                    {/* Activity Icon */}
+                    <div
+                      className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                        isOpenWater ? "bg-accent/10" : "bg-primary/10"
+                      }`}
+                    >
+                      {isOpenWater ? (
+                        <MapPin className="w-6 h-6 text-accent" />
+                      ) : (
+                        <Waves className="w-6 h-6 text-primary" />
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
+
+                    {/* Activity Details */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-foreground truncate">
+                          {activity.activityName || "Swim Session"}
+                        </h3>
+                        <Badge
+                          variant="secondary"
+                          className={`text-xs flex-shrink-0 ${
+                            isOpenWater
+                              ? "bg-accent/20 text-accent"
+                              : "bg-primary/20 text-primary"
+                          }`}
+                        >
+                          {isOpenWater ? "Open Water" : "Pool"}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {formatDate(activity.activityDate)} at {formatTime(activity.activityDate)}
+                      </p>
+
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-4 gap-4 mt-4">
+                        <div>
+                          <p className="text-lg font-display font-bold text-foreground">
+                            {formatDistance(activity.distanceMeters)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Distance</p>
+                        </div>
+                        <div>
+                          <p className="text-lg font-display font-bold text-foreground">
+                            {formatDuration(activity.durationSeconds)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Duration</p>
+                        </div>
+                        <div>
+                          <p className="text-lg font-display font-bold text-foreground">
+                            {formatPace(
+                              activity.avgPacePer100m,
+                              activity.distanceMeters,
+                              activity.durationSeconds
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Pace</p>
+                        </div>
+                        <div>
+                          <p className="text-lg font-display font-bold text-accent">
+                            +{activity.xpEarned}
+                          </p>
+                          <p className="text-xs text-muted-foreground">XP</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            checked={shareChecked}
+                            disabled={shareDisabled}
+                            onCheckedChange={(checked) => handleShareToggle(activity.id, checked)}
+                          />
+                          <span>Condividi nel feed</span>
+                        </div>
+                        {shareDisabled && <span>Salvataggio...</span>}
+                      </div>
+                    </div>
+
+                    {/* Arrow */}
+                    <Button variant="ghost" size="icon" asChild>
+                      <Link href={`/activities/${activity.id}`}>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                      </Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             )
           })
         )}
