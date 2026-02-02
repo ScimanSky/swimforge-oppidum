@@ -10,20 +10,64 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts"
+import { Skeleton } from "@/components/ui/skeleton"
 
-const weekData = [
-  { day: "Mon", distance: 2.4, goal: 2 },
-  { day: "Tue", distance: 0, goal: 2 },
-  { day: "Wed", distance: 3.1, goal: 2 },
-  { day: "Thu", distance: 1.8, goal: 2 },
-  { day: "Fri", distance: 2.6, goal: 2 },
-  { day: "Sat", distance: 2.5, goal: 2 },
-  { day: "Sun", distance: 0, goal: 2 },
-]
+type WeeklyProgressPoint = {
+  day: string
+  distance: number
+  goal?: number
+}
 
-export function WeeklyProgress() {
+type WeeklyProgressProps = {
+  data?: WeeklyProgressPoint[]
+  weeklyGoalKm?: number
+  isLoading?: boolean
+}
+
+export function WeeklyProgress({ data, weeklyGoalKm = 14, isLoading }: WeeklyProgressProps) {
+  if (isLoading) {
+    return (
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg font-display font-bold text-foreground">
+              Weekly Progress
+            </CardTitle>
+            <Skeleton className="h-5 w-24" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-[200px] w-full" />
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-6 w-16" />
+            </div>
+            <div className="space-y-2 text-right">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-6 w-16" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const weekData =
+    data && data.length > 0
+      ? data
+      : [
+          { day: "Mon", distance: 0, goal: 2 },
+          { day: "Tue", distance: 0, goal: 2 },
+          { day: "Wed", distance: 0, goal: 2 },
+          { day: "Thu", distance: 0, goal: 2 },
+          { day: "Fri", distance: 0, goal: 2 },
+          { day: "Sat", distance: 0, goal: 2 },
+          { day: "Sun", distance: 0, goal: 2 },
+        ]
+
   const totalDistance = weekData.reduce((acc, day) => acc + day.distance, 0)
-  const weeklyGoal = 14
+  const weeklyGoal = weeklyGoalKm
 
   return (
     <Card className="bg-card border-border">

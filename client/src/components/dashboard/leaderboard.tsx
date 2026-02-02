@@ -1,37 +1,25 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { ChevronRight, Trophy } from "lucide-react"
 import Link from "next/link"
 
-const leaderboard = [
-  {
-    rank: 1,
-    name: "You",
-    avatar: "/images/athlete-1.jpg",
-    initials: "SC",
-    distance: "12.4 km",
-    isCurrentUser: true,
-  },
-  {
-    rank: 2,
-    name: "Marcus R.",
-    avatar: "/images/athlete-2.jpg",
-    initials: "MR",
-    distance: "11.8 km",
-    isCurrentUser: false,
-  },
-  {
-    rank: 3,
-    name: "Emma T.",
-    avatar: "/images/athlete-3.jpg",
-    initials: "ET",
-    distance: "10.2 km",
-    isCurrentUser: false,
-  },
-]
+type LeaderboardEntry = {
+  rank: number
+  name: string
+  avatar?: string | null
+  initials: string
+  value: string
+  isCurrentUser?: boolean
+}
 
-export function Leaderboard() {
+type LeaderboardProps = {
+  entries: LeaderboardEntry[]
+  isLoading?: boolean
+}
+
+export function Leaderboard({ entries, isLoading }: LeaderboardProps) {
   return (
     <Card className="bg-card border-border">
       <CardHeader className="pb-2">
@@ -45,40 +33,57 @@ export function Leaderboard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {leaderboard.map((user) => (
-          <div
-            key={user.rank}
-            className={`flex items-center gap-3 p-3 rounded-lg ${
-              user.isCurrentUser
-                ? "bg-primary/10 border border-primary/30"
-                : "bg-secondary/30"
-            }`}
-          >
-            <span
-              className={`w-6 h-6 flex items-center justify-center text-sm font-bold rounded-full ${
-                user.rank === 1
-                  ? "bg-chart-4 text-primary-foreground"
-                  : user.rank === 2
-                  ? "bg-muted-foreground/30 text-foreground"
-                  : "bg-accent/30 text-accent"
+        {isLoading ? (
+          Array.from({ length: 3 }).map((_, index) => (
+            <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+              <Skeleton className="h-6 w-6 rounded-full" />
+              <Skeleton className="h-8 w-8 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3 w-24" />
+              </div>
+              <Skeleton className="h-4 w-16" />
+            </div>
+          ))
+        ) : entries.length === 0 ? (
+          <div className="text-sm text-muted-foreground text-center py-4">
+            No rankings yet.
+          </div>
+        ) : (
+          entries.map((user) => (
+            <div
+              key={user.rank}
+              className={`flex items-center gap-3 p-3 rounded-lg ${
+                user.isCurrentUser
+                  ? "bg-primary/10 border border-primary/30"
+                  : "bg-secondary/30"
               }`}
             >
-              {user.rank}
-            </span>
-            <Avatar className="w-8 h-8">
-              <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
-              <AvatarFallback>{user.initials}</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">
-                {user.name}
+              <span
+                className={`w-6 h-6 flex items-center justify-center text-sm font-bold rounded-full ${
+                  user.rank === 1
+                    ? "bg-chart-4 text-primary-foreground"
+                    : user.rank === 2
+                    ? "bg-muted-foreground/30 text-foreground"
+                    : "bg-accent/30 text-accent"
+                }`}
+              >
+                {user.rank}
+              </span>
+              <Avatar className="w-8 h-8">
+                <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.name} />
+                <AvatarFallback>{user.initials}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">
+                  {user.name}
+                </p>
+              </div>
+              <p className="text-sm font-display font-bold text-foreground">
+                {user.value}
               </p>
             </div>
-            <p className="text-sm font-display font-bold text-foreground">
-              {user.distance}
-            </p>
-          </div>
-        ))}
+          ))
+        )}
 
         <Button variant="ghost" size="sm" className="w-full mt-2" asChild>
           <Link href="/challenges">

@@ -1,27 +1,43 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { Skeleton } from "@/components/ui/skeleton"
 import { Brain, ChevronRight, TrendingUp, AlertCircle } from "lucide-react"
 import Link from "next/link"
 
-const insights = [
-  {
-    type: "tip",
-    icon: TrendingUp,
-    title: "Pace Improvement",
-    message: "Your 100m pace improved 5% this week. Keep up the consistency!",
-    color: "text-accent",
-  },
-  {
-    type: "alert",
-    icon: AlertCircle,
-    title: "Recovery Needed",
-    message: "Consider a rest day. Your training load is 15% above optimal.",
-    color: "text-chart-4",
-  },
-]
+type AIInsightsProps = {
+  insights: string[]
+  isLoading?: boolean
+}
 
-export function AIInsights() {
+const pickInsightStyle = (text: string) => {
+  const normalized = text.toLowerCase()
+  if (normalized.includes("attenzione") || normalized.includes("riposo") || normalized.includes("warning")) {
+    return { icon: AlertCircle, color: "text-chart-4", label: "Alert" }
+  }
+  return { icon: TrendingUp, color: "text-accent", label: "Tip" }
+}
+
+const makeTitle = (text: string) => {
+  const cleaned = text.replace(/^[\d\.\-\s]+/, "").trim()
+  const colonIndex = cleaned.indexOf(":")
+  if (colonIndex > 0 && colonIndex < 48) {
+    return cleaned.slice(0, colonIndex).trim()
+  }
+  const words = cleaned.split(/\s+/).slice(0, 4).join(" ")
+  return words || "Insight"
+}
+
+export function AIInsights({ insights, isLoading }: AIInsightsProps) {
+  const displayInsights = insights.slice(0, 2).map((message) => {
+    const style = pickInsightStyle(message)
+    return {
+      ...style,
+      title: makeTitle(message),
+      message,
+    }
+  })
+
   return (
     <Card className="bg-card border-border">
       <CardHeader className="pb-2">
@@ -32,28 +48,46 @@ export function AIInsights() {
               AI Coach
             </CardTitle>
           </div>
-          <Badge variant="secondary" className="text-xs bg-primary/20 text-primary">
-            2 new
-          </Badge>
+          {isLoading ? (
+            <Skeleton className="h-5 w-14" />
+          ) : (
+            <Badge variant="secondary" className="text-xs bg-primary/20 text-primary">
+              {insights.length} new
+            </Badge>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
-        {insights.map((insight, index) => (
-          <div
-            key={index}
-            className="p-3 rounded-lg bg-secondary/30 space-y-2"
-          >
-            <div className="flex items-center gap-2">
-              <insight.icon className={`w-4 h-4 ${insight.color}`} />
-              <span className="text-sm font-medium text-foreground">
-                {insight.title}
-              </span>
+        {isLoading ? (
+          Array.from({ length: 2 }).map((_, index) => (
+            <div key={index} className="p-3 rounded-lg bg-secondary/30 space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-3/4" />
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              {insight.message}
-            </p>
+          ))
+        ) : displayInsights.length === 0 ? (
+          <div className="text-sm text-muted-foreground">
+            No insights yet. Sync new activities to generate AI feedback.
           </div>
-        ))}
+        ) : (
+          displayInsights.map((insight, index) => (
+            <div
+              key={index}
+              className="p-3 rounded-lg bg-secondary/30 space-y-2"
+            >
+              <div className="flex items-center gap-2">
+                <insight.icon className={`w-4 h-4 ${insight.color}`} />
+                <span className="text-sm font-medium text-foreground">
+                  {insight.title}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {insight.message}
+              </p>
+            </div>
+          ))
+        )}
 
         <Button variant="ghost" size="sm" className="w-full mt-2" asChild>
           <Link href="/coach">
