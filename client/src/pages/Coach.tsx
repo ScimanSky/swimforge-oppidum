@@ -3,18 +3,22 @@
 import AppLayout from "@/components/AppLayout"
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { trpc } from "@/lib/trpc"
 import {
   Brain,
-  Send,
   Sparkles,
-  Waves,
   RefreshCw,
+  Target,
+  HeartPulse,
+  Activity,
+  MessageSquare,
 } from "lucide-react"
+
+
 
 type WorkoutSection = {
   title: string
@@ -83,10 +87,37 @@ const getExerciseDetails = (exercise: WorkoutExercise) =>
     exercise.equipment && `Attrezzi: ${exercise.equipment}`,
   ].filter(Boolean) as string[]
 
+const getConditionLabel = (value?: number | null) => {
+  if (value === null || value === undefined) return "N/D"
+  if (value >= 75) return "Ottima"
+  if (value >= 55) return "Buona"
+  if (value >= 35) return "Da gestire"
+  return "Critica"
+}
+
+const getFocusLabel = (
+  performance?: number,
+  consistency?: number,
+  recovery?: number | null,
+  efficiency?: number | null
+) => {
+  const candidates = [
+    { label: "Performance", value: performance },
+    { label: "Costanza", value: consistency },
+    { label: "Recupero", value: recovery },
+    { label: "Efficienza", value: efficiency },
+  ].filter((item) => item.value !== null && item.value !== undefined)
+
+  if (!candidates.length) return "Analisi in corso"
+  candidates.sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
+  return candidates[0].label
+}
+
 export default function Coach() {
   const [message, setMessage] = useState("")
   const [poolRegenerate, setPoolRegenerate] = useState(false)
   const [dryRegenerate, setDryRegenerate] = useState(false)
+
   const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
     { staleTime: 24 * 60 * 60 * 1000 }
@@ -103,19 +134,6 @@ export default function Coach() {
     { limit: 5, offset: 0 },
     { staleTime: 60 * 1000 }
   )
-
-  const assistantMessages = useMemo(() => {
-    if (advanced?.insights?.length) {
-      return advanced.insights.map((content) => ({ role: "assistant", content }))
-    }
-    return [
-      {
-        role: "assistant",
-        content:
-          "Nessun insight disponibile. Sincronizza nuove attivita per avviare l'analisi AI.",
-      },
-    ]
-  }, [advanced?.insights])
 
   const poolWorkout = poolWorkoutQuery.data as GeneratedWorkout | undefined
   const drylandWorkout = drylandWorkoutQuery.data as GeneratedWorkout | undefined
@@ -153,8 +171,14 @@ export default function Coach() {
       },
       {
         title: "Recovery",
-        value: recovery === null || recovery === undefined ? "—" : `${Math.round(recovery)}`,
-        helper: recovery === null || recovery === undefined ? "N/D" : `${Math.round(recovery)}%`,
+        value:
+          recovery === null || recovery === undefined
+            ? "—"
+            : `${Math.round(recovery)}`,
+        helper:
+          recovery === null || recovery === undefined
+            ? "N/D"
+            : `${Math.round(recovery)}%`,
       },
       {
         title: "Streak",
@@ -175,7 +199,10 @@ export default function Coach() {
     ]
     return metrics.map((metric) => ({
       ...metric,
-      display: metric.value === null || metric.value === undefined ? "—" : Math.round(metric.value),
+      display:
+        metric.value === null || metric.value === undefined
+          ? "—"
+          : Math.round(metric.value),
     }))
   }, [advanced])
 
@@ -213,12 +240,34 @@ export default function Coach() {
 
   const parsedSessionBullets = useMemo(() => {
     if (!latestSessionInsight) return []
-    if (Array.isArray(latestSessionInsight.bullets)) return latestSessionInsight.bullets
+    if (Array.isArray(latestSessionInsight.bullets))
+      return latestSessionInsight.bullets
     try {
       return JSON.parse(latestSessionInsight.bullets ?? "[]")
     } catch {
       return []
     }
+  }, [latestSessionInsight])
+
+  const focusLabel = useMemo(
+    () =>
+      getFocusLabel(
+        advanced?.performanceIndex,
+        advanced?.consistencyScore,
+        advanced?.recoveryReadinessScore,
+        advanced?.swimmingEfficiencyIndex
+      ),
+    [advanced]
+  )
+
+  const conditionLabel = useMemo(
+    () => getConditionLabel(advanced?.recoveryReadinessScore),
+    [advanced?.recoveryReadinessScore]
+  )
+
+  const lastSyncLabel = useMemo(() => {
+    if (!latestSessionInsight?.activity_date) return "—"
+    return formatDate(latestSessionInsight.activity_date) ?? "—"
   }, [latestSessionInsight])
 
   const handleRegeneratePool = async () => {
@@ -241,306 +290,418 @@ export default function Coach() {
 
   return (
     <AppLayout>
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20">
-          <Brain className="w-8 h-8 text-primary" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-display font-bold text-foreground">AI Coach</h1>
-          <p className="text-muted-foreground">Il tuo assistente personale per migliorare</p>
-        </div>
-      </div>
-
-      <Tabs defaultValue="insights">
-        <TabsList className="bg-secondary">
-          <TabsTrigger value="insights">Insights</TabsTrigger>
-          <TabsTrigger value="workouts">Allenamenti</TabsTrigger>
-          <TabsTrigger value="session-iq">Session IQ</TabsTrigger>
-          <TabsTrigger value="chat">Chat</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="insights" className="mt-6 space-y-4">
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {keyMetricCards.map((metric) => (
-              <Card key={metric.title} className="bg-card border-border">
-                <CardContent className="p-4">
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide">{metric.title}</p>
-                  <div className="mt-3 flex items-baseline gap-2">
-                    <span className="text-2xl font-display font-bold text-foreground">{metric.value}</span>
-                    <span className="text-xs text-muted-foreground">{metric.helper}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+      <div className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20">
+              <Brain className="w-8 h-8 text-primary" />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-display font-bold text-foreground">
+                  AI Coach Dashboard
+                </h1>
+                <Badge variant="secondary">Premium</Badge>
+              </div>
+              <p className="text-muted-foreground">
+                Analisi e allenamenti personalizzati basati sui tuoi dati reali.
+              </p>
+            </div>
           </div>
+          <Badge variant="outline" className="text-xs">
+            Ultimo sync: {lastSyncLabel}
+          </Badge>
+        </div>
 
-          {insightCards.length > 0 ? (
-            insightCards.map((insight, index) => (
-              <Card key={index} className="bg-card border-border">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-4">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <Sparkles className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-medium text-foreground">{insight.title}</h3>
-                        {insight.metric ? (
-                          <Badge variant="secondary" className="bg-primary/10 text-primary">
-                            {insight.metric}
-                          </Badge>
-                        ) : null}
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">{insight.description}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            <Card className="bg-card border-border">
-              <CardContent className="p-6 text-sm text-muted-foreground">
-                Nessun insight disponibile. Sincronizza nuove attivita per ottenere suggerimenti AI.
-              </CardContent>
-            </Card>
-          )}
-
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex flex-wrap items-center gap-3">
-                {advancedMetrics.map((metric) => (
-                  <div key={metric.key} className="flex items-center gap-2 rounded-full bg-secondary/40 px-3 py-1 text-xs">
-                    <span className="text-muted-foreground">{metric.key}</span>
-                    <span className="text-foreground font-semibold">{metric.display}</span>
-                  </div>
-                ))}
+        <Card className="bg-card border-border">
+          <CardContent className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10">
+                <Sparkles className="size-6 text-primary" />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="workouts" className="mt-6 space-y-6">
-          <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-start justify-between gap-3">
               <div>
-                <CardTitle className="font-display">Allenamento in Vasca</CardTitle>
-                <p className="text-sm text-muted-foreground">Generato dall&apos;AI</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRegeneratePool}
-                disabled={poolRegenerate || poolWorkoutQuery.isFetching}
-              >
-                <RefreshCw className={`mr-2 h-4 w-4 ${poolRegenerate ? "animate-spin" : ""}`} />
-                Rigenera
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {poolWorkout ? (
-                <>
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                    <span className="font-semibold text-foreground">{poolWorkout.title}</span>
-                    <span>• {poolWorkout.duration}</span>
-                    <span>• {poolWorkout.difficulty}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{poolWorkout.description}</p>
-                  <div className="space-y-3">
-                    {poolWorkout.sections.map((section, idx) => (
-                      <div key={idx} className="rounded-lg border border-border bg-secondary/20 p-4">
-                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                          <Badge variant="secondary">{section.title}</Badge>
-                          {section.notes && (
-                            <span className="text-xs text-muted-foreground">{section.notes}</span>
-                          )}
-                        </div>
-                        <div className="space-y-3">
-                          {section.exercises.map((exercise, exIdx) => (
-                            <div key={exIdx} className="rounded-md bg-background/60 p-3 text-sm">
-                              <div className="font-medium text-foreground">{exercise.name}</div>
-                              <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                {getExerciseDetails(exercise).map((detail, detailIdx) => (
-                                  <span key={detailIdx}>{detail}</span>
-                                ))}
-                              </div>
-                              {exercise.notes && (
-                                <p className="mt-2 text-xs text-muted-foreground">{exercise.notes}</p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  Allenamento in vasca non disponibile. Sincronizza nuove attività.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-start justify-between gap-3">
-              <div>
-                <CardTitle className="font-display">Allenamento Dryland</CardTitle>
-                <p className="text-sm text-muted-foreground">Forza, core e mobilità</p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRegenerateDryland}
-                disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
-              >
-                <RefreshCw className={`mr-2 h-4 w-4 ${dryRegenerate ? "animate-spin" : ""}`} />
-                Rigenera
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {drylandWorkout ? (
-                <>
-                  <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                    <span className="font-semibold text-foreground">{drylandWorkout.title}</span>
-                    <span>• {drylandWorkout.duration}</span>
-                    <span>• {drylandWorkout.difficulty}</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{drylandWorkout.description}</p>
-                  <div className="space-y-3">
-                    {drylandWorkout.sections.map((section, idx) => (
-                      <div key={idx} className="rounded-lg border border-border bg-secondary/20 p-4">
-                        <div className="mb-2 flex flex-wrap items-center gap-2">
-                          <Badge variant="secondary">{section.title}</Badge>
-                          {section.notes && (
-                            <span className="text-xs text-muted-foreground">{section.notes}</span>
-                          )}
-                        </div>
-                        <div className="space-y-3">
-                          {section.exercises.map((exercise, exIdx) => (
-                            <div key={exIdx} className="rounded-md bg-background/60 p-3 text-sm">
-                              <div className="font-medium text-foreground">{exercise.name}</div>
-                              <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                {getExerciseDetails(exercise).map((detail, detailIdx) => (
-                                  <span key={detailIdx}>{detail}</span>
-                                ))}
-                              </div>
-                              {exercise.notes && (
-                                <p className="mt-2 text-xs text-muted-foreground">{exercise.notes}</p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  Allenamento dryland non disponibile. Sincronizza nuove attività.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="session-iq" className="mt-6 space-y-4">
-          <Card className="bg-card border-border">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="font-display">Session IQ</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Analisi dell&apos;ultima sessione sincronizzata
+                <p className="text-sm text-muted-foreground">Analisi</p>
+                <p className="text-lg font-semibold text-foreground">
+                  {advanced?.insights?.length ? "Analisi completata" : "Analisi in corso"}
                 </p>
               </div>
-              <Button variant="outline" size="sm" asChild>
-                <a href="/session-iq">Apri archivio</a>
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {latestSessionInsight ? (
-                <div className="space-y-3">
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                    {formatDate(latestSessionInsight.activity_date) && (
-                      <span>📅 {formatDate(latestSessionInsight.activity_date)}</span>
-                    )}
-                    {formatDistance(latestSessionInsight.activity_distance_meters) && (
-                      <span>🏊 {formatDistance(latestSessionInsight.activity_distance_meters)}</span>
-                    )}
-                    {formatTime(latestSessionInsight.activity_duration_seconds) && (
-                      <span>⏱ {formatTime(latestSessionInsight.activity_duration_seconds)}</span>
-                    )}
-                  </div>
-                  <h3 className="text-lg font-semibold text-foreground">{latestSessionInsight.title}</h3>
-                  <p className="text-sm text-muted-foreground">{latestSessionInsight.summary}</p>
-                  {parsedSessionBullets.length > 0 && (
-                    <ul className="space-y-2 text-sm text-foreground">
-                      {parsedSessionBullets.map((bullet: string, idx: number) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="text-primary">•</span>
-                          <span>{bullet}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+            </div>
+            <div className="flex flex-wrap gap-4">
+              <div className="rounded-lg border border-border bg-background/60 px-4 py-3">
+                <p className="text-xs text-muted-foreground">Focus oggi</p>
+                <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Target className="size-4 text-primary" />
+                  {focusLabel}
                 </div>
-              ) : (
-                <div className="text-sm text-muted-foreground">
-                  Nessuna analisi disponibile. Sincronizza una nuova attività per generare Session IQ.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="chat" className="mt-6">
-          <Card className="bg-card border-border">
-            <CardContent className="p-0">
-              <div className="h-[320px] overflow-y-auto p-4 space-y-4">
-                {assistantMessages.map((msg, index) => (
-                  <div
-                    key={index}
-                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[80%] p-3 rounded-2xl ${
-                        msg.role === "user"
-                          ? "bg-primary text-primary-foreground rounded-br-md"
-                          : "bg-secondary text-secondary-foreground rounded-bl-md"
-                      }`}
-                    >
-                      {msg.role === "assistant" && (
-                        <div className="flex items-center gap-2 mb-2">
-                          <Sparkles className="w-4 h-4 text-primary" />
-                          <span className="text-xs font-medium text-primary">SwimForge AI</span>
-                        </div>
-                      )}
-                      <p className="text-sm whitespace-pre-line">{msg.content}</p>
-                    </div>
-                  </div>
-                ))}
               </div>
+              <div className="rounded-lg border border-border bg-background/60 px-4 py-3">
+                <p className="text-xs text-muted-foreground">Condition</p>
+                <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
+                  <HeartPulse className="size-4 text-primary" />
+                  {conditionLabel}
+                </div>
+              </div>
+              <div className="rounded-lg border border-border bg-background/60 px-4 py-3">
+                <p className="text-xs text-muted-foreground">Attività analizzate</p>
+                <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Activity className="size-4 text-primary" />
+                  {sessionInsightsQuery.data?.length ?? 0}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-              <div className="border-t border-border p-4">
+        <Tabs defaultValue="insights">
+          <TabsList className="bg-secondary">
+            <TabsTrigger value="insights">Insights</TabsTrigger>
+            <TabsTrigger value="workouts">Allenamenti</TabsTrigger>
+            <TabsTrigger value="session-iq">Session IQ</TabsTrigger>
+            <TabsTrigger value="chat">Chat</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="insights" className="mt-6 space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {keyMetricCards.map((metric) => (
+                <Card key={metric.title} className="bg-card border-border">
+                  <CardContent className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                      {metric.title}
+                    </p>
+                    <div className="mt-3 flex items-baseline gap-2">
+                      <span className="text-2xl font-display font-bold text-foreground">
+                        {metric.value}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {metric.helper}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {insightCards.length > 0 ? (
+              insightCards.map((insight, index) => (
+                <Card key={index} className="bg-card border-border">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-4">
+                      <div className="p-2 rounded-lg bg-primary/10">
+                        <Sparkles className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-medium text-foreground">
+                            {insight.title}
+                          </h3>
+                          {insight.metric ? (
+                            <Badge
+                              variant="secondary"
+                              className="bg-primary/10 text-primary"
+                            >
+                              {insight.metric}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {insight.description}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <Card className="bg-card border-border">
+                <CardContent className="p-6 text-sm text-muted-foreground">
+                  Nessun insight disponibile. Sincronizza nuove attivita per ottenere suggerimenti AI.
+                </CardContent>
+              </Card>
+            )}
+
+            <Card className="bg-card border-border">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  {advancedMetrics.map((metric) => (
+                    <div
+                      key={metric.key}
+                      className="flex items-center gap-2 rounded-full bg-secondary/40 px-3 py-1 text-xs"
+                    >
+                      <span className="text-muted-foreground">
+                        {metric.key}
+                      </span>
+                      <span className="text-foreground font-semibold">
+                        {metric.display}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="workouts" className="mt-6 space-y-6">
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="font-display">Allenamento in Vasca</CardTitle>
+                  <CardDescription>Generato dall&apos;AI</CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRegeneratePool}
+                  disabled={poolRegenerate || poolWorkoutQuery.isFetching}
+                >
+                  <RefreshCw
+                    className={`mr-2 h-4 w-4 ${poolRegenerate ? "animate-spin" : ""}`}
+                  />
+                  Rigenera
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {poolWorkout ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                      <span className="font-semibold text-foreground">
+                        {poolWorkout.title}
+                      </span>
+                      <span>• {poolWorkout.duration}</span>
+                      <span>• {poolWorkout.difficulty}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {poolWorkout.description}
+                    </p>
+                    <div className="space-y-3">
+                      {poolWorkout.sections.map((section, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-lg border border-border bg-secondary/20 p-4"
+                        >
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary">{section.title}</Badge>
+                            {section.notes && (
+                              <span className="text-xs text-muted-foreground">
+                                {section.notes}
+                              </span>
+                            )}
+                          </div>
+                          <div className="space-y-3">
+                            {section.exercises.map((exercise, exIdx) => (
+                              <div
+                                key={exIdx}
+                                className="rounded-md bg-background/60 p-3 text-sm"
+                              >
+                                <div className="font-medium text-foreground">
+                                  {exercise.name}
+                                </div>
+                                <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                  {getExerciseDetails(exercise).map(
+                                    (detail, detailIdx) => (
+                                      <span key={detailIdx}>{detail}</span>
+                                    )
+                                  )}
+                                </div>
+                                {exercise.notes && (
+                                  <p className="mt-2 text-xs text-muted-foreground">
+                                    {exercise.notes}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    Allenamento in vasca non disponibile. Sincronizza nuove attività.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="font-display">Allenamento Dryland</CardTitle>
+                  <CardDescription>Forza, core e mobilità</CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRegenerateDryland}
+                  disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
+                >
+                  <RefreshCw
+                    className={`mr-2 h-4 w-4 ${dryRegenerate ? "animate-spin" : ""}`}
+                  />
+                  Rigenera
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {drylandWorkout ? (
+                  <>
+                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                      <span className="font-semibold text-foreground">
+                        {drylandWorkout.title}
+                      </span>
+                      <span>• {drylandWorkout.duration}</span>
+                      <span>• {drylandWorkout.difficulty}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {drylandWorkout.description}
+                    </p>
+                    <div className="space-y-3">
+                      {drylandWorkout.sections.map((section, idx) => (
+                        <div
+                          key={idx}
+                          className="rounded-lg border border-border bg-secondary/20 p-4"
+                        >
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary">{section.title}</Badge>
+                            {section.notes && (
+                              <span className="text-xs text-muted-foreground">
+                                {section.notes}
+                              </span>
+                            )}
+                          </div>
+                          <div className="space-y-3">
+                            {section.exercises.map((exercise, exIdx) => (
+                              <div
+                                key={exIdx}
+                                className="rounded-md bg-background/60 p-3 text-sm"
+                              >
+                                <div className="font-medium text-foreground">
+                                  {exercise.name}
+                                </div>
+                                <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                  {getExerciseDetails(exercise).map(
+                                    (detail, detailIdx) => (
+                                      <span key={detailIdx}>{detail}</span>
+                                    )
+                                  )}
+                                </div>
+                                {exercise.notes && (
+                                  <p className="mt-2 text-xs text-muted-foreground">
+                                    {exercise.notes}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    Allenamento dryland non disponibile. Sincronizza nuove attività.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="session-iq" className="mt-6 space-y-4">
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="font-display">Session IQ</CardTitle>
+                  <CardDescription>
+                    Analisi dell&apos;ultima sessione sincronizzata
+                  </CardDescription>
+                </div>
+                <Button variant="outline" size="sm" asChild>
+                  <a href="/session-iq">Apri archivio</a>
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {latestSessionInsight ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                      {formatDate(latestSessionInsight.activity_date) && (
+                        <span>
+                          📅 {formatDate(latestSessionInsight.activity_date)}
+                        </span>
+                      )}
+                      {formatDistance(
+                        latestSessionInsight.activity_distance_meters
+                      ) && (
+                        <span>
+                          🏊 {formatDistance(
+                            latestSessionInsight.activity_distance_meters
+                          )}
+                        </span>
+                      )}
+                      {formatTime(
+                        latestSessionInsight.activity_duration_seconds
+                      ) && (
+                        <span>
+                          ⏱ {formatTime(
+                            latestSessionInsight.activity_duration_seconds
+                          )}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">
+                      {latestSessionInsight.title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {latestSessionInsight.summary}
+                    </p>
+                    {parsedSessionBullets.length > 0 && (
+                      <ul className="space-y-2 text-sm text-foreground">
+                        {parsedSessionBullets.map((bullet: string, idx: number) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-primary">•</span>
+                            <span>{bullet}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    Nessuna analisi disponibile. Sincronizza una nuova attività per generare Session IQ.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="chat" className="mt-6">
+            <Card className="bg-card border-border">
+              <CardContent className="p-6 space-y-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <MessageSquare className="size-5 text-primary" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">Chat AI</p>
+                    <p className="text-xs text-muted-foreground">
+                      Funzione in arrivo. Per ora usa gli insights e i piani generati.
+                    </p>
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <Input
-                    placeholder="Chat interattiva in arrivo"
+                    placeholder="Chat AI in arrivo"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     className="bg-secondary border-0"
                     disabled
                   />
                   <Button size="icon" disabled>
-                    <Send className="w-4 h-4" />
+                    <MessageSquare className="w-4 h-4" />
                   </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
     </AppLayout>
   )
 }
