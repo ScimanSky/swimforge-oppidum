@@ -2,14 +2,12 @@
 
 import AppLayout from "@/components/AppLayout"
 import { useMemo, useState } from "react"
-import Image from "next/image"
-import Link from "next/link"
+import { Link } from "wouter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import {
   Droplet,
@@ -237,7 +235,7 @@ export default function Community() {
                             post.has_splashed
                               ? "text-primary"
                               : "text-muted-foreground hover:text-foreground"
-                          }`}
+                          } ${isOwner ? "opacity-50 cursor-not-allowed" : ""}`}
                         >
                           <Droplet
                             className={`w-4 h-4 ${post.has_splashed ? "fill-primary" : ""}`}
@@ -245,75 +243,67 @@ export default function Community() {
                           <span>{post.splash_count} Splash</span>
                         </button>
 
-                        <Dialog
-                          open={openCommentsId === post.id}
-                          onOpenChange={(open) => {
-                            setOpenCommentsId(open ? post.id : null)
-                          }}
+                        <button
+                          onClick={() => setOpenCommentsId(openCommentsId === post.id ? null : post.id)}
+                          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
                         >
-                          <DialogTrigger asChild>
-                            <button className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-                              <MessageCircle className="w-4 h-4" />
-                              <span>{post.comment_count} Commenti</span>
-                            </button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-lg">
-                            <DialogHeader>
-                              <DialogTitle>Commenti</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div className="max-h-60 overflow-y-auto space-y-3">
-                                {commentsQuery.isLoading && openCommentsId === post.id ? (
-                                  <div className="text-sm text-muted-foreground">Caricamento...</div>
-                                ) : (commentsQuery.data ?? []).length > 0 ? (
-                                  (commentsQuery.data ?? []).map((comment: any) => (
-                                    <div key={comment.id} className="flex items-start gap-2">
-                                      <Avatar className="h-8 w-8">
-                                        <AvatarImage src={comment.user_avatar || "/placeholder.svg"} />
-                                        <AvatarFallback>
-                                          {getInitials(comment.user_name || comment.user_email || "SW")}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      <div>
-                                        <p className="text-xs text-muted-foreground">
-                                          {comment.user_name || comment.user_email}
-                                        </p>
-                                        <p className="text-sm text-foreground">{comment.content}</p>
-                                      </div>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div className="text-sm text-muted-foreground">Nessun commento ancora.</div>
-                                )}
-                              </div>
-                              <div className="flex gap-2">
-                                <Input
-                                  placeholder="Scrivi un commento..."
-                                  value={commentTextByPost[post.id] || ""}
-                                  onChange={(e) =>
-                                    setCommentTextByPost((prev) => ({
-                                      ...prev,
-                                      [post.id]: e.target.value,
-                                    }))
-                                  }
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.preventDefault()
-                                      submitComment(post.id)
-                                    }
-                                  }}
-                                />
-                                <Button
-                                  onClick={() => submitComment(post.id)}
-                                  disabled={addComment.isPending}
-                                >
-                                  Invia
-                                </Button>
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
+                          <MessageCircle className="w-4 h-4" />
+                          <span>{post.comment_count} Commenti</span>
+                        </button>
                       </div>
+
+                      {openCommentsId === post.id && (
+                        <div className="mt-4 rounded-xl border border-border bg-background/60 p-4 space-y-3">
+                          <div className="max-h-60 overflow-y-auto space-y-3">
+                            {commentsQuery.isLoading && openCommentsId === post.id ? (
+                              <div className="text-sm text-muted-foreground">Caricamento...</div>
+                            ) : (commentsQuery.data ?? []).length > 0 ? (
+                              (commentsQuery.data ?? []).map((comment: any) => (
+                                <div key={comment.id} className="flex items-start gap-2">
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarImage src={comment.user_avatar || "/placeholder.svg"} />
+                                    <AvatarFallback>
+                                      {getInitials(comment.user_name || comment.user_email || "SW")}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="text-xs text-muted-foreground">
+                                      {comment.user_name || comment.user_email}
+                                    </p>
+                                    <p className="text-sm text-foreground">{comment.content}</p>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="text-sm text-muted-foreground">Nessun commento ancora.</div>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <Input
+                              placeholder="Scrivi un commento..."
+                              value={commentTextByPost[post.id] || ""}
+                              onChange={(e) =>
+                                setCommentTextByPost((prev) => ({
+                                  ...prev,
+                                  [post.id]: e.target.value,
+                                }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault()
+                                  submitComment(post.id)
+                                }
+                              }}
+                            />
+                            <Button
+                              onClick={() => submitComment(post.id)}
+                              disabled={addComment.isPending}
+                            >
+                              Invia
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 )
@@ -377,11 +367,10 @@ export default function Community() {
                     className="bg-card border-border overflow-hidden group hover:border-primary/50 transition-all"
                   >
                     <div className="relative h-32">
-                      <Image
+                      <img
                         src={club.cover_image_url || "/placeholder.svg"}
                         alt={club.name}
-                        fill
-                        className="object-cover transition-transform duration-300 group-hover:scale-105"
+                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
                       <Badge className="absolute top-3 left-3 bg-secondary/80 text-secondary-foreground">
