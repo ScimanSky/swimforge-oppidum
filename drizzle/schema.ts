@@ -54,6 +54,9 @@ export const swimmerProfiles = pgTable("swimmer_profiles", {
   aiSkillLastEvaluatedAt: timestamp("ai_skill_last_evaluated_at"),
   aiSkillChange: text("ai_skill_change"),
   aiSkillMessage: text("ai_skill_message"),
+  notificationSettings: json("notification_settings"),
+  preferences: json("preferences"),
+  privacySettings: json("privacy_settings"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

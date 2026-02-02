@@ -87,6 +87,24 @@ const notificationSettings = [
   },
 ]
 
+const defaultNotificationState = notificationSettings.reduce(
+  (acc, setting) => ({ ...acc, [setting.id]: setting.enabled }),
+  {} as Record<string, boolean>
+)
+
+const defaultPreferencesState = {
+  units: "metric" as "metric" | "imperial",
+  paceFormat: "100m" as "100m" | "100y",
+  language: "it" as "it" | "en" | "es" | "fr",
+  timezone: "Europe/Rome",
+}
+
+const defaultPrivacyState = {
+  profilePublic: true,
+  activitiesPublic: true,
+  showLeaderboards: true,
+}
+
 export default function Settings() {
   const { data: me } = trpc.auth.me.useQuery()
   const { data: profile } = trpc.profile.get.useQuery()
@@ -199,17 +217,8 @@ export default function Settings() {
       return null
     }
 
-    const extension = file.name.split(".").pop() || "png"
-    const filePath = `profiles/${me.id}/${kind}-${Date.now()}.${extension}`
-    const { error } = await supabase.storage
-      .from("profile-media")
-      .upload(filePath, file, { upsert: true, contentType: file.type })
-    if (!error) {
-      const { data } = supabase.storage.from("profile-media").getPublicUrl(filePath)
-      return data.publicUrl
-    }
-
     try {
+      const extension = file.name.split(".").pop() || "png"
       const base64 = await readFileAsBase64(file)
       const { url } = await uploadMediaMutation.mutateAsync({
         kind,
@@ -219,6 +228,15 @@ export default function Settings() {
       })
       return url
     } catch (fallbackError: any) {
+      const extension = file.name.split(".").pop() || "png"
+      const filePath = `profiles/${me.id}/${kind}-${Date.now()}.${extension}`
+      const { error } = await supabase.storage
+        .from("profile-media")
+        .upload(filePath, file, { upsert: true, contentType: file.type })
+      if (!error) {
+        const { data } = supabase.storage.from("profile-media").getPublicUrl(filePath)
+        return data.publicUrl
+      }
       const message =
         fallbackError?.message ||
         "Upload fallito: controlla le policy di Supabase Storage."
@@ -259,15 +277,38 @@ export default function Settings() {
     toast.success("Profilo aggiornato.")
   }
 
-  const [notifications, setNotifications] = useState(
-    notificationSettings.reduce(
-      (acc, setting) => ({ ...acc, [setting.id]: setting.enabled }),
-      {} as Record<string, boolean>
-    )
-  )
+  const [notifications, setNotifications] = useState(defaultNotificationState)
+  const [preferences, setPreferences] = useState(defaultPreferencesState)
+  const [privacySettings, setPrivacySettings] = useState(defaultPrivacyState)
 
-  const toggleNotification = (id: string) => {
-    setNotifications((prev) => ({ ...prev, [id]: !prev[id] }))
+  useEffect(() => {
+    if (!profile) return
+    setNotifications({
+      ...defaultNotificationState,
+      ...(profile.notificationSettings as Record<string, boolean> | undefined),
+    })
+    setPreferences({
+      ...defaultPreferencesState,
+      ...(profile.preferences as typeof defaultPreferencesState | undefined),
+    })
+    setPrivacySettings({
+      ...defaultPrivacyState,
+      ...(profile.privacySettings as typeof defaultPrivacyState | undefined),
+    })
+  }, [profile?.notificationSettings, profile?.preferences, profile?.privacySettings])
+
+  const persistSettings = async (payload: Record<string, unknown>) => {
+    try {
+      await updateProfileMutation.mutateAsync(payload)
+    } catch (error: any) {
+      toast.error(error?.message || "Impossibile salvare le impostazioni.")
+    }
+  }
+
+  const toggleNotification = async (id: string) => {
+    const next = { ...notifications, [id]: !notifications[id] }
+    setNotifications(next)
+    await persistSettings({ notificationSettings: next })
   }
 
   return (
@@ -599,7 +640,14 @@ export default function Settings() {
                   <p className="font-medium text-foreground">Sistema Metrico</p>
                   <p className="text-sm text-muted-foreground">Chilometri, metri, kg</p>
                 </div>
-                <Select defaultValue="metric" disabled>
+                <Select
+                  value={preferences.units}
+                  onValueChange={(value) => {
+                    const next = { ...preferences, units: value as "metric" | "imperial" }
+                    setPreferences(next)
+                    void persistSettings({ preferences: next })
+                  }}
+                >
                   <SelectTrigger className="w-32 bg-secondary border-0">
                     <SelectValue />
                   </SelectTrigger>
@@ -614,7 +662,14 @@ export default function Settings() {
                   <p className="font-medium text-foreground">Formato Pace</p>
                   <p className="text-sm text-muted-foreground">Come visualizzare il ritmo</p>
                 </div>
-                <Select defaultValue="100m" disabled>
+                <Select
+                  value={preferences.paceFormat}
+                  onValueChange={(value) => {
+                    const next = { ...preferences, paceFormat: value as "100m" | "100y" }
+                    setPreferences(next)
+                    void persistSettings({ preferences: next })
+                  }}
+                >
                   <SelectTrigger className="w-32 bg-secondary border-0">
                     <SelectValue />
                   </SelectTrigger>
@@ -636,7 +691,14 @@ export default function Settings() {
                 <div>
                   <p className="font-medium text-foreground">Lingua</p>
                 </div>
-                <Select defaultValue="it" disabled>
+                <Select
+                  value={preferences.language}
+                  onValueChange={(value) => {
+                    const next = { ...preferences, language: value as "it" | "en" | "es" | "fr" }
+                    setPreferences(next)
+                    void persistSettings({ preferences: next })
+                  }}
+                >
                   <SelectTrigger className="w-40 bg-secondary border-0">
                     <SelectValue />
                   </SelectTrigger>
@@ -652,14 +714,21 @@ export default function Settings() {
                 <div>
                   <p className="font-medium text-foreground">Fuso Orario</p>
                 </div>
-                <Select defaultValue="rome" disabled>
+                <Select
+                  value={preferences.timezone}
+                  onValueChange={(value) => {
+                    const next = { ...preferences, timezone: value }
+                    setPreferences(next)
+                    void persistSettings({ preferences: next })
+                  }}
+                >
                   <SelectTrigger className="w-48 bg-secondary border-0">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="rome">Europe/Rome (UTC+1)</SelectItem>
-                    <SelectItem value="london">Europe/London (UTC)</SelectItem>
-                    <SelectItem value="ny">America/New_York (UTC-5)</SelectItem>
+                    <SelectItem value="Europe/Rome">Europe/Rome (UTC+1)</SelectItem>
+                    <SelectItem value="Europe/London">Europe/London (UTC)</SelectItem>
+                    <SelectItem value="America/New_York">America/New_York (UTC-5)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -681,7 +750,14 @@ export default function Settings() {
                     Permetti ad altri utenti di vedere il tuo profilo
                   </p>
                 </div>
-                <Switch defaultChecked disabled />
+                <Switch
+                  checked={privacySettings.profilePublic}
+                  onCheckedChange={(value) => {
+                    const next = { ...privacySettings, profilePublic: value }
+                    setPrivacySettings(next)
+                    void persistSettings({ privacySettings: next })
+                  }}
+                />
               </div>
               <div className="flex items-center justify-between py-3">
                 <div>
@@ -690,7 +766,14 @@ export default function Settings() {
                     Mostra le tue attivita nel feed della community
                   </p>
                 </div>
-                <Switch defaultChecked disabled />
+                <Switch
+                  checked={privacySettings.activitiesPublic}
+                  onCheckedChange={(value) => {
+                    const next = { ...privacySettings, activitiesPublic: value }
+                    setPrivacySettings(next)
+                    void persistSettings({ privacySettings: next })
+                  }}
+                />
               </div>
               <div className="flex items-center justify-between py-3">
                 <div>
@@ -699,7 +782,14 @@ export default function Settings() {
                     Partecipa alle classifiche pubbliche
                   </p>
                 </div>
-                <Switch defaultChecked disabled />
+                <Switch
+                  checked={privacySettings.showLeaderboards}
+                  onCheckedChange={(value) => {
+                    const next = { ...privacySettings, showLeaderboards: value }
+                    setPrivacySettings(next)
+                    void persistSettings({ privacySettings: next })
+                  }}
+                />
               </div>
             </CardContent>
           </Card>

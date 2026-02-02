@@ -277,6 +277,18 @@ export const appRouter = router({
         coverUrl: z.string().optional(),
         bio: z.string().optional(),
         location: z.string().optional(),
+        notificationSettings: z.record(z.boolean()).optional(),
+        preferences: z.object({
+          units: z.enum(["metric", "imperial"]).optional(),
+          paceFormat: z.enum(["100m", "100y"]).optional(),
+          language: z.enum(["it", "en", "es", "fr"]).optional(),
+          timezone: z.string().optional(),
+        }).optional(),
+        privacySettings: z.object({
+          profilePublic: z.boolean().optional(),
+          activitiesPublic: z.boolean().optional(),
+          showLeaderboards: z.boolean().optional(),
+        }).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         await db.updateSwimmerProfile(ctx.user.id, input);
