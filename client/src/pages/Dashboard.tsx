@@ -1,16 +1,22 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { DashboardHeader } from "@/components/dashboard/header"
-import { DashboardStats } from "@/components/dashboard/stats"
-import { RecentActivities } from "@/components/dashboard/recent-activities"
-import { WeeklyProgress } from "@/components/dashboard/weekly-progress"
-import { AIInsights } from "@/components/dashboard/ai-insights"
-import { QuickActions } from "@/components/dashboard/quick-actions"
-import { Leaderboard } from "@/components/dashboard/leaderboard"
 import { trpc } from "@/lib/trpc"
 import { useMemo } from "react"
-import { Waves, Timer, Gauge, ClipboardList } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Flame,
+  Waves,
+  Timer,
+  Target,
+  Trophy,
+  Zap,
+  ChevronRight,
+} from "lucide-react"
+import { Link } from "wouter"
 
 const formatDuration = (seconds: number) => {
   if (!seconds) return "—"
@@ -44,7 +50,7 @@ const changeLabel = (current: number, previous: number, suffix = "vs last week")
 
 export default function Dashboard() {
   const profileQuery = trpc.profile.get.useQuery()
-  const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
+  const activitiesQuery = trpc.activities.list.useQuery({ limit: 200, offset: 0, source: "all" })
   const timelineQuery = trpc.statistics.getTimeline.useQuery({ days: 7 })
   const advancedQuery = trpc.statistics.getAdvanced.useQuery({ days: 30 })
   const leaderboardQuery = trpc.leaderboard.get.useQuery({
@@ -52,8 +58,7 @@ export default function Dashboard() {
     period: "week",
     limit: 5,
   })
-
-  const isLoading = profileQuery.isLoading || activitiesQuery.isLoading
+  const challengesQuery = trpc.challenges.list.useQuery()
 
   const stats = useMemo(() => {
     const activities = activitiesQuery.data ?? []
@@ -95,34 +100,53 @@ export default function Dashboard() {
     const paceChange = changeLabel(prevPace, currentPace, "pace change")
     const sessionsChange = changeLabel(currentSessions, prevSessions)
 
+    const buildProgress = (current: number, previous: number) => {
+      const target = Math.max(current, previous, 1)
+      return Math.min(100, Math.round((current / target) * 100))
+    }
+
+    const paceProgress = prevPace > 0 ? Math.min(100, Math.round((prevPace / Math.max(currentPace, 1)) * 100)) : 100
+
     return [
       {
         icon: Waves,
-        label: "This Week",
+        label: "Distanza settimanale",
         value: formatDistanceKm(currentDistance),
         change: distanceChange.label,
         changeType: distanceChange.type,
+        progress: buildProgress(currentDistance, prevDistance),
+        color: "text-primary",
+        bgColor: "bg-primary/10",
       },
       {
         icon: Timer,
-        label: "Time This Week",
+        label: "Tempo in acqua",
         value: formatDuration(currentTime),
         change: timeChange.label,
         changeType: timeChange.type,
+        progress: buildProgress(currentTime, prevTime),
+        color: "text-chart-2",
+        bgColor: "bg-chart-2/10",
       },
       {
-        icon: Gauge,
-        label: "Avg Pace",
+        icon: Target,
+        label: "Pace medio",
         value: formatPace(currentPace),
         change: paceChange.label,
         changeType: paceChange.type,
+        progress: paceProgress,
+        color: "text-chart-3",
+        bgColor: "bg-chart-3/10",
       },
       {
-        icon: ClipboardList,
-        label: "Sessions",
+        icon: Zap,
+        label: "Sessioni",
         value: `${currentSessions}`,
         change: sessionsChange.label,
         changeType: sessionsChange.type,
+        progress: buildProgress(currentSessions, prevSessions),
+        color: "text-chart-5",
+        bgColor: "bg-chart-5/10",
       },
     ]
   }, [activitiesQuery.data])
@@ -131,25 +155,28 @@ export default function Dashboard() {
     const timeline = timelineQuery.data ?? []
     const map = new Map(timeline.map((point) => [point.date, point.distance]))
     const today = new Date()
-    const days = Array.from({ length: 7 }).map((_, index) => {
+    return Array.from({ length: 7 }).map((_, index) => {
       const date = new Date(today)
       date.setDate(today.getDate() - (6 - index))
       const key = date.toISOString().split("T")[0]
-      const label = date.toLocaleDateString("en-US", { weekday: "short" })
+      const label = date.toLocaleDateString("it-IT", { weekday: "short" })
       return {
         day: label,
         distance: map.get(key) ?? 0,
-        goal: 2,
       }
     })
-    return days
   }, [timelineQuery.data])
 
   const recentActivities = useMemo(() => {
-    return (activitiesQuery.data ?? []).slice(0, 5)
+    const list = activitiesQuery.data ?? []
+    return [...list]
+      .sort(
+        (a, b) =>
+          new Date(b.activityDate).getTime() -
+          new Date(a.activityDate).getTime()
+      )
+      .slice(0, 3)
   }, [activitiesQuery.data])
-
-  const insights = advancedQuery.data?.insights ?? []
 
   const leaderboardEntries = useMemo(() => {
     const raw = leaderboardQuery.data ?? []
@@ -182,31 +209,242 @@ export default function Dashboard() {
     }))
   }, [leaderboardQuery.data, profileQuery.data?.userId])
 
+  const challenges = useMemo(() => (challengesQuery.data ?? []) as any[], [challengesQuery.data])
+  const activeChallenges = useMemo(
+    () => challenges.filter((challenge) => challenge.status === "active" && challenge.isParticipant),
+    [challenges]
+  )
+
+  const aiInsight = useMemo(() => {
+    const insights = advancedQuery.data?.insights ?? []
+    if (!insights.length) return null
+    return {
+      title: "Insight principale",
+      message: insights[0].replace(/\*\*/g, ""),
+    }
+  }, [advancedQuery.data?.insights])
+
+  const profile = profileQuery.data
+  const xpProgress = profile?.nextLevelXp
+    ? Math.min(100, (profile.totalXp / profile.nextLevelXp) * 100)
+    : 0
+
   return (
     <AppLayout>
-      <div className="p-4 lg:p-6 space-y-6">
-        <DashboardHeader
-          name={profileQuery.data?.name}
-          streak={advancedQuery.data?.streak?.current ?? null}
-          xp={profileQuery.data?.totalXp ?? null}
-          isLoading={profileQuery.isLoading}
-        />
-        <DashboardStats stats={stats} isLoading={isLoading} />
+      <div className="space-y-6">
+        <Card className="bg-card border-border">
+          <CardContent className="p-6 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Waves className="size-7 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Bentornato,</p>
+                <h1 className="text-2xl font-display font-bold text-foreground">
+                  {profile?.name ?? "Nuotatore"}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {profile?.levelTitle ?? "Livello"} • {profile?.totalXp ?? 0} XP
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-col gap-3 min-w-[220px]">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>Prossimo livello</span>
+                <span>{profile?.xpToNextLevel ?? 0} XP</span>
+              </div>
+              <Progress value={xpProgress} className="h-2" />
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Flame className="size-4 text-primary" />
+                Streak attuale: {advancedQuery.data?.streak?.current ?? 0} giorni
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <WeeklyProgress
-              data={weeklyData}
-              weeklyGoalKm={14}
-              isLoading={timelineQuery.isLoading}
-            />
-            <RecentActivities activities={recentActivities} isLoading={activitiesQuery.isLoading} />
-          </div>
-          <div className="space-y-6">
-            <QuickActions />
-            <AIInsights insights={insights} isLoading={advancedQuery.isLoading} />
-            <Leaderboard entries={leaderboardEntries} isLoading={leaderboardQuery.isLoading} />
-          </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {stats.map((stat) => (
+            <Card key={stat.label} className="bg-card border-border">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div className={`flex size-10 items-center justify-center rounded-lg ${stat.bgColor} ${stat.color}`}>
+                    <stat.icon className="size-5" />
+                  </div>
+                  <Badge variant="secondary" className="text-xs">
+                    {stat.progress}%
+                  </Badge>
+                </div>
+                <div className="mt-4">
+                  <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                  <p className="text-sm text-muted-foreground">{stat.label}</p>
+                </div>
+                <Progress value={stat.progress} className="mt-3 h-1.5" />
+                <p className="mt-3 text-xs text-muted-foreground">{stat.change}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="bg-card border-border lg:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="font-display">Attività recenti</CardTitle>
+                <CardDescription>Le ultime sessioni sincronizzate</CardDescription>
+              </div>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/activities">
+                  Vai a tutte
+                  <ChevronRight className="ml-2 size-4" />
+                </Link>
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {recentActivities.length ? (
+                recentActivities.map((activity) => (
+                  <div
+                    key={activity.id}
+                    className="flex flex-col gap-3 rounded-xl border border-border bg-background/60 p-4 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        {formatDistanceKm(activity.distanceMeters || 0)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(activity.activityDate).toLocaleDateString("it-IT", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                      <span>⏱ {formatDuration(activity.durationSeconds || 0)}</span>
+                      <span>⚡ {formatPace(activity.avgPacePer100m || 0)}</span>
+                      {activity.avgHeartRate ? <span>❤️ {activity.avgHeartRate} bpm</span> : null}
+                    </div>
+                    <Badge variant="secondary" className="text-xs">
+                      +{activity.xpEarned ?? 0} XP
+                    </Badge>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Nessuna attività recente. Sincronizza Garmin o Strava.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="font-display">Progressi settimanali</CardTitle>
+              <CardDescription>Distanza per giorno</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {weeklyData.map((day) => (
+                <div key={day.day} className="flex items-center gap-3">
+                  <span className="w-10 text-xs text-muted-foreground">{day.day}</span>
+                  <Progress
+                    value={Math.min(100, (day.distance / 2000) * 100)}
+                    className="h-2 flex-1"
+                  />
+                  <span className="text-xs text-muted-foreground">
+                    {(day.distance / 1000).toFixed(1)} km
+                  </span>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="font-display">Sfide attive</CardTitle>
+              <CardDescription>Le tue sfide correnti</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {activeChallenges.length ? (
+                activeChallenges.slice(0, 2).map((challenge) => {
+                  const leaderboard = (challenge.leaderboard ?? []) as Array<{ progress: number }>
+                  const maxProgress = leaderboard.reduce(
+                    (max, item) => Math.max(max, item.progress || 0),
+                    0
+                  )
+                  const progressValue = challenge.current_progress ?? 0
+                  const progressPercent = maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
+                  return (
+                    <div key={challenge.id} className="rounded-xl border border-border bg-background/60 p-4">
+                      <p className="text-sm font-semibold text-foreground">{challenge.name}</p>
+                      <p className="text-xs text-muted-foreground">{challenge.objective}</p>
+                      <Progress value={progressPercent} className="mt-3 h-1.5" />
+                    </div>
+                  )
+                })
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Nessuna sfida attiva. Partecipane una dalla sezione Sfide.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="font-display">Classifica</CardTitle>
+              <CardDescription>Top nuotatori della settimana</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {leaderboardEntries.length ? (
+                leaderboardEntries.slice(0, 3).map((entry) => (
+                  <div key={entry.rank} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                        {entry.rank}
+                      </div>
+                      <div>
+                        <p className={`text-sm ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
+                          {entry.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">{entry.value}</p>
+                      </div>
+                    </div>
+                    {entry.isCurrentUser && (
+                      <Badge variant="secondary" className="text-xs">Tu</Badge>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">Nessuna classifica disponibile.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="font-display">Insight AI</CardTitle>
+              <CardDescription>Focus rapido della settimana</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {aiInsight ? (
+                <>
+                  <div className="flex items-center gap-2 text-primary">
+                    <Trophy className="size-5" />
+                    <span className="text-sm font-semibold">{aiInsight.title}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{aiInsight.message}</p>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link href="/coach">Apri AI Coach</Link>
+                  </Button>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Nessun insight disponibile. Sincronizza nuove attività.
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
     </AppLayout>
