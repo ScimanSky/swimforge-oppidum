@@ -181,19 +181,22 @@ function GaugeMetric({
   value,
   min = -100,
   max = 100,
+  neutralRange = 0,
   info,
 }: {
   label: string;
   value: number | null;
   min?: number;
   max?: number;
+  neutralRange?: number;
   info: any;
 }) {
   const safeValue = value ?? null;
   const clamped = safeValue !== null ? Math.max(min, Math.min(max, safeValue)) : null;
-  const pct = clamped !== null ? ((clamped - min) / (max - min)) * 100 : 0;
+  const isNeutral = clamped !== null && Math.abs(clamped) <= neutralRange;
+  const pct = clamped !== null && !isNeutral ? ((clamped - min) / (max - min)) * 100 : 0;
   const color =
-    clamped === null
+    clamped === null || isNeutral
       ? "var(--muted-foreground)"
       : clamped > 20
       ? "var(--chart-2)"
@@ -671,6 +674,7 @@ export default function Statistics() {
                       value={advanced.trendIndicator.percentage}
                       min={-50}
                       max={50}
+                      neutralRange={2}
                       info={metricsDefinitions.performanceIndex}
                     />
                   </div>
