@@ -66,7 +66,7 @@ export default function Dashboard() {
   const meQuery = trpc.auth.me.useQuery()
   const profileQuery = trpc.profile.get.useQuery()
   const activitiesQuery = trpc.activities.list.useQuery({ limit: 200, offset: 0, source: "all" })
-  const timelineQuery = trpc.statistics.getTimeline.useQuery({ days: 7 })
+  const timelineQuery = trpc.statistics.getTimeline.useQuery({ days: 14 })
   const advancedQuery = trpc.statistics.getAdvanced.useQuery({ days: 30 })
   const leaderboardQuery = trpc.leaderboard.get.useQuery({
     orderBy: "totalXp",
@@ -77,6 +77,7 @@ export default function Dashboard() {
 
   const stats = useMemo(() => {
     const activities = activitiesQuery.data ?? []
+    const timeline = timelineQuery.data ?? []
     const now = new Date()
     const startOfToday = new Date(now)
     startOfToday.setHours(0, 0, 0, 0)
@@ -84,6 +85,9 @@ export default function Dashboard() {
     startLast7.setDate(startLast7.getDate() - 6)
     const startPrev7 = new Date(startLast7)
     startPrev7.setDate(startPrev7.getDate() - 7)
+
+    const toDateKey = (date: Date) => date.toISOString().split("T")[0]
+    const timelineMap = new Map(timeline.map((point) => [point.date, point]))
 
     let currentDistance = 0
     let currentTime = 0
@@ -107,9 +111,71 @@ export default function Dashboard() {
       }
     })
 
+    let timelineCurrentDistanceKm = 0
+    let timelineCurrentSessions = 0
+    let timelineCurrentPaceValues: number[] = []
+    let timelinePrevDistanceKm = 0
+    let timelinePrevSessions = 0
+    let timelinePrevPaceValues: number[] = []
+
+    for (let i = 0; i < 7; i += 1) {
+      const date = new Date(startLast7)
+      date.setDate(startLast7.getDate() + i)
+      const key = toDateKey(date)
+      const entry = timelineMap.get(key)
+      if (entry) {
+        timelineCurrentDistanceKm += entry.distance || 0
+        timelineCurrentSessions += entry.sessions || 0
+        if (entry.pace) timelineCurrentPaceValues.push(entry.pace)
+      }
+    }
+
+    for (let i = 0; i < 7; i += 1) {
+      const date = new Date(startPrev7)
+      date.setDate(startPrev7.getDate() + i)
+      const key = toDateKey(date)
+      const entry = timelineMap.get(key)
+      if (entry) {
+        timelinePrevDistanceKm += entry.distance || 0
+        timelinePrevSessions += entry.sessions || 0
+        if (entry.pace) timelinePrevPaceValues.push(entry.pace)
+      }
+    }
+
+    const fallbackCurrentPace =
+      timelineCurrentPaceValues.length > 0
+        ? timelineCurrentPaceValues.reduce((sum, value) => sum + value, 0) /
+          timelineCurrentPaceValues.length
+        : 0
+    const fallbackPrevPace =
+      timelinePrevPaceValues.length > 0
+        ? timelinePrevPaceValues.reduce((sum, value) => sum + value, 0) / timelinePrevPaceValues.length
+        : 0
+
+    if (currentDistance === 0 && timelineCurrentDistanceKm > 0) {
+      currentDistance = timelineCurrentDistanceKm * 1000
+      currentSessions = timelineCurrentSessions
+    }
+    if (prevDistance === 0 && timelinePrevDistanceKm > 0) {
+      prevDistance = timelinePrevDistanceKm * 1000
+      prevSessions = timelinePrevSessions
+    }
+
     const currentPace =
-      currentDistance > 0 ? currentTime / (currentDistance / 100) : 0
-    const prevPace = prevDistance > 0 ? prevTime / (prevDistance / 100) : 0
+      currentDistance > 0 && currentTime > 0
+        ? currentTime / (currentDistance / 100)
+        : fallbackCurrentPace
+    const prevPace =
+      prevDistance > 0 && prevTime > 0
+        ? prevTime / (prevDistance / 100)
+        : fallbackPrevPace
+
+    if (currentTime === 0 && currentDistance > 0 && currentPace > 0) {
+      currentTime = Math.round((currentDistance / 100) * currentPace)
+    }
+    if (prevTime === 0 && prevDistance > 0 && prevPace > 0) {
+      prevTime = Math.round((prevDistance / 100) * prevPace)
+    }
 
     const distanceChange = changeLabel(currentDistance, prevDistance)
     const timeChange = changeLabel(currentTime, prevTime)
