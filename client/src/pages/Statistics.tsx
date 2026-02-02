@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   LineChart,
   Line,
@@ -16,11 +15,12 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { TrendingUp, TrendingDown, Minus, ChevronLeft, Info } from "lucide-react";
-import { Link } from "wouter";
+import { Info } from "lucide-react";
 import { motion } from "framer-motion";
 import { metricsDefinitions } from "@/data/metricsDefinitions";
 import { AppLayout } from "@/components/AppLayout";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 const PERIOD_OPTIONS = [
   { value: 7, label: "7 giorni" },
@@ -29,8 +29,13 @@ const PERIOD_OPTIONS = [
   { value: 365, label: "1 anno" },
 ];
 
-const HR_ZONE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#dc2626"];
-const PACE_COLORS = ["#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1", "#8b5cf6"];
+const HR_ZONE_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+];
 
 function MetricInfoButton({ info }: { info: any }) {
   const [open, setOpen] = useState(false);
@@ -46,7 +51,7 @@ function MetricInfoButton({ info }: { info: any }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="p-1 rounded-md hover:bg-secondary transition-colors"
+        className="p-1 rounded-md hover:bg-muted/60 transition-colors"
         title="Info"
       >
         <Info className="w-4 h-4 text-muted-foreground" />
@@ -126,7 +131,7 @@ function RingMetric({
   const offset = circumference * (1 - pct / 100);
 
   return (
-    <div className="rounded-2xl p-3 bg-card border border-border">
+    <div className="rounded-2xl p-4 bg-card/80 border border-border/60 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
         <MetricInfoButton info={info} />
@@ -138,7 +143,7 @@ function RingMetric({
               cx="50"
               cy="50"
               r={radius}
-              stroke="hsl(var(--border))"
+              stroke="var(--border)"
               strokeWidth="7"
               fill="none"
             />
@@ -153,7 +158,7 @@ function RingMetric({
               strokeDashoffset={offset}
               strokeLinecap="round"
               transform="rotate(-90 50 50)"
-              style={{ filter: `drop-shadow(0 0 10px ${color}55)` }}
+              style={{ filter: `drop-shadow(0 0 10px ${color})` }}
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -189,15 +194,15 @@ function GaugeMetric({
   const pct = clamped !== null ? ((clamped - min) / (max - min)) * 100 : 0;
   const color =
     clamped === null
-      ? "hsl(var(--muted-foreground))"
+      ? "var(--muted-foreground)"
       : clamped > 20
-      ? "#22c55e"
+      ? "var(--chart-2)"
       : clamped > 0
-      ? "#f59e0b"
-      : "#ef4444";
+      ? "var(--chart-4)"
+      : "var(--destructive)";
 
   return (
-    <div className="rounded-2xl p-4 bg-card border border-border">
+    <div className="rounded-2xl p-4 bg-card/80 border border-border/60 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
         <MetricInfoButton info={info} />
@@ -207,7 +212,7 @@ function GaugeMetric({
           <path
             d="M10 110 A90 90 0 0 1 190 110"
             fill="none"
-            stroke="hsl(var(--border))"
+            stroke="var(--border)"
             strokeWidth="12"
             pathLength={100}
             strokeLinecap="round"
@@ -221,7 +226,7 @@ function GaugeMetric({
             strokeDasharray={100}
             strokeDashoffset={100 - pct}
             strokeLinecap="round"
-            style={{ filter: `drop-shadow(0 0 12px ${color}66)` }}
+            style={{ filter: `drop-shadow(0 0 12px ${color})` }}
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pt-6">
@@ -246,7 +251,7 @@ function StreakRing({
 }) {
   const max = Math.max(record || 0, 7);
   return (
-    <div className="rounded-2xl p-3 bg-card border border-border">
+    <div className="rounded-2xl p-4 bg-card/80 border border-border/60 shadow-sm">
       <div className="flex items-center justify-between mb-3">
         <div className="text-xs uppercase tracking-wide text-muted-foreground">Streak</div>
         <div className="text-[10px] text-muted-foreground">Record {record}g</div>
@@ -258,7 +263,7 @@ function StreakRing({
               cx="50"
               cy="50"
               r={32}
-              stroke="hsl(var(--border))"
+              stroke="var(--border)"
               strokeWidth="7"
               fill="none"
             />
@@ -266,14 +271,14 @@ function StreakRing({
               cx="50"
               cy="50"
               r={32}
-              stroke="#f97316"
+              stroke="var(--chart-5)"
               strokeWidth="7"
               fill="none"
               strokeDasharray={2 * Math.PI * 32}
               strokeDashoffset={(2 * Math.PI * 32) * (1 - Math.min(1, current / max))}
               strokeLinecap="round"
               transform="rotate(-90 50 50)"
-              style={{ filter: "drop-shadow(0 0 10px #f9731655)" }}
+              style={{ filter: "drop-shadow(0 0 10px var(--chart-5))" }}
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -331,38 +336,31 @@ export default function Statistics() {
 
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low" className="text-foreground">
-    <div className="pb-20 overflow-x-hidden">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border px-4 py-4">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard">
-            <button className="p-2 hover:bg-secondary rounded-lg transition-colors">
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-          </Link>
-          <h1 className="text-xl font-bold">📊 Statistiche</h1>
+    <AppLayout className="text-foreground">
+      <div className="space-y-8 pb-16">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">Analisi performance</p>
+            <h1 className="text-3xl font-semibold text-foreground">Statistiche</h1>
+            <p className="text-sm text-muted-foreground">
+              Metriche avanzate e trend sulle tue sessioni recenti.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {PERIOD_OPTIONS.map((option) => (
+              <Button
+                key={option.value}
+                size="sm"
+                variant={period === option.value ? "default" : "secondary"}
+                onClick={() => setPeriod(option.value)}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
         </div>
 
-        {/* Period Filter */}
-        <div className="flex gap-2 mt-4 overflow-x-auto scrollbar-hide pb-2">
-          {PERIOD_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              onClick={() => setPeriod(option.value)}
-              className={`px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
-                period === option.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:bg-secondary"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="p-4 space-y-6 max-w-full overflow-x-hidden">
+        <div className="space-y-6">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-4">
             <div className="relative w-16 h-16">
@@ -383,57 +381,64 @@ export default function Statistics() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
             >
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Progress Timeline
-                </h2>
-                <div className="group relative">
-                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                  <div className="absolute left-0 top-6 w-64 p-2 bg-card/95 border border-border rounded-lg text-xs text-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                    Visualizza l'andamento della distanza percorsa e del pace medio nel periodo selezionato. Utile per identificare trend e progressi nel tempo.
+              <Card className="bg-card/80 border-border/60 shadow-sm">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-base">Progress Timeline</CardTitle>
+                      <CardDescription>
+                        Distanza e ritmo medio nel periodo selezionato.
+                      </CardDescription>
+                    </div>
+                    <div className="group relative mt-1">
+                      <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                      <div className="absolute right-0 top-6 w-64 rounded-lg border border-border bg-card/95 p-2 text-xs text-foreground opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none z-50">
+                        Visualizza l'andamento della distanza percorsa e del pace medio nel periodo selezionato. Utile per identificare trend e progressi nel tempo.
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-              <div className="rounded-xl p-4 bg-card border border-border">
-                {timelineChartData && timelineChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={250}>
-                    <LineChart data={timelineChartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" style={{ fontSize: "12px" }} />
-                      <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: "12px" }} />
-                      <Tooltip
-                        contentStyle={{
-                          background: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                          color: "hsl(var(--foreground))",
-                        }}
-                      />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="distanza"
-                        stroke="#3b82f6"
-                        strokeWidth={2}
-                        name="Distanza (km)"
-                        dot={{ fill: "#3b82f6" }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="pace"
-                        stroke="#10b981"
-                        strokeWidth={2}
-                        name="Pace (min/100m)"
-                        dot={{ fill: "#10b981" }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <p className="text-center text-muted-foreground py-8">
-                    Nessun dato disponibile per questo periodo
-                  </p>
-                )}
-              </div>
+                </CardHeader>
+                <CardContent>
+                  {timelineChartData && timelineChartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={250}>
+                      <LineChart data={timelineChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis dataKey="date" stroke="var(--muted-foreground)" style={{ fontSize: "12px" }} />
+                        <YAxis stroke="var(--muted-foreground)" style={{ fontSize: "12px" }} />
+                        <Tooltip
+                          contentStyle={{
+                            background: "var(--card)",
+                            border: "1px solid var(--border)",
+                            borderRadius: "8px",
+                            color: "var(--foreground)",
+                          }}
+                        />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="distanza"
+                          stroke="var(--chart-1)"
+                          strokeWidth={2}
+                          name="Distanza (km)"
+                          dot={{ fill: "var(--chart-1)" }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="pace"
+                          stroke="var(--chart-2)"
+                          strokeWidth={2}
+                          name="Pace (min/100m)"
+                          dot={{ fill: "var(--chart-2)" }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">
+                      Nessun dato disponibile per questo periodo
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
             </motion.section>
 
             {/* Analisi Prestazioni */}
@@ -443,125 +448,147 @@ export default function Statistics() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
             >
-              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                Analisi Prestazioni
+              <h2 className="text-lg font-semibold text-foreground">
+                Analisi prestazioni
               </h2>
 
               {/* HR Zones */}
               {hrZonesData.length > 0 && (
-                <div className="rounded-xl p-4 bg-card border border-border">
-                  <div className="flex items-center gap-2 mb-3">
-                    <h3 className="font-semibold">Zone Frequenza Cardiaca</h3>
-                    <div className="group relative">
-                      <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                      <div className="absolute left-0 top-6 w-72 p-2 bg-card/95 border border-border rounded-lg text-xs text-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                        Mostra la distribuzione percentuale del tempo trascorso in ciascuna zona di frequenza cardiaca. Z1: Recupero, Z2: Aerobica, Z3: Soglia, Z4: Anaerobica, Z5: Massima.
+                <Card className="bg-card/80 border-border/60 shadow-sm">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <CardTitle className="text-base">Zone frequenza cardiaca</CardTitle>
+                        <CardDescription>
+                          Distribuzione del tempo nelle diverse zone.
+                        </CardDescription>
+                      </div>
+                      <div className="group relative mt-1">
+                        <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                        <div className="absolute right-0 top-6 w-72 rounded-lg border border-border bg-card/95 p-2 text-xs text-foreground opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none z-50">
+                          Mostra la distribuzione percentuale del tempo trascorso in ciascuna zona di frequenza cardiaca. Z1: Recupero, Z2: Aerobica, Z3: Soglia, Z4: Anaerobica, Z5: Massima.
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <div className="flex flex-col md:flex-row items-center gap-4">
-                    <ResponsiveContainer width="100%" height={200}>
-                      <PieChart>
-                        <Pie
-                          data={hrZonesData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={80}
-                          paddingAngle={2}
-                          dataKey="value"
-                        >
-                          {hrZonesData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            background: "hsl(var(--card))",
-                            border: "1px solid hsl(var(--border))",
-                            borderRadius: "8px",
-                            color: "hsl(var(--foreground))",
-                          }}
-                          labelStyle={{
-                            color: "hsl(var(--foreground))",
-                          }}
-                          itemStyle={{
-                            color: "hsl(var(--foreground))",
-                          }}
-                          formatter={(value: number) => `${value}%`}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="space-y-2 text-sm">
-                      {hrZonesData.map((zone) => (
-                        <div key={zone.name} className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ background: zone.color }}
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-col md:flex-row items-center gap-4">
+                      <ResponsiveContainer width="100%" height={200}>
+                        <PieChart>
+                          <Pie
+                            data={hrZonesData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={2}
+                            dataKey="value"
+                          >
+                            {hrZonesData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              background: "var(--card)",
+                              border: "1px solid var(--border)",
+                              borderRadius: "8px",
+                              color: "var(--foreground)",
+                            }}
+                            formatter={(value: number) => `${value}%`}
                           />
-                          <span>
-                            {zone.name}: {zone.value}%
-                          </span>
-                        </div>
-                      ))}
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="space-y-2 text-sm">
+                        {hrZonesData.map((zone) => (
+                          <div key={zone.name} className="flex items-center gap-2">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ background: zone.color }}
+                            />
+                            <span>
+                              {zone.name}: {zone.value}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Pace Distribution */}
               {performance && performance.paceDistribution.length > 0 && (
-                <div className="rounded-xl p-4 bg-card border border-border">
-                  <div className="flex items-center gap-2 mb-3">
-                    <h3 className="font-semibold">Distribuzione Pace</h3>
-                    <div className="group relative">
-                      <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                      <div className="absolute left-0 top-6 w-72 p-2 bg-card/95 border border-border rounded-lg text-xs text-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                        Mostra quante sessioni hai completato in ciascun range di pace (min/100m). Ti aiuta a capire a quale velocità nuoti più frequentemente.
+                <Card className="bg-card/80 border-border/60 shadow-sm">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <CardTitle className="text-base">Distribuzione pace</CardTitle>
+                        <CardDescription>
+                          Sessioni per fascia di ritmo (min/100m).
+                        </CardDescription>
+                      </div>
+                      <div className="group relative mt-1">
+                        <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                        <div className="absolute right-0 top-6 w-72 rounded-lg border border-border bg-card/95 p-2 text-xs text-foreground opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none z-50">
+                          Mostra quante sessioni hai completato in ciascun range di pace (min/100m). Ti aiuta a capire a quale velocità nuoti più frequentemente.
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={performance.paceDistribution}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="range" stroke="hsl(var(--muted-foreground))" style={{ fontSize: "12px" }} />
-                      <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: "12px" }} />
-                      <Tooltip
-                        contentStyle={{
-                          background: "hsl(var(--card))",
-                          border: "1px solid hsl(var(--border))",
-                          borderRadius: "8px",
-                          color: "hsl(var(--foreground))",
-                        }}
-                      />
-                      <Bar dataKey="count" fill="#06b6d4" name="Sessioni" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                  </CardHeader>
+                  <CardContent>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={performance.paceDistribution}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis dataKey="range" stroke="var(--muted-foreground)" style={{ fontSize: "12px" }} />
+                        <YAxis stroke="var(--muted-foreground)" style={{ fontSize: "12px" }} />
+                        <Tooltip
+                          contentStyle={{
+                            background: "var(--card)",
+                            border: "1px solid var(--border)",
+                            borderRadius: "8px",
+                            color: "var(--foreground)",
+                          }}
+                        />
+                        <Bar dataKey="count" fill="var(--chart-1)" name="Sessioni" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
               )}
 
               {/* Calories & SWOLF */}
               {performance && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-xl p-4 bg-card border border-border">
-                    <div className="text-sm text-muted-foreground">Calorie Totali</div>
-                    <div className="text-2xl font-bold text-foreground">
-                      {performance.caloriesTotal.toLocaleString()}
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Media: {performance.avgCaloriesPerSession}/sessione
-                    </div>
-                  </div>
-                  {performance.swolfAvg && (
-                    <div className="rounded-xl p-4 bg-card border border-border">
-                      <div className="text-sm text-muted-foreground">SWOLF Medio</div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <Card className="bg-card/80 border-border/60 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Calorie totali</CardTitle>
+                      <CardDescription>Energia spesa nel periodo</CardDescription>
+                    </CardHeader>
+                    <CardContent>
                       <div className="text-2xl font-bold text-foreground">
-                        {performance.swolfAvg}
+                        {performance.caloriesTotal.toLocaleString()}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
-                        Efficienza nuotata
+                        Media: {performance.avgCaloriesPerSession}/sessione
                       </div>
-                    </div>
+                    </CardContent>
+                  </Card>
+                  {performance.swolfAvg && (
+                    <Card className="bg-card/80 border-border/60 shadow-sm">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">SWOLF medio</CardTitle>
+                        <CardDescription>Efficienza nuotata</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-2xl font-bold text-foreground">
+                          {performance.swolfAvg}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Valore più basso = migliore efficienza
+                        </div>
+                      </CardContent>
+                    </Card>
                   )}
                 </div>
               )}
@@ -575,8 +602,8 @@ export default function Statistics() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
               >
-                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                  Analisi Avanzate
+                <h2 className="text-lg font-semibold text-foreground">
+                  Analisi avanzate
                 </h2>
 
                 {/* Core Rings */}
@@ -584,19 +611,19 @@ export default function Statistics() {
                   <RingMetric
                     label="Performance"
                     value={advanced.performanceIndex}
-                    color="#38bdf8"
+                    color="var(--chart-1)"
                     info={metricsDefinitions.performanceIndex}
                   />
                   <RingMetric
                     label="Consistency"
                     value={advanced.consistencyScore}
-                    color="#22c55e"
+                    color="var(--chart-2)"
                     info={metricsDefinitions.consistencyScore}
                   />
                   <RingMetric
                     label="Recovery"
                     value={advanced.recoveryReadinessScore}
-                    color="#06b6d4"
+                    color="var(--chart-3)"
                     info={metricsDefinitions.rrs}
                   />
                   <StreakRing current={advanced.streak.current} record={advanced.streak.record} />
@@ -605,31 +632,31 @@ export default function Statistics() {
                 {/* Advanced Swimming Metrics */}
                 <div className="space-y-3">
                   <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Metriche Avanzate
+                    Metriche avanzate
                   </h3>
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                     <RingMetric
                       label="SEI"
                       value={advanced.swimmingEfficiencyIndex}
-                      color="#a855f7"
+                      color="var(--chart-5)"
                       info={metricsDefinitions.sei}
                     />
                     <RingMetric
                       label="TCI"
                       value={advanced.technicalConsistencyIndex}
-                      color="#f59e0b"
+                      color="var(--chart-4)"
                       info={metricsDefinitions.tci}
                     />
                     <RingMetric
                       label="SER"
                       value={advanced.strokeEfficiencyRating}
-                      color="#f97316"
+                      color="var(--chart-3)"
                       info={metricsDefinitions.ser}
                     />
                     <RingMetric
                       label="ACS"
                       value={advanced.aerobicCapacityScore}
-                      color="#84cc16"
+                      color="var(--chart-2)"
                       info={metricsDefinitions.acs}
                     />
                   </div>
@@ -651,30 +678,34 @@ export default function Statistics() {
 
                 {/* Predictions */}
                 {advanced.predictions && (
-                  <div className="rounded-xl p-4 bg-card border border-border">
-                    <h3 className="font-semibold mb-2">📈 Previsioni</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Al ritmo attuale raggiungerai{" "}
-                      <span className="font-bold text-foreground">
-                        {advanced.predictions.targetKm}km
-                      </span>{" "}
-                      entro il{" "}
-                      <span className="font-bold text-foreground">
-                        {new Date(advanced.predictions.estimatedDate).toLocaleDateString("it-IT")}
-                      </span>
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      ({advanced.predictions.daysRemaining} giorni rimasti)
-                    </p>
-                  </div>
+                  <Card className="bg-card/80 border-border/60 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Previsioni</CardTitle>
+                      <CardDescription>Stima di obiettivi al ritmo attuale.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        Al ritmo attuale raggiungerai{" "}
+                        <span className="font-bold text-foreground">
+                          {advanced.predictions.targetKm}km
+                        </span>{" "}
+                        entro il{" "}
+                        <span className="font-bold text-foreground">
+                          {new Date(advanced.predictions.estimatedDate).toLocaleDateString("it-IT")}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        ({advanced.predictions.daysRemaining} giorni rimasti)
+                      </p>
+                    </CardContent>
+                  </Card>
                 )}
               </motion.section>
             )}
           </>
         )}
+        </div>
       </div>
-
-    </div>
     </AppLayout>
   );
 }
