@@ -247,10 +247,12 @@ export default function Profile() {
       : null;
     const bestSwolf = swolfValues.length ? Math.min(...swolfValues) : null;
 
-    const bestPace = activities
+    const paceValues = activities
       .map((activity) => activity.avgPacePer100m)
-      .filter((value: number | null) => typeof value === "number" && value > 0)
-      .reduce((min, value) => Math.min(min, value), Number.POSITIVE_INFINITY);
+      .filter((value: number | null) => typeof value === "number" && value > 0) as number[];
+    const bestPace = paceValues.length
+      ? paceValues.reduce((min, value) => Math.min(min, value), Number.POSITIVE_INFINITY)
+      : null;
 
     const dateList = activities
       .map((activity) => new Date(activity.activityDate).toISOString().split("T")[0])
@@ -264,7 +266,7 @@ export default function Profile() {
       avgPace,
       avgSwolf,
       bestSwolf,
-      bestPace: Number.isFinite(bestPace) ? bestPace : null,
+      bestPace: bestPace !== null && Number.isFinite(bestPace) ? bestPace : null,
       streakCurrent: streaks.current,
       streakBest: streaks.best,
     };
@@ -299,17 +301,27 @@ export default function Profile() {
       (activity.distanceMeters ?? 0) > (max.distanceMeters ?? 0) ? activity : max
     );
 
-    const fastestPaceActivity = activities
-      .filter((activity) => activity.avgPacePer100m && activity.avgPacePer100m > 0)
-      .reduce((min, activity) =>
-        (activity.avgPacePer100m ?? Infinity) < (min.avgPacePer100m ?? Infinity) ? activity : min
-      );
+    const paceCandidates = activities.filter(
+      (activity) => activity.avgPacePer100m && activity.avgPacePer100m > 0
+    );
+    const fastestPaceActivity = paceCandidates.length
+      ? paceCandidates.reduce((min, activity) =>
+          (activity.avgPacePer100m ?? Infinity) < (min.avgPacePer100m ?? Infinity)
+            ? activity
+            : min
+        )
+      : null;
 
-    const bestSwolfActivity = activities
-      .filter((activity) => activity.avgSwolf && activity.avgSwolf > 0)
-      .reduce((min, activity) =>
-        (activity.avgSwolf ?? Infinity) < (min.avgSwolf ?? Infinity) ? activity : min
-      );
+    const swolfCandidates = activities.filter(
+      (activity) => activity.avgSwolf && activity.avgSwolf > 0
+    );
+    const bestSwolfActivity = swolfCandidates.length
+      ? swolfCandidates.reduce((min, activity) =>
+          (activity.avgSwolf ?? Infinity) < (min.avgSwolf ?? Infinity)
+            ? activity
+            : min
+        )
+      : null;
 
     const longestDuration = activities.reduce((max, activity) =>
       (activity.durationSeconds ?? 0) > (max.durationSeconds ?? 0) ? activity : max
