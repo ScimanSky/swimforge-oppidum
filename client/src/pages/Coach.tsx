@@ -313,7 +313,7 @@ export default function Coach() {
           </Badge>
         </div>
 
-        <Card className="bg-card border-border">
+        <Card className="bg-card/80 border-border/60 shadow-sm">
           <CardContent className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10">
@@ -353,9 +353,9 @@ export default function Coach() {
         </Card>
 
         <Tabs defaultValue="insights">
-          <TabsList className="bg-secondary">
+          <TabsList className="bg-secondary/60">
             <TabsTrigger value="insights">Insights</TabsTrigger>
-            <TabsTrigger value="workouts">Allenamenti</TabsTrigger>
+            <TabsTrigger value="workouts">Piano</TabsTrigger>
             <TabsTrigger value="session-iq">Session IQ</TabsTrigger>
             <TabsTrigger value="chat">Chat</TabsTrigger>
           </TabsList>
@@ -363,7 +363,7 @@ export default function Coach() {
           <TabsContent value="insights" className="mt-6 space-y-4">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               {keyMetricCards.map((metric) => (
-                <Card key={metric.title} className="bg-card border-border">
+                <Card key={metric.title} className="bg-card/80 border-border/60 shadow-sm">
                   <CardContent className="p-4">
                     <p className="text-xs text-muted-foreground uppercase tracking-wide">
                       {metric.title}
@@ -383,7 +383,7 @@ export default function Coach() {
 
             {insightCards.length > 0 ? (
               insightCards.map((insight, index) => (
-                <Card key={index} className="bg-card border-border">
+                <Card key={index} className="bg-card/80 border-border/60 shadow-sm">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
                       <div className="p-2 rounded-lg bg-primary/10">
@@ -412,14 +412,14 @@ export default function Coach() {
                 </Card>
               ))
             ) : (
-              <Card className="bg-card border-border">
+              <Card className="bg-card/80 border-border/60 shadow-sm">
                 <CardContent className="p-6 text-sm text-muted-foreground">
                   Nessun insight disponibile. Sincronizza nuove attivita per ottenere suggerimenti AI.
                 </CardContent>
               </Card>
             )}
 
-            <Card className="bg-card border-border">
+            <Card className="bg-card/80 border-border/60 shadow-sm">
               <CardContent className="p-4">
                 <div className="flex flex-wrap items-center gap-3">
                   {advancedMetrics.map((metric) => (
@@ -441,7 +441,7 @@ export default function Coach() {
           </TabsContent>
 
           <TabsContent value="workouts" className="mt-6 space-y-6">
-            <Card className="bg-card border-border">
+            <Card className="bg-card/80 border-border/60 shadow-sm">
               <CardHeader className="flex flex-row items-start justify-between gap-3">
                 <div>
                   <CardTitle className="font-display">Allenamento in Vasca</CardTitle>
@@ -522,7 +522,7 @@ export default function Coach() {
               </CardContent>
             </Card>
 
-            <Card className="bg-card border-border">
+            <Card className="bg-card/80 border-border/60 shadow-sm">
               <CardHeader className="flex flex-row items-start justify-between gap-3">
                 <div>
                   <CardTitle className="font-display">Allenamento Dryland</CardTitle>
@@ -605,7 +605,7 @@ export default function Coach() {
           </TabsContent>
 
           <TabsContent value="session-iq" className="mt-6 space-y-4">
-            <Card className="bg-card border-border">
+            <Card className="bg-card/80 border-border/60 shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
                   <CardTitle className="font-display">Session IQ</CardTitle>
@@ -672,7 +672,7 @@ export default function Coach() {
           </TabsContent>
 
           <TabsContent value="chat" className="mt-6">
-            <Card className="bg-card border-border">
+            <Card className="bg-card/80 border-border/60 shadow-sm">
               <CardContent className="p-6 space-y-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-primary/10">
