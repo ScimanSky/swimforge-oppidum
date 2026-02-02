@@ -46,10 +46,10 @@ function MetricInfoButton({ info }: { info: any }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="p-1 rounded-md hover:bg-[oklch(0.25_0.03_250)] transition-colors"
+        className="p-1 rounded-md hover:bg-secondary transition-colors"
         title="Info"
       >
-        <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)]" />
+        <Info className="w-4 h-4 text-muted-foreground" />
       </button>
       {open && (
         <div
@@ -57,40 +57,32 @@ function MetricInfoButton({ info }: { info: any }) {
           onClick={() => setOpen(false)}
         >
           <div
-            className="rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-            style={{
-              background: "oklch(0.15 0.03 250)",
-              border: "1px solid oklch(0.25 0.03 250)",
-            }}
+            className="rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto bg-card border border-border"
             ref={contentRef}
             onClick={(e) => e.stopPropagation()}
           >
             <div
-              className="sticky top-0 border-b p-6"
-              style={{
-                background: "oklch(0.15 0.03 250)",
-                borderColor: "oklch(0.25 0.03 250)",
-              }}
+              className="sticky top-0 border-b border-border p-6 bg-card"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-[oklch(0.90_0.05_220)]">
+                <h2 className="text-2xl font-bold text-foreground">
                   {info.title}
                 </h2>
                 <button
                   onClick={() => setOpen(false)}
-                  className="text-[oklch(0.60_0.05_250)] hover:text-[oklch(0.80_0.05_220)]"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   ✕
                 </button>
               </div>
             </div>
-            <div className="p-6 space-y-4 text-sm text-[oklch(0.80_0.05_220)]">
+            <div className="p-6 space-y-4 text-sm text-muted-foreground">
               <p>{info.description}</p>
-              <div className="rounded-lg p-3 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)] text-xs whitespace-pre-line">
+              <div className="rounded-lg p-3 bg-secondary border border-border text-xs whitespace-pre-line text-foreground">
                 {info.formula}
               </div>
               <div>
-                <h3 className="font-semibold text-[oklch(0.90_0.05_220)] mb-2">Interpretazione</h3>
+                <h3 className="font-semibold text-foreground mb-2">Interpretazione</h3>
                 <ul className="space-y-1">
                   <li><strong>Ottimo:</strong> {info.interpretation.excellent}</li>
                   <li><strong>Buono:</strong> {info.interpretation.good}</li>
@@ -99,7 +91,7 @@ function MetricInfoButton({ info }: { info: any }) {
                 </ul>
               </div>
               <div>
-                <h3 className="font-semibold text-[oklch(0.90_0.05_220)] mb-2">Come migliorare</h3>
+                <h3 className="font-semibold text-foreground mb-2">Come migliorare</h3>
                 <ul className="list-disc pl-5 space-y-1">
                   {info.howToImprove.map((tip: string, idx: number) => (
                     <li key={idx}>{tip}</li>
@@ -134,9 +126,9 @@ function RingMetric({
   const offset = circumference * (1 - pct / 100);
 
   return (
-    <div className="rounded-2xl p-3 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]">
+    <div className="rounded-2xl p-3 bg-card border border-border">
       <div className="flex items-center justify-between mb-3">
-        <div className="text-xs uppercase tracking-wide text-[oklch(0.65_0.05_250)]">{label}</div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
         <MetricInfoButton info={info} />
       </div>
       <div className="flex items-center gap-4">
@@ -146,7 +138,7 @@ function RingMetric({
               cx="50"
               cy="50"
               r={radius}
-              stroke="oklch(0.28 0.03 250)"
+              stroke="hsl(var(--border))"
               strokeWidth="7"
               fill="none"
             />
@@ -165,13 +157,13 @@ function RingMetric({
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div className="text-xl font-bold text-[oklch(0.92_0.05_220)]">
+            <div className="text-xl font-bold text-foreground">
               {safeValue !== null ? Math.round(safeValue) : "N/D"}
             </div>
-            <div className="text-[10px] text-[oklch(0.60_0.05_250)]">/{max}</div>
+            <div className="text-[10px] text-muted-foreground">/{max}</div>
           </div>
         </div>
-        <div className="text-xs text-[oklch(0.65_0.05_250)] leading-snug">
+        <div className="text-xs text-muted-foreground leading-snug">
           {safeValue !== null ? `${Math.round(pct)}%` : "Dato non disponibile"}
         </div>
       </div>
@@ -197,7 +189,7 @@ function GaugeMetric({
   const pct = clamped !== null ? ((clamped - min) / (max - min)) * 100 : 0;
   const color =
     clamped === null
-      ? "oklch(0.60_0.05_250)"
+      ? "hsl(var(--muted-foreground))"
       : clamped > 20
       ? "#22c55e"
       : clamped > 0
@@ -205,9 +197,9 @@ function GaugeMetric({
       : "#ef4444";
 
   return (
-    <div className="rounded-2xl p-4 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]">
+    <div className="rounded-2xl p-4 bg-card border border-border">
       <div className="flex items-center justify-between mb-3">
-        <div className="text-xs uppercase tracking-wide text-[oklch(0.65_0.05_250)]">{label}</div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
         <MetricInfoButton info={info} />
       </div>
       <div className="relative">
@@ -215,7 +207,7 @@ function GaugeMetric({
           <path
             d="M10 110 A90 90 0 0 1 190 110"
             fill="none"
-            stroke="oklch(0.28 0.03 250)"
+            stroke="hsl(var(--border))"
             strokeWidth="12"
             pathLength={100}
             strokeLinecap="round"
@@ -233,10 +225,10 @@ function GaugeMetric({
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pt-6">
-          <div className="text-2xl font-bold text-[oklch(0.92_0.05_220)]">
+          <div className="text-2xl font-bold text-foreground">
             {safeValue !== null ? `${Math.round(safeValue)}%` : "N/D"}
           </div>
-          <div className="text-[10px] text-[oklch(0.60_0.05_250)]">
+          <div className="text-[10px] text-muted-foreground">
             {min}% — {max}%
           </div>
         </div>
@@ -254,10 +246,10 @@ function StreakRing({
 }) {
   const max = Math.max(record || 0, 7);
   return (
-    <div className="rounded-2xl p-3 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]">
+    <div className="rounded-2xl p-3 bg-card border border-border">
       <div className="flex items-center justify-between mb-3">
-        <div className="text-xs uppercase tracking-wide text-[oklch(0.65_0.05_250)]">Streak</div>
-        <div className="text-[10px] text-[oklch(0.60_0.05_250)]">Record {record}g</div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">Streak</div>
+        <div className="text-[10px] text-muted-foreground">Record {record}g</div>
       </div>
       <div className="flex items-center gap-4">
         <div className="relative w-20 h-20">
@@ -266,7 +258,7 @@ function StreakRing({
               cx="50"
               cy="50"
               r={32}
-              stroke="oklch(0.28 0.03 250)"
+              stroke="hsl(var(--border))"
               strokeWidth="7"
               fill="none"
             />
@@ -285,11 +277,11 @@ function StreakRing({
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div className="text-lg font-bold text-[oklch(0.92_0.05_220)]">{current}</div>
-            <div className="text-[10px] text-[oklch(0.60_0.05_250)]">giorni</div>
+            <div className="text-lg font-bold text-foreground">{current}</div>
+            <div className="text-[10px] text-muted-foreground">giorni</div>
           </div>
         </div>
-        <div className="text-xs text-[oklch(0.60_0.05_250)] leading-snug">
+        <div className="text-xs text-muted-foreground leading-snug">
           🔥 Consecutivi attuali
         </div>
       </div>
@@ -339,13 +331,13 @@ export default function Statistics() {
 
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low" className="text-white">
+    <AppLayout showBubbles={true} bubbleIntensity="low" className="text-foreground">
     <div className="pb-20 overflow-x-hidden">
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-[oklch(0.18_0.03_250_/_0.55)] border-b border-[oklch(0.25_0.03_250)] px-4 py-4">
+      <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm border-b border-border px-4 py-4">
         <div className="flex items-center gap-3">
           <Link href="/dashboard">
-            <button className="p-2 hover:bg-white/10 rounded-lg transition-colors">
+            <button className="p-2 hover:bg-secondary rounded-lg transition-colors">
               <ChevronLeft className="w-5 h-5" />
             </button>
           </Link>
@@ -360,8 +352,8 @@ export default function Statistics() {
               onClick={() => setPeriod(option.value)}
               className={`px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
                 period === option.value
-                  ? "bg-[oklch(0.55_0.20_220)] text-white"
-                  : "bg-[oklch(0.20_0.03_250_/_0.55)] text-[oklch(0.70_0.05_250)] hover:bg-[oklch(0.25_0.03_250)]"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card text-muted-foreground hover:bg-secondary"
               }`}
             >
               {option.label}
@@ -374,12 +366,12 @@ export default function Statistics() {
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-4">
             <div className="relative w-16 h-16">
-              <div className="absolute inset-0 border-4 border-[oklch(0.30_0.04_250)] rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-[oklch(0.70_0.18_220)] border-t-transparent rounded-full animate-spin"></div>
+              <div className="absolute inset-0 border-4 border-border rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
             <div className="text-center space-y-2">
-              <p className="text-lg font-semibold text-[oklch(0.85_0.05_220)]">Caricamento statistiche...</p>
-              <p className="text-sm text-[oklch(0.65_0.03_220)]">Analisi dati in corso</p>
+              <p className="text-lg font-semibold text-foreground">Caricamento statistiche...</p>
+              <p className="text-sm text-muted-foreground">Analisi dati in corso</p>
             </div>
           </div>
         ) : (
@@ -392,35 +384,29 @@ export default function Statistics() {
               transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
             >
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[oklch(0.70_0.08_220)]">
+                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Progress Timeline
                 </h2>
                 <div className="group relative">
-                  <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)] cursor-help" />
-                  <div className="absolute left-0 top-6 w-64 p-2 bg-[oklch(0.20_0.03_250_/_0.55)] border border-[oklch(0.30_0.03_250)] rounded-lg text-xs text-[oklch(0.85_0.05_220)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                  <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                  <div className="absolute left-0 top-6 w-64 p-2 bg-card/95 border border-border rounded-lg text-xs text-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                     Visualizza l'andamento della distanza percorsa e del pace medio nel periodo selezionato. Utile per identificare trend e progressi nel tempo.
                   </div>
                 </div>
               </div>
-              <div
-                className="rounded-xl p-4"
-                style={{
-                  background: "oklch(0.18 0.03 250)",
-                  border: "1px solid oklch(0.25 0.03 250)",
-                }}
-              >
+              <div className="rounded-xl p-4 bg-card border border-border">
                 {timelineChartData && timelineChartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height={250}>
                     <LineChart data={timelineChartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.25 0.03 250)" />
-                      <XAxis dataKey="date" stroke="oklch(0.60 0.05 250)" style={{ fontSize: "12px" }} />
-                      <YAxis stroke="oklch(0.60 0.05 250)" style={{ fontSize: "12px" }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" style={{ fontSize: "12px" }} />
+                      <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: "12px" }} />
                       <Tooltip
                         contentStyle={{
-                          background: "oklch(0.20 0.03 250)",
-                          border: "1px solid oklch(0.30 0.03 250)",
+                          background: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
                           borderRadius: "8px",
-                          color: "white",
+                          color: "hsl(var(--foreground))",
                         }}
                       />
                       <Legend />
@@ -443,7 +429,7 @@ export default function Statistics() {
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (
-                  <p className="text-center text-[oklch(0.60_0.05_250)] py-8">
+                  <p className="text-center text-muted-foreground py-8">
                     Nessun dato disponibile per questo periodo
                   </p>
                 )}
@@ -457,24 +443,18 @@ export default function Statistics() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
             >
-              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[oklch(0.70_0.08_220)]">
+              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 Analisi Prestazioni
               </h2>
 
               {/* HR Zones */}
               {hrZonesData.length > 0 && (
-                <div
-                  className="rounded-xl p-4"
-                  style={{
-                    background: "oklch(0.18 0.03 250)",
-                    border: "1px solid oklch(0.25 0.03 250)",
-                  }}
-                >
+                <div className="rounded-xl p-4 bg-card border border-border">
                   <div className="flex items-center gap-2 mb-3">
                     <h3 className="font-semibold">Zone Frequenza Cardiaca</h3>
                     <div className="group relative">
-                      <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)] cursor-help" />
-                      <div className="absolute left-0 top-6 w-72 p-2 bg-[oklch(0.20_0.03_250_/_0.55)] border border-[oklch(0.30_0.03_250)] rounded-lg text-xs text-[oklch(0.85_0.05_220)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                      <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                      <div className="absolute left-0 top-6 w-72 p-2 bg-card/95 border border-border rounded-lg text-xs text-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                         Mostra la distribuzione percentuale del tempo trascorso in ciascuna zona di frequenza cardiaca. Z1: Recupero, Z2: Aerobica, Z3: Soglia, Z4: Anaerobica, Z5: Massima.
                       </div>
                     </div>
@@ -497,16 +477,16 @@ export default function Statistics() {
                         </Pie>
                         <Tooltip
                           contentStyle={{
-                            background: "oklch(0.20 0.03 250)",
-                            border: "1px solid oklch(0.30 0.03 250)",
+                            background: "hsl(var(--card))",
+                            border: "1px solid hsl(var(--border))",
                             borderRadius: "8px",
-                            color: "white",
+                            color: "hsl(var(--foreground))",
                           }}
                           labelStyle={{
-                            color: "white",
+                            color: "hsl(var(--foreground))",
                           }}
                           itemStyle={{
-                            color: "white",
+                            color: "hsl(var(--foreground))",
                           }}
                           formatter={(value: number) => `${value}%`}
                         />
@@ -531,33 +511,27 @@ export default function Statistics() {
 
               {/* Pace Distribution */}
               {performance && performance.paceDistribution.length > 0 && (
-                <div
-                  className="rounded-xl p-4"
-                  style={{
-                    background: "oklch(0.18 0.03 250)",
-                    border: "1px solid oklch(0.25 0.03 250)",
-                  }}
-                >
+                <div className="rounded-xl p-4 bg-card border border-border">
                   <div className="flex items-center gap-2 mb-3">
                     <h3 className="font-semibold">Distribuzione Pace</h3>
                     <div className="group relative">
-                      <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)] cursor-help" />
-                      <div className="absolute left-0 top-6 w-72 p-2 bg-[oklch(0.20_0.03_250_/_0.55)] border border-[oklch(0.30_0.03_250)] rounded-lg text-xs text-[oklch(0.85_0.05_220)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                      <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                      <div className="absolute left-0 top-6 w-72 p-2 bg-card/95 border border-border rounded-lg text-xs text-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
                         Mostra quante sessioni hai completato in ciascun range di pace (min/100m). Ti aiuta a capire a quale velocità nuoti più frequentemente.
                       </div>
                     </div>
                   </div>
                   <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={performance.paceDistribution}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.25 0.03 250)" />
-                      <XAxis dataKey="range" stroke="oklch(0.60 0.05 250)" style={{ fontSize: "12px" }} />
-                      <YAxis stroke="oklch(0.60 0.05 250)" style={{ fontSize: "12px" }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="range" stroke="hsl(var(--muted-foreground))" style={{ fontSize: "12px" }} />
+                      <YAxis stroke="hsl(var(--muted-foreground))" style={{ fontSize: "12px" }} />
                       <Tooltip
                         contentStyle={{
-                          background: "oklch(0.20 0.03 250)",
-                          border: "1px solid oklch(0.30 0.03 250)",
+                          background: "hsl(var(--card))",
+                          border: "1px solid hsl(var(--border))",
                           borderRadius: "8px",
-                          color: "white",
+                          color: "hsl(var(--foreground))",
                         }}
                       />
                       <Bar dataKey="count" fill="#06b6d4" name="Sessioni" />
@@ -569,34 +543,22 @@ export default function Statistics() {
               {/* Calories & SWOLF */}
               {performance && (
                 <div className="grid grid-cols-2 gap-3">
-                  <div
-                    className="rounded-xl p-4"
-                    style={{
-                      background: "oklch(0.18 0.03 250)",
-                      border: "1px solid oklch(0.25 0.03 250)",
-                    }}
-                  >
-                    <div className="text-sm text-[oklch(0.70_0.05_250)]">Calorie Totali</div>
-                    <div className="text-2xl font-bold text-[oklch(0.90_0.05_220)]">
+                  <div className="rounded-xl p-4 bg-card border border-border">
+                    <div className="text-sm text-muted-foreground">Calorie Totali</div>
+                    <div className="text-2xl font-bold text-foreground">
                       {performance.caloriesTotal.toLocaleString()}
                     </div>
-                    <div className="text-xs text-[oklch(0.60_0.05_250)] mt-1">
+                    <div className="text-xs text-muted-foreground mt-1">
                       Media: {performance.avgCaloriesPerSession}/sessione
                     </div>
                   </div>
                   {performance.swolfAvg && (
-                    <div
-                      className="rounded-xl p-4"
-                      style={{
-                        background: "oklch(0.18 0.03 250)",
-                        border: "1px solid oklch(0.25 0.03 250)",
-                      }}
-                    >
-                      <div className="text-sm text-[oklch(0.70_0.05_250)]">SWOLF Medio</div>
-                      <div className="text-2xl font-bold text-[oklch(0.90_0.05_220)]">
+                    <div className="rounded-xl p-4 bg-card border border-border">
+                      <div className="text-sm text-muted-foreground">SWOLF Medio</div>
+                      <div className="text-2xl font-bold text-foreground">
                         {performance.swolfAvg}
                       </div>
-                      <div className="text-xs text-[oklch(0.60_0.05_250)] mt-1">
+                      <div className="text-xs text-muted-foreground mt-1">
                         Efficienza nuotata
                       </div>
                     </div>
@@ -613,7 +575,7 @@ export default function Statistics() {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
               >
-                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[oklch(0.70_0.08_220)]">
+                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Analisi Avanzate
                 </h2>
 
@@ -642,7 +604,7 @@ export default function Statistics() {
 
                 {/* Advanced Swimming Metrics */}
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-[oklch(0.70_0.08_220)]">
+                  <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     Metriche Avanzate
                   </h3>
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -689,25 +651,19 @@ export default function Statistics() {
 
                 {/* Predictions */}
                 {advanced.predictions && (
-                  <div
-                    className="rounded-xl p-4"
-                    style={{
-                      background: "oklch(0.18 0.03 250)",
-                      border: "1px solid oklch(0.25 0.03 250)",
-                    }}
-                  >
+                  <div className="rounded-xl p-4 bg-card border border-border">
                     <h3 className="font-semibold mb-2">📈 Previsioni</h3>
-                    <p className="text-sm text-[oklch(0.80_0.05_220)]">
+                    <p className="text-sm text-muted-foreground">
                       Al ritmo attuale raggiungerai{" "}
-                      <span className="font-bold text-[oklch(0.90_0.05_220)]">
+                      <span className="font-bold text-foreground">
                         {advanced.predictions.targetKm}km
                       </span>{" "}
                       entro il{" "}
-                      <span className="font-bold text-[oklch(0.90_0.05_220)]">
+                      <span className="font-bold text-foreground">
                         {new Date(advanced.predictions.estimatedDate).toLocaleDateString("it-IT")}
                       </span>
                     </p>
-                    <p className="text-xs text-[oklch(0.60_0.05_250)] mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       ({advanced.predictions.daysRemaining} giorni rimasti)
                     </p>
                   </div>

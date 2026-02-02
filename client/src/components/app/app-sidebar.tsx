@@ -11,6 +11,7 @@ import {
   Activity,
   Users,
   Trophy,
+  BarChart3,
   User,
   Settings,
   Waves,
@@ -23,6 +24,7 @@ const mainNav = [
   { href: "/dashboard", icon: Home, label: "Dashboard" },
   { href: "/activities", icon: Activity, label: "Activities" },
   { href: "/community", icon: Users, label: "Community" },
+  { href: "/statistics", icon: BarChart3, label: "Stats" },
   { href: "/challenges", icon: Trophy, label: "Challenges" },
   { href: "/coach", icon: Brain, label: "AI Coach" },
 ]
