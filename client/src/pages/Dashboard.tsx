@@ -18,24 +18,38 @@ import {
 } from "lucide-react"
 import { Link } from "wouter"
 
-const formatDuration = (seconds: number) => {
-  if (!seconds) return "—"
+const formatDuration = (seconds: number | null | undefined) => {
+  if (seconds === null || seconds === undefined) return "—"
+  if (seconds === 0) return "0 min"
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
   if (hours > 0) return `${hours}h ${minutes}m`
   return `${minutes} min`
 }
 
-const formatDistanceKm = (meters: number) => {
-  if (!meters) return "—"
+const formatDistanceKm = (meters: number | null | undefined) => {
+  if (meters === null || meters === undefined) return "—"
+  if (meters === 0) return "0.0 km"
   return `${(meters / 1000).toFixed(1)} km`
 }
 
-const formatPace = (secondsPer100m: number) => {
-  if (!secondsPer100m || !Number.isFinite(secondsPer100m)) return "—"
+const formatPace = (secondsPer100m: number | null | undefined) => {
+  if (secondsPer100m === null || secondsPer100m === undefined) return "—"
+  if (!Number.isFinite(secondsPer100m) || secondsPer100m <= 0) return "—"
   const minutes = Math.floor(secondsPer100m / 60)
   const seconds = Math.round(secondsPer100m % 60)
   return `${minutes}:${seconds.toString().padStart(2, "0")}/100m`
+}
+
+const parseActivityDate = (value: string | Date | null | undefined) => {
+  if (!value) return null
+  if (value instanceof Date) return value
+  if (typeof value === "string") {
+    const normalized = value.includes("T") ? value : value.replace(" ", "T")
+    const date = new Date(normalized)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+  return null
 }
 
 const changeLabel = (current: number, previous: number, suffix = "vs last week") => {
@@ -49,6 +63,7 @@ const changeLabel = (current: number, previous: number, suffix = "vs last week")
 }
 
 export default function Dashboard() {
+  const meQuery = trpc.auth.me.useQuery()
   const profileQuery = trpc.profile.get.useQuery()
   const activitiesQuery = trpc.activities.list.useQuery({ limit: 200, offset: 0, source: "all" })
   const timelineQuery = trpc.statistics.getTimeline.useQuery({ days: 7 })
@@ -79,7 +94,8 @@ export default function Dashboard() {
     let prevSessions = 0
 
     activities.forEach((activity) => {
-      const date = new Date(activity.activityDate)
+      const date = parseActivityDate(activity.activityDate)
+      if (!date) return
       if (date >= startLast7) {
         currentDistance += activity.distanceMeters || 0
         currentTime += activity.durationSeconds || 0
@@ -172,8 +188,8 @@ export default function Dashboard() {
     return [...list]
       .sort(
         (a, b) =>
-          new Date(b.activityDate).getTime() -
-          new Date(a.activityDate).getTime()
+          (parseActivityDate(b.activityDate)?.getTime() ?? 0) -
+          (parseActivityDate(a.activityDate)?.getTime() ?? 0)
       )
       .slice(0, 3)
   }, [activitiesQuery.data])
@@ -225,6 +241,11 @@ export default function Dashboard() {
   }, [advancedQuery.data?.insights])
 
   const profile = profileQuery.data
+  const displayName =
+    meQuery.data?.name ||
+    profile?.name ||
+    meQuery.data?.email?.split("@")[0] ||
+    "Nuotatore"
   const xpProgress = profile?.nextLevelXp
     ? Math.min(100, (profile.totalXp / profile.nextLevelXp) * 100)
     : 0
@@ -235,16 +256,25 @@ export default function Dashboard() {
         <Card className="bg-card border-border">
           <CardContent className="p-6 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
-              <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center">
-                <Waves className="size-7 text-primary" />
+              <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center overflow-hidden">
+                {profile?.profileBadge?.badge_image_url ? (
+                  <img
+                    src={profile.profileBadge.badge_image_url}
+                    alt={profile.profileBadge.name || "Badge profilo"}
+                    className="h-full w-full object-contain"
+                    loading="lazy"
+                  />
+                ) : (
+                  <Waves className="size-7 text-primary" />
+                )}
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Bentornato,</p>
                 <h1 className="text-2xl font-display font-bold text-foreground">
-                  {profile?.name ?? "Nuotatore"}
+                  {displayName}
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  {profile?.levelTitle ?? "Livello"} • {profile?.totalXp ?? 0} XP
+                  {profile?.profileBadge?.name || profile?.levelTitle || "Livello"} • {profile?.totalXp ?? 0} XP
                 </p>
               </div>
             </div>
