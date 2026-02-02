@@ -282,6 +282,39 @@ export const appRouter = router({
         await db.updateSwimmerProfile(ctx.user.id, input);
         return { success: true };
       }),
+    uploadMedia: protectedProcedure
+      .input(
+        z.object({
+          kind: z.enum(["avatar", "cover"]),
+          fileBase64: z.string(),
+          mimeType: z.string(),
+          extension: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const { getSupabaseAdminClient } = await import("./_core/supabase_admin");
+        const admin = getSupabaseAdminClient();
+        const extension =
+          input.extension?.replace(".", "") ||
+          input.mimeType.split("/")[1] ||
+          "png";
+        const filePath = `profiles/${ctx.user.id}/${input.kind}-${Date.now()}.${extension}`;
+        const buffer = Buffer.from(input.fileBase64, "base64");
+        const { error } = await admin.storage
+          .from("profile-media")
+          .upload(filePath, buffer, {
+            contentType: input.mimeType,
+            upsert: true,
+          });
+        if (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: `Upload failed: ${error.message}`,
+          });
+        }
+        const { data } = admin.storage.from("profile-media").getPublicUrl(filePath);
+        return { url: data.publicUrl };
+      }),
     
     refreshStats: protectedProcedure
       .mutation(async ({ ctx }) => {

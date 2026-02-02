@@ -10,6 +10,7 @@ export const ENV = {
   supabaseUrl: process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? "",
   supabaseAnonKey:
     process.env.SUPABASE_ANON_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? "",
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
 };
 
 export function assertAuthEnv() {
@@ -21,5 +22,11 @@ export function assertAuthEnv() {
 export function assertSupabaseEnv() {
   if (!ENV.supabaseUrl || !ENV.supabaseAnonKey) {
     throw new Error("SUPABASE_URL and SUPABASE_ANON_KEY are required.");
+  }
+}
+
+export function assertSupabaseServiceEnv() {
+  if (!ENV.supabaseUrl || !ENV.supabaseServiceRoleKey) {
+    throw new Error("SUPABASE_SERVICE_ROLE_KEY is required.");
   }
 }

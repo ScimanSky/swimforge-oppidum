@@ -166,6 +166,23 @@ export default function Settings() {
   }, [profile?.avatarUrl, profile?.coverUrl, profile?.bio, profile?.location])
 
   const updateProfileMutation = trpc.profile.update.useMutation()
+  const uploadMediaMutation = trpc.profile.uploadMedia.useMutation()
+
+  const readFileAsBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result as string
+        const base64 = result.split(",")[1]
+        if (!base64) {
+          reject(new Error("Invalid file encoding"))
+          return
+        }
+        resolve(base64)
+      }
+      reader.onerror = () => reject(reader.error)
+      reader.readAsDataURL(file)
+    })
 
   const uploadToProfileBucket = async (file: File, kind: "avatar" | "cover") => {
     if (!me?.id) {
@@ -187,12 +204,27 @@ export default function Settings() {
     const { error } = await supabase.storage
       .from("profile-media")
       .upload(filePath, file, { upsert: true, contentType: file.type })
-    if (error) {
-      toast.error(`Upload fallito: ${error.message}`)
+    if (!error) {
+      const { data } = supabase.storage.from("profile-media").getPublicUrl(filePath)
+      return data.publicUrl
+    }
+
+    try {
+      const base64 = await readFileAsBase64(file)
+      const { url } = await uploadMediaMutation.mutateAsync({
+        kind,
+        fileBase64: base64,
+        mimeType: file.type,
+        extension,
+      })
+      return url
+    } catch (fallbackError: any) {
+      const message =
+        fallbackError?.message ||
+        "Upload fallito: controlla le policy di Supabase Storage."
+      toast.error(message)
       return null
     }
-    const { data } = supabase.storage.from("profile-media").getPublicUrl(filePath)
-    return data.publicUrl
   }
 
   const handleAvatarUpload = async (file?: File | null) => {
