@@ -1,19 +1,18 @@
 const stats = [
-  { value: "12K+", label: "Active Swimmers", description: "worldwide community" },
-  { value: "2.5M", label: "Kilometers Tracked", description: "and counting" },
-  { value: "98%", label: "Accuracy Rate", description: "in metrics analysis" },
-  { value: "4.9", label: "App Rating", description: "on all platforms" },
+  { value: "20", label: "Livelli", description: "da sbloccare" },
+  { value: "40+", label: "Badge", description: "di progressione" },
+  { value: "∞", label: "XP", description: "da guadagnare" },
 ]
 
 export function LandingStats() {
   return (
-    <section className="py-16 bg-card border-y border-border">
+    <section id="progress" className="py-16 bg-card border-y border-border">
       <div className="container mx-auto px-4">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-4">
+        <div className="grid grid-cols-3 gap-6 sm:gap-8">
           {stats.map((stat, index) => (
             <div
               key={index}
-              className="text-center lg:border-r last:border-r-0 border-border"
+              className="text-center border-r last:border-r-0 border-border"
             >
               <p className="text-3xl sm:text-4xl font-display font-bold text-primary">
                 {stat.value}

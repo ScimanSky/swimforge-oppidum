@@ -1,4 +1,3 @@
-import Image from "next/image"
 import { Badge } from "@/components/ui/badge"
 import {
   Activity,
@@ -12,39 +11,39 @@ import {
 const features = [
   {
     icon: Activity,
-    title: "Advanced Metrics",
-    description: "Pace, efficiency, load zones - get deep insights into every swim session with our powerful analytics engine.",
-    badge: "Analytics",
+    title: "Metriche Avanzate",
+    description: "Pace, SWOLF, zone cardio e consistenza: insights chiari su ogni sessione.",
+    badge: "Analisi",
   },
   {
     icon: Brain,
-    title: "AI Coaching",
-    description: "Personalized training plans and real-time feedback powered by advanced machine learning algorithms.",
-    badge: "AI-Powered",
+    title: "AI Coach",
+    description: "Consigli personalizzati e allenamenti mirati per vasca e dryland.",
+    badge: "AI",
   },
   {
     icon: Trophy,
-    title: "Gamification",
-    description: "Earn XP, unlock badges, level up your swimmer profile. Stay motivated with achievements and milestones.",
-    badge: "Rewards",
+    title: "Badge & XP",
+    description: "Sblocca traguardi, ottieni XP e scala i livelli nuotando.",
+    badge: "Progressi",
   },
   {
     icon: Users,
-    title: "Social Hub",
-    description: "Join clubs, share sessions, give Splash kudos. Connect with swimmers from around the world.",
-    badge: "Community",
+    title: "Community & Club",
+    description: "Condividi sessioni, dai splash e partecipa ai club.",
+    badge: "Social",
   },
   {
     icon: Zap,
-    title: "Device Sync",
-    description: "Seamlessly sync with Garmin, Strava, and other popular fitness platforms. Your data, unified.",
-    badge: "Integration",
+    title: "Sync Dispositivi",
+    description: "Integrazione con Garmin e Strava per importare tutto in un unico profilo.",
+    badge: "Integrazioni",
   },
   {
     icon: TrendingUp,
-    title: "Progress Tracking",
-    description: "Visualize your improvement over time with beautiful charts and performance comparisons.",
-    badge: "Insights",
+    title: "Progressi Chiari",
+    description: "Grafici e trend per capire dove migliori e dove spingere.",
+    badge: "Trend",
   },
 ]
 
@@ -53,12 +52,12 @@ export function LandingFeatures() {
     <section id="features" className="py-24 bg-background">
       <div className="container mx-auto px-4">
         <div className="text-center max-w-2xl mx-auto mb-16">
-          <Badge variant="outline" className="mb-4">Features</Badge>
+          <Badge variant="outline" className="mb-4">Funzionalità</Badge>
           <h2 className="text-3xl sm:text-4xl font-display font-bold text-foreground text-balance">
-            Everything you need to dominate the water
+            Tutto ciò che ti serve per crescere in acqua
           </h2>
           <p className="mt-4 text-muted-foreground">
-            From AI-powered coaching to social competitions, SwimForge has all the tools to take your swimming to the next level.
+            Dalla coaching AI alle sfide con gli amici, SwimForge ti accompagna vasca dopo vasca.
           </p>
         </div>
 
@@ -84,63 +83,8 @@ export function LandingFeatures() {
           ))}
         </div>
 
-        {/* Feature Showcase */}
-        <div className="mt-20 grid lg:grid-cols-2 gap-8 items-center">
-          <div className="relative aspect-[4/3] rounded-2xl overflow-hidden">
-            <Image
-              src="/images/pool-lanes.jpg"
-              alt="Swimming pool lanes"
-              fill
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
-            <div className="absolute bottom-6 left-6 right-6">
-              <div className="bg-card/90 backdrop-blur-sm rounded-xl p-4 border border-border">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-foreground">Today&apos;s Session</span>
-                  <Badge className="bg-accent text-accent-foreground">Pool</Badge>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-2xl font-display font-bold text-primary">2.4km</p>
-                    <p className="text-xs text-muted-foreground">Distance</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-display font-bold text-foreground">1:42</p>
-                    <p className="text-xs text-muted-foreground">Avg Pace/100m</p>
-                  </div>
-                  <div>
-                    <p className="text-2xl font-display font-bold text-accent">+85</p>
-                    <p className="text-xs text-muted-foreground">XP Earned</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <h3 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
-              Real-time performance tracking
-            </h3>
-            <p className="text-muted-foreground leading-relaxed">
-              Every stroke counts. Our advanced metrics engine analyzes your swimming data to provide insights you won&apos;t find anywhere else. From SWOLF scores to stroke rate consistency, we&apos;ve got you covered.
-            </p>
-            <ul className="space-y-3">
-              {[
-                "Automatic lap detection and split times",
-                "Heart rate zone analysis",
-                "Stroke efficiency scoring",
-                "Recovery recommendations",
-              ].map((item, index) => (
-                <li key={index} className="flex items-center gap-3 text-sm text-foreground">
-                  <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                    <div className="w-2 h-2 rounded-full bg-primary" />
-                  </div>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
+        <div className="mt-16 text-center text-sm text-muted-foreground">
+          Pensato per piscina e acque libere, con analisi chiare e motivazione costante.
         </div>
       </div>
     </section>

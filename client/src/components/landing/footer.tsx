@@ -1,40 +1,28 @@
 import Link from "next/link"
-import { Waves } from "lucide-react"
+import Image from "next/image"
 
 const footerLinks = {
-  product: {
-    title: "Product",
+  prodotto: {
+    title: "Prodotto",
     links: [
-      { label: "Features", href: "#features" },
-      { label: "Pricing", href: "#pricing" },
-      { label: "Integrations", href: "#" },
-      { label: "Changelog", href: "#" },
+      { label: "Funzionalità", href: "#features" },
+      { label: "Progressi", href: "#progress" },
+      { label: "Community", href: "/club" },
     ],
   },
-  company: {
-    title: "Company",
+  supporto: {
+    title: "Supporto",
     links: [
-      { label: "About", href: "#" },
-      { label: "Blog", href: "#" },
-      { label: "Careers", href: "#" },
-      { label: "Press", href: "#" },
+      { label: "Accedi", href: "/login" },
+      { label: "Registrati", href: "/signup" },
+      { label: "Coach", href: "/coach" },
     ],
   },
-  resources: {
-    title: "Resources",
+  legale: {
+    title: "Legale",
     links: [
-      { label: "Help Center", href: "#" },
-      { label: "Community", href: "#" },
-      { label: "Guides", href: "#" },
-      { label: "API Docs", href: "#" },
-    ],
-  },
-  legal: {
-    title: "Legal",
-    links: [
-      { label: "Privacy", href: "#" },
-      { label: "Terms", href: "#" },
-      { label: "Cookies", href: "#" },
+      { label: "Privacy", href: "/privacy" },
+      { label: "Termini", href: "/terms" },
     ],
   },
 }
@@ -43,17 +31,21 @@ export function LandingFooter() {
   return (
     <footer className="bg-card border-t border-border">
       <div className="container mx-auto px-4 py-12 lg:py-16">
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
           {/* Brand */}
-          <div className="col-span-2 md:col-span-4 lg:col-span-1 mb-4 lg:mb-0">
+          <div className="col-span-2 md:col-span-3 lg:col-span-1 mb-4 lg:mb-0">
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-                <Waves className="w-6 h-6 text-primary-foreground" />
-              </div>
+              <Image
+                src="/swimforge-logo.png"
+                alt="SwimForge"
+                width={36}
+                height={36}
+                className="h-9 w-9"
+              />
               <span className="font-display text-xl font-bold text-foreground">SwimForge</span>
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs">
-              The ultimate platform for swimmers who want to track, improve, and compete.
+              La piattaforma per nuotatori che vogliono crescere, competere e divertirsi.
             </p>
           </div>
 
@@ -81,17 +73,6 @@ export function LandingFooter() {
           <p className="text-sm text-muted-foreground">
             2026 SwimForge. All rights reserved.
           </p>
-          <div className="flex items-center gap-6">
-            <Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Twitter
-            </Link>
-            <Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Instagram
-            </Link>
-            <Link href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              YouTube
-            </Link>
-          </div>
         </div>
       </div>
     </footer>

@@ -4,13 +4,13 @@ import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Menu, Waves } from "lucide-react"
+import { Menu } from "lucide-react"
+import Image from "next/image"
 
 const navLinks = [
-  { href: "#features", label: "Features" },
-  { href: "#athletes", label: "Athletes" },
-  { href: "#community", label: "Community" },
-  { href: "#pricing", label: "Pricing" },
+  { href: "#features", label: "Funzionalità" },
+  { href: "#progress", label: "Progressi" },
+  { href: "#cta", label: "Inizia" },
 ]
 
 export function LandingNav() {
@@ -19,10 +19,15 @@ export function LandingNav() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
       <nav className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-            <Waves className="w-6 h-6 text-primary-foreground" />
-          </div>
+        <Link href="/" className="flex items-center gap-3">
+          <Image
+            src="/swimforge-logo.png"
+            alt="SwimForge"
+            width={36}
+            height={36}
+            className="h-9 w-9"
+            priority
+          />
           <span className="font-display text-xl font-bold text-foreground">SwimForge</span>
         </Link>
 
@@ -41,10 +46,10 @@ export function LandingNav() {
 
         <div className="hidden md:flex items-center gap-3">
           <Button variant="ghost" asChild>
-            <Link href="/login">Sign In</Link>
+            <Link href="/login">Accedi</Link>
           </Button>
           <Button asChild>
-            <Link href="/signup">Get Started</Link>
+            <Link href="/signup">Inizia l&apos;Avventura</Link>
           </Button>
         </div>
 
@@ -69,10 +74,10 @@ export function LandingNav() {
               ))}
               <div className="flex flex-col gap-3 mt-4">
                 <Button variant="outline" asChild className="w-full bg-transparent">
-                  <Link href="/login">Sign In</Link>
+                  <Link href="/login">Accedi</Link>
                 </Button>
                 <Button asChild className="w-full">
-                  <Link href="/signup">Get Started</Link>
+                  <Link href="/signup">Inizia l&apos;Avventura</Link>
                 </Button>
               </div>
             </div>
