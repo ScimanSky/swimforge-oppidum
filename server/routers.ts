@@ -274,6 +274,9 @@ export const appRouter = router({
     update: protectedProcedure
       .input(z.object({
         avatarUrl: z.string().optional(),
+        coverUrl: z.string().optional(),
+        bio: z.string().optional(),
+        location: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
         await db.updateSwimmerProfile(ctx.user.id, input);

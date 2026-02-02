@@ -1,57 +1,57 @@
-import AppLayout from "@/components/AppLayout"
-import Image from "next/image"
-import { useMemo } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import AppLayout from "@/components/AppLayout";
+import { useMemo } from "react";
+import { Link } from "wouter";
+import { trpc } from "@/lib/trpc";
+import { getBadgeImageUrl } from "@/lib/badgeImages";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Settings,
-  Share2,
-  Trophy,
-  Flame,
-  Target,
-  Droplets,
-  Clock,
   Calendar,
-  Award,
-  TrendingUp,
-  Zap,
+  Droplets,
+  Edit,
+  Flame,
+  MapPin,
+  Target,
   Timer,
-} from "lucide-react"
-import { trpc } from "@/lib/trpc"
-import { getBadgeImageUrl } from "@/lib/badgeImages"
+  TrendingUp,
+  Trophy,
+  Award,
+  Waves,
+  Zap,
+} from "lucide-react";
 
 const formatDistance = (meters?: number | null) => {
-  if (!meters) return "—"
-  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`
-}
+  if (!meters) return "—";
+  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
+};
 
 const formatTime = (seconds?: number | null) => {
-  if (!seconds) return "—"
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes} min`
-}
+  if (!seconds) return "—";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes} min`;
+};
 
 const formatPace = (secondsPer100m?: number | null) => {
-  if (!secondsPer100m || !Number.isFinite(secondsPer100m)) return "—"
-  const minutes = Math.floor(secondsPer100m / 60)
-  const seconds = Math.round(secondsPer100m % 60)
-  return `${minutes}:${seconds.toString().padStart(2, "0")}/100m`
-}
+  if (!secondsPer100m || !Number.isFinite(secondsPer100m)) return "—";
+  const minutes = Math.floor(secondsPer100m / 60);
+  const seconds = Math.round(secondsPer100m % 60);
+  return `${minutes}:${seconds.toString().padStart(2, "0")}/100m`;
+};
 
 const formatDate = (date?: string | Date | null) => {
-  if (!date) return "—"
+  if (!date) return "—";
   return new Date(date).toLocaleDateString("it-IT", {
     day: "numeric",
     month: "short",
     year: "numeric",
-  })
-}
+  });
+};
 
 const getInitials = (name: string) =>
   name
@@ -60,400 +60,507 @@ const getInitials = (name: string) =>
     .map((part) => part[0])
     .slice(0, 2)
     .join("")
-    .toUpperCase() || "SF"
+    .toUpperCase() || "SF";
 
 const getStreaks = (dates: string[]) => {
-  if (dates.length === 0) return { current: 0, best: 0 }
-  const uniqueDates = Array.from(new Set(dates)).sort()
-  let best = 1
-  let current = 1
+  if (dates.length === 0) return { current: 0, best: 0 };
+  const uniqueDates = Array.from(new Set(dates)).sort();
+  let best = 1;
+  let current = 1;
 
   for (let i = 1; i < uniqueDates.length; i += 1) {
-    const prev = new Date(uniqueDates[i - 1])
-    const curr = new Date(uniqueDates[i])
-    const diffDays = Math.round((curr.getTime() - prev.getTime()) / 86400000)
+    const prev = new Date(uniqueDates[i - 1]);
+    const curr = new Date(uniqueDates[i]);
+    const diffDays = Math.round((curr.getTime() - prev.getTime()) / 86400000);
     if (diffDays === 1) {
-      current += 1
-      best = Math.max(best, current)
+      current += 1;
+      best = Math.max(best, current);
     } else {
-      current = 1
+      current = 1;
     }
   }
 
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const dateSet = new Set(uniqueDates)
-  let activeStreak = 0
-  let cursor = new Date(today)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dateSet = new Set(uniqueDates);
+  let activeStreak = 0;
+  let cursor = new Date(today);
   while (dateSet.has(cursor.toISOString().split("T")[0])) {
-    activeStreak += 1
-    cursor.setDate(cursor.getDate() - 1)
+    activeStreak += 1;
+    cursor.setDate(cursor.getDate() - 1);
   }
 
-  return { current: activeStreak, best }
+  return { current: activeStreak, best };
+};
+
+const strokeLabels: Record<string, string> = {
+  freestyle: "Stile Libero",
+  backstroke: "Dorso",
+  breaststroke: "Rana",
+  butterfly: "Farfalla",
+  mixed: "Misto",
+};
+
+interface StatItemProps {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  subtext?: string;
+}
+
+function StatItem({ label, value, icon, subtext }: StatItemProps) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-4">
+      <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        {icon}
+      </div>
+      <div>
+        <p className="text-lg font-bold text-foreground">{value}</p>
+        <p className="text-sm text-muted-foreground">{label}</p>
+        {subtext && <p className="text-xs text-chart-4">{subtext}</p>}
+      </div>
+    </div>
+  );
+}
+
+interface BadgeCardProps {
+  title: string;
+  description: string;
+  imageUrl: string | null;
+  unlocked: boolean;
+  rarity: string;
+}
+
+function BadgeCard({ title, description, imageUrl, unlocked, rarity }: BadgeCardProps) {
+  const rarityColors: Record<string, string> = {
+    common: "bg-muted/60 text-muted-foreground",
+    uncommon: "bg-emerald-500/10 text-emerald-400",
+    rare: "bg-sky-500/10 text-sky-300",
+    epic: "bg-purple-500/10 text-purple-300",
+    legendary: "bg-amber-500/10 text-amber-300",
+  };
+
+  return (
+    <div
+      className={`flex items-center gap-4 rounded-lg border p-4 ${
+        unlocked ? "border-primary/20 bg-primary/5" : "border-border bg-muted/30 opacity-70"
+      }`}
+    >
+      <div
+        className={`flex size-12 items-center justify-center rounded-full ${
+          unlocked ? "bg-primary/15" : "bg-muted"
+        }`}
+      >
+        {imageUrl ? (
+          <img src={imageUrl} alt={title} className="size-9 object-contain" />
+        ) : (
+          <Waves className="size-5 text-primary" />
+        )}
+      </div>
+      <div className="flex-1">
+        <div className="flex items-center gap-2">
+          <p className="font-medium text-foreground">{title}</p>
+          <Badge className={rarityColors[rarity] || rarityColors.common}>{rarity}</Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      {unlocked && (
+        <Badge variant="secondary" className="shrink-0">
+          Sbloccato
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+interface ActivityItemProps {
+  type: string;
+  date: string;
+  duration: string;
+  distance: string;
+  pace: string;
+}
+
+function ActivityItem({ type, date, duration, distance, pace }: ActivityItemProps) {
+  return (
+    <div className="flex items-center justify-between border-b border-border py-3 last:border-0">
+      <div className="flex items-center gap-3">
+        <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
+          {type === "Piscina" ? (
+            <Waves className="size-5 text-primary" />
+          ) : (
+            <Droplets className="size-5 text-primary" />
+          )}
+        </div>
+        <div>
+          <p className="font-medium text-foreground">{type}</p>
+          <p className="text-sm text-muted-foreground">{date}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-4 text-right">
+        <div>
+          <p className="text-sm font-medium text-foreground">{distance}</p>
+          <p className="text-xs text-muted-foreground">Distanza</p>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">{duration}</p>
+          <p className="text-xs text-muted-foreground">Tempo</p>
+        </div>
+        <div>
+          <p className="text-sm font-medium text-foreground">{pace}</p>
+          <p className="text-xs text-muted-foreground">Pace</p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function Profile() {
-  const authQuery = trpc.auth.me.useQuery()
-  const profileQuery = trpc.profile.get.useQuery()
-  const activitiesQuery = trpc.activities.list.useQuery({
-    limit: 250,
+  const { data: me } = trpc.auth.me.useQuery();
+  const { data: profile } = trpc.profile.get.useQuery();
+  const { data: activitiesData } = trpc.activities.list.useQuery({
+    limit: 50,
     offset: 0,
     source: "all",
-  })
-  const badgesQuery = trpc.badges.progress.useQuery()
-  const xpHistoryQuery = trpc.xp.history.useQuery({ limit: 25 })
+  });
+  const { data: badgesData } = trpc.badges.progress.useQuery();
 
-  const profile = profileQuery.data
-  const userName = authQuery.data?.name || authQuery.data?.email?.split("@")[0] || "SwimForge"
-  const userEmail = authQuery.data?.email || ""
+  const displayName = me?.name || me?.email?.split("@")[0] || "SwimForge";
+  const username = me?.email ? `@${me.email.split("@")[0]}` : "@swimforge";
+  const bio = profile?.bio || "Aggiungi una bio dalle impostazioni.";
+  const location = profile?.location || "Località non impostata";
+
+  const activities = activitiesData ?? [];
+  const badgeProgress = (badgesData ?? []) as Array<any>;
 
   const stats = useMemo(() => {
-    const totalDistance = profile?.totalDistanceMeters ?? 0
-    const totalTime = profile?.totalTimeSeconds ?? 0
-    const totalSessions = profile?.totalSessions ?? 0
-    const avgPace = totalDistance > 0 ? totalTime / (totalDistance / 100) : 0
+    const totalDistance = profile?.totalDistanceMeters ?? 0;
+    const totalTime = profile?.totalTimeSeconds ?? 0;
+    const totalSessions = profile?.totalSessions ?? 0;
+    const avgPace = totalDistance > 0 ? totalTime / (totalDistance / 100) : 0;
 
-    const activities = activitiesQuery.data ?? []
-    const longestDistance = activities.reduce((max, a) => Math.max(max, a.distanceMeters || 0), 0)
+    const swolfValues = activities
+      .map((activity) => activity.avgSwolf)
+      .filter((value: number | null) => typeof value === "number" && value > 0) as number[];
+    const avgSwolf = swolfValues.length
+      ? Math.round(swolfValues.reduce((sum, value) => sum + value, 0) / swolfValues.length)
+      : null;
+    const bestSwolf = swolfValues.length ? Math.min(...swolfValues) : null;
+
     const bestPace = activities
-      .map((a) => a.avgPacePer100m)
-      .filter((value): value is number => typeof value === "number" && value > 0)
-      .reduce((min, value) => Math.min(min, value), Number.POSITIVE_INFINITY)
-    const dateList = activities
-      .map((a) => new Date(a.activityDate).toISOString().split("T")[0])
-      .filter(Boolean)
-    const streaks = getStreaks(dateList)
+      .map((activity) => activity.avgPacePer100m)
+      .filter((value: number | null) => typeof value === "number" && value > 0)
+      .reduce((min, value) => Math.min(min, value), Number.POSITIVE_INFINITY);
 
-    const xpHistory = xpHistoryQuery.data ?? []
-    const xpByDay = xpHistory.reduce<Record<string, number>>((acc, row) => {
-      const key = new Date(row.createdAt).toISOString().split("T")[0]
-      acc[key] = (acc[key] ?? 0) + (row.amount ?? 0)
-      return acc
-    }, {})
-    const bestXpDay = Object.values(xpByDay).reduce((max, value) => Math.max(max, value), 0)
+    const dateList = activities
+      .map((activity) => new Date(activity.activityDate).toISOString().split("T")[0])
+      .filter(Boolean);
+    const streaks = getStreaks(dateList);
 
     return {
       totalDistance,
       totalTime,
       totalSessions,
       avgPace,
-      longestDistance,
+      avgSwolf,
+      bestSwolf,
       bestPace: Number.isFinite(bestPace) ? bestPace : null,
       streakCurrent: streaks.current,
       streakBest: streaks.best,
-      bestXpDay,
-    }
-  }, [activitiesQuery.data, profile, xpHistoryQuery.data])
+    };
+  }, [activities, profile]);
 
-  const badgeProgress = useMemo(() => (badgesQuery.data ?? []) as any[], [badgesQuery.data])
-  const earnedCount = badgeProgress.filter((badge) => badge.earned).length
+  const primaryStroke = useMemo(() => {
+    if (!activities.length) return "Non disponibile";
+    const counts: Record<string, number> = {};
+    activities.forEach((activity) => {
+      const stroke = activity.strokeType || "mixed";
+      counts[stroke] = (counts[stroke] || 0) + 1;
+    });
+    const [top] = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return strokeLabels[top?.[0]] || "Misto";
+  }, [activities]);
 
-  const achievements = useMemo(() => {
-    const history = xpHistoryQuery.data ?? []
-    return history.map((row) => ({
-      id: row.id,
-      title: row.description || row.reason,
-      date: row.createdAt,
-      xp: row.amount,
-    }))
-  }, [xpHistoryQuery.data])
+  const recentActivities = useMemo(() => {
+    return activities.slice(0, 4).map((activity) => ({
+      id: activity.id,
+      type: activity.isOpenWater ? "Acque libere" : "Piscina",
+      date: formatDate(activity.activityDate),
+      duration: formatTime(activity.durationSeconds),
+      distance: formatDistance(activity.distanceMeters),
+      pace: formatPace(activity.avgPacePer100m),
+    }));
+  }, [activities]);
 
-  const strokeBreakdown = useMemo(() => {
-    const activities = activitiesQuery.data ?? []
-    if (!activities.length) return []
-    const counts = activities.reduce<Record<string, number>>((acc, activity) => {
-      const stroke = activity.strokeType || "mixed"
-      acc[stroke] = (acc[stroke] ?? 0) + 1
-      return acc
-    }, {})
-    const total = Object.values(counts).reduce((sum, value) => sum + value, 0)
-    const labels: Record<string, string> = {
-      freestyle: "Freestyle",
-      backstroke: "Backstroke",
-      breaststroke: "Breaststroke",
-      butterfly: "Butterfly",
-      mixed: "Mixed",
-    }
-    const colors = ["bg-primary", "bg-accent", "bg-chart-4", "bg-chart-5", "bg-chart-3"]
+  const records = useMemo(() => {
+    if (!activities.length) return [] as Array<{ label: string; value: string; date: string }>;
 
-    return Object.entries(counts).map(([stroke, value], index) => ({
-      style: labels[stroke] ?? stroke,
-      percentage: total ? Math.round((value / total) * 100) : 0,
-      color: colors[index % colors.length],
-    }))
-  }, [activitiesQuery.data])
+    const longest = activities.reduce((max, activity) =>
+      (activity.distanceMeters ?? 0) > (max.distanceMeters ?? 0) ? activity : max
+    );
 
-  const xpLevel = profile?.xpLevel ?? profile?.level ?? 1
-  const nextLevelXp = profile?.nextLevelXp ?? 0
-  const xpToNext = profile?.xpToNextLevel ?? 0
-  const currentXpProgress = nextLevelXp ? Math.max(0, nextLevelXp - xpToNext) : profile?.totalXp ?? 0
-  const xpProgressPercent = nextLevelXp ? Math.min(100, (currentXpProgress / nextLevelXp) * 100) : 0
+    const fastestPaceActivity = activities
+      .filter((activity) => activity.avgPacePer100m && activity.avgPacePer100m > 0)
+      .reduce((min, activity) =>
+        (activity.avgPacePer100m ?? Infinity) < (min.avgPacePer100m ?? Infinity) ? activity : min
+      );
+
+    const bestSwolfActivity = activities
+      .filter((activity) => activity.avgSwolf && activity.avgSwolf > 0)
+      .reduce((min, activity) =>
+        (activity.avgSwolf ?? Infinity) < (min.avgSwolf ?? Infinity) ? activity : min
+      );
+
+    const longestDuration = activities.reduce((max, activity) =>
+      (activity.durationSeconds ?? 0) > (max.durationSeconds ?? 0) ? activity : max
+    );
+
+    return [
+      {
+        label: "Sessione più lunga",
+        value: formatDistance(longest?.distanceMeters),
+        date: formatDate(longest?.activityDate),
+      },
+      {
+        label: "Pace migliore",
+        value: formatPace(fastestPaceActivity?.avgPacePer100m ?? null),
+        date: formatDate(fastestPaceActivity?.activityDate),
+      },
+      {
+        label: "SWOLF migliore",
+        value: bestSwolfActivity?.avgSwolf ? `${bestSwolfActivity.avgSwolf}` : "—",
+        date: formatDate(bestSwolfActivity?.activityDate),
+      },
+      {
+        label: "Durata record",
+        value: formatTime(longestDuration?.durationSeconds),
+        date: formatDate(longestDuration?.activityDate),
+      },
+    ];
+  }, [activities]);
+
+  const unlockedBadges = badgeProgress.filter((badge) => badge.earned).length;
+  const levelProgress = profile?.nextLevelXp
+    ? Math.min(100, ((profile.totalXp ?? 0) / profile.nextLevelXp) * 100)
+    : 0;
 
   return (
     <AppLayout>
-      <div className="p-4 lg:p-6 space-y-6">
-        {/* Profile Header */}
-        <Card className="bg-card border-border overflow-hidden">
-          <div className="relative h-32 sm:h-48">
-            <Image src="/images/pool-lanes.jpg" alt="Cover" fill className="object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
+      <div className="space-y-6">
+        <Card>
+          <div className="relative h-36 overflow-hidden rounded-t-lg bg-muted">
+            {profile?.coverUrl ? (
+              <img
+                src={profile.coverUrl}
+                alt="Cover profilo"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                Nessuna cover caricata
+              </div>
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-card/80 to-transparent" />
           </div>
-          <CardContent className="relative px-4 sm:px-6 pb-6">
-            <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-12 sm:-mt-16">
-              <Avatar className="w-24 h-24 sm:w-32 sm:h-32 border-4 border-card">
-                <AvatarImage src={profile?.avatarUrl || ""} alt={userName} />
-                <AvatarFallback className="text-2xl">{getInitials(userName)}</AvatarFallback>
+          <CardContent className="pt-6">
+            <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
+              <Avatar className="size-24">
+                <AvatarImage src={profile?.avatarUrl || ""} alt={displayName} />
+                <AvatarFallback className="text-2xl">{getInitials(displayName)}</AvatarFallback>
               </Avatar>
-
-              <div className="flex-1">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                  <h1 className="text-2xl font-display font-bold text-foreground">{userName}</h1>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge className="bg-primary text-primary-foreground">
-                      <Zap className="w-3 h-3 mr-1" />
-                      Livello {xpLevel}
-                    </Badge>
-                    {profile?.profileBadge?.name && (
-                      <Badge variant="outline" className="border-accent text-accent">
-                        <Flame className="w-3 h-3 mr-1" />
-                        {profile.profileBadge.name}
+              <div className="flex-1 text-center sm:text-left">
+                <div className="flex flex-col items-center gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h1 className="text-2xl font-bold text-foreground">{displayName}</h1>
+                      <Badge className="gap-1">
+                        <Zap className="size-3" />
+                        Livello {profile?.level ?? 1}
                       </Badge>
-                    )}
+                      {profile?.profileBadge?.name && (
+                        <Badge variant="outline" className="border-primary/40 text-primary">
+                          {profile.profileBadge.name}
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-muted-foreground">{username}</p>
+                  </div>
+                  <Link href="/settings">
+                    <Button variant="outline">
+                      <Edit className="mr-2 size-4" />
+                      Modifica profilo
+                    </Button>
+                  </Link>
+                </div>
+                <p className="mt-3 text-foreground">{bio}</p>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-sm text-muted-foreground sm:justify-start">
+                  <span className="flex items-center gap-1">
+                    <MapPin className="size-4" />
+                    {location}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="size-4" />
+                    Iscritto {formatDate(profile?.createdAt)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Waves className="size-4" />
+                    {primaryStroke}
+                  </span>
+                </div>
+                <div className="mt-4 flex flex-wrap justify-center gap-6 text-sm text-muted-foreground sm:justify-start">
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-foreground">—</p>
+                    <p>Following</p>
+                    <p className="text-xs text-muted-foreground">In arrivo</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-foreground">—</p>
+                    <p>Follower</p>
+                    <p className="text-xs text-muted-foreground">In arrivo</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-foreground">
+                      {unlockedBadges}/{badgeProgress.length || 0}
+                    </p>
+                    <p>Badge</p>
                   </div>
                 </div>
-                <p className="text-muted-foreground mt-1">
-                  {userEmail || "Nuotatore SwimForge"}
-                </p>
+              </div>
+            </div>
 
-                {/* XP Progress */}
-                <div className="mt-4 max-w-md">
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">Progresso verso il prossimo livello</span>
-                    <span className="text-foreground font-medium">
-                      {currentXpProgress} / {nextLevelXp || "—"} XP
-                    </span>
+            <div className="mt-6 rounded-lg bg-muted/50 p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex size-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                    {profile?.level ?? 1}
                   </div>
-                  <Progress value={xpProgressPercent} className="h-2" />
+                  <span className="font-medium text-foreground">
+                    Livello {profile?.level ?? 1}
+                  </span>
                 </div>
+                <span className="text-sm text-muted-foreground">
+                  {(profile?.totalXp ?? 0).toLocaleString()} / {(profile?.nextLevelXp ?? 0).toLocaleString()} XP
+                </span>
               </div>
-
-              <div className="flex gap-2 sm:self-start">
-                <Button variant="outline" size="icon">
-                  <Share2 className="w-4 h-4" />
-                </Button>
-                <Button variant="outline" size="icon">
-                  <Settings className="w-4 h-4" />
-                </Button>
-              </div>
+              <Progress value={levelProgress} className="mt-3 h-2" />
+              <p className="mt-2 text-xs text-muted-foreground">
+                {profile?.nextLevelXp
+                  ? `${Math.max(profile.nextLevelXp - (profile.totalXp ?? 0), 0)} XP al livello ${
+                      (profile.level ?? 1) + 1
+                    }`
+                  : ""}
+              </p>
             </div>
           </CardContent>
         </Card>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Card className="bg-card border-border">
-            <CardContent className="p-4 text-center">
-              <Droplets className="w-6 h-6 text-primary mx-auto mb-2" />
-              <p className="text-2xl font-display font-bold text-foreground">
-                {formatDistance(stats.totalDistance)}
-              </p>
-              <p className="text-xs text-muted-foreground">Distanza totale</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-4 text-center">
-              <Clock className="w-6 h-6 text-primary mx-auto mb-2" />
-              <p className="text-2xl font-display font-bold text-foreground">
-                {formatTime(stats.totalTime)}
-              </p>
-              <p className="text-xs text-muted-foreground">Tempo in acqua</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-4 text-center">
-              <Calendar className="w-6 h-6 text-primary mx-auto mb-2" />
-              <p className="text-2xl font-display font-bold text-foreground">
-                {stats.totalSessions}
-              </p>
-              <p className="text-xs text-muted-foreground">Sessioni totali</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-4 text-center">
-              <TrendingUp className="w-6 h-6 text-accent mx-auto mb-2" />
-              <p className="text-2xl font-display font-bold text-foreground">
-                {formatPace(stats.avgPace)}
-              </p>
-              <p className="text-xs text-muted-foreground">Pace medio</p>
-            </CardContent>
-          </Card>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatItem
+            label="Sessioni totali"
+            value={stats.totalSessions}
+            icon={<TrendingUp className="size-5" />}
+          />
+          <StatItem
+            label="Distanza totale"
+            value={formatDistance(stats.totalDistance)}
+            icon={<Waves className="size-5" />}
+          />
+          <StatItem
+            label="Pace medio"
+            value={formatPace(stats.avgPace)}
+            icon={<Timer className="size-5" />}
+          />
+          <StatItem
+            label="SWOLF medio"
+            value={stats.avgSwolf ?? "—"}
+            icon={<Target className="size-5" />}
+          />
+          <StatItem
+            label="Tempo totale"
+            value={formatTime(stats.totalTime)}
+            icon={<Calendar className="size-5" />}
+          />
+          <StatItem
+            label="Best SWOLF"
+            value={stats.bestSwolf ?? "—"}
+            icon={<Award className="size-5" />}
+            subtext={stats.bestSwolf ? "Record personale" : undefined}
+          />
+          <StatItem
+            label="Streak attuale"
+            value={`${stats.streakCurrent} giorni`}
+            icon={<Flame className="size-5" />}
+          />
+          <StatItem
+            label="Streak migliore"
+            value={`${stats.streakBest} giorni`}
+            icon={<Trophy className="size-5" />}
+          />
         </div>
 
-        <Tabs defaultValue="badges" className="space-y-6">
-          <TabsList className="bg-secondary/50">
-            <TabsTrigger value="badges">Badges</TabsTrigger>
-            <TabsTrigger value="achievements">Achievements</TabsTrigger>
-            <TabsTrigger value="stats">Detailed Stats</TabsTrigger>
+        <Tabs defaultValue="badges" className="w-full">
+          <TabsList>
+            <TabsTrigger value="badges">Badge</TabsTrigger>
+            <TabsTrigger value="activities">Attivita recenti</TabsTrigger>
+            <TabsTrigger value="records">Record personali</TabsTrigger>
           </TabsList>
-
-          {/* Badges Tab */}
-          <TabsContent value="badges">
-            <Card className="bg-card border-border">
+          <TabsContent value="badges" className="mt-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              {badgeProgress.map((badge) => (
+                <BadgeCard
+                  key={badge.id}
+                  title={badge.name}
+                  description={badge.description}
+                  imageUrl={badge.iconName ? getBadgeImageUrl(badge.iconName) : null}
+                  unlocked={badge.earned}
+                  rarity={badge.rarity}
+                />
+              ))}
+            </div>
+          </TabsContent>
+          <TabsContent value="activities" className="mt-4">
+            <Card>
+              <CardContent className="pt-6">
+                {recentActivities.length ? (
+                  recentActivities.map((activity) => (
+                    <ActivityItem key={activity.id} {...activity} />
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nessuna attivita recente.</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="records" className="mt-4">
+            <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-display font-bold text-foreground">
-                    Badges Collection
-                  </CardTitle>
-                  <span className="text-sm text-muted-foreground">
-                    {earnedCount} / {badgeProgress.length} earned
-                  </span>
-                </div>
+                <CardTitle>Record personali</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {badgeProgress.map((badge) => (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {records.map((record) => (
                     <div
-                      key={badge.id}
-                      className={`p-4 rounded-xl text-center transition-all ${
-                        badge.earned ? "bg-secondary/50" : "bg-secondary/20 opacity-70"
-                      }`}
+                      key={record.label}
+                      className="flex items-center justify-between rounded-lg border border-border p-4"
                     >
-                      <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center bg-background">
-                        <Image
-                          src={getBadgeImageUrl(badge.code)}
-                          alt={badge.name}
-                          width={40}
-                          height={40}
-                          className="w-8 h-8 object-contain"
-                        />
+                      <div>
+                        <p className="font-medium text-foreground">{record.label}</p>
+                        <p className="text-sm text-muted-foreground">{record.date}</p>
                       </div>
-                      <h4 className="font-medium text-foreground text-sm">{badge.name}</h4>
-                      <p className="text-xs text-muted-foreground mt-1">{badge.description}</p>
-                      {!badge.earned && (
-                        <div className="mt-2">
-                          <Progress value={badge.progress ?? 0} className="h-1" />
-                          <span className="text-[11px] text-muted-foreground">
-                            {badge.progress ?? 0}%
-                          </span>
-                        </div>
-                      )}
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-primary">{record.value}</p>
+                        <Badge variant="secondary" className="text-xs">
+                          PR
+                        </Badge>
+                      </div>
                     </div>
                   ))}
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
-
-          {/* Achievements Tab */}
-          <TabsContent value="achievements">
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="text-lg font-display font-bold text-foreground">
-                  Recent Achievements
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {achievements.length === 0 && (
-                  <div className="text-sm text-muted-foreground">Nessun traguardo registrato.</div>
-                )}
-                {achievements.map((achievement) => (
-                  <div
-                    key={achievement.id}
-                    className="flex items-center gap-4 p-4 rounded-xl bg-secondary/30"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-chart-4/10 flex items-center justify-center flex-shrink-0">
-                      <Award className="w-6 h-6 text-chart-4" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium text-foreground">{achievement.title}</h4>
-                      <p className="text-xs text-muted-foreground">
-                        {formatDate(achievement.date)}
-                      </p>
-                    </div>
-                    <Badge className="bg-accent/20 text-accent">+{achievement.xp} XP</Badge>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Detailed Stats Tab */}
-          <TabsContent value="stats">
-            <div className="grid md:grid-cols-2 gap-6">
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle className="text-lg font-display font-bold text-foreground">
-                    Personal Records
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {[
-                    {
-                      label: "Longest Swim",
-                      value: formatDistance(stats.longestDistance),
-                      icon: Droplets,
-                    },
-                    {
-                      label: "Best 100m Pace",
-                      value: formatPace(stats.bestPace),
-                      icon: Timer,
-                    },
-                    {
-                      label: "Best Streak",
-                      value: `${stats.streakBest} giorni`,
-                      icon: Flame,
-                    },
-                    {
-                      label: "Most XP in Day",
-                      value: `${stats.bestXpDay} XP`,
-                      icon: Zap,
-                    },
-                  ].map((record, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 rounded-lg bg-secondary/30"
-                    >
-                      <div className="flex items-center gap-3">
-                        <record.icon className="w-5 h-5 text-primary" />
-                        <span className="text-sm text-muted-foreground">{record.label}</span>
-                      </div>
-                      <span className="font-display font-bold text-foreground">{record.value}</span>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle className="text-lg font-display font-bold text-foreground">
-                    Swimming Style Breakdown
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {strokeBreakdown.length === 0 && (
-                    <div className="text-sm text-muted-foreground">Nessun dato disponibile.</div>
-                  )}
-                  {strokeBreakdown.map((style) => (
-                    <div key={style.style}>
-                      <div className="flex items-center justify-between text-sm mb-2">
-                        <span className="text-foreground">{style.style}</span>
-                        <span className="text-muted-foreground">{style.percentage}%</span>
-                      </div>
-                      <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                        <div
-                          className={`h-full ${style.color} rounded-full transition-all`}
-                          style={{ width: `${style.percentage}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
           </TabsContent>
         </Tabs>
       </div>
     </AppLayout>
-  )
+  );
 }

@@ -130,6 +130,14 @@ export const profileUpdateSchema = z.object({
     .string()
     .url('URL avatar non valido')
     .optional(),
+  coverUrl: z
+    .string()
+    .url('URL cover non valido')
+    .optional(),
+  location: z
+    .string()
+    .max(120, 'Localita massimo 120 caratteri')
+    .optional(),
 
   privacyLevel: z
     .enum(['public', 'friends', 'private'])

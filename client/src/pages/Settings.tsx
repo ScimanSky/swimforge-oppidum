@@ -1,7 +1,7 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -31,8 +31,10 @@ import {
   Smartphone,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
+import { supabase } from "@/lib/supabase"
 import { formatDistanceToNow } from "date-fns"
 import { it } from "date-fns/locale"
+import { toast } from "sonner"
 
 const notificationSettings = [
   {
@@ -143,6 +145,88 @@ export default function Settings() {
     return formatDistanceToNow(date, { addSuffix: true, locale: it })
   }
 
+  const avatarInputRef = useRef<HTMLInputElement | null>(null)
+  const coverInputRef = useRef<HTMLInputElement | null>(null)
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
+  const [isUploadingCover, setIsUploadingCover] = useState(false)
+  const [profileDraft, setProfileDraft] = useState({
+    avatarUrl: profile?.avatarUrl || "",
+    coverUrl: profile?.coverUrl || "",
+    bio: profile?.bio || "",
+    location: profile?.location || "",
+  })
+
+  useEffect(() => {
+    setProfileDraft({
+      avatarUrl: profile?.avatarUrl || "",
+      coverUrl: profile?.coverUrl || "",
+      bio: profile?.bio || "",
+      location: profile?.location || "",
+    })
+  }, [profile?.avatarUrl, profile?.coverUrl, profile?.bio, profile?.location])
+
+  const updateProfileMutation = trpc.profile.update.useMutation()
+
+  const uploadToProfileBucket = async (file: File, kind: "avatar" | "cover") => {
+    if (!me?.id) {
+      toast.error("Devi essere autenticato per caricare immagini.")
+      return null
+    }
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"]
+    if (!allowedTypes.includes(file.type)) {
+      toast.error("Formato non supportato. Usa JPG, PNG o WEBP.")
+      return null
+    }
+    if (file.size > 200 * 1024) {
+      toast.error("File troppo grande. Massimo 200KB.")
+      return null
+    }
+
+    const extension = file.name.split(".").pop() || "png"
+    const filePath = `profiles/${me.id}/${kind}-${Date.now()}.${extension}`
+    const { error } = await supabase.storage
+      .from("profile-media")
+      .upload(filePath, file, { upsert: true, contentType: file.type })
+    if (error) {
+      toast.error(`Upload fallito: ${error.message}`)
+      return null
+    }
+    const { data } = supabase.storage.from("profile-media").getPublicUrl(filePath)
+    return data.publicUrl
+  }
+
+  const handleAvatarUpload = async (file?: File | null) => {
+    if (!file) return
+    setIsUploadingAvatar(true)
+    const url = await uploadToProfileBucket(file, "avatar")
+    if (url) {
+      setProfileDraft((prev) => ({ ...prev, avatarUrl: url }))
+      await updateProfileMutation.mutateAsync({ avatarUrl: url })
+      toast.success("Avatar aggiornato.")
+    }
+    setIsUploadingAvatar(false)
+  }
+
+  const handleCoverUpload = async (file?: File | null) => {
+    if (!file) return
+    setIsUploadingCover(true)
+    const url = await uploadToProfileBucket(file, "cover")
+    if (url) {
+      setProfileDraft((prev) => ({ ...prev, coverUrl: url }))
+      await updateProfileMutation.mutateAsync({ coverUrl: url })
+      toast.success("Cover aggiornata.")
+    }
+    setIsUploadingCover(false)
+  }
+
+  const handleSaveProfile = async () => {
+    await updateProfileMutation.mutateAsync({
+      bio: profileDraft.bio || undefined,
+      location: profileDraft.location || undefined,
+    })
+    toast.success("Profilo aggiornato.")
+  }
+
   const [notifications, setNotifications] = useState(
     notificationSettings.reduce(
       (acc, setting) => ({ ...acc, [setting.id]: setting.enabled }),
@@ -195,24 +279,73 @@ export default function Settings() {
               <CardDescription>Aggiorna le informazioni del tuo profilo pubblico</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Cover Image */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-foreground">Cover profilo</p>
+                    <p className="text-sm text-muted-foreground">
+                      JPG/PNG/WEBP · max 200KB
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => coverInputRef.current?.click()}
+                    disabled={isUploadingCover}
+                  >
+                    <Camera className="w-4 h-4 mr-2" />
+                    {isUploadingCover ? "Caricamento..." : "Cambia cover"}
+                  </Button>
+                </div>
+                <input
+                  ref={coverInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(event) => handleCoverUpload(event.target.files?.[0])}
+                />
+                <div className="relative h-36 rounded-xl overflow-hidden bg-secondary">
+                  {profileDraft.coverUrl ? (
+                    <img
+                      src={profileDraft.coverUrl}
+                      alt="Cover profilo"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                      Nessuna cover caricata
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Avatar */}
               <div className="flex items-center gap-6">
                 <div className="relative">
                   <Avatar className="h-24 w-24">
-                    <AvatarImage src={profile?.avatarUrl || "/images/ai_coach_avatar.webp"} alt={displayName} />
+                    <AvatarImage src={profileDraft.avatarUrl || "/images/ai_coach_avatar.webp"} alt={displayName} />
                     <AvatarFallback>{initials}</AvatarFallback>
                   </Avatar>
                   <Button
                     size="icon"
                     className="absolute bottom-0 right-0 h-8 w-8 rounded-full"
-                    disabled
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={isUploadingAvatar}
                   >
                     <Camera className="w-4 h-4" />
                   </Button>
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(event) => handleAvatarUpload(event.target.files?.[0])}
+                  />
                 </div>
                 <div>
                   <p className="font-medium text-foreground">Foto Profilo</p>
-                  <p className="text-sm text-muted-foreground">Modifica avatar in arrivo.</p>
+                  <p className="text-sm text-muted-foreground">JPG/PNG/WEBP · max 200KB</p>
                 </div>
               </div>
 
@@ -236,7 +369,13 @@ export default function Settings() {
                 </div>
                 <div className="space-y-2">
                   <Label>Citta</Label>
-                  <Input value="Non impostato" className="bg-secondary border-0" disabled />
+                  <Input
+                    value={profileDraft.location}
+                    onChange={(event) =>
+                      setProfileDraft((prev) => ({ ...prev, location: event.target.value }))
+                    }
+                    className="bg-secondary border-0"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Data di Nascita</Label>
@@ -248,12 +387,16 @@ export default function Settings() {
                 <Label>Bio</Label>
                 <textarea
                   className="w-full h-24 p-3 rounded-lg bg-secondary border-0 text-foreground resize-none focus:ring-2 focus:ring-ring"
-                  value="Bio personalizzata non ancora disponibile."
-                  readOnly
+                  value={profileDraft.bio}
+                  onChange={(event) =>
+                    setProfileDraft((prev) => ({ ...prev, bio: event.target.value }))
+                  }
                 />
               </div>
 
-              <Button disabled>Salva Modifiche</Button>
+              <Button onClick={handleSaveProfile} disabled={updateProfileMutation.isPending}>
+                {updateProfileMutation.isPending ? "Salvataggio..." : "Salva Modifiche"}
+              </Button>
             </CardContent>
           </Card>
 
