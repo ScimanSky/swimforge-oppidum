@@ -403,11 +403,12 @@ export async function getAdvancedMetrics(
     intensity: avgPace > 0 ? 120 / avgPace : 0,  // Normalized intensity
     frequency: currentSessions
   };
+  const avgPrevPace = previousActivities.length > 0
+    ? previousActivities.reduce((sum, a) => sum + (a.avgPacePer100m || 0), 0) / previousActivities.length
+    : 0;
   const previousStats = {
     distance: previousDistance,
-    intensity: previousActivities.length > 0 
-      ? previousActivities.reduce((sum, a) => sum + (a.avgPacePer100m || 0), 0) / previousActivities.length
-      : 0,
+    intensity: avgPrevPace > 0 ? 120 / avgPrevPace : 0,
     frequency: previousActivities.length
   };
   const progressiveOverloadIndex = calculatePOI(currentStats, previousStats) || undefined;

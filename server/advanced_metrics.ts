@@ -207,6 +207,12 @@ export function calculatePOI(
   const { distance: currDist, intensity: currInt, frequency: currFreq } = currentPeriodStats;
   const { distance: prevDist, intensity: prevInt, frequency: prevFreq } = previousPeriodStats;
   
+  if (prevDist === 0 && prevInt === 0 && prevFreq === 0) {
+    if (currDist === 0 && currInt === 0 && currFreq === 0) {
+      return null;
+    }
+    return 0;
+  }
   if (prevDist === 0 || prevInt === 0 || prevFreq === 0) {
     return null;
   }

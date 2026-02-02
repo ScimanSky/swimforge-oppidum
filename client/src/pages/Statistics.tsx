@@ -671,11 +671,15 @@ export default function Statistics() {
                     />
                     <GaugeMetric
                       label="Trend"
-                      value={advanced.trendIndicator.percentage}
+                      value={
+                        advanced.trendIndicator.direction === "down"
+                          ? -advanced.trendIndicator.percentage
+                          : advanced.trendIndicator.percentage
+                      }
                       min={-50}
                       max={50}
                       neutralRange={2}
-                      info={metricsDefinitions.performanceIndex}
+                      info={metricsDefinitions.trend}
                     />
                   </div>
                 </div>
