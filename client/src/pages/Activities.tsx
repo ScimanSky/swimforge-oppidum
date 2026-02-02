@@ -27,99 +27,77 @@ import {
   MapPin,
 } from "lucide-react"
 import Link from "next/link"
+import { trpc } from "@/lib/trpc"
+import { Skeleton } from "@/components/ui/skeleton"
 
-const activities = [
-  {
-    id: 1,
-    type: "Pool",
-    title: "Morning Freestyle",
-    date: "Today",
-    time: "6:30 AM",
-    distance: "2.5 km",
-    duration: "42 min",
-    xp: 85,
-    pace: "1:40/100m",
-    strokes: 1240,
-    efficiency: 92,
-  },
-  {
-    id: 2,
-    type: "Pool",
-    title: "Interval Training",
-    date: "Yesterday",
-    time: "7:00 AM",
-    distance: "2.6 km",
-    duration: "45 min",
-    xp: 95,
-    pace: "1:44/100m",
-    strokes: 1380,
-    efficiency: 88,
-  },
-  {
-    id: 3,
-    type: "Open Water",
-    title: "Lake Swim",
-    date: "Jan 29",
-    time: "8:00 AM",
-    distance: "1.8 km",
-    duration: "35 min",
-    xp: 75,
-    pace: "1:56/100m",
-    strokes: 920,
-    efficiency: 85,
-  },
-  {
-    id: 4,
-    type: "Pool",
-    title: "Technique Drills",
-    date: "Jan 28",
-    time: "6:00 AM",
-    distance: "1.5 km",
-    duration: "30 min",
-    xp: 65,
-    pace: "2:00/100m",
-    strokes: 780,
-    efficiency: 94,
-  },
-  {
-    id: 5,
-    type: "Pool",
-    title: "Endurance Swim",
-    date: "Jan 27",
-    time: "7:30 AM",
-    distance: "3.0 km",
-    duration: "52 min",
-    xp: 110,
-    pace: "1:44/100m",
-    strokes: 1560,
-    efficiency: 89,
-  },
-  {
-    id: 6,
-    type: "Open Water",
-    title: "Coastal Training",
-    date: "Jan 25",
-    time: "9:00 AM",
-    distance: "2.2 km",
-    duration: "48 min",
-    xp: 100,
-    pace: "2:11/100m",
-    strokes: 1100,
-    efficiency: 82,
-  },
-]
+const formatDistance = (meters: number) => {
+  if (!meters) return "—"
+  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`
+}
+
+const formatDuration = (seconds: number) => {
+  if (!seconds) return "—"
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  if (hours > 0) return `${hours}h ${minutes % 60}m`
+  return `${minutes} min`
+}
+
+const formatPace = (secondsPer100m: number | null, distanceMeters: number, durationSeconds: number) => {
+  const pace = secondsPer100m && secondsPer100m > 0
+    ? secondsPer100m
+    : distanceMeters > 0
+    ? durationSeconds / (distanceMeters / 100)
+    : null
+  if (!pace || !Number.isFinite(pace)) return "—"
+  const minutes = Math.floor(pace / 60)
+  const seconds = Math.round(pace % 60)
+  return `${minutes}:${seconds.toString().padStart(2, "0")}/100m`
+}
+
+const formatDate = (date: string | Date) => {
+  const parsed = new Date(date)
+  return parsed.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+}
+
+const formatTime = (date: string | Date) => {
+  const parsed = new Date(date)
+  return parsed.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+}
 
 export default function Activities() {
   const [filter, setFilter] = useState("all")
   const [search, setSearch] = useState("")
+  const [sort, setSort] = useState("recent")
 
-  const filteredActivities = activities.filter((activity) => {
-    if (filter !== "all" && activity.type.toLowerCase().replace(" ", "-") !== filter)
-      return false
-    if (search && !activity.title.toLowerCase().includes(search.toLowerCase()))
-      return false
-    return true
-  })
+  const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
+  const advancedQuery = trpc.statistics.getAdvanced.useQuery({ days: 30 })
+
+  const activities = activitiesQuery.data ?? []
+
+  const filteredActivities = activities
+    .filter((activity) => {
+      const activityType = activity.isOpenWater ? "open-water" : "pool"
+      if (filter !== "all" && activityType !== filter) return false
+      if (search && !(activity.activityName || "").toLowerCase().includes(search.toLowerCase()))
+        return false
+      return true
+    })
+    .sort((a, b) => {
+      if (sort === "distance") return (b.distanceMeters || 0) - (a.distanceMeters || 0)
+      if (sort === "duration") return (b.durationSeconds || 0) - (a.durationSeconds || 0)
+      if (sort === "xp") return (b.xpEarned || 0) - (a.xpEarned || 0)
+      return new Date(b.activityDate).getTime() - new Date(a.activityDate).getTime()
+    })
+
+  const monthStart = new Date()
+  monthStart.setDate(monthStart.getDate() - 30)
+  monthStart.setHours(0, 0, 0, 0)
+  const monthActivities = activities.filter((activity) => new Date(activity.activityDate) >= monthStart)
+  const totalDistance = monthActivities.reduce((sum, a) => sum + (a.distanceMeters || 0), 0)
+  const totalTime = monthActivities.reduce((sum, a) => sum + (a.durationSeconds || 0), 0)
+  const totalXp = monthActivities.reduce((sum, a) => sum + (a.xpEarned || 0), 0)
+  const avgEfficiency = advancedQuery.data?.swimmingEfficiencyIndex
 
   return (
     <AppLayout>
@@ -161,7 +139,7 @@ export default function Activities() {
               <TabsTrigger value="open-water">Open Water</TabsTrigger>
             </TabsList>
           </Tabs>
-          <Select defaultValue="recent">
+          <Select value={sort} onValueChange={setSort}>
             <SelectTrigger className="w-[130px] bg-secondary/50 border-transparent">
               <Filter className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Sort" />
@@ -184,8 +162,12 @@ export default function Activities() {
               <Droplets className="w-4 h-4 text-primary" />
               <span className="text-xs text-muted-foreground">Total Distance</span>
             </div>
-            <p className="text-xl font-display font-bold text-foreground">13.6 km</p>
-            <p className="text-xs text-accent mt-1">This month</p>
+            {activitiesQuery.isLoading ? (
+              <Skeleton className="h-6 w-20" />
+            ) : (
+              <p className="text-xl font-display font-bold text-foreground">{formatDistance(totalDistance)}</p>
+            )}
+            <p className="text-xs text-accent mt-1">Last 30 days</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
@@ -194,8 +176,12 @@ export default function Activities() {
               <Timer className="w-4 h-4 text-primary" />
               <span className="text-xs text-muted-foreground">Total Time</span>
             </div>
-            <p className="text-xl font-display font-bold text-foreground">4h 12m</p>
-            <p className="text-xs text-accent mt-1">This month</p>
+            {activitiesQuery.isLoading ? (
+              <Skeleton className="h-6 w-20" />
+            ) : (
+              <p className="text-xl font-display font-bold text-foreground">{formatDuration(totalTime)}</p>
+            )}
+            <p className="text-xs text-accent mt-1">Last 30 days</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
@@ -204,8 +190,12 @@ export default function Activities() {
               <Zap className="w-4 h-4 text-accent" />
               <span className="text-xs text-muted-foreground">XP Earned</span>
             </div>
-            <p className="text-xl font-display font-bold text-foreground">530 XP</p>
-            <p className="text-xs text-accent mt-1">This month</p>
+            {activitiesQuery.isLoading ? (
+              <Skeleton className="h-6 w-20" />
+            ) : (
+              <p className="text-xl font-display font-bold text-foreground">{totalXp} XP</p>
+            )}
+            <p className="text-xs text-accent mt-1">Last 30 days</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
@@ -214,91 +204,127 @@ export default function Activities() {
               <TrendingUp className="w-4 h-4 text-primary" />
               <span className="text-xs text-muted-foreground">Avg Efficiency</span>
             </div>
-            <p className="text-xl font-display font-bold text-foreground">88%</p>
-            <p className="text-xs text-accent mt-1">+3% vs last month</p>
+            {advancedQuery.isLoading ? (
+              <Skeleton className="h-6 w-20" />
+            ) : (
+              <p className="text-xl font-display font-bold text-foreground">
+                {avgEfficiency !== null && avgEfficiency !== undefined
+                  ? `${Math.round(avgEfficiency)}%`
+                  : "—"}
+              </p>
+            )}
+            <p className="text-xs text-accent mt-1">SEI Index</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Activities List */}
       <div className="space-y-3">
-        {filteredActivities.map((activity) => (
-          <Link key={activity.id} href={`/activities/${activity.id}`}>
-            <Card className="bg-card border-border hover:border-primary/50 transition-all">
+        {activitiesQuery.isLoading ? (
+          Array.from({ length: 3 }).map((_, index) => (
+            <Card key={index} className="bg-card border-border">
               <CardContent className="p-4">
-                <div className="flex items-start gap-4">
-                  {/* Activity Icon */}
-                  <div
-                    className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                      activity.type === "Pool"
-                        ? "bg-primary/10"
-                        : "bg-accent/10"
-                    }`}
-                  >
-                    {activity.type === "Pool" ? (
-                      <Waves className="w-6 h-6 text-primary" />
-                    ) : (
-                      <MapPin className="w-6 h-6 text-accent" />
-                    )}
-                  </div>
-
-                  {/* Activity Details */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-foreground truncate">
-                        {activity.title}
-                      </h3>
-                      <Badge
-                        variant="secondary"
-                        className={`text-xs flex-shrink-0 ${
-                          activity.type === "Pool"
-                            ? "bg-primary/20 text-primary"
-                            : "bg-accent/20 text-accent"
-                        }`}
-                      >
-                        {activity.type}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {activity.date} at {activity.time}
-                    </p>
-
-                    {/* Stats Grid */}
-                    <div className="grid grid-cols-4 gap-4 mt-4">
-                      <div>
-                        <p className="text-lg font-display font-bold text-foreground">
-                          {activity.distance}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Distance</p>
-                      </div>
-                      <div>
-                        <p className="text-lg font-display font-bold text-foreground">
-                          {activity.duration}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Duration</p>
-                      </div>
-                      <div>
-                        <p className="text-lg font-display font-bold text-foreground">
-                          {activity.pace}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Pace</p>
-                      </div>
-                      <div>
-                        <p className="text-lg font-display font-bold text-accent">
-                          +{activity.xp}
-                        </p>
-                        <p className="text-xs text-muted-foreground">XP</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Arrow */}
-                  <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                <Skeleton className="h-4 w-40 mb-3" />
+                <Skeleton className="h-3 w-28 mb-4" />
+                <div className="grid grid-cols-4 gap-4">
+                  <Skeleton className="h-6 w-16" />
+                  <Skeleton className="h-6 w-16" />
+                  <Skeleton className="h-6 w-16" />
+                  <Skeleton className="h-6 w-16" />
                 </div>
               </CardContent>
             </Card>
-          </Link>
-        ))}
+          ))
+        ) : filteredActivities.length === 0 ? (
+          <Card className="bg-card border-border">
+            <CardContent className="p-8 text-center text-muted-foreground">
+              No activities found. Sync your devices to see your sessions here.
+            </CardContent>
+          </Card>
+        ) : (
+          filteredActivities.map((activity) => {
+            const isOpenWater = Boolean(activity.isOpenWater)
+            return (
+              <Link key={activity.id} href={`/activities/${activity.id}`}>
+                <Card className="bg-card border-border hover:border-primary/50 transition-all">
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-4">
+                      {/* Activity Icon */}
+                      <div
+                        className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                          isOpenWater ? "bg-accent/10" : "bg-primary/10"
+                        }`}
+                      >
+                        {isOpenWater ? (
+                          <MapPin className="w-6 h-6 text-accent" />
+                        ) : (
+                          <Waves className="w-6 h-6 text-primary" />
+                        )}
+                      </div>
+
+                      {/* Activity Details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-foreground truncate">
+                            {activity.activityName || "Swim Session"}
+                          </h3>
+                          <Badge
+                            variant="secondary"
+                            className={`text-xs flex-shrink-0 ${
+                              isOpenWater
+                                ? "bg-accent/20 text-accent"
+                                : "bg-primary/20 text-primary"
+                            }`}
+                          >
+                            {isOpenWater ? "Open Water" : "Pool"}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {formatDate(activity.activityDate)} at {formatTime(activity.activityDate)}
+                        </p>
+
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-4 gap-4 mt-4">
+                          <div>
+                            <p className="text-lg font-display font-bold text-foreground">
+                              {formatDistance(activity.distanceMeters)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Distance</p>
+                          </div>
+                          <div>
+                            <p className="text-lg font-display font-bold text-foreground">
+                              {formatDuration(activity.durationSeconds)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Duration</p>
+                          </div>
+                          <div>
+                            <p className="text-lg font-display font-bold text-foreground">
+                              {formatPace(
+                                activity.avgPacePer100m,
+                                activity.distanceMeters,
+                                activity.durationSeconds
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Pace</p>
+                          </div>
+                          <div>
+                            <p className="text-lg font-display font-bold text-accent">
+                              +{activity.xpEarned}
+                            </p>
+                            <p className="text-xs text-muted-foreground">XP</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Arrow */}
+                      <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            )
+          })
+        )}
       </div>
     </div>
     </AppLayout>
