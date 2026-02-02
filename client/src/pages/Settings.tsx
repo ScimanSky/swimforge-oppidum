@@ -1,8 +1,7 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { useState } from "react"
-import Image from "next/image"
+import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -17,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
 import {
   User,
   Bell,
@@ -32,30 +30,9 @@ import {
   LogOut,
   Smartphone,
 } from "lucide-react"
-
-const connectedAccounts = [
-  {
-    name: "Garmin Connect",
-    icon: "/images/garmin-logo.png",
-    connected: true,
-    lastSync: "5 min fa",
-    activities: 234,
-  },
-  {
-    name: "Strava",
-    icon: "/images/strava-logo.png",
-    connected: true,
-    lastSync: "1 ora fa",
-    activities: 189,
-  },
-  {
-    name: "Apple Health",
-    icon: "/images/apple-health-logo.png",
-    connected: false,
-    lastSync: null,
-    activities: 0,
-  },
-]
+import { trpc } from "@/lib/trpc"
+import { formatDistanceToNow } from "date-fns"
+import { it } from "date-fns/locale"
 
 const notificationSettings = [
   {
@@ -109,6 +86,63 @@ const notificationSettings = [
 ]
 
 export default function Settings() {
+  const { data: me } = trpc.auth.me.useQuery()
+  const { data: profile } = trpc.profile.get.useQuery()
+  const { data: activities } = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
+  const { data: garminStatus } = trpc.garmin.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 })
+  const { data: stravaStatus } = trpc.strava.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 })
+
+  const displayName = me?.name || me?.email || "Utente"
+  const initials = displayName
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase()
+
+  const activitiesBySource = useMemo(() => {
+    const counts = { garmin: 0, strava: 0, manual: 0 }
+    if (!activities) return counts
+    activities.forEach((activity) => {
+      if (activity.activitySource === "garmin") counts.garmin += 1
+      if (activity.activitySource === "strava") counts.strava += 1
+      if (activity.activitySource === "manual") counts.manual += 1
+    })
+    return counts
+  }, [activities])
+
+  const favoriteStroke = useMemo(() => {
+    if (!activities || activities.length === 0) return "Non disponibile"
+    const counts: Record<string, number> = {}
+    activities.forEach((activity) => {
+      const stroke = activity.strokeType || "mixed"
+      counts[stroke] = (counts[stroke] || 0) + 1
+    })
+    const [top] = Object.entries(counts).sort((a, b) => b[1] - a[1])
+    const strokeKey = top?.[0] || "mixed"
+    const labels: Record<string, string> = {
+      freestyle: "Stile Libero",
+      backstroke: "Dorso",
+      breaststroke: "Rana",
+      butterfly: "Farfalla",
+      mixed: "Misto",
+    }
+    return labels[strokeKey] || "Misto"
+  }, [activities])
+
+  const preferredPool = useMemo(() => {
+    const length = activities?.[0]?.poolLengthMeters
+    if (!length) return "Non disponibile"
+    return `${length}m ${length === 50 ? "(Olimpica)" : "(Corta)"}`
+  }, [activities])
+
+  const formatLastSync = (value?: Date | string | null) => {
+    if (!value) return "Mai sincronizzato"
+    const date = typeof value === "string" ? new Date(value) : value
+    if (Number.isNaN(date.getTime())) return "Mai sincronizzato"
+    return formatDistanceToNow(date, { addSuffix: true, locale: it })
+  }
+
   const [notifications, setNotifications] = useState(
     notificationSettings.reduce(
       (acc, setting) => ({ ...acc, [setting.id]: setting.enabled }),
@@ -165,19 +199,20 @@ export default function Settings() {
               <div className="flex items-center gap-6">
                 <div className="relative">
                   <Avatar className="h-24 w-24">
-                    <AvatarImage src="/images/athlete-1.jpg" alt="Profile" />
-                    <AvatarFallback>MR</AvatarFallback>
+                    <AvatarImage src={profile?.avatarUrl || "/images/ai_coach_avatar.webp"} alt={displayName} />
+                    <AvatarFallback>{initials}</AvatarFallback>
                   </Avatar>
                   <Button
                     size="icon"
                     className="absolute bottom-0 right-0 h-8 w-8 rounded-full"
+                    disabled
                   >
                     <Camera className="w-4 h-4" />
                   </Button>
                 </div>
                 <div>
                   <p className="font-medium text-foreground">Foto Profilo</p>
-                  <p className="text-sm text-muted-foreground">JPG, PNG. Max 5MB.</p>
+                  <p className="text-sm text-muted-foreground">Modifica avatar in arrivo.</p>
                 </div>
               </div>
 
@@ -185,27 +220,27 @@ export default function Settings() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Nome</Label>
-                  <Input defaultValue="Marco" className="bg-secondary border-0" />
+                  <Input value={displayName} className="bg-secondary border-0" disabled />
                 </div>
                 <div className="space-y-2">
                   <Label>Cognome</Label>
-                  <Input defaultValue="Rossi" className="bg-secondary border-0" />
+                  <Input value="Non impostato" className="bg-secondary border-0" disabled />
                 </div>
                 <div className="space-y-2">
                   <Label>Username</Label>
-                  <Input defaultValue="@marcorossi" className="bg-secondary border-0" />
+                  <Input value={me?.email ? `@${me.email.split("@")[0]}` : "Non impostato"} className="bg-secondary border-0" disabled />
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
-                  <Input type="email" defaultValue="marco@example.com" className="bg-secondary border-0" />
+                  <Input type="email" value={me?.email || ""} className="bg-secondary border-0" disabled />
                 </div>
                 <div className="space-y-2">
                   <Label>Citta</Label>
-                  <Input defaultValue="Milano" className="bg-secondary border-0" />
+                  <Input value="Non impostato" className="bg-secondary border-0" disabled />
                 </div>
                 <div className="space-y-2">
                   <Label>Data di Nascita</Label>
-                  <Input type="date" defaultValue="1990-05-15" className="bg-secondary border-0" />
+                  <Input type="date" value="" className="bg-secondary border-0" disabled />
                 </div>
               </div>
 
@@ -213,11 +248,12 @@ export default function Settings() {
                 <Label>Bio</Label>
                 <textarea
                   className="w-full h-24 p-3 rounded-lg bg-secondary border-0 text-foreground resize-none focus:ring-2 focus:ring-ring"
-                  defaultValue="Nuotatore appassionato. Master M30. Obiettivo: migliorare ogni giorno."
+                  value="Bio personalizzata non ancora disponibile."
+                  readOnly
                 />
               </div>
 
-              <Button>Salva Modifiche</Button>
+              <Button disabled>Salva Modifiche</Button>
             </CardContent>
           </Card>
 
@@ -231,60 +267,26 @@ export default function Settings() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Livello</Label>
-                  <Select defaultValue="intermediate">
-                    <SelectTrigger className="bg-secondary border-0">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="beginner">Principiante</SelectItem>
-                      <SelectItem value="intermediate">Intermedio</SelectItem>
-                      <SelectItem value="advanced">Avanzato</SelectItem>
-                      <SelectItem value="competitive">Agonista</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    value={profile?.aiSkillLabel || profile?.levelTitle || "Non disponibile"}
+                    className="bg-secondary border-0"
+                    disabled
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Stile Preferito</Label>
-                  <Select defaultValue="freestyle">
-                    <SelectTrigger className="bg-secondary border-0">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="freestyle">Stile Libero</SelectItem>
-                      <SelectItem value="backstroke">Dorso</SelectItem>
-                      <SelectItem value="breaststroke">Rana</SelectItem>
-                      <SelectItem value="butterfly">Farfalla</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input value={favoriteStroke} className="bg-secondary border-0" disabled />
                 </div>
                 <div className="space-y-2">
                   <Label>Lunghezza Piscina Preferita</Label>
-                  <Select defaultValue="25">
-                    <SelectTrigger className="bg-secondary border-0">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="25">25m (Corta)</SelectItem>
-                      <SelectItem value="50">50m (Olimpica)</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input value={preferredPool} className="bg-secondary border-0" disabled />
                 </div>
                 <div className="space-y-2">
                   <Label>Categoria Master</Label>
-                  <Select defaultValue="m30">
-                    <SelectTrigger className="bg-secondary border-0">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="m25">M25</SelectItem>
-                      <SelectItem value="m30">M30</SelectItem>
-                      <SelectItem value="m35">M35</SelectItem>
-                      <SelectItem value="m40">M40</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input value="Non impostato" className="bg-secondary border-0" disabled />
                 </div>
               </div>
-              <Button>Salva Profilo Nuotatore</Button>
+              <Button disabled>Salva Profilo Nuotatore</Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -299,7 +301,27 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {connectedAccounts.map((account) => (
+              {[
+                {
+                  name: "Garmin Connect",
+                  connected: garminStatus?.connected ?? false,
+                  lastSync: garminStatus?.lastSync ?? null,
+                  activities: activitiesBySource.garmin,
+                },
+                {
+                  name: "Strava",
+                  connected: stravaStatus?.connected ?? false,
+                  lastSync: stravaStatus?.lastSync ?? null,
+                  activities: activitiesBySource.strava,
+                },
+                {
+                  name: "Apple Health",
+                  connected: false,
+                  lastSync: null,
+                  activities: 0,
+                  disabled: true,
+                },
+              ].map((account) => (
                 <div
                   key={account.name}
                   className="flex items-center justify-between p-4 rounded-lg bg-secondary/30"
@@ -312,25 +334,29 @@ export default function Settings() {
                       <p className="font-medium text-foreground">{account.name}</p>
                       {account.connected ? (
                         <p className="text-sm text-muted-foreground">
-                          Sincronizzato {account.lastSync} - {account.activities} attivita
+                          Ultimo sync {formatLastSync(account.lastSync)} · {account.activities} attivita
                         </p>
                       ) : (
-                        <p className="text-sm text-muted-foreground">Non connesso</p>
+                        <p className="text-sm text-muted-foreground">
+                          {account.disabled ? "Disponibile prossimamente" : "Non connesso"}
+                        </p>
                       )}
                     </div>
                   </div>
                   {account.connected ? (
                     <div className="flex items-center gap-2">
-                      <Badge className="bg-accent/10 text-accent border-0">
-                        <Check className="w-3 h-3 mr-1" />
+                      <div className="flex items-center gap-2 text-sm text-accent">
+                        <Check className="w-4 h-4" />
                         Connesso
-                      </Badge>
-                      <Button variant="outline" size="sm">
-                        Disconnetti
+                      </div>
+                      <Button variant="outline" size="sm" asChild>
+                        <a href="/profile">Gestisci</a>
                       </Button>
                     </div>
                   ) : (
-                    <Button size="sm">Connetti</Button>
+                    <Button size="sm" disabled={account.disabled} asChild={!account.disabled}>
+                      {account.disabled ? "In arrivo" : <a href="/profile">Connetti</a>}
+                    </Button>
                   )}
                 </div>
               ))}
@@ -349,25 +375,11 @@ export default function Settings() {
                     <Smartphone className="w-6 h-6 text-primary" />
                   </div>
                   <div>
-                    <p className="font-medium text-foreground">iPhone 15 Pro</p>
-                    <p className="text-sm text-muted-foreground">Ultimo accesso: Oggi, 10:30</p>
+                    <p className="font-medium text-foreground">Dispositivo corrente</p>
+                    <p className="text-sm text-muted-foreground">Gestione dispositivi in arrivo</p>
                   </div>
                 </div>
-                <Badge variant="secondary">Questo dispositivo</Badge>
-              </div>
-              <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/30">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 rounded-lg bg-muted">
-                    <Globe className="w-6 h-6 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Chrome su MacBook</p>
-                    <p className="text-sm text-muted-foreground">Ultimo accesso: Ieri, 18:45</p>
-                  </div>
-                </div>
-                <Button variant="ghost" size="sm" className="text-destructive">
-                  Rimuovi
-                </Button>
+                <div className="text-xs text-muted-foreground">Attivo</div>
               </div>
             </CardContent>
           </Card>
@@ -412,7 +424,7 @@ export default function Settings() {
                   <p className="font-medium text-foreground">Sistema Metrico</p>
                   <p className="text-sm text-muted-foreground">Chilometri, metri, kg</p>
                 </div>
-                <Select defaultValue="metric">
+                <Select defaultValue="metric" disabled>
                   <SelectTrigger className="w-32 bg-secondary border-0">
                     <SelectValue />
                   </SelectTrigger>
@@ -427,7 +439,7 @@ export default function Settings() {
                   <p className="font-medium text-foreground">Formato Pace</p>
                   <p className="text-sm text-muted-foreground">Come visualizzare il ritmo</p>
                 </div>
-                <Select defaultValue="100m">
+                <Select defaultValue="100m" disabled>
                   <SelectTrigger className="w-32 bg-secondary border-0">
                     <SelectValue />
                   </SelectTrigger>
@@ -449,7 +461,7 @@ export default function Settings() {
                 <div>
                   <p className="font-medium text-foreground">Lingua</p>
                 </div>
-                <Select defaultValue="it">
+                <Select defaultValue="it" disabled>
                   <SelectTrigger className="w-40 bg-secondary border-0">
                     <SelectValue />
                   </SelectTrigger>
@@ -465,7 +477,7 @@ export default function Settings() {
                 <div>
                   <p className="font-medium text-foreground">Fuso Orario</p>
                 </div>
-                <Select defaultValue="rome">
+                <Select defaultValue="rome" disabled>
                   <SelectTrigger className="w-48 bg-secondary border-0">
                     <SelectValue />
                   </SelectTrigger>
@@ -494,7 +506,7 @@ export default function Settings() {
                     Permetti ad altri utenti di vedere il tuo profilo
                   </p>
                 </div>
-                <Switch defaultChecked />
+                <Switch defaultChecked disabled />
               </div>
               <div className="flex items-center justify-between py-3">
                 <div>
@@ -503,7 +515,7 @@ export default function Settings() {
                     Mostra le tue attivita nel feed della community
                   </p>
                 </div>
-                <Switch defaultChecked />
+                <Switch defaultChecked disabled />
               </div>
               <div className="flex items-center justify-between py-3">
                 <div>
@@ -512,7 +524,7 @@ export default function Settings() {
                     Partecipa alle classifiche pubbliche
                   </p>
                 </div>
-                <Switch defaultChecked />
+                <Switch defaultChecked disabled />
               </div>
             </CardContent>
           </Card>
@@ -529,7 +541,7 @@ export default function Settings() {
                     Scarica tutti i tuoi dati in formato JSON
                   </p>
                 </div>
-                <Button variant="outline" className="gap-2 bg-transparent">
+                <Button variant="outline" className="gap-2 bg-transparent" disabled>
                   <ExternalLink className="w-4 h-4" />
                   Esporta
                 </Button>
@@ -541,7 +553,7 @@ export default function Settings() {
                     Disconnetti tutte le sessioni attive
                   </p>
                 </div>
-                <Button variant="outline" className="gap-2 text-destructive bg-transparent">
+                <Button variant="outline" className="gap-2 text-destructive bg-transparent" disabled>
                   <LogOut className="w-4 h-4" />
                   Logout
                 </Button>
@@ -553,7 +565,7 @@ export default function Settings() {
                     Elimina permanentemente il tuo account e tutti i dati
                   </p>
                 </div>
-                <Button variant="destructive" className="gap-2">
+                <Button variant="destructive" className="gap-2" disabled>
                   <Trash2 className="w-4 h-4" />
                   Elimina
                 </Button>
