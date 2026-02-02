@@ -65,7 +65,7 @@ const changeLabel = (current: number, previous: number, suffix = "vs last week")
 export default function Dashboard() {
   const meQuery = trpc.auth.me.useQuery()
   const profileQuery = trpc.profile.get.useQuery()
-  const activitiesQuery = trpc.activities.list.useQuery({ limit: 200, offset: 0, source: "all" })
+  const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
   const timelineQuery = trpc.statistics.getTimeline.useQuery({ days: 14 })
   const advancedQuery = trpc.statistics.getAdvanced.useQuery({ days: 30 })
   const leaderboardQuery = trpc.leaderboard.get.useQuery({
@@ -231,7 +231,7 @@ export default function Dashboard() {
         bgColor: "bg-chart-5/10",
       },
     ]
-  }, [activitiesQuery.data])
+  }, [activitiesQuery.data, timelineQuery.data])
 
   const weeklyData = useMemo(() => {
     const timeline = timelineQuery.data ?? []
@@ -292,10 +292,14 @@ export default function Dashboard() {
   }, [leaderboardQuery.data, profileQuery.data?.userId])
 
   const challenges = useMemo(() => (challengesQuery.data ?? []) as any[], [challengesQuery.data])
-  const activeChallenges = useMemo(
-    () => challenges.filter((challenge) => challenge.status === "active" && challenge.isParticipant),
-    [challenges]
-  )
+  const activeChallenges = useMemo(() => {
+    return challenges.filter((challenge) => {
+      if (challenge.status !== "active") return false
+      if (challenge.isParticipant === undefined || challenge.isParticipant === null) return true
+      const value = challenge.isParticipant
+      return value === true || value === "t" || value === 1 || value === "true"
+    })
+  }, [challenges])
 
   const aiInsight = useMemo(() => {
     const insights = advancedQuery.data?.insights ?? []
@@ -322,16 +326,16 @@ export default function Dashboard() {
         <Card className="bg-card border-border">
           <CardContent className="p-6 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
-              <div className="size-14 rounded-2xl bg-primary/10 flex items-center justify-center overflow-hidden">
+              <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center overflow-hidden">
                 {profile?.profileBadge?.badge_image_url ? (
                   <img
                     src={profile.profileBadge.badge_image_url}
                     alt={profile.profileBadge.name || "Badge profilo"}
-                    className="h-full w-full object-contain"
+                    className="h-full w-full object-contain badge-hero-spin"
                     loading="lazy"
                   />
                 ) : (
-                  <Waves className="size-7 text-primary" />
+                  <Waves className="size-8 text-primary" />
                 )}
               </div>
               <div>
@@ -407,7 +411,7 @@ export default function Dashboard() {
                         {formatDistanceKm(activity.distanceMeters || 0)}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(activity.activityDate).toLocaleDateString("it-IT", {
+                        {(parseActivityDate(activity.activityDate) ?? new Date(activity.activityDate)).toLocaleDateString("it-IT", {
                           day: "numeric",
                           month: "short",
                           year: "numeric",

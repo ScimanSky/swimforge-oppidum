@@ -124,3 +124,16 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes swimforge-badge-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.badge-hero-spin {
+  animation: swimforge-badge-spin 10s linear infinite;
+}
