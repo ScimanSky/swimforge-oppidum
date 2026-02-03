@@ -77,6 +77,19 @@ const formatDate = (date?: string | null) => {
   })
 }
 
+const toDateKey = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+const fromDateKey = (key: string) => {
+  const [year, month, day] = key.split("-").map(Number)
+  if (!year || !month || !day) return null
+  return new Date(year, month - 1, day)
+}
+
 const getExerciseDetails = (exercise: WorkoutExercise) =>
   [
     exercise.sets && `Serie: ${exercise.sets}`,
@@ -239,7 +252,7 @@ export default function Coach() {
         return {
           ...item,
           _date: date,
-          _dateKey: date ? date.toISOString().split("T")[0] : null,
+          _dateKey: date ? toDateKey(date) : null,
           _sort: date ? date.getTime() : 0,
         }
       })
@@ -264,12 +277,14 @@ export default function Coach() {
   useEffect(() => {
     if (!availableDateKeys.length) return
     if (!selectedSessionDate) {
-      setSelectedSessionDate(new Date(`${availableDateKeys[0]}T00:00:00`))
+      const parsed = fromDateKey(availableDateKeys[0])
+      setSelectedSessionDate(parsed ?? new Date())
       return
     }
-    const key = selectedSessionDate.toISOString().split("T")[0]
+    const key = toDateKey(selectedSessionDate)
     if (!availableDateKeys.includes(key)) {
-      setSelectedSessionDate(new Date(`${availableDateKeys[0]}T00:00:00`))
+      const parsed = fromDateKey(availableDateKeys[0])
+      setSelectedSessionDate(parsed ?? new Date())
     }
   }, [availableDateKeys, selectedSessionDate])
 
@@ -291,7 +306,7 @@ export default function Coach() {
   }, [latestSessionInsight])
 
   const activeSessionDateKey = selectedSessionDate
-    ? selectedSessionDate.toISOString().split("T")[0]
+    ? toDateKey(selectedSessionDate)
     : availableDateKeys[0]
   const activeSessionEntry = activeSessionDateKey
     ? sessionByDate.get(activeSessionDateKey)?.[0] ?? null
@@ -318,7 +333,7 @@ export default function Coach() {
 
   const weekDateKeys = useMemo(() => {
     return weekDays
-      .map((day) => day.toISOString().split("T")[0])
+      .map((day) => toDateKey(day))
       .filter((key) => sessionByDate.has(key))
   }, [weekDays, sessionByDate])
 
@@ -774,7 +789,7 @@ export default function Coach() {
                     {sessionView === "week" && (
                       <div className="flex flex-wrap gap-2">
                         {weekDays.map((day) => {
-                          const key = day.toISOString().split("T")[0]
+                          const key = toDateKey(day)
                           if (!weekDateKeys.includes(key)) return null
                           const label = day.toLocaleDateString("it-IT", {
                             weekday: "short",
@@ -787,7 +802,11 @@ export default function Coach() {
                               type="button"
                               size="sm"
                               variant={isActive ? "default" : "outline"}
-                              onClick={() => setSelectedSessionDate(new Date(`${key}T00:00:00`))}
+                              onClick={() => {
+                                if (key !== activeSessionDateKey) {
+                                  setSelectedSessionDate(fromDateKey(key) ?? day)
+                                }
+                              }}
                             >
                               {label}
                             </Button>
