@@ -31,7 +31,6 @@ import {
   Smartphone,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
-import { supabase } from "@/lib/supabase"
 import { formatDistanceToNow } from "date-fns"
 import { it } from "date-fns/locale"
 import { toast } from "sonner"
@@ -183,7 +182,12 @@ export default function Settings() {
     })
   }, [profile?.avatarUrl, profile?.coverUrl, profile?.bio, profile?.location])
 
-  const updateProfileMutation = trpc.profile.update.useMutation()
+  const utils = trpc.useContext()
+  const updateProfileMutation = trpc.profile.update.useMutation({
+    onSuccess: () => {
+      void utils.profile.get.invalidate()
+    },
+  })
   const uploadMediaMutation = trpc.profile.uploadMedia.useMutation()
 
   const readFileAsBase64 = (file: File) =>
@@ -227,18 +231,9 @@ export default function Settings() {
         extension,
       })
       return url
-    } catch (fallbackError: any) {
-      const extension = file.name.split(".").pop() || "png"
-      const filePath = `profiles/${me.id}/${kind}-${Date.now()}.${extension}`
-      const { error } = await supabase.storage
-        .from("profile-media")
-        .upload(filePath, file, { upsert: true, contentType: file.type })
-      if (!error) {
-        const { data } = supabase.storage.from("profile-media").getPublicUrl(filePath)
-        return data.publicUrl
-      }
+    } catch (error: any) {
       const message =
-        fallbackError?.message ||
+        error?.message ||
         "Upload fallito: controlla le policy di Supabase Storage."
       toast.error(message)
       return null

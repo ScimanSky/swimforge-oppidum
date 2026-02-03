@@ -411,7 +411,7 @@ export async function getAdvancedMetrics(
     intensity: avgPrevPace > 0 ? 120 / avgPrevPace : 0,
     frequency: previousActivities.length
   };
-  const progressiveOverloadIndex = calculatePOI(currentStats, previousStats) || undefined;
+  const progressiveOverloadIndex = calculatePOI(currentStats, previousStats) ?? undefined;
 
   // Prepare data for AI
   const userData: UserStatsData = {

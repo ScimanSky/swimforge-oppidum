@@ -65,7 +65,10 @@ const changeLabel = (current: number, previous: number, suffix = "vs last week")
 export default function Dashboard() {
   const meQuery = trpc.auth.me.useQuery()
   const profileQuery = trpc.profile.get.useQuery()
-  const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
+  const activitiesQuery = trpc.activities.list.useQuery(
+    { limit: 200, offset: 0, source: "all" },
+    { staleTime: 0, refetchOnWindowFocus: true, refetchOnMount: "always" }
+  )
   const timelineQuery = trpc.statistics.getTimeline.useQuery({ days: 14 })
   const advancedQuery = trpc.statistics.getAdvanced.useQuery({ days: 30 })
   const leaderboardQuery = trpc.leaderboard.get.useQuery({
@@ -73,6 +76,14 @@ export default function Dashboard() {
     period: "week",
     limit: 5,
   })
+  const leaderboardAllQuery = trpc.leaderboard.get.useQuery(
+    {
+      orderBy: "totalXp",
+      period: "all",
+      limit: 5,
+    },
+    { enabled: (leaderboardQuery.data?.length ?? 0) === 0 }
+  )
   const challengesQuery = trpc.challenges.list.useQuery()
 
   const stats = useMemo(() => {
@@ -97,16 +108,20 @@ export default function Dashboard() {
     let prevTime = 0
     let prevSessions = 0
 
+    let validDates = 0
+    const toNumber = (value: unknown) => (value === null || value === undefined ? 0 : Number(value))
+
     activities.forEach((activity) => {
       const date = parseActivityDate(activity.activityDate)
       if (!date) return
+      validDates += 1
       if (date >= startLast7) {
-        currentDistance += activity.distanceMeters || 0
-        currentTime += activity.durationSeconds || 0
+        currentDistance += toNumber(activity.distanceMeters)
+        currentTime += toNumber(activity.durationSeconds)
         currentSessions += 1
       } else if (date >= startPrev7 && date < startLast7) {
-        prevDistance += activity.distanceMeters || 0
-        prevTime += activity.durationSeconds || 0
+        prevDistance += toNumber(activity.distanceMeters)
+        prevTime += toNumber(activity.durationSeconds)
         prevSessions += 1
       }
     })
@@ -124,8 +139,8 @@ export default function Dashboard() {
       const key = toDateKey(date)
       const entry = timelineMap.get(key)
       if (entry) {
-        timelineCurrentDistanceKm += entry.distance || 0
-        timelineCurrentSessions += entry.sessions || 0
+        timelineCurrentDistanceKm += Number(entry.distance || 0)
+        timelineCurrentSessions += Number(entry.sessions || 0)
         if (entry.pace) timelineCurrentPaceValues.push(entry.pace)
       }
     }
@@ -136,8 +151,8 @@ export default function Dashboard() {
       const key = toDateKey(date)
       const entry = timelineMap.get(key)
       if (entry) {
-        timelinePrevDistanceKm += entry.distance || 0
-        timelinePrevSessions += entry.sessions || 0
+        timelinePrevDistanceKm += Number(entry.distance || 0)
+        timelinePrevSessions += Number(entry.sessions || 0)
         if (entry.pace) timelinePrevPaceValues.push(entry.pace)
       }
     }
@@ -175,6 +190,17 @@ export default function Dashboard() {
     }
     if (prevTime === 0 && prevDistance > 0 && prevPace > 0) {
       prevTime = Math.round((prevDistance / 100) * prevPace)
+    }
+    if (validDates === 0 && activities.length > 0) {
+      currentDistance = activities.reduce(
+        (sum, activity) => sum + toNumber(activity.distanceMeters),
+        0
+      )
+      currentTime = activities.reduce(
+        (sum, activity) => sum + toNumber(activity.durationSeconds),
+        0
+      )
+      currentSessions = activities.length
     }
 
     const distanceChange = changeLabel(currentDistance, prevDistance)
@@ -261,7 +287,10 @@ export default function Dashboard() {
   }, [activitiesQuery.data])
 
   const leaderboardEntries = useMemo(() => {
-    const raw = leaderboardQuery.data ?? []
+    const raw =
+      leaderboardQuery.data && leaderboardQuery.data.length > 0
+        ? leaderboardQuery.data
+        : leaderboardAllQuery.data ?? []
     const normalizeEntry = (entry: any) => {
       const profile = entry.profile || entry
       const userName = entry.userName ?? entry.name ?? "Nuotatore"
@@ -289,7 +318,7 @@ export default function Dashboard() {
         ? String(profileQuery.data.userId) === entry.userId
         : false,
     }))
-  }, [leaderboardQuery.data, profileQuery.data?.userId])
+  }, [leaderboardQuery.data, leaderboardAllQuery.data, profileQuery.data?.userId])
 
   const challenges = useMemo(() => (challengesQuery.data ?? []) as any[], [challengesQuery.data])
   const activeChallenges = useMemo(() => {
@@ -312,8 +341,9 @@ export default function Dashboard() {
 
   const profile = profileQuery.data
   const displayName =
-    meQuery.data?.name ||
     profile?.name ||
+    profile?.username ||
+    meQuery.data?.name ||
     meQuery.data?.email?.split("@")[0] ||
     "Nuotatore"
   const xpProgress = profile?.nextLevelXp
@@ -326,16 +356,16 @@ export default function Dashboard() {
         <Card className="bg-card border-border">
           <CardContent className="p-6 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
-              <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center overflow-hidden">
+              <div className="size-20 rounded-2xl bg-primary/10 flex items-center justify-center overflow-hidden">
                 {profile?.profileBadge?.badge_image_url ? (
                   <img
                     src={profile.profileBadge.badge_image_url}
                     alt={profile.profileBadge.name || "Badge profilo"}
-                    className="h-full w-full object-contain badge-hero-spin"
+                    className="h-16 w-16 object-contain badge-hero-spin"
                     loading="lazy"
                   />
                 ) : (
-                  <Waves className="size-8 text-primary" />
+                  <Waves className="size-10 text-primary" />
                 )}
               </div>
               <div>
@@ -468,12 +498,13 @@ export default function Dashboard() {
               {activeChallenges.length ? (
                 activeChallenges.slice(0, 2).map((challenge) => {
                   const leaderboard = (challenge.leaderboard ?? []) as Array<{ progress: number }>
-                  const maxProgress = leaderboard.reduce(
-                    (max, item) => Math.max(max, item.progress || 0),
-                    0
+                  const progressValue = Number(challenge.current_progress ?? 0)
+                  const maxProgress = Math.max(
+                    progressValue,
+                    ...leaderboard.map((item) => Number(item.progress || 0))
                   )
-                  const progressValue = challenge.current_progress ?? 0
-                  const progressPercent = maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
+                  const progressPercent =
+                    maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
                   return (
                     <div key={challenge.id} className="rounded-xl border border-border bg-background/60 p-4">
                       <p className="text-sm font-semibold text-foreground">{challenge.name}</p>

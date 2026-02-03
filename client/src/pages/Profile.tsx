@@ -151,10 +151,14 @@ function BadgeCard({ title, description, imageUrl, unlocked, rarity }: BadgeCard
           unlocked ? "bg-primary/15" : "bg-muted"
         }`}
       >
-        {imageUrl ? (
-          <img src={imageUrl} alt={title} className="size-9 object-contain" />
+        {unlocked ? (
+          imageUrl ? (
+            <img src={imageUrl} alt={title} className="size-9 object-contain" />
+          ) : (
+            <Waves className="size-5 text-primary" />
+          )
         ) : (
-          <Waves className="size-5 text-primary" />
+          <span className="text-lg font-semibold text-muted-foreground">?</span>
         )}
       </div>
       <div className="flex-1">
@@ -297,8 +301,12 @@ export default function Profile() {
   const records = useMemo(() => {
     if (!activities.length) return [] as Array<{ label: string; value: string; date: string }>;
 
-    const longest = activities.reduce((max, activity) =>
-      (activity.distanceMeters ?? 0) > (max.distanceMeters ?? 0) ? activity : max
+    const longest = activities.reduce(
+      (max: any, activity: any) => {
+        if (!max) return activity;
+        return (activity.distanceMeters ?? 0) > (max.distanceMeters ?? 0) ? activity : max;
+      },
+      null
     );
 
     const paceCandidates = activities.filter(
@@ -323,8 +331,12 @@ export default function Profile() {
         )
       : null;
 
-    const longestDuration = activities.reduce((max, activity) =>
-      (activity.durationSeconds ?? 0) > (max.durationSeconds ?? 0) ? activity : max
+    const longestDuration = activities.reduce(
+      (max: any, activity: any) => {
+        if (!max) return activity;
+        return (activity.durationSeconds ?? 0) > (max.durationSeconds ?? 0) ? activity : max;
+      },
+      null
     );
 
     return [

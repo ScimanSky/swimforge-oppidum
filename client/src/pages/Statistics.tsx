@@ -193,7 +193,9 @@ function GaugeMetric({
 }) {
   const safeValue = value ?? null;
   const clamped = safeValue !== null ? Math.max(min, Math.min(max, safeValue)) : null;
-  const isNeutral = clamped !== null && Math.abs(clamped) <= neutralRange;
+  const isNeutral =
+    clamped !== null &&
+    (Math.abs(clamped) <= neutralRange || Math.round(clamped) === 0);
   const pct = clamped !== null && !isNeutral ? ((clamped - min) / (max - min)) * 100 : 0;
   const color =
     clamped === null || isNeutral

@@ -213,19 +213,21 @@ export function calculatePOI(
     }
     return 0;
   }
-  if (prevDist === 0 || prevInt === 0 || prevFreq === 0) {
-    return null;
+
+  const trends = [
+    { trend: prevDist > 0 ? ((currDist - prevDist) / prevDist) * 100 : null, weight: 0.3 },
+    { trend: prevInt > 0 ? ((currInt - prevInt) / prevInt) * 100 : null, weight: 0.4 },
+    { trend: prevFreq > 0 ? ((currFreq - prevFreq) / prevFreq) * 100 : null, weight: 0.3 },
+  ].filter((item) => item.trend !== null) as Array<{ trend: number; weight: number }>;
+
+  if (trends.length === 0) {
+    return 0;
   }
-  
-  // Calculate trends (percentage change)
-  const distanceTrend = ((currDist - prevDist) / prevDist) * 100;
-  const intensityTrend = ((currInt - prevInt) / prevInt) * 100;
-  const frequencyTrend = ((currFreq - prevFreq) / prevFreq) * 100;
-  
-  // Weighted average
-  const poi = (distanceTrend * 0.3) + (intensityTrend * 0.4) + (frequencyTrend * 0.3);
-  
-  // Clamp to -100 to +100
+
+  const totalWeight = trends.reduce((sum, item) => sum + item.weight, 0);
+  const poi =
+    trends.reduce((sum, item) => sum + item.trend * (item.weight / totalWeight), 0);
+
   return Math.round(Math.max(-100, Math.min(100, poi)));
 }
 
