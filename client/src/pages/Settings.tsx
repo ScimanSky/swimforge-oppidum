@@ -31,6 +31,7 @@ import {
   Smartphone,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
+import { supabase } from "@/lib/supabase"
 import { formatDistanceToNow } from "date-fns"
 import { it } from "date-fns/locale"
 import { toast } from "sonner"
@@ -232,10 +233,43 @@ export default function Settings() {
       })
       return url
     } catch (error: any) {
-      const message =
-        error?.message ||
-        "Upload fallito: controlla le policy di Supabase Storage."
-      toast.error(message)
+      const message = error?.message || "Upload fallito."
+      const shouldFallback =
+        /row-level security/i.test(message) ||
+        /rls/i.test(message) ||
+        /policy/i.test(message)
+      if (shouldFallback) {
+        try {
+          const sessionResult = await supabase.auth.getSession()
+          if (!sessionResult.data.session) {
+            toast.error(
+              "Upload fallito: il server non ha accesso allo storage. Verifica SUPABASE_SERVICE_ROLE_KEY su Render."
+            )
+            return null
+          }
+          const extension = file.name.split(".").pop() || "png"
+          const filePath = `profiles/${me.id}/${kind}-${Date.now()}.${extension}`
+          const { error: uploadError } = await supabase.storage
+            .from("profile-media")
+            .upload(filePath, file, { contentType: file.type, upsert: true })
+          if (uploadError) {
+            throw uploadError
+          }
+          const { data } = supabase.storage
+            .from("profile-media")
+            .getPublicUrl(filePath)
+          return data.publicUrl
+        } catch (fallbackError: any) {
+          toast.error(
+            fallbackError?.message ||
+              "Upload fallito: controlla le policy di Supabase Storage."
+          )
+          return null
+        }
+      }
+      toast.error(
+        message || "Upload fallito: controlla le policy di Supabase Storage."
+      )
       return null
     }
   }

@@ -46,12 +46,68 @@ const formatPace = (secondsPer100m?: number | null) => {
 
 const formatDate = (date?: string | Date | null) => {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("it-IT", {
+  const parsed = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return parsed.toLocaleDateString("it-IT", {
     day: "numeric",
     month: "short",
     year: "numeric",
   });
 };
+
+const parseActivityDate = (value?: string | Date | null) => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "string") {
+    const normalized = value.includes("T") ? value : value.replace(" ", "T");
+    const date = new Date(normalized);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
+};
+
+const toNumber = (value: unknown) => {
+  if (value === null || value === undefined) return 0;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : 0;
+};
+
+const getActivityDateValue = (activity: any) =>
+  activity?.activityDate ??
+  activity?.activity_date ??
+  activity?.createdAt ??
+  activity?.created_at ??
+  null;
+
+const getActivityDistance = (activity: any) =>
+  toNumber(activity?.distanceMeters ?? activity?.distance_meters ?? activity?.distance ?? 0);
+
+const getActivityDuration = (activity: any) =>
+  toNumber(
+    activity?.durationSeconds ??
+      activity?.duration_seconds ??
+      activity?.movingDuration ??
+      activity?.moving_duration ??
+      activity?.elapsedDuration ??
+      activity?.elapsed_duration ??
+      activity?.duration ??
+      0
+  );
+
+const getActivityPace = (activity: any) =>
+  toNumber(
+    activity?.avgPacePer100m ??
+      activity?.avg_pace_per_100m ??
+      activity?.pacePer100m ??
+      activity?.pace_per_100m ??
+      0
+  );
+
+const getActivityAvgSwolf = (activity: any) =>
+  toNumber(activity?.avgSwolf ?? activity?.avg_swolf ?? 0);
+
+const getActivityStroke = (activity: any) =>
+  activity?.strokeType ?? activity?.stroke_type ?? activity?.stroke ?? "mixed";
 
 const getInitials = (name: string) =>
   name
@@ -244,7 +300,7 @@ export default function Profile() {
     const avgPace = totalDistance > 0 ? totalTime / (totalDistance / 100) : 0;
 
     const swolfValues = activities
-      .map((activity) => activity.avgSwolf)
+      .map((activity) => getActivityAvgSwolf(activity))
       .filter((value: number | null) => typeof value === "number" && value > 0) as number[];
     const avgSwolf = swolfValues.length
       ? Math.round(swolfValues.reduce((sum, value) => sum + value, 0) / swolfValues.length)
@@ -252,14 +308,16 @@ export default function Profile() {
     const bestSwolf = swolfValues.length ? Math.min(...swolfValues) : null;
 
     const paceValues = activities
-      .map((activity) => activity.avgPacePer100m)
+      .map((activity) => getActivityPace(activity))
       .filter((value: number | null) => typeof value === "number" && value > 0) as number[];
     const bestPace = paceValues.length
       ? paceValues.reduce((min, value) => Math.min(min, value), Number.POSITIVE_INFINITY)
       : null;
 
     const dateList = activities
-      .map((activity) => new Date(activity.activityDate).toISOString().split("T")[0])
+      .map((activity) => parseActivityDate(getActivityDateValue(activity)))
+      .filter((value): value is Date => value instanceof Date)
+      .map((date) => date.toISOString().split("T")[0])
       .filter(Boolean);
     const streaks = getStreaks(dateList);
 
@@ -280,7 +338,7 @@ export default function Profile() {
     if (!activities.length) return "Non disponibile";
     const counts: Record<string, number> = {};
     activities.forEach((activity) => {
-      const stroke = activity.strokeType || "mixed";
+      const stroke = getActivityStroke(activity) || "mixed";
       counts[stroke] = (counts[stroke] || 0) + 1;
     });
     const [top] = Object.entries(counts).sort((a, b) => b[1] - a[1]);
@@ -288,13 +346,20 @@ export default function Profile() {
   }, [activities]);
 
   const recentActivities = useMemo(() => {
-    return activities.slice(0, 4).map((activity) => ({
+    return [...activities]
+      .sort((a, b) => {
+        const aDate = parseActivityDate(getActivityDateValue(a));
+        const bDate = parseActivityDate(getActivityDateValue(b));
+        return (bDate?.getTime() ?? 0) - (aDate?.getTime() ?? 0);
+      })
+      .slice(0, 4)
+      .map((activity) => ({
       id: activity.id,
       type: activity.isOpenWater ? "Acque libere" : "Piscina",
-      date: formatDate(activity.activityDate),
-      duration: formatTime(activity.durationSeconds),
-      distance: formatDistance(activity.distanceMeters),
-      pace: formatPace(activity.avgPacePer100m),
+      date: formatDate(parseActivityDate(getActivityDateValue(activity))),
+      duration: formatTime(getActivityDuration(activity)),
+      distance: formatDistance(getActivityDistance(activity)),
+      pace: formatPace(getActivityPace(activity)),
     }));
   }, [activities]);
 
@@ -304,37 +369,31 @@ export default function Profile() {
     const longest = activities.reduce(
       (max: any, activity: any) => {
         if (!max) return activity;
-        return (activity.distanceMeters ?? 0) > (max.distanceMeters ?? 0) ? activity : max;
+        return getActivityDistance(activity) > getActivityDistance(max) ? activity : max;
       },
       null
     );
 
-    const paceCandidates = activities.filter(
-      (activity) => activity.avgPacePer100m && activity.avgPacePer100m > 0
-    );
-    const fastestPaceActivity = paceCandidates.length
-      ? paceCandidates.reduce((min, activity) =>
-          (activity.avgPacePer100m ?? Infinity) < (min.avgPacePer100m ?? Infinity)
-            ? activity
-            : min
-        )
-      : null;
+    const paceCandidates = activities.filter((activity) => getActivityPace(activity) > 0);
+    const fastestPaceActivity = paceCandidates.reduce((min, activity) => {
+      if (!min) return activity;
+      return getActivityPace(activity) < getActivityPace(min)
+        ? activity
+        : min;
+    }, paceCandidates[0] ?? null);
 
-    const swolfCandidates = activities.filter(
-      (activity) => activity.avgSwolf && activity.avgSwolf > 0
-    );
-    const bestSwolfActivity = swolfCandidates.length
-      ? swolfCandidates.reduce((min, activity) =>
-          (activity.avgSwolf ?? Infinity) < (min.avgSwolf ?? Infinity)
-            ? activity
-            : min
-        )
-      : null;
+    const swolfCandidates = activities.filter((activity) => getActivityAvgSwolf(activity) > 0);
+    const bestSwolfActivity = swolfCandidates.reduce((min, activity) => {
+      if (!min) return activity;
+      return getActivityAvgSwolf(activity) < getActivityAvgSwolf(min)
+        ? activity
+        : min;
+    }, swolfCandidates[0] ?? null);
 
     const longestDuration = activities.reduce(
       (max: any, activity: any) => {
         if (!max) return activity;
-        return (activity.durationSeconds ?? 0) > (max.durationSeconds ?? 0) ? activity : max;
+        return getActivityDuration(activity) > getActivityDuration(max) ? activity : max;
       },
       null
     );
@@ -342,23 +401,23 @@ export default function Profile() {
     return [
       {
         label: "Sessione più lunga",
-        value: formatDistance(longest?.distanceMeters),
-        date: formatDate(longest?.activityDate),
+        value: formatDistance(longest ? getActivityDistance(longest) : null),
+        date: formatDate(parseActivityDate(getActivityDateValue(longest))),
       },
       {
         label: "Pace migliore",
-        value: formatPace(fastestPaceActivity?.avgPacePer100m ?? null),
-        date: formatDate(fastestPaceActivity?.activityDate),
+        value: formatPace(fastestPaceActivity ? getActivityPace(fastestPaceActivity) : null),
+        date: formatDate(parseActivityDate(getActivityDateValue(fastestPaceActivity))),
       },
       {
         label: "SWOLF migliore",
-        value: bestSwolfActivity?.avgSwolf ? `${bestSwolfActivity.avgSwolf}` : "—",
-        date: formatDate(bestSwolfActivity?.activityDate),
+        value: bestSwolfActivity ? `${Math.round(getActivityAvgSwolf(bestSwolfActivity))}` : "—",
+        date: formatDate(parseActivityDate(getActivityDateValue(bestSwolfActivity))),
       },
       {
         label: "Durata record",
-        value: formatTime(longestDuration?.durationSeconds),
-        date: formatDate(longestDuration?.activityDate),
+        value: formatTime(longestDuration ? getActivityDuration(longestDuration) : null),
+        date: formatDate(parseActivityDate(getActivityDateValue(longestDuration))),
       },
     ];
   }, [activities]);

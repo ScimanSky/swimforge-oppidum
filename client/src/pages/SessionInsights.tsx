@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { ChevronLeft, Sparkles, Waves, Activity } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 
 function formatDistance(meters?: number | null) {
   if (!meters) return null;
@@ -36,46 +37,118 @@ function formatDate(date?: string | null) {
 
 export default function SessionInsights() {
   const [page, setPage] = useState(0);
+  const [sessionView, setSessionView] = useState<"day" | "week">("day");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const limit = 12;
   const listQuery = trpc.activityInsights.list.useQuery({ limit, offset: page * limit }, {
     staleTime: 60 * 1000,
   });
 
-  const insights = useMemo(() => {
+  const sessionEntries = useMemo(() => {
     const data = listQuery.data ?? [];
-    const getKey = (item: any) =>
-      item.activity_date ??
-      item.activityDate ??
-      item.generated_at ??
-      item.generatedAt ??
-      item.activity_id ??
-      item.activityId ??
-      item.id ??
-      0;
-    const toEpoch = (value: any) => {
-      if (typeof value === "number") return value;
-      if (value instanceof Date) return value.getTime();
+    const normalizeDate = (value: any) => {
+      if (!value) return null;
+      if (value instanceof Date) return value;
       if (typeof value === "string") {
-        const ts = Date.parse(value);
-        if (Number.isFinite(ts)) return ts;
+        const normalized = value.includes("T") ? value : value.replace(" ", "T");
+        const date = new Date(normalized);
+        return Number.isNaN(date.getTime()) ? null : date;
       }
-      return 0;
+      return null;
     };
-    const sorted = [...data].sort((a: any, b: any) => {
-      const aKey = getKey(a);
-      const bKey = getKey(b);
-      const aTs = toEpoch(aKey);
-      const bTs = toEpoch(bKey);
-      if (aTs !== bTs) return bTs - aTs;
-      return String(bKey).localeCompare(String(aKey));
-    });
-    if (sorted.length >= 2) {
-      const first = toEpoch(getKey(sorted[0]));
-      const last = toEpoch(getKey(sorted[sorted.length - 1]));
-      if (first < last) return sorted.reverse();
-    }
-    return sorted;
+    return [...data]
+      .map((item: any) => {
+        const date =
+          normalizeDate(item.activity_date) ||
+          normalizeDate(item.activityDate) ||
+          normalizeDate(item.generated_at) ||
+          normalizeDate(item.generatedAt);
+        return {
+          ...item,
+          _date: date,
+          _dateKey: date ? date.toISOString().split("T")[0] : null,
+          _sort: date ? date.getTime() : 0,
+        };
+      })
+      .sort((a, b) => b._sort - a._sort);
   }, [listQuery.data]);
+
+  const sessionByDate = useMemo(() => {
+    const map = new Map<string, any[]>();
+    sessionEntries.forEach((entry: any) => {
+      if (!entry._dateKey) return;
+      const list = map.get(entry._dateKey) ?? [];
+      list.push(entry);
+      map.set(entry._dateKey, list);
+    });
+    return map;
+  }, [sessionEntries]);
+
+  const availableDateKeys = useMemo(
+    () => Array.from(sessionByDate.keys()).sort((a, b) => (a > b ? -1 : 1)),
+    [sessionByDate]
+  );
+
+  useEffect(() => {
+    if (!availableDateKeys.length) return;
+    if (!selectedDate) {
+      setSelectedDate(new Date(`${availableDateKeys[0]}T00:00:00`));
+      return;
+    }
+    const key = selectedDate.toISOString().split("T")[0];
+    if (!availableDateKeys.includes(key)) {
+      setSelectedDate(new Date(`${availableDateKeys[0]}T00:00:00`));
+    }
+  }, [availableDateKeys, selectedDate]);
+
+  const weekDays = useMemo(() => {
+    if (!selectedDate) return [];
+    const date = new Date(selectedDate);
+    const day = date.getDay();
+    const offset = (day + 6) % 7;
+    date.setDate(date.getDate() - offset);
+    date.setHours(0, 0, 0, 0);
+    return Array.from({ length: 7 }).map((_, index) => {
+      const d = new Date(date);
+      d.setDate(date.getDate() + index);
+      return d;
+    });
+  }, [selectedDate]);
+
+  const weekDateKeys = useMemo(
+    () =>
+      weekDays
+        .map((day) => day.toISOString().split("T")[0])
+        .filter((key) => sessionByDate.has(key)),
+    [weekDays, sessionByDate]
+  );
+
+  const activeDateKey = selectedDate
+    ? selectedDate.toISOString().split("T")[0]
+    : availableDateKeys[0];
+  const activeEntry = activeDateKey
+    ? sessionByDate.get(activeDateKey)?.[0] ?? null
+    : null;
+
+  const activeBullets = useMemo(() => {
+    if (!activeEntry) return [];
+    if (Array.isArray(activeEntry.bullets)) return activeEntry.bullets;
+    try {
+      return JSON.parse(activeEntry.bullets ?? "[]");
+    } catch {
+      return [];
+    }
+  }, [activeEntry]);
+
+  const activeTags = useMemo(() => {
+    if (!activeEntry) return [];
+    if (Array.isArray(activeEntry.tags)) return activeEntry.tags;
+    try {
+      return JSON.parse(activeEntry.tags ?? "[]");
+    } catch {
+      return [];
+    }
+  }, [activeEntry]);
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
@@ -124,36 +197,67 @@ export default function SessionInsights() {
             </div>
 
             <div className="lg:col-span-8 space-y-4">
-              {insights.length === 0 && (
+              {sessionEntries.length === 0 && (
                 <div className="bg-card/30 border border-white/10 rounded-2xl p-6 text-white/70">
                   Nessuna analisi disponibile. Sincronizza nuove attività per generare insight.
                 </div>
               )}
 
-              {insights.map((item: any, idx: number) => {
-                const bullets = Array.isArray(item.bullets) ? item.bullets : (() => {
-                  try {
-                    return JSON.parse(item.bullets ?? "[]");
-                  } catch {
-                    return [];
-                  }
-                })();
+              {sessionEntries.length > 0 && (
+                <div className="bg-card/30 border border-white/10 rounded-2xl p-4">
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant={sessionView === "day" ? "default" : "outline"}
+                      onClick={() => setSessionView("day")}
+                    >
+                      Giorno
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={sessionView === "week" ? "default" : "outline"}
+                      onClick={() => setSessionView("week")}
+                    >
+                      Settimana
+                    </Button>
+                  </div>
+                  <div className="mt-3">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={setSelectedDate}
+                      className="rounded-xl border border-white/10 bg-black/20"
+                    />
+                  </div>
+                  {sessionView === "week" && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {weekDays.map((day) => {
+                        const key = day.toISOString().split("T")[0];
+                        if (!weekDateKeys.includes(key)) return null;
+                        const label = day.toLocaleDateString("it-IT", {
+                          weekday: "short",
+                          day: "numeric",
+                        });
+                        const isActive = key === activeDateKey;
+                        return (
+                          <Button
+                            key={key}
+                            size="sm"
+                            variant={isActive ? "default" : "outline"}
+                            onClick={() => setSelectedDate(new Date(`${key}T00:00:00`))}
+                          >
+                            {label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
 
-                const tags = Array.isArray(item.tags) ? item.tags : (() => {
-                  try {
-                    return JSON.parse(item.tags ?? "[]");
-                  } catch {
-                    return [];
-                  }
-                })();
-
-                const distance = formatDistance(item.activity_distance_meters);
-                const duration = formatTime(item.activity_duration_seconds);
-                const date = formatDate(item.activity_date);
-
-                return (
+              {activeEntry && (
                   <motion.div
-                    key={`${item.id}-${idx}`}
+                    key={activeEntry.id ?? activeDateKey}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     className="bg-card/40 border border-white/10 rounded-2xl p-6 shadow-lg"
@@ -164,16 +268,22 @@ export default function SessionInsights() {
                         Analisi sessione
                       </div>
                       <div className="flex flex-wrap gap-3 text-xs text-white/60">
-                        {date && <span>📅 {date}</span>}
-                        {distance && <span>🏊 {distance}</span>}
-                        {duration && <span>⏱ {duration}</span>}
+                        {formatDate(activeEntry.activity_date) && (
+                          <span>📅 {formatDate(activeEntry.activity_date)}</span>
+                        )}
+                        {formatDistance(activeEntry.activity_distance_meters) && (
+                          <span>🏊 {formatDistance(activeEntry.activity_distance_meters)}</span>
+                        )}
+                        {formatTime(activeEntry.activity_duration_seconds) && (
+                          <span>⏱ {formatTime(activeEntry.activity_duration_seconds)}</span>
+                        )}
                       </div>
                     </div>
-                    <h2 className="text-lg font-semibold text-white mb-2">{item.title}</h2>
-                    <p className="text-white/70 text-sm leading-relaxed mb-3">{item.summary}</p>
-                    {bullets.length > 0 && (
+                    <h2 className="text-lg font-semibold text-white mb-2">{activeEntry.title}</h2>
+                    <p className="text-white/70 text-sm leading-relaxed mb-3">{activeEntry.summary}</p>
+                    {activeBullets.length > 0 && (
                       <ul className="space-y-2 text-sm text-white/80 mb-3">
-                        {bullets.map((bullet: string, bulletIdx: number) => (
+                        {activeBullets.map((bullet: string, bulletIdx: number) => (
                           <li key={bulletIdx} className="flex items-start gap-2">
                             <span className="text-cyan-300">•</span>
                             <span>{bullet}</span>
@@ -181,9 +291,9 @@ export default function SessionInsights() {
                         ))}
                       </ul>
                     )}
-                    {tags.length > 0 && (
+                    {activeTags.length > 0 && (
                       <div className="flex flex-wrap gap-2">
-                        {tags.map((tag: string, tagIdx: number) => (
+                        {activeTags.map((tag: string, tagIdx: number) => (
                           <span
                             key={tagIdx}
                             className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/70"
@@ -194,10 +304,9 @@ export default function SessionInsights() {
                       </div>
                     )}
                   </motion.div>
-                );
-              })}
+              )}
 
-              {insights.length >= limit && (
+              {sessionEntries.length >= limit && (
                 <div className="flex justify-center pt-4">
                   <Button
                     variant="outline"

@@ -125,7 +125,8 @@ function RingMetric({
   info: any;
 }) {
   const safeValue = value ?? null;
-  const pct = safeValue !== null ? Math.max(0, Math.min(100, (safeValue / max) * 100)) : 0;
+  const hasValue = safeValue !== null && Number.isFinite(safeValue);
+  const pct = hasValue ? Math.max(0, Math.min(100, (safeValue / max) * 100)) : 0;
   const radius = 32;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - pct / 100);
@@ -147,29 +148,31 @@ function RingMetric({
               strokeWidth="7"
               fill="none"
             />
-            <circle
-              cx="50"
-              cy="50"
-              r={radius}
-              stroke={color}
-              strokeWidth="7"
-              fill="none"
-              strokeDasharray={circumference}
-              strokeDashoffset={offset}
-              strokeLinecap="round"
-              transform="rotate(-90 50 50)"
-              style={{ filter: `drop-shadow(0 0 10px ${color})` }}
-            />
+            {hasValue && (
+              <circle
+                cx="50"
+                cy="50"
+                r={radius}
+                stroke={color}
+                strokeWidth="7"
+                fill="none"
+                strokeDasharray={circumference}
+                strokeDashoffset={offset}
+                strokeLinecap="round"
+                transform="rotate(-90 50 50)"
+                style={{ filter: `drop-shadow(0 0 10px ${color})` }}
+              />
+            )}
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
             <div className="text-xl font-bold text-foreground">
-              {safeValue !== null ? Math.round(safeValue) : "N/D"}
+            {hasValue ? Math.round(safeValue) : "N/D"}
             </div>
             <div className="text-[10px] text-muted-foreground">/{max}</div>
           </div>
         </div>
         <div className="text-xs text-muted-foreground leading-snug">
-          {safeValue !== null ? `${Math.round(pct)}%` : "Dato non disponibile"}
+          {hasValue ? `${Math.round(pct)}%` : "Dato non disponibile"}
         </div>
       </div>
     </div>
@@ -192,7 +195,9 @@ function GaugeMetric({
   info: any;
 }) {
   const safeValue = value ?? null;
-  const clamped = safeValue !== null ? Math.max(min, Math.min(max, safeValue)) : null;
+  const hasValue = safeValue !== null && Number.isFinite(safeValue);
+  const rounded = hasValue ? Math.round(safeValue) : null;
+  const clamped = rounded !== null ? Math.max(min, Math.min(max, rounded)) : null;
   const isNeutral =
     clamped !== null &&
     (Math.abs(clamped) <= neutralRange || Math.round(clamped) === 0);
@@ -222,21 +227,23 @@ function GaugeMetric({
             pathLength={100}
             strokeLinecap="round"
           />
-          <path
-            d="M10 110 A90 90 0 0 1 190 110"
-            fill="none"
-            stroke={color}
-            strokeWidth="12"
-            pathLength={100}
-            strokeDasharray={100}
-            strokeDashoffset={100 - pct}
-            strokeLinecap="round"
-            style={{ filter: `drop-shadow(0 0 12px ${color})` }}
-          />
+          {clamped !== null && !isNeutral ? (
+            <path
+              d="M10 110 A90 90 0 0 1 190 110"
+              fill="none"
+              stroke={color}
+              strokeWidth="12"
+              pathLength={100}
+              strokeDasharray={100}
+              strokeDashoffset={100 - pct}
+              strokeLinecap="round"
+              style={{ filter: `drop-shadow(0 0 12px ${color})` }}
+            />
+          ) : null}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pt-6">
           <div className="text-2xl font-bold text-foreground">
-            {safeValue !== null ? `${Math.round(safeValue)}%` : "N/D"}
+            {rounded !== null ? `${rounded}%` : "N/D"}
           </div>
           <div className="text-[10px] text-muted-foreground">
             {min}% — {max}%
@@ -338,6 +345,19 @@ export default function Statistics() {
     pace: point.pace ? point.pace / 60 : null, // convert to minutes
     sessioni: point.sessions,
   }));
+
+  const hasAdvancedData = Boolean(advanced);
+
+  const progressiveOverloadValue =
+    advanced?.progressiveOverloadIndex ?? (hasAdvancedData ? 0 : null);
+
+  const trendValue = advanced?.trendIndicator
+    ? advanced.trendIndicator.direction === "down"
+      ? -advanced.trendIndicator.percentage
+      : advanced.trendIndicator.percentage
+    : hasAdvancedData
+    ? 0
+    : null;
 
 
   return (
@@ -668,16 +688,12 @@ export default function Statistics() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <GaugeMetric
                       label="Progressive Overload"
-                      value={advanced.progressiveOverloadIndex}
+                      value={progressiveOverloadValue}
                       info={metricsDefinitions.poi}
                     />
                     <GaugeMetric
                       label="Trend"
-                      value={
-                        advanced.trendIndicator.direction === "down"
-                          ? -advanced.trendIndicator.percentage
-                          : advanced.trendIndicator.percentage
-                      }
+                      value={trendValue}
                       min={-50}
                       max={50}
                       neutralRange={2}

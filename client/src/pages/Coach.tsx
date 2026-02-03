@@ -1,12 +1,13 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Calendar } from "@/components/ui/calendar"
 import { trpc } from "@/lib/trpc"
 import {
   Brain,
@@ -118,6 +119,10 @@ export default function Coach() {
   const [poolRegenerate, setPoolRegenerate] = useState(false)
   const [dryRegenerate, setDryRegenerate] = useState(false)
   const [activeInsightIndex, setActiveInsightIndex] = useState(0)
+  const [activePoolSectionIndex, setActivePoolSectionIndex] = useState(0)
+  const [activeDrySectionIndex, setActiveDrySectionIndex] = useState(0)
+  const [sessionView, setSessionView] = useState<"day" | "week">("day")
+  const [selectedSessionDate, setSelectedSessionDate] = useState<Date | undefined>()
 
   const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
@@ -132,7 +137,7 @@ export default function Coach() {
     { staleTime: dryRegenerate ? 0 : 24 * 60 * 60 * 1000 }
   )
   const sessionInsightsQuery = trpc.activityInsights.list.useQuery(
-    { limit: 5, offset: 0 },
+    { limit: 50, offset: 0 },
     { staleTime: 60 * 1000 }
   )
 
@@ -212,48 +217,132 @@ export default function Coach() {
     }))
   }, [advanced])
 
-  const latestSessionInsight = useMemo(() => {
+  const sessionEntries = useMemo(() => {
     const data = sessionInsightsQuery.data ?? []
-    if (!data.length) return null
-    const getKey = (item: any) =>
-      item.activity_date ??
-      item.activityDate ??
-      item.generated_at ??
-      item.generatedAt ??
-      item.activity_id ??
-      item.activityId ??
-      item.id ??
-      0
-    const toEpoch = (value: any) => {
-      if (typeof value === "number") return value
-      if (value instanceof Date) return value.getTime()
+    const normalizeDate = (value: any) => {
+      if (!value) return null
+      if (value instanceof Date) return value
       if (typeof value === "string") {
-        const ts = Date.parse(value)
-        if (Number.isFinite(ts)) return ts
+        const normalized = value.includes("T") ? value : value.replace(" ", "T")
+        const date = new Date(normalized)
+        return Number.isNaN(date.getTime()) ? null : date
       }
-      return 0
+      return null
     }
-    const sorted = [...data].sort((a: any, b: any) => {
-      const aKey = getKey(a)
-      const bKey = getKey(b)
-      const aTs = toEpoch(aKey)
-      const bTs = toEpoch(bKey)
-      if (aTs !== bTs) return bTs - aTs
-      return String(bKey).localeCompare(String(aKey))
-    })
-    return sorted[0]
+    return [...data]
+      .map((item: any) => {
+        const date =
+          normalizeDate(item.activity_date) ||
+          normalizeDate(item.activityDate) ||
+          normalizeDate(item.generated_at) ||
+          normalizeDate(item.generatedAt)
+        return {
+          ...item,
+          _date: date,
+          _dateKey: date ? date.toISOString().split("T")[0] : null,
+          _sort: date ? date.getTime() : 0,
+        }
+      })
+      .sort((a, b) => b._sort - a._sort)
   }, [sessionInsightsQuery.data])
 
-  const parsedSessionBullets = useMemo(() => {
-    if (!latestSessionInsight) return []
-    if (Array.isArray(latestSessionInsight.bullets))
-      return latestSessionInsight.bullets
+  const sessionByDate = useMemo(() => {
+    const map = new Map<string, any[]>()
+    sessionEntries.forEach((entry: any) => {
+      if (!entry._dateKey) return
+      const list = map.get(entry._dateKey) ?? []
+      list.push(entry)
+      map.set(entry._dateKey, list)
+    })
+    return map
+  }, [sessionEntries])
+
+  const availableDateKeys = useMemo(() => {
+    return Array.from(sessionByDate.keys()).sort((a, b) => (a > b ? -1 : 1))
+  }, [sessionByDate])
+
+  useEffect(() => {
+    if (!availableDateKeys.length) return
+    if (!selectedSessionDate) {
+      setSelectedSessionDate(new Date(`${availableDateKeys[0]}T00:00:00`))
+      return
+    }
+    const key = selectedSessionDate.toISOString().split("T")[0]
+    if (!availableDateKeys.includes(key)) {
+      setSelectedSessionDate(new Date(`${availableDateKeys[0]}T00:00:00`))
+    }
+  }, [availableDateKeys, selectedSessionDate])
+
+  const latestSessionInsight = sessionEntries[0] ?? null
+
+  const parseBullets = (value: any) => {
+    if (!value) return []
+    if (Array.isArray(value)) return value
     try {
-      return JSON.parse(latestSessionInsight.bullets ?? "[]")
+      return JSON.parse(value ?? "[]")
     } catch {
       return []
     }
+  }
+
+  const parsedSessionBullets = useMemo(() => {
+    if (!latestSessionInsight) return []
+    return parseBullets(latestSessionInsight.bullets)
   }, [latestSessionInsight])
+
+  const activeSessionDateKey = selectedSessionDate
+    ? selectedSessionDate.toISOString().split("T")[0]
+    : availableDateKeys[0]
+  const activeSessionEntry = activeSessionDateKey
+    ? sessionByDate.get(activeSessionDateKey)?.[0] ?? null
+    : null
+
+  const activeSessionBullets = useMemo(
+    () => parseBullets(activeSessionEntry?.bullets),
+    [activeSessionEntry]
+  )
+
+  const weekDays = useMemo(() => {
+    if (!selectedSessionDate) return []
+    const date = new Date(selectedSessionDate)
+    const day = date.getDay()
+    const offset = (day + 6) % 7
+    date.setDate(date.getDate() - offset)
+    date.setHours(0, 0, 0, 0)
+    return Array.from({ length: 7 }).map((_, index) => {
+      const d = new Date(date)
+      d.setDate(date.getDate() + index)
+      return d
+    })
+  }, [selectedSessionDate])
+
+  const weekDateKeys = useMemo(() => {
+    return weekDays
+      .map((day) => day.toISOString().split("T")[0])
+      .filter((key) => sessionByDate.has(key))
+  }, [weekDays, sessionByDate])
+
+  const activePoolSection = useMemo(() => {
+    const sections = poolWorkout?.sections ?? []
+    if (!sections.length) return null
+    const idx = Math.min(activePoolSectionIndex, sections.length - 1)
+    return sections[idx]
+  }, [poolWorkout?.sections, activePoolSectionIndex])
+
+  const activeDrySection = useMemo(() => {
+    const sections = drylandWorkout?.sections ?? []
+    if (!sections.length) return null
+    const idx = Math.min(activeDrySectionIndex, sections.length - 1)
+    return sections[idx]
+  }, [drylandWorkout?.sections, activeDrySectionIndex])
+
+  useEffect(() => {
+    setActivePoolSectionIndex(0)
+  }, [poolWorkout?.sections?.length])
+
+  useEffect(() => {
+    setActiveDrySectionIndex(0)
+  }, [drylandWorkout?.sections?.length])
 
   const focusLabel = useMemo(
     () =>
@@ -490,22 +579,32 @@ export default function Coach() {
                     <p className="text-sm text-muted-foreground">
                       {poolWorkout.description}
                     </p>
-                    <div className="space-y-3">
-                      {poolWorkout.sections.map((section, idx) => (
-                        <div
-                          key={idx}
-                          className="rounded-lg border border-border bg-secondary/20 p-4"
-                        >
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap gap-2">
+                        {poolWorkout.sections.map((section, idx) => (
+                          <Button
+                            key={idx}
+                            type="button"
+                            size="sm"
+                            variant={idx === activePoolSectionIndex ? "default" : "outline"}
+                            onClick={() => setActivePoolSectionIndex(idx)}
+                          >
+                            {section.title}
+                          </Button>
+                        ))}
+                      </div>
+                      {activePoolSection ? (
+                        <div className="rounded-lg border border-border bg-secondary/20 p-4">
                           <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary">{section.title}</Badge>
-                            {section.notes && (
+                            <Badge variant="secondary">{activePoolSection.title}</Badge>
+                            {activePoolSection.notes && (
                               <span className="text-xs text-muted-foreground">
-                                {section.notes}
+                                {activePoolSection.notes}
                               </span>
                             )}
                           </div>
                           <div className="space-y-3">
-                            {section.exercises.map((exercise, exIdx) => (
+                            {activePoolSection.exercises.map((exercise, exIdx) => (
                               <div
                                 key={exIdx}
                                 className="rounded-md bg-background/60 p-3 text-sm"
@@ -529,7 +628,7 @@ export default function Coach() {
                             ))}
                           </div>
                         </div>
-                      ))}
+                      ) : null}
                     </div>
                   </>
                 ) : (
@@ -571,22 +670,32 @@ export default function Coach() {
                     <p className="text-sm text-muted-foreground">
                       {drylandWorkout.description}
                     </p>
-                    <div className="space-y-3">
-                      {drylandWorkout.sections.map((section, idx) => (
-                        <div
-                          key={idx}
-                          className="rounded-lg border border-border bg-secondary/20 p-4"
-                        >
+                    <div className="space-y-4">
+                      <div className="flex flex-wrap gap-2">
+                        {drylandWorkout.sections.map((section, idx) => (
+                          <Button
+                            key={idx}
+                            type="button"
+                            size="sm"
+                            variant={idx === activeDrySectionIndex ? "default" : "outline"}
+                            onClick={() => setActiveDrySectionIndex(idx)}
+                          >
+                            {section.title}
+                          </Button>
+                        ))}
+                      </div>
+                      {activeDrySection ? (
+                        <div className="rounded-lg border border-border bg-secondary/20 p-4">
                           <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary">{section.title}</Badge>
-                            {section.notes && (
+                            <Badge variant="secondary">{activeDrySection.title}</Badge>
+                            {activeDrySection.notes && (
                               <span className="text-xs text-muted-foreground">
-                                {section.notes}
+                                {activeDrySection.notes}
                               </span>
                             )}
                           </div>
                           <div className="space-y-3">
-                            {section.exercises.map((exercise, exIdx) => (
+                            {activeDrySection.exercises.map((exercise, exIdx) => (
                               <div
                                 key={exIdx}
                                 className="rounded-md bg-background/60 p-3 text-sm"
@@ -610,7 +719,7 @@ export default function Coach() {
                             ))}
                           </div>
                         </div>
-                      ))}
+                      ) : null}
                     </div>
                   </>
                 ) : (
@@ -636,55 +745,98 @@ export default function Coach() {
                 </Button>
               </CardHeader>
               <CardContent>
-                {latestSessionInsight ? (
+                <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
                   <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                      {formatDate(latestSessionInsight.activity_date) && (
-                        <span>
-                          📅 {formatDate(latestSessionInsight.activity_date)}
-                        </span>
-                      )}
-                      {formatDistance(
-                        latestSessionInsight.activity_distance_meters
-                      ) && (
-                        <span>
-                          🏊 {formatDistance(
-                            latestSessionInsight.activity_distance_meters
-                          )}
-                        </span>
-                      )}
-                      {formatTime(
-                        latestSessionInsight.activity_duration_seconds
-                      ) && (
-                        <span>
-                          ⏱ {formatTime(
-                            latestSessionInsight.activity_duration_seconds
-                          )}
-                        </span>
-                      )}
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={sessionView === "day" ? "default" : "outline"}
+                        onClick={() => setSessionView("day")}
+                      >
+                        Giorno
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={sessionView === "week" ? "default" : "outline"}
+                        onClick={() => setSessionView("week")}
+                      >
+                        Settimana
+                      </Button>
                     </div>
-                    <h3 className="text-lg font-semibold text-foreground">
-                      {latestSessionInsight.title}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      {latestSessionInsight.summary}
-                    </p>
-                    {parsedSessionBullets.length > 0 && (
-                      <ul className="space-y-2 text-sm text-foreground">
-                        {parsedSessionBullets.map((bullet: string, idx: number) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <span className="text-primary">•</span>
-                            <span>{bullet}</span>
-                          </li>
-                        ))}
-                      </ul>
+                    <Calendar
+                      mode="single"
+                      selected={selectedSessionDate}
+                      onSelect={setSelectedSessionDate}
+                      className="rounded-xl border border-border bg-background/60"
+                    />
+                    {sessionView === "week" && (
+                      <div className="flex flex-wrap gap-2">
+                        {weekDays.map((day) => {
+                          const key = day.toISOString().split("T")[0]
+                          if (!weekDateKeys.includes(key)) return null
+                          const label = day.toLocaleDateString("it-IT", {
+                            weekday: "short",
+                            day: "numeric",
+                          })
+                          const isActive = key === activeSessionDateKey
+                          return (
+                            <Button
+                              key={key}
+                              type="button"
+                              size="sm"
+                              variant={isActive ? "default" : "outline"}
+                              onClick={() => setSelectedSessionDate(new Date(`${key}T00:00:00`))}
+                            >
+                              {label}
+                            </Button>
+                          )
+                        })}
+                      </div>
                     )}
                   </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground">
-                    Nessuna analisi disponibile. Sincronizza una nuova attività per generare Session IQ.
-                  </div>
-                )}
+
+                  {activeSessionEntry ? (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                        {formatDate(activeSessionEntry.activity_date) && (
+                          <span>📅 {formatDate(activeSessionEntry.activity_date)}</span>
+                        )}
+                        {formatDistance(activeSessionEntry.activity_distance_meters) && (
+                          <span>
+                            🏊 {formatDistance(activeSessionEntry.activity_distance_meters)}
+                          </span>
+                        )}
+                        {formatTime(activeSessionEntry.activity_duration_seconds) && (
+                          <span>
+                            ⏱ {formatTime(activeSessionEntry.activity_duration_seconds)}
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="text-lg font-semibold text-foreground">
+                        {activeSessionEntry.title}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {activeSessionEntry.summary}
+                      </p>
+                      {activeSessionBullets.length > 0 && (
+                        <ul className="space-y-2 text-sm text-foreground">
+                          {activeSessionBullets.map((bullet: string, idx: number) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <span className="text-primary">•</span>
+                              <span>{bullet}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      Nessuna analisi disponibile. Sincronizza una nuova attività per generare Session IQ.
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
