@@ -35,6 +35,18 @@ function formatDate(date?: string | null) {
   });
 }
 
+function toDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateFromKey(key: string) {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 export default function SessionInsights() {
   const [page, setPage] = useState(0);
   const [sessionView, setSessionView] = useState<"day" | "week">("day");
@@ -66,7 +78,7 @@ export default function SessionInsights() {
         return {
           ...item,
           _date: date,
-          _dateKey: date ? date.toISOString().split("T")[0] : null,
+          _dateKey: date ? toDateKey(date) : null,
           _sort: date ? date.getTime() : 0,
         };
       })
@@ -92,12 +104,12 @@ export default function SessionInsights() {
   useEffect(() => {
     if (!availableDateKeys.length) return;
     if (!selectedDate) {
-      setSelectedDate(new Date(`${availableDateKeys[0]}T00:00:00`));
+      setSelectedDate(dateFromKey(availableDateKeys[0]));
       return;
     }
-    const key = selectedDate.toISOString().split("T")[0];
+    const key = toDateKey(selectedDate);
     if (!availableDateKeys.includes(key)) {
-      setSelectedDate(new Date(`${availableDateKeys[0]}T00:00:00`));
+      setSelectedDate(dateFromKey(availableDateKeys[0]));
     }
   }, [availableDateKeys, selectedDate]);
 
@@ -118,13 +130,13 @@ export default function SessionInsights() {
   const weekDateKeys = useMemo(
     () =>
       weekDays
-        .map((day) => day.toISOString().split("T")[0])
+        .map((day) => toDateKey(day))
         .filter((key) => sessionByDate.has(key)),
     [weekDays, sessionByDate]
   );
 
   const activeDateKey = selectedDate
-    ? selectedDate.toISOString().split("T")[0]
+    ? toDateKey(selectedDate)
     : availableDateKeys[0];
   const activeEntry = activeDateKey
     ? sessionByDate.get(activeDateKey)?.[0] ?? null
@@ -232,7 +244,7 @@ export default function SessionInsights() {
                   {sessionView === "week" && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {weekDays.map((day) => {
-                        const key = day.toISOString().split("T")[0];
+                        const key = toDateKey(day);
                         if (!weekDateKeys.includes(key)) return null;
                         const label = day.toLocaleDateString("it-IT", {
                           weekday: "short",
@@ -244,7 +256,7 @@ export default function SessionInsights() {
                             key={key}
                             size="sm"
                             variant={isActive ? "default" : "outline"}
-                            onClick={() => setSelectedDate(new Date(`${key}T00:00:00`))}
+                            onClick={() => setSelectedDate(dateFromKey(key))}
                           >
                             {label}
                           </Button>
