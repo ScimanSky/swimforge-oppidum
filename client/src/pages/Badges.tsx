@@ -183,8 +183,8 @@ export default function Badges() {
   };
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low" className="dark">
-      <div className="pb-24">
+    <AppLayout showBubbles={true} bubbleIntensity="low">
+      <div className="dark min-h-screen bg-background pb-24">
       {/* Hidden audio element for badge sounds (dynamic source) */}
       <audio ref={audioRef} preload="auto" />
 
