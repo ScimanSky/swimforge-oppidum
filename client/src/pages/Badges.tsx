@@ -362,13 +362,14 @@ export default function Badges() {
                         filter: 'grayscale(100%)',
                       }}
                     >
+                      {isEarned && <div className="badge-spotlight" />}
                       {/* Badge Image with 3D rotation */}
                       <div className="relative z-10 w-full h-full flex items-center justify-center">
                         {isEarned && pngPath ? (
                           <img 
                             src={pngPath} 
                             alt={badge.name}
-                            className={`w-full h-full object-contain ${isEarned ? 'badge-3d' : ''}`}
+                            className={`w-[86%] h-[86%] object-contain ${isEarned ? 'badge-3d' : ''}`}
                             onContextMenu={(e) => e.preventDefault()}
                             draggable={false}
                             style={{ 
