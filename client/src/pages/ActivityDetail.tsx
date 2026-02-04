@@ -3,6 +3,7 @@
 import AppLayout from "@/components/AppLayout"
 import { trpc } from "@/lib/trpc"
 import { useRoute, Link } from "wouter"
+import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
@@ -428,22 +429,54 @@ export default function ActivityDetail() {
     })
   })()
 
-  const lapSummary = lapSplits.reduce(
-    (acc, lap) => {
-      if (lap.distance) acc.distance += lap.distance
-      if (lap.duration) acc.duration += lap.duration
-      if (lap.swolf !== null && lap.swolf !== undefined) {
-        acc.swolfSum += lap.swolf
-        acc.swolfCount += 1
-      }
-      if (lap.avgHr !== null && lap.avgHr !== undefined) {
-        acc.avgHrSum += lap.avgHr
-        acc.avgHrCount += 1
-      }
-      return acc
-    },
-    { distance: 0, duration: 0, swolfSum: 0, swolfCount: 0, avgHrSum: 0, avgHrCount: 0 }
-  )
+  const buildLapSummary = (laps: typeof lapSplits) =>
+    laps.reduce(
+      (acc, lap) => {
+        if (lap.distance) acc.distance += lap.distance
+        if (lap.duration) acc.duration += lap.duration
+        if (lap.swolf !== null && lap.swolf !== undefined) {
+          acc.swolfSum += lap.swolf
+          acc.swolfCount += 1
+        }
+        if (lap.avgHr !== null && lap.avgHr !== undefined) {
+          acc.avgHrSum += lap.avgHr
+          acc.avgHrCount += 1
+        }
+        return acc
+      },
+      { distance: 0, duration: 0, swolfSum: 0, swolfCount: 0, avgHrSum: 0, avgHrCount: 0 }
+    )
+
+  const [lapStrokeFilter, setLapStrokeFilter] = useState<string>("all")
+  const [lapTypeFilter, setLapTypeFilter] = useState<"all" | "work" | "recovery">("all")
+
+  const lapStrokeOptions = useMemo(() => {
+    const counts = new Map<string, number>()
+    lapSplits.forEach((lap) => {
+      const key = lap.dominantStroke ?? "mixed"
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    })
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([key, count]) => ({
+        key,
+        label: strokeLabels[key] ?? key,
+        count,
+      }))
+  }, [lapSplits])
+
+  const filteredLapSplits = lapSplits.filter((lap) => {
+    const isRecovery = !lap.distance || lap.distance === 0
+    if (lapTypeFilter === "work" && isRecovery) return false
+    if (lapTypeFilter === "recovery" && !isRecovery) return false
+    if (lapStrokeFilter !== "all") {
+      const strokeKey = lap.dominantStroke ?? "mixed"
+      if (strokeKey !== lapStrokeFilter) return false
+    }
+    return true
+  })
+
+  const lapSummary = buildLapSummary(filteredLapSplits)
 
   const lapSummaryStats = {
     distance: lapSummary.distance,
@@ -798,7 +831,7 @@ export default function ActivityDetail() {
                           <div className="flex w-full items-center justify-between gap-4">
                             <span>Lap Garmin</span>
                             <Badge variant="secondary" className="text-xs">
-                              {lapSplits.length} lap
+                              {filteredLapSplits.length}/{lapSplits.length} lap
                             </Badge>
                           </div>
                         </AccordionTrigger>
@@ -819,9 +852,63 @@ export default function ActivityDetail() {
                             <span>SWOLF medio: {formatNumber(lapSummaryStats.avgSwolf)}</span>
                             <span>FC media: {lapSummaryStats.avgHr ? `${lapSummaryStats.avgHr} bpm` : "—"}</span>
                           </div>
-                          <Accordion type="multiple" className="mt-3 space-y-2">
-                            {lapSplits.map(renderLapItem)}
-                          </Accordion>
+
+                          <div className="mt-3 flex flex-col gap-2 text-xs text-muted-foreground">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium text-foreground">Tipo:</span>
+                              <Button
+                                size="sm"
+                                variant={lapTypeFilter === "all" ? "secondary" : "outline"}
+                                onClick={() => setLapTypeFilter("all")}
+                              >
+                                Tutti
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={lapTypeFilter === "work" ? "secondary" : "outline"}
+                                onClick={() => setLapTypeFilter("work")}
+                              >
+                                Lavoro
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={lapTypeFilter === "recovery" ? "secondary" : "outline"}
+                                onClick={() => setLapTypeFilter("recovery")}
+                              >
+                                Recupero
+                              </Button>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium text-foreground">Stile:</span>
+                              <Button
+                                size="sm"
+                                variant={lapStrokeFilter === "all" ? "secondary" : "outline"}
+                                onClick={() => setLapStrokeFilter("all")}
+                              >
+                                Tutti
+                              </Button>
+                              {lapStrokeOptions.map((option) => (
+                                <Button
+                                  key={option.key}
+                                  size="sm"
+                                  variant={lapStrokeFilter === option.key ? "secondary" : "outline"}
+                                  onClick={() => setLapStrokeFilter(option.key)}
+                                >
+                                  {option.label} ({option.count})
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {filteredLapSplits.length === 0 ? (
+                            <p className="mt-3 text-xs text-muted-foreground">
+                              Nessun lap disponibile con i filtri selezionati.
+                            </p>
+                          ) : (
+                            <Accordion type="multiple" className="mt-3 space-y-2">
+                              {filteredLapSplits.map(renderLapItem)}
+                            </Accordion>
+                          )}
                         </AccordionContent>
                       </AccordionItem>
                     )}
