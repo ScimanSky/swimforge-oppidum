@@ -21,6 +21,7 @@ import { metricsDefinitions } from "@/data/metricsDefinitions";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const PERIOD_OPTIONS = [
   { value: 7, label: "7 giorni" },
@@ -395,9 +396,16 @@ export default function Statistics() {
             </div>
           </div>
         ) : (
-          <>
-            {/* Progress Timeline */}
-            <motion.section 
+          <Accordion
+            type="multiple"
+            defaultValue={["timeline", "performance", "advanced"]}
+            className="space-y-4"
+          >
+            <AccordionItem value="timeline" className="border-0">
+              <AccordionTrigger className="text-left">Progress Timeline</AccordionTrigger>
+              <AccordionContent>
+                {/* Progress Timeline */}
+                <motion.section 
               className="space-y-3"
               initial={{ opacity: 0, y: 30, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -462,18 +470,19 @@ export default function Statistics() {
                 </CardContent>
               </Card>
             </motion.section>
+              </AccordionContent>
+            </AccordionItem>
 
-            {/* Analisi Prestazioni */}
-            <motion.section 
+            <AccordionItem value="performance" className="border-0">
+              <AccordionTrigger className="text-left">Analisi prestazioni</AccordionTrigger>
+              <AccordionContent>
+                {/* Analisi Prestazioni */}
+                <motion.section 
               className="space-y-3"
               initial={{ opacity: 0, y: 30, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
             >
-              <h2 className="text-lg font-semibold text-foreground">
-                Analisi prestazioni
-              </h2>
-
               {/* HR Zones */}
               {hrZonesData.length > 0 && (
                 <Card className="bg-card/80 border-border/60 shadow-sm">
@@ -615,19 +624,20 @@ export default function Statistics() {
                 </div>
               )}
               </motion.section>
+              </AccordionContent>
+            </AccordionItem>
 
             {/* Analisi Avanzate */}
             {advanced && (
-              <motion.section 
+              <AccordionItem value="advanced" className="border-0">
+                <AccordionTrigger className="text-left">Analisi avanzate</AccordionTrigger>
+                <AccordionContent>
+                  <motion.section 
                 className="space-y-3"
                 initial={{ opacity: 0, y: 30, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
               >
-                <h2 className="text-lg font-semibold text-foreground">
-                  Analisi avanzate
-                </h2>
-
                 {/* Core Rings */}
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                   <RingMetric
@@ -724,8 +734,10 @@ export default function Statistics() {
                   </Card>
                 )}
               </motion.section>
+                </AccordionContent>
+              </AccordionItem>
             )}
-          </>
+          </Accordion>
         )}
         </div>
       </div>
