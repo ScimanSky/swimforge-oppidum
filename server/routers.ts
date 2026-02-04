@@ -384,31 +384,80 @@ export const appRouter = router({
     get: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ ctx, input }) => {
-        const activity = await db.getActivityById(input.id);
+        let activity = await db.getActivityById(input.id);
         if (!activity || activity.userId !== ctx.user.id) {
           throw new TRPCError({ code: "NOT_FOUND" });
         }
         if (activity.activitySource === "garmin" && activity.garminActivityId) {
           const rawData = (activity.rawData ?? {}) as Record<string, any>;
-          if (!rawData.garmin_details) {
-            const fullDetails = await garmin.getGarminActivityFullDetails(
+          const fullDetails =
+            rawData.garmin_details ??
+            (await garmin.getGarminActivityFullDetails(
               ctx.user.id,
               activity.garminActivityId
-            );
-            if (fullDetails) {
-              const nextRawData = {
-                ...rawData,
-                garmin_details: fullDetails,
-              };
+            ));
+
+          if (fullDetails) {
+            const nextRawData = rawData.garmin_details
+              ? rawData
+              : {
+                  ...rawData,
+                  garmin_details: fullDetails,
+                };
+
+            const advanced = garmin.extractGarminAdvancedFields(fullDetails);
+            const updates: Record<string, any> = {};
+
+            const setIfMissing = (key: string, value: any) => {
+              const current = (activity as any)[key];
+              if (value === null || value === undefined) return;
+              if (current === null || current === undefined || current === 0) {
+                updates[key] = value;
+              }
+            };
+
+            setIfMissing("avgSwolf", advanced.avgSwolf);
+            setIfMissing("avgStrokeDistance", advanced.avgStrokeDistance);
+            setIfMissing("avgStrokes", advanced.avgStrokes);
+            setIfMissing("avgStrokeCadence", advanced.avgStrokeCadence);
+            setIfMissing("trainingEffect", advanced.trainingEffect);
+            setIfMissing("anaerobicTrainingEffect", advanced.anaerobicTrainingEffect);
+            setIfMissing("vo2MaxValue", advanced.vo2MaxValue);
+            setIfMissing("recoveryTimeHours", advanced.recoveryTimeHours);
+            setIfMissing("avgStress", advanced.avgStress);
+            setIfMissing("avgHeartRate", advanced.avgHeartRate);
+            setIfMissing("maxHeartRate", advanced.maxHeartRate);
+            setIfMissing("restingHeartRate", advanced.restingHeartRate);
+            setIfMissing("lapsCount", advanced.lapsCount);
+            setIfMissing("poolLengthMeters", advanced.poolLengthMeters);
+            if (advanced.strokeType && (!activity.strokeType || activity.strokeType === "mixed")) {
+              updates.strokeType = advanced.strokeType;
+            }
+
+            if (advanced.hrZones) {
+              const hrValues = Object.values(advanced.hrZones);
+              const hasZones = hrValues.some((value) => Number(value) > 0);
+              if (hasZones) {
+                if (!activity.hrZone1Seconds) updates.hrZone1Seconds = advanced.hrZones.hrZone1Seconds;
+                if (!activity.hrZone2Seconds) updates.hrZone2Seconds = advanced.hrZones.hrZone2Seconds;
+                if (!activity.hrZone3Seconds) updates.hrZone3Seconds = advanced.hrZones.hrZone3Seconds;
+                if (!activity.hrZone4Seconds) updates.hrZone4Seconds = advanced.hrZones.hrZone4Seconds;
+                if (!activity.hrZone5Seconds) updates.hrZone5Seconds = advanced.hrZones.hrZone5Seconds;
+              }
+            }
+
+            if (Object.keys(updates).length > 0 || nextRawData !== rawData) {
               const dbInstance = await getDb();
               if (dbInstance) {
                 const { swimmingActivities } = await import("../drizzle/schema");
                 await dbInstance
                   .update(swimmingActivities)
-                  .set({ rawData: nextRawData })
+                  .set({ ...updates, rawData: nextRawData })
                   .where(eq(swimmingActivities.id, activity.id));
+                activity = { ...activity, ...updates, rawData: nextRawData } as typeof activity;
               }
-              activity.rawData = nextRawData;
+            } else if (rawData.garmin_details) {
+              activity.rawData = rawData;
             }
           }
         }

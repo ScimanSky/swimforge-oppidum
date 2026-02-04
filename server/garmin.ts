@@ -152,6 +152,125 @@ export async function getGarminActivityFullDetails(
   }
 }
 
+const toNumber = (value: any) => {
+  if (value === null || value === undefined || value === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
+const pickFirst = (obj: any, keys: string[]) => {
+  if (!obj) return null;
+  for (const key of keys) {
+    const value = obj[key];
+    if (value !== null && value !== undefined) {
+      return value;
+    }
+  }
+  return null;
+};
+
+const normalizeStrokeType = (value: any) => {
+  if (!value) return null;
+  const raw = String(value).toLowerCase();
+  if (raw.includes("free") || raw.includes("stile") || raw.includes("crawl")) return "freestyle";
+  if (raw.includes("back") || raw.includes("dorso")) return "backstroke";
+  if (raw.includes("breast") || raw.includes("rana")) return "breaststroke";
+  if (raw.includes("butter") || raw.includes("farf")) return "butterfly";
+  if (raw.includes("mix")) return "mixed";
+  return "mixed";
+};
+
+const normalizeStrokeDistanceCm = (value: any) => {
+  const num = toNumber(value);
+  if (!num) return null;
+  return num < 10 ? Math.round(num * 100) : Math.round(num);
+};
+
+const normalizeTrainingEffect = (value: any) => {
+  const num = toNumber(value);
+  if (num === null) return null;
+  return num <= 10 ? Math.round(num * 10) : Math.round(num);
+};
+
+const normalizeRecoveryHours = (value: any) => {
+  const num = toNumber(value);
+  if (num === null) return null;
+  return num > 48 ? Math.round(num / 60) : Math.round(num);
+};
+
+const normalizeHrZones = (zones: any) => {
+  if (!zones) return null;
+  const map: Record<string, number> = {
+    hrZone1Seconds: 0,
+    hrZone2Seconds: 0,
+    hrZone3Seconds: 0,
+    hrZone4Seconds: 0,
+    hrZone5Seconds: 0,
+  };
+
+  if (Array.isArray(zones)) {
+    zones.forEach((zone) => {
+      const zoneNum = zone?.zoneNumber ?? zone?.zone ?? zone?.zoneIndex;
+      const seconds = toNumber(
+        pickFirst(zone, ["secsInZone", "seconds", "timeInSeconds", "value"])
+      ) ?? 0;
+      if (zoneNum && zoneNum >= 1 && zoneNum <= 5) {
+        map[`hrZone${zoneNum}Seconds`] = seconds;
+      }
+    });
+  } else if (typeof zones === "object") {
+    const zoneValues = [
+      zones.zone1TimeInSeconds ?? zones.zone1 ?? zones.zone1Seconds,
+      zones.zone2TimeInSeconds ?? zones.zone2 ?? zones.zone2Seconds,
+      zones.zone3TimeInSeconds ?? zones.zone3 ?? zones.zone3Seconds,
+      zones.zone4TimeInSeconds ?? zones.zone4 ?? zones.zone4Seconds,
+      zones.zone5TimeInSeconds ?? zones.zone5 ?? zones.zone5Seconds,
+    ];
+    zoneValues.forEach((value, index) => {
+      map[`hrZone${index + 1}Seconds`] = toNumber(value) ?? 0;
+    });
+  }
+
+  return map;
+};
+
+export function extractGarminAdvancedFields(fullDetails: any) {
+  const source = fullDetails?.details ?? fullDetails?.activity ?? fullDetails ?? null;
+  const strokeType = normalizeStrokeType(
+    pickFirst(source, ["strokeType", "swimStrokeType", "avgStrokeType"])
+  );
+  const hrZones = normalizeHrZones(fullDetails?.hr_zones);
+
+  return {
+    avgSwolf: toNumber(pickFirst(source, ["averageSwolf", "avgSwolf"])),
+    avgStrokeDistance: normalizeStrokeDistanceCm(
+      pickFirst(source, ["avgStrokeDistance", "averageStrokeDistance"])
+    ),
+    avgStrokes: toNumber(pickFirst(source, ["avgStrokes", "averageStrokes"])),
+    avgStrokeCadence: toNumber(
+      pickFirst(source, ["avgStrokeCadenceRpm", "avgStrokeCadence"])
+    ),
+    trainingEffect: normalizeTrainingEffect(
+      pickFirst(source, ["aerobicTrainingEffect", "trainingEffect"])
+    ),
+    anaerobicTrainingEffect: normalizeTrainingEffect(
+      pickFirst(source, ["anaerobicTrainingEffect"])
+    ),
+    vo2MaxValue: toNumber(pickFirst(source, ["vO2MaxValue", "vo2MaxValue"])),
+    recoveryTimeHours: normalizeRecoveryHours(
+      pickFirst(source, ["recoveryTime", "recoveryTimeMinutes"])
+    ),
+    avgStress: toNumber(pickFirst(source, ["averageStress", "avgStress"])),
+    avgHeartRate: toNumber(pickFirst(source, ["averageHR", "avgHeartRate"])),
+    maxHeartRate: toNumber(pickFirst(source, ["maxHR", "maxHeartRate"])),
+    restingHeartRate: toNumber(pickFirst(source, ["restingHeartRate"])),
+    lapsCount: toNumber(pickFirst(source, ["lapCount", "totalLaps", "numLaps"])),
+    poolLengthMeters: toNumber(pickFirst(source, ["poolLength", "poolLengthMeters"])),
+    strokeType,
+    hrZones,
+  };
+}
+
 /**
  * Get Garmin connection status for a user
  */
