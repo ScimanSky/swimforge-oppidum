@@ -432,6 +432,12 @@ export default function Dashboard() {
     profile?.profileBadge?.image_url ||
     profile?.profileBadge?.imageUrl ||
     null
+  const profileCoverImage =
+    profile?.coverUrl ||
+    profile?.cover_url ||
+    profile?.coverImageUrl ||
+    profile?.cover_image_url ||
+    null
   const xpProgress = profile?.nextLevelXp
     ? Math.min(100, (profile.totalXp / profile.nextLevelXp) * 100)
     : 0
@@ -439,8 +445,19 @@ export default function Dashboard() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <Card className="bg-card border-border">
-          <CardContent className="p-6 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <Card className="bg-card border-border relative overflow-hidden">
+          {profileCoverImage && (
+            <div className="absolute inset-0">
+              <img
+                src={profileCoverImage}
+                alt="Cover profilo"
+                className="h-full w-full object-cover opacity-25"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/70 to-background/40" />
+            </div>
+          )}
+          <CardContent className="relative p-6 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
               <div className="size-32 rounded-2xl bg-primary/10 flex items-center justify-center overflow-hidden">
                 {profileBadgeImage ? (

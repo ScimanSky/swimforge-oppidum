@@ -127,13 +127,15 @@
 
 @keyframes swimforge-badge-spin {
   from {
-    transform: rotate(0deg);
+    transform: perspective(800px) rotateY(0deg);
   }
   to {
-    transform: rotate(360deg);
+    transform: perspective(800px) rotateY(360deg);
   }
 }
 
 .badge-hero-spin {
   animation: swimforge-badge-spin 10s linear infinite;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
 }
