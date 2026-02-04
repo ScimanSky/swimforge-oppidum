@@ -122,14 +122,6 @@ export default function Dashboard() {
     period: "week",
     limit: 5,
   })
-  const leaderboardAllQuery = trpc.leaderboard.get.useQuery(
-    {
-      orderBy: "totalXp",
-      period: "all",
-      limit: 5,
-    },
-    { enabled: (leaderboardQuery.data?.length ?? 0) === 0 }
-  )
   const challengesQuery = trpc.challenges.list.useQuery()
 
   const stats = useMemo(() => {
@@ -372,10 +364,7 @@ export default function Dashboard() {
   }, [activitiesQuery.data])
 
   const leaderboardEntries = useMemo(() => {
-    const raw =
-      leaderboardQuery.data && leaderboardQuery.data.length > 0
-        ? leaderboardQuery.data
-        : leaderboardAllQuery.data ?? []
+    const raw = leaderboardQuery.data ?? []
     const normalizeEntry = (entry: any) => {
       const profile = entry.profile || entry
       const userName = entry.userName ?? entry.name ?? "Nuotatore"
@@ -385,7 +374,7 @@ export default function Dashboard() {
         .slice(0, 2)
         .join("")
         .toUpperCase()
-      const xpValue = entry.periodXp ?? entry.totalXp ?? profile.totalXp ?? 0
+      const xpValue = Number(entry.periodXp ?? 0)
       return {
         id: profile.id ?? entry.id ?? 0,
         userId: String(profile.userId ?? entry.userId ?? ""),
@@ -403,7 +392,7 @@ export default function Dashboard() {
         ? String(profileQuery.data.userId) === entry.userId
         : false,
     }))
-  }, [leaderboardQuery.data, leaderboardAllQuery.data, profileQuery.data?.userId])
+  }, [leaderboardQuery.data, profileQuery.data?.userId])
 
   const challenges = useMemo(() => (challengesQuery.data ?? []) as any[], [challengesQuery.data])
   const activeChallenges = useMemo(() => {

@@ -11,10 +11,7 @@ import {
   ArrowLeft,
   Droplets,
   Timer,
-  Zap,
-  Activity as ActivityIcon,
   HeartPulse,
-  Waves,
   Gauge,
   MapPin,
   Trophy,
@@ -66,6 +63,67 @@ const formatNumber = (value?: number | null, suffix?: string) => {
   return `${value}${suffix ?? ""}`
 }
 
+const toNumber = (value: any) => {
+  if (value === null || value === undefined || value === "") return null
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+const pickFirst = (obj: any, keys: string[]) => {
+  if (!obj) return null
+  for (const key of keys) {
+    const value = obj[key]
+    if (value !== null && value !== undefined) {
+      return value
+    }
+  }
+  return null
+}
+
+const getDistanceMeters = (obj: any) =>
+  toNumber(
+    pickFirst(obj, [
+      "distance",
+      "distanceMeters",
+      "distanceInMeters",
+      "totalDistance",
+      "distance_meters",
+    ])
+  )
+
+const getDurationSeconds = (obj: any) =>
+  toNumber(
+    pickFirst(obj, [
+      "duration",
+      "durationSeconds",
+      "elapsedDuration",
+      "movingDuration",
+      "activeDuration",
+      "duration_seconds",
+    ])
+  )
+
+const getSpeedMps = (obj: any) => {
+  const raw = toNumber(
+    pickFirst(obj, ["averageSpeed", "avgSpeed", "averageMovingSpeed", "avgMovingSpeed"])
+  )
+  if (!raw) return null
+  return raw > 15 ? raw / 3.6 : raw
+}
+
+const getPacePer100m = (obj: any) => {
+  const pace = toNumber(
+    pickFirst(obj, ["avgPacePer100m", "averagePace", "avgPace", "pacePer100m"])
+  )
+  if (pace && pace > 0) return pace
+  const speed = getSpeedMps(obj)
+  if (speed && speed > 0) return 100 / speed
+  const distance = getDistanceMeters(obj)
+  const duration = getDurationSeconds(obj)
+  if (distance && duration) return duration / (distance / 100)
+  return null
+}
+
 export default function ActivityDetail() {
   const [, params] = useRoute<{ id: string }>("/activities/:id")
   const activityId = params?.id ? Number(params.id) : NaN
@@ -92,17 +150,123 @@ export default function ActivityDetail() {
   ]
   const totalHrSeconds = hrZones.reduce((sum, zone) => sum + (zone.seconds || 0), 0)
 
-  const renderGarminSection = (title: string, payload: any) => {
-    if (!payload) return null
+  const garminSummarySource = garminDetails?.details ?? garminDetails?.activity ?? null
+  const garminDistance = garminSummarySource ? getDistanceMeters(garminSummarySource) : null
+  const garminDuration = garminSummarySource ? getDurationSeconds(garminSummarySource) : null
+  const garminPace = garminSummarySource ? getPacePer100m(garminSummarySource) : null
+  const garminSpeed = garminSummarySource ? getSpeedMps(garminSummarySource) : null
+  const garminStrokeType = garminSummarySource
+    ? pickFirst(garminSummarySource, ["strokeType", "swimStrokeType", "avgStrokeType"])
+    : null
+
+  const summaryMetrics = [
+    { label: "Distanza", value: garminDistance ? formatDistance(garminDistance) : "—" },
+    { label: "Durata", value: garminDuration ? formatDuration(garminDuration) : "—" },
+    { label: "Pace medio", value: garminPace ? formatPace(garminPace, garminDistance ?? 0, garminDuration ?? 0) : "—" },
+    { label: "Velocità media", value: garminSpeed ? `${(garminSpeed * 3.6).toFixed(1)} km/h` : "—" },
+    { label: "Calorie", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["calories", "caloriesBurned"]))) },
+    { label: "FC media", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["averageHR", "avgHeartRate"])), " bpm") },
+    { label: "FC max", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["maxHR", "maxHeartRate"])), " bpm") },
+    { label: "SWOLF", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["averageSwolf", "avgSwolf"]))) },
+    { label: "Stile", value: garminStrokeType ? String(garminStrokeType) : "—" },
+    { label: "Vasche", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["lapCount", "totalLaps"]))) },
+    { label: "Lunghezza vasca", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["poolLength", "poolLengthMeters"])), " m") },
+  ].filter((item) => item.value !== "—")
+
+  const normalizeZones = (zones: any) => {
+    if (!zones) return []
+    const map: Record<string, number> = {}
+    if (Array.isArray(zones)) {
+      zones.forEach((zone) => {
+        const zoneNum = zone?.zoneNumber ?? zone?.zone ?? zone?.zoneIndex
+        const seconds =
+          toNumber(
+            pickFirst(zone, ["secsInZone", "seconds", "timeInSeconds", "value"])
+          ) ?? 0
+        if (zoneNum) {
+          map[`Z${zoneNum}`] = seconds
+        }
+      })
+    } else if (typeof zones === "object") {
+      const zoneValues = [
+        zones.zone1TimeInSeconds ?? zones.zone1 ?? zones.zone1Seconds,
+        zones.zone2TimeInSeconds ?? zones.zone2 ?? zones.zone2Seconds,
+        zones.zone3TimeInSeconds ?? zones.zone3 ?? zones.zone3Seconds,
+        zones.zone4TimeInSeconds ?? zones.zone4 ?? zones.zone4Seconds,
+        zones.zone5TimeInSeconds ?? zones.zone5 ?? zones.zone5Seconds,
+      ]
+      zoneValues.forEach((value, index) => {
+        map[`Z${index + 1}`] = toNumber(value) ?? 0
+      })
+    }
+    return Object.entries(map).map(([label, seconds]) => ({ label, seconds }))
+  }
+
+  const garminHrZones = normalizeZones(garminDetails?.hr_zones)
+  const garminPowerZones = normalizeZones(garminDetails?.power_zones)
+  const garminSplits = Array.isArray(garminDetails?.splits) ? garminDetails.splits : []
+  const garminTypedSplits = Array.isArray(garminDetails?.typed_splits) ? garminDetails.typed_splits : []
+  const garminSplitSummaries = Array.isArray(garminDetails?.split_summaries)
+    ? garminDetails.split_summaries
+    : []
+  const garminWeather = garminDetails?.weather ?? null
+  const garminGear = garminDetails?.gear ?? null
+  const garminExerciseSets = Array.isArray(garminDetails?.exercise_sets)
+    ? garminDetails.exercise_sets
+    : []
+
+  const renderMetricRow = (label: string, value: string) => (
+    <div key={label} className="flex items-center justify-between gap-3 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-medium text-foreground">{value}</span>
+    </div>
+  )
+
+  const renderSplitCard = (split: any, index: number) => {
+    const distance = getDistanceMeters(split)
+    const duration = getDurationSeconds(split)
+    const pace = getPacePer100m(split)
+    const avgHr = toNumber(pickFirst(split, ["averageHR", "avgHeartRate", "avgHR"]))
+    const swolf = toNumber(pickFirst(split, ["averageSwolf", "avgSwolf"]))
+    const stroke = pickFirst(split, ["strokeType", "swimStrokeType", "avgStrokeType", "stroke"])
+    const cadence = toNumber(pickFirst(split, ["avgStrokeCadence", "avgStrokeCadenceRpm", "avgCadence"]))
+    const strokes = toNumber(pickFirst(split, ["avgStrokes", "averageStrokes", "strokes"]))
     return (
-      <details className="rounded-lg border border-border bg-background/60 p-3">
-        <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
-          {title}
-        </summary>
-        <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap text-xs text-foreground">
-          {JSON.stringify(payload, null, 2)}
-        </pre>
-      </details>
+      <div key={`split-${index}`} className="rounded-lg border border-border bg-background/60 p-3">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Lap {index + 1}</span>
+          {stroke ? <span className="capitalize">{stroke}</span> : null}
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+          <span>Distanza: {distance ? formatDistance(distance) : "—"}</span>
+          <span>Durata: {duration ? formatDuration(duration) : "—"}</span>
+          <span>Pace: {pace ? formatPace(pace, distance ?? 0, duration ?? 0) : "—"}</span>
+          <span>FC: {avgHr ? `${avgHr} bpm` : "—"}</span>
+          <span>SWOLF: {swolf ?? "—"}</span>
+          <span>Cadenza: {cadence ? `${cadence} spm` : "—"}</span>
+          <span>Bracciate: {strokes ?? "—"}</span>
+        </div>
+      </div>
+    )
+  }
+
+  const renderExerciseSet = (set: any, index: number) => {
+    const name = pickFirst(set, ["exerciseName", "name", "exercise", "activity"])
+    const reps = toNumber(pickFirst(set, ["reps", "repetitions"]))
+    const weight = toNumber(pickFirst(set, ["weight", "weightKg", "weight_kg"]))
+    const duration = toNumber(pickFirst(set, ["duration", "durationSeconds"]))
+    return (
+      <div key={`exercise-${index}`} className="rounded-lg border border-border bg-background/60 p-3 text-xs">
+        <div className="flex items-center justify-between text-muted-foreground">
+          <span>Set {index + 1}</span>
+          {name ? <span className="font-medium text-foreground">{name}</span> : null}
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <span>Ripetizioni: {reps ?? "—"}</span>
+          <span>Peso: {weight ? `${weight} kg` : "—"}</span>
+          <span>Durata: {duration ? formatDuration(duration) : "—"}</span>
+        </div>
+      </div>
     )
   }
 
@@ -348,67 +512,144 @@ export default function ActivityDetail() {
                   )}
                 </CardContent>
               </Card>
-
-              <Card className="bg-card border-border">
-                <CardHeader>
-                  <CardTitle className="font-display">Dati attività</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">ID Garmin</span>
-                    <span className="font-medium text-foreground">{activity.garminActivityId ?? "—"}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">ID Strava</span>
-                    <span className="font-medium text-foreground">{activity.stravaActivityId ?? "—"}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Condivisa nel feed</span>
-                    <span className="font-medium text-foreground">{activity.shareToFeed ? "Sì" : "No"}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Note</span>
-                    <span className="font-medium text-foreground">{activity.notes ?? "—"}</span>
-                  </div>
-                  {activity.rawData ? (
-                    <details className="rounded-lg border border-border bg-background/60 p-3">
-                      <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
-                        Dati grezzi Garmin (raw)
-                      </summary>
-                      <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap text-xs text-foreground">
-                        {JSON.stringify(activity.rawData, null, 2)}
-                      </pre>
-                    </details>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">Nessun dato grezzo disponibile.</p>
-                  )}
-                </CardContent>
-              </Card>
             </div>
 
             <Card className="bg-card border-border">
               <CardHeader>
                 <CardTitle className="font-display">Dettagli Garmin avanzati</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                {garminDetails ? (
-                  <>
-                    {renderGarminSection("Dettagli attività", garminDetails.details)}
-                    {renderGarminSection("Attività singola", garminDetails.activity)}
-                    {renderGarminSection("Splits (laps)", garminDetails.splits)}
-                    {renderGarminSection("Splits per tipo", garminDetails.typed_splits)}
-                    {renderGarminSection("Riepilogo splits", garminDetails.split_summaries)}
-                    {renderGarminSection("Meteo", garminDetails.weather)}
-                    {renderGarminSection("Zone HR", garminDetails.hr_zones)}
-                    {renderGarminSection("Zone potenza", garminDetails.power_zones)}
-                    {renderGarminSection("Gear", garminDetails.gear)}
-                    {renderGarminSection("Exercise sets", garminDetails.exercise_sets)}
-                  </>
-                ) : (
+              <CardContent className="space-y-4 text-sm">
+                {!garminDetails ? (
                   <p className="text-xs text-muted-foreground">
                     Dettagli Garmin non disponibili. Assicurati di essere connesso a Garmin e
                     ricarica la pagina.
                   </p>
+                ) : (
+                  <>
+                    {summaryMetrics.length > 0 && (
+                      <div className="rounded-lg border border-border bg-background/60 p-4 space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase">Riepilogo Garmin</p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {summaryMetrics.map((item) => renderMetricRow(item.label, item.value))}
+                        </div>
+                      </div>
+                    )}
+
+                    {garminSplits.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase">Splits (laps)</p>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {garminSplits.map(renderSplitCard)}
+                        </div>
+                      </div>
+                    )}
+
+                    {garminTypedSplits.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase">Splits per stile</p>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {garminTypedSplits.map(renderSplitCard)}
+                        </div>
+                      </div>
+                    )}
+
+                    {garminSplitSummaries.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase">Riepilogo splits</p>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {garminSplitSummaries.map(renderSplitCard)}
+                        </div>
+                      </div>
+                    )}
+
+                    {garminWeather && (
+                      <div className="rounded-lg border border-border bg-background/60 p-4 space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase">Meteo</p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {renderMetricRow("Temperatura", formatNumber(toNumber(pickFirst(garminWeather, ["temperature", "temp"])),"°C"))}
+                          {renderMetricRow("Umidità", formatNumber(toNumber(pickFirst(garminWeather, ["humidity"])), "%"))}
+                          {renderMetricRow("Vento", formatNumber(toNumber(pickFirst(garminWeather, ["windSpeed", "wind_speed"])), " km/h"))}
+                          {renderMetricRow("Condizioni", String(pickFirst(garminWeather, ["condition", "conditions", "summary"]) ?? "—"))}
+                        </div>
+                      </div>
+                    )}
+
+                    {garminHrZones.length > 0 && (
+                      <div className="rounded-lg border border-border bg-background/60 p-4 space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase">Zone cardio Garmin</p>
+                        {garminHrZones.map((zone) => {
+                          const total = garminHrZones.reduce((sum, z) => sum + (z.seconds || 0), 0)
+                          const percent = total ? Math.round((zone.seconds / total) * 100) : 0
+                          return (
+                            <div key={zone.label} className="flex items-center gap-3">
+                              <span className="w-8 text-xs text-muted-foreground">{zone.label}</span>
+                              <div className="h-2 flex-1 rounded-full bg-muted">
+                                <div className="h-2 rounded-full bg-primary" style={{ width: `${percent}%` }} />
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {Math.round((zone.seconds || 0) / 60)} min · {percent}%
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {garminPowerZones.length > 0 && (
+                      <div className="rounded-lg border border-border bg-background/60 p-4 space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase">Zone potenza</p>
+                        {garminPowerZones.map((zone) => {
+                          const total = garminPowerZones.reduce((sum, z) => sum + (z.seconds || 0), 0)
+                          const percent = total ? Math.round((zone.seconds / total) * 100) : 0
+                          return (
+                            <div key={zone.label} className="flex items-center gap-3">
+                              <span className="w-8 text-xs text-muted-foreground">{zone.label}</span>
+                              <div className="h-2 flex-1 rounded-full bg-muted">
+                                <div className="h-2 rounded-full bg-primary" style={{ width: `${percent}%` }} />
+                              </div>
+                              <span className="text-xs text-muted-foreground">
+                                {Math.round((zone.seconds || 0) / 60)} min · {percent}%
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+
+                    {garminGear && (
+                      <div className="rounded-lg border border-border bg-background/60 p-4 space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase">Gear</p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {renderMetricRow(
+                            "Nome",
+                            String(pickFirst(garminGear, ["name", "gearName", "displayName"]) ?? "—")
+                          )}
+                          {renderMetricRow(
+                            "Tipo",
+                            String(pickFirst(garminGear, ["type", "gearType"]) ?? "—")
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {garminExerciseSets.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium text-muted-foreground uppercase">Exercise sets</p>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          {garminExerciseSets.map(renderExerciseSet)}
+                        </div>
+                      </div>
+                    )}
+
+                    <details className="rounded-lg border border-border bg-background/60 p-3">
+                      <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                        Mostra dati Garmin completi (JSON)
+                      </summary>
+                      <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap text-xs text-foreground">
+                        {JSON.stringify(garminDetails, null, 2)}
+                      </pre>
+                    </details>
+                  </>
                 )}
               </CardContent>
             </Card>
