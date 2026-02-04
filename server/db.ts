@@ -135,6 +135,23 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function updateUser(
+  userId: number,
+  data: { name?: string | null; email?: string }
+) {
+  const db = await getDb();
+  if (!db) return;
+  const updatePayload: Partial<InsertUser> = {};
+  if (data.name !== undefined) {
+    updatePayload.name = data.name;
+  }
+  if (data.email !== undefined) {
+    updatePayload.email = data.email;
+  }
+  if (Object.keys(updatePayload).length === 0) return;
+  await db.update(users).set(updatePayload).where(eq(users.id, userId));
+}
+
 // Legacy: upsert user (for OAuth compatibility)
 export async function upsertUser(user: InsertUser): Promise<void> {
   const db = await getDb();

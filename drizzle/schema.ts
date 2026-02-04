@@ -1,4 +1,4 @@
-import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean, json, serial, unique, doublePrecision } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean, json, serial, unique, doublePrecision, date } from "drizzle-orm/pg-core";
 
 // ============================================
 // ENUMS for PostgreSQL
@@ -35,6 +35,12 @@ export const swimmerProfiles = pgTable("swimmer_profiles", {
   coverUrl: text("cover_url"),
   bio: text("bio"),
   location: text("location"),
+  lastName: text("last_name"),
+  username: text("username"),
+  birthDate: date("birth_date"),
+  preferredStroke: strokeTypeEnum("preferred_stroke"),
+  preferredPoolLengthMeters: integer("preferred_pool_length_meters"),
+  masterCategory: text("master_category"),
   level: integer("level").default(1).notNull(),
   totalXp: integer("total_xp").default(0).notNull(),
   currentLevelXp: integer("current_level_xp").default(0).notNull(),

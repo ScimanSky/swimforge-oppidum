@@ -106,6 +106,15 @@ const defaultPrivacyState = {
   showLeaderboards: true,
 }
 
+const strokeOptions = [
+  { value: "auto", label: "Auto (da attivita)" },
+  { value: "freestyle", label: "Stile libero" },
+  { value: "backstroke", label: "Dorso" },
+  { value: "breaststroke", label: "Rana" },
+  { value: "butterfly", label: "Farfalla" },
+  { value: "mixed", label: "Misto" },
+]
+
 export default function Settings() {
   const { data: me } = trpc.auth.me.useQuery()
   const { data: profile } = trpc.profile.get.useQuery()
@@ -169,25 +178,59 @@ export default function Settings() {
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const [isUploadingCover, setIsUploadingCover] = useState(false)
   const [profileDraft, setProfileDraft] = useState({
+    name: me?.name || "",
+    email: me?.email || "",
+    lastName: profile?.lastName || "",
+    username: profile?.username || (me?.email ? me.email.split("@")[0] : ""),
+    birthDate: profile?.birthDate || "",
     avatarUrl: profile?.avatarUrl || "",
     coverUrl: profile?.coverUrl || "",
     bio: profile?.bio || "",
     location: profile?.location || "",
+    preferredStroke: profile?.preferredStroke || "auto",
+    preferredPoolLengthMeters: profile?.preferredPoolLengthMeters
+      ? String(profile.preferredPoolLengthMeters)
+      : "",
+    masterCategory: profile?.masterCategory || "",
   })
 
   useEffect(() => {
     setProfileDraft({
+      name: me?.name || "",
+      email: me?.email || "",
+      lastName: profile?.lastName || "",
+      username: profile?.username || (me?.email ? me.email.split("@")[0] : ""),
+      birthDate: profile?.birthDate || "",
       avatarUrl: profile?.avatarUrl || "",
       coverUrl: profile?.coverUrl || "",
       bio: profile?.bio || "",
       location: profile?.location || "",
+      preferredStroke: profile?.preferredStroke || "auto",
+      preferredPoolLengthMeters: profile?.preferredPoolLengthMeters
+        ? String(profile.preferredPoolLengthMeters)
+        : "",
+      masterCategory: profile?.masterCategory || "",
     })
-  }, [profile?.avatarUrl, profile?.coverUrl, profile?.bio, profile?.location])
+  }, [
+    me?.name,
+    me?.email,
+    profile?.avatarUrl,
+    profile?.coverUrl,
+    profile?.bio,
+    profile?.location,
+    profile?.lastName,
+    profile?.username,
+    profile?.birthDate,
+    profile?.preferredStroke,
+    profile?.preferredPoolLengthMeters,
+    profile?.masterCategory,
+  ])
 
   const utils = trpc.useContext()
   const updateProfileMutation = trpc.profile.update.useMutation({
     onSuccess: () => {
       void utils.profile.get.invalidate()
+      void utils.auth.me.invalidate()
     },
   })
   const uploadMediaMutation = trpc.profile.uploadMedia.useMutation()
@@ -300,11 +343,42 @@ export default function Settings() {
   }
 
   const handleSaveProfile = async () => {
+    const normalizedUsername = profileDraft.username
+      .trim()
+      .replace(/^@+/, "")
+    const normalizedEmail = profileDraft.email.trim()
     await updateProfileMutation.mutateAsync({
+      name: profileDraft.name.trim() || undefined,
+      email: normalizedEmail || undefined,
       bio: profileDraft.bio || undefined,
       location: profileDraft.location || undefined,
+      lastName: profileDraft.lastName.trim() || undefined,
+      username: normalizedUsername || undefined,
+      birthDate: profileDraft.birthDate || null,
     })
     toast.success("Profilo aggiornato.")
+  }
+
+  const handleSaveSwimmerProfile = async () => {
+    const poolLengthValue = Number(profileDraft.preferredPoolLengthMeters)
+    const preferredPoolLengthMeters = Number.isFinite(poolLengthValue) && poolLengthValue > 0
+      ? Math.round(poolLengthValue)
+      : null
+
+    await updateProfileMutation.mutateAsync({
+      preferredStroke:
+        profileDraft.preferredStroke === "auto"
+          ? null
+          : (profileDraft.preferredStroke as
+              | "freestyle"
+              | "backstroke"
+              | "breaststroke"
+              | "butterfly"
+              | "mixed"),
+      preferredPoolLengthMeters,
+      masterCategory: profileDraft.masterCategory.trim() || undefined,
+    })
+    toast.success("Profilo nuotatore aggiornato.")
   }
 
   const [notifications, setNotifications] = useState(defaultNotificationState)
@@ -456,19 +530,44 @@ export default function Settings() {
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Nome</Label>
-                  <Input value={displayName} className="bg-secondary border-0" disabled />
+                  <Input
+                    value={profileDraft.name}
+                    onChange={(event) =>
+                      setProfileDraft((prev) => ({ ...prev, name: event.target.value }))
+                    }
+                    className="bg-secondary border-0"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Cognome</Label>
-                  <Input value="Non impostato" className="bg-secondary border-0" disabled />
+                  <Input
+                    value={profileDraft.lastName}
+                    onChange={(event) =>
+                      setProfileDraft((prev) => ({ ...prev, lastName: event.target.value }))
+                    }
+                    className="bg-secondary border-0"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Username</Label>
-                  <Input value={me?.email ? `@${me.email.split("@")[0]}` : "Non impostato"} className="bg-secondary border-0" disabled />
+                  <Input
+                    value={profileDraft.username}
+                    onChange={(event) =>
+                      setProfileDraft((prev) => ({ ...prev, username: event.target.value }))
+                    }
+                    className="bg-secondary border-0"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
-                  <Input type="email" value={me?.email || ""} className="bg-secondary border-0" disabled />
+                  <Input
+                    type="email"
+                    value={profileDraft.email}
+                    onChange={(event) =>
+                      setProfileDraft((prev) => ({ ...prev, email: event.target.value }))
+                    }
+                    className="bg-secondary border-0"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Citta</Label>
@@ -482,7 +581,14 @@ export default function Settings() {
                 </div>
                 <div className="space-y-2">
                   <Label>Data di Nascita</Label>
-                  <Input type="date" value="" className="bg-secondary border-0" disabled />
+                  <Input
+                    type="date"
+                    value={profileDraft.birthDate}
+                    onChange={(event) =>
+                      setProfileDraft((prev) => ({ ...prev, birthDate: event.target.value }))
+                    }
+                    className="bg-secondary border-0"
+                  />
                 </div>
               </div>
 
@@ -521,18 +627,57 @@ export default function Settings() {
                 </div>
                 <div className="space-y-2">
                   <Label>Stile Preferito</Label>
-                  <Input value={favoriteStroke} className="bg-secondary border-0" disabled />
+                  <Select
+                    value={profileDraft.preferredStroke || "auto"}
+                    onValueChange={(value) =>
+                      setProfileDraft((prev) => ({ ...prev, preferredStroke: value }))
+                    }
+                  >
+                    <SelectTrigger className="bg-secondary border-0">
+                      <SelectValue placeholder="Seleziona stile" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {strokeOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Suggerito: {favoriteStroke}
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label>Lunghezza Piscina Preferita</Label>
-                  <Input value={preferredPool} className="bg-secondary border-0" disabled />
+                  <Input
+                    type="number"
+                    min={1}
+                    value={profileDraft.preferredPoolLengthMeters}
+                    onChange={(event) =>
+                      setProfileDraft((prev) => ({
+                        ...prev,
+                        preferredPoolLengthMeters: event.target.value,
+                      }))
+                    }
+                    placeholder={preferredPool}
+                    className="bg-secondary border-0"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Categoria Master</Label>
-                  <Input value="Non impostato" className="bg-secondary border-0" disabled />
+                  <Input
+                    value={profileDraft.masterCategory}
+                    onChange={(event) =>
+                      setProfileDraft((prev) => ({ ...prev, masterCategory: event.target.value }))
+                    }
+                    className="bg-secondary border-0"
+                  />
                 </div>
               </div>
-              <Button disabled>Salva Profilo Nuotatore</Button>
+              <Button onClick={handleSaveSwimmerProfile} disabled={updateProfileMutation.isPending}>
+                {updateProfileMutation.isPending ? "Salvataggio..." : "Salva Profilo Nuotatore"}
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

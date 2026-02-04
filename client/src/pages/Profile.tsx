@@ -285,8 +285,16 @@ export default function Profile() {
   });
   const { data: badgesData } = trpc.badges.progress.useQuery();
 
-  const displayName = me?.name || me?.email?.split("@")[0] || "SwimForge";
-  const username = me?.email ? `@${me.email.split("@")[0]}` : "@swimforge";
+  const displayName =
+    [me?.name, profile?.lastName].filter(Boolean).join(" ") ||
+    profile?.username ||
+    me?.email?.split("@")[0] ||
+    "SwimForge";
+  const username = profile?.username
+    ? `@${profile.username.replace(/^@+/, "")}`
+    : me?.email
+      ? `@${me.email.split("@")[0]}`
+      : "@swimforge";
   const bio = profile?.bio || "Aggiungi una bio dalle impostazioni.";
   const location = profile?.location || "Località non impostata";
 

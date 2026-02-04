@@ -262,10 +262,18 @@ export const appRouter = router({
     
     update: protectedProcedure
       .input(z.object({
+        name: z.string().min(1).max(120).optional(),
+        email: z.string().email().optional(),
         avatarUrl: z.string().optional(),
         coverUrl: z.string().optional(),
         bio: z.string().optional(),
         location: z.string().optional(),
+        lastName: z.string().max(120).optional(),
+        username: z.string().max(60).optional(),
+        birthDate: z.string().optional().nullable(),
+        preferredStroke: z.enum(["freestyle", "backstroke", "breaststroke", "butterfly", "mixed"]).optional().nullable(),
+        preferredPoolLengthMeters: z.number().int().positive().optional().nullable(),
+        masterCategory: z.string().max(120).optional(),
         notificationSettings: z.record(z.boolean()).optional(),
         preferences: z.object({
           units: z.enum(["metric", "imperial"]).optional(),
@@ -280,7 +288,42 @@ export const appRouter = router({
         }).optional(),
       }))
       .mutation(async ({ ctx, input }) => {
-        await db.updateSwimmerProfile(ctx.user.id, input);
+        const {
+          name,
+          email,
+          notificationSettings,
+          preferences,
+          privacySettings,
+          ...profilePayload
+        } = input;
+
+        if (email) {
+          const normalizedEmail = email.toLowerCase().trim();
+          if (normalizedEmail !== ctx.user.email?.toLowerCase()) {
+            const existing = await db.getUserByEmail(normalizedEmail);
+            if (existing && existing.id !== ctx.user.id) {
+              throw new TRPCError({
+                code: "CONFLICT",
+                message: "Email gia in uso da un altro account.",
+              });
+            }
+            await db.updateUser(ctx.user.id, { email: normalizedEmail });
+          }
+        }
+
+        if (name !== undefined) {
+          const trimmedName = name.trim();
+          if (trimmedName !== (ctx.user.name || "")) {
+            await db.updateUser(ctx.user.id, { name: trimmedName || null });
+          }
+        }
+
+        await db.updateSwimmerProfile(ctx.user.id, {
+          ...profilePayload,
+          notificationSettings,
+          preferences,
+          privacySettings,
+        });
         return { success: true };
       }),
     uploadMedia: protectedProcedure
