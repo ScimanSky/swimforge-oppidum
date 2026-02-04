@@ -346,18 +346,15 @@ export default function Statistics() {
     sessioni: point.sessions,
   }));
 
-  const hasAdvancedData = Boolean(advanced);
-
   const progressiveOverloadValue =
-    advanced?.progressiveOverloadIndex ?? (hasAdvancedData ? 0 : null);
+    advanced?.poiBaseline === false ? null : advanced?.progressiveOverloadIndex ?? null;
 
-  const trendValue = advanced?.trendIndicator
-    ? advanced.trendIndicator.direction === "down"
-      ? -advanced.trendIndicator.percentage
-      : advanced.trendIndicator.percentage
-    : hasAdvancedData
-    ? 0
-    : null;
+  const trendValue =
+    advanced?.trendBaseline && advanced?.trendIndicator
+      ? advanced.trendIndicator.direction === "down"
+        ? -advanced.trendIndicator.percentage
+        : advanced.trendIndicator.percentage
+      : null;
 
 
   return (

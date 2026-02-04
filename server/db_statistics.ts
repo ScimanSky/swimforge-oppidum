@@ -46,6 +46,7 @@ export interface AdvancedMetrics {
     direction: 'up' | 'down' | 'stable';
     percentage: number;
   };
+  trendBaseline: boolean;
   insights: string[];
   predictions: {
     targetKm: number;
@@ -63,6 +64,7 @@ export interface AdvancedMetrics {
   aerobicCapacityScore: number | null; // ACS: 0-100
   recoveryReadinessScore: number | null; // RRS: 0-100
   progressiveOverloadIndex: number | null; // POI: -100 to +100
+  poiBaseline: boolean;
 }
 
 // ============================================
@@ -303,7 +305,8 @@ export async function getAdvancedMetrics(
 
   // Trend Indicator
   const previousDistance = previousActivities.reduce((sum, a) => sum + a.distanceMeters, 0) / 1000;
-  const trendPercentage = previousDistance > 0
+  const trendBaseline = previousDistance > 0;
+  const trendPercentage = trendBaseline
     ? Math.round(((currentDistance - previousDistance) / previousDistance) * 100)
     : 0;
 
@@ -411,7 +414,10 @@ export async function getAdvancedMetrics(
     intensity: avgPrevPace > 0 ? 120 / avgPrevPace : 0,
     frequency: previousActivities.length
   };
-  const progressiveOverloadIndex = calculatePOI(currentStats, previousStats) ?? undefined;
+  const poiBaseline = previousStats.distance > 0 || previousStats.intensity > 0 || previousStats.frequency > 0;
+  const progressiveOverloadIndex = poiBaseline
+    ? calculatePOI(currentStats, previousStats) ?? undefined
+    : undefined;
 
   // Prepare data for AI
   const userData: UserStatsData = {
@@ -460,6 +466,7 @@ export async function getAdvancedMetrics(
     performanceIndex,
     consistencyScore,
     trendIndicator,
+    trendBaseline,
     insights,
     predictions,
     streak: {
@@ -472,5 +479,6 @@ export async function getAdvancedMetrics(
     aerobicCapacityScore,
     recoveryReadinessScore,
     progressiveOverloadIndex,
+    poiBaseline,
   };
 }
