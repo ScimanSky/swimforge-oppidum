@@ -1,11 +1,26 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 import {
   Target,
   Plus,
@@ -22,6 +37,7 @@ import {
   Trash2,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
+import { toast } from "sonner"
 
 const formatDate = (date?: string | Date | null) => {
   if (!date) return "—"
@@ -53,6 +69,15 @@ const categoryColors: Record<string, string> = {
 }
 
 export default function Goals() {
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [customGoals, setCustomGoals] = useState<any[]>([])
+  const [customDraft, setCustomDraft] = useState({
+    title: "",
+    category: "distance",
+    targetValue: "",
+    unit: "",
+  })
+
   const profileQuery = trpc.profile.get.useQuery()
   const timelineQuery = trpc.statistics.getTimeline.useQuery({ days: 7 })
   const performanceQuery = trpc.statistics.getPerformance.useQuery({ days: 30 })
@@ -196,6 +221,57 @@ export default function Goals() {
     return suggestions.slice(0, 3)
   }, [weeklyDistanceMeters, swolfAvg, weeklySessions])
 
+  const allActiveGoals = useMemo(() => {
+    return [...activeGoals, ...customGoals]
+  }, [activeGoals, customGoals])
+
+  const addSuggestedGoal = (goal: any) => {
+    const id = `${goal.category}-${goal.title}`.toLowerCase().replace(/\s+/g, "-")
+    const exists = customGoals.some((item) => item.id === id)
+    if (exists) {
+      toast.info("Obiettivo gia aggiunto")
+      return
+    }
+    const newGoal = {
+      id,
+      title: goal.title,
+      category: goal.category,
+      currentValue: 0,
+      targetValue: goal.category === "distance" ? 8 : 100,
+      unit: goal.category === "distance" ? "km" : "punti",
+      progress: 0,
+      deadline: "Da iniziare",
+      status: "behind",
+      milestones: [],
+    }
+    setCustomGoals((prev) => [...prev, newGoal])
+    toast.success("Obiettivo aggiunto")
+  }
+
+  const addCustomGoal = () => {
+    if (!customDraft.title.trim()) {
+      toast.error("Inserisci un titolo per l'obiettivo")
+      return
+    }
+    const id = `custom-${Date.now()}`
+    const targetValue = Number(customDraft.targetValue) || 0
+    const newGoal = {
+      id,
+      title: customDraft.title.trim(),
+      category: customDraft.category,
+      currentValue: 0,
+      targetValue: targetValue || "—",
+      unit: customDraft.unit || "valore",
+      progress: 0,
+      deadline: "Da iniziare",
+      status: "behind",
+      milestones: [],
+    }
+    setCustomGoals((prev) => [...prev, newGoal])
+    setCustomDraft({ title: "", category: customDraft.category, targetValue: "", unit: "" })
+    toast.success("Obiettivo creato")
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -205,15 +281,100 @@ export default function Goals() {
             <h1 className="text-2xl font-display font-bold text-foreground">Obiettivi</h1>
             <p className="text-muted-foreground">Definisci e traccia i tuoi obiettivi di nuoto</p>
           </div>
-          <Button className="gap-2" disabled>
-            <Plus className="w-4 h-4" />
-            Nuovo Obiettivo (coming soon)
-          </Button>
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" />
+                Crea obiettivo
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Crea obiettivo</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Titolo</label>
+                  <Input
+                    value={customDraft.title}
+                    onChange={(event) =>
+                      setCustomDraft((prev) => ({ ...prev, title: event.target.value }))
+                    }
+                    placeholder="Es. 12 km a settimana"
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Categoria</label>
+                    <Select
+                      value={customDraft.category}
+                      onValueChange={(value) =>
+                        setCustomDraft((prev) => ({ ...prev, category: value }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="distance">Distanza</SelectItem>
+                        <SelectItem value="frequency">Frequenza</SelectItem>
+                        <SelectItem value="efficiency">Efficienza</SelectItem>
+                        <SelectItem value="speed">Velocita</SelectItem>
+                        <SelectItem value="technique">Tecnica</SelectItem>
+                        <SelectItem value="milestone">Milestone</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Target</label>
+                    <Input
+                      value={customDraft.targetValue}
+                      onChange={(event) =>
+                        setCustomDraft((prev) => ({ ...prev, targetValue: event.target.value }))
+                      }
+                      placeholder="Valore obiettivo"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Unita</label>
+                    <Input
+                      value={customDraft.unit}
+                      onChange={(event) =>
+                        setCustomDraft((prev) => ({ ...prev, unit: event.target.value }))
+                      }
+                      placeholder="km, sessioni, sec..."
+                    />
+                  </div>
+                </div>
+                <Button onClick={addCustomGoal}>Aggiungi obiettivo</Button>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-foreground">Suggeriti per te</p>
+                  <div className="space-y-2">
+                    {suggestedGoals.map((goal) => (
+                      <div
+                        key={goal.title}
+                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 bg-secondary/30 p-3"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{goal.title}</p>
+                          <p className="text-xs text-muted-foreground">{goal.description}</p>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={() => addSuggestedGoal(goal)}>
+                          Aggiungi
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Active Goals */}
         <div className="grid gap-6">
-          {activeGoals.map((goal) => {
+          {allActiveGoals.map((goal) => {
             const Icon = categoryIcons[goal.category] || Target
             const colorClass = categoryColors[goal.category] || "text-primary bg-primary/10"
             return (
