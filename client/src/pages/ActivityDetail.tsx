@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc"
 import { useRoute, Link } from "wouter"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -427,32 +428,74 @@ export default function ActivityDetail() {
     })
   })()
 
-  const renderLapCard = (lap: typeof lapSplits[number]) => {
+  const lapSummary = lapSplits.reduce(
+    (acc, lap) => {
+      if (lap.distance) acc.distance += lap.distance
+      if (lap.duration) acc.duration += lap.duration
+      if (lap.swolf !== null && lap.swolf !== undefined) {
+        acc.swolfSum += lap.swolf
+        acc.swolfCount += 1
+      }
+      if (lap.avgHr !== null && lap.avgHr !== undefined) {
+        acc.avgHrSum += lap.avgHr
+        acc.avgHrCount += 1
+      }
+      return acc
+    },
+    { distance: 0, duration: 0, swolfSum: 0, swolfCount: 0, avgHrSum: 0, avgHrCount: 0 }
+  )
+
+  const lapSummaryStats = {
+    distance: lapSummary.distance,
+    duration: lapSummary.duration,
+    pace:
+      lapSummary.distance > 0 ? lapSummary.duration / (lapSummary.distance / 100) : null,
+    avgSwolf:
+      lapSummary.swolfCount > 0 ? Math.round(lapSummary.swolfSum / lapSummary.swolfCount) : null,
+    avgHr:
+      lapSummary.avgHrCount > 0 ? Math.round(lapSummary.avgHrSum / lapSummary.avgHrCount) : null,
+  }
+
+  const renderLapItem = (lap: typeof lapSplits[number]) => {
     const pace = lap.distance > 0 ? lap.duration / (lap.distance / 100) : null
     const bestPace = lap.maxSpeed && lap.maxSpeed > 0 ? 100 / lap.maxSpeed : null
-    const label =
-      lap.distance === 0 ? "Recupero" : `Lap ${lap.index + 1}`
+    const label = lap.distance === 0 ? "Recupero" : `Lap ${lap.index + 1}`
     const strokeLabel = lap.dominantStroke ? strokeLabels[lap.dominantStroke] ?? lap.dominantStroke : null
     return (
-      <div key={`lap-${lap.index}`} className="rounded-lg border border-border bg-background/60 p-3">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{label}</span>
-          {strokeLabel ? <span className="capitalize">{strokeLabel}</span> : null}
-        </div>
-        <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
-          <span>Distanza: {formatDistance(lap.distance)}</span>
-          <span>Tempo: {formatSplitDuration(lap.duration)}</span>
-          <span>Tempo cumulato: {formatSplitDuration(lap.cumulativeSeconds)}</span>
-          <span>Pace medio: {pace ? formatPace(pace, lap.distance, lap.duration) : "—"}</span>
-          <span>Pace migliore: {bestPace ? formatPace(bestPace, lap.distance, lap.duration) : "—"}</span>
-          <span>SWOLF medio: {formatNumber(lap.swolf)}</span>
-          <span>FC media: {lap.avgHr ? `${lap.avgHr} bpm` : "—"}</span>
-          <span>FC max: {lap.maxHr ? `${lap.maxHr} bpm` : "—"}</span>
-          <span>Totale bracciate: {formatNumber(lap.totalStrokes)}</span>
-          <span>Media bracciate/vasca: {formatNumber(lap.avgStrokes)}</span>
-          <span>Calorie: {formatNumber(lap.calories)}</span>
-        </div>
-      </div>
+      <AccordionItem
+        key={`lap-${lap.index}`}
+        value={`lap-${lap.index}`}
+        className="rounded-lg border border-border bg-background/60 px-3"
+      >
+        <AccordionTrigger className="py-3 text-sm">
+          <div className="flex w-full items-center justify-between gap-4">
+            <div className="flex flex-col items-start">
+              <span className="text-xs text-muted-foreground">{label}</span>
+              <span className="text-sm font-semibold text-foreground">
+                {formatDistance(lap.distance)} · {formatSplitDuration(lap.duration)}
+              </span>
+            </div>
+            <div className="text-xs text-muted-foreground text-right">
+              {strokeLabel ? <span className="capitalize">{strokeLabel}</span> : "—"}
+            </div>
+          </div>
+        </AccordionTrigger>
+        <AccordionContent className="px-0 pb-3">
+          <div className="grid gap-2 text-xs sm:grid-cols-2">
+            <span>Distanza: {formatDistance(lap.distance)}</span>
+            <span>Tempo: {formatSplitDuration(lap.duration)}</span>
+            <span>Tempo cumulato: {formatSplitDuration(lap.cumulativeSeconds)}</span>
+            <span>Pace medio: {pace ? formatPace(pace, lap.distance, lap.duration) : "—"}</span>
+            <span>Pace migliore: {bestPace ? formatPace(bestPace, lap.distance, lap.duration) : "—"}</span>
+            <span>SWOLF medio: {formatNumber(lap.swolf)}</span>
+            <span>FC media: {lap.avgHr ? `${lap.avgHr} bpm` : "—"}</span>
+            <span>FC max: {lap.maxHr ? `${lap.maxHr} bpm` : "—"}</span>
+            <span>Totale bracciate: {formatNumber(lap.totalStrokes)}</span>
+            <span>Media bracciate/vasca: {formatNumber(lap.avgStrokes)}</span>
+            <span>Calorie: {formatNumber(lap.calories)}</span>
+          </div>
+        </AccordionContent>
+      </AccordionItem>
     )
   }
 
@@ -731,138 +774,221 @@ export default function ActivityDetail() {
                     ricarica la pagina.
                   </p>
                 ) : (
-                  <>
+                  <Accordion type="multiple" className="space-y-3">
                     {summaryMetrics.length > 0 && (
-                      <div className="rounded-lg border border-border bg-background/60 p-4 space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase">Riepilogo Garmin</p>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {summaryMetrics.map((item) => renderMetricRow(item.label, item.value))}
-                        </div>
-                      </div>
+                      <AccordionItem
+                        value="garmin-summary"
+                        className="rounded-lg border border-border bg-background/60 px-3"
+                      >
+                        <AccordionTrigger className="py-3">Riepilogo Garmin</AccordionTrigger>
+                        <AccordionContent className="px-0 pb-3">
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {summaryMetrics.map((item) => renderMetricRow(item.label, item.value))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
                     )}
 
                     {lapSplits.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase">Splits (laps)</p>
-                        <div className="grid gap-3 md:grid-cols-2">
-                          {lapSplits.map(renderLapCard)}
-                        </div>
-                      </div>
+                      <AccordionItem
+                        value="garmin-laps"
+                        className="rounded-lg border border-border bg-background/60 px-3"
+                      >
+                        <AccordionTrigger className="py-3">
+                          <div className="flex w-full items-center justify-between gap-4">
+                            <span>Lap Garmin</span>
+                            <Badge variant="secondary" className="text-xs">
+                              {lapSplits.length} lap
+                            </Badge>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="px-0 pb-3">
+                          <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+                            <span>Totale: {formatDistance(lapSummaryStats.distance)}</span>
+                            <span>Tempo: {formatSplitDuration(lapSummaryStats.duration)}</span>
+                            <span>
+                              Pace medio:{" "}
+                              {lapSummaryStats.pace
+                                ? formatPace(
+                                    lapSummaryStats.pace,
+                                    lapSummaryStats.distance,
+                                    lapSummaryStats.duration
+                                  )
+                                : "—"}
+                            </span>
+                            <span>SWOLF medio: {formatNumber(lapSummaryStats.avgSwolf)}</span>
+                            <span>FC media: {lapSummaryStats.avgHr ? `${lapSummaryStats.avgHr} bpm` : "—"}</span>
+                          </div>
+                          <Accordion type="multiple" className="mt-3 space-y-2">
+                            {lapSplits.map(renderLapItem)}
+                          </Accordion>
+                        </AccordionContent>
+                      </AccordionItem>
                     )}
 
                     {garminTypedSplits.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase">Splits per stile</p>
-                        {typedSplitsSummaryList.length > 0 && (
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            {typedSplitsSummaryList.map((summary) => (
-                              <div
-                                key={summary.strokeKey}
-                                className="rounded-lg border border-border bg-background/60 p-4"
-                              >
-                                <div className="flex items-center justify-between">
-                                  <p className="text-sm font-semibold text-foreground">{summary.label}</p>
-                                  <Badge variant="secondary" className="text-xs">
-                                    {summary.laps} vasche
-                                  </Badge>
+                      <AccordionItem
+                        value="garmin-typed-splits"
+                        className="rounded-lg border border-border bg-background/60 px-3"
+                      >
+                        <AccordionTrigger className="py-3">Splits per stile</AccordionTrigger>
+                        <AccordionContent className="px-0 pb-3">
+                          {typedSplitsSummaryList.length > 0 && (
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              {typedSplitsSummaryList.map((summary) => (
+                                <div
+                                  key={summary.strokeKey}
+                                  className="rounded-lg border border-border bg-background/80 p-3"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-sm font-semibold text-foreground">{summary.label}</p>
+                                    <Badge variant="secondary" className="text-xs">
+                                      {summary.laps} vasche
+                                    </Badge>
+                                  </div>
+                                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                    <span>Distanza: {summary.distance ? formatDistance(summary.distance) : "—"}</span>
+                                    <span>Durata: {summary.duration ? formatDuration(summary.duration) : "—"}</span>
+                                    <span>
+                                      Pace:{" "}
+                                      {summary.pace
+                                        ? formatPace(summary.pace, summary.distance, summary.duration)
+                                        : "—"}
+                                    </span>
+                                    <span>Lap: {summary.laps}</span>
+                                  </div>
                                 </div>
-                                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                                  <span>Distanza: {summary.distance ? formatDistance(summary.distance) : "—"}</span>
-                                  <span>Durata: {summary.duration ? formatDuration(summary.duration) : "—"}</span>
-                                  <span>Pace: {summary.pace ? formatPace(summary.pace, summary.distance, summary.duration) : "—"}</span>
-                                  <span>Lap: {summary.laps}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <details className="rounded-lg border border-border bg-background/60 p-3">
-                          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
-                            Dettaglio laps per stile
-                          </summary>
-                          <div className="mt-3 grid gap-3 md:grid-cols-2">
-                            {garminTypedSplits.map(renderSplitCard)}
-                          </div>
-                        </details>
-                      </div>
+                              ))}
+                            </div>
+                          )}
+                          <details className="mt-3 rounded-lg border border-border bg-background/80 p-3">
+                            <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                              Dettaglio laps per stile
+                            </summary>
+                            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                              {garminTypedSplits.map(renderSplitCard)}
+                            </div>
+                          </details>
+                        </AccordionContent>
+                      </AccordionItem>
                     )}
 
                     {garminSplitSummaries.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase">Riepilogo splits</p>
-                        <div className="grid gap-3 md:grid-cols-2">
-                          {garminSplitSummaries.map(renderSplitCard)}
-                        </div>
-                      </div>
+                      <AccordionItem
+                        value="garmin-split-summaries"
+                        className="rounded-lg border border-border bg-background/60 px-3"
+                      >
+                        <AccordionTrigger className="py-3">Riepilogo splits</AccordionTrigger>
+                        <AccordionContent className="px-0 pb-3">
+                          <div className="grid gap-3 md:grid-cols-2">
+                            {garminSplitSummaries.map(renderSplitCard)}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
                     )}
 
                     {garminWeather && (
-                      <div className="rounded-lg border border-border bg-background/60 p-4 space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase">Meteo</p>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {renderMetricRow("Temperatura", formatNumber(toNumber(pickFirst(garminWeather, ["temperature", "temp"])),"°C"))}
-                          {renderMetricRow("Umidità", formatNumber(toNumber(pickFirst(garminWeather, ["humidity"])), "%"))}
-                          {renderMetricRow("Vento", formatNumber(toNumber(pickFirst(garminWeather, ["windSpeed", "wind_speed"])), " km/h"))}
-                          {renderMetricRow("Condizioni", String(pickFirst(garminWeather, ["condition", "conditions", "summary"]) ?? "—"))}
-                        </div>
-                      </div>
+                      <AccordionItem
+                        value="garmin-weather"
+                        className="rounded-lg border border-border bg-background/60 px-3"
+                      >
+                        <AccordionTrigger className="py-3">Meteo</AccordionTrigger>
+                        <AccordionContent className="px-0 pb-3">
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {renderMetricRow(
+                              "Temperatura",
+                              formatNumber(toNumber(pickFirst(garminWeather, ["temperature", "temp"])), "°C")
+                            )}
+                            {renderMetricRow(
+                              "Umidità",
+                              formatNumber(toNumber(pickFirst(garminWeather, ["humidity"])), "%")
+                            )}
+                            {renderMetricRow(
+                              "Vento",
+                              formatNumber(toNumber(pickFirst(garminWeather, ["windSpeed", "wind_speed"])), " km/h")
+                            )}
+                            {renderMetricRow(
+                              "Condizioni",
+                              String(pickFirst(garminWeather, ["condition", "conditions", "summary"]) ?? "—")
+                            )}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
                     )}
 
                     {garminPowerZones.length > 0 && (
-                      <div className="rounded-lg border border-border bg-background/60 p-4 space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase">Zone potenza</p>
-                        {garminPowerZones.map((zone) => {
-                          const total = garminPowerZones.reduce((sum, z) => sum + (z.seconds || 0), 0)
-                          const percent = total ? Math.round((zone.seconds / total) * 100) : 0
-                          return (
-                            <div key={zone.label} className="flex items-center gap-3">
-                              <span className="w-8 text-xs text-muted-foreground">{zone.label}</span>
-                              <div className="h-2 flex-1 rounded-full bg-muted">
-                                <div className="h-2 rounded-full bg-primary" style={{ width: `${percent}%` }} />
+                      <AccordionItem
+                        value="garmin-power-zones"
+                        className="rounded-lg border border-border bg-background/60 px-3"
+                      >
+                        <AccordionTrigger className="py-3">Zone potenza</AccordionTrigger>
+                        <AccordionContent className="px-0 pb-3">
+                          {garminPowerZones.map((zone) => {
+                            const total = garminPowerZones.reduce((sum, z) => sum + (z.seconds || 0), 0)
+                            const percent = total ? Math.round((zone.seconds / total) * 100) : 0
+                            return (
+                              <div key={zone.label} className="flex items-center gap-3">
+                                <span className="w-8 text-xs text-muted-foreground">{zone.label}</span>
+                                <div className="h-2 flex-1 rounded-full bg-muted">
+                                  <div className="h-2 rounded-full bg-primary" style={{ width: `${percent}%` }} />
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {Math.round((zone.seconds || 0) / 60)} min · {percent}%
+                                </span>
                               </div>
-                              <span className="text-xs text-muted-foreground">
-                                {Math.round((zone.seconds || 0) / 60)} min · {percent}%
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
+                            )
+                          })}
+                        </AccordionContent>
+                      </AccordionItem>
                     )}
 
                     {garminGear && (
-                      <div className="rounded-lg border border-border bg-background/60 p-4 space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase">Gear</p>
-                        <div className="grid gap-2 sm:grid-cols-2">
-                          {renderMetricRow(
-                            "Nome",
-                            String(pickFirst(garminGear, ["name", "gearName", "displayName"]) ?? "—")
-                          )}
-                          {renderMetricRow(
-                            "Tipo",
-                            String(pickFirst(garminGear, ["type", "gearType"]) ?? "—")
-                          )}
-                        </div>
-                      </div>
+                      <AccordionItem
+                        value="garmin-gear"
+                        className="rounded-lg border border-border bg-background/60 px-3"
+                      >
+                        <AccordionTrigger className="py-3">Gear</AccordionTrigger>
+                        <AccordionContent className="px-0 pb-3">
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {renderMetricRow(
+                              "Nome",
+                              String(pickFirst(garminGear, ["name", "gearName", "displayName"]) ?? "—")
+                            )}
+                            {renderMetricRow(
+                              "Tipo",
+                              String(pickFirst(garminGear, ["type", "gearType"]) ?? "—")
+                            )}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
                     )}
 
                     {garminExerciseSets.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase">Exercise sets</p>
-                        <div className="grid gap-3 md:grid-cols-2">
-                          {garminExerciseSets.map(renderExerciseSet)}
-                        </div>
-                      </div>
+                      <AccordionItem
+                        value="garmin-exercise-sets"
+                        className="rounded-lg border border-border bg-background/60 px-3"
+                      >
+                        <AccordionTrigger className="py-3">Exercise sets</AccordionTrigger>
+                        <AccordionContent className="px-0 pb-3">
+                          <div className="grid gap-3 md:grid-cols-2">
+                            {garminExerciseSets.map(renderExerciseSet)}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
                     )}
 
-                    <details className="rounded-lg border border-border bg-background/60 p-3">
-                      <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
-                        Mostra dati Garmin completi (JSON)
-                      </summary>
-                      <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap text-xs text-foreground">
-                        {JSON.stringify(garminDetails, null, 2)}
-                      </pre>
-                    </details>
-                  </>
+                    <AccordionItem
+                      value="garmin-json"
+                      className="rounded-lg border border-border bg-background/60 px-3"
+                    >
+                      <AccordionTrigger className="py-3">Dati Garmin completi (JSON)</AccordionTrigger>
+                      <AccordionContent className="px-0 pb-3">
+                        <pre className="max-h-72 overflow-auto whitespace-pre-wrap text-xs text-foreground">
+                          {JSON.stringify(garminDetails, null, 2)}
+                        </pre>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
                 )}
               </CardContent>
             </Card>
