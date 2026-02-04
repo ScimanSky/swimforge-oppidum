@@ -71,7 +71,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       {/* Desktop Sidebar */}
       <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r border-border bg-card lg:block">
         <div className="flex h-full flex-col">
@@ -221,8 +221,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* Main Content */}
-      <main className="min-h-screen pt-16 lg:pl-64 lg:pt-0">
-        <div className="mx-auto max-w-7xl p-4 md:p-6 lg:p-8">
+      <main className="min-h-screen min-w-0 pt-16 lg:pl-64 lg:pt-0">
+        <div className="mx-auto max-w-7xl min-w-0 p-4 md:p-6 lg:p-8">
           {children}
         </div>
       </main>
