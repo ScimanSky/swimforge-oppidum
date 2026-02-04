@@ -17,6 +17,7 @@ import { Waves, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import ThemeToggleButton from "@/components/ThemeToggleButton";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -91,7 +92,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex relative">
+      <ThemeToggleButton className="absolute right-4 top-4 z-20" />
       {/* Left Side - Image */}
       <div className="hidden lg:flex lg:w-1/2 relative">
         <Image src="/images/hero-swimmer.jpg" alt="Swimmer" fill className="object-cover" />

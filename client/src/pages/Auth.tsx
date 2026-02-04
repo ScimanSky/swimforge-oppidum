@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import { Waves, Mail, Lock, User } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
+import ThemeToggleButton from "@/components/ThemeToggleButton";
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
@@ -146,20 +147,21 @@ export default function Auth() {
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="medium" className="flex items-center justify-center p-4" withShell={false}>
-    <div className="w-full flex items-center justify-center">
+    <div className="w-full flex items-center justify-center relative">
+      <ThemeToggleButton className="absolute right-2 top-2 z-20" />
       {/* Background effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
       </div>
 
-      <Card className="w-full max-w-md bg-slate-900/80 border-blue-500/30 backdrop-blur-xl relative z-10">
+      <Card className="w-full max-w-md bg-card/90 border-border/70 backdrop-blur-xl relative z-10">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto">
             <img src="/swimforge-logo.png" alt="SwimForge" className="h-28 md:h-32 w-auto" />
           </div>
-          <CardTitle className="text-2xl font-bold text-white">SwimForge</CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardTitle className="text-2xl font-bold text-foreground">SwimForge</CardTitle>
+          <CardDescription className="text-muted-foreground">
             Accedi o registrati per iniziare a tracciare i tuoi progressi
           </CardDescription>
         </CardHeader>
@@ -170,7 +172,7 @@ export default function Auth() {
             <Button
               type="button"
               variant="outline"
-              className="w-full bg-white hover:bg-gray-50 text-gray-900 border-gray-300"
+              className="w-full bg-background hover:bg-muted text-foreground border-border"
               onClick={handleGoogleLogin}
               disabled={isGoogleLoading || isLoading}
             >
@@ -203,20 +205,20 @@ export default function Auth() {
 
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <Separator className="w-full bg-slate-700" />
+                <Separator className="w-full" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-slate-900 px-2 text-slate-400">Oppure</span>
+                <span className="bg-card px-2 text-muted-foreground">Oppure</span>
               </div>
             </div>
           </div>
 
           <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-slate-800/50">
-              <TabsTrigger value="login" className="data-[state=active]:bg-blue-600">
+            <TabsList className="grid w-full grid-cols-2 bg-muted">
+              <TabsTrigger value="login" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Accedi
               </TabsTrigger>
-              <TabsTrigger value="register" className="data-[state=active]:bg-blue-600">
+              <TabsTrigger value="register" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                 Registrati
               </TabsTrigger>
             </TabsList>
@@ -224,32 +226,32 @@ export default function Auth() {
             <TabsContent value="login" className="mt-6">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="login-email" className="text-slate-300">Email</Label>
+                  <Label htmlFor="login-email" className="text-muted-foreground">Email</Label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       id="login-email"
                       type="email"
                       placeholder="la.tua@email.com"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
-                      className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
+                      className="pl-10 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
                       disabled={isLoading || isGoogleLoading}
                     />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="login-password" className="text-slate-300">Password</Label>
+                  <Label htmlFor="login-password" className="text-muted-foreground">Password</Label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     <Input
                       id="login-password"
                       type="password"
                       placeholder="••••••••"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
-                      className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
+                      className="pl-10 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
                       disabled={isLoading || isGoogleLoading}
                     />
                   </div>
@@ -257,7 +259,7 @@ export default function Auth() {
 
                 <Button 
                   type="submit" 
-                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600"
+                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                   disabled={isLoading || isGoogleLoading}
                 >
                   {isLoading ? "Accesso in corso..." : "Accedi"}
@@ -267,74 +269,74 @@ export default function Auth() {
 
             <TabsContent value="register" className="mt-6">
               {emailSent ? (
-                <div className="space-y-3 text-center text-sm text-slate-400">
+                <div className="space-y-3 text-center text-sm text-muted-foreground">
                   Ti abbiamo inviato una mail di conferma a
-                  <span className="text-white font-medium"> {registerEmail}</span>.
-                  <div className="text-xs text-slate-500">
+                  <span className="text-foreground font-medium"> {registerEmail}</span>.
+                  <div className="text-xs text-muted-foreground">
                     Clicca sul link ricevuto per attivare l&apos;account.
                   </div>
                 </div>
               ) : (
                 <form onSubmit={handleRegister} className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="register-name" className="text-slate-300">Nome (opzionale)</Label>
+                    <Label htmlFor="register-name" className="text-muted-foreground">Nome (opzionale)</Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
                         id="register-name"
                         type="text"
                         placeholder="Il tuo nome"
                         value={registerName}
                         onChange={(e) => setRegisterName(e.target.value)}
-                        className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
+                        className="pl-10 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
                         disabled={isLoading || isGoogleLoading}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="register-email" className="text-slate-300">Email</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Label htmlFor="register-email" className="text-muted-foreground">Email</Label>
+                  <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
                         id="register-email"
                         type="email"
                         placeholder="la.tua@email.com"
                         value={registerEmail}
                         onChange={(e) => setRegisterEmail(e.target.value)}
-                        className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
+                        className="pl-10 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
                         disabled={isLoading || isGoogleLoading}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="register-password" className="text-slate-300">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Label htmlFor="register-password" className="text-muted-foreground">Password</Label>
+                  <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
                         id="register-password"
                         type="password"
                         placeholder="Minimo 8 caratteri"
                         value={registerPassword}
                         onChange={(e) => setRegisterPassword(e.target.value)}
-                        className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
+                        className="pl-10 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
                         disabled={isLoading || isGoogleLoading}
                       />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="confirm-password" className="text-slate-300">Conferma Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <Label htmlFor="confirm-password" className="text-muted-foreground">Conferma Password</Label>
+                  <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                       <Input
                         id="confirm-password"
                         type="password"
                         placeholder="Ripeti la password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
+                        className="pl-10 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
                         disabled={isLoading || isGoogleLoading}
                       />
                     </div>
@@ -342,7 +344,7 @@ export default function Auth() {
 
                   <Button 
                     type="submit" 
-                    className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600"
+                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                     disabled={isLoading || isGoogleLoading}
                   >
                     {isLoading ? "Registrazione in corso..." : "Registrati"}
@@ -353,7 +355,7 @@ export default function Auth() {
           </Tabs>
         </CardContent>
 
-        <CardFooter className="text-center text-sm text-slate-500">
+        <CardFooter className="text-center text-sm text-muted-foreground">
           <p className="w-full">
             Traccia i tuoi progressi nel nuoto con SwimForge
           </p>

@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Waves, ArrowRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import ThemeToggleButton from "@/components/ThemeToggleButton";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -46,7 +47,8 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex relative">
+      <ThemeToggleButton className="absolute right-4 top-4 z-20" />
       <div className="hidden lg:flex lg:w-1/2 relative">
         <Image src="/images/hero-swimmer.jpg" alt="Swimmer" fill className="object-cover" />
         <div className="absolute inset-0 bg-gradient-to-r from-background/80 to-transparent" />

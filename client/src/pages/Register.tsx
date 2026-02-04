@@ -25,6 +25,7 @@ import { Waves, Eye, EyeOff, ArrowRight, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import ThemeToggleButton from "@/components/ThemeToggleButton";
 
 const features = [
   "Sincronizza automaticamente da Garmin e Strava",
@@ -146,7 +147,8 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex relative">
+      <ThemeToggleButton className="absolute right-4 top-4 z-20" />
       {/* Left Side - Image */}
       <div className="hidden lg:flex lg:w-1/2 relative">
         <Image src="/images/open-water.jpg" alt="Open water swimmer" fill className="object-cover" />
