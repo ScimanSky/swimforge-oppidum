@@ -390,15 +390,18 @@ export const appRouter = router({
         }
         if (activity.activitySource === "garmin" && activity.garminActivityId) {
           const rawData = (activity.rawData ?? {}) as Record<string, any>;
+          const existingDetails = rawData.garmin_details;
+          const hasExistingDetails =
+            existingDetails && typeof existingDetails === "object" && Object.keys(existingDetails).length > 0;
           const fullDetails =
-            rawData.garmin_details ??
+            (hasExistingDetails ? existingDetails : null) ??
             (await garmin.getGarminActivityFullDetails(
               ctx.user.id,
               activity.garminActivityId
             ));
 
           if (fullDetails) {
-            const nextRawData = rawData.garmin_details
+            const nextRawData = hasExistingDetails
               ? rawData
               : {
                   ...rawData,
