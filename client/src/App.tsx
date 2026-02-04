@@ -11,6 +11,7 @@ import Challenges from "./pages/Challenges";
 import ChallengeDetail from "./pages/ChallengeDetail";
 import Leaderboard from "./pages/Leaderboard";
 import Activities from "./pages/Activities";
+import ActivityDetail from "./pages/ActivityDetail";
 import Goals from "./pages/Goals";
 import Profile from "./pages/Profile";
 import Statistics from "./pages/Statistics";
@@ -51,6 +52,7 @@ function Router() {
       <Route path="/challenges" component={Challenges} />
       <Route path="/challenges/:id" component={ChallengeDetail} />
       <Route path="/leaderboard" component={Leaderboard} />
+      <Route path="/activities/:id" component={ActivityDetail} />
       <Route path="/activities" component={Activities} />
       <Route path="/goals" component={Goals} />
       <Route path="/statistics" component={Statistics} />
