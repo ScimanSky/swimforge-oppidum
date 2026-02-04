@@ -438,6 +438,7 @@ export default function Dashboard() {
     profile?.coverImageUrl ||
     profile?.cover_image_url ||
     null
+  const coverImage = profileCoverImage || "/images/pool-lanes.jpg"
   const xpProgress = profile?.nextLevelXp
     ? Math.min(100, (profile.totalXp / profile.nextLevelXp) * 100)
     : 0
@@ -446,10 +447,10 @@ export default function Dashboard() {
     <AppLayout>
       <div className="space-y-6">
         <Card className="bg-card border-border relative overflow-hidden">
-          {profileCoverImage && (
+          {coverImage && (
             <div className="absolute inset-0">
               <img
-                src={profileCoverImage}
+                src={coverImage}
                 alt="Cover profilo"
                 className="h-full w-full object-cover opacity-25"
                 loading="lazy"
