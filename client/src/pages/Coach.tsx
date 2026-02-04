@@ -393,96 +393,104 @@ export default function Coach() {
             <TabsTrigger value="chat">Chat</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="insights" className="mt-6 space-y-4">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              {keyMetricCards.map((metric) => (
-                <Card key={metric.title} className="bg-card/80 border-border/60 shadow-sm">
+          <TabsContent value="insights" className="mt-6">
+            <div className="flex flex-col gap-4">
+              <div className="order-2 lg:order-1">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  {keyMetricCards.map((metric) => (
+                    <Card key={metric.title} className="bg-card/80 border-border/60 shadow-sm">
+                      <CardContent className="p-4">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                          {metric.title}
+                        </p>
+                        <div className="mt-3 flex items-baseline gap-2">
+                          <span className="text-2xl font-display font-bold text-foreground">
+                            {metric.value}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {metric.helper}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              <div className="order-1 lg:order-2">
+                {insightCards.length > 0 ? (
+                  <Card className="bg-card/80 border-border/60 shadow-sm">
+                    <CardContent className="p-4 space-y-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {insightCards.map((_, index) => (
+                          <Button
+                            key={index}
+                            type="button"
+                            size="sm"
+                            variant={index === safeInsightIndex ? "default" : "outline"}
+                            className="h-8 w-8 rounded-full p-0"
+                            onClick={() => setActiveInsightIndex(index)}
+                          >
+                            {index + 1}
+                          </Button>
+                        ))}
+                      </div>
+                      <div className="flex items-start gap-4">
+                        <div className="p-2 rounded-lg bg-primary/10">
+                          <Sparkles className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-medium text-foreground">
+                              {activeInsight?.title ?? "Insight"}
+                            </h3>
+                            {activeInsight?.metric ? (
+                              <Badge
+                                variant="secondary"
+                                className="bg-primary/10 text-primary"
+                              >
+                                {activeInsight.metric}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {activeInsight?.description ?? "Seleziona un insight per leggerlo."}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Card className="bg-card/80 border-border/60 shadow-sm">
+                    <CardContent className="p-6 text-sm text-muted-foreground">
+                      Nessun insight disponibile. Sincronizza nuove attivita per ottenere suggerimenti AI.
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+
+              <div className="order-3">
+                <Card className="bg-card/80 border-border/60 shadow-sm">
                   <CardContent className="p-4">
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                      {metric.title}
-                    </p>
-                    <div className="mt-3 flex items-baseline gap-2">
-                      <span className="text-2xl font-display font-bold text-foreground">
-                        {metric.value}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {metric.helper}
-                      </span>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {advancedMetrics.map((metric) => (
+                        <div
+                          key={metric.key}
+                          className="flex items-center gap-2 rounded-full bg-secondary/40 px-3 py-1 text-xs"
+                        >
+                          <span className="text-muted-foreground">
+                            {metric.key}
+                          </span>
+                          <span className="text-foreground font-semibold">
+                            {metric.display}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+              </div>
             </div>
-
-            {insightCards.length > 0 ? (
-              <Card className="bg-card/80 border-border/60 shadow-sm">
-                <CardContent className="p-4 space-y-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    {insightCards.map((_, index) => (
-                      <Button
-                        key={index}
-                        type="button"
-                        size="sm"
-                        variant={index === safeInsightIndex ? "default" : "outline"}
-                        className="h-8 w-8 rounded-full p-0"
-                        onClick={() => setActiveInsightIndex(index)}
-                      >
-                        {index + 1}
-                      </Button>
-                    ))}
-                  </div>
-                  <div className="flex items-start gap-4">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <Sparkles className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-medium text-foreground">
-                          {activeInsight?.title ?? "Insight"}
-                        </h3>
-                        {activeInsight?.metric ? (
-                          <Badge
-                            variant="secondary"
-                            className="bg-primary/10 text-primary"
-                          >
-                            {activeInsight.metric}
-                          </Badge>
-                        ) : null}
-                      </div>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {activeInsight?.description ?? "Seleziona un insight per leggerlo."}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="bg-card/80 border-border/60 shadow-sm">
-                <CardContent className="p-6 text-sm text-muted-foreground">
-                  Nessun insight disponibile. Sincronizza nuove attivita per ottenere suggerimenti AI.
-                </CardContent>
-              </Card>
-            )}
-
-            <Card className="bg-card/80 border-border/60 shadow-sm">
-              <CardContent className="p-4">
-                <div className="flex flex-wrap items-center gap-3">
-                  {advancedMetrics.map((metric) => (
-                    <div
-                      key={metric.key}
-                      className="flex items-center gap-2 rounded-full bg-secondary/40 px-3 py-1 text-xs"
-                    >
-                      <span className="text-muted-foreground">
-                        {metric.key}
-                      </span>
-                      <span className="text-foreground font-semibold">
-                        {metric.display}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           <TabsContent value="workouts" className="mt-6 space-y-6">
