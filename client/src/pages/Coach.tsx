@@ -564,184 +564,198 @@ export default function Coach() {
 
           <TabsContent value="workouts" className="mt-6 space-y-6">
             <Card className="bg-card/80 border-border/60 shadow-sm">
-              <CardHeader className="flex flex-row items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="font-display">Allenamento in Vasca</CardTitle>
-                  <CardDescription>Generato dall&apos;AI</CardDescription>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRegeneratePool}
-                  disabled={poolRegenerate || poolWorkoutQuery.isFetching}
-                >
-                  <RefreshCw
-                    className={`mr-2 h-4 w-4 ${poolRegenerate ? "animate-spin" : ""}`}
-                  />
-                  Rigenera
-                </Button>
+              <CardHeader>
+                <CardTitle className="font-display">Allenamenti AI</CardTitle>
+                <CardDescription>
+                  Vasca e dryland affiancati per consultare le fasi senza scorrere.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {poolWorkout ? (
-                  <>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                      <span className="font-semibold text-foreground">
-                        {poolWorkout.title}
-                      </span>
-                      <span>• {poolWorkout.duration}</span>
-                      <span>• {poolWorkout.difficulty}</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {poolWorkout.description}
-                    </p>
-                    <div className="space-y-4">
-                      <div className="flex flex-wrap gap-2">
-                        {poolWorkout.sections.map((section, idx) => (
-                          <Button
-                            key={idx}
-                            type="button"
-                            size="sm"
-                            variant={idx === activePoolSectionIndex ? "default" : "outline"}
-                            onClick={() => setActivePoolSectionIndex(idx)}
-                          >
-                            {section.title}
-                          </Button>
-                        ))}
+              <CardContent>
+                <div className="grid gap-6 lg:grid-cols-2">
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-base font-semibold text-foreground">
+                          Allenamento in Vasca
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Generato dall&apos;AI
+                        </p>
                       </div>
-                      {activePoolSection ? (
-                        <div className="rounded-lg border border-border bg-secondary/20 p-4">
-                          <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary">{activePoolSection.title}</Badge>
-                            {activePoolSection.notes && (
-                              <span className="text-xs text-muted-foreground">
-                                {activePoolSection.notes}
-                              </span>
-                            )}
-                          </div>
-                          <div className="space-y-3">
-                            {activePoolSection.exercises.map((exercise, exIdx) => (
-                              <div
-                                key={exIdx}
-                                className="rounded-md bg-background/60 p-3 text-sm"
-                              >
-                                <div className="font-medium text-foreground">
-                                  {exercise.name}
-                                </div>
-                                <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                  {getExerciseDetails(exercise).map(
-                                    (detail, detailIdx) => (
-                                      <span key={detailIdx}>{detail}</span>
-                                    )
-                                  )}
-                                </div>
-                                {exercise.notes && (
-                                  <p className="mt-2 text-xs text-muted-foreground">
-                                    {exercise.notes}
-                                  </p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRegeneratePool}
+                        disabled={poolRegenerate || poolWorkoutQuery.isFetching}
+                      >
+                        <RefreshCw
+                          className={`mr-2 h-4 w-4 ${poolRegenerate ? "animate-spin" : ""}`}
+                        />
+                        Rigenera
+                      </Button>
                     </div>
-                  </>
-                ) : (
-                  <div className="text-sm text-muted-foreground">
-                    Allenamento in vasca non disponibile. Sincronizza nuove attività.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
 
-            <Card className="bg-card/80 border-border/60 shadow-sm">
-              <CardHeader className="flex flex-row items-start justify-between gap-3">
-                <div>
-                  <CardTitle className="font-display">Allenamento Dryland</CardTitle>
-                  <CardDescription>Forza, core e mobilità</CardDescription>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRegenerateDryland}
-                  disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
-                >
-                  <RefreshCw
-                    className={`mr-2 h-4 w-4 ${dryRegenerate ? "animate-spin" : ""}`}
-                  />
-                  Rigenera
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {drylandWorkout ? (
-                  <>
-                    <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                      <span className="font-semibold text-foreground">
-                        {drylandWorkout.title}
-                      </span>
-                      <span>• {drylandWorkout.duration}</span>
-                      <span>• {drylandWorkout.difficulty}</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {drylandWorkout.description}
-                    </p>
-                    <div className="space-y-4">
-                      <div className="flex flex-wrap gap-2">
-                        {drylandWorkout.sections.map((section, idx) => (
-                          <Button
-                            key={idx}
-                            type="button"
-                            size="sm"
-                            variant={idx === activeDrySectionIndex ? "default" : "outline"}
-                            onClick={() => setActiveDrySectionIndex(idx)}
-                          >
-                            {section.title}
-                          </Button>
-                        ))}
-                      </div>
-                      {activeDrySection ? (
-                        <div className="rounded-lg border border-border bg-secondary/20 p-4">
-                          <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary">{activeDrySection.title}</Badge>
-                            {activeDrySection.notes && (
-                              <span className="text-xs text-muted-foreground">
-                                {activeDrySection.notes}
-                              </span>
-                            )}
-                          </div>
-                          <div className="space-y-3">
-                            {activeDrySection.exercises.map((exercise, exIdx) => (
-                              <div
-                                key={exIdx}
-                                className="rounded-md bg-background/60 p-3 text-sm"
-                              >
-                                <div className="font-medium text-foreground">
-                                  {exercise.name}
-                                </div>
-                                <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                  {getExerciseDetails(exercise).map(
-                                    (detail, detailIdx) => (
-                                      <span key={detailIdx}>{detail}</span>
-                                    )
+                    {poolWorkout ? (
+                      <>
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                          <span className="font-semibold text-foreground">
+                            {poolWorkout.title}
+                          </span>
+                          <span>• {poolWorkout.duration}</span>
+                          <span>• {poolWorkout.difficulty}</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {poolWorkout.description}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {poolWorkout.sections.map((section, idx) => (
+                            <Button
+                              key={idx}
+                              type="button"
+                              size="sm"
+                              variant={idx === activePoolSectionIndex ? "default" : "outline"}
+                              onClick={() => setActivePoolSectionIndex(idx)}
+                            >
+                              {section.title}
+                            </Button>
+                          ))}
+                        </div>
+                        {activePoolSection ? (
+                          <div className="rounded-lg border border-border bg-secondary/20 p-4 max-h-[420px] overflow-auto">
+                            <div className="mb-2 flex flex-wrap items-center gap-2">
+                              <Badge variant="secondary">{activePoolSection.title}</Badge>
+                              {activePoolSection.notes && (
+                                <span className="text-xs text-muted-foreground">
+                                  {activePoolSection.notes}
+                                </span>
+                              )}
+                            </div>
+                            <div className="space-y-3">
+                              {activePoolSection.exercises.map((exercise, exIdx) => (
+                                <div
+                                  key={exIdx}
+                                  className="rounded-md bg-background/60 p-3 text-sm"
+                                >
+                                  <div className="font-medium text-foreground">
+                                    {exercise.name}
+                                  </div>
+                                  <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                    {getExerciseDetails(exercise).map(
+                                      (detail, detailIdx) => (
+                                        <span key={detailIdx}>{detail}</span>
+                                      )
+                                    )}
+                                  </div>
+                                  {exercise.notes && (
+                                    <p className="mt-2 text-xs text-muted-foreground">
+                                      {exercise.notes}
+                                    </p>
                                   )}
                                 </div>
-                                {exercise.notes && (
-                                  <p className="mt-2 text-xs text-muted-foreground">
-                                    {exercise.notes}
-                                  </p>
-                                )}
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-sm text-muted-foreground">
-                    Allenamento dryland non disponibile. Sincronizza nuove attività.
+                        ) : null}
+                      </>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        Allenamento in vasca non disponibile. Sincronizza nuove attività.
+                      </div>
+                    )}
                   </div>
-                )}
+
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="text-base font-semibold text-foreground">
+                          Allenamento Dryland
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Forza, core e mobilità
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRegenerateDryland}
+                        disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
+                      >
+                        <RefreshCw
+                          className={`mr-2 h-4 w-4 ${dryRegenerate ? "animate-spin" : ""}`}
+                        />
+                        Rigenera
+                      </Button>
+                    </div>
+
+                    {drylandWorkout ? (
+                      <>
+                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                          <span className="font-semibold text-foreground">
+                            {drylandWorkout.title}
+                          </span>
+                          <span>• {drylandWorkout.duration}</span>
+                          <span>• {drylandWorkout.difficulty}</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {drylandWorkout.description}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {drylandWorkout.sections.map((section, idx) => (
+                            <Button
+                              key={idx}
+                              type="button"
+                              size="sm"
+                              variant={idx === activeDrySectionIndex ? "default" : "outline"}
+                              onClick={() => setActiveDrySectionIndex(idx)}
+                            >
+                              {section.title}
+                            </Button>
+                          ))}
+                        </div>
+                        {activeDrySection ? (
+                          <div className="rounded-lg border border-border bg-secondary/20 p-4 max-h-[420px] overflow-auto">
+                            <div className="mb-2 flex flex-wrap items-center gap-2">
+                              <Badge variant="secondary">{activeDrySection.title}</Badge>
+                              {activeDrySection.notes && (
+                                <span className="text-xs text-muted-foreground">
+                                  {activeDrySection.notes}
+                                </span>
+                              )}
+                            </div>
+                            <div className="space-y-3">
+                              {activeDrySection.exercises.map((exercise, exIdx) => (
+                                <div
+                                  key={exIdx}
+                                  className="rounded-md bg-background/60 p-3 text-sm"
+                                >
+                                  <div className="font-medium text-foreground">
+                                    {exercise.name}
+                                  </div>
+                                  <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                    {getExerciseDetails(exercise).map(
+                                      (detail, detailIdx) => (
+                                        <span key={detailIdx}>{detail}</span>
+                                      )
+                                    )}
+                                  </div>
+                                  {exercise.notes && (
+                                    <p className="mt-2 text-xs text-muted-foreground">
+                                      {exercise.notes}
+                                    </p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <div className="text-sm text-muted-foreground">
+                        Allenamento dryland non disponibile. Sincronizza nuove attività.
+                      </div>
+                    )}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
