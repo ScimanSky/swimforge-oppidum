@@ -215,6 +215,57 @@ export default function ActivityDetail() {
     ? garminDetails.exercise_sets
     : []
 
+  const strokeLabels: Record<string, string> = {
+    freestyle: "Stile libero",
+    backstroke: "Dorso",
+    breaststroke: "Rana",
+    butterfly: "Farfalla",
+    mixed: "Misto",
+  }
+
+  const normalizeStrokeKey = (value: any) => {
+    if (!value) return "mixed"
+    const raw = String(value).toLowerCase().replace(/\s+/g, "_")
+    if (raw.includes("free") || raw.includes("stile") || raw.includes("crawl")) return "freestyle"
+    if (raw.includes("back") || raw.includes("dorso")) return "backstroke"
+    if (raw.includes("breast") || raw.includes("rana")) return "breaststroke"
+    if (raw.includes("butter") || raw.includes("farf")) return "butterfly"
+    if (raw.includes("mix")) return "mixed"
+    return raw
+  }
+
+  const typedSplitsSummary = garminTypedSplits.reduce(
+    (acc: Record<string, { distance: number; duration: number; laps: number; count: number }>, split) => {
+      const strokeKey = normalizeStrokeKey(
+        pickFirst(split, ["strokeType", "swimStrokeType", "avgStrokeType", "stroke", "type"])
+      )
+      const distance = getDistanceMeters(split) ?? 0
+      const duration = getDurationSeconds(split) ?? 0
+      const laps = toNumber(pickFirst(split, ["lapCount", "totalLaps", "numLaps", "laps"])) ?? 0
+      if (!acc[strokeKey]) {
+        acc[strokeKey] = { distance: 0, duration: 0, laps: 0, count: 0 }
+      }
+      acc[strokeKey].distance += distance
+      acc[strokeKey].duration += duration
+      acc[strokeKey].laps += laps
+      acc[strokeKey].count += 1
+      return acc
+    },
+    {}
+  )
+
+  const typedSplitsSummaryList = Object.entries(typedSplitsSummary).map(([strokeKey, data]) => {
+    const pace = data.distance > 0 ? data.duration / (data.distance / 100) : null
+    return {
+      strokeKey,
+      label: strokeLabels[strokeKey] ?? strokeKey,
+      distance: data.distance,
+      duration: data.duration,
+      laps: data.laps || data.count,
+      pace,
+    }
+  })
+
   const renderMetricRow = (label: string, value: string) => (
     <div key={label} className="flex items-center justify-between gap-3 text-sm">
       <span className="text-muted-foreground">{label}</span>
@@ -547,9 +598,37 @@ export default function ActivityDetail() {
                     {garminTypedSplits.length > 0 && (
                       <div className="space-y-2">
                         <p className="text-xs font-medium text-muted-foreground uppercase">Splits per stile</p>
-                        <div className="grid gap-3 md:grid-cols-2">
-                          {garminTypedSplits.map(renderSplitCard)}
-                        </div>
+                        {typedSplitsSummaryList.length > 0 && (
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            {typedSplitsSummaryList.map((summary) => (
+                              <div
+                                key={summary.strokeKey}
+                                className="rounded-lg border border-border bg-background/60 p-4"
+                              >
+                                <div className="flex items-center justify-between">
+                                  <p className="text-sm font-semibold text-foreground">{summary.label}</p>
+                                  <Badge variant="secondary" className="text-xs">
+                                    {summary.laps} vasche
+                                  </Badge>
+                                </div>
+                                <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                  <span>Distanza: {summary.distance ? formatDistance(summary.distance) : "—"}</span>
+                                  <span>Durata: {summary.duration ? formatDuration(summary.duration) : "—"}</span>
+                                  <span>Pace: {summary.pace ? formatPace(summary.pace, summary.distance, summary.duration) : "—"}</span>
+                                  <span>Lap: {summary.laps}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <details className="rounded-lg border border-border bg-background/60 p-3">
+                          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                            Dettaglio laps per stile
+                          </summary>
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            {garminTypedSplits.map(renderSplitCard)}
+                          </div>
+                        </details>
                       </div>
                     )}
 

@@ -35,6 +35,7 @@ import { supabase } from "@/lib/supabase"
 import { formatDistanceToNow } from "date-fns"
 import { it } from "date-fns/locale"
 import { toast } from "sonner"
+import GarminSection from "@/components/GarminSection"
 
 const notificationSettings = [
   {
@@ -607,6 +608,8 @@ export default function Settings() {
               ))}
             </CardContent>
           </Card>
+
+          <GarminSection garminConnected={garminStatus?.connected ?? false} />
 
           <Card className="bg-card border-border">
             <CardHeader>
