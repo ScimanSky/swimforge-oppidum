@@ -256,7 +256,7 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
                         </div>
                         <Button
                           type="submit"
-                          className="w-full bg-[var(--navy)] hover:bg-[var(--navy-light)]"
+                          className="w-full bg-[var(--navy)] text-foreground hover:bg-[var(--navy-light)]"
                           disabled={isLoading}
                         >
                           {isLoading ? (
@@ -306,7 +306,7 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
                           </Button>
                           <Button
                             type="submit"
-                            className="flex-1 bg-[var(--navy)] hover:bg-[var(--navy-light)]"
+                            className="flex-1 bg-[var(--navy)] text-foreground hover:bg-[var(--navy-light)]"
                             disabled={isLoading || mfaCode.length < 4}
                           >
                             {isLoading ? (

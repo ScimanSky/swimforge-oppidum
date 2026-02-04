@@ -40,7 +40,7 @@ export default function ClubInvite() {
             )}
             <div className="flex flex-col gap-2">
               {clubId && (
-                <Button className="bg-[var(--azure)] text-white" asChild>
+                <Button className="bg-[var(--azure)] text-primary-foreground" asChild>
                   <a href={`/community/club/${clubId}`}>Vai al club</a>
                 </Button>
               )}

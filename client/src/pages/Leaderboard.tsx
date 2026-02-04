@@ -112,17 +112,17 @@ export default function Leaderboard() {
     <AppLayout showBubbles={true} bubbleIntensity="low">
     <div className="pb-20">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-white">
+      <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-foreground">
         <div className="container py-4">
           <div className="flex items-center gap-3">
             <Link href="/challenges">
-              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
+              <Button variant="ghost" size="icon" className="text-foreground hover:bg-muted/60">
                 <ChevronLeft className="h-5 w-5" />
               </Button>
             </Link>
             <div>
               <h1 className="font-semibold text-lg">Classifica</h1>
-              <p className="text-sm text-white/70">Sfida i tuoi compagni</p>
+              <p className="text-sm text-muted-foreground">Sfida i tuoi compagni</p>
             </div>
           </div>
         </div>

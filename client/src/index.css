@@ -37,6 +37,11 @@
   --sidebar-accent-foreground: oklch(0.20 0.02 230);
   --sidebar-border: oklch(0.86 0.01 230);
   --sidebar-ring: oklch(0.62 0.17 195);
+  --navy: oklch(0.96 0.01 230);
+  --navy-light: oklch(0.92 0.02 230);
+  --azure: oklch(0.62 0.17 195);
+  --gold: oklch(0.78 0.12 90);
+  --gold-light: oklch(0.84 0.12 90);
 }
 
 .dark {
@@ -72,6 +77,11 @@
   --sidebar-accent-foreground: oklch(0.98 0 0);
   --sidebar-border: oklch(0.28 0.02 230);
   --sidebar-ring: oklch(0.75 0.15 195);
+  --navy: oklch(0.10 0.01 230);
+  --navy-light: oklch(0.18 0.02 230);
+  --azure: oklch(0.75 0.15 195);
+  --gold: oklch(0.82 0.15 90);
+  --gold-light: oklch(0.88 0.15 90);
 }
 
 @theme inline {

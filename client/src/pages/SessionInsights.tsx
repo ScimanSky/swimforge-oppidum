@@ -163,7 +163,7 @@ export default function SessionInsights() {
   }, [activeEntry]);
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
+    <AppLayout showBubbles={true} bubbleIntensity="medium">
       <div className="min-h-screen overflow-x-hidden font-sans text-foreground relative pb-24">
         <div className="fixed inset-0 opacity-10 pointer-events-none -z-40">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.25),_transparent_60%)]" />
@@ -173,36 +173,36 @@ export default function SessionInsights() {
           <div className="flex flex-col gap-3 mb-8 md:flex-row md:items-center md:gap-4">
             <div className="flex items-center gap-3">
               <Link href="/coach">
-                <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10 px-2">
+                <Button variant="ghost" className="text-muted-foreground hover:text-foreground hover:bg-muted/60 px-2">
                   <ChevronLeft className="h-5 w-5" />
                   <span className="ml-1 hidden sm:inline">Coach</span>
                 </Button>
               </Link>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold text-white">Session IQ</h1>
+                <h1 className="text-2xl font-bold text-foreground">Session IQ</h1>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold)]/30">
                   Premium (free)
                 </span>
               </div>
             </div>
             <div className="flex items-center gap-2 md:ml-auto">
-              <div className="text-xs text-white/50">Analisi singole sessioni</div>
+              <div className="text-xs text-muted-foreground">Analisi singole sessioni</div>
             </div>
           </div>
 
           <div className="grid lg:grid-cols-12 gap-6">
             <div className="lg:col-span-4 space-y-4">
-              <div className="bg-card/40 border border-white/10 rounded-2xl p-5">
-                <div className="flex items-center gap-2 text-cyan-200 text-xs uppercase tracking-wider mb-3">
+              <div className="bg-card/60 border border-border/60 rounded-2xl p-5">
+                <div className="flex items-center gap-2 text-primary text-xs uppercase tracking-wider mb-3">
                   <Sparkles className="h-4 w-4" />
                   Overview
                 </div>
-                <p className="text-white/70 text-sm leading-relaxed">
+                <p className="text-muted-foreground text-sm leading-relaxed">
                   Qui trovi tutte le analisi AI generate per ogni sessione. Sono basate
                   sui dati della singola attività, senza usare la storia globale.
                 </p>
-                <div className="mt-4 flex items-center gap-2 text-xs text-white/60">
-                  <Waves className="h-4 w-4 text-cyan-300" />
+                <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                  <Waves className="h-4 w-4 text-primary" />
                   Nuove analisi compaiono dopo ogni sync.
                 </div>
               </div>
@@ -210,13 +210,13 @@ export default function SessionInsights() {
 
             <div className="lg:col-span-8 space-y-4">
               {sessionEntries.length === 0 && (
-                <div className="bg-card/30 border border-white/10 rounded-2xl p-6 text-white/70">
+                <div className="bg-card/50 border border-border/60 rounded-2xl p-6 text-muted-foreground">
                   Nessuna analisi disponibile. Sincronizza nuove attività per generare insight.
                 </div>
               )}
 
               {sessionEntries.length > 0 && (
-                <div className="bg-card/30 border border-white/10 rounded-2xl p-3 sm:p-4">
+                <div className="bg-card/50 border border-border/60 rounded-2xl p-3 sm:p-4">
                   <div className="flex flex-wrap gap-2">
                     <Button
                       size="sm"
@@ -238,7 +238,7 @@ export default function SessionInsights() {
                       mode="single"
                       selected={selectedDate}
                       onSelect={setSelectedDate}
-                      className="rounded-xl border border-white/10 bg-black/20 [--cell-size:--spacing(6)] sm:[--cell-size:--spacing(7)] md:[--cell-size:--spacing(8)]"
+                      className="rounded-xl border border-border/60 bg-background/60 [--cell-size:--spacing(6)] sm:[--cell-size:--spacing(7)] md:[--cell-size:--spacing(8)]"
                     />
                   </div>
                   {sessionView === "week" && (
@@ -272,14 +272,14 @@ export default function SessionInsights() {
                     key={activeEntry.id ?? activeDateKey}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-card/40 border border-white/10 rounded-2xl p-6 shadow-lg"
+                    className="bg-card/60 border border-border/60 rounded-2xl p-6 shadow-lg"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                      <div className="flex items-center gap-2 text-cyan-200 text-xs uppercase tracking-wider">
+                      <div className="flex items-center gap-2 text-primary text-xs uppercase tracking-wider">
                         <Activity className="h-4 w-4" />
                         Analisi sessione
                       </div>
-                      <div className="flex flex-wrap gap-3 text-xs text-white/60">
+                      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                         {formatDate(activeEntry.activity_date) && (
                           <span>📅 {formatDate(activeEntry.activity_date)}</span>
                         )}
@@ -291,13 +291,13 @@ export default function SessionInsights() {
                         )}
                       </div>
                     </div>
-                    <h2 className="text-lg font-semibold text-white mb-2">{activeEntry.title}</h2>
-                    <p className="text-white/70 text-sm leading-relaxed mb-3">{activeEntry.summary}</p>
+                    <h2 className="text-lg font-semibold text-foreground mb-2">{activeEntry.title}</h2>
+                    <p className="text-muted-foreground text-sm leading-relaxed mb-3">{activeEntry.summary}</p>
                     {activeBullets.length > 0 && (
-                      <ul className="space-y-2 text-sm text-white/80 mb-3">
+                      <ul className="space-y-2 text-sm text-foreground/80 mb-3">
                         {activeBullets.map((bullet: string, bulletIdx: number) => (
                           <li key={bulletIdx} className="flex items-start gap-2">
-                            <span className="text-cyan-300">•</span>
+                            <span className="text-primary">•</span>
                             <span>{bullet}</span>
                           </li>
                         ))}
@@ -308,7 +308,7 @@ export default function SessionInsights() {
                         {activeTags.map((tag: string, tagIdx: number) => (
                           <span
                             key={tagIdx}
-                            className="text-xs px-2 py-1 rounded-full bg-white/10 text-white/70"
+                            className="text-xs px-2 py-1 rounded-full bg-muted/60 text-muted-foreground"
                           >
                             {tag}
                           </span>

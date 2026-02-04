@@ -272,12 +272,12 @@ export default function ClubDetail() {
   }
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
+    <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-foreground">
       <div className="min-h-screen pb-24">
         <section className="relative py-12 bg-gradient-to-b from-[var(--navy)] to-background overflow-hidden">
           <div className="absolute top-0 right-0 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="container relative z-10 space-y-6">
-            <Link href="/community" className="inline-flex items-center gap-2 text-white/70 hover:text-white">
+            <Link href="/community" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-4 w-4" />
               Torna ai club
             </Link>
@@ -286,13 +286,13 @@ export default function ClubDetail() {
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <Users className="h-6 w-6 text-[var(--azure)]" />
-                  <span className="text-sm text-white/60">Club</span>
+                  <span className="text-sm text-muted-foreground">Club</span>
                 </div>
                 <h1 className="text-3xl md:text-4xl font-bold">{club?.name ?? "Club"}</h1>
-                <p className="text-white/70 mt-2 max-w-2xl">
+                <p className="text-muted-foreground mt-2 max-w-2xl">
                   {club?.description || "Condividi progressi, allenamenti e obiettivi con la tua squadra."}
                 </p>
-                <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-white/70">
+                <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                   <span>{club?.member_count ?? 0} membri</span>
                   <span>{club?.is_private ? "Privato" : "Pubblico"}</span>
                 </div>
@@ -305,7 +305,7 @@ export default function ClubDetail() {
                     </Button>
                   ) : (
                     <Button
-                      className="bg-[var(--azure)] text-white"
+                      className="bg-[var(--azure)] text-primary-foreground"
                       onClick={() => joinClub.mutate({ clubId })}
                       disabled={club.visibility !== "public"}
                     >
@@ -322,7 +322,7 @@ export default function ClubDetail() {
           <div className="container space-y-8">
             {club && club.is_private && !club.is_member ? (
               <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-                <CardContent className="p-6 text-white/70">
+                <CardContent className="p-6 text-muted-foreground">
                   Questo club è privato. Entra nel club per vedere i contenuti.
                 </CardContent>
               </Card>
@@ -333,7 +333,7 @@ export default function ClubDetail() {
                     <CardContent className="p-6">
                       <h3 className="text-lg font-semibold mb-3">Regole del club</h3>
                       <div
-                        className="prose prose-invert prose-sm max-w-none"
+                        className="prose dark:prose-invert prose-sm max-w-none"
                         dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(club.rules) }}
                       />
                     </CardContent>
@@ -344,17 +344,17 @@ export default function ClubDetail() {
                     <CardContent className="p-6 space-y-4">
                       <div className="flex items-center justify-between">
                         <h2 className="text-xl font-semibold">Bacheca del club</h2>
-                        <span className="text-sm text-white/60">{feedItems.length} post</span>
+                        <span className="text-sm text-muted-foreground">{feedItems.length} post</span>
                       </div>
                       <div className="flex flex-col md:flex-row gap-3">
                         <Input
                           placeholder="Condividi un pensiero con il club..."
                           value={postText}
                           onChange={(e) => setPostText(e.target.value)}
-                          className="bg-white/5 border-white/10"
+                          className="bg-muted/40 dark:bg-white/5 border-border/60"
                         />
                         <Button
-                          className="bg-[var(--gold)] text-[var(--navy)]"
+                          className="bg-[var(--gold)] text-slate-900 dark:text-[var(--navy)]"
                           onClick={() =>
                             createPost.mutate({
                               clubId,
@@ -375,7 +375,7 @@ export default function ClubDetail() {
                       <h3 className="text-lg font-semibold">Membri attivi</h3>
                       <div className="space-y-3 max-h-64 overflow-auto pr-2">
                         {members.length === 0 ? (
-                          <div className="text-white/60 text-sm">Nessun membro disponibile.</div>
+                          <div className="text-muted-foreground text-sm">Nessun membro disponibile.</div>
                         ) : (
                           members.map((member) => (
                             <div key={member.user_id} className="flex items-center gap-3">
@@ -386,13 +386,13 @@ export default function ClubDetail() {
                                   className="h-9 w-9 rounded-full object-cover"
                                 />
                               ) : (
-                                <div className="h-9 w-9 rounded-full bg-white/10" />
+                                <div className="h-9 w-9 rounded-full bg-muted/40 dark:bg-white/10" />
                               )}
                               <div className="flex-1">
                                 <div className="text-sm font-semibold">
                                   {member.user_name || member.user_email}
                                 </div>
-                                <div className="text-xs text-white/50">
+                                <div className="text-xs text-muted-foreground">
                                   {member.role === "moderator" ? "Moderatore" : member.role === "admin" ? "Admin" : member.role}
                                 </div>
                               </div>
@@ -406,7 +406,7 @@ export default function ClubDetail() {
                                       role: e.target.value as "member" | "moderator" | "admin",
                                     })
                                   }
-                                  className="rounded-md bg-white/5 border border-white/10 px-2 py-1 text-xs"
+                                  className="rounded-md bg-muted/40 dark:bg-white/5 border border-border/60 px-2 py-1 text-xs"
                                 >
                                   <option value="member">Membro</option>
                                   <option value="moderator">Moderatore</option>
@@ -435,18 +435,18 @@ export default function ClubDetail() {
                     <CardContent className="p-6 space-y-4">
                       <div className="flex items-center justify-between">
                         <h3 className="text-lg font-semibold">Impostazioni club</h3>
-                        <span className="text-xs text-white/60">
+                        <span className="text-xs text-muted-foreground">
                           {isOwner ? "Owner" : "Moderazione"}
                         </span>
                       </div>
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="space-y-2">
-                          <label className="text-xs text-white/60">Visibilità</label>
+                          <label className="text-xs text-muted-foreground">Visibilità</label>
                           <select
                             value={visibilityDraft}
                             onChange={(e) => setVisibilityDraft(e.target.value as "public" | "private" | "invite")}
                             disabled={!isOwner}
-                            className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm"
+                            className="w-full rounded-md bg-muted/40 dark:bg-white/5 border border-border/60 px-3 py-2 text-sm"
                           >
                             <option value="public">Pubblico</option>
                             <option value="private">Privato</option>
@@ -454,26 +454,26 @@ export default function ClubDetail() {
                           </select>
                         </div>
                         <div className="space-y-2">
-                          <label className="text-xs text-white/60">Regole del club</label>
+                          <label className="text-xs text-muted-foreground">Regole del club</label>
                           <textarea
                             value={rulesDraft}
                             onChange={(e) => setRulesDraft(e.target.value)}
-                            className="min-h-[90px] w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm"
+                            className="min-h-[90px] w-full rounded-md bg-muted/40 dark:bg-white/5 border border-border/60 px-3 py-2 text-sm"
                           />
                         </div>
                       </div>
                       {rulesDraft.trim().length > 0 && (
-                        <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-                          <div className="text-xs text-white/60 mb-2">Anteprima regole</div>
+                        <div className="rounded-lg border border-border/60 bg-muted/40 dark:bg-white/5 p-3">
+                          <div className="text-xs text-muted-foreground mb-2">Anteprima regole</div>
                           <div
-                            className="prose prose-invert prose-sm max-w-none"
+                            className="prose dark:prose-invert prose-sm max-w-none"
                             dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(rulesDraft) }}
                           />
                         </div>
                       )}
                       <div className="flex flex-col sm:flex-row gap-2">
                         <Button
-                          className="bg-[var(--azure)] text-white"
+                          className="bg-[var(--azure)] text-primary-foreground"
                           onClick={() =>
                             updateClub.mutate({
                               clubId,
@@ -507,11 +507,11 @@ export default function ClubDetail() {
                       <h3 className="text-lg font-semibold">Inviti</h3>
                       <div className="grid gap-3 md:grid-cols-3">
                         <div className="space-y-2">
-                          <label className="text-xs text-white/60">Ruolo</label>
+                          <label className="text-xs text-muted-foreground">Ruolo</label>
                           <select
                             value={inviteRole}
                             onChange={(e) => setInviteRole(e.target.value as "member" | "moderator")}
-                            className="w-full rounded-md bg-white/5 border border-white/10 px-3 py-2 text-sm"
+                            className="w-full rounded-md bg-muted/40 dark:bg-white/5 border border-border/60 px-3 py-2 text-sm"
                           >
                             <option value="member">Membro</option>
                             {(isOwner || club?.member_role === "admin") && (
@@ -520,18 +520,18 @@ export default function ClubDetail() {
                           </select>
                         </div>
                         <div className="space-y-2">
-                          <label className="text-xs text-white/60">Utilizzi max</label>
+                          <label className="text-xs text-muted-foreground">Utilizzi max</label>
                           <Input
                             type="number"
                             min={1}
                             max={100}
                             value={inviteMaxUses}
                             onChange={(e) => setInviteMaxUses(Number(e.target.value) || 1)}
-                            className="bg-white/5 border-white/10"
+                            className="bg-muted/40 dark:bg-white/5 border-border/60"
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-xs text-white/60">Scadenza (giorni)</label>
+                          <label className="text-xs text-muted-foreground">Scadenza (giorni)</label>
                           <Input
                             type="number"
                             min={1}
@@ -541,12 +541,12 @@ export default function ClubDetail() {
                               const value = e.target.value;
                               setInviteExpiryDays(value ? Number(value) : "");
                             }}
-                            className="bg-white/5 border-white/10"
+                            className="bg-muted/40 dark:bg-white/5 border-border/60"
                           />
                         </div>
                       </div>
                       <Button
-                        className="bg-[var(--gold)] text-[var(--navy)]"
+                        className="bg-[var(--gold)] text-slate-900 dark:text-[var(--navy)]"
                         disabled={createInvite.isPending}
                         onClick={() => {
                           const days = typeof inviteExpiryDays === "number" ? inviteExpiryDays : 0;
@@ -563,7 +563,7 @@ export default function ClubDetail() {
                       </Button>
 
                       {invites.length === 0 ? (
-                        <div className="text-sm text-white/60">Nessun invito attivo.</div>
+                        <div className="text-sm text-muted-foreground">Nessun invito attivo.</div>
                       ) : (
                         <div className="space-y-3">
                           {invites.map((invite) => {
@@ -580,11 +580,11 @@ export default function ClubDetail() {
                             return (
                               <div
                                 key={invite.id}
-                                className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2"
+                                className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-lg border border-border/60 bg-muted/40 dark:bg-white/5 px-3 py-2"
                               >
                                 <div className="text-sm">
                                   <div className="font-semibold">{invite.code}</div>
-                                  <div className="text-xs text-white/60">
+                                  <div className="text-xs text-muted-foreground">
                                     Ruolo: {invite.role} · Usati {invite.used_count}/{invite.max_uses} · {statusLabel}
                                   </div>
                                 </div>
@@ -621,7 +621,7 @@ export default function ClubDetail() {
                       <CardContent className="p-6 space-y-4">
                         <h3 className="text-lg font-semibold">Richieste di ingresso</h3>
                         {requests.length === 0 ? (
-                          <div className="text-white/60 text-sm">Nessuna richiesta in attesa.</div>
+                          <div className="text-muted-foreground text-sm">Nessuna richiesta in attesa.</div>
                         ) : (
                           <div className="space-y-3">
                             {requests.map((member) => (
@@ -633,17 +633,17 @@ export default function ClubDetail() {
                                     className="h-8 w-8 rounded-full object-cover"
                                   />
                                 ) : (
-                                  <div className="h-8 w-8 rounded-full bg-white/10" />
+                                  <div className="h-8 w-8 rounded-full bg-muted/40 dark:bg-white/10" />
                                 )}
                                 <div className="flex-1">
                                   <div className="text-sm font-semibold">
                                     {member.user_name || member.user_email}
                                   </div>
-                                  <div className="text-xs text-white/50">Richiesta in attesa</div>
+                                  <div className="text-xs text-muted-foreground">Richiesta in attesa</div>
                                 </div>
                                 <Button
                                   size="sm"
-                                  className="bg-[var(--azure)] text-white"
+                                  className="bg-[var(--azure)] text-primary-foreground"
                                   onClick={() => approveRequest.mutate({ clubId, userId: member.user_id })}
                                 >
                                   Approva
@@ -666,7 +666,7 @@ export default function ClubDetail() {
                       <CardContent className="p-6 space-y-4">
                         <h3 className="text-lg font-semibold">Utenti bannati</h3>
                         {bannedMembers.length === 0 ? (
-                          <div className="text-white/60 text-sm">Nessun utente bannato.</div>
+                          <div className="text-muted-foreground text-sm">Nessun utente bannato.</div>
                         ) : (
                           <div className="space-y-3">
                             {bannedMembers.map((member) => (
@@ -678,13 +678,13 @@ export default function ClubDetail() {
                                     className="h-8 w-8 rounded-full object-cover"
                                   />
                                 ) : (
-                                  <div className="h-8 w-8 rounded-full bg-white/10" />
+                                  <div className="h-8 w-8 rounded-full bg-muted/40 dark:bg-white/10" />
                                 )}
                                 <div className="flex-1">
                                   <div className="text-sm font-semibold">
                                     {member.user_name || member.user_email}
                                   </div>
-                                  <div className="text-xs text-white/50">Bannato</div>
+                                  <div className="text-xs text-muted-foreground">Bannato</div>
                                 </div>
                                 <Button
                                   size="sm"
@@ -704,11 +704,11 @@ export default function ClubDetail() {
 
                 {feedQuery.isLoading ? (
                   <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-                    <CardContent className="p-6 text-white/60">Caricamento feed...</CardContent>
+                    <CardContent className="p-6 text-muted-foreground">Caricamento feed...</CardContent>
                   </Card>
                 ) : feedItems.length === 0 ? (
                   <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-                    <CardContent className="p-6 text-white/60">
+                    <CardContent className="p-6 text-muted-foreground">
                       Nessun contenuto nel club. Condividi il primo post!
                     </CardContent>
                   </Card>
@@ -736,11 +736,11 @@ export default function ClubDetail() {
                                     className="h-12 w-12 rounded-full object-cover"
                                   />
                                 ) : (
-                                  <div className="h-12 w-12 rounded-full bg-white/10" />
+                                  <div className="h-12 w-12 rounded-full bg-muted/40 dark:bg-white/10" />
                                 )}
                                 <div className="flex-1">
                                   <div className="font-semibold">{post.user_name || post.user_email}</div>
-                                  <div className="text-xs text-white/50">{formatDate(post.activity_date)}</div>
+                                  <div className="text-xs text-muted-foreground">{formatDate(post.activity_date)}</div>
                                 </div>
                               </div>
 
@@ -819,14 +819,14 @@ export default function ClubDetail() {
                                       )}
                                     </Button>
                                   </DialogTrigger>
-                                  <DialogContent className="max-w-lg bg-[var(--navy)] text-white border border-white/10">
+                                  <DialogContent className="max-w-lg bg-[var(--navy)] text-foreground border border-border/60">
                                     <DialogHeader>
                                       <DialogTitle>Commenti</DialogTitle>
                                     </DialogHeader>
                                     <div className="space-y-3">
-                                      <div className="space-y-2 text-sm text-white/80 max-h-64 overflow-y-auto pr-1">
+                                      <div className="space-y-2 text-sm text-muted-foreground max-h-64 overflow-y-auto pr-1">
                                         {commentsQuery.isLoading ? (
-                                          <div className="text-white/50">Caricamento commenti...</div>
+                                          <div className="text-muted-foreground">Caricamento commenti...</div>
                                         ) : commentsQuery.data && commentsQuery.data.length > 0 ? (
                                           commentsQuery.data.map((comment: any) => (
                                             <div key={comment.id} className="flex items-start gap-2">
@@ -837,10 +837,10 @@ export default function ClubDetail() {
                                                   className="h-6 w-6 rounded-full object-cover"
                                                 />
                                               ) : (
-                                                <div className="h-6 w-6 rounded-full bg-white/10" />
+                                                <div className="h-6 w-6 rounded-full bg-muted/40 dark:bg-white/10" />
                                               )}
                                               <div>
-                                                <div className="text-xs text-white/60">
+                                                <div className="text-xs text-muted-foreground">
                                                   {comment.user_name || comment.user_email}
                                                 </div>
                                                 <div>{comment.content}</div>
@@ -848,7 +848,7 @@ export default function ClubDetail() {
                                             </div>
                                           ))
                                         ) : (
-                                          <div className="text-white/50">Nessun commento ancora.</div>
+                                          <div className="text-muted-foreground">Nessun commento ancora.</div>
                                         )}
                                       </div>
 
@@ -876,7 +876,7 @@ export default function ClubDetail() {
                                             })
                                           }
                                           disabled={addComment.isPending || (commentTextByPost[post.id] ?? "").trim().length === 0}
-                                          className="bg-[var(--gold)] text-[var(--navy)]"
+                                          className="bg-[var(--gold)] text-slate-900 dark:text-[var(--navy)]"
                                         >
                                           Pubblica
                                         </Button>
