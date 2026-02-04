@@ -426,11 +426,10 @@ export default function Dashboard() {
     meQuery.data?.name ||
     meQuery.data?.email?.split("@")[0] ||
     "Nuotatore"
-  const profileBadgeImage =
-    profile?.profileBadge?.badge_image_url ||
-    profile?.profileBadge?.badgeImageUrl ||
-    profile?.profileBadge?.image_url ||
-    profile?.profileBadge?.imageUrl ||
+  const profileAvatarUrl =
+    profile?.avatarUrl ||
+    profile?.avatar_url ||
+    profile?.avatar ||
     null
   const profileCoverImage =
     profile?.coverUrl ||
@@ -452,24 +451,32 @@ export default function Dashboard() {
               <img
                 src={coverImage}
                 alt="Cover profilo"
-                className="h-full w-full object-cover opacity-25"
+                className="h-full w-full object-cover opacity-20 dark:opacity-25"
                 loading="lazy"
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/70 to-background/40" />
+              <div className="absolute inset-0 bg-gradient-to-r from-background/95 via-background/80 to-background/50" />
             </div>
           )}
           <CardContent className="relative p-6 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
-              <div className="size-32 rounded-2xl bg-primary/10 flex items-center justify-center overflow-hidden">
-                {profileBadgeImage ? (
+              <div className="size-32 rounded-2xl bg-muted/60 border border-border/60 flex items-center justify-center overflow-hidden">
+                {profileAvatarUrl ? (
                   <img
-                    src={profileBadgeImage}
-                    alt={profile?.profileBadge?.name || "Badge profilo"}
-                    className="h-28 w-28 object-contain badge-hero-spin"
+                    src={profileAvatarUrl}
+                    alt={displayName}
+                    className="h-full w-full object-cover"
                     loading="lazy"
                   />
                 ) : (
-                  <Waves className="size-12 text-primary" />
+                  <div className="flex h-full w-full items-center justify-center bg-primary/10 text-primary text-2xl font-semibold">
+                    {displayName
+                      .split(" ")
+                      .filter(Boolean)
+                      .slice(0, 2)
+                      .map((part) => part[0])
+                      .join("")
+                      .toUpperCase()}
+                  </div>
                 )}
               </div>
               <div>
