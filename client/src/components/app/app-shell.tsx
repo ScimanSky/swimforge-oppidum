@@ -4,7 +4,6 @@ import React, { useState } from "react"
 import { Link, useLocation } from "wouter"
 import { cn } from "@/lib/utils"
 import {
-  Home,
   LayoutDashboard,
   Waves,
   Users,
@@ -17,8 +16,11 @@ import {
   X,
   Medal,
   BarChart3,
+  LogOut,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { trpc } from "@/lib/trpc"
+import { supabase } from "@/lib/supabase"
 
 interface NavItem {
   label: string
@@ -42,6 +44,26 @@ const navItems: NavItem[] = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const logoutMutation = trpc.auth.logout.useMutation()
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return
+    setIsLoggingOut(true)
+    try {
+      await logoutMutation.mutateAsync()
+    } catch {
+      // ignore logout errors, still clear client session
+    }
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // ignore
+    }
+    localStorage.removeItem("swimforge:autoSync:dashboardReady")
+    localStorage.removeItem("swimforge:autoSync:last")
+    window.location.href = "/"
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -80,13 +102,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           {/* Bottom section */}
           <div className="border-t border-border p-4">
-            <Link
-              href="/"
-              className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <Home className="size-5" />
-              Torna alla home
-            </Link>
+              <LogOut className="size-5" />
+              {isLoggingOut ? "Logout..." : "Logout"}
+            </button>
           </div>
         </div>
       </aside>
@@ -144,14 +168,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             )
           })}
-          <Link
-            href="/"
-            onClick={() => setMobileMenuOpen(false)}
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          <button
+            type="button"
+            onClick={() => {
+              setMobileMenuOpen(false)
+              void handleLogout()
+            }}
+            disabled={isLoggingOut}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <Home className="size-5" />
-            Torna alla home
-          </Link>
+            <LogOut className="size-5" />
+            {isLoggingOut ? "Logout..." : "Logout"}
+          </button>
         </nav>
       </div>
 

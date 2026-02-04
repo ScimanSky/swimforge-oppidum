@@ -29,12 +29,6 @@ async function runAutoSync(userId: number, options: { force?: boolean } = {}) {
   ]);
 }
 
-function triggerAutoSync(userId: number) {
-  void runAutoSync(userId, { force: true }).catch((error) => {
-    console.error(`[Auto-Sync] Failed for user ${userId}:`, error);
-  });
-}
-
 async function applyRateLimit(
   limiter: (req: Request, res: Response, next: (err?: any) => void) => void,
   req: Request,
@@ -133,9 +127,6 @@ export const appRouter = router({
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
         
-        // Auto-sync Garmin + Strava activities in background if needed
-        triggerAutoSync(result.user.id);
-        
         return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
       }),
     
@@ -227,8 +218,6 @@ export const appRouter = router({
         
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-        // Auto-sync Garmin + Strava activities in background if needed
-        triggerAutoSync(user.id);
         return { success: true, user: { id: user.id, email: user.email, name: user.name } };
       }),
   }),
