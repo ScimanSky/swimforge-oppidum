@@ -120,6 +120,7 @@ export default function Coach() {
   const [activeInsightIndex, setActiveInsightIndex] = useState(0)
   const [activePoolSectionIndex, setActivePoolSectionIndex] = useState(0)
   const [activeDrySectionIndex, setActiveDrySectionIndex] = useState(0)
+  const [activeWorkout, setActiveWorkout] = useState<"pool" | "dryland">("pool")
 
   const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
@@ -489,36 +490,57 @@ export default function Coach() {
               <CardHeader>
                 <CardTitle className="font-display">Allenamenti AI</CardTitle>
                 <CardDescription>
-                  Vasca e dryland affiancati per consultare le fasi senza scorrere.
+                  Un solo allenamento alla volta. Tocca il titolo per cambiare modalità.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <div className="space-y-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-base font-semibold text-foreground">
-                          Allenamento in Vasca
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          Generato dall&apos;AI
-                        </p>
-                      </div>
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap gap-2">
                       <Button
-                        variant="outline"
+                        type="button"
                         size="sm"
-                        onClick={handleRegeneratePool}
-                        disabled={poolRegenerate || poolWorkoutQuery.isFetching}
+                        variant={activeWorkout === "pool" ? "default" : "outline"}
+                        onClick={() => setActiveWorkout("pool")}
                       >
-                        <RefreshCw
-                          className={`mr-2 h-4 w-4 ${poolRegenerate ? "animate-spin" : ""}`}
-                        />
-                        Rigenera
+                        Allenamento in Vasca
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={activeWorkout === "dryland" ? "default" : "outline"}
+                        onClick={() => setActiveWorkout("dryland")}
+                      >
+                        Allenamento Dryland
                       </Button>
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={activeWorkout === "pool" ? handleRegeneratePool : handleRegenerateDryland}
+                      disabled={
+                        activeWorkout === "pool"
+                          ? poolRegenerate || poolWorkoutQuery.isFetching
+                          : dryRegenerate || drylandWorkoutQuery.isFetching
+                      }
+                    >
+                      <RefreshCw
+                        className={`mr-2 h-4 w-4 ${
+                          activeWorkout === "pool"
+                            ? (poolRegenerate ? "animate-spin" : "")
+                            : (dryRegenerate ? "animate-spin" : "")
+                        }`}
+                      />
+                      Rigenera
+                    </Button>
+                  </div>
 
-                    {poolWorkout ? (
+                  {activeWorkout === "pool" ? (
+                    poolWorkout ? (
                       <>
+                        <div className="text-sm text-muted-foreground">
+                          Generato dall&apos;AI
+                        </div>
                         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                           <span className="font-semibold text-foreground">
                             {poolWorkout.title}
@@ -583,100 +605,77 @@ export default function Coach() {
                       <div className="text-sm text-muted-foreground">
                         Allenamento in vasca non disponibile. Sincronizza nuove attività.
                       </div>
-                    )}
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="text-base font-semibold text-foreground">
-                          Allenamento Dryland
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          Forza, core e mobilità
-                        </p>
+                    )
+                  ) : drylandWorkout ? (
+                    <>
+                      <div className="text-sm text-muted-foreground">
+                        Forza, core e mobilità
                       </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRegenerateDryland}
-                        disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
-                      >
-                        <RefreshCw
-                          className={`mr-2 h-4 w-4 ${dryRegenerate ? "animate-spin" : ""}`}
-                        />
-                        Rigenera
-                      </Button>
-                    </div>
-
-                    {drylandWorkout ? (
-                      <>
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                          <span className="font-semibold text-foreground">
-                            {drylandWorkout.title}
-                          </span>
-                          <span>• {drylandWorkout.duration}</span>
-                          <span>• {drylandWorkout.difficulty}</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {drylandWorkout.description}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {drylandWorkout.sections.map((section, idx) => (
-                            <Button
-                              key={idx}
-                              type="button"
-                              size="sm"
-                              variant={idx === activeDrySectionIndex ? "default" : "outline"}
-                              onClick={() => setActiveDrySectionIndex(idx)}
-                            >
-                              {section.title}
-                            </Button>
-                          ))}
-                        </div>
-                        {activeDrySection ? (
-                          <div className="rounded-lg border border-border bg-secondary/20 p-4 max-h-[420px] overflow-auto">
-                            <div className="mb-2 flex flex-wrap items-center gap-2">
-                              <Badge variant="secondary">{activeDrySection.title}</Badge>
-                              {activeDrySection.notes && (
-                                <span className="text-xs text-muted-foreground">
-                                  {activeDrySection.notes}
-                                </span>
-                              )}
-                            </div>
-                            <div className="space-y-3">
-                              {activeDrySection.exercises.map((exercise, exIdx) => (
-                                <div
-                                  key={exIdx}
-                                  className="rounded-md bg-background/60 p-3 text-sm"
-                                >
-                                  <div className="font-medium text-foreground">
-                                    {exercise.name}
-                                  </div>
-                                  <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                    {getExerciseDetails(exercise).map(
-                                      (detail, detailIdx) => (
-                                        <span key={detailIdx}>{detail}</span>
-                                      )
-                                    )}
-                                  </div>
-                                  {exercise.notes && (
-                                    <p className="mt-2 text-xs text-muted-foreground">
-                                      {exercise.notes}
-                                    </p>
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                        <span className="font-semibold text-foreground">
+                          {drylandWorkout.title}
+                        </span>
+                        <span>• {drylandWorkout.duration}</span>
+                        <span>• {drylandWorkout.difficulty}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {drylandWorkout.description}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {drylandWorkout.sections.map((section, idx) => (
+                          <Button
+                            key={idx}
+                            type="button"
+                            size="sm"
+                            variant={idx === activeDrySectionIndex ? "default" : "outline"}
+                            onClick={() => setActiveDrySectionIndex(idx)}
+                          >
+                            {section.title}
+                          </Button>
+                        ))}
+                      </div>
+                      {activeDrySection ? (
+                        <div className="rounded-lg border border-border bg-secondary/20 p-4 max-h-[420px] overflow-auto">
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <Badge variant="secondary">{activeDrySection.title}</Badge>
+                            {activeDrySection.notes && (
+                              <span className="text-xs text-muted-foreground">
+                                {activeDrySection.notes}
+                              </span>
+                            )}
+                          </div>
+                          <div className="space-y-3">
+                            {activeDrySection.exercises.map((exercise, exIdx) => (
+                              <div
+                                key={exIdx}
+                                className="rounded-md bg-background/60 p-3 text-sm"
+                              >
+                                <div className="font-medium text-foreground">
+                                  {exercise.name}
+                                </div>
+                                <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                  {getExerciseDetails(exercise).map(
+                                    (detail, detailIdx) => (
+                                      <span key={detailIdx}>{detail}</span>
+                                    )
                                   )}
                                 </div>
-                              ))}
-                            </div>
+                                {exercise.notes && (
+                                  <p className="mt-2 text-xs text-muted-foreground">
+                                    {exercise.notes}
+                                  </p>
+                                )}
+                              </div>
+                            ))}
                           </div>
-                        ) : null}
-                      </>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">
-                        Allenamento dryland non disponibile. Sincronizza nuove attività.
-                      </div>
-                    )}
-                  </div>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      Allenamento dryland non disponibile. Sincronizza nuove attività.
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
