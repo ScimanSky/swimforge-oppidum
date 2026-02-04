@@ -1125,6 +1125,32 @@ export const appRouter = router({
         return getComments(input.postId);
       }),
 
+    ghostChallenges: router({
+      list: protectedProcedure
+        .input(z.object({ clubId: z.number().optional() }).optional())
+        .query(async ({ ctx, input }) => {
+          const { listGhostChallenges } = await import("./db_ghost_challenges");
+          return listGhostChallenges(ctx.user.id, input?.clubId);
+        }),
+      createFromPost: protectedProcedure
+        .input(z.object({ postId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const { createGhostChallengeFromPost } = await import("./db_ghost_challenges");
+          try {
+            const result = await createGhostChallengeFromPost(ctx.user.id, input.postId);
+            if (!result) {
+              throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Creazione sfida fallita" });
+            }
+            return { success: true, id: result.id };
+          } catch (error: any) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: error?.message || "Impossibile creare la Ghost Track",
+            });
+          }
+        }),
+    }),
+
     clubs: router({
       list: protectedProcedure
         .input(z.object({

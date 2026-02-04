@@ -13,9 +13,6 @@ import {
   Droplet,
   MessageCircle,
   Users,
-  Trophy,
-  ChevronRight,
-  Clock,
   Plus,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
@@ -38,6 +35,13 @@ const formatPace = (meters?: number | null, seconds?: number | null) => {
   if (!meters || !seconds || meters <= 0) return "—"
   const pace = seconds / (meters / 100)
   if (!Number.isFinite(pace)) return "—"
+  const minutes = Math.floor(pace / 60)
+  const secs = Math.round(pace % 60)
+  return `${minutes}:${secs.toString().padStart(2, "0")}/100m`
+}
+
+const formatPaceValue = (pace?: number | null) => {
+  if (!pace || pace <= 0) return "—"
   const minutes = Math.floor(pace / 60)
   const secs = Math.round(pace % 60)
   return `${minutes}:${secs.toString().padStart(2, "0")}/100m`
@@ -81,11 +85,19 @@ export default function Community() {
     search: clubSearch.trim() || undefined,
     limit: 12,
   })
-  const challengesQuery = trpc.challenges.list.useQuery()
+  const ghostChallengesQuery = trpc.community.ghostChallenges.list.useQuery()
 
   const toggleSplash = trpc.community.toggleSplash.useMutation({
     onSuccess: () => feedQuery.refetch(),
     onError: (err) => toast.error(err.message || "Impossibile inviare uno Splash"),
+  })
+
+  const createGhostChallenge = trpc.community.ghostChallenges.createFromPost.useMutation({
+    onSuccess: () => {
+      toast.success("Ghost Track creata!")
+      ghostChallengesQuery.refetch()
+    },
+    onError: (err) => toast.error(err.message || "Impossibile creare la Ghost Track"),
   })
 
   const commentsQuery = trpc.community.comments.useQuery(
@@ -104,7 +116,10 @@ export default function Community() {
 
   const feedItems = useMemo(() => (feedQuery.data as any[]) || [], [feedQuery.data])
   const clubs = useMemo(() => (clubsQuery.data as any[]) || [], [clubsQuery.data])
-  const challenges = useMemo(() => (challengesQuery.data as any[]) || [], [challengesQuery.data])
+  const ghostChallenges = useMemo(
+    () => (ghostChallengesQuery.data as any[]) || [],
+    [ghostChallengesQuery.data]
+  )
 
   const submitComment = (postId: number) => {
     const content = (commentTextByPost[postId] ?? "").trim()
@@ -131,7 +146,7 @@ export default function Community() {
           <TabsList className="bg-secondary/50">
             <TabsTrigger value="feed">Feed</TabsTrigger>
             <TabsTrigger value="clubs">Club</TabsTrigger>
-            <TabsTrigger value="challenges">Challenges</TabsTrigger>
+            <TabsTrigger value="challenges">Ghost Track</TabsTrigger>
           </TabsList>
 
           {/* Feed Tab */}
@@ -222,34 +237,48 @@ export default function Community() {
                       </div>
 
                       {/* Post Actions */}
-                      <div className="flex items-center gap-4 pt-4 border-t border-border">
-                        <button
-                          onClick={() => {
-                            if (isOwner) {
-                              toast.info("Non puoi mettere Splash al tuo allenamento.")
-                              return
-                            }
-                            toggleSplash.mutate({ postId: post.id })
-                          }}
-                          className={`flex items-center gap-1.5 text-sm transition-colors ${
-                            post.has_splashed
-                              ? "text-primary"
-                              : "text-muted-foreground hover:text-foreground"
-                          } ${isOwner ? "opacity-50 cursor-not-allowed" : ""}`}
-                        >
-                          <Droplet
-                            className={`w-4 h-4 ${post.has_splashed ? "fill-primary" : ""}`}
-                          />
-                          <span>{post.splash_count} Splash</span>
-                        </button>
+                      <div className="flex flex-wrap items-center gap-4 pt-4 border-t border-border">
+                        <div className="flex items-center gap-4">
+                          <button
+                            onClick={() => {
+                              if (isOwner) {
+                                toast.info("Non puoi mettere Splash al tuo allenamento.")
+                                return
+                              }
+                              toggleSplash.mutate({ postId: post.id })
+                            }}
+                            className={`flex items-center gap-1.5 text-sm transition-colors ${
+                              post.has_splashed
+                                ? "text-primary"
+                                : "text-muted-foreground hover:text-foreground"
+                            } ${isOwner ? "opacity-50 cursor-not-allowed" : ""}`}
+                          >
+                            <Droplet
+                              className={`w-4 h-4 ${post.has_splashed ? "fill-primary" : ""}`}
+                            />
+                            <span>{post.splash_count} Splash</span>
+                          </button>
 
-                        <button
-                          onClick={() => setOpenCommentsId(openCommentsId === post.id ? null : post.id)}
-                          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                          <span>{post.comment_count} Commenti</span>
-                        </button>
+                          <button
+                            onClick={() => setOpenCommentsId(openCommentsId === post.id ? null : post.id)}
+                            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                            <span>{post.comment_count} Commenti</span>
+                          </button>
+                        </div>
+
+                        {post.activity_id && !isOwner && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="ml-auto"
+                            onClick={() => createGhostChallenge.mutate({ postId: post.id })}
+                            disabled={createGhostChallenge.isPending}
+                          >
+                            Sfida Ghost
+                          </Button>
+                        )}
                       </div>
 
                       {openCommentsId === post.id && (
@@ -395,83 +424,91 @@ export default function Community() {
             </div>
           </TabsContent>
 
-          {/* Challenges Tab */}
+          {/* Ghost Track Tab */}
           <TabsContent value="challenges" className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-display font-bold text-foreground">
-                Sfide Attive
+                Ghost Track
               </h2>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/challenges">
-                  Vedi tutte
-                  <ChevronRight className="w-4 h-4 ml-1" />
-                </Link>
-              </Button>
+              <Badge variant="secondary" className="text-xs">
+                Sfide 1v1 sulle sessioni reali
+              </Badge>
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
-              {challengesQuery.isLoading ? (
+              {ghostChallengesQuery.isLoading ? (
                 <Card className="bg-card border-border">
-                  <CardContent className="p-6 text-muted-foreground">Caricamento sfide...</CardContent>
+                  <CardContent className="p-6 text-muted-foreground">
+                    Caricamento Ghost Track...
+                  </CardContent>
                 </Card>
-              ) : challenges.length === 0 ? (
+              ) : ghostChallenges.length === 0 ? (
                 <Card className="bg-card border-border">
-                  <CardContent className="p-6 text-muted-foreground">Nessuna sfida attiva.</CardContent>
+                  <CardContent className="p-6 text-muted-foreground">
+                    Nessuna Ghost Track ancora. Lancia una sfida dal feed!
+                  </CardContent>
                 </Card>
               ) : (
-                challenges.map((challenge: any) => {
-                  const rules = challenge.rules || {}
-                  const target = typeof rules.target === "number" ? rules.target : null
-                  const current = Number(challenge.current_progress || 0)
-                  const progressPercent = target ? Math.min(100, Math.round((current / target) * 100)) : null
-                  const endsIn = challenge.end_date
-                    ? formatTimeAgo(challenge.end_date)
-                    : "—"
+                ghostChallenges.map((ghost: any) => {
+                  const challengerName =
+                    ghost.challenger_name || ghost.challenger_email?.split("@")[0] || "Tu"
+                  const opponentName =
+                    ghost.opponent_name || ghost.opponent_email?.split("@")[0] || "Avversario"
+                  const challengerIsMe = ghost.challenger_user_id === currentUserId
+                  const winnerId = ghost.winner_user_id
+                  const isDraw = !winnerId
+                  const winnerLabel = isDraw
+                    ? "Pareggio"
+                    : winnerId === currentUserId
+                      ? "Hai vinto"
+                      : "Hai perso"
+                  const challengerDistance = formatDistance(ghost.challenger_distance_meters)
+                  const opponentDistance = formatDistance(ghost.opponent_distance_meters)
+                  const challengerDuration = formatDuration(ghost.challenger_duration_seconds)
+                  const opponentDuration = formatDuration(ghost.opponent_duration_seconds)
+                  const challengerPace = formatPaceValue(ghost.challenger_pace_per_100m)
+                  const opponentPace = formatPaceValue(ghost.opponent_pace_per_100m)
 
                   return (
-                    <Card key={challenge.id} className="bg-card border-border">
-                      <CardContent className="p-6">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="w-12 h-12 rounded-xl bg-chart-4/10 flex items-center justify-center">
-                            <Trophy className="w-6 h-6 text-chart-4" />
+                    <Card key={ghost.id} className="bg-card border-border">
+                      <CardContent className="p-6 space-y-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs text-muted-foreground">
+                              {ghost.club_name ? `Club: ${ghost.club_name}` : "Feed pubblico"}
+                            </p>
+                            <h3 className="text-lg font-semibold text-foreground">
+                              {challengerIsMe ? "Tu" : challengerName} vs {challengerIsMe ? opponentName : "Tu"}
+                            </h3>
                           </div>
-                          {challenge.prize_description && (
-                            <Badge variant="outline" className="text-xs">
-                              {challenge.prize_description}
-                            </Badge>
-                          )}
+                          <Badge
+                            variant={winnerId === currentUserId ? "default" : "outline"}
+                            className="text-xs"
+                          >
+                            {winnerLabel}
+                          </Badge>
                         </div>
 
-                        <h3 className="text-lg font-semibold text-foreground mb-1">
-                          {challenge.name}
-                        </h3>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          {challenge.description || "Sfida attiva"}
-                        </p>
-
-                        <div className="mb-4">
-                          <div className="flex items-center justify-between text-xs mb-2">
-                            <span className="text-muted-foreground">Progresso</span>
-                            <span className="text-foreground font-medium">
-                              {progressPercent !== null ? `${progressPercent}%` : "—"}
-                            </span>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-lg border border-border/60 bg-secondary/30 p-3">
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {challengerIsMe ? "La tua sessione" : challengerName}
+                            </p>
+                            <div className="text-sm text-foreground">
+                              <div>Distanza: {challengerDistance}</div>
+                              <div>Tempo: {challengerDuration}</div>
+                              <div>Pace: {challengerPace}</div>
+                            </div>
                           </div>
-                          <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary rounded-full transition-all"
-                              style={{ width: `${progressPercent ?? 0}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-1.5 text-muted-foreground">
-                            <Users className="w-4 h-4" />
-                            <span>{challenge.participantCount ?? 0} partecipanti</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 text-muted-foreground">
-                            <Clock className="w-4 h-4" />
-                            <span>{endsIn}</span>
+                          <div className="rounded-lg border border-border/60 bg-secondary/30 p-3">
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {challengerIsMe ? opponentName : "La tua sessione"}
+                            </p>
+                            <div className="text-sm text-foreground">
+                              <div>Distanza: {opponentDistance}</div>
+                              <div>Tempo: {opponentDuration}</div>
+                              <div>Pace: {opponentPace}</div>
+                            </div>
                           </div>
                         </div>
                       </CardContent>

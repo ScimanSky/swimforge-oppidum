@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { Users, ArrowLeft, Droplet, MessageCircle, Share2, Plus } from "lucide-react";
+import { Users, ArrowLeft, Droplet, MessageCircle, Share2, Plus, Trophy } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { renderMarkdownPreview } from "@/lib/markdownPreview";
+import { toast } from "sonner";
 
 type FeedItem = {
   id: number;
@@ -186,6 +187,13 @@ export default function ClubDetail() {
 
   const toggleSplash = trpc.community.toggleSplash.useMutation({
     onSuccess: () => utils.community.clubs.feed.invalidate({ clubId, limit: 20 }),
+  });
+
+  const createGhostChallenge = trpc.community.ghostChallenges.createFromPost.useMutation({
+    onSuccess: () => {
+      toast.success("Ghost Track creata!");
+    },
+    onError: (err) => toast.error(err.message || "Impossibile creare la Ghost Track"),
   });
 
   const addComment = trpc.community.addComment.useMutation({
@@ -885,6 +893,18 @@ export default function ClubDetail() {
                                     </div>
                                   </DialogContent>
                                 </Dialog>
+
+                                {post.activity_id && !isOwner && (
+                                  <Button
+                                    variant="outline"
+                                    className="flex-1 flex items-center justify-center gap-2"
+                                    onClick={() => createGhostChallenge.mutate({ postId: post.id })}
+                                    disabled={createGhostChallenge.isPending}
+                                  >
+                                    <Trophy className="h-5 w-5" />
+                                    <span>Ghost Track</span>
+                                  </Button>
+                                )}
 
                                 <Button variant="outline" className="flex-1 flex items-center justify-center gap-2">
                                   <Share2 className="h-5 w-5" />

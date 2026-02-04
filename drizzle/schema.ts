@@ -112,6 +112,28 @@ export const swimmingActivities = pgTable("swimming_activities", {
 });
 
 // ============================================
+// GHOST CHALLENGES (Club + Feed)
+// ============================================
+export const ghostChallenges = pgTable("ghost_challenges", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id"),
+  challengerUserId: integer("challenger_user_id").notNull(),
+  challengerActivityId: integer("challenger_activity_id").notNull(),
+  opponentUserId: integer("opponent_user_id").notNull(),
+  opponentActivityId: integer("opponent_activity_id").notNull(),
+  status: text("status").default("completed").notNull(),
+  winnerUserId: integer("winner_user_id"),
+  winnerReason: text("winner_reason"),
+  challengerDistanceMeters: integer("challenger_distance_meters"),
+  challengerDurationSeconds: integer("challenger_duration_seconds"),
+  challengerPacePer100m: integer("challenger_pace_per_100m"),
+  opponentDistanceMeters: integer("opponent_distance_meters"),
+  opponentDurationSeconds: integer("opponent_duration_seconds"),
+  opponentPacePer100m: integer("opponent_pace_per_100m"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ============================================
 // GARMIN ACTIVITY LAPS (Detailed splits)
 // ============================================
 export const garminActivityLaps = pgTable(
