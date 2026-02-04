@@ -32,6 +32,20 @@ const formatDuration = (seconds?: number | null) => {
   return `${minutes} min`
 }
 
+const formatSplitDuration = (seconds?: number | null) => {
+  if (!seconds && seconds !== 0) return "—"
+  if (seconds === 0) return "0:00"
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = Math.round(seconds % 60)
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`
+  }
+  return `${minutes}:${secs.toString().padStart(2, "0")}`
+}
+
 const formatPace = (secondsPer100m?: number | null, distanceMeters?: number | null, durationSeconds?: number | null) => {
   const pace =
     secondsPer100m && secondsPer100m > 0
@@ -263,9 +277,19 @@ export default function ActivityDetail() {
   const displayHrZones = hasDbHrZones ? hrZones : garminHrZones
   const displayHrTotal = displayHrZones.reduce((sum, zone) => sum + (zone.seconds || 0), 0)
   const garminPowerZones = normalizeZones(garminDetails?.power_zones)
-  const garminSplits = Array.isArray(garminDetails?.splits) ? garminDetails.splits : []
-  const garminTypedSplits = Array.isArray(garminDetails?.typed_splits) ? garminDetails.typed_splits : []
-  const garminSplitSummaries = Array.isArray(garminDetails?.split_summaries)
+  const garminSplits = Array.isArray(garminDetails?.splits?.lapDTOs)
+    ? garminDetails.splits.lapDTOs
+    : Array.isArray(garminDetails?.splits)
+    ? garminDetails.splits
+    : []
+  const garminTypedSplits = Array.isArray(garminDetails?.typed_splits?.splits)
+    ? garminDetails.typed_splits.splits
+    : Array.isArray(garminDetails?.typed_splits)
+    ? garminDetails.typed_splits
+    : []
+  const garminSplitSummaries = Array.isArray(garminDetails?.split_summaries?.splitSummaries)
+    ? garminDetails.split_summaries.splitSummaries
+    : Array.isArray(garminDetails?.split_summaries)
     ? garminDetails.split_summaries
     : []
   const garminWeather = garminDetails?.weather ?? null
@@ -337,7 +361,7 @@ export default function ActivityDetail() {
     const duration = getDurationSeconds(split)
     const pace = getPacePer100m(split)
     const avgHr = toNumber(pickFirst(split, ["averageHR", "avgHeartRate", "avgHR"]))
-    const swolf = toNumber(pickFirst(split, ["averageSwolf", "avgSwolf"]))
+    const swolf = toNumber(pickFirst(split, ["averageSwolf", "avgSwolf", "averageSWOLF"]))
     const stroke = pickFirst(split, ["strokeType", "swimStrokeType", "avgStrokeType", "stroke"])
     const cadence = toNumber(pickFirst(split, ["avgStrokeCadence", "avgStrokeCadenceRpm", "avgCadence"]))
     const strokes = toNumber(pickFirst(split, ["avgStrokes", "averageStrokes", "strokes"]))
@@ -355,6 +379,78 @@ export default function ActivityDetail() {
           <span>SWOLF: {swolf ?? "—"}</span>
           <span>Cadenza: {cadence ? `${cadence} spm` : "—"}</span>
           <span>Bracciate: {strokes ?? "—"}</span>
+        </div>
+      </div>
+    )
+  }
+
+  const lapSplits = (() => {
+    let cumulativeSeconds = 0
+    return garminSplits.map((lap: any, index: number) => {
+      const distance = getDistanceMeters(lap) ?? 0
+      const duration = toNumber(pickFirst(lap, ["duration", "movingDuration", "elapsedDuration"])) ?? 0
+      cumulativeSeconds += duration
+      const avgSpeed = getSpeedMps(lap)
+      const maxSpeed = toNumber(pickFirst(lap, ["maxSpeed", "peakSpeed"]))
+      const avgHr = toNumber(pickFirst(lap, ["averageHR", "avgHeartRate", "avgHR"]))
+      const maxHr = toNumber(pickFirst(lap, ["maxHR", "maxHeartRate"]))
+      const swolf = toNumber(pickFirst(lap, ["averageSWOLF", "averageSwolf", "avgSwolf"]))
+      const totalStrokes = toNumber(pickFirst(lap, ["totalNumberOfStrokes", "totalStrokes"]))
+      const avgStrokes = toNumber(pickFirst(lap, ["averageStrokes", "avgStrokes"]))
+      const calories = toNumber(pickFirst(lap, ["calories", "caloriesBurned"]))
+      const lengthDTOs = Array.isArray(lap?.lengthDTOs) ? lap.lengthDTOs : []
+      const strokeCounts: Record<string, number> = {}
+      lengthDTOs.forEach((length: any) => {
+        const strokeRaw = length?.swimStroke ?? length?.strokeType ?? length?.stroke
+        const strokeKey = normalizeStrokeKey(strokeRaw)
+        strokeCounts[strokeKey] = (strokeCounts[strokeKey] ?? 0) + 1
+      })
+      const dominantStroke =
+        Object.entries(strokeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+
+      return {
+        index,
+        distance,
+        duration,
+        cumulativeSeconds,
+        avgSpeed,
+        maxSpeed,
+        avgHr,
+        maxHr,
+        swolf,
+        totalStrokes,
+        avgStrokes,
+        calories,
+        dominantStroke,
+        lengths: lengthDTOs,
+      }
+    })
+  })()
+
+  const renderLapCard = (lap: typeof lapSplits[number]) => {
+    const pace = lap.distance > 0 ? lap.duration / (lap.distance / 100) : null
+    const bestPace = lap.maxSpeed && lap.maxSpeed > 0 ? 100 / lap.maxSpeed : null
+    const label =
+      lap.distance === 0 ? "Recupero" : `Lap ${lap.index + 1}`
+    const strokeLabel = lap.dominantStroke ? strokeLabels[lap.dominantStroke] ?? lap.dominantStroke : null
+    return (
+      <div key={`lap-${lap.index}`} className="rounded-lg border border-border bg-background/60 p-3">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>{label}</span>
+          {strokeLabel ? <span className="capitalize">{strokeLabel}</span> : null}
+        </div>
+        <div className="mt-2 grid gap-2 text-xs sm:grid-cols-2">
+          <span>Distanza: {formatDistance(lap.distance)}</span>
+          <span>Tempo: {formatSplitDuration(lap.duration)}</span>
+          <span>Tempo cumulato: {formatSplitDuration(lap.cumulativeSeconds)}</span>
+          <span>Pace medio: {pace ? formatPace(pace, lap.distance, lap.duration) : "—"}</span>
+          <span>Pace migliore: {bestPace ? formatPace(bestPace, lap.distance, lap.duration) : "—"}</span>
+          <span>SWOLF medio: {formatNumber(lap.swolf)}</span>
+          <span>FC media: {lap.avgHr ? `${lap.avgHr} bpm` : "—"}</span>
+          <span>FC max: {lap.maxHr ? `${lap.maxHr} bpm` : "—"}</span>
+          <span>Totale bracciate: {formatNumber(lap.totalStrokes)}</span>
+          <span>Media bracciate/vasca: {formatNumber(lap.avgStrokes)}</span>
+          <span>Calorie: {formatNumber(lap.calories)}</span>
         </div>
       </div>
     )
@@ -645,11 +741,11 @@ export default function ActivityDetail() {
                       </div>
                     )}
 
-                    {garminSplits.length > 0 && (
+                    {lapSplits.length > 0 && (
                       <div className="space-y-2">
                         <p className="text-xs font-medium text-muted-foreground uppercase">Splits (laps)</p>
                         <div className="grid gap-3 md:grid-cols-2">
-                          {garminSplits.map(renderSplitCard)}
+                          {lapSplits.map(renderLapCard)}
                         </div>
                       </div>
                     )}
