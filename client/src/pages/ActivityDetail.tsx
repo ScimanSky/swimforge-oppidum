@@ -173,28 +173,6 @@ export default function ActivityDetail() {
     garminDetails?.details ??
     garminDetails?.activity ??
     null
-  const garminDistance = garminSummarySource ? getDistanceMeters(garminSummarySource) : null
-  const garminDuration = garminSummarySource ? getDurationSeconds(garminSummarySource) : null
-  const garminPace = garminSummarySource ? getPacePer100m(garminSummarySource) : null
-  const garminSpeed = garminSummarySource ? getSpeedMps(garminSummarySource) : null
-  const garminStrokeType = garminSummarySource
-    ? pickFirst(garminSummarySource, ["strokeType", "swimStrokeType", "avgStrokeType"])
-    : null
-
-  const summaryMetrics = [
-    { label: "Distanza", value: garminDistance ? formatDistance(garminDistance) : "—" },
-    { label: "Durata", value: garminDuration ? formatDuration(garminDuration) : "—" },
-    { label: "Pace medio", value: garminPace ? formatPace(garminPace, garminDistance ?? 0, garminDuration ?? 0) : "—" },
-    { label: "Velocità media", value: garminSpeed ? `${(garminSpeed * 3.6).toFixed(1)} km/h` : "—" },
-    { label: "Calorie", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["calories", "caloriesBurned"]))) },
-    { label: "FC media", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["averageHR", "avgHeartRate"])), " bpm") },
-    { label: "FC max", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["maxHR", "maxHeartRate"])), " bpm") },
-    { label: "SWOLF", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["averageSwolf", "avgSwolf", "averageSWOLF"]))) },
-    { label: "Stile", value: garminStrokeType ? String(garminStrokeType) : "—" },
-    { label: "Vasche", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["lapCount", "totalLaps"]))) },
-    { label: "Lunghezza vasca", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["poolLength", "poolLengthMeters"])), " m") },
-  ].filter((item) => item.value !== "—")
-
   const normalizeStrokeDistanceCm = (value: any) => {
     const num = toNumber(value)
     if (!num) return null
@@ -350,13 +328,6 @@ export default function ActivityDetail() {
       pace,
     }
   })
-
-  const renderMetricRow = (label: string, value: string) => (
-    <div key={label} className="flex items-center justify-between gap-3 text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium text-foreground">{value}</span>
-    </div>
-  )
 
   const renderSplitCard = (split: any, index: number) => {
     const distance = getDistanceMeters(split)
@@ -798,7 +769,7 @@ export default function ActivityDetail() {
 
             <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle className="font-display">Dettagli Garmin avanzati</CardTitle>
+                <CardTitle className="font-display">Dettagli sessione 2</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 text-sm">
                 {!garminDetails ? (
@@ -808,20 +779,6 @@ export default function ActivityDetail() {
                   </p>
                 ) : (
                   <Accordion type="multiple" className="space-y-3">
-                    {summaryMetrics.length > 0 && (
-                      <AccordionItem
-                        value="garmin-summary"
-                        className="rounded-lg border border-border bg-background/60 px-3"
-                      >
-                        <AccordionTrigger className="py-3">Riepilogo Garmin</AccordionTrigger>
-                        <AccordionContent className="px-0 pb-3">
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            {summaryMetrics.map((item) => renderMetricRow(item.label, item.value))}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-
                     {lapSplits.length > 0 && (
                       <AccordionItem
                         value="garmin-laps"
