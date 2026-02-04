@@ -139,10 +139,12 @@ export default function Dashboard() {
     const now = new Date()
     const startOfToday = new Date(now)
     startOfToday.setHours(0, 0, 0, 0)
-    const startLast7 = new Date(startOfToday)
-    startLast7.setDate(startLast7.getDate() - 6)
-    const startPrev7 = new Date(startLast7)
-    startPrev7.setDate(startPrev7.getDate() - 7)
+    const startOfWeek = new Date(startOfToday)
+    const dayOfWeek = startOfWeek.getDay()
+    const diffFromMonday = (dayOfWeek + 6) % 7
+    startOfWeek.setDate(startOfWeek.getDate() - diffFromMonday)
+    const startPrevWeek = new Date(startOfWeek)
+    startPrevWeek.setDate(startPrevWeek.getDate() - 7)
 
     const toDateKey = (date: Date) => date.toISOString().split("T")[0]
     const timelineMap = new Map(timeline.map((point) => [point.date, point]))
@@ -161,11 +163,11 @@ export default function Dashboard() {
       const date = parseActivityDate(getActivityDateValue(activity))
       if (!date) return
       validDates += 1
-      if (date >= startLast7) {
+      if (date >= startOfWeek && date <= now) {
         currentDistance += getActivityDistance(activity)
         currentTime += getActivityDuration(activity)
         currentSessions += 1
-      } else if (date >= startPrev7 && date < startLast7) {
+      } else if (date >= startPrevWeek && date < startOfWeek) {
         prevDistance += getActivityDistance(activity)
         prevTime += getActivityDuration(activity)
         prevSessions += 1
@@ -180,8 +182,8 @@ export default function Dashboard() {
     let timelinePrevPaceValues: number[] = []
 
     for (let i = 0; i < 7; i += 1) {
-      const date = new Date(startLast7)
-      date.setDate(startLast7.getDate() + i)
+      const date = new Date(startOfWeek)
+      date.setDate(startOfWeek.getDate() + i)
       const key = toDateKey(date)
       const entry = timelineMap.get(key)
       if (entry) {
@@ -192,8 +194,8 @@ export default function Dashboard() {
     }
 
     for (let i = 0; i < 7; i += 1) {
-      const date = new Date(startPrev7)
-      date.setDate(startPrev7.getDate() + i)
+      const date = new Date(startPrevWeek)
+      date.setDate(startPrevWeek.getDate() + i)
       const key = toDateKey(date)
       const entry = timelineMap.get(key)
       if (entry) {
@@ -332,9 +334,15 @@ export default function Dashboard() {
     const timeline = timelineQuery.data ?? []
     const map = new Map(timeline.map((point) => [point.date, point.distance]))
     const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const startOfWeek = new Date(today)
+    const dayOfWeek = startOfWeek.getDay()
+    const diffFromMonday = (dayOfWeek + 6) % 7
+    startOfWeek.setDate(startOfWeek.getDate() - diffFromMonday)
+
     return Array.from({ length: 7 }).map((_, index) => {
-      const date = new Date(today)
-      date.setDate(today.getDate() - (6 - index))
+      const date = new Date(startOfWeek)
+      date.setDate(startOfWeek.getDate() + index)
       const key = date.toISOString().split("T")[0]
       const label = date.toLocaleDateString("it-IT", { weekday: "short" })
       return {
