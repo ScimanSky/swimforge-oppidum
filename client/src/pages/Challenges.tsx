@@ -10,6 +10,20 @@ import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
   Trophy,
   Users,
   Clock,
@@ -22,6 +36,7 @@ import {
   Zap,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
+import { toast } from "sonner"
 
 const formatDistance = (meters?: number | null) => {
   if (!meters) return "—"
@@ -115,11 +130,29 @@ const getStreak = (dates: string[]) => {
 
 export default function Challenges() {
   const [activeTab, setActiveTab] = useState("active")
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [createDraft, setCreateDraft] = useState({
+    name: "",
+    description: "",
+    type: "pool",
+    objective: "total_distance",
+    duration: "1_week",
+    startDate: new Date().toISOString().split("T")[0],
+  })
 
   const profileQuery = trpc.profile.get.useQuery()
   const activitiesQuery = trpc.activities.list.useQuery({ limit: 200, offset: 0, source: "all" })
   const badgesQuery = trpc.badges.userBadges.useQuery()
   const challengesQuery = trpc.challenges.list.useQuery()
+  const createChallenge = trpc.challenges.create.useMutation({
+    onSuccess: () => {
+      toast.success("Sfida creata!")
+      setIsCreateOpen(false)
+      setCreateDraft((prev) => ({ ...prev, name: "", description: "" }))
+      challengesQuery.refetch()
+    },
+    onError: (err) => toast.error(err.message || "Impossibile creare la sfida"),
+  })
   const leaderboardQuery = trpc.leaderboard.get.useQuery({
     orderBy: "totalXp",
     period: "week",
@@ -165,10 +198,139 @@ export default function Challenges() {
             <h1 className="text-2xl font-display font-bold text-foreground">Challenges</h1>
             <p className="text-muted-foreground">Compete, earn badges, and climb the leaderboard</p>
           </div>
-          <Button className="gap-2">
-            <Plus className="w-4 h-4" />
-            Create Challenge
-          </Button>
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="w-4 h-4" />
+                Crea sfida
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Crea sfida</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Nome sfida</label>
+                  <input
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    value={createDraft.name}
+                    onChange={(event) =>
+                      setCreateDraft((prev) => ({ ...prev, name: event.target.value }))
+                    }
+                    placeholder="Es. Settimana sprint"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Descrizione</label>
+                  <textarea
+                    className="w-full min-h-[90px] rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    value={createDraft.description}
+                    onChange={(event) =>
+                      setCreateDraft((prev) => ({ ...prev, description: event.target.value }))
+                    }
+                    placeholder="Descrivi l'obiettivo della sfida"
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Tipo</label>
+                    <Select
+                      value={createDraft.type}
+                      onValueChange={(value) =>
+                        setCreateDraft((prev) => ({ ...prev, type: value }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pool">Piscina</SelectItem>
+                        <SelectItem value="open_water">Open water</SelectItem>
+                        <SelectItem value="both">Entrambi</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Obiettivo</label>
+                    <Select
+                      value={createDraft.objective}
+                      onValueChange={(value) =>
+                        setCreateDraft((prev) => ({ ...prev, objective: value }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Obiettivo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="total_distance">Distanza totale</SelectItem>
+                        <SelectItem value="total_sessions">Numero sessioni</SelectItem>
+                        <SelectItem value="consistency">Costanza</SelectItem>
+                        <SelectItem value="avg_pace">Pace medio</SelectItem>
+                        <SelectItem value="total_time">Tempo totale</SelectItem>
+                        <SelectItem value="longest_session">Sessione piu lunga</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Durata</label>
+                    <Select
+                      value={createDraft.duration}
+                      onValueChange={(value) =>
+                        setCreateDraft((prev) => ({ ...prev, duration: value }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Durata" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="3_days">3 giorni</SelectItem>
+                        <SelectItem value="1_week">1 settimana</SelectItem>
+                        <SelectItem value="2_weeks">2 settimane</SelectItem>
+                        <SelectItem value="1_month">1 mese</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Inizio</label>
+                    <input
+                      type="date"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                      value={createDraft.startDate}
+                      onChange={(event) =>
+                        setCreateDraft((prev) => ({ ...prev, startDate: event.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+                <Button
+                  onClick={() =>
+                    createChallenge.mutate({
+                      name: createDraft.name.trim() || "Nuova sfida",
+                      description: createDraft.description.trim() || undefined,
+                      type: createDraft.type as "pool" | "open_water" | "both",
+                      objective: createDraft.objective as
+                        | "total_distance"
+                        | "total_sessions"
+                        | "consistency"
+                        | "avg_pace"
+                        | "total_time"
+                        | "longest_session",
+                      duration: createDraft.duration as
+                        | "3_days"
+                        | "1_week"
+                        | "2_weeks"
+                        | "1_month",
+                      startDate: createDraft.startDate || new Date().toISOString(),
+                    })
+                  }
+                  disabled={createChallenge.isPending}
+                >
+                  {createChallenge.isPending ? "Creazione..." : "Crea sfida"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Stats Cards */}
