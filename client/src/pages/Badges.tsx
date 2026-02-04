@@ -310,7 +310,7 @@ export default function Badges() {
             <button
               key={key}
               onClick={() => setSelectedCategory(key)}
-              className={`rounded-full px-3 py-2 text-sm font-medium border transition-colors ${
+              className={`rounded-full px-2.5 py-1.5 text-xs font-medium border transition-colors sm:px-3 sm:py-2 sm:text-sm ${
                 selectedCategory === key
                   ? "bg-primary text-primary-foreground border-primary/60 shadow-sm"
                   : "bg-card/60 text-foreground/80 border-border/60 hover:bg-accent/40 hover:text-foreground"
