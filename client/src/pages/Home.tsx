@@ -113,13 +113,13 @@ export default function Home() {
     <div className="min-h-screen bg-background">
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-lg">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <img
               src="/swimforge-logo.png"
               alt="SwimForge"
-              className="size-9"
+              className="size-12 drop-shadow-sm"
             />
-            <span className="text-xl font-semibold text-foreground">
+            <span className="text-2xl font-semibold text-foreground">
               SwimForge
             </span>
           </div>
@@ -143,20 +143,6 @@ export default function Home() {
               Club
             </Link>
           </nav>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}
-            >
-              Accedi
-            </Link>
-            <Link
-              href="/signup"
-              className={cn(buttonVariants({ size: "sm" }))}
-            >
-              Inizia l&apos;Avventura
-            </Link>
-          </div>
         </div>
       </header>
 
@@ -172,7 +158,7 @@ export default function Home() {
             </Badge>
             <h1 className="mb-6 text-balance text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
               SwimForge
-              <span className="text-primary block">Forgi il tuo percorso</span>
+              <span className="text-primary block">Forgia il tuo percorso</span>
             </h1>
             <p className="mb-8 text-pretty text-lg text-muted-foreground md:text-xl">
               La piattaforma esclusiva per nuotatori di tutte le età. Trasforma
@@ -184,14 +170,8 @@ export default function Home() {
                 href="/signup"
                 className={cn(buttonVariants({ size: "lg" }))}
               >
-                Inizia l&apos;Avventura
+                Inizia l&apos;avventura
                 <ArrowRight className="ml-2 size-4" />
-              </Link>
-              <Link
-                href="/login"
-                className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
-              >
-                Accedi
               </Link>
             </div>
           </div>

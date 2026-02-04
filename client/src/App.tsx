@@ -24,6 +24,8 @@ import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import StravaConnect from "./pages/StravaConnect";
 import Settings from "./pages/Settings";
 import BadgeUnlockNotification from "./components/BadgeUnlockNotification";
@@ -42,6 +44,8 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
       <Route path="/signup" component={Register} />
+      <Route path="/forgot-password" component={ForgotPassword} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/badges" component={Badges} />
       <Route path="/challenges" component={Challenges} />

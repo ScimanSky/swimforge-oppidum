@@ -22,6 +22,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Waves, Eye, EyeOff, ArrowRight, Check } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 
 const features = [
   "Sincronizza automaticamente da Garmin e Strava",
@@ -33,6 +36,114 @@ const features = [
 export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [step, setStep] = useState(1);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
+
+  const syncSupabaseUserMutation = trpc.auth.syncSupabaseUser.useMutation({
+    onSuccess: () => {
+      toast.success("Registrazione completata!");
+      setTimeout(() => {
+        window.location.href = "/dashboard";
+      }, 100);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Errore durante la registrazione");
+      setIsLoading(false);
+    },
+  });
+
+  const handleContinue = () => {
+    if (!firstName || !lastName) {
+      toast.error("Inserisci nome e cognome");
+      return;
+    }
+    if (!email) {
+      toast.error("Inserisci un'email valida");
+      return;
+    }
+    if (!password || password.length < 8) {
+      toast.error("La password deve avere almeno 8 caratteri");
+      return;
+    }
+    if (!acceptedTerms) {
+      toast.error("Devi accettare i termini di servizio");
+      return;
+    }
+    setStep(2);
+  };
+
+  const handleRegister = async () => {
+    if (!email || !password) {
+      toast.error("Inserisci email e password");
+      return;
+    }
+    setIsLoading(true);
+
+    const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: {
+          full_name: fullName || undefined,
+          name: fullName || undefined,
+        },
+      },
+    });
+
+    if (error) {
+      toast.error(error.message || "Errore durante la registrazione");
+      setIsLoading(false);
+      return;
+    }
+
+    if (data.session) {
+      syncSupabaseUserMutation.mutate({
+        accessToken: data.session.access_token,
+        user: {
+          id: data.user?.id ?? "",
+          email: data.user?.email ?? email,
+          name:
+            data.user?.user_metadata?.full_name ||
+            data.user?.user_metadata?.name ||
+            fullName ||
+            null,
+        },
+      });
+      return;
+    }
+
+    setEmailSent(true);
+    setIsLoading(false);
+    toast.success("Controlla la tua email per confermare la registrazione.");
+  };
+
+  const handleGoogleRegister = async () => {
+    try {
+      setIsGoogleLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      });
+
+      if (error) {
+        toast.error("Errore durante l'accesso con Google");
+        console.error(error);
+        setIsGoogleLoading(false);
+      }
+    } catch (error) {
+      toast.error("Errore durante l'accesso con Google");
+      console.error(error);
+      setIsGoogleLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex">
@@ -92,16 +203,42 @@ export default function Register() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              {step === 1 ? (
+              {emailSent ? (
+                <div className="space-y-3 text-center">
+                  <div className="text-sm text-muted-foreground">
+                    Ti abbiamo inviato una mail di conferma a
+                    <span className="text-foreground font-medium"> {email}</span>.
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Clicca sul link nella mail per attivare l&apos;account e completare la
+                    registrazione.
+                  </div>
+                  <Link href="/login" className="inline-flex w-full">
+                    <Button className="w-full">Vai al login</Button>
+                  </Link>
+                </div>
+              ) : step === 1 ? (
                 <>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-2">
                       <Label>Nome</Label>
-                      <Input placeholder="Marco" className="bg-secondary border-0" />
+                      <Input
+                        placeholder="Marco"
+                        className="bg-secondary border-0"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        disabled={isLoading || isGoogleLoading}
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label>Cognome</Label>
-                      <Input placeholder="Rossi" className="bg-secondary border-0" />
+                      <Input
+                        placeholder="Rossi"
+                        className="bg-secondary border-0"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        disabled={isLoading || isGoogleLoading}
+                      />
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -110,6 +247,9 @@ export default function Register() {
                       type="email"
                       placeholder="nome@esempio.com"
                       className="bg-secondary border-0"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={isLoading || isGoogleLoading}
                     />
                   </div>
                   <div className="space-y-2">
@@ -119,6 +259,9 @@ export default function Register() {
                         type={showPassword ? "text" : "password"}
                         placeholder="Minimo 8 caratteri"
                         className="bg-secondary border-0 pr-10"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        disabled={isLoading || isGoogleLoading}
                       />
                       <Button
                         type="button"
@@ -126,6 +269,7 @@ export default function Register() {
                         size="icon"
                         className="absolute right-0 top-0 h-full"
                         onClick={() => setShowPassword((prev) => !prev)}
+                        disabled={isLoading || isGoogleLoading}
                       >
                         {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </Button>
@@ -133,7 +277,13 @@ export default function Register() {
                   </div>
 
                   <div className="flex items-start gap-2">
-                    <Checkbox id="terms" className="mt-1" />
+                    <Checkbox
+                      id="terms"
+                      className="mt-1"
+                      checked={acceptedTerms}
+                      onCheckedChange={(value) => setAcceptedTerms(Boolean(value))}
+                      disabled={isLoading || isGoogleLoading}
+                    />
                     <label htmlFor="terms" className="text-sm text-muted-foreground">
                       Accetto i{" "}
                       <Link href="/terms" className="text-primary hover:underline">
@@ -146,7 +296,11 @@ export default function Register() {
                     </label>
                   </div>
 
-                  <Button className="w-full gap-2" onClick={() => setStep(2)}>
+                  <Button
+                    className="w-full gap-2"
+                    onClick={handleContinue}
+                    disabled={isLoading || isGoogleLoading}
+                  >
                     Continua
                     <ArrowRight className="w-4 h-4" />
                   </Button>
@@ -203,20 +357,23 @@ export default function Register() {
                       variant="outline"
                       className="flex-1 bg-transparent"
                       onClick={() => setStep(1)}
+                      disabled={isLoading || isGoogleLoading}
                     >
                       Indietro
                     </Button>
-                    <Link href="/dashboard" className="flex-1">
-                      <Button className="w-full gap-2">
-                        Crea Account
-                        <ArrowRight className="w-4 h-4" />
-                      </Button>
-                    </Link>
+                    <Button
+                      className="w-full flex-1 gap-2"
+                      onClick={handleRegister}
+                      disabled={isLoading || isGoogleLoading}
+                    >
+                      {isLoading ? "Creazione..." : "Crea Account"}
+                      {!isLoading && <ArrowRight className="w-4 h-4" />}
+                    </Button>
                   </div>
                 </>
               )}
 
-              {step === 1 && (
+              {step === 1 && !emailSent && (
                 <>
                   <div className="relative my-6">
                     <div className="absolute inset-0 flex items-center">
@@ -229,8 +386,13 @@ export default function Register() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button variant="outline" className="gap-2 bg-transparent">
+                  <div className="grid grid-cols-1 gap-3">
+                    <Button
+                      variant="outline"
+                      className="gap-2 bg-transparent"
+                      onClick={handleGoogleRegister}
+                      disabled={isLoading || isGoogleLoading}
+                    >
                       <svg className="w-4 h-4" viewBox="0 0 24 24">
                         <path
                           fill="currentColor"
@@ -250,12 +412,6 @@ export default function Register() {
                         />
                       </svg>
                       Google
-                    </Button>
-                    <Button variant="outline" className="gap-2 bg-transparent">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                      </svg>
-                      GitHub
                     </Button>
                   </div>
 

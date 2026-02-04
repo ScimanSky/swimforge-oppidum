@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -13,9 +12,9 @@ import { Waves, Mail, Lock, User } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 
 export default function Auth() {
-  const [, navigate] = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   
   // Login form state
   const [loginEmail, setLoginEmail] = useState("");
@@ -27,7 +26,7 @@ export default function Auth() {
   const [registerName, setRegisterName] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const loginMutation = trpc.auth.login.useMutation({
+  const syncSupabaseUserMutation = trpc.auth.syncSupabaseUser.useMutation({
     onSuccess: () => {
       toast.success("Login effettuato con successo!");
       setTimeout(() => {
@@ -40,30 +39,39 @@ export default function Auth() {
     onSettled: () => setIsLoading(false),
   });
 
-  const registerMutation = trpc.auth.register.useMutation({
-    onSuccess: () => {
-      toast.success("Registrazione completata! Benvenuto in SwimForge!");
-      setTimeout(() => {
-        window.location.href = "/dashboard";
-      }, 100);
-    },
-    onError: (error) => {
-      toast.error(error.message || "Errore durante la registrazione");
-    },
-    onSettled: () => setIsLoading(false),
-  });
-
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginEmail || !loginPassword) {
       toast.error("Inserisci email e password");
       return;
     }
     setIsLoading(true);
-    loginMutation.mutate({ email: loginEmail, password: loginPassword });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password: loginPassword,
+    });
+
+    if (error || !data.session) {
+      toast.error(error?.message || "Errore durante il login");
+      setIsLoading(false);
+      return;
+    }
+
+    const user = data.user;
+    syncSupabaseUserMutation.mutate({
+      accessToken: data.session.access_token,
+      user: {
+        id: user?.id ?? "",
+        email: user?.email ?? loginEmail,
+        name:
+          user?.user_metadata?.full_name ||
+          user?.user_metadata?.name ||
+          null,
+      },
+    });
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!registerEmail || !registerPassword) {
       toast.error("Inserisci email e password");
@@ -78,11 +86,39 @@ export default function Auth() {
       return;
     }
     setIsLoading(true);
-    registerMutation.mutate({ 
-      email: registerEmail, 
+    const { data, error } = await supabase.auth.signUp({
+      email: registerEmail,
       password: registerPassword,
-      name: registerName || undefined,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        data: {
+          full_name: registerName || undefined,
+          name: registerName || undefined,
+        },
+      },
     });
+
+    if (error) {
+      toast.error(error.message || "Errore durante la registrazione");
+      setIsLoading(false);
+      return;
+    }
+
+    if (data.session) {
+      syncSupabaseUserMutation.mutate({
+        accessToken: data.session.access_token,
+        user: {
+          id: data.user?.id ?? "",
+          email: data.user?.email ?? registerEmail,
+          name: registerName || null,
+        },
+      });
+      return;
+    }
+
+    setEmailSent(true);
+    setIsLoading(false);
+    toast.success("Controlla la tua email per confermare la registrazione.");
   };
 
   const handleGoogleLogin = async () => {
@@ -230,79 +266,89 @@ export default function Auth() {
             </TabsContent>
 
             <TabsContent value="register" className="mt-6">
-              <form onSubmit={handleRegister} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="register-name" className="text-slate-300">Nome (opzionale)</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <Input
-                      id="register-name"
-                      type="text"
-                      placeholder="Il tuo nome"
-                      value={registerName}
-                      onChange={(e) => setRegisterName(e.target.value)}
-                      className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
-                      disabled={isLoading || isGoogleLoading}
-                    />
+              {emailSent ? (
+                <div className="space-y-3 text-center text-sm text-slate-400">
+                  Ti abbiamo inviato una mail di conferma a
+                  <span className="text-white font-medium"> {registerEmail}</span>.
+                  <div className="text-xs text-slate-500">
+                    Clicca sul link ricevuto per attivare l&apos;account.
                   </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="register-email" className="text-slate-300">Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <Input
-                      id="register-email"
-                      type="email"
-                      placeholder="la.tua@email.com"
-                      value={registerEmail}
-                      onChange={(e) => setRegisterEmail(e.target.value)}
-                      className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
-                      disabled={isLoading || isGoogleLoading}
-                    />
+              ) : (
+                <form onSubmit={handleRegister} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="register-name" className="text-slate-300">Nome (opzionale)</Label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <Input
+                        id="register-name"
+                        type="text"
+                        placeholder="Il tuo nome"
+                        value={registerName}
+                        onChange={(e) => setRegisterName(e.target.value)}
+                        className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
+                        disabled={isLoading || isGoogleLoading}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="register-password" className="text-slate-300">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <Input
-                      id="register-password"
-                      type="password"
-                      placeholder="Minimo 6 caratteri"
-                      value={registerPassword}
-                      onChange={(e) => setRegisterPassword(e.target.value)}
-                      className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
-                      disabled={isLoading || isGoogleLoading}
-                    />
+                  <div className="space-y-2">
+                    <Label htmlFor="register-email" className="text-slate-300">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <Input
+                        id="register-email"
+                        type="email"
+                        placeholder="la.tua@email.com"
+                        value={registerEmail}
+                        onChange={(e) => setRegisterEmail(e.target.value)}
+                        className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
+                        disabled={isLoading || isGoogleLoading}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-password" className="text-slate-300">Conferma Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                    <Input
-                      id="confirm-password"
-                      type="password"
-                      placeholder="Ripeti la password"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
-                      disabled={isLoading || isGoogleLoading}
-                    />
+                  <div className="space-y-2">
+                    <Label htmlFor="register-password" className="text-slate-300">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <Input
+                        id="register-password"
+                        type="password"
+                        placeholder="Minimo 8 caratteri"
+                        value={registerPassword}
+                        onChange={(e) => setRegisterPassword(e.target.value)}
+                        className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
+                        disabled={isLoading || isGoogleLoading}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600"
-                  disabled={isLoading || isGoogleLoading}
-                >
-                  {isLoading ? "Registrazione in corso..." : "Registrati"}
-                </Button>
-              </form>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-password" className="text-slate-300">Conferma Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                      <Input
+                        id="confirm-password"
+                        type="password"
+                        placeholder="Ripeti la password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="pl-10 bg-slate-800/50 border-slate-700 text-white placeholder:text-slate-500"
+                        disabled={isLoading || isGoogleLoading}
+                      />
+                    </div>
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-700 hover:to-cyan-600"
+                    disabled={isLoading || isGoogleLoading}
+                  >
+                    {isLoading ? "Registrazione in corso..." : "Registrati"}
+                  </Button>
+                </form>
+              )}
             </TabsContent>
           </Tabs>
         </CardContent>

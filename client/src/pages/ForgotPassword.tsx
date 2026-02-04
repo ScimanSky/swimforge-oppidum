@@ -1,0 +1,136 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Waves, ArrowRight } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { toast } from "sonner";
+
+export default function ForgotPassword() {
+  const [email, setEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSent, setIsSent] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email) {
+      toast.error("Inserisci un'email valida");
+      return;
+    }
+
+    setIsLoading(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+
+    if (error) {
+      toast.error(error.message || "Errore durante l'invio dell'email");
+      setIsLoading(false);
+      return;
+    }
+
+    setIsSent(true);
+    setIsLoading(false);
+    toast.success("Email inviata! Controlla la tua casella di posta.");
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex">
+      <div className="hidden lg:flex lg:w-1/2 relative">
+        <Image src="/images/hero-swimmer.jpg" alt="Swimmer" fill className="object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/80 to-transparent" />
+        <div className="absolute bottom-12 left-12 max-w-md">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
+              <Waves className="w-6 h-6 text-primary-foreground" />
+            </div>
+            <span className="font-display text-2xl font-bold text-foreground">
+              SwimForge
+            </span>
+          </div>
+          <h2 className="text-3xl font-display font-bold text-foreground mb-2">
+            Recupero password
+          </h2>
+          <p className="text-muted-foreground">
+            Ti invieremo un link per impostare una nuova password.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="w-full max-w-md">
+          <div className="flex items-center gap-2 mb-8 lg:hidden">
+            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
+              <Waves className="w-6 h-6 text-primary-foreground" />
+            </div>
+            <span className="font-display text-2xl font-bold text-foreground">
+              SwimForge
+            </span>
+          </div>
+
+          <Card className="bg-card border-border">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl font-display">Password dimenticata</CardTitle>
+              <CardDescription>
+                Inserisci l&apos;email per ricevere il link di recupero
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {isSent ? (
+                <div className="space-y-3 text-center text-sm text-muted-foreground">
+                  Abbiamo inviato il link di recupero a
+                  <span className="text-foreground font-medium"> {email}</span>.
+                  <div className="text-xs text-muted-foreground">
+                    Se non lo vedi, controlla anche la cartella spam.
+                  </div>
+                  <Link href="/login" className="inline-flex w-full">
+                    <Button className="w-full">Torna al login</Button>
+                  </Link>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      placeholder="nome@esempio.com"
+                      className="bg-secondary border-0"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={isLoading}
+                    />
+                  </div>
+
+                  <Button type="submit" className="w-full gap-2" disabled={isLoading}>
+                    {isLoading ? "Invio..." : "Invia link"}
+                    {!isLoading && <ArrowRight className="w-4 h-4" />}
+                  </Button>
+                </form>
+              )}
+
+              {!isSent && (
+                <p className="text-center text-sm text-muted-foreground mt-6">
+                  Ricordi la password?{" "}
+                  <Link href="/login" className="text-primary hover:underline">
+                    Accedi
+                  </Link>
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
