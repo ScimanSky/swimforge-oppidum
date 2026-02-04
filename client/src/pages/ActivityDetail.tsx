@@ -149,6 +149,7 @@ export default function ActivityDetail() {
     { label: "Z5", seconds: activity?.hrZone5Seconds ?? 0 },
   ]
   const totalHrSeconds = hrZones.reduce((sum, zone) => sum + (zone.seconds || 0), 0)
+  const hasDbHrZones = hrZones.some((zone) => (zone.seconds || 0) > 0)
 
   const garminSummarySource = garminDetails?.details ?? garminDetails?.activity ?? null
   const garminDistance = garminSummarySource ? getDistanceMeters(garminSummarySource) : null
@@ -172,6 +173,57 @@ export default function ActivityDetail() {
     { label: "Vasche", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["lapCount", "totalLaps"]))) },
     { label: "Lunghezza vasca", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["poolLength", "poolLengthMeters"])), " m") },
   ].filter((item) => item.value !== "—")
+
+  const normalizeStrokeDistanceCm = (value: any) => {
+    const num = toNumber(value)
+    if (!num) return null
+    return num < 10 ? num * 100 : num
+  }
+
+  const techMetrics = {
+    swolf:
+      activity?.avgSwolf ??
+      toNumber(pickFirst(garminSummarySource, ["averageSwolf", "avgSwolf"])),
+    avgStrokeDistance:
+      activity?.avgStrokeDistance ??
+      normalizeStrokeDistanceCm(
+        pickFirst(garminSummarySource, ["avgStrokeDistance", "averageStrokeDistance"])
+      ),
+    avgStrokes:
+      activity?.avgStrokes ??
+      toNumber(pickFirst(garminSummarySource, ["avgStrokes", "averageStrokes"])),
+    avgStrokeCadence:
+      activity?.avgStrokeCadence ??
+      toNumber(pickFirst(garminSummarySource, ["avgStrokeCadenceRpm", "avgStrokeCadence"])),
+    trainingEffect:
+      activity?.trainingEffect ??
+      toNumber(pickFirst(garminSummarySource, ["aerobicTrainingEffect", "trainingEffect"])),
+    anaerobicTrainingEffect:
+      activity?.anaerobicTrainingEffect ??
+      toNumber(pickFirst(garminSummarySource, ["anaerobicTrainingEffect"])),
+    vo2MaxValue:
+      activity?.vo2MaxValue ??
+      toNumber(pickFirst(garminSummarySource, ["vO2MaxValue", "vo2MaxValue"])),
+    recoveryTimeHours:
+      activity?.recoveryTimeHours ??
+      (() => {
+        const minutes = toNumber(pickFirst(garminSummarySource, ["recoveryTime", "recoveryTimeMinutes"]))
+        return minutes ? Math.round(minutes / 60) : null
+      })(),
+    avgStress:
+      activity?.avgStress ??
+      toNumber(pickFirst(garminSummarySource, ["averageStress", "avgStress"])),
+  }
+
+  const displayAvgHr =
+    activity?.avgHeartRate ??
+    toNumber(pickFirst(garminSummarySource, ["averageHR", "avgHeartRate"]))
+  const displayMaxHr =
+    activity?.maxHeartRate ??
+    toNumber(pickFirst(garminSummarySource, ["maxHR", "maxHeartRate"]))
+  const displayRestingHr =
+    activity?.restingHeartRate ??
+    toNumber(pickFirst(garminSummarySource, ["restingHeartRate"]))
 
   const normalizeZones = (zones: any) => {
     if (!zones) return []
@@ -203,6 +255,8 @@ export default function ActivityDetail() {
   }
 
   const garminHrZones = normalizeZones(garminDetails?.hr_zones)
+  const displayHrZones = hasDbHrZones ? hrZones : garminHrZones
+  const displayHrTotal = displayHrZones.reduce((sum, zone) => sum + (zone.seconds || 0), 0)
   const garminPowerZones = normalizeZones(garminDetails?.power_zones)
   const garminSplits = Array.isArray(garminDetails?.splits) ? garminDetails.splits : []
   const garminTypedSplits = Array.isArray(garminDetails?.typed_splits) ? garminDetails.typed_splits : []
@@ -462,39 +516,39 @@ export default function ActivityDetail() {
                 <CardContent className="space-y-3 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">SWOLF medio</span>
-                    <span className="font-medium text-foreground">{formatNumber(activity.avgSwolf)}</span>
+                    <span className="font-medium text-foreground">{formatNumber(techMetrics.swolf)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Distanza media bracciata</span>
-                    <span className="font-medium text-foreground">{formatNumber(activity.avgStrokeDistance, " cm")}</span>
+                    <span className="font-medium text-foreground">{formatNumber(techMetrics.avgStrokeDistance, " cm")}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Bracciate per vasca</span>
-                    <span className="font-medium text-foreground">{formatNumber(activity.avgStrokes)}</span>
+                    <span className="font-medium text-foreground">{formatNumber(techMetrics.avgStrokes)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Cadenza bracciata</span>
-                    <span className="font-medium text-foreground">{formatNumber(activity.avgStrokeCadence, " spm")}</span>
+                    <span className="font-medium text-foreground">{formatNumber(techMetrics.avgStrokeCadence, " spm")}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Training effect</span>
-                    <span className="font-medium text-foreground">{formatNumber(activity.trainingEffect)}</span>
+                    <span className="font-medium text-foreground">{formatNumber(techMetrics.trainingEffect)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Anaerobic TE</span>
-                    <span className="font-medium text-foreground">{formatNumber(activity.anaerobicTrainingEffect)}</span>
+                    <span className="font-medium text-foreground">{formatNumber(techMetrics.anaerobicTrainingEffect)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">VO2 max</span>
-                    <span className="font-medium text-foreground">{formatNumber(activity.vo2MaxValue)}</span>
+                    <span className="font-medium text-foreground">{formatNumber(techMetrics.vo2MaxValue)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Recupero</span>
-                    <span className="font-medium text-foreground">{formatNumber(activity.recoveryTimeHours, " h")}</span>
+                    <span className="font-medium text-foreground">{formatNumber(techMetrics.recoveryTimeHours, " h")}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Stress medio</span>
-                    <span className="font-medium text-foreground">{formatNumber(activity.avgStress)}</span>
+                    <span className="font-medium text-foreground">{formatNumber(techMetrics.avgStress)}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -513,7 +567,7 @@ export default function ActivityDetail() {
                         Media
                       </div>
                       <p className="mt-2 text-lg font-semibold text-foreground">
-                        {formatNumber(activity.avgHeartRate, " bpm")}
+                        {formatNumber(displayAvgHr, " bpm")}
                       </p>
                     </div>
                     <div className="rounded-lg border border-border bg-background/60 p-3">
@@ -522,7 +576,7 @@ export default function ActivityDetail() {
                         Massima
                       </div>
                       <p className="mt-2 text-lg font-semibold text-foreground">
-                        {formatNumber(activity.maxHeartRate, " bpm")}
+                        {formatNumber(displayMaxHr, " bpm")}
                       </p>
                     </div>
                     <div className="rounded-lg border border-border bg-background/60 p-3">
@@ -531,16 +585,16 @@ export default function ActivityDetail() {
                         Riposo
                       </div>
                       <p className="mt-2 text-lg font-semibold text-foreground">
-                        {formatNumber(activity.restingHeartRate, " bpm")}
+                        {formatNumber(displayRestingHr, " bpm")}
                       </p>
                     </div>
                   </div>
 
-                  {totalHrSeconds > 0 ? (
+                  {displayHrTotal > 0 ? (
                     <div className="space-y-2">
-                      {hrZones.map((zone) => {
-                        const percent = totalHrSeconds
-                          ? Math.round((zone.seconds / totalHrSeconds) * 100)
+                      {displayHrZones.map((zone) => {
+                        const percent = displayHrTotal
+                          ? Math.round((zone.seconds / displayHrTotal) * 100)
                           : 0
                         return (
                           <div key={zone.label} className="flex items-center gap-3">
@@ -650,27 +704,6 @@ export default function ActivityDetail() {
                           {renderMetricRow("Vento", formatNumber(toNumber(pickFirst(garminWeather, ["windSpeed", "wind_speed"])), " km/h"))}
                           {renderMetricRow("Condizioni", String(pickFirst(garminWeather, ["condition", "conditions", "summary"]) ?? "—"))}
                         </div>
-                      </div>
-                    )}
-
-                    {garminHrZones.length > 0 && (
-                      <div className="rounded-lg border border-border bg-background/60 p-4 space-y-2">
-                        <p className="text-xs font-medium text-muted-foreground uppercase">Zone cardio Garmin</p>
-                        {garminHrZones.map((zone) => {
-                          const total = garminHrZones.reduce((sum, z) => sum + (z.seconds || 0), 0)
-                          const percent = total ? Math.round((zone.seconds / total) * 100) : 0
-                          return (
-                            <div key={zone.label} className="flex items-center gap-3">
-                              <span className="w-8 text-xs text-muted-foreground">{zone.label}</span>
-                              <div className="h-2 flex-1 rounded-full bg-muted">
-                                <div className="h-2 rounded-full bg-primary" style={{ width: `${percent}%` }} />
-                              </div>
-                              <span className="text-xs text-muted-foreground">
-                                {Math.round((zone.seconds || 0) / 60)} min · {percent}%
-                              </span>
-                            </div>
-                          )
-                        })}
                       </div>
                     )}
 
