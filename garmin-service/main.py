@@ -172,6 +172,28 @@ def get_garmin_client(user_id: str):
     session = sessions.get(user_id)
     if session and session.get("client"):
         return session["client"]
+    # Try to restore session from token store (after deploy/restart)
+    token_path = get_token_path(user_id)
+    if token_path.exists():
+        try:
+            from garminconnect import Garmin
+            client = Garmin()
+            client.login(str(token_path))
+            try:
+                display_name = client.display_name
+            except Exception:
+                display_name = None
+            sessions[user_id] = {
+                "client": client,
+                "email": None,
+                "display_name": display_name,
+                "last_sync": None,
+                "connected_at": datetime.now().isoformat()
+            }
+            logger.info(f"Restored Garmin session from tokens for user {user_id}")
+            return client
+        except Exception as e:
+            logger.warning(f"Failed to restore Garmin session for user {user_id}: {e}")
     return None
 
 
