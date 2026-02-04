@@ -216,7 +216,7 @@ export default function SessionInsights() {
               )}
 
               {sessionEntries.length > 0 && (
-                <div className="bg-card/30 border border-white/10 rounded-2xl p-4">
+                <div className="bg-card/30 border border-white/10 rounded-2xl p-3 sm:p-4">
                   <div className="flex flex-wrap gap-2">
                     <Button
                       size="sm"
@@ -238,7 +238,7 @@ export default function SessionInsights() {
                       mode="single"
                       selected={selectedDate}
                       onSelect={setSelectedDate}
-                      className="rounded-xl border border-white/10 bg-black/20"
+                      className="rounded-xl border border-white/10 bg-black/20 [--cell-size:--spacing(6)] sm:[--cell-size:--spacing(7)] md:[--cell-size:--spacing(8)]"
                     />
                   </div>
                   {sessionView === "week" && (

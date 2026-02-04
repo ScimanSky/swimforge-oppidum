@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Calendar } from "@/components/ui/calendar"
 import { trpc } from "@/lib/trpc"
 import {
   Brain,
@@ -77,19 +76,6 @@ const formatDate = (date?: string | null) => {
   })
 }
 
-const toDateKey = (date: Date) => {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, "0")
-  const day = String(date.getDate()).padStart(2, "0")
-  return `${year}-${month}-${day}`
-}
-
-const fromDateKey = (key: string) => {
-  const [year, month, day] = key.split("-").map(Number)
-  if (!year || !month || !day) return null
-  return new Date(year, month - 1, day)
-}
-
 const getExerciseDetails = (exercise: WorkoutExercise) =>
   [
     exercise.sets && `Serie: ${exercise.sets}`,
@@ -134,8 +120,6 @@ export default function Coach() {
   const [activeInsightIndex, setActiveInsightIndex] = useState(0)
   const [activePoolSectionIndex, setActivePoolSectionIndex] = useState(0)
   const [activeDrySectionIndex, setActiveDrySectionIndex] = useState(0)
-  const [sessionView, setSessionView] = useState<"day" | "week">("day")
-  const [selectedSessionDate, setSelectedSessionDate] = useState<Date | undefined>()
 
   const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
@@ -252,41 +236,11 @@ export default function Coach() {
         return {
           ...item,
           _date: date,
-          _dateKey: date ? toDateKey(date) : null,
           _sort: date ? date.getTime() : 0,
         }
       })
       .sort((a, b) => b._sort - a._sort)
   }, [sessionInsightsQuery.data])
-
-  const sessionByDate = useMemo(() => {
-    const map = new Map<string, any[]>()
-    sessionEntries.forEach((entry: any) => {
-      if (!entry._dateKey) return
-      const list = map.get(entry._dateKey) ?? []
-      list.push(entry)
-      map.set(entry._dateKey, list)
-    })
-    return map
-  }, [sessionEntries])
-
-  const availableDateKeys = useMemo(() => {
-    return Array.from(sessionByDate.keys()).sort((a, b) => (a > b ? -1 : 1))
-  }, [sessionByDate])
-
-  useEffect(() => {
-    if (!availableDateKeys.length) return
-    if (!selectedSessionDate) {
-      const parsed = fromDateKey(availableDateKeys[0])
-      setSelectedSessionDate(parsed ?? new Date())
-      return
-    }
-    const key = toDateKey(selectedSessionDate)
-    if (!availableDateKeys.includes(key)) {
-      const parsed = fromDateKey(availableDateKeys[0])
-      setSelectedSessionDate(parsed ?? new Date())
-    }
-  }, [availableDateKeys, selectedSessionDate])
 
   const latestSessionInsight = sessionEntries[0] ?? null
 
@@ -304,38 +258,6 @@ export default function Coach() {
     if (!latestSessionInsight) return []
     return parseBullets(latestSessionInsight.bullets)
   }, [latestSessionInsight])
-
-  const activeSessionDateKey = selectedSessionDate
-    ? toDateKey(selectedSessionDate)
-    : availableDateKeys[0]
-  const activeSessionEntry = activeSessionDateKey
-    ? sessionByDate.get(activeSessionDateKey)?.[0] ?? null
-    : null
-
-  const activeSessionBullets = useMemo(
-    () => parseBullets(activeSessionEntry?.bullets),
-    [activeSessionEntry]
-  )
-
-  const weekDays = useMemo(() => {
-    if (!selectedSessionDate) return []
-    const date = new Date(selectedSessionDate)
-    const day = date.getDay()
-    const offset = (day + 6) % 7
-    date.setDate(date.getDate() - offset)
-    date.setHours(0, 0, 0, 0)
-    return Array.from({ length: 7 }).map((_, index) => {
-      const d = new Date(date)
-      d.setDate(date.getDate() + index)
-      return d
-    })
-  }, [selectedSessionDate])
-
-  const weekDateKeys = useMemo(() => {
-    return weekDays
-      .map((day) => toDateKey(day))
-      .filter((key) => sessionByDate.has(key))
-  }, [weekDays, sessionByDate])
 
   const activePoolSection = useMemo(() => {
     const sections = poolWorkout?.sections ?? []
@@ -762,7 +684,7 @@ export default function Coach() {
 
           <TabsContent value="session-iq" className="mt-6 space-y-4">
             <Card className="bg-card/80 border-border/60 shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="font-display">Session IQ</CardTitle>
                   <CardDescription>
@@ -774,102 +696,48 @@ export default function Coach() {
                 </Button>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+                {latestSessionInsight ? (
                   <div className="space-y-3">
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={sessionView === "day" ? "default" : "outline"}
-                        onClick={() => setSessionView("day")}
-                      >
-                        Giorno
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={sessionView === "week" ? "default" : "outline"}
-                        onClick={() => setSessionView("week")}
-                      >
-                        Settimana
-                      </Button>
-                    </div>
-                    <Calendar
-                      mode="single"
-                      selected={selectedSessionDate}
-                      onSelect={setSelectedSessionDate}
-                      className="rounded-xl border border-border bg-background/60"
-                    />
-                    {sessionView === "week" && (
-                      <div className="flex flex-wrap gap-2">
-                        {weekDays.map((day) => {
-                          const key = toDateKey(day)
-                          if (!weekDateKeys.includes(key)) return null
-                          const label = day.toLocaleDateString("it-IT", {
-                            weekday: "short",
-                            day: "numeric",
-                          })
-                          const isActive = key === activeSessionDateKey
-                          return (
-                            <Button
-                              key={key}
-                              type="button"
-                              size="sm"
-                              variant={isActive ? "default" : "outline"}
-                              onClick={() => {
-                                if (key !== activeSessionDateKey) {
-                                  setSelectedSessionDate(fromDateKey(key) ?? day)
-                                }
-                              }}
-                            >
-                              {label}
-                            </Button>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  {activeSessionEntry ? (
-                    <div className="space-y-3">
-                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                        {formatDate(activeSessionEntry.activity_date) && (
-                          <span>📅 {formatDate(activeSessionEntry.activity_date)}</span>
-                        )}
-                        {formatDistance(activeSessionEntry.activity_distance_meters) && (
-                          <span>
-                            🏊 {formatDistance(activeSessionEntry.activity_distance_meters)}
-                          </span>
-                        )}
-                        {formatTime(activeSessionEntry.activity_duration_seconds) && (
-                          <span>
-                            ⏱ {formatTime(activeSessionEntry.activity_duration_seconds)}
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="text-lg font-semibold text-foreground">
-                        {activeSessionEntry.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {activeSessionEntry.summary}
-                      </p>
-                      {activeSessionBullets.length > 0 && (
-                        <ul className="space-y-2 text-sm text-foreground">
-                          {activeSessionBullets.map((bullet: string, idx: number) => (
-                            <li key={idx} className="flex items-start gap-2">
-                              <span className="text-primary">•</span>
-                              <span>{bullet}</span>
-                            </li>
-                          ))}
-                        </ul>
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                      <span className="rounded-full bg-primary/10 px-2 py-1 text-primary">
+                        Ultima sessione
+                      </span>
+                      {formatDate(latestSessionInsight.activity_date) && (
+                        <span>📅 {formatDate(latestSessionInsight.activity_date)}</span>
+                      )}
+                      {formatDistance(latestSessionInsight.activity_distance_meters) && (
+                        <span>
+                          🏊 {formatDistance(latestSessionInsight.activity_distance_meters)}
+                        </span>
+                      )}
+                      {formatTime(latestSessionInsight.activity_duration_seconds) && (
+                        <span>
+                          ⏱ {formatTime(latestSessionInsight.activity_duration_seconds)}
+                        </span>
                       )}
                     </div>
-                  ) : (
-                    <div className="text-sm text-muted-foreground">
-                      Nessuna analisi disponibile. Sincronizza una nuova attività per generare Session IQ.
-                    </div>
-                  )}
-                </div>
+                    <h3 className="text-lg font-semibold text-foreground">
+                      {latestSessionInsight.title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {latestSessionInsight.summary}
+                    </p>
+                    {parsedSessionBullets.length > 0 && (
+                      <ul className="space-y-2 text-sm text-foreground">
+                        {parsedSessionBullets.map((bullet: string, idx: number) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-primary">•</span>
+                            <span>{bullet}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    Nessuna analisi disponibile. Sincronizza una nuova attività per generare Session IQ.
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
