@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import { supabase } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 const features = [
   "Sincronizza automaticamente da Garmin e Strava",
@@ -35,6 +36,7 @@ const features = [
 ];
 
 export default function Register() {
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [step, setStep] = useState(1);
   const [firstName, setFirstName] = useState("");
@@ -45,6 +47,16 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) return;
+    window.location.href = "/dashboard";
+  }, [authLoading, isAuthenticated]);
+
+  if (authLoading || isAuthenticated) {
+    return <div className="min-h-screen bg-background" />;
+  }
 
   const syncSupabaseUserMutation = trpc.auth.syncSupabaseUser.useMutation({
     onSuccess: () => {
