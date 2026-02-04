@@ -305,22 +305,20 @@ export default function Badges() {
         </motion.div>
 
         {/* Category Tabs */}
-        <div className="overflow-x-auto -mx-4 px-4">
-          <div className="flex gap-2 min-w-max pb-2">
-            {Object.entries(categoryLabels).map(([key, label]) => (
-              <button
-                key={key}
-                onClick={() => setSelectedCategory(key)}
-                className={`rounded-full px-4 py-2 text-sm font-medium border transition-colors ${
-                  selectedCategory === key
-                    ? "bg-primary text-primary-foreground border-primary/60 shadow-sm"
-                    : "bg-card/60 text-foreground/80 border-border/60 hover:bg-accent/40 hover:text-foreground"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-wrap gap-2">
+          {Object.entries(categoryLabels).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setSelectedCategory(key)}
+              className={`rounded-full px-3 py-2 text-sm font-medium border transition-colors ${
+                selectedCategory === key
+                  ? "bg-primary text-primary-foreground border-primary/60 shadow-sm"
+                  : "bg-card/60 text-foreground/80 border-border/60 hover:bg-accent/40 hover:text-foreground"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
 
         {/* Badge Grid */}
