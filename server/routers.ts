@@ -388,6 +388,30 @@ export const appRouter = router({
         if (!activity || activity.userId !== ctx.user.id) {
           throw new TRPCError({ code: "NOT_FOUND" });
         }
+        if (activity.activitySource === "garmin" && activity.garminActivityId) {
+          const rawData = (activity.rawData ?? {}) as Record<string, any>;
+          if (!rawData.garmin_details) {
+            const fullDetails = await garmin.getGarminActivityFullDetails(
+              ctx.user.id,
+              activity.garminActivityId
+            );
+            if (fullDetails) {
+              const nextRawData = {
+                ...rawData,
+                garmin_details: fullDetails,
+              };
+              const dbInstance = await getDb();
+              if (dbInstance) {
+                const { swimmingActivities } = await import("../drizzle/schema");
+                await dbInstance
+                  .update(swimmingActivities)
+                  .set({ rawData: nextRawData })
+                  .where(eq(swimmingActivities.id, activity.id));
+              }
+              activity.rawData = nextRawData;
+            }
+          }
+        }
         return activity;
       }),
     

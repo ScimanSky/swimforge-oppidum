@@ -175,6 +175,17 @@ def get_garmin_client(user_id: str):
     return None
 
 
+def safe_garmin_call(method, *args):
+    """Safely call Garmin Connect methods without breaking the whole response."""
+    if method is None:
+        return None
+    try:
+        return method(*args)
+    except Exception as err:
+        logger.warning(f"Garmin call {getattr(method, '__name__', str(method))} failed: {err}")
+        return None
+
+
 def determine_stroke_type(activity_name: str, activity_type: str) -> str:
     """Determine stroke type from activity name"""
     name = activity_name.lower()
@@ -883,6 +894,54 @@ async def get_activity_details(
             status_code=500,
             detail=f"Errore nel recupero dei dettagli: {str(e)}"
         )
+
+
+@app.get("/activity/{activity_id}/full")
+async def get_activity_full_details(
+    activity_id: str,
+    user_id: str = Header(None, alias="user-id"),
+    api_key: str = Depends(verify_api_key)
+):
+    """Get full Garmin activity details (splits, typed splits, weather, gear, zones, etc)."""
+    if not user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="user-id header is required"
+        )
+
+    client = get_garmin_client(user_id)
+
+    if not client:
+        raise HTTPException(
+            status_code=401,
+            detail="Non autenticato. Effettua prima il login."
+        )
+
+    logger.info(f"Fetching full Garmin details for activity {activity_id}")
+
+    details = safe_garmin_call(getattr(client, "get_activity_details", None), activity_id)
+    activity = safe_garmin_call(getattr(client, "get_activity", None), activity_id)
+    splits = safe_garmin_call(getattr(client, "get_activity_splits", None), activity_id)
+    typed_splits = safe_garmin_call(getattr(client, "get_activity_typed_splits", None), activity_id)
+    split_summaries = safe_garmin_call(getattr(client, "get_activity_split_summaries", None), activity_id)
+    weather = safe_garmin_call(getattr(client, "get_activity_weather", None), activity_id)
+    hr_zones = safe_garmin_call(getattr(client, "get_activity_hr_in_timezones", None), activity_id)
+    power_zones = safe_garmin_call(getattr(client, "get_activity_power_in_timezones", None), activity_id)
+    gear = safe_garmin_call(getattr(client, "get_activity_gear", None), activity_id)
+    exercise_sets = safe_garmin_call(getattr(client, "get_activity_exercise_sets", None), activity_id)
+
+    return {
+        "activity": activity,
+        "details": details,
+        "splits": splits,
+        "typed_splits": typed_splits,
+        "split_summaries": split_summaries,
+        "weather": weather,
+        "hr_zones": hr_zones,
+        "power_zones": power_zones,
+        "gear": gear,
+        "exercise_sets": exercise_sets,
+    }
 
 
 @app.post("/sync", response_model=SyncResponse)

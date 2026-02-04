@@ -76,6 +76,7 @@ export default function ActivityDetail() {
 
   const activity = activityQuery.data
   const isLoading = activityQuery.isLoading
+  const garminDetails = (activity?.rawData as any)?.garmin_details ?? null
 
   const avgSpeedKmh =
     activity?.distanceMeters && activity?.durationSeconds
@@ -90,6 +91,20 @@ export default function ActivityDetail() {
     { label: "Z5", seconds: activity?.hrZone5Seconds ?? 0 },
   ]
   const totalHrSeconds = hrZones.reduce((sum, zone) => sum + (zone.seconds || 0), 0)
+
+  const renderGarminSection = (title: string, payload: any) => {
+    if (!payload) return null
+    return (
+      <details className="rounded-lg border border-border bg-background/60 p-3">
+        <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+          {title}
+        </summary>
+        <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap text-xs text-foreground">
+          {JSON.stringify(payload, null, 2)}
+        </pre>
+      </details>
+    )
+  }
 
   return (
     <AppLayout>
@@ -370,6 +385,33 @@ export default function ActivityDetail() {
                 </CardContent>
               </Card>
             </div>
+
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="font-display">Dettagli Garmin avanzati</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                {garminDetails ? (
+                  <>
+                    {renderGarminSection("Dettagli attività", garminDetails.details)}
+                    {renderGarminSection("Attività singola", garminDetails.activity)}
+                    {renderGarminSection("Splits (laps)", garminDetails.splits)}
+                    {renderGarminSection("Splits per tipo", garminDetails.typed_splits)}
+                    {renderGarminSection("Riepilogo splits", garminDetails.split_summaries)}
+                    {renderGarminSection("Meteo", garminDetails.weather)}
+                    {renderGarminSection("Zone HR", garminDetails.hr_zones)}
+                    {renderGarminSection("Zone potenza", garminDetails.power_zones)}
+                    {renderGarminSection("Gear", garminDetails.gear)}
+                    {renderGarminSection("Exercise sets", garminDetails.exercise_sets)}
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Dettagli Garmin non disponibili. Assicurati di essere connesso a Garmin e
+                    ricarica la pagina.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
           </>
         )}
       </div>

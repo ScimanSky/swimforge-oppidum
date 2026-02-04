@@ -102,6 +102,56 @@ async function callGarminService(
   }
 }
 
+async function callGarminServiceWithUser(
+  endpoint: string,
+  userId: number,
+  method: "GET" | "POST" = "GET",
+  body?: object
+): Promise<any> {
+  const url = `${GARMIN_SERVICE_URL}${endpoint}`;
+
+  try {
+    const response = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": GARMIN_SERVICE_SECRET,
+        "user-id": userId.toString(),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    const data = await response.json().catch(() => ({ detail: "Unknown error" }));
+
+    if (!response.ok) {
+      throw new Error(data.detail || `HTTP ${response.status}`);
+    }
+
+    return data;
+  } catch (error: any) {
+    console.error(`[Garmin Service] Error calling ${endpoint}:`, error.message);
+    throw error;
+  }
+}
+
+export async function getGarminActivityFullDetails(
+  userId: number,
+  garminActivityId: string
+): Promise<any | null> {
+  try {
+    return await callGarminServiceWithUser(
+      `/activity/${garminActivityId}/full`,
+      userId
+    );
+  } catch (error) {
+    console.warn(
+      `[Garmin] Could not fetch full details for activity ${garminActivityId}:`,
+      error
+    );
+    return null;
+  }
+}
+
 /**
  * Get Garmin connection status for a user
  */
