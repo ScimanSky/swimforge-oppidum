@@ -311,7 +311,11 @@ export default function Badges() {
               <button
                 key={key}
                 onClick={() => setSelectedCategory(key)}
-                className={`game-tab ${selectedCategory === key ? 'active' : ''}`}
+                className={`rounded-full px-4 py-2 text-sm font-medium border transition-colors ${
+                  selectedCategory === key
+                    ? "bg-primary text-primary-foreground border-primary/60 shadow-sm"
+                    : "bg-card/60 text-foreground/80 border-border/60 hover:bg-accent/40 hover:text-foreground"
+                }`}
               >
                 {label}
               </button>
