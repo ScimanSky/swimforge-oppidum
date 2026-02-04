@@ -73,6 +73,7 @@ class LoginResponse(BaseModel):
     message: str
     user_id: Optional[str] = None
     mfa_required: bool = False
+    token_data: Optional[str] = None
 
 
 class StatusResponse(BaseModel):
@@ -124,6 +125,11 @@ class SyncResponse(BaseModel):
     synced_count: int
     activities: List[SwimmingActivity]
     message: Optional[str] = None
+
+
+class RestoreRequest(BaseModel):
+    user_id: str
+    token_data: str
 
 
 # Lifespan context manager
@@ -486,6 +492,12 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
             logger.info(f"Saved tokens for user {request.user_id}")
         except Exception as e:
             logger.warning(f"Could not save tokens: {e}")
+        token_data = None
+        try:
+            if token_path.exists():
+                token_data = token_path.read_text()
+        except Exception as e:
+            logger.warning(f"Could not read token data: {e}")
         
         # Get display name
         try:
@@ -506,7 +518,8 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
             success=True,
             message="Connesso a Garmin Connect con successo!",
             user_id=request.user_id,
-            mfa_required=False
+            mfa_required=False,
+            token_data=token_data
         )
         
     except HTTPException:
@@ -605,6 +618,12 @@ async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_ke
             logger.info(f"Saved tokens for user {request.user_id}")
         except Exception as e:
             logger.warning(f"Could not save tokens: {e}")
+        token_data = None
+        try:
+            if token_path.exists():
+                token_data = token_path.read_text()
+        except Exception as e:
+            logger.warning(f"Could not read token data: {e}")
         
         # Get display name
         try:
@@ -625,7 +644,8 @@ async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_ke
             success=True,
             message="Connesso a Garmin Connect con successo!",
             user_id=request.user_id,
-            mfa_required=False
+            mfa_required=False,
+            token_data=token_data
         )
         
     except HTTPException:
@@ -673,6 +693,50 @@ async def logout(user_id: str, api_key: str = Depends(verify_api_key)):
         pass
     
     return {"success": True, "message": "Disconnesso con successo"}
+
+
+@app.post("/auth/restore")
+async def restore_session(
+    request: RestoreRequest,
+    api_key: str = Depends(verify_api_key)
+):
+    """Restore Garmin session from token data stored in DB."""
+    try:
+        token_path = get_token_path(request.user_id)
+        token_path.write_text(request.token_data)
+
+        try:
+            from garminconnect import Garmin
+        except ImportError as e:
+            logger.error(f"Failed to import garminconnect: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="Garmin Connect library not available."
+            )
+
+        client = Garmin()
+        client.login(str(token_path))
+
+        try:
+            display_name = client.display_name
+        except Exception:
+            display_name = None
+
+        sessions[request.user_id] = {
+            "client": client,
+            "email": None,
+            "display_name": display_name,
+            "last_sync": None,
+            "connected_at": datetime.now().isoformat()
+        }
+
+        return {"success": True, "message": "Sessione Garmin ripristinata"}
+    except Exception as e:
+        logger.error(f"Failed to restore session for user {request.user_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Errore nel ripristino della sessione Garmin: {str(e)}"
+        )
 
 
 @app.get("/auth/status/{user_id}", response_model=StatusResponse)

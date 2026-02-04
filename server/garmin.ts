@@ -18,7 +18,7 @@ import { getDb } from "./db";
 import { garminTokens, swimmingActivities, swimmerProfiles, xpTransactions, badgeDefinitions, userBadges } from "../drizzle/schema";
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
-import { encryptForStorage } from "./lib/tokenCrypto";
+import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
 import { invalidateUserCache } from "./lib/cache";
 
 // Garmin microservice configuration
@@ -134,11 +134,54 @@ async function callGarminServiceWithUser(
   }
 }
 
+async function ensureGarminSessionFromDb(userId: number): Promise<boolean> {
+  try {
+    const status = await callGarminService(`/auth/status/${userId}`);
+    if (status?.connected) return true;
+  } catch {
+    // ignore and try restore
+  }
+
+  const db = await getDb();
+  if (!db) return false;
+
+  const tokens = await db
+    .select()
+    .from(garminTokens)
+    .where(eq(garminTokens.userId, userId))
+    .limit(1);
+
+  const stored = tokens[0]?.oauth1Token;
+  if (!stored) return false;
+
+  const decrypted = decryptIfNeeded(stored);
+  if (!decrypted.startsWith("garth:")) {
+    return false;
+  }
+  const tokenData = decrypted.slice("garth:".length);
+  if (!tokenData) return false;
+
+  try {
+    const result = await callGarminService("/auth/restore", "POST", {
+      user_id: String(userId),
+      token_data: tokenData,
+    });
+    return Boolean(result?.success);
+  } catch (error) {
+    console.warn(`[Garmin] Failed to restore session for user ${userId}:`, error);
+    return false;
+  }
+}
+
 export async function getGarminActivityFullDetails(
   userId: number,
   garminActivityId: string
 ): Promise<any | null> {
   try {
+    const restored = await ensureGarminSessionFromDb(userId);
+    if (!restored) {
+      return null;
+    }
     return await callGarminServiceWithUser(
       `/activity/${garminActivityId}/full`,
       userId
@@ -368,26 +411,32 @@ export async function connectGarmin(
       return { success: false, error: result.message || "Authentication failed" };
     }
 
+    const tokenPayload = result.token_data ? `garth:${result.token_data}` : null;
+
     // Store connection info in local database
     await db.insert(garminTokens).values({
       userId,
       garminEmail: email,
-      oauth1Token: encryptForStorage(JSON.stringify({ 
-        connected: true, 
-        service_user_id: String(userId),
-        connected_at: new Date().toISOString()
-      })),
+      oauth1Token: tokenPayload
+        ? encryptForStorage(tokenPayload)
+        : encryptForStorage(JSON.stringify({ 
+            connected: true, 
+            service_user_id: String(userId),
+            connected_at: new Date().toISOString()
+          })),
       oauth2Token: null,
       tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     }).onConflictDoUpdate({
       target: garminTokens.userId,
       set: {
         garminEmail: email,
-        oauth1Token: encryptForStorage(JSON.stringify({ 
-          connected: true, 
-          service_user_id: String(userId),
-          connected_at: new Date().toISOString()
-        })),
+        oauth1Token: tokenPayload
+          ? encryptForStorage(tokenPayload)
+          : encryptForStorage(JSON.stringify({ 
+              connected: true, 
+              service_user_id: String(userId),
+              connected_at: new Date().toISOString()
+            })),
         tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         updatedAt: new Date(),
       },
@@ -433,28 +482,34 @@ export async function completeMfa(
       return { success: false, error: result.message || "MFA verification failed" };
     }
 
+    const tokenPayload = result.token_data ? `garth:${result.token_data}` : null;
+
     // Store connection info in local database
     await db.insert(garminTokens).values({
       userId,
       garminEmail: email,
-      oauth1Token: encryptForStorage(JSON.stringify({ 
-        connected: true, 
-        service_user_id: String(userId),
-        connected_at: new Date().toISOString(),
-        mfa_completed: true
-      })),
+      oauth1Token: tokenPayload
+        ? encryptForStorage(tokenPayload)
+        : encryptForStorage(JSON.stringify({ 
+            connected: true, 
+            service_user_id: String(userId),
+            connected_at: new Date().toISOString(),
+            mfa_completed: true
+          })),
       oauth2Token: null,
       tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     }).onConflictDoUpdate({
       target: garminTokens.userId,
       set: {
         garminEmail: email,
-        oauth1Token: encryptForStorage(JSON.stringify({ 
-          connected: true, 
-          service_user_id: String(userId),
-          connected_at: new Date().toISOString(),
-          mfa_completed: true
-        })),
+        oauth1Token: tokenPayload
+          ? encryptForStorage(tokenPayload)
+          : encryptForStorage(JSON.stringify({ 
+              connected: true, 
+              service_user_id: String(userId),
+              connected_at: new Date().toISOString(),
+              mfa_completed: true
+            })),
         tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         updatedAt: new Date(),
       },
@@ -609,6 +664,14 @@ export async function syncGarminActivities(
   }
 
   try {
+    const restored = await ensureGarminSessionFromDb(userId);
+    if (!restored) {
+      return {
+        synced: 0,
+        newXp: 0,
+        error: "Sessione Garmin non attiva. Ricollega Garmin Connect.",
+      };
+    }
     // Call microservice to sync activities
     const result: GarminServiceResponse = await callGarminService("/sync", "POST", {
       user_id: String(userId),
