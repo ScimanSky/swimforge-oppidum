@@ -151,7 +151,12 @@ export default function ActivityDetail() {
   const totalHrSeconds = hrZones.reduce((sum, zone) => sum + (zone.seconds || 0), 0)
   const hasDbHrZones = hrZones.some((zone) => (zone.seconds || 0) > 0)
 
-  const garminSummarySource = garminDetails?.details ?? garminDetails?.activity ?? null
+  const garminSummarySource =
+    garminDetails?.activity?.summaryDTO ??
+    garminDetails?.summaryDTO ??
+    garminDetails?.details ??
+    garminDetails?.activity ??
+    null
   const garminDistance = garminSummarySource ? getDistanceMeters(garminSummarySource) : null
   const garminDuration = garminSummarySource ? getDurationSeconds(garminSummarySource) : null
   const garminPace = garminSummarySource ? getPacePer100m(garminSummarySource) : null
@@ -168,7 +173,7 @@ export default function ActivityDetail() {
     { label: "Calorie", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["calories", "caloriesBurned"]))) },
     { label: "FC media", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["averageHR", "avgHeartRate"])), " bpm") },
     { label: "FC max", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["maxHR", "maxHeartRate"])), " bpm") },
-    { label: "SWOLF", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["averageSwolf", "avgSwolf"]))) },
+    { label: "SWOLF", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["averageSwolf", "avgSwolf", "averageSWOLF"]))) },
     { label: "Stile", value: garminStrokeType ? String(garminStrokeType) : "—" },
     { label: "Vasche", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["lapCount", "totalLaps"]))) },
     { label: "Lunghezza vasca", value: formatNumber(toNumber(pickFirst(garminSummarySource, ["poolLength", "poolLengthMeters"])), " m") },
@@ -183,7 +188,7 @@ export default function ActivityDetail() {
   const techMetrics = {
     swolf:
       activity?.avgSwolf ??
-      toNumber(pickFirst(garminSummarySource, ["averageSwolf", "avgSwolf"])),
+      toNumber(pickFirst(garminSummarySource, ["averageSwolf", "avgSwolf", "averageSWOLF"])),
     avgStrokeDistance:
       activity?.avgStrokeDistance ??
       normalizeStrokeDistanceCm(
@@ -194,7 +199,7 @@ export default function ActivityDetail() {
       toNumber(pickFirst(garminSummarySource, ["avgStrokes", "averageStrokes"])),
     avgStrokeCadence:
       activity?.avgStrokeCadence ??
-      toNumber(pickFirst(garminSummarySource, ["avgStrokeCadenceRpm", "avgStrokeCadence"])),
+      toNumber(pickFirst(garminSummarySource, ["avgStrokeCadenceRpm", "avgStrokeCadence", "averageSwimCadence"])),
     trainingEffect:
       activity?.trainingEffect ??
       toNumber(pickFirst(garminSummarySource, ["aerobicTrainingEffect", "trainingEffect"])),

@@ -212,6 +212,17 @@ const pickFirst = (obj: any, keys: string[]) => {
   return null;
 };
 
+const pickFirstFromSources = (sources: any[], keys: string[]) => {
+  for (const source of sources) {
+    if (!source) continue;
+    const value = pickFirst(source, keys);
+    if (value !== null && value !== undefined) {
+      return value;
+    }
+  }
+  return null;
+};
+
 const normalizeStrokeType = (value: any) => {
   if (!value) return null;
   const raw = String(value).toLowerCase();
@@ -278,37 +289,69 @@ const normalizeHrZones = (zones: any) => {
 };
 
 export function extractGarminAdvancedFields(fullDetails: any) {
-  const source = fullDetails?.details ?? fullDetails?.activity ?? fullDetails ?? null;
+  const activity = fullDetails?.activity ?? null;
+  const summary = activity?.summaryDTO ?? fullDetails?.summaryDTO ?? null;
+  const details = fullDetails?.details ?? null;
+
+  const sources = [details, summary, activity, fullDetails].filter(Boolean);
+
   const strokeType = normalizeStrokeType(
-    pickFirst(source, ["strokeType", "swimStrokeType", "avgStrokeType"])
+    pickFirstFromSources(sources, ["strokeType", "swimStrokeType", "avgStrokeType"])
   );
   const hrZones = normalizeHrZones(fullDetails?.hr_zones);
 
   return {
-    avgSwolf: toNumber(pickFirst(source, ["averageSwolf", "avgSwolf"])),
-    avgStrokeDistance: normalizeStrokeDistanceCm(
-      pickFirst(source, ["avgStrokeDistance", "averageStrokeDistance"])
+    avgSwolf: toNumber(
+      pickFirstFromSources(sources, ["averageSwolf", "avgSwolf", "averageSWOLF"])
     ),
-    avgStrokes: toNumber(pickFirst(source, ["avgStrokes", "averageStrokes"])),
+    avgStrokeDistance: normalizeStrokeDistanceCm(
+      pickFirstFromSources(sources, ["avgStrokeDistance", "averageStrokeDistance"])
+    ),
+    avgStrokes: toNumber(
+      pickFirstFromSources(sources, ["avgStrokes", "averageStrokes"])
+    ),
     avgStrokeCadence: toNumber(
-      pickFirst(source, ["avgStrokeCadenceRpm", "avgStrokeCadence"])
+      pickFirstFromSources(sources, [
+        "avgStrokeCadenceRpm",
+        "avgStrokeCadence",
+        "averageSwimCadence",
+      ])
     ),
     trainingEffect: normalizeTrainingEffect(
-      pickFirst(source, ["aerobicTrainingEffect", "trainingEffect"])
+      pickFirstFromSources(sources, ["aerobicTrainingEffect", "trainingEffect"])
     ),
     anaerobicTrainingEffect: normalizeTrainingEffect(
-      pickFirst(source, ["anaerobicTrainingEffect"])
+      pickFirstFromSources(sources, ["anaerobicTrainingEffect"])
     ),
-    vo2MaxValue: toNumber(pickFirst(source, ["vO2MaxValue", "vo2MaxValue"])),
+    vo2MaxValue: toNumber(
+      pickFirstFromSources(sources, ["vO2MaxValue", "vo2MaxValue"])
+    ),
     recoveryTimeHours: normalizeRecoveryHours(
-      pickFirst(source, ["recoveryTime", "recoveryTimeMinutes"])
+      pickFirstFromSources(sources, ["recoveryTime", "recoveryTimeMinutes"])
     ),
-    avgStress: toNumber(pickFirst(source, ["averageStress", "avgStress"])),
-    avgHeartRate: toNumber(pickFirst(source, ["averageHR", "avgHeartRate"])),
-    maxHeartRate: toNumber(pickFirst(source, ["maxHR", "maxHeartRate"])),
-    restingHeartRate: toNumber(pickFirst(source, ["restingHeartRate"])),
-    lapsCount: toNumber(pickFirst(source, ["lapCount", "totalLaps", "numLaps"])),
-    poolLengthMeters: toNumber(pickFirst(source, ["poolLength", "poolLengthMeters"])),
+    avgStress: toNumber(
+      pickFirstFromSources(sources, ["averageStress", "avgStress"])
+    ),
+    avgHeartRate: toNumber(
+      pickFirstFromSources(sources, ["averageHR", "avgHeartRate"])
+    ),
+    maxHeartRate: toNumber(
+      pickFirstFromSources(sources, ["maxHR", "maxHeartRate"])
+    ),
+    restingHeartRate: toNumber(
+      pickFirstFromSources(sources, ["restingHeartRate"])
+    ),
+    lapsCount: toNumber(
+      pickFirstFromSources(sources, [
+        "lapCount",
+        "totalLaps",
+        "numLaps",
+        "numberOfActiveLengths",
+      ])
+    ),
+    poolLengthMeters: toNumber(
+      pickFirstFromSources(sources, ["poolLength", "poolLengthMeters"])
+    ),
     strokeType,
     hrZones,
   };
@@ -697,6 +740,73 @@ export async function syncGarminActivities(
       return { synced: 0, newXp: 0, error: "Profile not found" };
     }
 
+    const enrichActivityDetails = async (params: {
+      activityId: number;
+      garminActivityId: string;
+      currentStrokeType?: string | null;
+      baseRawData?: Record<string, any> | null;
+    }) => {
+      const fullDetails = await getGarminActivityFullDetails(
+        userId,
+        params.garminActivityId
+      );
+      if (!fullDetails) return;
+
+      const advanced = extractGarminAdvancedFields(fullDetails);
+      const updates: Record<string, any> = {
+        rawData: {
+          ...(params.baseRawData ?? {}),
+          garmin_details: fullDetails,
+        },
+      };
+
+      const setIfDefined = (key: string, value: any) => {
+        if (value === null || value === undefined) return;
+        updates[key] = value;
+      };
+
+      setIfDefined("avgSwolf", advanced.avgSwolf);
+      setIfDefined("avgStrokeDistance", advanced.avgStrokeDistance);
+      setIfDefined("avgStrokes", advanced.avgStrokes);
+      setIfDefined("avgStrokeCadence", advanced.avgStrokeCadence);
+      setIfDefined("trainingEffect", advanced.trainingEffect);
+      setIfDefined("anaerobicTrainingEffect", advanced.anaerobicTrainingEffect);
+      setIfDefined("vo2MaxValue", advanced.vo2MaxValue);
+      setIfDefined("recoveryTimeHours", advanced.recoveryTimeHours);
+      setIfDefined("avgStress", advanced.avgStress);
+      setIfDefined("avgHeartRate", advanced.avgHeartRate);
+      setIfDefined("maxHeartRate", advanced.maxHeartRate);
+      setIfDefined("restingHeartRate", advanced.restingHeartRate);
+      setIfDefined("lapsCount", advanced.lapsCount);
+      setIfDefined("poolLengthMeters", advanced.poolLengthMeters);
+
+      if (
+        advanced.strokeType &&
+        (!params.currentStrokeType || params.currentStrokeType === "mixed")
+      ) {
+        updates.strokeType = advanced.strokeType;
+      }
+
+      if (advanced.hrZones) {
+        const hrValues = Object.values(advanced.hrZones);
+        const hasZones = hrValues.some((value) => Number(value) > 0);
+        if (hasZones) {
+          setIfDefined("hrZone1Seconds", advanced.hrZones.hrZone1Seconds);
+          setIfDefined("hrZone2Seconds", advanced.hrZones.hrZone2Seconds);
+          setIfDefined("hrZone3Seconds", advanced.hrZones.hrZone3Seconds);
+          setIfDefined("hrZone4Seconds", advanced.hrZones.hrZone4Seconds);
+          setIfDefined("hrZone5Seconds", advanced.hrZones.hrZone5Seconds);
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await db
+          .update(swimmingActivities)
+          .set(updates)
+          .where(eq(swimmingActivities.id, params.activityId));
+      }
+    };
+
     // Process each activity
     for (const activity of result.activities) {
       // Check if activity already exists (by Garmin ID)
@@ -712,6 +822,39 @@ export async function syncGarminActivities(
         .limit(1);
 
       if (existingGarmin.length > 0) {
+        const existing = existingGarmin[0];
+        const existingRaw = (existing.rawData ?? {}) as Record<string, any>;
+        const existingDetails = existingRaw.garmin_details;
+        const hasSummary =
+          Boolean(existingDetails?.activity?.summaryDTO ?? existingDetails?.summaryDTO);
+        const hasAdvanced =
+          Boolean(
+            existing.avgSwolf ||
+              existing.avgStrokeDistance ||
+              existing.avgStrokes ||
+              existing.avgStrokeCadence ||
+              existing.trainingEffect ||
+              existing.anaerobicTrainingEffect ||
+              existing.avgHeartRate ||
+              existing.hrZone1Seconds
+          );
+
+        if (!hasSummary || !hasAdvanced) {
+          try {
+            await enrichActivityDetails({
+              activityId: existing.id,
+              garminActivityId: activity.activity_id,
+              currentStrokeType: existing.strokeType,
+              baseRawData: existingRaw,
+            });
+          } catch (error) {
+            console.warn(
+              `[Garmin] Failed to enrich existing activity ${activity.activity_id}:`,
+              error
+            );
+          }
+        }
+
         continue; // Skip already synced activities
       }
 
@@ -751,7 +894,7 @@ export async function syncGarminActivities(
       const activityXp = calculateActivityXp(activity);
 
       // Insert new activity
-      await db.insert(swimmingActivities).values({
+      const [inserted] = await db.insert(swimmingActivities).values({
         userId,
         garminActivityId: activity.activity_id,
         activitySource: "garmin",
@@ -764,7 +907,7 @@ export async function syncGarminActivities(
         calories: activity.calories,
         avgHeartRate: activity.avg_heart_rate,
         maxHeartRate: activity.max_heart_rate,
-        swolfScore: activity.swolf_score,
+        avgSwolf: activity.swolf_score,
         lapsCount: activity.laps_count,
         avgStrokeDistance: activity.avg_stroke_distance ? Math.round(activity.avg_stroke_distance * 100) / 100 : undefined,
         avgStrokes: activity.avg_strokes ? Math.round(activity.avg_strokes) : undefined,
@@ -783,7 +926,23 @@ export async function syncGarminActivities(
         hrZone5Seconds: activity.hr_zone_5_seconds ? Math.round(activity.hr_zone_5_seconds) : undefined,
         rawData: activity.raw_data ?? undefined,
         xpEarned: activityXp,
-      });
+      }).returning({ id: swimmingActivities.id });
+
+      if (inserted?.id) {
+        try {
+          await enrichActivityDetails({
+            activityId: inserted.id,
+            garminActivityId: activity.activity_id,
+            currentStrokeType: activity.stroke_type,
+            baseRawData: (activity.raw_data ?? {}) as Record<string, any>,
+          });
+        } catch (error) {
+          console.warn(
+            `[Garmin] Failed to enrich activity ${activity.activity_id}:`,
+            error
+          );
+        }
+      }
 
       totalNewXp += activityXp;
 
@@ -1228,7 +1387,7 @@ export async function migrateHrZones(userId: number): Promise<{
         const hrZones = await response.json();
 
         // Fetch activity details (including SWOLF)
-        let swolfScore = activity.swolfScore; // Keep existing value if fetch fails
+        let swolfScore = activity.avgSwolf; // Keep existing value if fetch fails
         try {
           const detailsResponse = await fetch(
             `${GARMIN_SERVICE_URL}/activity/${activity.garminActivityId}/details`,
@@ -1262,7 +1421,7 @@ export async function migrateHrZones(userId: number): Promise<{
             hrZone3Seconds: Math.round(hrZones.zone3 || 0),
             hrZone4Seconds: Math.round(hrZones.zone4 || 0),
             hrZone5Seconds: Math.round(hrZones.zone5 || 0),
-            swolfScore: swolfScore,
+            avgSwolf: swolfScore,
           })
           .where(eq(swimmingActivities.id, activity.id));
 
