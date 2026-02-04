@@ -269,7 +269,12 @@ export async function getLeaderboard(
 
   const now = new Date();
   const startDate = new Date(now);
-  if (period === 'week') startDate.setDate(startDate.getDate() - 7);
+  if (period === 'week') {
+    startDate.setHours(0, 0, 0, 0);
+    const dayOfWeek = startDate.getDay();
+    const diffFromMonday = (dayOfWeek + 6) % 7;
+    startDate.setDate(startDate.getDate() - diffFromMonday);
+  }
   if (period === 'month') startDate.setDate(startDate.getDate() - 30);
 
   const result = await db.execute(sql`
@@ -287,7 +292,14 @@ export async function getLeaderboard(
       u.name,
       u.email,
       COALESCE((SELECT COUNT(*) FROM user_badges WHERE user_id = sp.user_id AND earned_at >= ${startDate}), 0) as "badgeCount",
-      COALESCE((SELECT SUM(amount) FROM xp_transactions WHERE user_id = sp.user_id AND created_at >= ${startDate}), 0) as "periodXp"
+      COALESCE(
+        NULLIF(
+          (SELECT SUM(amount) FROM xp_transactions WHERE user_id = sp.user_id AND created_at >= ${startDate}),
+          0
+        ),
+        (SELECT SUM(xp_earned) FROM swimming_activities WHERE user_id = sp.user_id AND activity_date >= ${startDate}),
+        0
+      ) as "periodXp"
     FROM swimmer_profiles sp
     JOIN users u ON sp.user_id = u.id
     ORDER BY 
