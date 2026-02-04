@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,10 @@ import { toast } from "sonner";
 import { Waves, Mail, Lock, User } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function Auth() {
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
@@ -26,6 +28,16 @@ export default function Auth() {
   const [registerPassword, setRegisterPassword] = useState("");
   const [registerName, setRegisterName] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) return;
+    window.location.href = "/dashboard";
+  }, [authLoading, isAuthenticated]);
+
+  if (authLoading || isAuthenticated) {
+    return <div className="min-h-screen bg-background" />;
+  }
 
   const syncSupabaseUserMutation = trpc.auth.syncSupabaseUser.useMutation({
     onSuccess: () => {
