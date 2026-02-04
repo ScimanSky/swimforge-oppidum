@@ -146,7 +146,12 @@ export default function Dashboard() {
     const startPrevWeek = new Date(startOfWeek)
     startPrevWeek.setDate(startPrevWeek.getDate() - 7)
 
-    const toDateKey = (date: Date) => date.toISOString().split("T")[0]
+    const toDateKey = (date: Date) => {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, "0")
+      const day = String(date.getDate()).padStart(2, "0")
+      return `${year}-${month}-${day}`
+    }
     const timelineMap = new Map(timeline.map((point) => [point.date, point]))
 
     let currentDistance = 0
@@ -343,11 +348,14 @@ export default function Dashboard() {
     return Array.from({ length: 7 }).map((_, index) => {
       const date = new Date(startOfWeek)
       date.setDate(startOfWeek.getDate() + index)
-      const key = date.toISOString().split("T")[0]
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+        date.getDate()
+      ).padStart(2, "0")}`
       const label = date.toLocaleDateString("it-IT", { weekday: "short" })
+      const distanceKm = Number(map.get(key) ?? 0)
       return {
         day: label,
-        distance: map.get(key) ?? 0,
+        distance: distanceKm * 1000,
       }
     })
   }, [timelineQuery.data])
