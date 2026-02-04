@@ -3,6 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
+import { useAuth } from "@/_core/hooks/useAuth";
 import {
   Activity,
   ArrowRight,
@@ -16,6 +17,7 @@ import {
   Moon,
 } from "lucide-react";
 import { Link } from "wouter";
+import { useEffect } from "react";
 
 const features = [
   {
@@ -113,6 +115,17 @@ function StatItem({
 
 export default function Home() {
   const { theme, toggleTheme, switchable } = useTheme();
+  const { isAuthenticated, loading } = useAuth();
+
+  useEffect(() => {
+    if (loading) return;
+    if (!isAuthenticated) return;
+    window.location.href = "/dashboard";
+  }, [isAuthenticated, loading]);
+
+  if (loading || isAuthenticated) {
+    return <div className="min-h-screen bg-background" />;
+  }
 
   return (
     <div className="min-h-screen bg-background">
