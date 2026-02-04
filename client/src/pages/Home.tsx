@@ -1,7 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   Activity,
   ArrowRight,
@@ -11,6 +12,8 @@ import {
   Users,
   Waves,
   Zap,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -109,6 +112,8 @@ function StatItem({
 }
 
 export default function Home() {
+  const { theme, toggleTheme, switchable } = useTheme();
+
   return (
     <div className="min-h-screen bg-background">
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-lg">
@@ -143,6 +148,17 @@ export default function Home() {
               Club
             </Link>
           </nav>
+          {switchable && toggleTheme && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={toggleTheme}
+              aria-label="Cambia tema"
+            >
+              {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            </Button>
+          )}
         </div>
       </header>
 

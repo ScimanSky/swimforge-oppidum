@@ -17,10 +17,14 @@ import {
   Medal,
   BarChart3,
   LogOut,
+  Sun,
+  Moon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { trpc } from "@/lib/trpc"
 import { supabase } from "@/lib/supabase"
+import { Switch } from "@/components/ui/switch"
+import { useTheme } from "@/contexts/ThemeContext"
 
 interface NavItem {
   label: string
@@ -45,6 +49,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const { theme, toggleTheme, switchable } = useTheme()
   const logoutMutation = trpc.auth.logout.useMutation()
 
   const handleLogout = async () => {
@@ -101,7 +106,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           {/* Bottom section */}
-          <div className="border-t border-border p-4">
+          <div className="border-t border-border p-4 space-y-3">
+            {switchable && toggleTheme && (
+              <div className="flex items-center justify-between rounded-lg bg-accent/40 px-3 py-2 text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  {theme === "dark" ? (
+                    <Moon className="size-4" />
+                  ) : (
+                    <Sun className="size-4" />
+                  )}
+                  <span>{theme === "dark" ? "Scuro" : "Chiaro"}</span>
+                </div>
+                <Switch
+                  checked={theme === "dark"}
+                  onCheckedChange={() => toggleTheme()}
+                />
+              </div>
+            )}
             <button
               type="button"
               onClick={handleLogout}
@@ -168,6 +189,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             )
           })}
+          {switchable && toggleTheme && (
+            <div className="mt-3 flex items-center justify-between rounded-lg bg-accent/40 px-3 py-2 text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                {theme === "dark" ? (
+                  <Moon className="size-4" />
+                ) : (
+                  <Sun className="size-4" />
+                )}
+                <span>{theme === "dark" ? "Scuro" : "Chiaro"}</span>
+              </div>
+              <Switch
+                checked={theme === "dark"}
+                onCheckedChange={() => toggleTheme()}
+              />
+            </div>
+          )}
           <button
             type="button"
             onClick={() => {
