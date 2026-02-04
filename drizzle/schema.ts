@@ -1,4 +1,4 @@
-import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean, json, serial, unique } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean, json, serial, unique, doublePrecision } from "drizzle-orm/pg-core";
 
 // ============================================
 // ENUMS for PostgreSQL
@@ -104,6 +104,78 @@ export const swimmingActivities = pgTable("swimming_activities", {
   shareToFeed: boolean("share_to_feed").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ============================================
+// GARMIN ACTIVITY LAPS (Detailed splits)
+// ============================================
+export const garminActivityLaps = pgTable(
+  "garmin_activity_laps",
+  {
+    id: serial("id").primaryKey(),
+    activityId: integer("activity_id")
+      .notNull()
+      .references(() => swimmingActivities.id, { onDelete: "cascade" }),
+    lapIndex: integer("lap_index").notNull(),
+    distanceMeters: integer("distance_meters"),
+    durationSeconds: doublePrecision("duration_seconds"),
+    movingDurationSeconds: doublePrecision("moving_duration_seconds"),
+    elapsedDurationSeconds: doublePrecision("elapsed_duration_seconds"),
+    averageSpeedMps: doublePrecision("average_speed_mps"),
+    maxSpeedMps: doublePrecision("max_speed_mps"),
+    averageMovingSpeedMps: doublePrecision("average_moving_speed_mps"),
+    averageSwolf: integer("average_swolf"),
+    averageStrokes: doublePrecision("average_strokes"),
+    totalNumberOfStrokes: integer("total_number_of_strokes"),
+    averageSwimCadence: integer("average_swim_cadence"),
+    calories: integer("calories"),
+    avgHeartRate: integer("avg_heart_rate"),
+    maxHeartRate: integer("max_heart_rate"),
+    numberOfActiveLengths: integer("number_of_active_lengths"),
+    strokeType: text("stroke_type"),
+    startTimeGmt: timestamp("start_time_gmt"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    activityLapUnique: unique("garmin_activity_laps_activity_lap_idx").on(
+      table.activityId,
+      table.lapIndex
+    ),
+  })
+);
+
+// ============================================
+// GARMIN ACTIVITY LENGTHS (Per pool length)
+// ============================================
+export const garminActivityLengths = pgTable(
+  "garmin_activity_lengths",
+  {
+    id: serial("id").primaryKey(),
+    activityId: integer("activity_id")
+      .notNull()
+      .references(() => swimmingActivities.id, { onDelete: "cascade" }),
+    lapId: integer("lap_id")
+      .notNull()
+      .references(() => garminActivityLaps.id, { onDelete: "cascade" }),
+    lengthIndex: integer("length_index").notNull(),
+    distanceMeters: integer("distance_meters"),
+    durationSeconds: doublePrecision("duration_seconds"),
+    averageSpeedMps: doublePrecision("average_speed_mps"),
+    maxSpeedMps: doublePrecision("max_speed_mps"),
+    averageSwolf: integer("average_swolf"),
+    totalNumberOfStrokes: integer("total_number_of_strokes"),
+    avgHeartRate: integer("avg_heart_rate"),
+    maxHeartRate: integer("max_heart_rate"),
+    strokeType: text("stroke_type"),
+    startTimeGmt: timestamp("start_time_gmt"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    lapLengthUnique: unique("garmin_activity_lengths_lap_length_idx").on(
+      table.lapId,
+      table.lengthIndex
+    ),
+  })
+);
 
 // ============================================
 // BADGE DEFINITIONS

@@ -15,7 +15,16 @@
  */
 
 import { getDb } from "./db";
-import { garminTokens, swimmingActivities, swimmerProfiles, xpTransactions, badgeDefinitions, userBadges } from "../drizzle/schema";
+import {
+  garminTokens,
+  swimmingActivities,
+  swimmerProfiles,
+  xpTransactions,
+  badgeDefinitions,
+  userBadges,
+  garminActivityLaps,
+  garminActivityLengths,
+} from "../drizzle/schema";
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
 import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
@@ -234,6 +243,13 @@ const normalizeStrokeType = (value: any) => {
   return "mixed";
 };
 
+const toTimestamp = (value: any) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
 const normalizeStrokeDistanceCm = (value: any) => {
   const num = toNumber(value);
   if (!num) return null;
@@ -355,6 +371,123 @@ export function extractGarminAdvancedFields(fullDetails: any) {
     strokeType,
     hrZones,
   };
+}
+
+export async function persistGarminLapDetails(
+  db: Awaited<ReturnType<typeof getDb>>,
+  activityId: number,
+  fullDetails: any
+) {
+  if (!db) return;
+  const lapDtos = Array.isArray(fullDetails?.splits?.lapDTOs)
+    ? fullDetails.splits.lapDTOs
+    : Array.isArray(fullDetails?.splits)
+    ? fullDetails.splits
+    : [];
+
+  if (lapDtos.length === 0) {
+    return;
+  }
+
+  // Reset existing laps/lengths for this activity
+  await db.delete(garminActivityLengths).where(eq(garminActivityLengths.activityId, activityId));
+  await db.delete(garminActivityLaps).where(eq(garminActivityLaps.activityId, activityId));
+
+  const lapRecords = lapDtos.map((lap: any, index: number) => {
+    const lengthDTOs = Array.isArray(lap?.lengthDTOs) ? lap.lengthDTOs : [];
+    const strokeCounts: Record<string, number> = {};
+    lengthDTOs.forEach((length: any) => {
+      const strokeKey = normalizeStrokeType(
+        length?.swimStroke ?? length?.strokeType ?? length?.stroke
+      );
+      if (!strokeKey) return;
+      strokeCounts[strokeKey] = (strokeCounts[strokeKey] ?? 0) + 1;
+    });
+    const dominantStroke =
+      Object.entries(strokeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+    return {
+      activityId,
+      lapIndex: toNumber(lap?.lapIndex) ?? index + 1,
+      distanceMeters: toNumber(lap?.distance),
+      durationSeconds: toNumber(lap?.duration),
+      movingDurationSeconds: toNumber(lap?.movingDuration),
+      elapsedDurationSeconds: toNumber(lap?.elapsedDuration),
+      averageSpeedMps: toNumber(lap?.averageSpeed),
+      maxSpeedMps: toNumber(lap?.maxSpeed),
+      averageMovingSpeedMps: toNumber(lap?.averageMovingSpeed),
+      averageSwolf: toNumber(lap?.averageSWOLF ?? lap?.averageSwolf),
+      averageStrokes: toNumber(lap?.averageStrokes ?? lap?.avgStrokes),
+      totalNumberOfStrokes: toNumber(lap?.totalNumberOfStrokes),
+      averageSwimCadence: toNumber(lap?.averageSwimCadence),
+      calories: toNumber(lap?.calories),
+      avgHeartRate: toNumber(lap?.averageHR ?? lap?.avgHeartRate),
+      maxHeartRate: toNumber(lap?.maxHR ?? lap?.maxHeartRate),
+      numberOfActiveLengths: toNumber(lap?.numberOfActiveLengths),
+      strokeType: dominantStroke,
+      startTimeGmt: toTimestamp(lap?.startTimeGMT),
+    };
+  });
+
+  const insertedLaps = await db
+    .insert(garminActivityLaps)
+    .values(lapRecords)
+    .returning({ id: garminActivityLaps.id, lapIndex: garminActivityLaps.lapIndex });
+
+  const lapIdByIndex = new Map<number, number>();
+  insertedLaps.forEach((lap) => {
+    if (lap.lapIndex !== null && lap.lapIndex !== undefined) {
+      lapIdByIndex.set(lap.lapIndex, lap.id);
+    }
+  });
+
+  const lengthRecords: Array<{
+    activityId: number;
+    lapId: number;
+    lengthIndex: number;
+    distanceMeters?: number | null;
+    durationSeconds?: number | null;
+    averageSpeedMps?: number | null;
+    maxSpeedMps?: number | null;
+    averageSwolf?: number | null;
+    totalNumberOfStrokes?: number | null;
+    avgHeartRate?: number | null;
+    maxHeartRate?: number | null;
+    strokeType?: string | null;
+    startTimeGmt?: Date | null;
+  }> = [];
+
+  lapDtos.forEach((lap: any, index: number) => {
+    const lapIndex = toNumber(lap?.lapIndex) ?? index + 1;
+    const lapId = lapIdByIndex.get(lapIndex);
+    if (!lapId) return;
+
+    const lengthDTOs = Array.isArray(lap?.lengthDTOs) ? lap.lengthDTOs : [];
+    lengthDTOs.forEach((length: any, lengthIndex: number) => {
+      const strokeKey = normalizeStrokeType(
+        length?.swimStroke ?? length?.strokeType ?? length?.stroke
+      );
+      lengthRecords.push({
+        activityId,
+        lapId,
+        lengthIndex: toNumber(length?.lengthIndex) ?? lengthIndex + 1,
+        distanceMeters: toNumber(length?.distance),
+        durationSeconds: toNumber(length?.duration),
+        averageSpeedMps: toNumber(length?.averageSpeed),
+        maxSpeedMps: toNumber(length?.maxSpeed),
+        averageSwolf: toNumber(length?.averageSWOLF ?? length?.averageSwolf),
+        totalNumberOfStrokes: toNumber(length?.totalNumberOfStrokes),
+        avgHeartRate: toNumber(length?.averageHR ?? length?.avgHeartRate),
+        maxHeartRate: toNumber(length?.maxHR ?? length?.maxHeartRate),
+        strokeType: strokeKey,
+        startTimeGmt: toTimestamp(length?.startTimeGMT),
+      });
+    });
+  });
+
+  if (lengthRecords.length > 0) {
+    await db.insert(garminActivityLengths).values(lengthRecords);
+  }
 }
 
 /**
@@ -805,6 +938,8 @@ export async function syncGarminActivities(
           .set(updates)
           .where(eq(swimmingActivities.id, params.activityId));
       }
+
+      await persistGarminLapDetails(db, params.activityId, fullDetails);
     };
 
     // Process each activity
@@ -838,6 +973,23 @@ export async function syncGarminActivities(
               existing.avgHeartRate ||
               existing.hrZone1Seconds
           );
+
+        const [existingLap] = await db
+          .select({ id: garminActivityLaps.id })
+          .from(garminActivityLaps)
+          .where(eq(garminActivityLaps.activityId, existing.id))
+          .limit(1);
+
+        if (!existingLap && existingDetails) {
+          try {
+            await persistGarminLapDetails(db, existing.id, existingDetails);
+          } catch (error) {
+            console.warn(
+              `[Garmin] Failed to persist laps for activity ${activity.activity_id}:`,
+              error
+            );
+          }
+        }
 
         if (!hasSummary || !hasAdvanced) {
           try {

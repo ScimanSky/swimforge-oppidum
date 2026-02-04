@@ -456,15 +456,34 @@ export const appRouter = router({
               }
             }
 
-            if (Object.keys(updates).length > 0 || nextRawData !== rawData) {
-              const dbInstance = await getDb();
-              if (dbInstance) {
-                const { swimmingActivities } = await import("../drizzle/schema");
+            const dbInstance = await getDb();
+            if (dbInstance) {
+              const { swimmingActivities, garminActivityLaps } = await import("../drizzle/schema");
+              if (Object.keys(updates).length > 0 || nextRawData !== rawData) {
                 await dbInstance
                   .update(swimmingActivities)
                   .set({ ...updates, rawData: nextRawData })
                   .where(eq(swimmingActivities.id, activity.id));
                 activity = { ...activity, ...updates, rawData: nextRawData } as typeof activity;
+              } else if (rawData.garmin_details) {
+                activity.rawData = rawData;
+              }
+
+              try {
+                const existingLap = await dbInstance
+                  .select({ id: garminActivityLaps.id })
+                  .from(garminActivityLaps)
+                  .where(eq(garminActivityLaps.activityId, activity.id))
+                  .limit(1);
+                if (existingLap.length === 0) {
+                  await garmin.persistGarminLapDetails(
+                    dbInstance,
+                    activity.id,
+                    fullDetails
+                  );
+                }
+              } catch (error) {
+                console.warn("[Garmin] Failed to persist lap details:", error);
               }
             } else if (rawData.garmin_details) {
               activity.rawData = rawData;
