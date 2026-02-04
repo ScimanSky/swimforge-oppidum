@@ -974,35 +974,6 @@ export default function ActivityDetail() {
                       </AccordionItem>
                     )}
 
-                    {garminWeather && (
-                      <AccordionItem
-                        value="garmin-weather"
-                        className="rounded-lg border border-border bg-background/60 px-3"
-                      >
-                        <AccordionTrigger className="py-3">Meteo</AccordionTrigger>
-                        <AccordionContent className="px-0 pb-3">
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            {renderMetricRow(
-                              "Temperatura",
-                              formatNumber(toNumber(pickFirst(garminWeather, ["temperature", "temp"])), "°C")
-                            )}
-                            {renderMetricRow(
-                              "Umidità",
-                              formatNumber(toNumber(pickFirst(garminWeather, ["humidity"])), "%")
-                            )}
-                            {renderMetricRow(
-                              "Vento",
-                              formatNumber(toNumber(pickFirst(garminWeather, ["windSpeed", "wind_speed"])), " km/h")
-                            )}
-                            {renderMetricRow(
-                              "Condizioni",
-                              String(pickFirst(garminWeather, ["condition", "conditions", "summary"]) ?? "—")
-                            )}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-
                     {garminPowerZones.length > 0 && (
                       <AccordionItem
                         value="garmin-power-zones"
@@ -1029,27 +1000,6 @@ export default function ActivityDetail() {
                       </AccordionItem>
                     )}
 
-                    {garminGear && (
-                      <AccordionItem
-                        value="garmin-gear"
-                        className="rounded-lg border border-border bg-background/60 px-3"
-                      >
-                        <AccordionTrigger className="py-3">Gear</AccordionTrigger>
-                        <AccordionContent className="px-0 pb-3">
-                          <div className="grid gap-2 sm:grid-cols-2">
-                            {renderMetricRow(
-                              "Nome",
-                              String(pickFirst(garminGear, ["name", "gearName", "displayName"]) ?? "—")
-                            )}
-                            {renderMetricRow(
-                              "Tipo",
-                              String(pickFirst(garminGear, ["type", "gearType"]) ?? "—")
-                            )}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-
                     {garminExerciseSets.length > 0 && (
                       <AccordionItem
                         value="garmin-exercise-sets"
@@ -1064,17 +1014,6 @@ export default function ActivityDetail() {
                       </AccordionItem>
                     )}
 
-                    <AccordionItem
-                      value="garmin-json"
-                      className="rounded-lg border border-border bg-background/60 px-3"
-                    >
-                      <AccordionTrigger className="py-3">Dati Garmin completi (JSON)</AccordionTrigger>
-                      <AccordionContent className="px-0 pb-3">
-                        <pre className="max-h-72 overflow-auto whitespace-pre-wrap text-xs text-foreground">
-                          {JSON.stringify(garminDetails, null, 2)}
-                        </pre>
-                      </AccordionContent>
-                    </AccordionItem>
                   </Accordion>
                 )}
               </CardContent>
