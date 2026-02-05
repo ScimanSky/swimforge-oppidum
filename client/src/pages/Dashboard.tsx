@@ -2,7 +2,7 @@
 
 import AppLayout from "@/components/AppLayout"
 import { trpc } from "@/lib/trpc"
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -419,16 +419,35 @@ export default function Dashboard() {
   }, [advancedQuery.data?.insights])
 
   const profile = profileQuery.data
-  const displayName =
-    profile?.displayName ||
-    profile?.display_name ||
+  const [displayPreference, setDisplayPreference] = useState<"full" | "nickname">("full")
+
+  useEffect(() => {
+    const stored = localStorage.getItem("swimforge:dashboardDisplayName")
+    if (stored === "nickname") setDisplayPreference("nickname")
+  }, [])
+
+  const firstName =
+    profile?.firstName ||
+    profile?.first_name ||
     profile?.name ||
-    [profile?.firstName || profile?.first_name, profile?.lastName || profile?.last_name]
-      .filter(Boolean)
-      .join(" ") ||
+    meQuery.data?.name ||
+    ""
+  const lastName =
+    profile?.lastName ||
+    profile?.last_name ||
+    ""
+  const fullName = [firstName, lastName].filter(Boolean).join(" ")
+  const nickname =
     profile?.username ||
     profile?.handle ||
-    meQuery.data?.name ||
+    profile?.displayName ||
+    profile?.display_name ||
+    ""
+
+  const displayName =
+    (displayPreference === "nickname" && nickname) ||
+    fullName ||
+    nickname ||
     meQuery.data?.email?.split("@")[0] ||
     "Nuotatore"
   const profileAvatarUrl =

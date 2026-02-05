@@ -177,6 +177,7 @@ export default function Settings() {
   const coverInputRef = useRef<HTMLInputElement | null>(null)
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const [isUploadingCover, setIsUploadingCover] = useState(false)
+  const [displayNamePreference, setDisplayNamePreference] = useState<"full" | "nickname">("full")
   const [profileDraft, setProfileDraft] = useState({
     name: me?.name || "",
     email: me?.email || "",
@@ -225,6 +226,11 @@ export default function Settings() {
     profile?.preferredPoolLengthMeters,
     profile?.masterCategory,
   ])
+
+  useEffect(() => {
+    const stored = localStorage.getItem("swimforge:dashboardDisplayName")
+    if (stored === "nickname") setDisplayNamePreference("nickname")
+  }, [])
 
   const utils = trpc.useContext()
   const updateProfileMutation = trpc.profile.update.useMutation({
@@ -570,6 +576,26 @@ export default function Settings() {
                     }
                     className="bg-background/60"
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>Nome in dashboard</Label>
+                  <Select
+                    value={displayNamePreference}
+                    onValueChange={(value) => {
+                      const next = value === "nickname" ? "nickname" : "full"
+                      setDisplayNamePreference(next)
+                      localStorage.setItem("swimforge:dashboardDisplayName", next)
+                      toast.success("Preferenza aggiornata.")
+                    }}
+                  >
+                    <SelectTrigger className="bg-background/60">
+                      <SelectValue placeholder="Seleziona preferenza" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="full">Nome e Cognome</SelectItem>
+                      <SelectItem value="nickname">Nickname</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>Email</Label>
