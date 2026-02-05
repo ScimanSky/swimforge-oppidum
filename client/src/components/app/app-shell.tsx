@@ -70,9 +70,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r border-border bg-card lg:block">
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-16 items-center gap-2 border-b border-border px-6">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-              <Waves className="size-5 text-primary-foreground" />
+          <div className="flex h-16 items-center gap-3 border-b border-border px-6">
+            <div className="flex size-9 items-center justify-center rounded-lg bg-primary/15">
+              <img
+                src="/swimforge-logo_original.png"
+                alt="SwimForge"
+                className="h-7 w-7 object-contain"
+              />
             </div>
             <span className="text-lg font-semibold text-foreground">SwimForge</span>
           </div>
@@ -132,9 +136,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Header */}
       <header className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center justify-between border-b border-border bg-card px-4 lg:hidden">
-        <div className="flex items-center gap-2">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-            <Waves className="size-5 text-primary-foreground" />
+        <div className="flex items-center gap-3">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-primary/15">
+            <img
+              src="/swimforge-logo_original.png"
+              alt="SwimForge"
+              className="h-7 w-7 object-contain"
+            />
           </div>
           <span className="text-lg font-semibold text-foreground">SwimForge</span>
         </div>

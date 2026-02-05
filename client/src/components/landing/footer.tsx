@@ -36,7 +36,7 @@ export function LandingFooter() {
           <div className="col-span-2 md:col-span-3 lg:col-span-1 mb-4 lg:mb-0">
             <Link href="/" className="flex items-center gap-2 mb-4">
               <Image
-                src="/swimforge-logo.png"
+                src="/swimforge-logo_original.png"
                 alt="SwimForge"
                 width={36}
                 height={36}

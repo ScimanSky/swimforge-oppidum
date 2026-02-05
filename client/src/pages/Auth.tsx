@@ -170,7 +170,7 @@ export default function Auth() {
       <Card className="relative z-10 w-full max-w-md bg-card/90 border-border/70 backdrop-blur-xl glass-panel">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto">
-            <img src="/swimforge-logo.png" alt="SwimForge" className="h-28 md:h-32 w-auto" />
+            <img src="/swimforge-logo_original.png" alt="SwimForge" className="h-28 md:h-32 w-auto" />
           </div>
           <CardTitle className="text-2xl font-bold neon-gradient-text">SwimForge</CardTitle>
           <CardDescription className="text-muted-foreground">
