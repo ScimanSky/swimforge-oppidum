@@ -768,27 +768,6 @@ export default function Settings() {
           </Card>
 
           <GarminSection garminConnected={garminStatus?.connected ?? false} />
-
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="font-display">Dispositivi</CardTitle>
-              <CardDescription>Gestisci i dispositivi collegati al tuo account</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between rounded-lg border border-border bg-background/60 p-4">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <Smartphone className="w-6 h-6 text-primary" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-foreground">Dispositivo corrente</p>
-                    <p className="text-sm text-muted-foreground">Gestione dispositivi in arrivo</p>
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground">Attivo</div>
-              </div>
-            </CardContent>
-          </Card>
         </TabsContent>
 
         {/* Notifications Tab */}
