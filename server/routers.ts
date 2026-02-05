@@ -1151,6 +1151,39 @@ export const appRouter = router({
         }),
     }),
 
+    ghostTrack: router({
+      friends: protectedProcedure
+        .input(z.object({ search: z.string().optional() }).optional())
+        .query(async ({ ctx, input }) => {
+          const { listGhostTrackFriends } = await import("./db_ghost_challenges");
+          return listGhostTrackFriends(ctx.user.id, input?.search);
+        }),
+      sessions: protectedProcedure
+        .input(z.object({ friendUserId: z.number() }))
+        .query(async ({ ctx, input }) => {
+          const { listGhostTrackSessions } = await import("./db_ghost_challenges");
+          return listGhostTrackSessions(ctx.user.id, input.friendUserId);
+        }),
+      preview: protectedProcedure
+        .input(z.object({ postId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const { getGhostChallengeContextFromPost } = await import("./db_ghost_challenges");
+          return getGhostChallengeContextFromPost(ctx.user.id, input.postId);
+        }),
+      laps: protectedProcedure
+        .input(z.object({ activityIds: z.array(z.number()).min(1).max(2) }))
+        .query(async ({ input }) => {
+          const { getGhostTrackLaps } = await import("./db_ghost_challenges");
+          return getGhostTrackLaps(input.activityIds);
+        }),
+      leaderboard: protectedProcedure
+        .input(z.object({ limit: z.number().min(1).max(20).optional() }).optional())
+        .query(async ({ input }) => {
+          const { listGhostTrackLeaderboard } = await import("./db_ghost_challenges");
+          return listGhostTrackLeaderboard(input?.limit ?? 5);
+        }),
+    }),
+
     clubs: router({
       list: protectedProcedure
         .input(z.object({
