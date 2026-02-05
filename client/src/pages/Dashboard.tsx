@@ -456,10 +456,10 @@ export default function Dashboard() {
               <img
                 src={coverImage}
                 alt="Cover profilo"
-                className="h-full w-full object-cover opacity-20 dark:opacity-25"
+                className="h-full w-full object-cover opacity-45 dark:opacity-55"
                 loading="lazy"
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-background/95 via-background/80 to-background/50" />
+              <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/55 to-background/35" />
             </div>
           )}
           <CardContent className="relative p-6 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
