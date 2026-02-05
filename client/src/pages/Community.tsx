@@ -9,6 +9,21 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Droplet,
   MessageCircle,
@@ -68,6 +83,13 @@ export default function Community() {
   const [openCommentsId, setOpenCommentsId] = useState<number | null>(null)
   const [clubScope, setClubScope] = useState<"all" | "mine">("all")
   const [clubSearch, setClubSearch] = useState("")
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [createDraft, setCreateDraft] = useState({
+    name: "",
+    description: "",
+    visibility: "public",
+    coverImageUrl: "",
+  })
 
   const profileQuery = trpc.profile.get.useQuery()
   const currentUserId = profileQuery.data?.userId
@@ -95,6 +117,20 @@ export default function Community() {
       feedQuery.refetch()
     },
     onError: (err) => toast.error(err.message || "Impossibile inviare il commento"),
+  })
+
+  const createClub = trpc.community.clubs.create.useMutation({
+    onSuccess: (data) => {
+      toast.success("Club creato!")
+      setIsCreateOpen(false)
+      setCreateDraft({ name: "", description: "", visibility: "public", coverImageUrl: "" })
+      setClubScope("mine")
+      clubsQuery.refetch()
+      if (data?.clubId) {
+        toast.info("Apri il club dalla lista per gestirlo.")
+      }
+    },
+    onError: (err) => toast.error(err.message || "Impossibile creare il club"),
   })
 
   const feedItems = useMemo(() => (feedQuery.data as any[]) || [], [feedQuery.data])
@@ -343,10 +379,90 @@ export default function Community() {
                 onChange={(e) => setClubSearch(e.target.value)}
                 className="max-w-sm bg-background/60"
               />
-              <Button variant="outline-neon" size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Crea Club
-              </Button>
+              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline-neon" size="sm">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Crea Club
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Crea il tuo club</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">Nome club</p>
+                      <Input
+                        value={createDraft.name}
+                        onChange={(event) =>
+                          setCreateDraft((prev) => ({ ...prev, name: event.target.value }))
+                        }
+                        placeholder="Es. SwimForge Milano"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">Descrizione</p>
+                      <Textarea
+                        value={createDraft.description}
+                        onChange={(event) =>
+                          setCreateDraft((prev) => ({ ...prev, description: event.target.value }))
+                        }
+                        placeholder="Scrivi due righe per presentare il club"
+                        rows={3}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">Visibilità</p>
+                      <Select
+                        value={createDraft.visibility}
+                        onValueChange={(value) =>
+                          setCreateDraft((prev) => ({ ...prev, visibility: value }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleziona visibilità" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="public">Pubblico</SelectItem>
+                          <SelectItem value="private">Privato</SelectItem>
+                          <SelectItem value="invite">Su invito</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">Cover (opzionale)</p>
+                      <Input
+                        value={createDraft.coverImageUrl}
+                        onChange={(event) =>
+                          setCreateDraft((prev) => ({ ...prev, coverImageUrl: event.target.value }))
+                        }
+                        placeholder="https://..."
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="ghost" onClick={() => setIsCreateOpen(false)}>
+                        Annulla
+                      </Button>
+                      <Button
+                        variant="neon"
+                        onClick={() =>
+                          createClub.mutate({
+                            name: createDraft.name.trim(),
+                            description: createDraft.description.trim() || undefined,
+                            coverImageUrl: createDraft.coverImageUrl.trim() || undefined,
+                            visibility: createDraft.visibility as "public" | "private" | "invite",
+                            isPrivate: createDraft.visibility === "private",
+                          })
+                        }
+                        disabled={createClub.isPending || createDraft.name.trim().length < 3}
+                      >
+                        {createClub.isPending ? "Creazione..." : "Crea Club"}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
