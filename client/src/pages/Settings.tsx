@@ -830,7 +830,7 @@ export default function Settings() {
               <CardTitle className="font-display">Unita di Misura</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-medium text-foreground">Sistema Metrico</p>
                   <p className="text-sm text-muted-foreground">Chilometri, metri, kg</p>
@@ -852,7 +852,7 @@ export default function Settings() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-medium text-foreground">Formato Pace</p>
                   <p className="text-sm text-muted-foreground">Come visualizzare il ritmo</p>
@@ -882,7 +882,7 @@ export default function Settings() {
               <CardTitle className="font-display">Lingua e Regione</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-medium text-foreground">Lingua</p>
                 </div>
@@ -905,7 +905,7 @@ export default function Settings() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-medium text-foreground">Fuso Orario</p>
                 </div>
