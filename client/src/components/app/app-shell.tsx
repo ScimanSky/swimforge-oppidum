@@ -73,7 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex h-16 items-center gap-3 border-b border-border px-6">
             <div className="flex size-9 items-center justify-center rounded-lg bg-primary/15">
               <img
-                src="/swimforge-logo_original.png"
+                src="/swimforge-logo.png"
                 alt="SwimForge"
                 className="h-7 w-7 object-contain"
               />
@@ -139,7 +139,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-lg bg-primary/15">
             <img
-              src="/swimforge-logo_original.png"
+              src="/swimforge-logo.png"
               alt="SwimForge"
               className="h-7 w-7 object-contain"
             />

@@ -133,7 +133,7 @@ export default function Home() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
           <div className="flex items-center gap-3">
             <img
-              src="/swimforge-logo_original.png"
+              src="/swimforge-logo.png"
               alt="SwimForge"
               className="size-12 drop-shadow-sm"
             />
@@ -287,7 +287,7 @@ export default function Home() {
             <div className="col-span-2 md:col-span-3 lg:col-span-1">
               <Link href="/" className="mb-4 flex items-center gap-2">
                 <img
-                  src="/swimforge-logo_original.png"
+                  src="/swimforge-logo.png"
                   alt="SwimForge"
                   className="size-9"
                 />

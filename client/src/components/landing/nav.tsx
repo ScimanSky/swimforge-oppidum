@@ -21,7 +21,7 @@ export function LandingNav() {
       <nav className="container mx-auto px-4 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-3">
           <Image
-            src="/swimforge-logo_original.png"
+            src="/swimforge-logo.png"
             alt="SwimForge"
             width={36}
             height={36}
