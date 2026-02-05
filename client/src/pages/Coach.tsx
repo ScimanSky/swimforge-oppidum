@@ -334,19 +334,19 @@ export default function Coach() {
                 <h1 className="text-2xl font-display font-bold text-foreground">
                   AI Coach Dashboard
                 </h1>
-                <Badge variant="secondary">Premium</Badge>
+                <Badge variant="neon">Premium</Badge>
               </div>
               <p className="text-muted-foreground">
                 Analisi e allenamenti personalizzati basati sui tuoi dati reali.
               </p>
             </div>
           </div>
-          <Badge variant="outline" className="text-xs">
+          <Badge variant="outline" className="text-xs border-primary/40 text-primary">
             Ultimo sync: {lastSyncLabel}
           </Badge>
         </div>
 
-        <Card className="bg-card/80 border-border/60 shadow-sm">
+        <Card className="bg-card border-border">
           <CardContent className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10">
@@ -386,7 +386,7 @@ export default function Coach() {
         </Card>
 
         <Tabs defaultValue="insights">
-          <TabsList className="bg-secondary/60">
+          <TabsList>
             <TabsTrigger value="insights">Insights</TabsTrigger>
             <TabsTrigger value="workouts">Piano</TabsTrigger>
             <TabsTrigger value="session-iq">Session IQ</TabsTrigger>
@@ -398,7 +398,7 @@ export default function Coach() {
               <div className="order-2 lg:order-1">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                   {keyMetricCards.map((metric) => (
-                    <Card key={metric.title} className="bg-card/80 border-border/60 shadow-sm">
+                    <Card key={metric.title} className="bg-card border-border">
                       <CardContent className="p-4">
                         <p className="text-xs text-muted-foreground uppercase tracking-wide">
                           {metric.title}
@@ -419,7 +419,7 @@ export default function Coach() {
 
               <div className="order-1 lg:order-2">
                 {insightCards.length > 0 ? (
-                  <Card className="bg-card/80 border-border/60 shadow-sm">
+                  <Card className="bg-card border-border">
                     <CardContent className="p-4 space-y-4">
                       <div className="flex flex-wrap items-center gap-2">
                         {insightCards.map((_, index) => (
@@ -427,7 +427,7 @@ export default function Coach() {
                             key={index}
                             type="button"
                             size="sm"
-                            variant={index === safeInsightIndex ? "default" : "outline"}
+                            variant={index === safeInsightIndex ? "neon" : "outline-neon"}
                             className="h-8 w-8 rounded-full p-0"
                             onClick={() => setActiveInsightIndex(index)}
                           >
@@ -445,12 +445,7 @@ export default function Coach() {
                               {activeInsight?.title ?? "Insight"}
                             </h3>
                             {activeInsight?.metric ? (
-                              <Badge
-                                variant="secondary"
-                                className="bg-primary/10 text-primary"
-                              >
-                                {activeInsight.metric}
-                              </Badge>
+                              <Badge variant="neon">{activeInsight.metric}</Badge>
                             ) : null}
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">
@@ -461,7 +456,7 @@ export default function Coach() {
                     </CardContent>
                   </Card>
                 ) : (
-                  <Card className="bg-card/80 border-border/60 shadow-sm">
+                  <Card className="bg-card border-border">
                     <CardContent className="p-6 text-sm text-muted-foreground">
                       Nessun insight disponibile. Sincronizza nuove attivita per ottenere suggerimenti AI.
                     </CardContent>
@@ -470,7 +465,7 @@ export default function Coach() {
               </div>
 
               <div className="order-3">
-                <Card className="bg-card/80 border-border/60 shadow-sm">
+                <Card className="bg-card border-border">
                   <CardContent className="p-4">
                     <div className="flex flex-wrap items-center gap-3">
                       {advancedMetrics.map((metric) => (
@@ -494,7 +489,7 @@ export default function Coach() {
           </TabsContent>
 
           <TabsContent value="workouts" className="mt-6 space-y-6">
-            <Card className="bg-card/80 border-border/60 shadow-sm">
+            <Card className="bg-card border-border">
               <CardHeader>
                 <CardTitle className="font-display">Allenamenti AI</CardTitle>
                 <CardDescription>
@@ -508,7 +503,7 @@ export default function Coach() {
                       <Button
                         type="button"
                         size="sm"
-                        variant={activeWorkout === "pool" ? "default" : "outline"}
+                        variant={activeWorkout === "pool" ? "neon" : "outline-neon"}
                         onClick={() => setActiveWorkout("pool")}
                       >
                         Allenamento in Vasca
@@ -516,14 +511,14 @@ export default function Coach() {
                       <Button
                         type="button"
                         size="sm"
-                        variant={activeWorkout === "dryland" ? "default" : "outline"}
+                        variant={activeWorkout === "dryland" ? "neon" : "outline-neon"}
                         onClick={() => setActiveWorkout("dryland")}
                       >
                         Allenamento Dryland
                       </Button>
                     </div>
                     <Button
-                      variant="outline"
+                      variant="outline-neon"
                       size="sm"
                       onClick={activeWorkout === "pool" ? handleRegeneratePool : handleRegenerateDryland}
                       disabled={
@@ -573,9 +568,9 @@ export default function Coach() {
                           ))}
                         </div>
                         {activePoolSection ? (
-                          <div className="rounded-lg border border-border bg-secondary/20 p-4 max-h-[420px] overflow-auto">
+                          <div className="max-h-[420px] overflow-auto rounded-lg border border-border bg-background/60 p-4">
                             <div className="mb-2 flex flex-wrap items-center gap-2">
-                              <Badge variant="secondary">{activePoolSection.title}</Badge>
+                              <Badge variant="neon">{activePoolSection.title}</Badge>
                               {activePoolSection.notes && (
                                 <span className="text-xs text-muted-foreground">
                                   {activePoolSection.notes}
@@ -586,7 +581,7 @@ export default function Coach() {
                               {activePoolSection.exercises.map((exercise, exIdx) => (
                                 <div
                                   key={exIdx}
-                                  className="rounded-md bg-background/60 p-3 text-sm"
+                                  className="rounded-md bg-background/80 p-3 text-sm"
                                 >
                                   <div className="font-medium text-foreground">
                                     {exercise.name}
@@ -643,9 +638,9 @@ export default function Coach() {
                         ))}
                       </div>
                       {activeDrySection ? (
-                        <div className="rounded-lg border border-border bg-secondary/20 p-4 max-h-[420px] overflow-auto">
+                        <div className="max-h-[420px] overflow-auto rounded-lg border border-border bg-background/60 p-4">
                           <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <Badge variant="secondary">{activeDrySection.title}</Badge>
+                            <Badge variant="neon">{activeDrySection.title}</Badge>
                             {activeDrySection.notes && (
                               <span className="text-xs text-muted-foreground">
                                 {activeDrySection.notes}
@@ -656,7 +651,7 @@ export default function Coach() {
                             {activeDrySection.exercises.map((exercise, exIdx) => (
                               <div
                                 key={exIdx}
-                                className="rounded-md bg-background/60 p-3 text-sm"
+                                className="rounded-md bg-background/80 p-3 text-sm"
                               >
                                 <div className="font-medium text-foreground">
                                   {exercise.name}
@@ -690,7 +685,7 @@ export default function Coach() {
           </TabsContent>
 
           <TabsContent value="session-iq" className="mt-6 space-y-4">
-            <Card className="bg-card/80 border-border/60 shadow-sm">
+            <Card className="bg-card border-border">
               <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="font-display">Session IQ</CardTitle>
@@ -698,7 +693,7 @@ export default function Coach() {
                     Analisi dell&apos;ultima sessione sincronizzata
                   </CardDescription>
                 </div>
-                <Button variant="outline" size="sm" asChild>
+                <Button variant="outline-neon" size="sm" asChild>
                   <a href="/session-iq">Apri archivio</a>
                 </Button>
               </CardHeader>
@@ -750,7 +745,7 @@ export default function Coach() {
           </TabsContent>
 
           <TabsContent value="chat" className="mt-6">
-            <Card className="bg-card/80 border-border/60 shadow-sm">
+            <Card className="bg-card border-border">
               <CardContent className="p-6 space-y-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-primary/10">
@@ -768,10 +763,10 @@ export default function Coach() {
                     placeholder="Chat AI in arrivo"
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
-                    className="bg-secondary border-0"
+                    className="bg-background/60"
                     disabled
                   />
-                  <Button size="icon" disabled>
+                  <Button size="icon" variant="ghost-neon" disabled>
                     <MessageSquare className="w-4 h-4" />
                   </Button>
                 </div>

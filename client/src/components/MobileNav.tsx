@@ -1,14 +1,14 @@
 import { Link, useLocation } from "wouter";
-import { Home, Medal, Users, Activity, BarChart3, Waves } from "lucide-react";
+import { Home, Users, Activity, BarChart3, Trophy, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/dashboard", icon: Home, label: "Home" },
   { href: "/activities", icon: Activity, label: "Attività" },
-  { href: "/badges", icon: Medal, label: "Badge" },
+  { href: "/challenges", icon: Trophy, label: "Sfide" },
   { href: "/community", icon: Users, label: "Club" },
-  { href: "/statistics", icon: BarChart3, label: "Stats" },
-  { href: "/coach", icon: Waves, label: "Coach" },
+  { href: "/statistics", icon: BarChart3, label: "Progressi" },
+  { href: "/profile", icon: User, label: "Profilo" },
 ];
 
 export default function MobileNav() {
@@ -29,8 +29,8 @@ export default function MobileNav() {
                     : "text-muted-foreground hover:text-foreground"
                 )}
                 style={isActive ? {
-                  background: "oklch(0.62 0.17 195 / 0.12)",
-                  boxShadow: "0 0 15px oklch(0.62 0.17 195 / 0.2)",
+                  background: "var(--neon-soft)",
+                  boxShadow: "0 0 18px var(--neon-glow)",
                 } : {}}
               >
                 <item.icon 

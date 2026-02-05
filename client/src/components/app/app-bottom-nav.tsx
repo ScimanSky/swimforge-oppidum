@@ -7,11 +7,11 @@ import { Home, Activity, Users, Trophy, BarChart3, User } from "lucide-react"
 
 const navItems = [
   { href: "/dashboard", icon: Home, label: "Home" },
-  { href: "/activities", icon: Activity, label: "Activities" },
-  { href: "/community", icon: Users, label: "Community" },
-  { href: "/statistics", icon: BarChart3, label: "Stats" },
-  { href: "/challenges", icon: Trophy, label: "Challenges" },
-  { href: "/profile", icon: User, label: "Profile" },
+  { href: "/activities", icon: Activity, label: "Attività" },
+  { href: "/challenges", icon: Trophy, label: "Sfide" },
+  { href: "/community", icon: Users, label: "Club" },
+  { href: "/statistics", icon: BarChart3, label: "Progressi" },
+  { href: "/profile", icon: User, label: "Profilo" },
 ]
 
 export function AppBottomNav() {

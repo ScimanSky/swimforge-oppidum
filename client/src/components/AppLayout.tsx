@@ -21,14 +21,14 @@ export function AppLayout({
 }: AppLayoutProps) {
   if (withShell) {
     return (
-      <div className={`min-h-screen bg-background ${className}`}>
+      <div className={`min-h-screen bg-background dark:bg-[radial-gradient(circle_at_top,_var(--neon-soft),_transparent_65%)] ${className}`}>
         <AppShell>{children}</AppShell>
       </div>
     );
   }
 
   return (
-    <div className={`min-h-screen bg-background ${className}`}>
+    <div className={`min-h-screen bg-background dark:bg-[radial-gradient(circle_at_top,_var(--neon-soft),_transparent_65%)] ${className}`}>
       {children}
     </div>
   );

@@ -5,6 +5,8 @@ import { ChevronLeft, Sparkles, Waves, Activity } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 
 function formatDistance(meters?: number | null) {
@@ -163,26 +165,22 @@ export default function SessionInsights() {
   }, [activeEntry]);
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="medium">
+    <AppLayout>
       <div className="min-h-screen overflow-x-hidden font-sans text-foreground relative pb-24">
-        <div className="fixed inset-0 opacity-10 pointer-events-none -z-40">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.25),_transparent_60%)]" />
-        </div>
-
         <div className="container py-8 md:py-12">
           <div className="flex flex-col gap-3 mb-8 md:flex-row md:items-center md:gap-4">
             <div className="flex items-center gap-3">
               <Link href="/coach">
-                <Button variant="ghost" className="text-muted-foreground hover:text-foreground hover:bg-muted/60 px-2">
+                <Button variant="ghost-neon" className="px-2">
                   <ChevronLeft className="h-5 w-5" />
                   <span className="ml-1 hidden sm:inline">Coach</span>
                 </Button>
               </Link>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-bold text-foreground">Session IQ</h1>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold)]/30">
+                <Badge variant="neon" className="text-xs">
                   Premium (free)
-                </span>
+                </Badge>
               </div>
             </div>
             <div className="flex items-center gap-2 md:ml-auto">
@@ -192,7 +190,8 @@ export default function SessionInsights() {
 
           <div className="grid lg:grid-cols-12 gap-6">
             <div className="lg:col-span-4 space-y-4">
-              <div className="bg-card/60 border border-border/60 rounded-2xl p-5">
+              <Card className="bg-card border-border">
+                <CardContent className="p-5">
                 <div className="flex items-center gap-2 text-primary text-xs uppercase tracking-wider mb-3">
                   <Sparkles className="h-4 w-4" />
                   Overview
@@ -205,29 +204,33 @@ export default function SessionInsights() {
                   <Waves className="h-4 w-4 text-primary" />
                   Nuove analisi compaiono dopo ogni sync.
                 </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
 
             <div className="lg:col-span-8 space-y-4">
               {sessionEntries.length === 0 && (
-                <div className="bg-card/50 border border-border/60 rounded-2xl p-6 text-muted-foreground">
-                  Nessuna analisi disponibile. Sincronizza nuove attività per generare insight.
-                </div>
+                <Card className="bg-card border-border">
+                  <CardContent className="p-6 text-muted-foreground">
+                    Nessuna analisi disponibile. Sincronizza nuove attività per generare insight.
+                  </CardContent>
+                </Card>
               )}
 
               {sessionEntries.length > 0 && (
-                <div className="bg-card/50 border border-border/60 rounded-2xl p-3 sm:p-4">
+                <Card className="bg-card border-border">
+                  <CardContent className="p-3 sm:p-4">
                   <div className="flex flex-wrap gap-2">
                     <Button
                       size="sm"
-                      variant={sessionView === "day" ? "default" : "outline"}
+                      variant={sessionView === "day" ? "neon" : "outline-neon"}
                       onClick={() => setSessionView("day")}
                     >
                       Giorno
                     </Button>
                     <Button
                       size="sm"
-                      variant={sessionView === "week" ? "default" : "outline"}
+                      variant={sessionView === "week" ? "neon" : "outline-neon"}
                       onClick={() => setSessionView("week")}
                     >
                       Settimana
@@ -238,7 +241,7 @@ export default function SessionInsights() {
                       mode="single"
                       selected={selectedDate}
                       onSelect={setSelectedDate}
-                      className="rounded-xl border border-border/60 bg-background/60 [--cell-size:--spacing(6)] sm:[--cell-size:--spacing(7)] md:[--cell-size:--spacing(8)]"
+                      className="rounded-xl border border-border bg-background/60 [--cell-size:--spacing(6)] sm:[--cell-size:--spacing(7)] md:[--cell-size:--spacing(8)]"
                     />
                   </div>
                   {sessionView === "week" && (
@@ -255,7 +258,7 @@ export default function SessionInsights() {
                           <Button
                             key={key}
                             size="sm"
-                            variant={isActive ? "default" : "outline"}
+                            variant={isActive ? "neon" : "outline-neon"}
                             onClick={() => setSelectedDate(dateFromKey(key))}
                           >
                             {label}
@@ -264,7 +267,8 @@ export default function SessionInsights() {
                       })}
                     </div>
                   )}
-                </div>
+                  </CardContent>
+                </Card>
               )}
 
               {activeEntry && (
@@ -272,7 +276,7 @@ export default function SessionInsights() {
                     key={activeEntry.id ?? activeDateKey}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="bg-card/60 border border-border/60 rounded-2xl p-6 shadow-lg"
+                    className="bg-card border border-border rounded-2xl p-6 shadow-lg"
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                       <div className="flex items-center gap-2 text-primary text-xs uppercase tracking-wider">
@@ -306,12 +310,9 @@ export default function SessionInsights() {
                     {activeTags.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {activeTags.map((tag: string, tagIdx: number) => (
-                          <span
-                            key={tagIdx}
-                            className="text-xs px-2 py-1 rounded-full bg-muted/60 text-muted-foreground"
-                          >
+                          <Badge key={tagIdx} variant="outline" className="text-xs">
                             {tag}
-                          </span>
+                          </Badge>
                         ))}
                       </div>
                     )}
@@ -321,8 +322,7 @@ export default function SessionInsights() {
               {sessionEntries.length >= limit && (
                 <div className="flex justify-center pt-4">
                   <Button
-                    variant="outline"
-                    className="border-cyan-400/40 text-cyan-100 hover:bg-cyan-500/10"
+                    variant="outline-neon"
                     onClick={() => setPage((p) => p + 1)}
                   >
                     Carica altre

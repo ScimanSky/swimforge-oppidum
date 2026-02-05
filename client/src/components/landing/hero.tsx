@@ -24,7 +24,7 @@ export function LandingHero() {
 
       <div className="container mx-auto px-4 relative z-10">
         <div className="max-w-2xl">
-          <Badge variant="outline" className="mb-6 border-primary/50 text-primary">
+          <Badge variant="neon" className="mb-6">
             Analisi AI • Gamification • Community
           </Badge>
 
@@ -39,13 +39,13 @@ export function LandingHero() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 mt-8">
-            <Button size="lg" className="text-base h-12 px-8" asChild>
+            <Button size="lg" variant="neon" className="text-base h-12 px-8" asChild>
               <Link href="/signup">
                 Inizia l&apos;Avventura
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Link>
             </Button>
-            <Button size="lg" variant="outline" className="text-base h-12 px-8 bg-transparent" asChild>
+            <Button size="lg" variant="outline-neon" className="text-base h-12 px-8 bg-transparent" asChild>
               <Link href="/login">Accedi</Link>
             </Button>
           </div>

@@ -166,7 +166,7 @@ interface StatItemProps {
 
 function StatItem({ label, value, icon, subtext }: StatItemProps) {
   return (
-    <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-4">
+    <div className="flex items-center gap-3 rounded-lg border border-border bg-background/60 p-4">
       <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
         {icon}
       </div>
@@ -199,7 +199,7 @@ function BadgeCard({ title, description, imageUrl, unlocked, rarity }: BadgeCard
   return (
     <div
       className={`flex items-center gap-4 rounded-lg border p-4 ${
-        unlocked ? "border-primary/20 bg-primary/5" : "border-border bg-muted/30 opacity-70"
+        unlocked ? "border-primary/30 bg-primary/5" : "border-border bg-muted/30 opacity-70"
       }`}
     >
       <div
@@ -225,7 +225,7 @@ function BadgeCard({ title, description, imageUrl, unlocked, rarity }: BadgeCard
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
       {unlocked && (
-        <Badge variant="secondary" className="shrink-0">
+        <Badge variant="neon" className="shrink-0">
           Sbloccato
         </Badge>
       )}
@@ -438,7 +438,7 @@ export default function Profile() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <Card>
+        <Card className="bg-card border-border">
           <div className="relative h-36 overflow-hidden rounded-t-lg bg-muted">
             {profile?.coverUrl ? (
               <img
@@ -455,7 +455,7 @@ export default function Profile() {
           </div>
           <CardContent className="pt-6">
             <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
-              <Avatar className="size-24">
+              <Avatar className="size-24 border border-border">
                 <AvatarImage src={profile?.avatarUrl || ""} alt={displayName} />
                 <AvatarFallback className="text-2xl">{getInitials(displayName)}</AvatarFallback>
               </Avatar>
@@ -464,7 +464,7 @@ export default function Profile() {
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h1 className="text-2xl font-bold text-foreground">{displayName}</h1>
-                      <Badge className="gap-1">
+                      <Badge variant="neon" className="gap-1">
                         <Zap className="size-3" />
                         Livello {profile?.level ?? 1}
                       </Badge>
@@ -477,7 +477,7 @@ export default function Profile() {
                     <p className="text-muted-foreground">{username}</p>
                   </div>
                   <Link href="/settings">
-                    <Button variant="outline">
+                    <Button variant="outline-neon">
                       <Edit className="mr-2 size-4" />
                       Modifica profilo
                     </Button>
@@ -519,7 +519,7 @@ export default function Profile() {
               </div>
             </div>
 
-            <div className="mt-6 rounded-lg bg-muted/50 p-4">
+            <div className="mt-6 rounded-lg border border-border bg-background/60 p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <div className="flex size-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
@@ -610,7 +610,7 @@ export default function Profile() {
             </div>
           </TabsContent>
           <TabsContent value="activities" className="mt-4">
-            <Card>
+            <Card className="bg-card border-border">
               <CardContent className="pt-6">
                 {recentActivities.length ? (
                   recentActivities.map((activity) => (
@@ -623,7 +623,7 @@ export default function Profile() {
             </Card>
           </TabsContent>
           <TabsContent value="records" className="mt-4">
-            <Card>
+            <Card className="bg-card border-border">
               <CardHeader>
                 <CardTitle>Record personali</CardTitle>
               </CardHeader>
@@ -632,7 +632,7 @@ export default function Profile() {
                   {records.map((record) => (
                     <div
                       key={record.label}
-                      className="flex items-center justify-between rounded-lg border border-border p-4"
+                      className="flex items-center justify-between rounded-lg border border-border bg-background/60 p-4"
                     >
                       <div>
                         <p className="font-medium text-foreground">{record.label}</p>
@@ -640,7 +640,7 @@ export default function Profile() {
                       </div>
                       <div className="text-right">
                         <p className="text-lg font-bold text-primary">{record.value}</p>
-                        <Badge variant="secondary" className="text-xs">
+                        <Badge variant="neon" className="text-xs">
                           PR
                         </Badge>
                       </div>

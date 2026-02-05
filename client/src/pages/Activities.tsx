@@ -131,20 +131,20 @@ export default function Activities() {
 
   return (
     <AppLayout>
-    <div className="p-4 lg:p-6 space-y-6">
+    <div className="space-y-6 p-4 lg:p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-display font-bold text-foreground">
-            Activities
+          <h1 className="text-2xl font-display font-bold text-foreground lg:text-3xl">
+            Attività
           </h1>
           <p className="text-muted-foreground mt-1">
-            Track and manage all your swim sessions
+            Tutte le sessioni di nuoto, in un unico posto.
           </p>
         </div>
-        <Button variant="outline" asChild>
+        <Button variant="outline-neon" asChild>
           <Link href="/profile">
-            <Plus className="w-4 h-4 mr-2" />
+            <Plus className="mr-2 h-4 w-4" />
             Collega dispositivi
           </Link>
         </Button>
@@ -153,32 +153,32 @@ export default function Activities() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search activities..."
+            placeholder="Cerca attività..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 bg-secondary/50 border-transparent focus:border-primary"
+            className="bg-background/60 pl-9"
           />
         </div>
         <div className="flex gap-2">
           <Tabs value={filter} onValueChange={setFilter}>
-            <TabsList className="bg-secondary/50">
-              <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="pool">Pool</TabsTrigger>
+            <TabsList>
+              <TabsTrigger value="all">Tutte</TabsTrigger>
+              <TabsTrigger value="pool">Vasca</TabsTrigger>
               <TabsTrigger value="open-water">Open Water</TabsTrigger>
             </TabsList>
           </Tabs>
           <Select value={sort} onValueChange={setSort}>
-            <SelectTrigger className="w-[130px] bg-secondary/50 border-transparent">
-              <Filter className="w-4 h-4 mr-2" />
+            <SelectTrigger className="w-[150px] bg-background/60">
+              <Filter className="mr-2 h-4 w-4" />
               <SelectValue placeholder="Sort" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="recent">Most Recent</SelectItem>
-              <SelectItem value="distance">Distance</SelectItem>
-              <SelectItem value="duration">Duration</SelectItem>
-              <SelectItem value="xp">XP Earned</SelectItem>
+              <SelectItem value="recent">Più recenti</SelectItem>
+              <SelectItem value="distance">Distanza</SelectItem>
+              <SelectItem value="duration">Durata</SelectItem>
+              <SelectItem value="xp">XP</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -188,51 +188,55 @@ export default function Activities() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Droplets className="w-4 h-4 text-primary" />
-              <span className="text-xs text-muted-foreground">Total Distance</span>
+            <div className="mb-2 flex items-center gap-2">
+              <Droplets className="h-4 w-4 text-primary" />
+              <span className="text-xs text-muted-foreground">Distanza totale</span>
             </div>
             {activitiesQuery.isLoading ? (
               <Skeleton className="h-6 w-20" />
             ) : (
-              <p className="text-xl font-display font-bold text-foreground">{formatDistance(totalDistance)}</p>
+              <p className="text-xl font-display font-bold text-foreground">
+                {formatDistance(totalDistance)}
+              </p>
             )}
-            <p className="text-xs text-accent mt-1">Last 30 days</p>
+            <p className="mt-1 text-xs text-primary/80">Ultimi 30 giorni</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Timer className="w-4 h-4 text-primary" />
-              <span className="text-xs text-muted-foreground">Total Time</span>
+            <div className="mb-2 flex items-center gap-2">
+              <Timer className="h-4 w-4 text-primary" />
+              <span className="text-xs text-muted-foreground">Tempo totale</span>
             </div>
             {activitiesQuery.isLoading ? (
               <Skeleton className="h-6 w-20" />
             ) : (
-              <p className="text-xl font-display font-bold text-foreground">{formatDuration(totalTime)}</p>
+              <p className="text-xl font-display font-bold text-foreground">
+                {formatDuration(totalTime)}
+              </p>
             )}
-            <p className="text-xs text-accent mt-1">Last 30 days</p>
+            <p className="mt-1 text-xs text-primary/80">Ultimi 30 giorni</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Zap className="w-4 h-4 text-accent" />
-              <span className="text-xs text-muted-foreground">XP Earned</span>
+            <div className="mb-2 flex items-center gap-2">
+              <Zap className="h-4 w-4 text-accent" />
+              <span className="text-xs text-muted-foreground">XP guadagnati</span>
             </div>
             {activitiesQuery.isLoading ? (
               <Skeleton className="h-6 w-20" />
             ) : (
               <p className="text-xl font-display font-bold text-foreground">{totalXp} XP</p>
             )}
-            <p className="text-xs text-accent mt-1">Last 30 days</p>
+            <p className="mt-1 text-xs text-accent">Ultimi 30 giorni</p>
           </CardContent>
         </Card>
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <TrendingUp className="w-4 h-4 text-primary" />
-              <span className="text-xs text-muted-foreground">Avg Efficiency</span>
+            <div className="mb-2 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <span className="text-xs text-muted-foreground">Efficienza media</span>
             </div>
             {advancedQuery.isLoading ? (
               <Skeleton className="h-6 w-20" />
@@ -243,7 +247,7 @@ export default function Activities() {
                   : "—"}
               </p>
             )}
-            <p className="text-xs text-accent mt-1">SEI Index</p>
+            <p className="mt-1 text-xs text-primary/80">SEI Index</p>
           </CardContent>
         </Card>
       </div>
@@ -268,7 +272,7 @@ export default function Activities() {
         ) : filteredActivities.length === 0 ? (
           <Card className="bg-card border-border">
             <CardContent className="p-8 text-center text-muted-foreground">
-              No activities found. Sync your devices to see your sessions here.
+              Nessuna attività trovata. Sincronizza i dispositivi per vedere le sessioni.
             </CardContent>
           </Card>
         ) : (
@@ -277,56 +281,57 @@ export default function Activities() {
             const shareChecked = getShareState(activity)
             const shareDisabled = pendingShareId === activity.id
             return (
-              <Card key={activity.id} className="bg-card border-border hover:border-primary/50 transition-all">
+              <Card
+                key={activity.id}
+                className="bg-card border-border transition-all hover:border-primary/50"
+              >
                 <CardContent className="p-4">
                   <div className="flex items-start gap-4">
                     {/* Activity Icon */}
                     <div
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                      className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${
                         isOpenWater ? "bg-accent/10" : "bg-primary/10"
                       }`}
                     >
                       {isOpenWater ? (
-                        <MapPin className="w-6 h-6 text-accent" />
+                        <MapPin className="h-6 w-6 text-accent" />
                       ) : (
-                        <Waves className="w-6 h-6 text-primary" />
+                        <Waves className="h-6 w-6 text-primary" />
                       )}
                     </div>
 
                     {/* Activity Details */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="mb-1 flex items-center gap-2">
                         <h3 className="font-semibold text-foreground truncate">
                           {activity.activityName || "Swim Session"}
                         </h3>
                         <Badge
-                          variant="secondary"
-                          className={`text-xs flex-shrink-0 ${
-                            isOpenWater
-                              ? "bg-accent/20 text-accent"
-                              : "bg-primary/20 text-primary"
+                          variant="neon"
+                          className={`flex-shrink-0 text-xs ${
+                            isOpenWater ? "text-accent" : "text-primary"
                           }`}
                         >
-                          {isOpenWater ? "Open Water" : "Pool"}
+                          {isOpenWater ? "Open Water" : "Vasca"}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        {formatDate(activity.activityDate)} at {formatTime(activity.activityDate)}
+                        {formatDate(activity.activityDate)} · {formatTime(activity.activityDate)}
                       </p>
 
                       {/* Stats Grid */}
-                      <div className="grid grid-cols-4 gap-4 mt-4">
+                      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
                         <div>
                           <p className="text-lg font-display font-bold text-foreground">
                             {formatDistance(activity.distanceMeters)}
                           </p>
-                          <p className="text-xs text-muted-foreground">Distance</p>
+                          <p className="text-xs text-muted-foreground">Distanza</p>
                         </div>
                         <div>
                           <p className="text-lg font-display font-bold text-foreground">
                             {formatDuration(activity.durationSeconds)}
                           </p>
-                          <p className="text-xs text-muted-foreground">Duration</p>
+                          <p className="text-xs text-muted-foreground">Durata</p>
                         </div>
                         <div>
                           <p className="text-lg font-display font-bold text-foreground">
@@ -360,9 +365,9 @@ export default function Activities() {
                     </div>
 
                     {/* Arrow */}
-                    <Button variant="ghost" size="icon" asChild>
+                    <Button variant="ghost-neon" size="icon" asChild>
                       <Link href={`/activities/${activity.id}`}>
-                        <ChevronRight className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                        <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
                       </Link>
                     </Button>
                   </div>

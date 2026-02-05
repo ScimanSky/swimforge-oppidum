@@ -159,7 +159,7 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex relative">
+    <div className="min-h-screen bg-background dark:bg-[radial-gradient(circle_at_top,_var(--neon-soft),_transparent_65%)] flex relative">
       <ThemeToggleButton className="absolute right-4 top-4 z-20" />
       {/* Left Side - Image */}
       <div className="hidden lg:flex lg:w-1/2 relative">
@@ -368,7 +368,7 @@ export default function Register() {
 
                   <div className="flex gap-3">
                     <Button
-                      variant="outline"
+                      variant="outline-neon"
                       className="flex-1 bg-transparent"
                       onClick={() => setStep(1)}
                       disabled={isLoading || isGoogleLoading}
@@ -376,6 +376,7 @@ export default function Register() {
                       Indietro
                     </Button>
                     <Button
+                      variant="neon"
                       className="w-full flex-1 gap-2"
                       onClick={handleRegister}
                       disabled={isLoading || isGoogleLoading}
@@ -402,7 +403,7 @@ export default function Register() {
 
                   <div className="grid grid-cols-1 gap-3">
                     <Button
-                      variant="outline"
+                      variant="outline-neon"
                       className="gap-2 bg-transparent"
                       onClick={handleGoogleRegister}
                       disabled={isLoading || isGoogleLoading}

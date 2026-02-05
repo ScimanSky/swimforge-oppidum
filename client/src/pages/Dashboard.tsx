@@ -516,7 +516,7 @@ export default function Dashboard() {
                   <div className={`flex size-10 items-center justify-center rounded-lg ${stat.bgColor} ${stat.color}`}>
                     <stat.icon className="size-5" />
                   </div>
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="neon" className="text-xs">
                     {stat.progress}%
                   </Badge>
                 </div>
@@ -538,7 +538,7 @@ export default function Dashboard() {
                 <CardTitle className="font-display">Attività recenti</CardTitle>
                 <CardDescription>Le ultime sessioni sincronizzate</CardDescription>
               </div>
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost-neon" size="sm" asChild>
                 <Link href="/activities">
                   Vai a tutte
                   <ChevronRight className="ml-2 size-4" />
@@ -576,7 +576,7 @@ export default function Dashboard() {
                         <span>❤️ {Math.round(getActivityAvgHeartRate(activity))} bpm</span>
                       ) : null}
                     </div>
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="neon" className="text-xs">
                       +{activity.xpEarned ?? activity.xp_earned ?? 0} XP
                     </Badge>
                   </div>
@@ -667,7 +667,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                     {entry.isCurrentUser && (
-                      <Badge variant="secondary" className="text-xs">Tu</Badge>
+                      <Badge variant="neon" className="text-xs">Tu</Badge>
                     )}
                   </div>
                 ))
@@ -690,7 +690,7 @@ export default function Dashboard() {
                     <span className="text-sm font-semibold">{aiInsight.title}</span>
                   </div>
                   <p className="text-sm text-muted-foreground">{aiInsight.message}</p>
-                  <Button variant="outline" size="sm" asChild>
+                  <Button variant="outline-neon" size="sm" asChild>
                     <Link href="/coach">Apri AI Coach</Link>
                   </Button>
                 </>

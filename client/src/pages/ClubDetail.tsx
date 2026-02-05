@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { Users, ArrowLeft, Droplet, MessageCircle, Share2, Plus, Trophy } from "lucide-react";
+import { Users, ArrowLeft, Droplet, MessageCircle, Share2, Plus } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { renderMarkdownPreview } from "@/lib/markdownPreview";
-import { toast } from "sonner";
 
 type FeedItem = {
   id: number;
@@ -189,13 +188,6 @@ export default function ClubDetail() {
     onSuccess: () => utils.community.clubs.feed.invalidate({ clubId, limit: 20 }),
   });
 
-  const createGhostChallenge = trpc.community.ghostChallenges.createFromPost.useMutation({
-    onSuccess: () => {
-      toast.success("Ghost Track creata!");
-    },
-    onError: (err) => toast.error(err.message || "Impossibile creare la Ghost Track"),
-  });
-
   const addComment = trpc.community.addComment.useMutation({
     onSuccess: (_data, variables) => {
       setCommentTextByPost((prev) => ({ ...prev, [variables.postId]: "" }));
@@ -280,10 +272,10 @@ export default function ClubDetail() {
   }
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-foreground">
+    <AppLayout className="text-foreground">
       <div className="min-h-screen pb-24">
-        <section className="relative py-12 bg-gradient-to-b from-[var(--navy)] to-background overflow-hidden">
-          <div className="absolute top-0 right-0 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+        <section className="relative overflow-hidden bg-gradient-to-b from-background/80 to-background py-12">
+          <div className="pointer-events-none absolute right-0 top-0 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
           <div className="container relative z-10 space-y-6">
             <Link href="/community" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-4 w-4" />
@@ -293,7 +285,7 @@ export default function ClubDetail() {
             <div className="flex flex-col lg:flex-row gap-6 items-start">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
-                  <Users className="h-6 w-6 text-[var(--azure)]" />
+                  <Users className="h-6 w-6 text-primary" />
                   <span className="text-sm text-muted-foreground">Club</span>
                 </div>
                 <h1 className="text-3xl md:text-4xl font-bold">{club?.name ?? "Club"}</h1>
@@ -308,12 +300,12 @@ export default function ClubDetail() {
               {club && (
                 <div className="flex items-center gap-2">
                   {club.is_member ? (
-                    <Button variant="outline" onClick={() => leaveClub.mutate({ clubId })}>
+                    <Button variant="outline-neon" onClick={() => leaveClub.mutate({ clubId })}>
                       Lascia Club
                     </Button>
                   ) : (
                     <Button
-                      className="bg-[var(--azure)] text-primary-foreground"
+                      variant="neon"
                       onClick={() => joinClub.mutate({ clubId })}
                       disabled={club.visibility !== "public"}
                     >
@@ -359,10 +351,10 @@ export default function ClubDetail() {
                           placeholder="Condividi un pensiero con il club..."
                           value={postText}
                           onChange={(e) => setPostText(e.target.value)}
-                          className="bg-muted/40 dark:bg-white/5 border-border/60"
+                          className="bg-background/60"
                         />
                         <Button
-                          className="bg-[var(--gold)] text-slate-900 dark:text-[var(--navy)]"
+                          variant="neon"
                           onClick={() =>
                             createPost.mutate({
                               clubId,
@@ -424,7 +416,7 @@ export default function ClubDetail() {
                               {isStaff && member.role !== "owner" && (
                                 <Button
                                   size="sm"
-                                  variant="outline"
+                                  variant="outline-neon"
                                   onClick={() => banMember.mutate({ clubId, userId: member.user_id })}
                                 >
                                   Ban
@@ -454,7 +446,7 @@ export default function ClubDetail() {
                             value={visibilityDraft}
                             onChange={(e) => setVisibilityDraft(e.target.value as "public" | "private" | "invite")}
                             disabled={!isOwner}
-                            className="w-full rounded-md bg-muted/40 dark:bg-white/5 border border-border/60 px-3 py-2 text-sm"
+                            className="w-full rounded-md bg-background/60 border border-border/60 px-3 py-2 text-sm"
                           >
                             <option value="public">Pubblico</option>
                             <option value="private">Privato</option>
@@ -466,12 +458,12 @@ export default function ClubDetail() {
                           <textarea
                             value={rulesDraft}
                             onChange={(e) => setRulesDraft(e.target.value)}
-                            className="min-h-[90px] w-full rounded-md bg-muted/40 dark:bg-white/5 border border-border/60 px-3 py-2 text-sm"
+                            className="min-h-[90px] w-full rounded-md bg-background/60 border border-border/60 px-3 py-2 text-sm"
                           />
                         </div>
                       </div>
                       {rulesDraft.trim().length > 0 && (
-                        <div className="rounded-lg border border-border/60 bg-muted/40 dark:bg-white/5 p-3">
+                        <div className="rounded-lg border border-border/60 bg-background/60 p-3">
                           <div className="text-xs text-muted-foreground mb-2">Anteprima regole</div>
                           <div
                             className="prose dark:prose-invert prose-sm max-w-none"
@@ -481,7 +473,7 @@ export default function ClubDetail() {
                       )}
                       <div className="flex flex-col sm:flex-row gap-2">
                         <Button
-                          className="bg-[var(--azure)] text-primary-foreground"
+                          variant="neon"
                           onClick={() =>
                             updateClub.mutate({
                               clubId,
@@ -519,7 +511,7 @@ export default function ClubDetail() {
                           <select
                             value={inviteRole}
                             onChange={(e) => setInviteRole(e.target.value as "member" | "moderator")}
-                            className="w-full rounded-md bg-muted/40 dark:bg-white/5 border border-border/60 px-3 py-2 text-sm"
+                            className="w-full rounded-md bg-background/60 border border-border/60 px-3 py-2 text-sm"
                           >
                             <option value="member">Membro</option>
                             {(isOwner || club?.member_role === "admin") && (
@@ -535,7 +527,7 @@ export default function ClubDetail() {
                             max={100}
                             value={inviteMaxUses}
                             onChange={(e) => setInviteMaxUses(Number(e.target.value) || 1)}
-                            className="bg-muted/40 dark:bg-white/5 border-border/60"
+                            className="bg-background/60 border-border/60"
                           />
                         </div>
                         <div className="space-y-2">
@@ -549,12 +541,12 @@ export default function ClubDetail() {
                               const value = e.target.value;
                               setInviteExpiryDays(value ? Number(value) : "");
                             }}
-                            className="bg-muted/40 dark:bg-white/5 border-border/60"
+                            className="bg-background/60 border-border/60"
                           />
                         </div>
                       </div>
                       <Button
-                        className="bg-[var(--gold)] text-slate-900 dark:text-[var(--navy)]"
+                        variant="neon"
                         disabled={createInvite.isPending}
                         onClick={() => {
                           const days = typeof inviteExpiryDays === "number" ? inviteExpiryDays : 0;
@@ -588,7 +580,7 @@ export default function ClubDetail() {
                             return (
                               <div
                                 key={invite.id}
-                                className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-lg border border-border/60 bg-muted/40 dark:bg-white/5 px-3 py-2"
+                                className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2"
                               >
                                 <div className="text-sm">
                                   <div className="font-semibold">{invite.code}</div>
@@ -599,7 +591,7 @@ export default function ClubDetail() {
                                 <div className="flex items-center gap-2">
                                   <Button
                                     size="sm"
-                                    variant="outline"
+                                    variant="outline-neon"
                                     onClick={() => copyInviteLink(invite.code)}
                                   >
                                     Copia link
@@ -651,14 +643,14 @@ export default function ClubDetail() {
                                 </div>
                                 <Button
                                   size="sm"
-                                  className="bg-[var(--azure)] text-primary-foreground"
+                                  variant="neon"
                                   onClick={() => approveRequest.mutate({ clubId, userId: member.user_id })}
                                 >
                                   Approva
                                 </Button>
                                 <Button
                                   size="sm"
-                                  variant="outline"
+                                  variant="outline-neon"
                                   onClick={() => rejectRequest.mutate({ clubId, userId: member.user_id })}
                                 >
                                   Rifiuta
@@ -696,7 +688,7 @@ export default function ClubDetail() {
                                 </div>
                                 <Button
                                   size="sm"
-                                  variant="outline"
+                                  variant="outline-neon"
                                   onClick={() => unbanMember.mutate({ clubId, userId: member.user_id })}
                                 >
                                   Riammetti
@@ -765,22 +757,22 @@ export default function ClubDetail() {
                               )}
 
                               {(distance || duration || pace) && (
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6 p-4 rounded-lg bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/20">
+                                <div className="mb-6 grid grid-cols-2 gap-3 rounded-lg border border-border bg-primary/5 p-4 md:grid-cols-4">
                                   {distance && (
                                     <div className="text-center">
-                                      <div className="text-2xl font-bold text-[var(--azure)]">{distance}</div>
+                                      <div className="text-2xl font-bold text-primary">{distance}</div>
                                       <div className="text-xs text-muted-foreground">Distanza</div>
                                     </div>
                                   )}
                                   {duration && (
                                     <div className="text-center">
-                                      <div className="text-2xl font-bold text-[var(--azure)]">{duration}</div>
+                                      <div className="text-2xl font-bold text-primary">{duration}</div>
                                       <div className="text-xs text-muted-foreground">Tempo</div>
                                     </div>
                                   )}
                                   {pace && (
                                     <div className="text-center">
-                                      <div className="text-2xl font-bold text-[var(--gold)]">{pace}</div>
+                                      <div className="text-2xl font-bold text-accent">{pace}</div>
                                       <div className="text-xs text-muted-foreground">/100m</div>
                                     </div>
                                   )}
@@ -801,8 +793,8 @@ export default function ClubDetail() {
                                   disabled={toggleSplash.isPending || isOwner}
                                   className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg font-semibold transition-all ${
                                     post.has_splashed
-                                      ? "bg-[var(--azure)]/20 text-[var(--azure)] border border-[var(--azure)]/50"
-                                      : "bg-transparent text-muted-foreground border border-border/50 hover:border-[var(--azure)]/50"
+                                      ? "bg-primary/20 text-primary border border-primary/50"
+                                      : "bg-transparent text-muted-foreground border border-border/50 hover:border-primary/50 hover:text-primary"
                                   }`}
                                 >
                                   <Droplet className="h-5 w-5" />
@@ -815,19 +807,19 @@ export default function ClubDetail() {
                                 >
                                   <DialogTrigger asChild>
                                     <Button
-                                      variant="outline"
+                                      variant="outline-neon"
                                       className="flex-1 flex items-center justify-center gap-2"
                                     >
                                       <MessageCircle className="h-5 w-5" />
                                       <span>Commenti</span>
                                       {post.comment_count > 0 && (
-                                        <span className="ml-1 inline-flex items-center justify-center min-w-[22px] h-5 px-2 rounded-full bg-[var(--azure)]/20 text-[var(--azure)] text-xs font-semibold">
+                                        <span className="ml-1 inline-flex min-w-[22px] h-5 items-center justify-center rounded-full bg-primary/20 px-2 text-xs font-semibold text-primary">
                                           {post.comment_count}
                                         </span>
                                       )}
                                     </Button>
                                   </DialogTrigger>
-                                  <DialogContent className="max-w-lg bg-[var(--navy)] text-foreground border border-border/60">
+                                  <DialogContent className="max-w-lg bg-card text-foreground border border-border">
                                     <DialogHeader>
                                       <DialogTitle>Commenti</DialogTitle>
                                     </DialogHeader>
@@ -877,14 +869,17 @@ export default function ClubDetail() {
                                           placeholder="Scrivi un commento..."
                                         />
                                         <Button
+                                          variant="neon"
                                           onClick={() =>
                                             addComment.mutate({
                                               postId: post.id,
                                               content: (commentTextByPost[post.id] ?? "").trim(),
                                             })
                                           }
-                                          disabled={addComment.isPending || (commentTextByPost[post.id] ?? "").trim().length === 0}
-                                          className="bg-[var(--gold)] text-slate-900 dark:text-[var(--navy)]"
+                                          disabled={
+                                            addComment.isPending ||
+                                            (commentTextByPost[post.id] ?? "").trim().length === 0
+                                          }
                                         >
                                           Pubblica
                                         </Button>
@@ -894,19 +889,7 @@ export default function ClubDetail() {
                                   </DialogContent>
                                 </Dialog>
 
-                                {post.activity_id && !isOwner && (
-                                  <Button
-                                    variant="outline"
-                                    className="flex-1 flex items-center justify-center gap-2"
-                                    onClick={() => createGhostChallenge.mutate({ postId: post.id })}
-                                    disabled={createGhostChallenge.isPending}
-                                  >
-                                    <Trophy className="h-5 w-5" />
-                                    <span>Ghost Track</span>
-                                  </Button>
-                                )}
-
-                                <Button variant="outline" className="flex-1 flex items-center justify-center gap-2">
+                                <Button variant="outline-neon" className="flex-1 flex items-center justify-center gap-2">
                                   <Share2 className="h-5 w-5" />
                                   <span>Condividi</span>
                                 </Button>

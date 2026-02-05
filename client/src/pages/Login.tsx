@@ -104,7 +104,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex relative">
+    <div className="min-h-screen bg-background dark:bg-[radial-gradient(circle_at_top,_var(--neon-soft),_transparent_65%)] flex relative">
       <ThemeToggleButton className="absolute right-4 top-4 z-20" />
       {/* Left Side - Image */}
       <div className="hidden lg:flex lg:w-1/2 relative">
@@ -188,7 +188,7 @@ export default function Login() {
                   </div>
                 </div>
 
-                <Button type="submit" className="w-full gap-2" disabled={isLoading || isGoogleLoading}>
+                <Button variant="neon" type="submit" className="w-full gap-2" disabled={isLoading || isGoogleLoading}>
                   {isLoading ? "Accesso..." : "Accedi"}
                   {!isLoading && <ArrowRight className="w-4 h-4" />}
                 </Button>
@@ -208,7 +208,7 @@ export default function Login() {
               <div className="grid grid-cols-1 gap-3">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="outline-neon"
                   className="gap-2 bg-transparent"
                   onClick={handleGoogleLogin}
                   disabled={isLoading || isGoogleLoading}

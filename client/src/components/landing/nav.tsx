@@ -45,10 +45,10 @@ export function LandingNav() {
         </div>
 
         <div className="hidden md:flex items-center gap-3">
-          <Button variant="ghost" asChild>
+          <Button variant="ghost-neon" asChild>
             <Link href="/login">Accedi</Link>
           </Button>
-          <Button asChild>
+          <Button variant="neon" asChild>
             <Link href="/signup">Inizia l&apos;Avventura</Link>
           </Button>
         </div>
@@ -73,10 +73,10 @@ export function LandingNav() {
                 </Link>
               ))}
               <div className="flex flex-col gap-3 mt-4">
-                <Button variant="outline" asChild className="w-full bg-transparent">
+                <Button variant="outline-neon" asChild className="w-full bg-transparent">
                   <Link href="/login">Accedi</Link>
                 </Button>
-                <Button asChild className="w-full">
+                <Button variant="neon" asChild className="w-full">
                   <Link href="/signup">Inizia l&apos;Avventura</Link>
                 </Button>
               </div>

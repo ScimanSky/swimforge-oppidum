@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
-import GhostTrackTab from "@/components/ghost-track/GhostTrackTab"
 import {
   Droplet,
   MessageCircle,
@@ -84,13 +83,6 @@ export default function Community() {
     onError: (err) => toast.error(err.message || "Impossibile inviare uno Splash"),
   })
 
-  const createGhostChallenge = trpc.community.ghostChallenges.createFromPost.useMutation({
-    onSuccess: () => {
-      toast.success("Ghost Track creata!")
-    },
-    onError: (err) => toast.error(err.message || "Impossibile creare la Ghost Track"),
-  })
-
   const commentsQuery = trpc.community.comments.useQuery(
     { postId: openCommentsId ?? 0 },
     { enabled: !!openCommentsId }
@@ -130,10 +122,9 @@ export default function Community() {
         </div>
 
         <Tabs defaultValue="feed" className="space-y-6">
-          <TabsList className="bg-secondary/50">
+          <TabsList>
             <TabsTrigger value="feed">Feed</TabsTrigger>
             <TabsTrigger value="clubs">Club</TabsTrigger>
-            <TabsTrigger value="challenges">Ghost Track</TabsTrigger>
           </TabsList>
 
           {/* Feed Tab */}
@@ -173,7 +164,7 @@ export default function Community() {
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-foreground">{name}</span>
                             {post.activity_source && (
-                              <Badge variant="secondary" className="text-xs">
+                              <Badge variant="neon" className="text-xs">
                                 {post.activity_source}
                               </Badge>
                             )}
@@ -191,12 +182,8 @@ export default function Community() {
                             {post.content || "Sessione condivisa"}
                           </h4>
                           <Badge
-                            variant="secondary"
-                            className={`text-xs ${
-                              activityType === "Pool"
-                                ? "bg-primary/20 text-primary"
-                                : "bg-accent/20 text-accent"
-                            }`}
+                            variant="neon"
+                            className={`text-xs ${activityType === "Pool" ? "text-primary" : "text-accent"}`}
                           >
                             {activityType}
                           </Badge>
@@ -256,15 +243,9 @@ export default function Community() {
                         </div>
 
                         {post.activity_id && !isOwner && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="ml-auto"
-                            onClick={() => createGhostChallenge.mutate({ postId: post.id })}
-                            disabled={createGhostChallenge.isPending}
-                          >
-                            Sfida Ghost
-                          </Button>
+                          <Badge variant="outline" className="ml-auto text-xs">
+                            Sessione pubblica
+                          </Badge>
                         )}
                       </div>
 
@@ -312,6 +293,7 @@ export default function Community() {
                               }}
                             />
                             <Button
+                              variant="neon"
                               onClick={() => submitComment(post.id)}
                               disabled={addComment.isPending}
                             >
@@ -338,14 +320,14 @@ export default function Community() {
               </div>
               <div className="flex gap-2">
                 <Button
-                  variant={clubScope === "all" ? "default" : "outline"}
+                  variant={clubScope === "all" ? "neon" : "outline-neon"}
                   size="sm"
                   onClick={() => setClubScope("all")}
                 >
                   Esplora
                 </Button>
                 <Button
-                  variant={clubScope === "mine" ? "default" : "outline"}
+                  variant={clubScope === "mine" ? "neon" : "outline-neon"}
                   size="sm"
                   onClick={() => setClubScope("mine")}
                 >
@@ -359,10 +341,10 @@ export default function Community() {
                 placeholder="Cerca club..."
                 value={clubSearch}
                 onChange={(e) => setClubSearch(e.target.value)}
-                className="max-w-sm bg-secondary/50 border-transparent"
+                className="max-w-sm bg-background/60"
               />
-              <Button variant="outline" size="sm">
-                <Plus className="w-4 h-4 mr-2" />
+              <Button variant="outline-neon" size="sm">
+                <Plus className="mr-2 h-4 w-4" />
                 Crea Club
               </Button>
             </div>
@@ -389,7 +371,7 @@ export default function Community() {
                         className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
-                      <Badge className="absolute top-3 left-3 bg-secondary/80 text-secondary-foreground">
+                      <Badge className="absolute left-3 top-3 bg-secondary/80 text-secondary-foreground">
                         {club.visibility === "invite" ? "Su invito" : club.visibility === "private" ? "Privato" : "Pubblico"}
                       </Badge>
                     </div>
@@ -397,10 +379,10 @@ export default function Community() {
                       <h3 className="font-semibold text-foreground mb-2">{club.name}</h3>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                          <Users className="w-4 h-4" />
+                          <Users className="h-4 w-4" />
                           <span>{club.member_count} membri</span>
                         </div>
-                        <Button size="sm" asChild>
+                        <Button variant="neon" size="sm" asChild>
                           <Link href={`/community/club/${club.id}`}>Apri</Link>
                         </Button>
                       </div>
@@ -411,10 +393,6 @@ export default function Community() {
             </div>
           </TabsContent>
 
-          {/* Ghost Track Tab */}
-          <TabsContent value="challenges" className="space-y-6">
-            <GhostTrackTab />
-          </TabsContent>
         </Tabs>
       </div>
     </AppLayout>

@@ -9,12 +9,9 @@ import {
   Users,
   User,
   Trophy,
-  Target,
   Bot,
-  Settings,
   Menu,
   X,
-  Medal,
   BarChart3,
   LogOut,
   Sun,
@@ -35,14 +32,11 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard className="size-5" /> },
   { label: "Attività", path: "/activities", icon: <Waves className="size-5" /> },
-  { label: "Club", path: "/community", icon: <Users className="size-5" /> },
-  { label: "Badge", path: "/badges", icon: <Medal className="size-5" /> },
   { label: "Sfide", path: "/challenges", icon: <Trophy className="size-5" /> },
-  { label: "Goals", path: "/goals", icon: <Target className="size-5" /> },
-  { label: "Stats", path: "/statistics", icon: <BarChart3 className="size-5" /> },
+  { label: "Club", path: "/community", icon: <Users className="size-5" /> },
+  { label: "Progressi", path: "/statistics", icon: <BarChart3 className="size-5" /> },
   { label: "Coach", path: "/coach", icon: <Bot className="size-5" /> },
   { label: "Profilo", path: "/profile", icon: <User className="size-5" /> },
-  { label: "Impostazioni", path: "/settings", icon: <Settings className="size-5" /> },
 ]
 
 export function AppShell({ children }: { children: React.ReactNode }) {

@@ -281,6 +281,17 @@ export default function Badges() {
       </header>
 
       <main className="container py-6 space-y-6">
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline-neon" asChild>
+            <Link href="/statistics">Statistiche</Link>
+          </Button>
+          <Button size="sm" variant="outline-neon" asChild>
+            <Link href="/goals">Obiettivi</Link>
+          </Button>
+          <Button size="sm" variant="neon" asChild>
+            <Link href="/badges">Badge</Link>
+          </Button>
+        </div>
         {/* Progress Overview Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

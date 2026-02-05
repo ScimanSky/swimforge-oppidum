@@ -527,7 +527,7 @@ export default function ActivityDetail() {
     <AppLayout>
       <div className="space-y-6">
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost-neon" size="icon" asChild>
             <Link href="/activities">
               <ArrowLeft className="size-5" />
             </Link>
@@ -769,7 +769,7 @@ export default function ActivityDetail() {
 
             <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle className="font-display">Dettagli sessione 2</CardTitle>
+                <CardTitle className="font-display">Lap & Splits</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 text-sm">
                 {!garminDetails ? (
@@ -815,21 +815,21 @@ export default function ActivityDetail() {
                               <span className="font-medium text-foreground">Tipo:</span>
                               <Button
                                 size="sm"
-                                variant={lapTypeFilter === "all" ? "secondary" : "outline"}
+                                variant={lapTypeFilter === "all" ? "neon" : "outline-neon"}
                                 onClick={() => setLapTypeFilter("all")}
                               >
                                 Tutti
                               </Button>
                               <Button
                                 size="sm"
-                                variant={lapTypeFilter === "work" ? "secondary" : "outline"}
+                                variant={lapTypeFilter === "work" ? "neon" : "outline-neon"}
                                 onClick={() => setLapTypeFilter("work")}
                               >
                                 Lavoro
                               </Button>
                               <Button
                                 size="sm"
-                                variant={lapTypeFilter === "recovery" ? "secondary" : "outline"}
+                                variant={lapTypeFilter === "recovery" ? "neon" : "outline-neon"}
                                 onClick={() => setLapTypeFilter("recovery")}
                               >
                                 Recupero
@@ -839,7 +839,7 @@ export default function ActivityDetail() {
                               <span className="font-medium text-foreground">Stile:</span>
                               <Button
                                 size="sm"
-                                variant={lapStrokeFilter === "all" ? "secondary" : "outline"}
+                                variant={lapStrokeFilter === "all" ? "neon" : "outline-neon"}
                                 onClick={() => setLapStrokeFilter("all")}
                               >
                                 Tutti
@@ -848,7 +848,7 @@ export default function ActivityDetail() {
                                 <Button
                                   key={option.key}
                                   size="sm"
-                                  variant={lapStrokeFilter === option.key ? "secondary" : "outline"}
+                                  variant={lapStrokeFilter === option.key ? "neon" : "outline-neon"}
                                   onClick={() => setLapStrokeFilter(option.key)}
                                 >
                                   {option.label} ({option.count})

@@ -158,7 +158,7 @@ export default function Auth() {
   };
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="medium" className="flex items-center justify-center p-4" withShell={false}>
+    <AppLayout className="flex items-center justify-center p-4" withShell={false}>
     <div className="w-full flex items-center justify-center relative">
       <ThemeToggleButton className="absolute right-2 top-2 z-20" />
       {/* Background effects */}
@@ -167,7 +167,7 @@ export default function Auth() {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
       </div>
 
-      <Card className="w-full max-w-md bg-card/90 border-border/70 backdrop-blur-xl relative z-10">
+      <Card className="relative z-10 w-full max-w-md bg-card/90 border-border/70 backdrop-blur-xl">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto">
             <img src="/swimforge-logo.png" alt="SwimForge" className="h-28 md:h-32 w-auto" />
@@ -183,8 +183,8 @@ export default function Auth() {
           <div className="space-y-4 mb-6">
             <Button
               type="button"
-              variant="outline"
-              className="w-full bg-background hover:bg-muted text-foreground border-border"
+              variant="outline-neon"
+              className="w-full"
               onClick={handleGoogleLogin}
               disabled={isGoogleLoading || isLoading}
             >
@@ -225,12 +225,12 @@ export default function Auth() {
             </div>
           </div>
 
-          <Tabs defaultValue="login" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 bg-muted">
-              <TabsTrigger value="login" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+            <Tabs defaultValue="login" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login">
                 Accedi
               </TabsTrigger>
-              <TabsTrigger value="register" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <TabsTrigger value="register">
                 Registrati
               </TabsTrigger>
             </TabsList>
@@ -247,7 +247,7 @@ export default function Auth() {
                       placeholder="la.tua@email.com"
                       value={loginEmail}
                       onChange={(e) => setLoginEmail(e.target.value)}
-                      className="pl-10 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                      className="pl-10 bg-background/60"
                       disabled={isLoading || isGoogleLoading}
                     />
                   </div>
@@ -263,7 +263,7 @@ export default function Auth() {
                       placeholder="••••••••"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
-                      className="pl-10 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                      className="pl-10 bg-background/60"
                       disabled={isLoading || isGoogleLoading}
                     />
                   </div>
@@ -271,7 +271,8 @@ export default function Auth() {
 
                 <Button 
                   type="submit" 
-                  className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                  variant="neon"
+                  className="w-full"
                   disabled={isLoading || isGoogleLoading}
                 >
                   {isLoading ? "Accesso in corso..." : "Accedi"}
@@ -300,7 +301,7 @@ export default function Auth() {
                         placeholder="Il tuo nome"
                         value={registerName}
                         onChange={(e) => setRegisterName(e.target.value)}
-                        className="pl-10 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                        className="pl-10 bg-background/60"
                         disabled={isLoading || isGoogleLoading}
                       />
                     </div>
@@ -316,7 +317,7 @@ export default function Auth() {
                         placeholder="la.tua@email.com"
                         value={registerEmail}
                         onChange={(e) => setRegisterEmail(e.target.value)}
-                        className="pl-10 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                        className="pl-10 bg-background/60"
                         disabled={isLoading || isGoogleLoading}
                       />
                     </div>
@@ -332,7 +333,7 @@ export default function Auth() {
                         placeholder="Minimo 8 caratteri"
                         value={registerPassword}
                         onChange={(e) => setRegisterPassword(e.target.value)}
-                        className="pl-10 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                        className="pl-10 bg-background/60"
                         disabled={isLoading || isGoogleLoading}
                       />
                     </div>
@@ -348,7 +349,7 @@ export default function Auth() {
                         placeholder="Ripeti la password"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="pl-10 bg-secondary border-border text-foreground placeholder:text-muted-foreground"
+                        className="pl-10 bg-background/60"
                         disabled={isLoading || isGoogleLoading}
                       />
                     </div>
@@ -356,7 +357,8 @@ export default function Auth() {
 
                   <Button 
                     type="submit" 
-                    className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                    variant="neon"
+                    className="w-full"
                     disabled={isLoading || isGoogleLoading}
                   >
                     {isLoading ? "Registrazione in corso..." : "Registrati"}

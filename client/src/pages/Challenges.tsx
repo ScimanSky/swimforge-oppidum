@@ -29,14 +29,15 @@ import {
   Clock,
   Target,
   Flame,
-  Medal,
   Crown,
+  Medal,
   Plus,
   ChevronRight,
   Zap,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
+import GhostTrackTab from "@/components/ghost-track/GhostTrackTab"
 
 const formatDistance = (meters?: number | null) => {
   if (!meters) return "—"
@@ -129,6 +130,7 @@ const getStreak = (dates: string[]) => {
 }
 
 export default function Challenges() {
+  const [sectionTab, setSectionTab] = useState("ghost")
   const [activeTab, setActiveTab] = useState("active")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [createDraft, setCreateDraft] = useState({
@@ -195,392 +197,410 @@ export default function Challenges() {
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-display font-bold text-foreground">Challenges</h1>
-            <p className="text-muted-foreground">Compete, earn badges, and climb the leaderboard</p>
+            <h1 className="text-3xl font-display font-bold text-foreground">Sfide</h1>
+            <p className="text-muted-foreground">Ghost Track e sfide classiche in un unico hub.</p>
           </div>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <Plus className="w-4 h-4" />
-                Crea sfida
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Crea sfida</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Nome sfida</label>
-                  <input
-                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                    value={createDraft.name}
-                    onChange={(event) =>
-                      setCreateDraft((prev) => ({ ...prev, name: event.target.value }))
-                    }
-                    placeholder="Es. Settimana sprint"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Descrizione</label>
-                  <textarea
-                    className="w-full min-h-[90px] rounded-md border border-border bg-background px-3 py-2 text-sm"
-                    value={createDraft.description}
-                    onChange={(event) =>
-                      setCreateDraft((prev) => ({ ...prev, description: event.target.value }))
-                    }
-                    placeholder="Descrivi l'obiettivo della sfida"
-                  />
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Tipo</label>
-                    <Select
-                      value={createDraft.type}
-                      onValueChange={(value) =>
-                        setCreateDraft((prev) => ({ ...prev, type: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Tipo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pool">Piscina</SelectItem>
-                        <SelectItem value="open_water">Open water</SelectItem>
-                        <SelectItem value="both">Entrambi</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Obiettivo</label>
-                    <Select
-                      value={createDraft.objective}
-                      onValueChange={(value) =>
-                        setCreateDraft((prev) => ({ ...prev, objective: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Obiettivo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="total_distance">Distanza totale</SelectItem>
-                        <SelectItem value="total_sessions">Numero sessioni</SelectItem>
-                        <SelectItem value="consistency">Costanza</SelectItem>
-                        <SelectItem value="avg_pace">Pace medio</SelectItem>
-                        <SelectItem value="total_time">Tempo totale</SelectItem>
-                        <SelectItem value="longest_session">Sessione piu lunga</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Durata</label>
-                    <Select
-                      value={createDraft.duration}
-                      onValueChange={(value) =>
-                        setCreateDraft((prev) => ({ ...prev, duration: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Durata" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="3_days">3 giorni</SelectItem>
-                        <SelectItem value="1_week">1 settimana</SelectItem>
-                        <SelectItem value="2_weeks">2 settimane</SelectItem>
-                        <SelectItem value="1_month">1 mese</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Inizio</label>
-                    <input
-                      type="date"
-                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                      value={createDraft.startDate}
-                      onChange={(event) =>
-                        setCreateDraft((prev) => ({ ...prev, startDate: event.target.value }))
-                      }
-                    />
-                  </div>
-                </div>
-                <Button
-                  onClick={() =>
-                    createChallenge.mutate({
-                      name: createDraft.name.trim() || "Nuova sfida",
-                      description: createDraft.description.trim() || undefined,
-                      type: createDraft.type as "pool" | "open_water" | "both",
-                      objective: createDraft.objective as
-                        | "total_distance"
-                        | "total_sessions"
-                        | "consistency"
-                        | "avg_pace"
-                        | "total_time"
-                        | "longest_session",
-                      duration: createDraft.duration as
-                        | "3_days"
-                        | "1_week"
-                        | "2_weeks"
-                        | "1_month",
-                      startDate: createDraft.startDate || new Date().toISOString(),
-                    })
-                  }
-                  disabled={createChallenge.isPending}
-                >
-                  {createChallenge.isPending ? "Creazione..." : "Crea sfida"}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-primary/10">
-                  <Trophy className="w-5 h-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-2xl font-display font-bold text-foreground">
-                    {activeChallenges.length + pendingChallenges.length}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Active Challenges</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-accent/10">
-                  <Medal className="w-5 h-5 text-accent" />
-                </div>
-                <div>
-                  <p className="text-2xl font-display font-bold text-foreground">{badgeCount}</p>
-                  <p className="text-xs text-muted-foreground">Badges Earned</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-chart-4/10">
-                  <Flame className="w-5 h-5 text-chart-4" />
-                </div>
-                <div>
-                  <p className="text-2xl font-display font-bold text-foreground">{streak}</p>
-                  <p className="text-xs text-muted-foreground">Day Streak</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-card border-border">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-chart-5/10">
-                  <Zap className="w-5 h-5 text-chart-5" />
-                </div>
-                <div>
-                  <p className="text-2xl font-display font-bold text-foreground">{totalXp}</p>
-                  <p className="text-xs text-muted-foreground">Total XP</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="bg-secondary">
-            <TabsTrigger value="active">Active ({activeChallenges.length + pendingChallenges.length})</TabsTrigger>
-            <TabsTrigger value="available">Available</TabsTrigger>
-            <TabsTrigger value="completed">Completed</TabsTrigger>
-            <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+        <Tabs value={sectionTab} onValueChange={setSectionTab} className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="ghost">Ghost Track</TabsTrigger>
+            <TabsTrigger value="classic">Sfide classiche</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="active" className="mt-6 space-y-4">
-            {[...activeChallenges, ...pendingChallenges].length === 0 && (
+          <TabsContent value="ghost">
+            <GhostTrackTab />
+          </TabsContent>
+
+          <TabsContent value="classic" className="space-y-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-display font-bold text-foreground">Sfide classiche</h2>
+                <p className="text-muted-foreground">Competi con obiettivi condivisi.</p>
+              </div>
+              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="neon" className="gap-2">
+                    <Plus className="w-4 h-4" />
+                    Crea sfida
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Crea sfida</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Nome sfida</label>
+                      <input
+                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                        value={createDraft.name}
+                        onChange={(event) =>
+                          setCreateDraft((prev) => ({ ...prev, name: event.target.value }))
+                        }
+                        placeholder="Es. Settimana sprint"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">Descrizione</label>
+                      <textarea
+                        className="w-full min-h-[90px] rounded-md border border-border bg-background px-3 py-2 text-sm"
+                        value={createDraft.description}
+                        onChange={(event) =>
+                          setCreateDraft((prev) => ({ ...prev, description: event.target.value }))
+                        }
+                        placeholder="Descrivi l'obiettivo della sfida"
+                      />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Tipo</label>
+                        <Select
+                          value={createDraft.type}
+                          onValueChange={(value) =>
+                            setCreateDraft((prev) => ({ ...prev, type: value }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Tipo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pool">Piscina</SelectItem>
+                            <SelectItem value="open_water">Open water</SelectItem>
+                            <SelectItem value="both">Entrambi</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Obiettivo</label>
+                        <Select
+                          value={createDraft.objective}
+                          onValueChange={(value) =>
+                            setCreateDraft((prev) => ({ ...prev, objective: value }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Obiettivo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="total_distance">Distanza totale</SelectItem>
+                            <SelectItem value="total_sessions">Sessioni totali</SelectItem>
+                            <SelectItem value="consistency">Costanza</SelectItem>
+                            <SelectItem value="avg_pace">Pace medio</SelectItem>
+                            <SelectItem value="total_time">Tempo totale</SelectItem>
+                            <SelectItem value="longest_session">Sessione più lunga</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Durata</label>
+                        <Select
+                          value={createDraft.duration}
+                          onValueChange={(value) =>
+                            setCreateDraft((prev) => ({ ...prev, duration: value }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Durata" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="1_week">1 settimana</SelectItem>
+                            <SelectItem value="2_weeks">2 settimane</SelectItem>
+                            <SelectItem value="1_month">1 mese</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-foreground">Data inizio</label>
+                        <input
+                          type="date"
+                          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                          value={createDraft.startDate}
+                          onChange={(event) =>
+                            setCreateDraft((prev) => ({ ...prev, startDate: event.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+                    <Button
+                      variant="neon"
+                      className="w-full"
+                      onClick={() => createChallenge.mutate(createDraft)}
+                      disabled={!createDraft.name.trim()}
+                    >
+                      Crea sfida
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               <Card className="bg-card border-border">
-                <CardContent className="p-6 text-muted-foreground">
-                  Nessuna sfida attiva. Esplora le nuove sfide disponibili!
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-lg bg-primary/10 p-2">
+                      <Trophy className="h-5 w-5 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-display font-bold text-foreground">
+                        {activeChallenges.length + pendingChallenges.length}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Active Challenges</p>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
-            )}
-            {[...activeChallenges, ...pendingChallenges].map((challenge) => {
-              const leaderboard = (challenge.leaderboard ?? []) as Array<{ progress: number }>
-              const maxProgress = leaderboard.reduce((max, item) => Math.max(max, item.progress || 0), 0)
-              const progressValue = challenge.current_progress ?? 0
-              const progressPercent = maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
-
-              return (
-                <Card key={challenge.id} className="bg-card border-border overflow-hidden">
-                  <div className="flex flex-col md:flex-row">
-                    <div className="relative w-full md:w-48 h-32 md:h-auto">
-                      <Image
-                        src={challenge.badge_image_url || "/images/pool-lanes.jpg"}
-                        alt={challenge.name}
-                        fill
-                        className="object-cover"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent to-card md:bg-gradient-to-t md:from-transparent md:to-card/50" />
+              <Card className="bg-card border-border">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-lg bg-accent/10 p-2">
+                      <Medal className="h-5 w-5 text-accent" />
                     </div>
-                    <CardContent className="flex-1 p-4">
-                      <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="text-2xl font-display font-bold text-foreground">{badgeCount}</p>
+                      <p className="text-xs text-muted-foreground">Badges Earned</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-card border-border">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-lg bg-chart-4/10 p-2">
+                      <Flame className="h-5 w-5 text-chart-4" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-display font-bold text-foreground">{streak}</p>
+                      <p className="text-xs text-muted-foreground">Day Streak</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="bg-card border-border">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-lg bg-chart-5/10 p-2">
+                      <Zap className="h-5 w-5 text-chart-5" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-display font-bold text-foreground">{totalXp}</p>
+                      <p className="text-xs text-muted-foreground">Total XP</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="bg-secondary">
+                <TabsTrigger value="active">
+                  Active ({activeChallenges.length + pendingChallenges.length})
+                </TabsTrigger>
+                <TabsTrigger value="available">Available</TabsTrigger>
+                <TabsTrigger value="completed">Completed</TabsTrigger>
+                <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="active" className="mt-6 space-y-4">
+                {[...activeChallenges, ...pendingChallenges].length === 0 && (
+                  <Card className="bg-card border-border">
+                    <CardContent className="p-6 text-muted-foreground">
+                      Nessuna sfida attiva. Esplora le nuove sfide disponibili!
+                    </CardContent>
+                  </Card>
+                )}
+                {[...activeChallenges, ...pendingChallenges].map((challenge) => {
+                  const leaderboard = (challenge.leaderboard ?? []) as Array<{ progress: number }>
+                  const maxProgress = leaderboard.reduce(
+                    (max, item) => Math.max(max, item.progress || 0),
+                    0
+                  )
+                  const progressValue = challenge.current_progress ?? 0
+                  const progressPercent =
+                    maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
+
+                  return (
+                    <Card key={challenge.id} className="bg-card border-border overflow-hidden">
+                      <div className="flex flex-col md:flex-row">
+                        <div className="relative h-32 w-full md:h-auto md:w-48">
+                          <Image
+                            src={challenge.badge_image_url || "/images/pool-lanes.jpg"}
+                            alt={challenge.name}
+                            fill
+                            className="object-cover"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-card md:bg-gradient-to-t md:from-transparent md:to-card/50" />
+                        </div>
+                        <CardContent className="flex-1 p-4">
+                          <div className="mb-3 flex items-start justify-between">
+                            <div>
+                              <h3 className="text-lg font-display font-bold text-foreground">
+                                {challenge.name}
+                              </h3>
+                              <p className="text-sm text-muted-foreground">
+                                {challenge.description || ""}
+                              </p>
+                            </div>
+                            <Badge variant="outline" className="border-primary/30 text-primary">
+                              {challenge.status === "pending" ? "In arrivo" : "Attiva"}
+                            </Badge>
+                          </div>
+
+                          <div className="mb-4 grid grid-cols-2 gap-4 text-sm">
+                            <div className="flex items-center gap-2">
+                              <Target className="h-4 w-4 text-primary" />
+                              <span className="text-muted-foreground">
+                                {objectiveLabel(challenge.objective)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4 text-primary" />
+                              <span className="text-muted-foreground">
+                                {challenge.participantCount} partecipanti
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-primary" />
+                              <span className="text-muted-foreground">
+                                {formatDaysLeft(challenge.end_date)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Trophy className="h-4 w-4 text-primary" />
+                              <span className="text-muted-foreground">
+                                {challenge.prize_description || "Badge esclusivo"}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Your Progress</span>
+                              <span className="font-medium text-foreground">
+                                {formatObjective(challenge.objective, progressValue)}
+                              </span>
+                            </div>
+                            <Progress value={progressPercent} className="h-2" />
+                          </div>
+
+                          <div className="mt-4 flex flex-wrap gap-2">
+                            <Button variant="outline-neon" size="sm" className="gap-2">
+                              View Details
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost-neon"
+                              size="sm"
+                              onClick={() => leaveChallenge.mutate({ challengeId: challenge.id })}
+                            >
+                              Leave
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </div>
+                    </Card>
+                  )
+                })}
+              </TabsContent>
+
+              <TabsContent value="available" className="mt-6 space-y-4">
+                {availableChallenges.length === 0 && (
+                  <Card className="bg-card border-border">
+                    <CardContent className="p-6 text-muted-foreground">
+                      Nessuna sfida disponibile al momento.
+                    </CardContent>
+                  </Card>
+                )}
+                {availableChallenges.map((challenge) => (
+                  <Card key={challenge.id} className="bg-card border-border">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-4">
                         <div>
                           <h3 className="text-lg font-display font-bold text-foreground">
                             {challenge.name}
                           </h3>
                           <p className="text-sm text-muted-foreground">{challenge.description || ""}</p>
-                        </div>
-                        <Badge
-                          variant="outline"
-                          className="border-primary/30 text-primary"
-                        >
-                          {challenge.status === "pending" ? "In arrivo" : "Attiva"}
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
-                        <div className="flex items-center gap-2">
-                          <Target className="w-4 h-4 text-primary" />
-                          <span className="text-muted-foreground">{objectiveLabel(challenge.objective)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-primary" />
-                          <span className="text-muted-foreground">
+                          <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                            <Users className="h-4 w-4" />
                             {challenge.participantCount} partecipanti
-                          </span>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-4 h-4 text-primary" />
-                          <span className="text-muted-foreground">
-                            {formatDaysLeft(challenge.end_date)}
-                          </span>
+                        <div className="flex flex-col items-end gap-2">
+                          <Badge variant="secondary">{objectiveLabel(challenge.objective)}</Badge>
+                          <Button
+                            variant="neon"
+                            size="sm"
+                            onClick={() => joinChallenge.mutate({ challengeId: challenge.id })}
+                          >
+                            Join
+                          </Button>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Trophy className="w-4 h-4 text-primary" />
-                          <span className="text-muted-foreground">
-                            {challenge.prize_description || "Badge esclusivo"}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-muted-foreground">Your Progress</span>
-                          <span className="text-foreground font-medium">
-                            {formatObjective(challenge.objective, progressValue)}
-                          </span>
-                        </div>
-                        <Progress value={progressPercent} className="h-2" />
-                      </div>
-
-                      <div className="flex flex-wrap gap-2 mt-4">
-                        <Button variant="outline" size="sm" className="gap-2">
-                          View Details
-                          <ChevronRight className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground"
-                          onClick={() => leaveChallenge.mutate({ challengeId: challenge.id })}
-                        >
-                          Leave
-                        </Button>
                       </div>
                     </CardContent>
-                  </div>
+                  </Card>
+                ))}
+              </TabsContent>
+
+              <TabsContent value="completed" className="mt-6">
+                <Card className="bg-card border-border">
+                  <CardContent className="p-6 text-muted-foreground">
+                    Nessuna sfida completata al momento.
+                  </CardContent>
                 </Card>
-              )
-            })}
-          </TabsContent>
+              </TabsContent>
 
-          <TabsContent value="available" className="mt-6 space-y-4">
-            {availableChallenges.length === 0 && (
-              <Card className="bg-card border-border">
-                <CardContent className="p-6 text-muted-foreground">
-                  Nessuna sfida disponibile al momento.
-                </CardContent>
-              </Card>
-            )}
-            {availableChallenges.map((challenge) => (
-              <Card key={challenge.id} className="bg-card border-border">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="text-lg font-display font-bold text-foreground">
-                        {challenge.name}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">{challenge.description || ""}</p>
-                      <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                        <Users className="w-4 h-4" />
-                        {challenge.participantCount} partecipanti
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <Badge variant="secondary">{objectiveLabel(challenge.objective)}</Badge>
-                      <Button
-                        size="sm"
-                        onClick={() => joinChallenge.mutate({ challengeId: challenge.id })}
-                      >
-                        Join
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-
-          <TabsContent value="completed" className="mt-6">
-            <Card className="bg-card border-border">
-              <CardContent className="p-6 text-muted-foreground">
-                Nessuna sfida completata al momento.
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="leaderboard" className="mt-6">
-            <Card className="bg-card border-border">
-              <CardContent className="p-4">
-                <div className="space-y-4">
-                  {leaderboard.length === 0 && (
-                    <div className="text-muted-foreground">Nessuna classifica disponibile.</div>
-                  )}
-                  {leaderboard.map((entry, index) => {
-                    const profile = entry.profile ?? entry
-                    const name = entry.name ?? profile.name ?? "Nuotatore"
-                    return (
-                      <div
-                        key={entry.userId ?? entry.id ?? index}
-                        className="flex items-center gap-4 p-3 rounded-lg bg-secondary/30"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          {index === 0 ? (
-                            <Crown className="w-4 h-4 text-primary" />
-                          ) : (
-                            <span className="text-sm font-bold text-foreground">{index + 1}</span>
-                          )}
+              <TabsContent value="leaderboard" className="mt-6">
+                <Card className="bg-card border-border">
+                  <CardContent className="p-4">
+                    <div className="space-y-4">
+                      {leaderboard.length === 0 && (
+                        <div className="text-muted-foreground">
+                          Nessuna classifica disponibile.
                         </div>
-                        <Avatar className="w-10 h-10">
-                          <AvatarImage src={profile.profileImage || "/placeholder.svg"} alt={name} />
-                          <AvatarFallback>{getInitials(name)}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <h4 className="font-medium text-foreground">{name}</h4>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDistance(profile.totalDistanceMeters || 0)}
-                          </p>
-                        </div>
-                        <Badge className="bg-accent/20 text-accent">{profile.totalXp} XP</Badge>
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+                      )}
+                      {leaderboard.map((entry, index) => {
+                        const profile = entry.profile ?? entry
+                        const name = entry.name ?? profile.name ?? "Nuotatore"
+                        return (
+                          <div
+                            key={entry.userId ?? entry.id ?? index}
+                            className="flex items-center gap-4 rounded-lg bg-secondary/30 p-3"
+                          >
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                              {index === 0 ? (
+                                <Crown className="h-4 w-4 text-primary" />
+                              ) : (
+                                <span className="text-sm font-bold text-foreground">
+                                  {index + 1}
+                                </span>
+                              )}
+                            </div>
+                            <Avatar className="h-10 w-10">
+                              <AvatarImage
+                                src={profile.profileImage || "/placeholder.svg"}
+                                alt={name}
+                              />
+                              <AvatarFallback>{getInitials(name)}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <h4 className="font-medium text-foreground">{name}</h4>
+                              <p className="text-xs text-muted-foreground">
+                                {formatDistance(profile.totalDistanceMeters || 0)}
+                              </p>
+                            </div>
+                            <Badge className="bg-accent/20 text-accent">{profile.totalXp} XP</Badge>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
         </Tabs>
       </div>

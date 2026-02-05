@@ -47,7 +47,7 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex relative">
+    <div className="min-h-screen bg-background flex relative dark:bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_rgba(15,23,42,0.92)_45%,_rgba(2,6,23,1)_100%)]">
       <ThemeToggleButton className="absolute right-4 top-4 z-20" />
       <div className="hidden lg:flex lg:w-1/2 relative">
         <Image src="/images/hero-swimmer.jpg" alt="Swimmer" fill className="object-cover" />
@@ -97,7 +97,9 @@ export default function ForgotPassword() {
                     Se non lo vedi, controlla anche la cartella spam.
                   </div>
                   <Link href="/login" className="inline-flex w-full">
-                    <Button className="w-full">Torna al login</Button>
+                    <Button variant="outline-neon" className="w-full">
+                      Torna al login
+                    </Button>
                   </Link>
                 </div>
               ) : (
@@ -107,14 +109,14 @@ export default function ForgotPassword() {
                     <Input
                       type="email"
                       placeholder="nome@esempio.com"
-                      className="bg-secondary border-0"
+                      className="bg-background/60"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       disabled={isLoading}
                     />
                   </div>
 
-                  <Button type="submit" className="w-full gap-2" disabled={isLoading}>
+                  <Button variant="neon" type="submit" className="w-full gap-2" disabled={isLoading}>
                     {isLoading ? "Invio..." : "Invia link"}
                     {!isLoading && <ArrowRight className="w-4 h-4" />}
                   </Button>

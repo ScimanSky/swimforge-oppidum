@@ -16,23 +16,21 @@ import {
   Settings,
   Waves,
   Brain,
-  Target,
   X,
 } from "lucide-react"
 
 const mainNav = [
   { href: "/dashboard", icon: Home, label: "Dashboard" },
-  { href: "/activities", icon: Activity, label: "Activities" },
-  { href: "/community", icon: Users, label: "Community" },
-  { href: "/statistics", icon: BarChart3, label: "Stats" },
-  { href: "/challenges", icon: Trophy, label: "Challenges" },
-  { href: "/coach", icon: Brain, label: "AI Coach" },
+  { href: "/activities", icon: Activity, label: "Attività" },
+  { href: "/challenges", icon: Trophy, label: "Sfide" },
+  { href: "/community", icon: Users, label: "Club" },
+  { href: "/statistics", icon: BarChart3, label: "Progressi" },
+  { href: "/coach", icon: Brain, label: "Coach" },
+  { href: "/profile", icon: User, label: "Profilo" },
 ]
 
 const secondaryNav = [
-  { href: "/profile", icon: User, label: "Profile" },
-  { href: "/goals", icon: Target, label: "Goals" },
-  { href: "/settings", icon: Settings, label: "Settings" },
+  { href: "/settings", icon: Settings, label: "Impostazioni" },
 ]
 
 interface AppSidebarProps {

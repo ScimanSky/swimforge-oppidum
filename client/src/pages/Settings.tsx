@@ -425,7 +425,7 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile">
-        <TabsList className="bg-secondary flex-wrap h-auto gap-1">
+        <TabsList className="flex-wrap gap-1">
           <TabsTrigger value="profile" className="gap-2">
             <User className="w-4 h-4" />
             Profilo
@@ -466,7 +466,7 @@ export default function Settings() {
                     </p>
                   </div>
                   <Button
-                    variant="outline"
+                    variant="outline-neon"
                     size="sm"
                     onClick={() => coverInputRef.current?.click()}
                     disabled={isUploadingCover}
@@ -482,7 +482,7 @@ export default function Settings() {
                   className="hidden"
                   onChange={(event) => handleCoverUpload(event.target.files?.[0])}
                 />
-                <div className="relative h-36 rounded-xl overflow-hidden bg-secondary">
+                <div className="relative h-36 rounded-xl overflow-hidden bg-background/60">
                   {profileDraft.coverUrl ? (
                     <img
                       src={profileDraft.coverUrl}
@@ -500,12 +500,13 @@ export default function Settings() {
               {/* Avatar */}
               <div className="flex items-center gap-6">
                 <div className="relative">
-                  <Avatar className="h-24 w-24">
+                  <Avatar className="h-24 w-24 border border-border">
                     <AvatarImage src={profileDraft.avatarUrl || "/images/ai_coach_avatar.webp"} alt={displayName} />
                     <AvatarFallback>{initials}</AvatarFallback>
                   </Avatar>
                   <Button
                     size="icon"
+                    variant="neon"
                     className="absolute bottom-0 right-0 h-8 w-8 rounded-full"
                     onClick={() => avatarInputRef.current?.click()}
                     disabled={isUploadingAvatar}
@@ -535,7 +536,7 @@ export default function Settings() {
                     onChange={(event) =>
                       setProfileDraft((prev) => ({ ...prev, name: event.target.value }))
                     }
-                    className="bg-secondary border-0"
+                    className="bg-background/60"
                   />
                 </div>
                 <div className="space-y-2">
@@ -545,7 +546,7 @@ export default function Settings() {
                     onChange={(event) =>
                       setProfileDraft((prev) => ({ ...prev, lastName: event.target.value }))
                     }
-                    className="bg-secondary border-0"
+                    className="bg-background/60"
                   />
                 </div>
                 <div className="space-y-2">
@@ -555,7 +556,7 @@ export default function Settings() {
                     onChange={(event) =>
                       setProfileDraft((prev) => ({ ...prev, username: event.target.value }))
                     }
-                    className="bg-secondary border-0"
+                    className="bg-background/60"
                   />
                 </div>
                 <div className="space-y-2">
@@ -566,7 +567,7 @@ export default function Settings() {
                     onChange={(event) =>
                       setProfileDraft((prev) => ({ ...prev, email: event.target.value }))
                     }
-                    className="bg-secondary border-0"
+                    className="bg-background/60"
                   />
                 </div>
                 <div className="space-y-2">
@@ -576,7 +577,7 @@ export default function Settings() {
                     onChange={(event) =>
                       setProfileDraft((prev) => ({ ...prev, location: event.target.value }))
                     }
-                    className="bg-secondary border-0"
+                    className="bg-background/60"
                   />
                 </div>
                 <div className="space-y-2">
@@ -587,7 +588,7 @@ export default function Settings() {
                     onChange={(event) =>
                       setProfileDraft((prev) => ({ ...prev, birthDate: event.target.value }))
                     }
-                    className="bg-secondary border-0"
+                    className="bg-background/60"
                   />
                 </div>
               </div>
@@ -595,7 +596,7 @@ export default function Settings() {
               <div className="space-y-2">
                 <Label>Bio</Label>
                 <textarea
-                  className="w-full h-24 p-3 rounded-lg bg-secondary border-0 text-foreground resize-none focus:ring-2 focus:ring-ring"
+                  className="h-24 w-full resize-none rounded-lg bg-background/60 p-3 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   value={profileDraft.bio}
                   onChange={(event) =>
                     setProfileDraft((prev) => ({ ...prev, bio: event.target.value }))
@@ -603,7 +604,7 @@ export default function Settings() {
                 />
               </div>
 
-              <Button onClick={handleSaveProfile} disabled={updateProfileMutation.isPending}>
+              <Button variant="neon" onClick={handleSaveProfile} disabled={updateProfileMutation.isPending}>
                 {updateProfileMutation.isPending ? "Salvataggio..." : "Salva Modifiche"}
               </Button>
             </CardContent>
@@ -621,7 +622,7 @@ export default function Settings() {
                   <Label>Livello</Label>
                   <Input
                     value={profile?.aiSkillLabel || profile?.levelTitle || "Non disponibile"}
-                    className="bg-secondary border-0"
+                    className="bg-background/60"
                     disabled
                   />
                 </div>
@@ -633,7 +634,7 @@ export default function Settings() {
                       setProfileDraft((prev) => ({ ...prev, preferredStroke: value }))
                     }
                   >
-                    <SelectTrigger className="bg-secondary border-0">
+                    <SelectTrigger className="bg-background/60">
                       <SelectValue placeholder="Seleziona stile" />
                     </SelectTrigger>
                     <SelectContent>
@@ -661,7 +662,7 @@ export default function Settings() {
                       }))
                     }
                     placeholder={preferredPool}
-                    className="bg-secondary border-0"
+                    className="bg-background/60"
                   />
                 </div>
                 <div className="space-y-2">
@@ -671,11 +672,11 @@ export default function Settings() {
                     onChange={(event) =>
                       setProfileDraft((prev) => ({ ...prev, masterCategory: event.target.value }))
                     }
-                    className="bg-secondary border-0"
+                    className="bg-background/60"
                   />
                 </div>
               </div>
-              <Button onClick={handleSaveSwimmerProfile} disabled={updateProfileMutation.isPending}>
+              <Button variant="neon" onClick={handleSaveSwimmerProfile} disabled={updateProfileMutation.isPending}>
                 {updateProfileMutation.isPending ? "Salvataggio..." : "Salva Profilo Nuotatore"}
               </Button>
             </CardContent>
@@ -715,10 +716,10 @@ export default function Settings() {
               ].map((account) => (
                 <div
                   key={account.name}
-                  className="flex items-center justify-between p-4 rounded-lg bg-secondary/30"
+                  className="flex items-center justify-between rounded-lg border border-border bg-background/60 p-4"
                 >
                   <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-lg bg-background flex items-center justify-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/40">
                       <Globe className="w-6 h-6 text-muted-foreground" />
                     </div>
                     <div>
@@ -740,12 +741,12 @@ export default function Settings() {
                         <Check className="w-4 h-4" />
                         Connesso
                       </div>
-                      <Button variant="outline" size="sm" asChild>
+                      <Button variant="outline-neon" size="sm" asChild>
                         <a href="/profile">Gestisci</a>
                       </Button>
                     </div>
                   ) : (
-                    <Button size="sm" disabled={account.disabled} asChild={!account.disabled}>
+                    <Button variant="neon" size="sm" disabled={account.disabled} asChild={!account.disabled}>
                       {account.disabled ? "In arrivo" : <a href="/profile">Connetti</a>}
                     </Button>
                   )}
@@ -762,7 +763,7 @@ export default function Settings() {
               <CardDescription>Gestisci i dispositivi collegati al tuo account</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/30">
+              <div className="flex items-center justify-between rounded-lg border border-border bg-background/60 p-4">
                 <div className="flex items-center gap-4">
                   <div className="p-2 rounded-lg bg-primary/10">
                     <Smartphone className="w-6 h-6 text-primary" />
@@ -825,7 +826,7 @@ export default function Settings() {
                     void persistSettings({ preferences: next })
                   }}
                 >
-                  <SelectTrigger className="w-32 bg-secondary border-0">
+                  <SelectTrigger className="w-32 bg-background/60">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -847,7 +848,7 @@ export default function Settings() {
                     void persistSettings({ preferences: next })
                   }}
                 >
-                  <SelectTrigger className="w-32 bg-secondary border-0">
+                  <SelectTrigger className="w-32 bg-background/60">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -876,7 +877,7 @@ export default function Settings() {
                     void persistSettings({ preferences: next })
                   }}
                 >
-                  <SelectTrigger className="w-40 bg-secondary border-0">
+                  <SelectTrigger className="w-40 bg-background/60">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -899,7 +900,7 @@ export default function Settings() {
                     void persistSettings({ preferences: next })
                   }}
                 >
-                  <SelectTrigger className="w-48 bg-secondary border-0">
+                  <SelectTrigger className="w-48 bg-background/60">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -983,7 +984,7 @@ export default function Settings() {
                     Scarica tutti i tuoi dati in formato JSON
                   </p>
                 </div>
-                <Button variant="outline" className="gap-2 bg-transparent" disabled>
+                <Button variant="outline-neon" className="gap-2 bg-transparent" disabled>
                   <ExternalLink className="w-4 h-4" />
                   Esporta
                 </Button>
@@ -995,7 +996,7 @@ export default function Settings() {
                     Disconnetti tutte le sessioni attive
                   </p>
                 </div>
-                <Button variant="outline" className="gap-2 text-destructive bg-transparent" disabled>
+                <Button variant="outline-neon" className="gap-2 text-destructive bg-transparent" disabled>
                   <LogOut className="w-4 h-4" />
                   Logout
                 </Button>

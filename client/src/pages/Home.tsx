@@ -83,7 +83,7 @@ function FeatureCard({
         <div className="mb-4 flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="size-6" />
         </div>
-        <Badge variant="secondary" className="mb-3 text-xs">
+        <Badge variant="neon" className="mb-3 text-xs">
           {badge}
         </Badge>
         <h3 className="mb-2 text-lg font-semibold text-foreground">{title}</h3>
@@ -128,7 +128,7 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background dark:bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.16),_rgba(15,23,42,0.9)_45%,_rgba(2,6,23,1)_100%)]">
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-lg">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
           <div className="flex items-center gap-3">
@@ -164,7 +164,7 @@ export default function Home() {
           {switchable && toggleTheme && (
             <Button
               type="button"
-              variant="ghost"
+              variant="ghost-neon"
               size="icon"
               onClick={toggleTheme}
               aria-label="Cambia tema"
@@ -179,10 +179,7 @@ export default function Home() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/15 via-background to-background" />
         <div className="relative mx-auto max-w-7xl px-4 py-24 md:px-6 md:py-32 lg:py-40">
           <div className="mx-auto max-w-3xl text-center">
-            <Badge
-              variant="outline"
-              className="mb-6 border-primary/50 text-primary"
-            >
+            <Badge variant="neon" className="mb-6">
               Analisi AI • Gamification • Community
             </Badge>
             <h1 className="mb-6 text-balance text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
@@ -197,7 +194,7 @@ export default function Home() {
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link
                 href="/signup"
-                className={cn(buttonVariants({ size: "lg" }))}
+                className={cn(buttonVariants({ size: "lg", variant: "neon" }))}
               >
                 Inizia l&apos;avventura
                 <ArrowRight className="ml-2 size-4" />
@@ -220,7 +217,7 @@ export default function Home() {
       <section id="features" className="py-24">
         <div className="mx-auto max-w-7xl px-4 md:px-6">
           <div className="mx-auto mb-16 max-w-2xl text-center">
-            <Badge variant="outline" className="mb-4">
+            <Badge variant="neon" className="mb-4">
               Funzionalità
             </Badge>
             <h2 className="text-3xl font-bold text-foreground sm:text-4xl">
@@ -267,14 +264,14 @@ export default function Home() {
               <div className="mt-8 flex flex-col gap-4 sm:flex-row">
                 <Link
                   href="/signup"
-                  className={cn(buttonVariants({ size: "lg" }))}
+                  className={cn(buttonVariants({ size: "lg", variant: "neon" }))}
                 >
                   Inizia l&apos;Avventura
                   <ArrowRight className="ml-2 size-4" />
                 </Link>
                 <Link
                   href="/login"
-                  className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
+                  className={cn(buttonVariants({ variant: "outline-neon", size: "lg" }))}
                 >
                   Accedi
                 </Link>

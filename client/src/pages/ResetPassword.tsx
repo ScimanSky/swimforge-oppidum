@@ -80,7 +80,7 @@ export default function ResetPassword() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex relative">
+    <div className="min-h-screen bg-background flex relative dark:bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_rgba(15,23,42,0.92)_45%,_rgba(2,6,23,1)_100%)]">
       <ThemeToggleButton className="absolute right-4 top-4 z-20" />
       <div className="hidden lg:flex lg:w-1/2 relative">
         <Image src="/images/hero-swimmer.jpg" alt="Swimmer" fill className="object-cover" />
@@ -134,14 +134,14 @@ export default function ResetPassword() {
                       <Input
                         type={showPassword ? "text" : "password"}
                         placeholder="Minimo 8 caratteri"
-                        className="bg-secondary border-0 pr-10"
+                        className="bg-background/60 pr-10"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         disabled={isLoading}
                       />
                       <Button
                         type="button"
-                        variant="ghost"
+                        variant="ghost-neon"
                         size="icon"
                         className="absolute right-0 top-0 h-full"
                         onClick={() => setShowPassword((prev) => !prev)}
@@ -158,14 +158,14 @@ export default function ResetPassword() {
                       <Input
                         type={showConfirmPassword ? "text" : "password"}
                         placeholder="Ripeti la password"
-                        className="bg-secondary border-0 pr-10"
+                        className="bg-background/60 pr-10"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         disabled={isLoading}
                       />
                       <Button
                         type="button"
-                        variant="ghost"
+                        variant="ghost-neon"
                         size="icon"
                         className="absolute right-0 top-0 h-full"
                         onClick={() => setShowConfirmPassword((prev) => !prev)}
@@ -176,7 +176,7 @@ export default function ResetPassword() {
                     </div>
                   </div>
 
-                  <Button type="submit" className="w-full gap-2" disabled={isLoading}>
+                  <Button variant="neon" type="submit" className="w-full gap-2" disabled={isLoading}>
                     {isLoading ? "Aggiornamento..." : "Aggiorna password"}
                     {!isLoading && <ArrowRight className="w-4 h-4" />}
                   </Button>
@@ -185,7 +185,9 @@ export default function ResetPassword() {
                 <div className="space-y-3 text-center text-sm text-muted-foreground">
                   Il link non e valido o e scaduto.
                   <Link href="/forgot-password" className="inline-flex w-full">
-                    <Button className="w-full">Richiedi nuovo link</Button>
+                    <Button variant="outline-neon" className="w-full">
+                      Richiedi nuovo link
+                    </Button>
                   </Link>
                 </div>
               )}

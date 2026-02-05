@@ -22,6 +22,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Link } from "wouter";
 
 const PERIOD_OPTIONS = [
   { value: 7, label: "7 giorni" },
@@ -362,12 +363,23 @@ export default function Statistics() {
     <AppLayout className="text-foreground">
       <div className="space-y-8 pb-16">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-1">
-            <p className="text-sm text-muted-foreground">Analisi performance</p>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Progressi</p>
             <h1 className="text-3xl font-semibold text-foreground">Statistiche</h1>
             <p className="text-sm text-muted-foreground">
               Metriche avanzate e trend sulle tue sessioni recenti.
             </p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="neon" asChild>
+                <Link href="/statistics">Statistiche</Link>
+              </Button>
+              <Button size="sm" variant="outline-neon" asChild>
+                <Link href="/goals">Obiettivi</Link>
+              </Button>
+              <Button size="sm" variant="outline-neon" asChild>
+                <Link href="/badges">Badge</Link>
+              </Button>
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {PERIOD_OPTIONS.map((option) => (
