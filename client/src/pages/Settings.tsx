@@ -431,8 +431,8 @@ export default function Settings() {
       </div>
 
       <Tabs defaultValue="profile">
-        <div className="grid gap-6 xl:grid-cols-12">
-          <div className="xl:col-span-3">
+        <div className="grid gap-6 xl:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]">
+          <div className="xl:sticky xl:top-24 h-fit">
             <Card className="bg-card border-border glass-panel">
               <CardHeader>
                 <CardTitle className="font-display text-base">Sezioni</CardTitle>
@@ -465,7 +465,7 @@ export default function Settings() {
             </Card>
           </div>
 
-          <div className="xl:col-span-9">
+          <div className="min-w-0">
             {/* Profile Tab */}
             <TabsContent value="profile" className="space-y-6">
           <Card className="bg-card border-border">
