@@ -248,6 +248,16 @@ export async function getAdvancedMetrics(
       )
     );
 
+  // If no previous period activities, fall back to splitting the current period in half
+  const midDate = getDaysAgo(Math.floor(days / 2));
+  const useFallbackComparison = previousActivities.length === 0;
+  const comparisonCurrentActivities = useFallbackComparison
+    ? currentActivities.filter((a) => new Date(a.activityDate).getTime() >= midDate.getTime())
+    : currentActivities;
+  const comparisonPreviousActivities = useFallbackComparison
+    ? currentActivities.filter((a) => new Date(a.activityDate).getTime() < midDate.getTime())
+    : previousActivities;
+
   // Calculate Performance Index (0-100)
   const currentDistance = currentActivities.reduce((sum, a) => sum + a.distanceMeters, 0) / 1000;
   const currentSessions = currentActivities.length;
@@ -314,10 +324,13 @@ export async function getAdvancedMetrics(
   const consistencyScore = Math.round(Math.min(regularityScore + streakScore - gapPenalty, 100));
 
   // Trend Indicator
-  const previousDistance = previousActivities.reduce((sum, a) => sum + a.distanceMeters, 0) / 1000;
+  const comparisonCurrentDistance =
+    comparisonCurrentActivities.reduce((sum, a) => sum + a.distanceMeters, 0) / 1000;
+  const previousDistance =
+    comparisonPreviousActivities.reduce((sum, a) => sum + a.distanceMeters, 0) / 1000;
   const trendBaseline = previousDistance > 0;
   const trendPercentage = trendBaseline
-    ? Math.round(((currentDistance - previousDistance) / previousDistance) * 100)
+    ? Math.round(((comparisonCurrentDistance - previousDistance) / previousDistance) * 100)
     : 0;
 
   const trendIndicator = {
@@ -411,18 +424,23 @@ export async function getAdvancedMetrics(
     : undefined;
 
   // POI: Compare current vs previous period
+  const comparisonAvgPace = comparisonCurrentActivities.length > 0
+    ? comparisonCurrentActivities
+        .filter(a => a.avgPacePer100m)
+        .reduce((sum, a) => sum + a.avgPacePer100m!, 0) / Math.max(comparisonCurrentActivities.filter(a => a.avgPacePer100m).length, 1)
+    : 0;
   const currentStats = {
-    distance: currentDistance,
-    intensity: avgPace > 0 ? 120 / avgPace : 0,  // Normalized intensity
-    frequency: currentSessions
+    distance: comparisonCurrentDistance,
+    intensity: comparisonAvgPace > 0 ? 120 / comparisonAvgPace : 0,  // Normalized intensity
+    frequency: comparisonCurrentActivities.length
   };
-  const avgPrevPace = previousActivities.length > 0
-    ? previousActivities.reduce((sum, a) => sum + (a.avgPacePer100m || 0), 0) / previousActivities.length
+  const avgPrevPace = comparisonPreviousActivities.length > 0
+    ? comparisonPreviousActivities.reduce((sum, a) => sum + (a.avgPacePer100m || 0), 0) / comparisonPreviousActivities.length
     : 0;
   const previousStats = {
     distance: previousDistance,
     intensity: avgPrevPace > 0 ? 120 / avgPrevPace : 0,
-    frequency: previousActivities.length
+    frequency: comparisonPreviousActivities.length
   };
   const poiBaseline = previousStats.distance > 0 || previousStats.intensity > 0 || previousStats.frequency > 0;
   const progressiveOverloadIndex = poiBaseline
