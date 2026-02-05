@@ -267,34 +267,44 @@ export async function getAdvancedMetrics(
   );
   const regularityScore = (datesWithActivity.size / days) * 50; // 50 points max
 
-  // Calculate streak
-  let currentStreak = 0;
-  let recordStreak = 0;
-  let tempStreak = 0;
+  // Calculate streak based on training days (Mon/Wed/Fri)
+  const trainingDays = new Set([1, 3, 5]); // 0=Sun, 1=Mon, 3=Wed, 5=Fri
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const trainingDates: string[] = [];
 
   for (let i = 0; i < 365; i++) {
     const checkDate = new Date(today);
     checkDate.setDate(checkDate.getDate() - i);
-    const dateStr = formatDate(checkDate);
+    if (trainingDays.has(checkDate.getDay())) {
+      trainingDates.push(formatDate(checkDate));
+    }
+  }
 
+  trainingDates.reverse(); // oldest -> newest
+
+  let recordStreak = 0;
+  let tempStreak = 0;
+  for (const dateStr of trainingDates) {
     if (datesWithActivity.has(dateStr)) {
-      tempStreak++;
-      if (i === 0 || currentStreak > 0) {
-        currentStreak = tempStreak;
-      }
+      tempStreak += 1;
       recordStreak = Math.max(recordStreak, tempStreak);
     } else {
-      if (i === 0) {
-        // Check yesterday
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        if (!datesWithActivity.has(formatDate(yesterday))) {
-          currentStreak = 0;
-        }
-      }
       tempStreak = 0;
+    }
+  }
+
+  let currentStreak = 0;
+  let endIndex = trainingDates.length - 1;
+  const todayStr = formatDate(today);
+  if (trainingDays.has(today.getDay()) && !datesWithActivity.has(todayStr)) {
+    endIndex -= 1;
+  }
+  for (let i = endIndex; i >= 0; i--) {
+    if (datesWithActivity.has(trainingDates[i])) {
+      currentStreak += 1;
+    } else {
+      break;
     }
   }
 

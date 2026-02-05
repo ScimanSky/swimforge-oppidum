@@ -121,32 +121,48 @@ const getInitials = (name: string) =>
 const getStreaks = (dates: string[]) => {
   if (dates.length === 0) return { current: 0, best: 0 };
   const uniqueDates = Array.from(new Set(dates)).sort();
-  let best = 1;
-  let current = 1;
-
-  for (let i = 1; i < uniqueDates.length; i += 1) {
-    const prev = new Date(uniqueDates[i - 1]);
-    const curr = new Date(uniqueDates[i]);
-    const diffDays = Math.round((curr.getTime() - prev.getTime()) / 86400000);
-    if (diffDays === 1) {
-      current += 1;
-      best = Math.max(best, current);
-    } else {
-      current = 1;
-    }
-  }
+  const dateSet = new Set(uniqueDates);
+  const trainingDays = new Set([1, 3, 5]); // Mon/Wed/Fri
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const dateSet = new Set(uniqueDates);
-  let activeStreak = 0;
-  let cursor = new Date(today);
-  while (dateSet.has(cursor.toISOString().split("T")[0])) {
-    activeStreak += 1;
-    cursor.setDate(cursor.getDate() - 1);
+
+  const trainingDates: string[] = [];
+  for (let i = 0; i < 365; i += 1) {
+    const checkDate = new Date(today);
+    checkDate.setDate(checkDate.getDate() - i);
+    if (trainingDays.has(checkDate.getDay())) {
+      trainingDates.push(checkDate.toISOString().split("T")[0]);
+    }
+  }
+  trainingDates.reverse();
+
+  let best = 0;
+  let temp = 0;
+  for (const dateStr of trainingDates) {
+    if (dateSet.has(dateStr)) {
+      temp += 1;
+      best = Math.max(best, temp);
+    } else {
+      temp = 0;
+    }
   }
 
-  return { current: activeStreak, best };
+  let endIndex = trainingDates.length - 1;
+  const todayStr = today.toISOString().split("T")[0];
+  if (trainingDays.has(today.getDay()) && !dateSet.has(todayStr)) {
+    endIndex -= 1;
+  }
+  let current = 0;
+  for (let i = endIndex; i >= 0; i -= 1) {
+    if (dateSet.has(trainingDates[i])) {
+      current += 1;
+    } else {
+      break;
+    }
+  }
+
+  return { current, best };
 };
 
 const strokeLabels: Record<string, string> = {
