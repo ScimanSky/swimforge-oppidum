@@ -71,8 +71,16 @@ const categoryColors: Record<string, string> = {
 
 export default function Goals() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
   const [customGoals, setCustomGoals] = useState<any[]>([])
   const [customDraft, setCustomDraft] = useState({
+    title: "",
+    category: "distance",
+    targetValue: "",
+    unit: "",
+  })
+  const [editDraft, setEditDraft] = useState({
+    id: "",
     title: "",
     category: "distance",
     targetValue: "",
@@ -278,6 +286,47 @@ export default function Goals() {
     toast.success("Obiettivo eliminato")
   }
 
+  const openEditGoal = (goal: any) => {
+    setEditDraft({
+      id: goal.id,
+      title: goal.title ?? "",
+      category: goal.category ?? "distance",
+      targetValue: goal.targetValue ? String(goal.targetValue) : "",
+      unit: goal.unit ?? "",
+    })
+    setIsEditOpen(true)
+  }
+
+  const saveEditGoal = () => {
+    if (!editDraft.id || !editDraft.title.trim()) {
+      toast.error("Inserisci un titolo per l'obiettivo")
+      return
+    }
+    const targetValueNumber = Number(editDraft.targetValue)
+    setCustomGoals((prev) =>
+      prev.map((goal) => {
+        if (goal.id !== editDraft.id) return goal
+        const numericTarget = Number.isFinite(targetValueNumber) && targetValueNumber > 0
+        const nextTarget = numericTarget ? targetValueNumber : editDraft.targetValue || "—"
+        const currentValue = Number(goal.currentValue) || 0
+        const progress =
+          numericTarget && currentValue > 0
+            ? Math.min(100, (currentValue / targetValueNumber) * 100)
+            : goal.progress ?? 0
+        return {
+          ...goal,
+          title: editDraft.title.trim(),
+          category: editDraft.category,
+          targetValue: nextTarget,
+          unit: editDraft.unit || goal.unit,
+          progress,
+        }
+      })
+    )
+    setIsEditOpen(false)
+    toast.success("Obiettivo aggiornato")
+  }
+
   useEffect(() => {
     const stored = localStorage.getItem("swimforge:customGoals")
     if (!stored) return
@@ -404,6 +453,78 @@ export default function Goals() {
               </div>
             </DialogContent>
           </Dialog>
+          <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Modifica obiettivo</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Titolo</label>
+                  <Input
+                    value={editDraft.title}
+                    onChange={(event) =>
+                      setEditDraft((prev) => ({ ...prev, title: event.target.value }))
+                    }
+                    placeholder="Es. 12 km a settimana"
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Categoria</label>
+                    <Select
+                      value={editDraft.category}
+                      onValueChange={(value) =>
+                        setEditDraft((prev) => ({ ...prev, category: value }))
+                      }
+                    >
+                      <SelectTrigger className="bg-background/60">
+                        <SelectValue placeholder="Seleziona categoria" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="distance">Distanza</SelectItem>
+                        <SelectItem value="speed">Velocita</SelectItem>
+                        <SelectItem value="efficiency">Efficienza</SelectItem>
+                        <SelectItem value="frequency">Frequenza</SelectItem>
+                        <SelectItem value="endurance">Resistenza</SelectItem>
+                        <SelectItem value="technique">Tecnica</SelectItem>
+                        <SelectItem value="milestone">Traguardo</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Valore target</label>
+                    <Input
+                      type="number"
+                      value={editDraft.targetValue}
+                      onChange={(event) =>
+                        setEditDraft((prev) => ({ ...prev, targetValue: event.target.value }))
+                      }
+                      placeholder="Es. 10"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Unita</label>
+                  <Input
+                    value={editDraft.unit}
+                    onChange={(event) =>
+                      setEditDraft((prev) => ({ ...prev, unit: event.target.value }))
+                    }
+                    placeholder="Es. km/settimana"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" onClick={() => setIsEditOpen(false)}>
+                    Annulla
+                  </Button>
+                  <Button variant="neon" onClick={saveEditGoal}>
+                    Salva modifiche
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Active Goals */}
@@ -484,9 +605,20 @@ export default function Goals() {
                       </div>
 
                       <div className="flex gap-2">
+                      {isCustom ? (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => openEditGoal(goal)}
+                          aria-label="Modifica obiettivo"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                      ) : (
                         <Button variant="outline" size="icon" disabled>
                           <Edit className="w-4 h-4" />
                         </Button>
+                      )}
                         {isCustom ? (
                           <Button
                             variant="outline"
