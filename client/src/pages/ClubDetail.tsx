@@ -288,7 +288,7 @@ export default function ClubDetail() {
                   <Users className="h-6 w-6 text-primary" />
                   <span className="text-sm text-muted-foreground">Club</span>
                 </div>
-                <h1 className="text-3xl md:text-4xl font-bold">{club?.name ?? "Club"}</h1>
+                <h1 className="text-3xl md:text-4xl font-bold neon-gradient-text">{club?.name ?? "Club"}</h1>
                 <p className="text-muted-foreground mt-2 max-w-2xl">
                   {club?.description || "Condividi progressi, allenamenti e obiettivi con la tua squadra."}
                 </p>

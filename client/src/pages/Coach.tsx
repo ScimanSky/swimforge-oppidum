@@ -324,27 +324,29 @@ export default function Coach() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-accent/20">
-              <Brain className="w-8 h-8 text-primary" />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-display font-bold text-foreground">
-                  AI Coach Dashboard
-                </h1>
-                <Badge variant="neon">Premium</Badge>
+        <Card className="bg-card border-border glass-panel">
+          <CardContent className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 p-3">
+                <Brain className="h-8 w-8 text-primary" />
               </div>
-              <p className="text-muted-foreground">
-                Analisi e allenamenti personalizzati basati sui tuoi dati reali.
-              </p>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-3xl font-display font-bold neon-gradient-text">
+                    AI Coach
+                  </h1>
+                  <Badge variant="neon">Premium</Badge>
+                </div>
+                <p className="text-muted-foreground">
+                  Analisi e allenamenti personalizzati basati sui tuoi dati reali.
+                </p>
+              </div>
             </div>
-          </div>
-          <Badge variant="outline" className="text-xs border-primary/40 text-primary">
-            Ultimo sync: {lastSyncLabel}
-          </Badge>
-        </div>
+            <Badge variant="outline" className="text-xs border-primary/40 text-primary">
+              Ultimo sync: {lastSyncLabel}
+            </Badge>
+          </CardContent>
+        </Card>
 
         <Card className="bg-card border-border">
           <CardContent className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

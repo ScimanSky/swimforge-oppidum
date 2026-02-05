@@ -19,19 +19,22 @@ export function AppLayout({
   className = "",
   withShell = true,
 }: AppLayoutProps) {
-  if (withShell) {
-    return (
-      <div className={`min-h-screen bg-background dark:bg-[radial-gradient(circle_at_top,_var(--neon-soft),_transparent_65%)] ${className}`}>
-        <AppShell>{children}</AppShell>
+  const layout = (
+    <div
+      className={`relative min-h-screen bg-background ${className}`}
+    >
+      <div className="pointer-events-none absolute inset-0 opacity-70 dark:opacity-100">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_transparent_45%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,_rgba(129,140,248,0.12),_transparent_45%)]" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,_rgba(15,23,42,0.0),_rgba(15,23,42,0.35))] dark:block hidden" />
       </div>
-    );
-  }
-
-  return (
-    <div className={`min-h-screen bg-background dark:bg-[radial-gradient(circle_at_top,_var(--neon-soft),_transparent_65%)] ${className}`}>
-      {children}
+      <div className="relative z-10">
+        {withShell ? <AppShell>{children}</AppShell> : children}
+      </div>
     </div>
   );
+
+  return layout;
 }
 
 export default AppLayout;

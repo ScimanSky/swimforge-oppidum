@@ -193,3 +193,25 @@ body,
   z-index: 0;
   pointer-events: none;
 }
+
+@layer utilities {
+  .neon-gradient-text {
+    background: linear-gradient(135deg, var(--primary), var(--accent));
+    -webkit-background-clip: text;
+    color: transparent;
+  }
+
+  .glass-panel {
+    background: color-mix(in oklch, var(--card) 88%, transparent);
+    border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+    backdrop-filter: blur(18px);
+  }
+
+  .bento-surface {
+    background: linear-gradient(135deg, var(--neon-soft), transparent 70%);
+  }
+
+  .neon-outline {
+    box-shadow: 0 0 0 1px var(--border), 0 0 30px var(--neon-soft);
+  }
+}

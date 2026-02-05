@@ -167,12 +167,12 @@ export default function Auth() {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
       </div>
 
-      <Card className="relative z-10 w-full max-w-md bg-card/90 border-border/70 backdrop-blur-xl">
+      <Card className="relative z-10 w-full max-w-md bg-card/90 border-border/70 backdrop-blur-xl glass-panel">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto">
             <img src="/swimforge-logo.png" alt="SwimForge" className="h-28 md:h-32 w-auto" />
           </div>
-          <CardTitle className="text-2xl font-bold text-foreground">SwimForge</CardTitle>
+          <CardTitle className="text-2xl font-bold neon-gradient-text">SwimForge</CardTitle>
           <CardDescription className="text-muted-foreground">
             Accedi o registrati per iniziare a tracciare i tuoi progressi
           </CardDescription>

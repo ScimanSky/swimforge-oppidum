@@ -450,7 +450,7 @@ export default function Dashboard() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <Card className="bg-card border-border relative overflow-hidden">
+        <Card className="bg-card border-border relative overflow-hidden glass-panel">
           {coverImage && (
             <div className="absolute inset-0">
               <img
@@ -486,7 +486,7 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Bentornato,</p>
-                <h1 className="text-2xl font-display font-bold text-foreground">
+                <h1 className="text-2xl font-display font-bold neon-gradient-text">
                   {displayName}
                 </h1>
                 <p className="text-sm text-muted-foreground">
@@ -508,199 +508,201 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat) => (
-            <Card key={stat.label} className="bg-card border-border">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div className={`flex size-10 items-center justify-center rounded-lg ${stat.bgColor} ${stat.color}`}>
-                    <stat.icon className="size-5" />
-                  </div>
-                  <Badge variant="neon" className="text-xs">
-                    {stat.progress}%
-                  </Badge>
+        <div className="grid gap-6 xl:grid-cols-12">
+          <div className="space-y-6 xl:col-span-7">
+            <div className="grid gap-4 sm:grid-cols-2">
+              {stats.map((stat) => (
+                <Card key={stat.label} className="bg-card border-border">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div className={`flex size-10 items-center justify-center rounded-lg ${stat.bgColor} ${stat.color}`}>
+                        <stat.icon className="size-5" />
+                      </div>
+                      <Badge variant="neon" className="text-xs">
+                        {stat.progress}%
+                      </Badge>
+                    </div>
+                    <div className="mt-4">
+                      <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                      <p className="text-sm text-muted-foreground">{stat.label}</p>
+                    </div>
+                    <Progress value={stat.progress} className="mt-3 h-1.5" />
+                    <p className="mt-3 text-xs text-muted-foreground">{stat.change}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <Card className="bg-card border-border">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="font-display">Attività recenti</CardTitle>
+                  <CardDescription>Le ultime sessioni sincronizzate</CardDescription>
                 </div>
-                <div className="mt-4">
-                  <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-                  <p className="text-sm text-muted-foreground">{stat.label}</p>
-                </div>
-                <Progress value={stat.progress} className="mt-3 h-1.5" />
-                <p className="mt-3 text-xs text-muted-foreground">{stat.change}</p>
+                <Button variant="ghost-neon" size="sm" asChild>
+                  <Link href="/activities">
+                    Vai a tutte
+                    <ChevronRight className="ml-2 size-4" />
+                  </Link>
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {recentActivities.length ? (
+                  recentActivities.map((activity) => (
+                    <div
+                      key={activity.id}
+                      className="flex flex-col gap-3 rounded-xl border border-border bg-background/60 p-4 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          {formatDistanceKm(getActivityDistance(activity))}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {(() => {
+                            const parsed = parseActivityDate(getActivityDateValue(activity))
+                            return parsed
+                              ? parsed.toLocaleDateString("it-IT", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })
+                              : "—"
+                          })()}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                        <span>⏱ {formatDuration(getActivityDuration(activity))}</span>
+                        <span>⚡ {formatPace(getActivityPace(activity))}</span>
+                        {getActivityAvgHeartRate(activity) > 0 ? (
+                          <span>❤️ {Math.round(getActivityAvgHeartRate(activity))} bpm</span>
+                        ) : null}
+                      </div>
+                      <Badge variant="neon" className="text-xs">
+                        +{activity.xpEarned ?? activity.xp_earned ?? 0} XP
+                      </Badge>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Nessuna attività recente. Sincronizza Garmin o Strava.
+                  </p>
+                )}
               </CardContent>
             </Card>
-          ))}
-        </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="bg-card border-border lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="font-display">Attività recenti</CardTitle>
-                <CardDescription>Le ultime sessioni sincronizzate</CardDescription>
-              </div>
-              <Button variant="ghost-neon" size="sm" asChild>
-                <Link href="/activities">
-                  Vai a tutte
-                  <ChevronRight className="ml-2 size-4" />
-                </Link>
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {recentActivities.length ? (
-                recentActivities.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="flex flex-col gap-3 rounded-xl border border-border bg-background/60 p-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">
-                        {formatDistanceKm(getActivityDistance(activity))}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {(() => {
-                          const parsed = parseActivityDate(getActivityDateValue(activity))
-                          return parsed
-                            ? parsed.toLocaleDateString("it-IT", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              })
-                            : "—"
-                        })()}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                      <span>⏱ {formatDuration(getActivityDuration(activity))}</span>
-                      <span>⚡ {formatPace(getActivityPace(activity))}</span>
-                      {getActivityAvgHeartRate(activity) > 0 ? (
-                        <span>❤️ {Math.round(getActivityAvgHeartRate(activity))} bpm</span>
-                      ) : null}
-                    </div>
-                    <Badge variant="neon" className="text-xs">
-                      +{activity.xpEarned ?? activity.xp_earned ?? 0} XP
-                    </Badge>
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Nessuna attività recente. Sincronizza Garmin o Strava.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="font-display">Progressi settimanali</CardTitle>
-              <CardDescription>Distanza per giorno</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {weeklyData.map((day) => (
-                <div key={day.day} className="flex items-center gap-3">
-                  <span className="w-10 text-xs text-muted-foreground">{day.day}</span>
-                  <Progress
-                    value={Math.min(100, (day.distance / 2000) * 100)}
-                    className="h-2 flex-1"
-                  />
-                  <span className="text-xs text-muted-foreground">
-                    {(day.distance / 1000).toFixed(1)} km
-                  </span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="font-display">Sfide attive</CardTitle>
-              <CardDescription>Le tue sfide correnti</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {activeChallenges.length ? (
-                activeChallenges.slice(0, 2).map((challenge) => {
-                  const leaderboard = (challenge.leaderboard ?? challenge.leaderboardEntries ?? []) as Array<{ progress: number }>
-                  const progressValue = Number(
-                    challenge.current_progress ?? challenge.currentProgress ?? challenge.progress ?? 0
-                  )
-                  const maxProgress = Math.max(
-                    progressValue,
-                    ...leaderboard.map((item) => Number(item.progress || 0))
-                  )
-                  const progressPercent =
-                    maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
-                  return (
-                    <div key={challenge.id} className="rounded-xl border border-border bg-background/60 p-4">
-                      <p className="text-sm font-semibold text-foreground">{challenge.name}</p>
-                      <p className="text-xs text-muted-foreground">{challenge.objective}</p>
-                      <Progress value={progressPercent} className="mt-3 h-1.5" />
-                    </div>
-                  )
-                })
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Nessuna sfida attiva. Partecipane una dalla sezione Sfide.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="font-display">Classifica</CardTitle>
-              <CardDescription>Top nuotatori della settimana</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {leaderboardEntries.length ? (
-                leaderboardEntries.slice(0, 3).map((entry) => (
-                  <div key={entry.rank} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                        {entry.rank}
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="font-display">Sfide attive</CardTitle>
+                <CardDescription>Le tue sfide correnti</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {activeChallenges.length ? (
+                  activeChallenges.slice(0, 2).map((challenge) => {
+                    const leaderboard = (challenge.leaderboard ?? challenge.leaderboardEntries ?? []) as Array<{ progress: number }>
+                    const progressValue = Number(
+                      challenge.current_progress ?? challenge.currentProgress ?? challenge.progress ?? 0
+                    )
+                    const maxProgress = Math.max(
+                      progressValue,
+                      ...leaderboard.map((item) => Number(item.progress || 0))
+                    )
+                    const progressPercent =
+                      maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
+                    return (
+                      <div key={challenge.id} className="rounded-xl border border-border bg-background/60 p-4">
+                        <p className="text-sm font-semibold text-foreground">{challenge.name}</p>
+                        <p className="text-xs text-muted-foreground">{challenge.objective}</p>
+                        <Progress value={progressPercent} className="mt-3 h-1.5" />
                       </div>
-                      <div>
-                        <p className={`text-sm ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
-                          {entry.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{entry.value}</p>
-                      </div>
-                    </div>
-                    {entry.isCurrentUser && (
-                      <Badge variant="neon" className="text-xs">Tu</Badge>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <p className="text-sm text-muted-foreground">Nessuna classifica disponibile.</p>
-              )}
-            </CardContent>
-          </Card>
+                    )
+                  })
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Nessuna sfida attiva. Partecipane una dalla sezione Sfide.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
 
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="font-display">Insight AI</CardTitle>
-              <CardDescription>Focus rapido della settimana</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {aiInsight ? (
-                <>
-                  <div className="flex items-center gap-2 text-primary">
-                    <Trophy className="size-5" />
-                    <span className="text-sm font-semibold">{aiInsight.title}</span>
+          <div className="space-y-6 xl:col-span-5">
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="font-display">Progressi settimanali</CardTitle>
+                <CardDescription>Distanza per giorno</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {weeklyData.map((day) => (
+                  <div key={day.day} className="flex items-center gap-3">
+                    <span className="w-10 text-xs text-muted-foreground">{day.day}</span>
+                    <Progress
+                      value={Math.min(100, (day.distance / 2000) * 100)}
+                      className="h-2 flex-1"
+                    />
+                    <span className="text-xs text-muted-foreground">
+                      {(day.distance / 1000).toFixed(1)} km
+                    </span>
                   </div>
-                  <p className="text-sm text-muted-foreground">{aiInsight.message}</p>
-                  <Button variant="outline-neon" size="sm" asChild>
-                    <Link href="/coach">Apri AI Coach</Link>
-                  </Button>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Nessun insight disponibile. Sincronizza nuove attività.
-                </p>
-              )}
-            </CardContent>
-          </Card>
+                ))}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="font-display">Classifica</CardTitle>
+                <CardDescription>Top nuotatori della settimana</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {leaderboardEntries.length ? (
+                  leaderboardEntries.slice(0, 3).map((entry) => (
+                    <div key={entry.rank} className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                          {entry.rank}
+                        </div>
+                        <div>
+                          <p className={`text-sm ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
+                            {entry.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{entry.value}</p>
+                        </div>
+                      </div>
+                      {entry.isCurrentUser && (
+                        <Badge variant="neon" className="text-xs">Tu</Badge>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nessuna classifica disponibile.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border-border">
+              <CardHeader>
+                <CardTitle className="font-display">Insight AI</CardTitle>
+                <CardDescription>Focus rapido della settimana</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {aiInsight ? (
+                  <>
+                    <div className="flex items-center gap-2 text-primary">
+                      <Trophy className="size-5" />
+                      <span className="text-sm font-semibold">{aiInsight.title}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{aiInsight.message}</p>
+                    <Button variant="outline-neon" size="sm" asChild>
+                      <Link href="/coach">Apri AI Coach</Link>
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Nessun insight disponibile. Sincronizza nuove attività.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </AppLayout>

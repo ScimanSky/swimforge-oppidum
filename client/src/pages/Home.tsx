@@ -183,8 +183,8 @@ export default function Home() {
               Analisi AI • Gamification • Community
             </Badge>
             <h1 className="mb-6 text-balance text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
-              SwimForge
-              <span className="text-primary block">Forgia il tuo percorso</span>
+              <span className="neon-gradient-text">SwimForge</span>
+              <span className="block text-primary">Forgia il tuo percorso</span>
             </h1>
             <p className="mb-8 text-pretty text-lg text-muted-foreground md:text-xl">
               La piattaforma esclusiva per nuotatori di tutte le età. Trasforma

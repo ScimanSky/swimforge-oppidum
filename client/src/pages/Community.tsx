@@ -112,7 +112,7 @@ export default function Community() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl lg:text-3xl font-display font-bold text-foreground">
+            <h1 className="text-2xl lg:text-3xl font-display font-bold neon-gradient-text">
               Club
             </h1>
             <p className="text-muted-foreground mt-1">

@@ -438,7 +438,8 @@ export default function Profile() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <Card className="bg-card border-border">
+        <div className="grid gap-6 xl:grid-cols-12">
+          <Card className="bg-card border-border xl:col-span-7 glass-panel">
           <div className="relative h-36 overflow-hidden rounded-t-lg bg-muted">
             {profile?.coverUrl ? (
               <img
@@ -463,7 +464,7 @@ export default function Profile() {
                 <div className="flex flex-col items-center gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-2xl font-bold text-foreground">{displayName}</h1>
+                      <h1 className="text-2xl font-bold neon-gradient-text">{displayName}</h1>
                       <Badge variant="neon" className="gap-1">
                         <Zap className="size-3" />
                         Livello {profile?.level ?? 1}
@@ -543,50 +544,58 @@ export default function Profile() {
               </p>
             </div>
           </CardContent>
-        </Card>
+          </Card>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatItem
-            label="Sessioni totali"
-            value={stats.totalSessions}
-            icon={<TrendingUp className="size-5" />}
-          />
-          <StatItem
-            label="Distanza totale"
-            value={formatDistance(stats.totalDistance)}
-            icon={<Waves className="size-5" />}
-          />
-          <StatItem
-            label="Pace medio"
-            value={formatPace(stats.avgPace)}
-            icon={<Timer className="size-5" />}
-          />
-          <StatItem
-            label="SWOLF medio"
-            value={stats.avgSwolf ?? "—"}
-            icon={<Target className="size-5" />}
-          />
-          <StatItem
-            label="Tempo totale"
-            value={formatTime(stats.totalTime)}
-            icon={<Calendar className="size-5" />}
-          />
-          <StatItem
-            label="Best SWOLF"
-            value={stats.bestSwolf ?? "—"}
-            icon={<Award className="size-5" />}
-            subtext={stats.bestSwolf ? "Record personale" : undefined}
-          />
-          <StatItem
-            label="Streak attuale"
-            value={`${stats.streakCurrent} giorni`}
-            icon={<Flame className="size-5" />}
-          />
-          <StatItem
-            label="Streak migliore"
-            value={`${stats.streakBest} giorni`}
-            icon={<Trophy className="size-5" />}
-          />
+          <Card className="bg-card border-border xl:col-span-5">
+            <CardHeader>
+              <CardTitle className="font-display">Snapshot performance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <StatItem
+                  label="Sessioni totali"
+                  value={stats.totalSessions}
+                  icon={<TrendingUp className="size-5" />}
+                />
+                <StatItem
+                  label="Distanza totale"
+                  value={formatDistance(stats.totalDistance)}
+                  icon={<Waves className="size-5" />}
+                />
+                <StatItem
+                  label="Pace medio"
+                  value={formatPace(stats.avgPace)}
+                  icon={<Timer className="size-5" />}
+                />
+                <StatItem
+                  label="SWOLF medio"
+                  value={stats.avgSwolf ?? "—"}
+                  icon={<Target className="size-5" />}
+                />
+                <StatItem
+                  label="Tempo totale"
+                  value={formatTime(stats.totalTime)}
+                  icon={<Calendar className="size-5" />}
+                />
+                <StatItem
+                  label="Best SWOLF"
+                  value={stats.bestSwolf ?? "—"}
+                  icon={<Award className="size-5" />}
+                  subtext={stats.bestSwolf ? "Record personale" : undefined}
+                />
+                <StatItem
+                  label="Streak attuale"
+                  value={`${stats.streakCurrent} giorni`}
+                  icon={<Flame className="size-5" />}
+                />
+                <StatItem
+                  label="Streak migliore"
+                  value={`${stats.streakBest} giorni`}
+                  icon={<Trophy className="size-5" />}
+                />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <Tabs defaultValue="badges" className="w-full">

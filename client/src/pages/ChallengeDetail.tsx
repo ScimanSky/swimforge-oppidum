@@ -183,7 +183,7 @@ export default function ChallengeDetail() {
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="text-3xl font-display font-bold text-foreground">
+          <h1 className="text-3xl font-display font-bold neon-gradient-text">
             {challenge.name}
           </h1>
         </div>
@@ -194,7 +194,7 @@ export default function ChallengeDetail() {
           animate={{ opacity: 1, y: 0 }}
           className="space-y-4"
         >
-          <Card className="bg-card border-border">
+          <Card className="bg-card border-border glass-panel">
             <CardContent className="space-y-4 p-6">
               <p className="text-muted-foreground">{challenge.description}</p>
 

@@ -420,36 +420,48 @@ export default function Settings() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-display font-bold text-foreground">Impostazioni</h1>
+        <h1 className="text-2xl font-display font-bold neon-gradient-text">Impostazioni</h1>
         <p className="text-muted-foreground">Gestisci il tuo account e le preferenze</p>
       </div>
 
       <Tabs defaultValue="profile">
-        <TabsList className="flex-wrap gap-1">
-          <TabsTrigger value="profile" className="gap-2">
-            <User className="w-4 h-4" />
-            Profilo
-          </TabsTrigger>
-          <TabsTrigger value="connections" className="gap-2">
-            <Link className="w-4 h-4" />
-            Connessioni
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-2">
-            <Bell className="w-4 h-4" />
-            Notifiche
-          </TabsTrigger>
-          <TabsTrigger value="preferences" className="gap-2">
-            <Palette className="w-4 h-4" />
-            Preferenze
-          </TabsTrigger>
-          <TabsTrigger value="privacy" className="gap-2">
-            <Shield className="w-4 h-4" />
-            Privacy
-          </TabsTrigger>
-        </TabsList>
+        <div className="grid gap-6 xl:grid-cols-12">
+          <div className="xl:col-span-3">
+            <Card className="bg-card border-border glass-panel">
+              <CardHeader>
+                <CardTitle className="font-display text-base">Sezioni</CardTitle>
+                <CardDescription>Scegli l&apos;area da aggiornare</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TabsList className="flex w-full flex-col items-stretch gap-2">
+                  <TabsTrigger value="profile" className="justify-start gap-2">
+                    <User className="w-4 h-4" />
+                    Profilo
+                  </TabsTrigger>
+                  <TabsTrigger value="connections" className="justify-start gap-2">
+                    <Link className="w-4 h-4" />
+                    Connessioni
+                  </TabsTrigger>
+                  <TabsTrigger value="notifications" className="justify-start gap-2">
+                    <Bell className="w-4 h-4" />
+                    Notifiche
+                  </TabsTrigger>
+                  <TabsTrigger value="preferences" className="justify-start gap-2">
+                    <Palette className="w-4 h-4" />
+                    Preferenze
+                  </TabsTrigger>
+                  <TabsTrigger value="privacy" className="justify-start gap-2">
+                    <Shield className="w-4 h-4" />
+                    Privacy
+                  </TabsTrigger>
+                </TabsList>
+              </CardContent>
+            </Card>
+          </div>
 
-        {/* Profile Tab */}
-        <TabsContent value="profile" className="mt-6 space-y-6">
+          <div className="xl:col-span-9">
+            {/* Profile Tab */}
+            <TabsContent value="profile" className="space-y-6">
           <Card className="bg-card border-border">
             <CardHeader>
               <CardTitle className="font-display">Informazioni Profilo</CardTitle>
@@ -684,7 +696,7 @@ export default function Settings() {
         </TabsContent>
 
         {/* Connections Tab */}
-        <TabsContent value="connections" className="mt-6 space-y-4">
+        <TabsContent value="connections" className="space-y-4">
           <Card className="bg-card border-border">
             <CardHeader>
               <CardTitle className="font-display">Account Collegati</CardTitle>
@@ -780,7 +792,7 @@ export default function Settings() {
         </TabsContent>
 
         {/* Notifications Tab */}
-        <TabsContent value="notifications" className="mt-6">
+        <TabsContent value="notifications">
           <Card className="bg-card border-border">
             <CardHeader>
               <CardTitle className="font-display">Preferenze Notifiche</CardTitle>
@@ -807,7 +819,7 @@ export default function Settings() {
         </TabsContent>
 
         {/* Preferences Tab */}
-        <TabsContent value="preferences" className="mt-6 space-y-4">
+        <TabsContent value="preferences" className="space-y-4">
           <Card className="bg-card border-border">
             <CardHeader>
               <CardTitle className="font-display">Unita di Misura</CardTitle>
@@ -915,7 +927,7 @@ export default function Settings() {
         </TabsContent>
 
         {/* Privacy Tab */}
-        <TabsContent value="privacy" className="mt-6 space-y-4">
+        <TabsContent value="privacy" className="space-y-4">
           <Card className="bg-card border-border">
             <CardHeader>
               <CardTitle className="font-display">Privacy Profilo</CardTitle>
@@ -1016,6 +1028,8 @@ export default function Settings() {
             </CardContent>
           </Card>
         </TabsContent>
+          </div>
+        </div>
       </Tabs>
     </div>
     </AppLayout>

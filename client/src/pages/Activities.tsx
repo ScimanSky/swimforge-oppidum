@@ -131,123 +131,129 @@ export default function Activities() {
 
   return (
     <AppLayout>
-    <div className="space-y-6 p-4 lg:p-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold text-foreground lg:text-3xl">
-            Attività
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Tutte le sessioni di nuoto, in un unico posto.
-          </p>
-        </div>
-        <Button variant="outline-neon" asChild>
-          <Link href="/profile">
-            <Plus className="mr-2 h-4 w-4" />
-            Collega dispositivi
-          </Link>
-        </Button>
-      </div>
+    <div className="space-y-8 p-4 lg:p-6">
+      <div className="grid gap-6 xl:grid-cols-12">
+        <Card className="bg-card border-border xl:col-span-8 glass-panel">
+          <CardContent className="space-y-6 p-6">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h1 className="text-3xl font-display font-bold neon-gradient-text">
+                  Attività
+                </h1>
+                <p className="text-muted-foreground">
+                  Tutte le sessioni di nuoto, in un unico posto.
+                </p>
+              </div>
+              <Button variant="outline-neon" asChild>
+                <Link href="/profile">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Collega dispositivi
+                </Link>
+              </Button>
+            </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Cerca attività..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="bg-background/60 pl-9"
-          />
-        </div>
-        <div className="flex gap-2">
-          <Tabs value={filter} onValueChange={setFilter}>
-            <TabsList>
-              <TabsTrigger value="all">Tutte</TabsTrigger>
-              <TabsTrigger value="pool">Vasca</TabsTrigger>
-              <TabsTrigger value="open-water">Open Water</TabsTrigger>
-            </TabsList>
-          </Tabs>
-          <Select value={sort} onValueChange={setSort}>
-            <SelectTrigger className="w-[150px] bg-background/60">
-              <Filter className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Sort" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="recent">Più recenti</SelectItem>
-              <SelectItem value="distance">Distanza</SelectItem>
-              <SelectItem value="duration">Durata</SelectItem>
-              <SelectItem value="xp">XP</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <Card className="bg-background/60 border-border">
+                <CardContent className="p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Droplets className="h-4 w-4 text-primary" />
+                    <span className="text-xs text-muted-foreground">Distanza totale</span>
+                  </div>
+                  {activitiesQuery.isLoading ? (
+                    <Skeleton className="h-6 w-20" />
+                  ) : (
+                    <p className="text-xl font-display font-bold text-foreground">
+                      {formatDistance(totalDistance)}
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs text-primary/80">Ultimi 30 giorni</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-background/60 border-border">
+                <CardContent className="p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Timer className="h-4 w-4 text-primary" />
+                    <span className="text-xs text-muted-foreground">Tempo totale</span>
+                  </div>
+                  {activitiesQuery.isLoading ? (
+                    <Skeleton className="h-6 w-20" />
+                  ) : (
+                    <p className="text-xl font-display font-bold text-foreground">
+                      {formatDuration(totalTime)}
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs text-primary/80">Ultimi 30 giorni</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-background/60 border-border">
+                <CardContent className="p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-accent" />
+                    <span className="text-xs text-muted-foreground">XP guadagnati</span>
+                  </div>
+                  {activitiesQuery.isLoading ? (
+                    <Skeleton className="h-6 w-20" />
+                  ) : (
+                    <p className="text-xl font-display font-bold text-foreground">{totalXp} XP</p>
+                  )}
+                  <p className="mt-1 text-xs text-accent">Ultimi 30 giorni</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-background/60 border-border">
+                <CardContent className="p-4">
+                  <div className="mb-2 flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    <span className="text-xs text-muted-foreground">Efficienza media</span>
+                  </div>
+                  {advancedQuery.isLoading ? (
+                    <Skeleton className="h-6 w-20" />
+                  ) : (
+                    <p className="text-xl font-display font-bold text-foreground">
+                      {avgEfficiency !== null && avgEfficiency !== undefined
+                        ? `${Math.round(avgEfficiency)}%`
+                        : "—"}
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs text-primary/80">SEI Index</p>
+                </CardContent>
+              </Card>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Activity Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="mb-2 flex items-center gap-2">
-              <Droplets className="h-4 w-4 text-primary" />
-              <span className="text-xs text-muted-foreground">Distanza totale</span>
+        <Card className="bg-card border-border xl:col-span-4">
+          <CardContent className="space-y-4 p-6">
+            <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-primary">
+              <Filter className="h-4 w-4" />
+              Filtri
             </div>
-            {activitiesQuery.isLoading ? (
-              <Skeleton className="h-6 w-20" />
-            ) : (
-              <p className="text-xl font-display font-bold text-foreground">
-                {formatDistance(totalDistance)}
-              </p>
-            )}
-            <p className="mt-1 text-xs text-primary/80">Ultimi 30 giorni</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="mb-2 flex items-center gap-2">
-              <Timer className="h-4 w-4 text-primary" />
-              <span className="text-xs text-muted-foreground">Tempo totale</span>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Cerca attività..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="bg-background/60 pl-9"
+              />
             </div>
-            {activitiesQuery.isLoading ? (
-              <Skeleton className="h-6 w-20" />
-            ) : (
-              <p className="text-xl font-display font-bold text-foreground">
-                {formatDuration(totalTime)}
-              </p>
-            )}
-            <p className="mt-1 text-xs text-primary/80">Ultimi 30 giorni</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="mb-2 flex items-center gap-2">
-              <Zap className="h-4 w-4 text-accent" />
-              <span className="text-xs text-muted-foreground">XP guadagnati</span>
-            </div>
-            {activitiesQuery.isLoading ? (
-              <Skeleton className="h-6 w-20" />
-            ) : (
-              <p className="text-xl font-display font-bold text-foreground">{totalXp} XP</p>
-            )}
-            <p className="mt-1 text-xs text-accent">Ultimi 30 giorni</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <div className="mb-2 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              <span className="text-xs text-muted-foreground">Efficienza media</span>
-            </div>
-            {advancedQuery.isLoading ? (
-              <Skeleton className="h-6 w-20" />
-            ) : (
-              <p className="text-xl font-display font-bold text-foreground">
-                {avgEfficiency !== null && avgEfficiency !== undefined
-                  ? `${Math.round(avgEfficiency)}%`
-                  : "—"}
-              </p>
-            )}
-            <p className="mt-1 text-xs text-primary/80">SEI Index</p>
+            <Tabs value={filter} onValueChange={setFilter}>
+              <TabsList>
+                <TabsTrigger value="all">Tutte</TabsTrigger>
+                <TabsTrigger value="pool">Vasca</TabsTrigger>
+                <TabsTrigger value="open-water">Open Water</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Select value={sort} onValueChange={setSort}>
+              <SelectTrigger className="w-full bg-background/60">
+                <SelectValue placeholder="Ordina" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recent">Più recenti</SelectItem>
+                <SelectItem value="distance">Distanza</SelectItem>
+                <SelectItem value="duration">Durata</SelectItem>
+                <SelectItem value="xp">XP</SelectItem>
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
       </div>

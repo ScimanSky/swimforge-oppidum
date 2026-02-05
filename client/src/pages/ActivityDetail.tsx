@@ -534,7 +534,7 @@ export default function ActivityDetail() {
           </Button>
           <div className="flex-1">
             <p className="text-sm text-muted-foreground">Dettaglio attività</p>
-            <h1 className="text-2xl font-display font-bold text-foreground">
+            <h1 className="text-2xl font-display font-bold neon-gradient-text">
               {activity?.activityName || "Swim Session"}
             </h1>
           </div>
@@ -605,8 +605,8 @@ export default function ActivityDetail() {
               </CardContent>
             </Card>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Card className="bg-card border-border">
+            <div className="grid gap-6 xl:grid-cols-12">
+              <Card className="bg-card border-border xl:col-span-7">
                 <CardHeader>
                   <CardTitle className="font-display">Dettagli sessione</CardTitle>
                 </CardHeader>
@@ -657,7 +657,7 @@ export default function ActivityDetail() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-card border-border">
+              <Card className="bg-card border-border xl:col-span-5">
                 <CardHeader>
                   <CardTitle className="font-display">Tecnica & Efficienza</CardTitle>
                 </CardHeader>
@@ -702,8 +702,8 @@ export default function ActivityDetail() {
               </Card>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Card className="bg-card border-border">
+            <div className="grid gap-6 xl:grid-cols-12">
+              <Card className="bg-card border-border xl:col-span-7">
                 <CardHeader>
                   <CardTitle className="font-display">Frequenza cardiaca</CardTitle>
                 </CardHeader>
@@ -765,216 +765,216 @@ export default function ActivityDetail() {
                   )}
                 </CardContent>
               </Card>
-            </div>
 
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="font-display">Lap & Splits</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                {!garminDetails ? (
-                  <p className="text-xs text-muted-foreground">
-                    Dettagli Garmin non disponibili. Assicurati di essere connesso a Garmin e
-                    ricarica la pagina.
-                  </p>
-                ) : (
-                  <Accordion type="multiple" className="space-y-3">
-                    {lapSplits.length > 0 && (
-                      <AccordionItem
-                        value="garmin-laps"
-                        className="rounded-lg border border-border bg-background/60 px-3"
-                      >
-                        <AccordionTrigger className="py-3">
-                          <div className="flex w-full items-center justify-between gap-4">
-                            <span>Lap Garmin</span>
-                            <Badge variant="secondary" className="text-xs">
-                              {filteredLapSplits.length}/{lapSplits.length} lap
-                            </Badge>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="px-0 pb-3">
-                          <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
-                            <span>Totale: {formatDistance(lapSummaryStats.distance)}</span>
-                            <span>Tempo: {formatSplitDuration(lapSummaryStats.duration)}</span>
-                            <span>
-                              Pace medio:{" "}
-                              {lapSummaryStats.pace
-                                ? formatPace(
-                                    lapSummaryStats.pace,
-                                    lapSummaryStats.distance,
-                                    lapSummaryStats.duration
-                                  )
-                                : "—"}
-                            </span>
-                            <span>SWOLF medio: {formatNumber(lapSummaryStats.avgSwolf)}</span>
-                            <span>FC media: {lapSummaryStats.avgHr ? `${lapSummaryStats.avgHr} bpm` : "—"}</span>
-                          </div>
-
-                          <div className="mt-3 flex flex-col gap-2 text-xs text-muted-foreground">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-medium text-foreground">Tipo:</span>
-                              <Button
-                                size="sm"
-                                variant={lapTypeFilter === "all" ? "neon" : "outline-neon"}
-                                onClick={() => setLapTypeFilter("all")}
-                              >
-                                Tutti
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant={lapTypeFilter === "work" ? "neon" : "outline-neon"}
-                                onClick={() => setLapTypeFilter("work")}
-                              >
-                                Lavoro
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant={lapTypeFilter === "recovery" ? "neon" : "outline-neon"}
-                                onClick={() => setLapTypeFilter("recovery")}
-                              >
-                                Recupero
-                              </Button>
+              <Card className="bg-card border-border xl:col-span-5">
+                <CardHeader>
+                  <CardTitle className="font-display">Lap & Splits</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm">
+                  {!garminDetails ? (
+                    <p className="text-xs text-muted-foreground">
+                      Dettagli Garmin non disponibili. Assicurati di essere connesso a Garmin e
+                      ricarica la pagina.
+                    </p>
+                  ) : (
+                    <Accordion type="multiple" className="space-y-3">
+                      {lapSplits.length > 0 && (
+                        <AccordionItem
+                          value="garmin-laps"
+                          className="rounded-lg border border-border bg-background/60 px-3"
+                        >
+                          <AccordionTrigger className="py-3">
+                            <div className="flex w-full items-center justify-between gap-4">
+                              <span>Lap Garmin</span>
+                              <Badge variant="secondary" className="text-xs">
+                                {filteredLapSplits.length}/{lapSplits.length} lap
+                              </Badge>
                             </div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-medium text-foreground">Stile:</span>
-                              <Button
-                                size="sm"
-                                variant={lapStrokeFilter === "all" ? "neon" : "outline-neon"}
-                                onClick={() => setLapStrokeFilter("all")}
-                              >
-                                Tutti
-                              </Button>
-                              {lapStrokeOptions.map((option) => (
+                          </AccordionTrigger>
+                          <AccordionContent className="px-0 pb-3">
+                            <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 lg:grid-cols-4">
+                              <span>Totale: {formatDistance(lapSummaryStats.distance)}</span>
+                              <span>Tempo: {formatSplitDuration(lapSummaryStats.duration)}</span>
+                              <span>
+                                Pace medio:{" "}
+                                {lapSummaryStats.pace
+                                  ? formatPace(
+                                      lapSummaryStats.pace,
+                                      lapSummaryStats.distance,
+                                      lapSummaryStats.duration
+                                    )
+                                  : "—"}
+                              </span>
+                              <span>SWOLF medio: {formatNumber(lapSummaryStats.avgSwolf)}</span>
+                              <span>FC media: {lapSummaryStats.avgHr ? `${lapSummaryStats.avgHr} bpm` : "—"}</span>
+                            </div>
+
+                            <div className="mt-3 flex flex-col gap-2 text-xs text-muted-foreground">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-medium text-foreground">Tipo:</span>
                                 <Button
-                                  key={option.key}
                                   size="sm"
-                                  variant={lapStrokeFilter === option.key ? "neon" : "outline-neon"}
-                                  onClick={() => setLapStrokeFilter(option.key)}
+                                  variant={lapTypeFilter === "all" ? "neon" : "outline-neon"}
+                                  onClick={() => setLapTypeFilter("all")}
                                 >
-                                  {option.label} ({option.count})
+                                  Tutti
                                 </Button>
-                              ))}
-                            </div>
-                          </div>
-
-                          {filteredLapSplits.length === 0 ? (
-                            <p className="mt-3 text-xs text-muted-foreground">
-                              Nessun lap disponibile con i filtri selezionati.
-                            </p>
-                          ) : (
-                            <Accordion type="multiple" className="mt-3 space-y-2">
-                              {filteredLapSplits.map(renderLapItem)}
-                            </Accordion>
-                          )}
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-
-                    {garminTypedSplits.length > 0 && (
-                      <AccordionItem
-                        value="garmin-typed-splits"
-                        className="rounded-lg border border-border bg-background/60 px-3"
-                      >
-                        <AccordionTrigger className="py-3">Splits per stile</AccordionTrigger>
-                        <AccordionContent className="px-0 pb-3">
-                          {typedSplitsSummaryList.length > 0 && (
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              {typedSplitsSummaryList.map((summary) => (
-                                <div
-                                  key={summary.strokeKey}
-                                  className="rounded-lg border border-border bg-background/80 p-3"
+                                <Button
+                                  size="sm"
+                                  variant={lapTypeFilter === "work" ? "neon" : "outline-neon"}
+                                  onClick={() => setLapTypeFilter("work")}
                                 >
-                                  <div className="flex items-center justify-between">
-                                    <p className="text-sm font-semibold text-foreground">{summary.label}</p>
-                                    <Badge variant="secondary" className="text-xs">
-                                      {summary.laps} vasche
-                                    </Badge>
-                                  </div>
-                                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                                    <span>Distanza: {summary.distance ? formatDistance(summary.distance) : "—"}</span>
-                                    <span>Durata: {summary.duration ? formatDuration(summary.duration) : "—"}</span>
-                                    <span>
-                                      Pace:{" "}
-                                      {summary.pace
-                                        ? formatPace(summary.pace, summary.distance, summary.duration)
-                                        : "—"}
-                                    </span>
-                                    <span>Lap: {summary.laps}</span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          <details className="mt-3 rounded-lg border border-border bg-background/80 p-3">
-                            <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
-                              Dettaglio laps per stile
-                            </summary>
-                            <div className="mt-3 grid gap-3 md:grid-cols-2">
-                              {garminTypedSplits.map(renderSplitCard)}
-                            </div>
-                          </details>
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-
-                    {garminSplitSummaries.length > 0 && (
-                      <AccordionItem
-                        value="garmin-split-summaries"
-                        className="rounded-lg border border-border bg-background/60 px-3"
-                      >
-                        <AccordionTrigger className="py-3">Riepilogo splits</AccordionTrigger>
-                        <AccordionContent className="px-0 pb-3">
-                          <div className="grid gap-3 md:grid-cols-2">
-                            {garminSplitSummaries.map(renderSplitCard)}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
-
-                    {garminPowerZones.length > 0 && (
-                      <AccordionItem
-                        value="garmin-power-zones"
-                        className="rounded-lg border border-border bg-background/60 px-3"
-                      >
-                        <AccordionTrigger className="py-3">Zone potenza</AccordionTrigger>
-                        <AccordionContent className="px-0 pb-3">
-                          {garminPowerZones.map((zone) => {
-                            const total = garminPowerZones.reduce((sum, z) => sum + (z.seconds || 0), 0)
-                            const percent = total ? Math.round((zone.seconds / total) * 100) : 0
-                            return (
-                              <div key={zone.label} className="flex items-center gap-3">
-                                <span className="w-8 text-xs text-muted-foreground">{zone.label}</span>
-                                <div className="h-2 flex-1 rounded-full bg-muted">
-                                  <div className="h-2 rounded-full bg-primary" style={{ width: `${percent}%` }} />
-                                </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {Math.round((zone.seconds || 0) / 60)} min · {percent}%
-                                </span>
+                                  Lavoro
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant={lapTypeFilter === "recovery" ? "neon" : "outline-neon"}
+                                  onClick={() => setLapTypeFilter("recovery")}
+                                >
+                                  Recupero
+                                </Button>
                               </div>
-                            )
-                          })}
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="font-medium text-foreground">Stile:</span>
+                                <Button
+                                  size="sm"
+                                  variant={lapStrokeFilter === "all" ? "neon" : "outline-neon"}
+                                  onClick={() => setLapStrokeFilter("all")}
+                                >
+                                  Tutti
+                                </Button>
+                                {lapStrokeOptions.map((option) => (
+                                  <Button
+                                    key={option.key}
+                                    size="sm"
+                                    variant={lapStrokeFilter === option.key ? "neon" : "outline-neon"}
+                                    onClick={() => setLapStrokeFilter(option.key)}
+                                  >
+                                    {option.label} ({option.count})
+                                  </Button>
+                                ))}
+                              </div>
+                            </div>
 
-                    {garminExerciseSets.length > 0 && (
-                      <AccordionItem
-                        value="garmin-exercise-sets"
-                        className="rounded-lg border border-border bg-background/60 px-3"
-                      >
-                        <AccordionTrigger className="py-3">Exercise sets</AccordionTrigger>
-                        <AccordionContent className="px-0 pb-3">
-                          <div className="grid gap-3 md:grid-cols-2">
-                            {garminExerciseSets.map(renderExerciseSet)}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    )}
+                            {filteredLapSplits.length === 0 ? (
+                              <p className="mt-3 text-xs text-muted-foreground">
+                                Nessun lap disponibile con i filtri selezionati.
+                              </p>
+                            ) : (
+                              <Accordion type="multiple" className="mt-3 space-y-2">
+                                {filteredLapSplits.map(renderLapItem)}
+                              </Accordion>
+                            )}
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
 
-                  </Accordion>
-                )}
-              </CardContent>
-            </Card>
+                      {garminTypedSplits.length > 0 && (
+                        <AccordionItem
+                          value="garmin-typed-splits"
+                          className="rounded-lg border border-border bg-background/60 px-3"
+                        >
+                          <AccordionTrigger className="py-3">Splits per stile</AccordionTrigger>
+                          <AccordionContent className="px-0 pb-3">
+                            {typedSplitsSummaryList.length > 0 && (
+                              <div className="grid gap-3 sm:grid-cols-2">
+                                {typedSplitsSummaryList.map((summary) => (
+                                  <div
+                                    key={summary.strokeKey}
+                                    className="rounded-lg border border-border bg-background/80 p-3"
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <p className="text-sm font-semibold text-foreground">{summary.label}</p>
+                                      <Badge variant="secondary" className="text-xs">
+                                        {summary.laps} vasche
+                                      </Badge>
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                      <span>Distanza: {summary.distance ? formatDistance(summary.distance) : "—"}</span>
+                                      <span>Durata: {summary.duration ? formatDuration(summary.duration) : "—"}</span>
+                                      <span>
+                                        Pace:{" "}
+                                        {summary.pace
+                                          ? formatPace(summary.pace, summary.distance, summary.duration)
+                                          : "—"}
+                                      </span>
+                                      <span>Lap: {summary.laps}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <details className="mt-3 rounded-lg border border-border bg-background/80 p-3">
+                              <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+                                Dettaglio laps per stile
+                              </summary>
+                              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                {garminTypedSplits.map(renderSplitCard)}
+                              </div>
+                            </details>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
+
+                      {garminSplitSummaries.length > 0 && (
+                        <AccordionItem
+                          value="garmin-split-summaries"
+                          className="rounded-lg border border-border bg-background/60 px-3"
+                        >
+                          <AccordionTrigger className="py-3">Riepilogo splits</AccordionTrigger>
+                          <AccordionContent className="px-0 pb-3">
+                            <div className="grid gap-3 md:grid-cols-2">
+                              {garminSplitSummaries.map(renderSplitCard)}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
+
+                      {garminPowerZones.length > 0 && (
+                        <AccordionItem
+                          value="garmin-power-zones"
+                          className="rounded-lg border border-border bg-background/60 px-3"
+                        >
+                          <AccordionTrigger className="py-3">Zone potenza</AccordionTrigger>
+                          <AccordionContent className="px-0 pb-3">
+                            {garminPowerZones.map((zone) => {
+                              const total = garminPowerZones.reduce((sum, z) => sum + (z.seconds || 0), 0)
+                              const percent = total ? Math.round((zone.seconds / total) * 100) : 0
+                              return (
+                                <div key={zone.label} className="flex items-center gap-3">
+                                  <span className="w-8 text-xs text-muted-foreground">{zone.label}</span>
+                                  <div className="h-2 flex-1 rounded-full bg-muted">
+                                    <div className="h-2 rounded-full bg-primary" style={{ width: `${percent}%` }} />
+                                  </div>
+                                  <span className="text-xs text-muted-foreground">
+                                    {Math.round((zone.seconds || 0) / 60)} min · {percent}%
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
+
+                      {garminExerciseSets.length > 0 && (
+                        <AccordionItem
+                          value="garmin-exercise-sets"
+                          className="rounded-lg border border-border bg-background/60 px-3"
+                        >
+                          <AccordionTrigger className="py-3">Exercise sets</AccordionTrigger>
+                          <AccordionContent className="px-0 pb-3">
+                            <div className="grid gap-3 md:grid-cols-2">
+                              {garminExerciseSets.map(renderExerciseSet)}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )}
+
+                    </Accordion>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </>
         )}
       </div>

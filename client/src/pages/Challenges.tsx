@@ -197,7 +197,7 @@ export default function Challenges() {
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-display font-bold text-foreground">Sfide</h1>
+            <h1 className="text-3xl font-display font-bold neon-gradient-text">Sfide</h1>
             <p className="text-muted-foreground">Ghost Track e sfide classiche in un unico hub.</p>
           </div>
         </div>

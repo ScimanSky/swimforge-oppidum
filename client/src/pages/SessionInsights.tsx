@@ -177,7 +177,7 @@ export default function SessionInsights() {
                 </Button>
               </Link>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold text-foreground">Session IQ</h1>
+                <h1 className="text-2xl font-bold neon-gradient-text">Session IQ</h1>
                 <Badge variant="neon" className="text-xs">
                   Premium (free)
                 </Badge>
@@ -190,7 +190,7 @@ export default function SessionInsights() {
 
           <div className="grid lg:grid-cols-12 gap-6">
             <div className="lg:col-span-4 space-y-4">
-              <Card className="bg-card border-border">
+              <Card className="bg-card border-border glass-panel">
                 <CardContent className="p-5">
                 <div className="flex items-center gap-2 text-primary text-xs uppercase tracking-wider mb-3">
                   <Sparkles className="h-4 w-4" />
@@ -210,7 +210,7 @@ export default function SessionInsights() {
 
             <div className="lg:col-span-8 space-y-4">
               {sessionEntries.length === 0 && (
-                <Card className="bg-card border-border">
+                <Card className="bg-card border-border glass-panel">
                   <CardContent className="p-6 text-muted-foreground">
                     Nessuna analisi disponibile. Sincronizza nuove attività per generare insight.
                   </CardContent>
