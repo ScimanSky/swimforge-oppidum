@@ -273,6 +273,11 @@ export default function Goals() {
     toast.success("Obiettivo creato")
   }
 
+  const removeCustomGoal = (id: string) => {
+    setCustomGoals((prev) => prev.filter((goal) => goal.id !== id))
+    toast.success("Obiettivo eliminato")
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6">
@@ -389,6 +394,7 @@ export default function Goals() {
           {allActiveGoals.map((goal) => {
             const Icon = categoryIcons[goal.category] || Target
             const colorClass = categoryColors[goal.category] || "text-primary bg-primary/10"
+            const isCustom = customGoals.some((item) => item.id === goal.id)
             return (
               <Card key={goal.id} className="bg-card border-border">
                 <CardContent className="p-6">
@@ -457,9 +463,20 @@ export default function Goals() {
                       <Button variant="outline" size="icon" disabled>
                         <Edit className="w-4 h-4" />
                       </Button>
-                      <Button variant="outline" size="icon" disabled>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      {isCustom ? (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => removeCustomGoal(goal.id)}
+                          aria-label="Elimina obiettivo"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      ) : (
+                        <Button variant="outline" size="icon" disabled>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardContent>
