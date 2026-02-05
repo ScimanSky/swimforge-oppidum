@@ -1,7 +1,7 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -223,8 +223,8 @@ export default function Goals() {
   }, [weeklyDistanceMeters, swolfAvg, weeklySessions])
 
   const allActiveGoals = useMemo(() => {
-    return [...activeGoals, ...customGoals]
-  }, [activeGoals, customGoals])
+    return [...customGoals]
+  }, [customGoals])
 
   const addSuggestedGoal = (goal: any) => {
     const id = `${goal.category}-${goal.title}`.toLowerCase().replace(/\s+/g, "-")
@@ -277,6 +277,23 @@ export default function Goals() {
     setCustomGoals((prev) => prev.filter((goal) => goal.id !== id))
     toast.success("Obiettivo eliminato")
   }
+
+  useEffect(() => {
+    const stored = localStorage.getItem("swimforge:customGoals")
+    if (!stored) return
+    try {
+      const parsed = JSON.parse(stored)
+      if (Array.isArray(parsed)) {
+        setCustomGoals(parsed)
+      }
+    } catch {
+      // ignore invalid storage
+    }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem("swimforge:customGoals", JSON.stringify(customGoals))
+  }, [customGoals])
 
   return (
     <AppLayout>
@@ -391,98 +408,106 @@ export default function Goals() {
 
         {/* Active Goals */}
         <div className="grid gap-6">
-          {allActiveGoals.map((goal) => {
-            const Icon = categoryIcons[goal.category] || Target
-            const colorClass = categoryColors[goal.category] || "text-primary bg-primary/10"
-            const isCustom = customGoals.some((item) => item.id === goal.id)
-            return (
-              <Card key={goal.id} className="bg-card border-border">
-                <CardContent className="p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${colorClass}`}>
-                            <Icon className="w-5 h-5" />
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-display font-bold text-foreground">
-                              {goal.title}
-                            </h3>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge variant="secondary" className="text-xs">
-                                {goal.category}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">{goal.deadline}</span>
+          {allActiveGoals.length === 0 ? (
+            <Card className="bg-card border-border">
+              <CardContent className="p-6 text-sm text-muted-foreground">
+                Nessun obiettivo creato. Usa “Crea obiettivo” o aggiungi un suggerimento.
+              </CardContent>
+            </Card>
+          ) : (
+            allActiveGoals.map((goal) => {
+              const Icon = categoryIcons[goal.category] || Target
+              const colorClass = categoryColors[goal.category] || "text-primary bg-primary/10"
+              const isCustom = customGoals.some((item) => item.id === goal.id)
+              return (
+                <Card key={goal.id} className="bg-card border-border">
+                  <CardContent className="p-6">
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-lg ${colorClass}`}>
+                              <Icon className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-display font-bold text-foreground">
+                                {goal.title}
+                              </h3>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge variant="secondary" className="text-xs">
+                                  {goal.category}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">{goal.deadline}</span>
+                              </div>
                             </div>
                           </div>
+                          <Badge
+                            className={
+                              goal.status === "on-track"
+                                ? "bg-primary/20 text-primary"
+                                : "bg-chart-5/20 text-chart-5"
+                            }
+                          >
+                            {goal.status === "on-track" ? "On Track" : "Behind"}
+                          </Badge>
                         </div>
-                        <Badge
-                          className={
-                            goal.status === "on-track"
-                              ? "bg-primary/20 text-primary"
-                              : "bg-chart-5/20 text-chart-5"
-                          }
-                        >
-                          {goal.status === "on-track" ? "On Track" : "Behind"}
-                        </Badge>
-                      </div>
 
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-muted-foreground">Progress</span>
-                          <span className="text-sm font-medium text-foreground">
-                            {goal.currentValue} / {goal.targetValue} {goal.unit}
-                          </span>
-                        </div>
-                        <Progress value={goal.progress} className="h-2" />
-                      </div>
-
-                      {goal.milestones.length > 0 && (
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-foreground mb-2">Milestones</h4>
-                          <div className="grid sm:grid-cols-2 gap-2">
-                            {goal.milestones.map((milestone, index) => (
-                              <div key={index} className="flex items-center gap-2">
-                                {milestone.completed ? (
-                                  <CheckCircle2 className="w-4 h-4 text-primary" />
-                                ) : (
-                                  <Circle className="w-4 h-4 text-muted-foreground" />
-                                )}
-                                <span className="text-sm text-muted-foreground">
-                                  {milestone.title}
-                                </span>
-                              </div>
-                            ))}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Progress</span>
+                            <span className="text-sm font-medium text-foreground">
+                              {goal.currentValue} / {goal.targetValue} {goal.unit}
+                            </span>
                           </div>
+                          <Progress value={goal.progress} className="h-2" />
                         </div>
-                      )}
-                    </div>
 
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="icon" disabled>
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      {isCustom ? (
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => removeCustomGoal(goal.id)}
-                          aria-label="Elimina obiettivo"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      ) : (
+                        {goal.milestones.length > 0 && (
+                          <div className="mt-4">
+                            <h4 className="text-sm font-medium text-foreground mb-2">Milestones</h4>
+                            <div className="grid sm:grid-cols-2 gap-2">
+                              {goal.milestones.map((milestone, index) => (
+                                <div key={index} className="flex items-center gap-2">
+                                  {milestone.completed ? (
+                                    <CheckCircle2 className="w-4 h-4 text-primary" />
+                                  ) : (
+                                    <Circle className="w-4 h-4 text-muted-foreground" />
+                                  )}
+                                  <span className="text-sm text-muted-foreground">
+                                    {milestone.title}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2">
                         <Button variant="outline" size="icon" disabled>
-                          <Trash2 className="w-4 h-4" />
+                          <Edit className="w-4 h-4" />
                         </Button>
-                      )}
+                        {isCustom ? (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => removeCustomGoal(goal.id)}
+                            aria-label="Elimina obiettivo"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        ) : (
+                          <Button variant="outline" size="icon" disabled>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
+                  </CardContent>
+                </Card>
+              )
+            })
+          )}
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
