@@ -12,8 +12,8 @@ export const redis = createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
   socket: {
     reconnectStrategy: (retries) => {
-      if (retries > 50) return false; // stop reconnecting after 50 attempts
-      return Math.min(retries * 200, 5000); // max 5s delay
+      if (retries > 20) return false; // Stop reconnecting after 20 attempts
+      return Math.min(retries * 100, 3000);
     },
   },
 });

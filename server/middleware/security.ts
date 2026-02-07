@@ -170,55 +170,6 @@ export const helmetConfig = {
 // ============================================================================
 
 /**
- * Middleware per loggare richieste sospette
- * 
- * Detecta pattern sospetti in richieste non-API (evita falsi positivi su tRPC).
- */
-export function suspiciousRequestLogger(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  // Skip tRPC and known API paths to avoid false positives
-  if (req.path.startsWith('/api/trpc') || req.path.startsWith('/health') || req.path.startsWith('/status')) {
-    return next();
-  }
-
-  const suspiciousPatterns = [
-    /(\bunion\b.*\bselect\b)/i,
-    /(\bdrop\b.*\btable\b)/i,
-    /(\bdelete\b.*\bfrom\b)/i,
-    /(--|;).*(\bdrop\b|\bdelete\b|\binsert\b|\bupdate\b)/i,
-    /('.*\bor\b.*'.*=.*')/i,
-    /<script\b/i,
-  ];
-
-  const fullUrl = req.originalUrl || req.url;
-  // Handle both string and object bodies; skip large bodies to avoid performance overhead
-  let body = '';
-  if (typeof req.body === 'string') {
-    body = req.body.length <= 10000 ? req.body : '';
-  } else if (req.body) {
-    try { body = JSON.stringify(req.body).slice(0, 10000); } catch { body = ''; }
-  }
-
-  const isSuspicious = suspiciousPatterns.some(
-    (pattern) => pattern.test(fullUrl) || pattern.test(body)
-  );
-
-  if (isSuspicious) {
-    console.warn('[SECURITY] Suspicious request detected', {
-      ip: req.ip,
-      method: req.method,
-      path: req.path,
-      userAgent: req.headers['user-agent'],
-    });
-  }
-
-  next();
-}
-
-/**
  * Middleware per validare user agent
  */
 export function userAgentValidation(
@@ -276,7 +227,6 @@ export function applySecurityMiddleware() {
   return [
     helmet(helmetConfig as any),
     cors(corsOptions),
-    suspiciousRequestLogger,
     userAgentValidation,
   ];
 }
@@ -300,7 +250,6 @@ export default {
   aiCoachLimiter,
   corsOptions,
   helmetConfig,
-  suspiciousRequestLogger,
   userAgentValidation,
   payloadSizeLimit,
   applySecurityMiddleware,

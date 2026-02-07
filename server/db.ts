@@ -25,7 +25,7 @@ export async function getDb() {
       _pool = new Pool({
         connectionString: process.env.DATABASE_URL,
         ssl: { rejectUnauthorized: false },
-        max: 5,
+        max: 10,
         min: 1,
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 10000,
