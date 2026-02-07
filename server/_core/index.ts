@@ -15,7 +15,7 @@ import { assertAuthEnv } from "./env";
 
 // Security middleware
 import { requestLogger, errorHandler } from "../middleware/logger";
-import { applySecurityMiddleware, applyRateLimiting, loginLimiter } from "../middleware/security";
+import { applySecurityMiddleware, applyRateLimiting } from "../middleware/security";
 import { rollbar, captureError } from "../middleware/rollbar-init";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -53,6 +53,11 @@ async function startServer() {
 
   // Give Redis a moment to connect in background
   await new Promise(resolve => setTimeout(resolve, 500));
+
+  // Health check endpoint (before rate limiting)
+  app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', uptime: process.uptime() });
+  });
 
   // Apply security middleware (CORS, headers, etc.)
   app.use(...applySecurityMiddleware());
@@ -135,18 +140,7 @@ async function startServer() {
     serveStatic(app);
   }
 
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
-
-  if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
-  }
-
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
-  });
-
-  // Error handling middleware (must be last)
+  // Error handling middleware (must be after routes but before server.listen)
   app.use(errorHandler);
 
   // Rollbar error handler (must be after other error handlers)
@@ -158,6 +152,17 @@ async function startServer() {
     });
     // Don't send error details to client
     res.status(500).json({ error: "Internal Server Error" });
+  });
+
+  const preferredPort = parseInt(process.env.PORT || "3000");
+  const port = await findAvailablePort(preferredPort);
+
+  if (port !== preferredPort) {
+    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+  }
+
+  server.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}/`);
   });
 
   // Cron moved to external scheduler via /api/cron/complete-challenges

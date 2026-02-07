@@ -11,30 +11,11 @@ import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 import helmet from 'helmet';
 import { Request, Response, NextFunction } from 'express';
+import { createRedisStore } from '../lib/redis-rate-limit-store';
 
 // ============================================================================
 // RATE LIMITING - SEMPLIFICATO
 // ============================================================================
-
-/**
- * Store in memoria per rate limiting
- * In produzione, usa Redis per distribuito
- */
-const store = new Map<string, { count: number; resetTime: number }>();
-
-/**
- * Helper per ottenere chiave di rate limiting
- */
-function getRateLimitKey(req: any): string {
-  // Usa user ID se disponibile, altrimenti IP
-  if (req.user?.id) {
-    return `user:${req.user.id}`;
-  }
-  
-  // Fallback a IP (supporta IPv4 e IPv6)
-  const ip = req.ip || req.connection?.remoteAddress || 'unknown';
-  return `ip:${ip}`;
-}
 
 /**
  * Rate limiter per endpoint di login
@@ -51,6 +32,7 @@ export const loginLimiter = rateLimit({
   skip: (req: any) => {
     return req.ip === process.env.ADMIN_IP;
   },
+  store: createRedisStore({ prefix: 'rl:login:', windowMs: 15 * 60 * 1000 }),
 });
 
 /**
@@ -65,6 +47,7 @@ export const registrationLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createRedisStore({ prefix: 'rl:registration:', windowMs: 60 * 60 * 1000 }),
 });
 
 /**
@@ -82,6 +65,7 @@ export const apiLimiter = rateLimit({
   skip: (req: any) => {
     return req.path === '/health' || req.path === '/status';
   },
+  store: createRedisStore({ prefix: 'rl:api:', windowMs: 1 * 60 * 1000 }),
 });
 
 /**
@@ -96,6 +80,7 @@ export const garminSyncLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createRedisStore({ prefix: 'rl:garmin:', windowMs: 5 * 60 * 1000 }),
 });
 
 /**
@@ -110,6 +95,7 @@ export const aiCoachLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createRedisStore({ prefix: 'rl:ai:', windowMs: 60 * 60 * 1000 }),
 });
 
 // ============================================================================
@@ -260,8 +246,6 @@ export function applySecurityMiddleware() {
     helmet(helmetConfig as any),
     cors(corsOptions),
     userAgentValidation,
-    suspiciousRequestLogger,
-    payloadSizeLimit,
   ];
 }
 

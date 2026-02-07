@@ -11,7 +11,10 @@ import { logger } from '../middleware/logger';
 export const redis = createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
   socket: {
-    reconnectStrategy: (retries) => Math.min(retries * 50, 500),
+    reconnectStrategy: (retries) => {
+      if (retries > 50) return false; // stop reconnecting after 50 attempts
+      return Math.min(retries * 200, 5000); // max 5s delay
+    },
   },
 });
 
@@ -74,7 +77,9 @@ export async function getCached<T>(key: string): Promise<T | null> {
       event: 'cache:hit',
     });
 
-    return JSON.parse(cached) as T;
+    // Redis get returns string | Buffer, convert to string
+    const cachedStr = typeof cached === 'string' ? cached : cached.toString();
+    return JSON.parse(cachedStr) as T;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`Cache get failed for key ${key}: ${message}`, {
@@ -173,10 +178,23 @@ export async function getOrSetCached<T>(
 export async function invalidateCachePattern(pattern: string): Promise<void> {
   try {
     if (!redis.isOpen) return; // Redis not connected
-    const keys = await redis.keys(pattern);
-    if (keys.length > 0) {
-      await redis.del(keys);
-      logger.debug(`Cache invalidate pattern: ${pattern} (${keys.length} keys)`, {
+    const keysToDelete: string[] = [];
+    
+    // Use SCAN instead of KEYS to avoid blocking Redis on Upstash
+    for await (const key of redis.scanIterator({ MATCH: pattern, COUNT: 100 })) {
+      // scanIterator returns string | Buffer, convert to string
+      const keyStr = typeof key === 'string' ? key : key.toString();
+      keysToDelete.push(keyStr);
+    }
+    
+    if (keysToDelete.length > 0) {
+      // Handle single key and multiple keys differently to avoid type assertion issues
+      if (keysToDelete.length === 1) {
+        await redis.del(keysToDelete[0]);
+      } else {
+        await redis.del(keysToDelete as [string, ...string[]]);
+      }
+      logger.debug(`Cache invalidate pattern: ${pattern} (${keysToDelete.length} keys)`, {
         event: 'cache:invalidate_pattern',
       });
     }
@@ -211,7 +229,7 @@ export async function invalidateUserCache(userId: string): Promise<void> {
     cacheKeys.userStats(userId),
     cacheKeys.userProfile(userId),
     cacheKeys.badges(userId),
-    `user:activities:${userId}:*`,
+    // REMOVED: `user:activities:${userId}:*` — DEL doesn't support wildcards
   ];
 
   await deleteMultipleCached(keys);
