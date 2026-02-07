@@ -18,26 +18,6 @@ import { createRedisStore } from '../lib/redis-rate-limit-store';
 // ============================================================================
 
 /**
- * Store in memoria per rate limiting
- * In produzione, usa Redis per distribuito
- */
-const store = new Map<string, { count: number; resetTime: number }>();
-
-/**
- * Helper per ottenere chiave di rate limiting
- */
-function getRateLimitKey(req: any): string {
-  // Usa user ID se disponibile, altrimenti IP
-  if (req.user?.id) {
-    return `user:${req.user.id}`;
-  }
-  
-  // Fallback a IP (supporta IPv4 e IPv6)
-  const ip = req.ip || req.connection?.remoteAddress || 'unknown';
-  return `ip:${ip}`;
-}
-
-/**
  * Rate limiter per endpoint di login
  */
 export const loginLimiter = rateLimit({

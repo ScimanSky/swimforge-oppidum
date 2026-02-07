@@ -15,7 +15,7 @@ import { assertAuthEnv } from "./env";
 
 // Security middleware
 import { requestLogger, errorHandler } from "../middleware/logger";
-import { applySecurityMiddleware, applyRateLimiting, loginLimiter } from "../middleware/security";
+import { applySecurityMiddleware, applyRateLimiting } from "../middleware/security";
 import { rollbar, captureError } from "../middleware/rollbar-init";
 
 function isPortAvailable(port: number): Promise<boolean> {

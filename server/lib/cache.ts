@@ -11,7 +11,10 @@ import { logger } from '../middleware/logger';
 export const redis = createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
   socket: {
-    reconnectStrategy: (retries) => Math.min(retries * 50, 500),
+    reconnectStrategy: (retries) => {
+      if (retries > 50) return false; // stop reconnecting after 50 attempts
+      return Math.min(retries * 200, 5000); // max 5s delay
+    },
   },
 });
 
