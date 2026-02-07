@@ -138,7 +138,7 @@ export const helmetConfig = {
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'],
+      scriptSrc: ["'self'", 'cdn.jsdelivr.net'],
       styleSrc: ["'self'", "'unsafe-inline'", 'fonts.googleapis.com'],
       fontSrc: ["'self'", 'fonts.gstatic.com'],
       imgSrc: ["'self'", 'data:', 'https:'],
@@ -147,11 +147,9 @@ export const helmetConfig = {
         'api.garmin.com',
         'api.strava.com',
         'https://sentry.io',
-        'https://wpnxaadvyxmhlcgdobla.supabase.co', // Supabase Auth
-        'https://*.supabase.co', // Supabase wildcard
-        'https://api.manus.im', // Manus OAuth
-        'https://oauth.manus.im', // Manus OAuth Portal
-      ],
+        process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wpnxaadvyxmhlcgdobla.supabase.co',
+        'https://*.supabase.co',
+      ].filter(Boolean),
       frameSrc: ["'none'"],
       objectSrc: ["'none'"],
     },
@@ -174,16 +172,44 @@ export const helmetConfig = {
 /**
  * Middleware per loggare richieste sospette
  * 
- * DISABILITATO: Troppi falsi positivi su richieste tRPC batch e API valide.
- * Implementare un pattern più sofisticato in futuro.
+ * Detecta pattern sospetti in richieste non-API (evita falsi positivi su tRPC).
  */
 export function suspiciousRequestLogger(
   req: Request,
   res: Response,
   next: NextFunction
 ) {
-  // Disabilitato temporaneamente - troppi falsi positivi
-  // TODO: Implementare pattern più accurato per SQL injection detection
+  // Skip tRPC and known API paths to avoid false positives
+  if (req.path.startsWith('/api/trpc') || req.path.startsWith('/health') || req.path.startsWith('/status')) {
+    return next();
+  }
+
+  const suspiciousPatterns = [
+    /(\bunion\b.*\bselect\b)/i,
+    /(\bdrop\b.*\btable\b)/i,
+    /(\bdelete\b.*\bfrom\b)/i,
+    /(--|;).*(\bdrop\b|\bdelete\b|\binsert\b|\bupdate\b)/i,
+    /('.*\bor\b.*'.*=.*')/i,
+    /<script\b/i,
+  ];
+
+  const fullUrl = req.originalUrl || req.url;
+  // Handle both string and object bodies
+  const body = typeof req.body === 'string' ? req.body : (req.body ? JSON.stringify(req.body) : '');
+
+  const isSuspicious = suspiciousPatterns.some(
+    (pattern) => pattern.test(fullUrl) || pattern.test(body)
+  );
+
+  if (isSuspicious) {
+    console.warn('[SECURITY] Suspicious request detected', {
+      ip: req.ip,
+      method: req.method,
+      path: req.path,
+      userAgent: req.headers['user-agent'],
+    });
+  }
+
   next();
 }
 
@@ -245,6 +271,7 @@ export function applySecurityMiddleware() {
   return [
     helmet(helmetConfig as any),
     cors(corsOptions),
+    suspiciousRequestLogger,
     userAgentValidation,
   ];
 }
