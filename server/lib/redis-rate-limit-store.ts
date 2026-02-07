@@ -31,27 +31,21 @@ export class RedisRateLimitStore implements Store {
     
     try {
       if (!redis.isOpen) {
-        // Fallback to in-memory behavior - no persistent storage
         logger.debug('Redis not connected, rate limit not persisted', {
           event: 'rate-limit:redis_unavailable',
         });
         return { totalHits: 1, resetTime: undefined };
       }
 
-      const multi = redis.multi();
-      multi.incr(redisKey);
-      multi.pExpire(redisKey, this.windowMs);
-      multi.pTtl(redisKey);
-
-      const results = await multi.exec();
+      // Use individual commands instead of multi() — pTtl is not available in multi
+      const totalHits = await redis.incr(redisKey);
       
-      if (!results || results.length < 3) {
-        throw new Error('Redis multi command failed');
+      // Only set expiry on first increment (when totalHits is 1)
+      if (totalHits === 1) {
+        await redis.pExpire(redisKey, this.windowMs);
       }
-
-      const totalHits = Number(results[0]) || 1;
-      const ttl = Number(results[2]) || -1;
-
+      
+      const ttl = await redis.pTTL(redisKey);
       const resetTime = ttl > 0 ? new Date(Date.now() + ttl) : undefined;
 
       return { totalHits, resetTime };
@@ -60,7 +54,6 @@ export class RedisRateLimitStore implements Store {
       logger.error(`Rate limit increment failed: ${message}`, {
         event: 'rate-limit:increment_failed',
       });
-      // Fallback: return permissive value to not block users on Redis errors
       return { totalHits: 1, resetTime: undefined };
     }
   }
@@ -111,7 +104,7 @@ export class RedisRateLimitStore implements Store {
       if (!value) return undefined;
       
       const valueStr = typeof value === 'string' ? value : value.toString();
-      const ttl = await redis.pTtl(redisKey);
+      const ttl = await redis.pTTL(redisKey);
       const ttlNum = typeof ttl === 'number' ? ttl : -1;
       const resetTime = ttlNum > 0 ? new Date(Date.now() + ttlNum) : undefined;
       
