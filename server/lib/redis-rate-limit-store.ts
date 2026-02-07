@@ -9,6 +9,9 @@ import type { Store, IncrementResponse } from 'express-rate-limit';
 import { redis } from './cache';
 import { logger } from '../middleware/logger';
 
+// Cleanup expired local store entries at most once per minute to avoid performance overhead
+const LOCAL_STORE_CLEANUP_INTERVAL_MS = 60000;
+
 export class RedisRateLimitStore implements Store {
   prefix: string;
   resetExpiryOnChange: boolean;
@@ -16,7 +19,6 @@ export class RedisRateLimitStore implements Store {
   localKeys: boolean;
   private localStore: Map<string, { count: number; resetTime: number }> = new Map();
   private lastCleanup: number = Date.now();
-  private cleanupInterval: number = 60000; // Clean up every 60 seconds
 
   constructor(options: { prefix?: string; windowMs: number; resetExpiryOnChange?: boolean }) {
     this.prefix = options.prefix || 'rl:';
@@ -46,7 +48,7 @@ export class RedisRateLimitStore implements Store {
   private cleanExpiredLocal(): void {
     const now = Date.now();
     // Only clean up periodically to avoid performance issues on high traffic
-    if (now - this.lastCleanup < this.cleanupInterval) {
+    if (now - this.lastCleanup < LOCAL_STORE_CLEANUP_INTERVAL_MS) {
       return;
     }
     
