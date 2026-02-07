@@ -129,3 +129,4 @@ assets/pdf-social/
 
 # Local-only PDFs
 assets/pdf-social/
+package-lock.json
