@@ -210,6 +210,11 @@ const toNumber = (value: any) => {
   return Number.isFinite(num) ? num : null;
 };
 
+const toInt = (value: any) => {
+  const num = toNumber(value);
+  return num !== null ? Math.round(num) : null;
+};
+
 const pickFirst = (obj: any, keys: string[]) => {
   if (!obj) return null;
   for (const key of keys) {
@@ -285,7 +290,7 @@ const normalizeHrZones = (zones: any) => {
         pickFirst(zone, ["secsInZone", "seconds", "timeInSeconds", "value"])
       ) ?? 0;
       if (zoneNum && zoneNum >= 1 && zoneNum <= 5) {
-        map[`hrZone${zoneNum}Seconds`] = seconds;
+        map[`hrZone${zoneNum}Seconds`] = Math.round(seconds);
       }
     });
   } else if (typeof zones === "object") {
@@ -297,7 +302,7 @@ const normalizeHrZones = (zones: any) => {
       zones.zone5TimeInSeconds ?? zones.zone5 ?? zones.zone5Seconds,
     ];
     zoneValues.forEach((value, index) => {
-      map[`hrZone${index + 1}Seconds`] = toNumber(value) ?? 0;
+      map[`hrZone${index + 1}Seconds`] = Math.round(toNumber(value) ?? 0);
     });
   }
 
@@ -408,22 +413,22 @@ export async function persistGarminLapDetails(
 
     return {
       activityId,
-      lapIndex: toNumber(lap?.lapIndex) ?? index + 1,
-      distanceMeters: toNumber(lap?.distance),
+      lapIndex: toInt(lap?.lapIndex) ?? index + 1,
+      distanceMeters: toInt(lap?.distance),
       durationSeconds: toNumber(lap?.duration),
       movingDurationSeconds: toNumber(lap?.movingDuration),
       elapsedDurationSeconds: toNumber(lap?.elapsedDuration),
       averageSpeedMps: toNumber(lap?.averageSpeed),
       maxSpeedMps: toNumber(lap?.maxSpeed),
       averageMovingSpeedMps: toNumber(lap?.averageMovingSpeed),
-      averageSwolf: toNumber(lap?.averageSWOLF ?? lap?.averageSwolf),
+      averageSwolf: toInt(lap?.averageSWOLF ?? lap?.averageSwolf),
       averageStrokes: toNumber(lap?.averageStrokes ?? lap?.avgStrokes),
-      totalNumberOfStrokes: toNumber(lap?.totalNumberOfStrokes),
-      averageSwimCadence: toNumber(lap?.averageSwimCadence),
-      calories: toNumber(lap?.calories),
-      avgHeartRate: toNumber(lap?.averageHR ?? lap?.avgHeartRate),
-      maxHeartRate: toNumber(lap?.maxHR ?? lap?.maxHeartRate),
-      numberOfActiveLengths: toNumber(lap?.numberOfActiveLengths),
+      totalNumberOfStrokes: toInt(lap?.totalNumberOfStrokes),
+      averageSwimCadence: toInt(lap?.averageSwimCadence),
+      calories: toInt(lap?.calories),
+      avgHeartRate: toInt(lap?.averageHR ?? lap?.avgHeartRate),
+      maxHeartRate: toInt(lap?.maxHR ?? lap?.maxHeartRate),
+      numberOfActiveLengths: toInt(lap?.numberOfActiveLengths),
       strokeType: dominantStroke,
       startTimeGmt: toTimestamp(lap?.startTimeGMT),
     };
@@ -458,7 +463,7 @@ export async function persistGarminLapDetails(
   }> = [];
 
   lapDtos.forEach((lap: any, index: number) => {
-    const lapIndex = toNumber(lap?.lapIndex) ?? index + 1;
+    const lapIndex = toInt(lap?.lapIndex) ?? index + 1;
     const lapId = lapIdByIndex.get(lapIndex);
     if (!lapId) return;
 
@@ -470,15 +475,15 @@ export async function persistGarminLapDetails(
       lengthRecords.push({
         activityId,
         lapId,
-        lengthIndex: toNumber(length?.lengthIndex) ?? lengthIndex + 1,
-        distanceMeters: toNumber(length?.distance),
+        lengthIndex: toInt(length?.lengthIndex) ?? lengthIndex + 1,
+        distanceMeters: toInt(length?.distance),
         durationSeconds: toNumber(length?.duration),
         averageSpeedMps: toNumber(length?.averageSpeed),
         maxSpeedMps: toNumber(length?.maxSpeed),
-        averageSwolf: toNumber(length?.averageSWOLF ?? length?.averageSwolf),
-        totalNumberOfStrokes: toNumber(length?.totalNumberOfStrokes),
-        avgHeartRate: toNumber(length?.averageHR ?? length?.avgHeartRate),
-        maxHeartRate: toNumber(length?.maxHR ?? length?.maxHeartRate),
+        averageSwolf: toInt(length?.averageSWOLF ?? length?.averageSwolf),
+        totalNumberOfStrokes: toInt(length?.totalNumberOfStrokes),
+        avgHeartRate: toInt(length?.averageHR ?? length?.avgHeartRate),
+        maxHeartRate: toInt(length?.maxHR ?? length?.maxHeartRate),
         strokeType: strokeKey,
         startTimeGmt: toTimestamp(length?.startTimeGMT),
       });
@@ -898,20 +903,25 @@ export async function syncGarminActivities(
         updates[key] = value;
       };
 
-      setIfDefined("avgSwolf", advanced.avgSwolf);
+      const setIfDefinedInt = (key: string, value: any) => {
+        if (value === null || value === undefined) return;
+        updates[key] = Math.round(value);
+      };
+
+      setIfDefinedInt("avgSwolf", advanced.avgSwolf);
       setIfDefined("avgStrokeDistance", advanced.avgStrokeDistance);
-      setIfDefined("avgStrokes", advanced.avgStrokes);
-      setIfDefined("avgStrokeCadence", advanced.avgStrokeCadence);
-      setIfDefined("trainingEffect", advanced.trainingEffect);
-      setIfDefined("anaerobicTrainingEffect", advanced.anaerobicTrainingEffect);
-      setIfDefined("vo2MaxValue", advanced.vo2MaxValue);
-      setIfDefined("recoveryTimeHours", advanced.recoveryTimeHours);
-      setIfDefined("avgStress", advanced.avgStress);
-      setIfDefined("avgHeartRate", advanced.avgHeartRate);
-      setIfDefined("maxHeartRate", advanced.maxHeartRate);
-      setIfDefined("restingHeartRate", advanced.restingHeartRate);
-      setIfDefined("lapsCount", advanced.lapsCount);
-      setIfDefined("poolLengthMeters", advanced.poolLengthMeters);
+      setIfDefinedInt("avgStrokes", advanced.avgStrokes);
+      setIfDefinedInt("avgStrokeCadence", advanced.avgStrokeCadence);
+      setIfDefinedInt("trainingEffect", advanced.trainingEffect);
+      setIfDefinedInt("anaerobicTrainingEffect", advanced.anaerobicTrainingEffect);
+      setIfDefinedInt("vo2MaxValue", advanced.vo2MaxValue);
+      setIfDefinedInt("recoveryTimeHours", advanced.recoveryTimeHours);
+      setIfDefinedInt("avgStress", advanced.avgStress);
+      setIfDefinedInt("avgHeartRate", advanced.avgHeartRate);
+      setIfDefinedInt("maxHeartRate", advanced.maxHeartRate);
+      setIfDefinedInt("restingHeartRate", advanced.restingHeartRate);
+      setIfDefinedInt("lapsCount", advanced.lapsCount);
+      setIfDefinedInt("poolLengthMeters", advanced.poolLengthMeters);
 
       if (
         advanced.strokeType &&
@@ -924,11 +934,11 @@ export async function syncGarminActivities(
         const hrValues = Object.values(advanced.hrZones);
         const hasZones = hrValues.some((value) => Number(value) > 0);
         if (hasZones) {
-          setIfDefined("hrZone1Seconds", advanced.hrZones.hrZone1Seconds);
-          setIfDefined("hrZone2Seconds", advanced.hrZones.hrZone2Seconds);
-          setIfDefined("hrZone3Seconds", advanced.hrZones.hrZone3Seconds);
-          setIfDefined("hrZone4Seconds", advanced.hrZones.hrZone4Seconds);
-          setIfDefined("hrZone5Seconds", advanced.hrZones.hrZone5Seconds);
+          setIfDefinedInt("hrZone1Seconds", advanced.hrZones.hrZone1Seconds);
+          setIfDefinedInt("hrZone2Seconds", advanced.hrZones.hrZone2Seconds);
+          setIfDefinedInt("hrZone3Seconds", advanced.hrZones.hrZone3Seconds);
+          setIfDefinedInt("hrZone4Seconds", advanced.hrZones.hrZone4Seconds);
+          setIfDefinedInt("hrZone5Seconds", advanced.hrZones.hrZone5Seconds);
         }
       }
 
@@ -1051,16 +1061,16 @@ export async function syncGarminActivities(
         garminActivityId: activity.activity_id,
         activitySource: "garmin",
         activityDate,
-        distanceMeters: activity.distance_meters,
-        durationSeconds: activity.duration_seconds,
-        poolLengthMeters: activity.pool_length || 25,
+        distanceMeters: Math.round(activity.distance_meters),
+        durationSeconds: Math.round(activity.duration_seconds),
+        poolLengthMeters: Math.round(activity.pool_length || 25),
         strokeType: activity.stroke_type as "freestyle" | "backstroke" | "breaststroke" | "butterfly" | "mixed",
-        avgPacePer100m: activity.avg_pace_per_100m,
-        calories: activity.calories,
-        avgHeartRate: activity.avg_heart_rate,
-        maxHeartRate: activity.max_heart_rate,
-        avgSwolf: activity.swolf_score,
-        lapsCount: activity.laps_count,
+        avgPacePer100m: activity.avg_pace_per_100m ? Math.round(activity.avg_pace_per_100m) : undefined,
+        calories: activity.calories ? Math.round(activity.calories) : undefined,
+        avgHeartRate: activity.avg_heart_rate ? Math.round(activity.avg_heart_rate) : undefined,
+        maxHeartRate: activity.max_heart_rate ? Math.round(activity.max_heart_rate) : undefined,
+        avgSwolf: activity.swolf_score ? Math.round(activity.swolf_score) : undefined,
+        lapsCount: activity.laps_count ? Math.round(activity.laps_count) : undefined,
         avgStrokeDistance: activity.avg_stroke_distance ? Math.round(activity.avg_stroke_distance * 100) / 100 : undefined,
         avgStrokes: activity.avg_strokes ? Math.round(activity.avg_strokes) : undefined,
         avgStrokeCadence: activity.avg_stroke_cadence ? Math.round(activity.avg_stroke_cadence) : undefined,
