@@ -29,6 +29,7 @@ import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
 import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
 import { invalidateUserCache } from "./lib/cache";
+import { checkAndAwardBadges as checkAchievementBadges } from "./badge_engine";
 
 // Garmin microservice configuration
 const GARMIN_SERVICE_URL = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
@@ -952,22 +953,37 @@ export async function syncGarminActivities(
       await persistGarminLapDetails(db, params.activityId, fullDetails);
     };
 
+    // Bulk fetch all existing Garmin activity IDs for this user to avoid N+1 queries
+    const existingActivities = await db
+      .select({
+        garminActivityId: swimmingActivities.garminActivityId,
+        id: swimmingActivities.id,
+        strokeType: swimmingActivities.strokeType,
+        rawData: swimmingActivities.rawData,
+        avgSwolf: swimmingActivities.avgSwolf,
+        avgStrokeDistance: swimmingActivities.avgStrokeDistance,
+        avgStrokes: swimmingActivities.avgStrokes,
+        avgStrokeCadence: swimmingActivities.avgStrokeCadence,
+        trainingEffect: swimmingActivities.trainingEffect,
+        anaerobicTrainingEffect: swimmingActivities.anaerobicTrainingEffect,
+        avgHeartRate: swimmingActivities.avgHeartRate,
+        hrZone1Seconds: swimmingActivities.hrZone1Seconds,
+      })
+      .from(swimmingActivities)
+      .where(eq(swimmingActivities.userId, userId));
+
+    const existingGarminMap = new Map(
+      existingActivities
+        .filter(a => a.garminActivityId)
+        .map(a => [a.garminActivityId!, a])
+    );
+
     // Process each activity
     for (const activity of result.activities) {
-      // Check if activity already exists (by Garmin ID)
-      const existingGarmin = await db
-        .select()
-        .from(swimmingActivities)
-        .where(
-          and(
-            eq(swimmingActivities.userId, userId),
-            eq(swimmingActivities.garminActivityId, activity.activity_id)
-          )
-        )
-        .limit(1);
+      // Check if activity already exists (by Garmin ID) using our pre-fetched map
+      const existing = existingGarminMap.get(activity.activity_id);
 
-      if (existingGarmin.length > 0) {
-        const existing = existingGarmin[0];
+      if (existing) {
         const existingRaw = (existing.rawData ?? {}) as Record<string, any>;
         const existingDetails = existingRaw.garmin_details;
         const hasSummary =
@@ -1121,14 +1137,11 @@ export async function syncGarminActivities(
 
     // Update profile totals
     if (syncedCount > 0) {
+      // Use accurate aggregates from DB instead of incremental sums
+      const { getActivityAggregates } = await import("./db");
+      const aggregates = await getActivityAggregates(userId);
+      
       const newTotalXp = (profile.totalXp || 0) + totalNewXp;
-      const newTotalDistance = (profile.totalDistanceMeters || 0) + 
-        result.activities.reduce((sum, a) => sum + a.distance_meters, 0);
-      const newTotalTime = (profile.totalTimeSeconds || 0) + 
-        result.activities.reduce((sum, a) => sum + a.duration_seconds, 0);
-      const newTotalSessions = (profile.totalSessions || 0) + syncedCount;
-
-      // Calculate new level
       const newLevel = calculateLevel(newTotalXp);
 
       await db
@@ -1136,24 +1149,11 @@ export async function syncGarminActivities(
         .set({
           totalXp: newTotalXp,
           level: newLevel,
-          totalDistanceMeters: newTotalDistance,
-          totalTimeSeconds: newTotalTime,
-          totalSessions: newTotalSessions,
-        })
-        .where(eq(swimmerProfiles.userId, userId));
-
-      // Calculate open water stats
-      const newTotalOpenWaterSessions = (profile.totalOpenWaterSessions || 0) + 
-        result.activities.filter(a => a.is_open_water).length;
-      const newTotalOpenWaterDistance = (profile.totalOpenWaterMeters || 0) + 
-        result.activities.filter(a => a.is_open_water).reduce((sum, a) => sum + a.distance_meters, 0);
-
-      // Update profile with open water stats
-      await db
-        .update(swimmerProfiles)
-        .set({
-          totalOpenWaterSessions: newTotalOpenWaterSessions,
-          totalOpenWaterMeters: newTotalOpenWaterDistance,
+          totalDistanceMeters: aggregates.totalDistance,
+          totalTimeSeconds: aggregates.totalTime,
+          totalSessions: aggregates.totalSessions,
+          totalOpenWaterSessions: aggregates.totalOpenWaterSessions,
+          totalOpenWaterMeters: aggregates.totalOpenWaterMeters,
         })
         .where(eq(swimmerProfiles.userId, userId));
 
@@ -1167,11 +1167,11 @@ export async function syncGarminActivities(
       const longestSessionDistance = longestActivity[0]?.distanceMeters || 0;
       // Check and award badges
       await checkAndAwardBadges(userId, {
-        totalDistance: newTotalDistance,
-        totalSessions: newTotalSessions,
+        totalDistance: aggregates.totalDistance,
+        totalSessions: aggregates.totalSessions,
         totalXp: newTotalXp,
         level: newLevel,
-        totalTime: newTotalTime,
+        totalTime: aggregates.totalTime,
         longestSessionDistance,
       });
 
@@ -1179,17 +1179,14 @@ export async function syncGarminActivities(
       await updateUserProfileBadge(userId, newTotalXp);
 
       // Check and award achievement badges
-      const { checkAndAwardBadges: checkAchievementBadges } = await import("./badge_engine");
-      (async () => {
-        try {
-          const newBadges = await checkAchievementBadges(userId);
-          if (newBadges.length > 0) {
-            console.log(`[Badge Engine] Awarded ${newBadges.length} new badges: ${newBadges.join(", ")}`);
-          }
-        } catch (error) {
-          console.error(`[Badge Engine] Failed for user ${userId}:`, error);
+      try {
+        const newBadges = await checkAchievementBadges(userId);
+        if (newBadges.length > 0) {
+          console.log(`[Badge Engine] Awarded ${newBadges.length} new badges: ${newBadges.join(", ")}`);
         }
-      })();
+      } catch (error) {
+        console.error(`[Badge Engine] Failed for user ${userId}:`, error);
+      }
 
       // Auto-update challenge progress for active challenges
       await updateActiveChallengesProgress(userId);
@@ -1406,37 +1403,31 @@ export async function getPersonalRecords(userId: number): Promise<{
     return { longestSession: 0, fastestPace100m: 0, mostDistanceWeek: 0 };
   }
 
-  const activities = await db
-    .select()
+  // Single query for max distance and min pace
+  const [stats] = await db
+    .select({
+      longestSession: sql<number>`coalesce(max(${swimmingActivities.distanceMeters}), 0)`,
+      fastestPace100m: sql<number>`coalesce(min(${swimmingActivities.avgPacePer100m}), 0)`,
+    })
     .from(swimmingActivities)
     .where(eq(swimmingActivities.userId, userId));
 
-  let longestSession = 0;
-  let fastestPace100m = Infinity;
+  // Weekly distance aggregation
+  const weeklyResult = await db.execute(sql`
+    SELECT coalesce(max(weekly_distance), 0) as most_distance_week
+    FROM (
+      SELECT sum(distance_meters) as weekly_distance
+      FROM swimming_activities
+      WHERE user_id = ${userId}
+      GROUP BY date_trunc('week', activity_date)
+    ) weekly
+  `);
 
-  for (const activity of activities) {
-    if (activity.distanceMeters > longestSession) {
-      longestSession = activity.distanceMeters;
-    }
-    if (activity.avgPacePer100m && activity.avgPacePer100m < fastestPace100m) {
-      fastestPace100m = activity.avgPacePer100m;
-    }
-  }
-
-  // Calculate most distance in a week
-  const weekDistances: { [key: string]: number } = {};
-  for (const activity of activities) {
-    const date = new Date(activity.activityDate);
-    const weekStart = new Date(date);
-    weekStart.setDate(date.getDate() - date.getDay());
-    const weekKey = weekStart.toISOString().split("T")[0];
-    weekDistances[weekKey] = (weekDistances[weekKey] || 0) + activity.distanceMeters;
-  }
-  const mostDistanceWeek = Math.max(0, ...Object.values(weekDistances));
+  const mostDistanceWeek = Number((weeklyResult.rows[0] as any)?.most_distance_week ?? 0);
 
   return {
-    longestSession,
-    fastestPace100m: fastestPace100m === Infinity ? 0 : fastestPace100m,
+    longestSession: Number(stats?.longestSession ?? 0),
+    fastestPace100m: Number(stats?.fastestPace100m ?? 0),
     mostDistanceWeek,
   };
 }

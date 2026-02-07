@@ -84,23 +84,35 @@ describe("RedisRateLimitStore", () => {
       expect(result.resetTime).toBeUndefined();
     });
 
-    it("should fallback when Redis is not connected", async () => {
+    it("should use in-memory fallback when Redis is not connected", async () => {
       mockRedis.isOpen = false;
 
       const result = await store.increment("test-key");
 
       expect(mockRedis.incr).not.toHaveBeenCalled();
       expect(result.totalHits).toBe(1);
-      expect(result.resetTime).toBeUndefined();
+      expect(result.resetTime).toBeInstanceOf(Date);
     });
 
-    it("should handle errors gracefully and return permissive values", async () => {
+    it("should accumulate hits in in-memory fallback", async () => {
+      mockRedis.isOpen = false;
+
+      const result1 = await store.increment("test-key");
+      const result2 = await store.increment("test-key");
+      const result3 = await store.increment("test-key");
+
+      expect(result1.totalHits).toBe(1);
+      expect(result2.totalHits).toBe(2);
+      expect(result3.totalHits).toBe(3);
+    });
+
+    it("should use in-memory fallback on Redis errors", async () => {
       mockRedis.incr.mockRejectedValue(new Error("Redis connection failed"));
 
       const result = await store.increment("test-key");
 
       expect(result.totalHits).toBe(1);
-      expect(result.resetTime).toBeUndefined();
+      expect(result.resetTime).toBeInstanceOf(Date);
     });
   });
 
