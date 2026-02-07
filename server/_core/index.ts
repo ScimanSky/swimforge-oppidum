@@ -54,6 +54,11 @@ async function startServer() {
   // Give Redis a moment to connect in background
   await new Promise(resolve => setTimeout(resolve, 500));
 
+  // Health check endpoint (before rate limiting)
+  app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', uptime: process.uptime() });
+  });
+
   // Apply security middleware (CORS, headers, etc.)
   app.use(...applySecurityMiddleware());
 

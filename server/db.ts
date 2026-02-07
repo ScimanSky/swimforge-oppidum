@@ -2,8 +2,6 @@ import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import bcrypt from "bcryptjs";
-import { readFileSync } from "fs";
-import { join } from "path";
 import { 
   InsertUser, users, User,
   swimmerProfiles, InsertSwimmerProfile,
@@ -243,10 +241,8 @@ export async function getLeaderboard(
   limit: number = 50,
   period: 'all' | 'week' | 'month' = 'all'
 ) {
-  console.log('[getLeaderboard] Called with orderBy:', orderBy, 'limit:', limit, 'period:', period);
   const db = await getDb();
   if (!db) {
-    console.log('[getLeaderboard] DB not available');
     return [];
   }  
   if (period === 'all') {
