@@ -125,7 +125,5 @@ assets/swim-forge.zip:Zone.Identifier
 assets/coach_drafts/
 
 # Local-only PDFs
-assets/pdf-social/
 
-# Local-only PDFs
-assets/pdf-social/
+package-lock.json

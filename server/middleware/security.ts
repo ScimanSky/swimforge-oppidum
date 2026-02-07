@@ -194,8 +194,13 @@ export function suspiciousRequestLogger(
   ];
 
   const fullUrl = req.originalUrl || req.url;
-  // Handle both string and object bodies
-  const body = typeof req.body === 'string' ? req.body : (req.body ? JSON.stringify(req.body) : '');
+  // Handle both string and object bodies; skip large bodies to avoid performance overhead
+  let body = '';
+  if (typeof req.body === 'string') {
+    body = req.body.length <= 10000 ? req.body : '';
+  } else if (req.body) {
+    try { body = JSON.stringify(req.body).slice(0, 10000); } catch { body = ''; }
+  }
 
   const isSuspicious = suspiciousPatterns.some(
     (pattern) => pattern.test(fullUrl) || pattern.test(body)

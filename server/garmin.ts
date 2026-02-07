@@ -954,8 +954,6 @@ export async function syncGarminActivities(
     };
 
     // Bulk fetch all existing Garmin activity IDs for this user to avoid N+1 queries
-    // We fetch multiple fields because they're used later in the loop for enrichment decisions
-    // (checking hasAdvanced flag on lines 980-990)
     const existingActivities = await db
       .select({
         garminActivityId: swimmingActivities.garminActivityId,
