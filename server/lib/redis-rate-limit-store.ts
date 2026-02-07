@@ -37,7 +37,7 @@ export class RedisRateLimitStore implements Store {
         return { totalHits: 1, resetTime: undefined };
       }
 
-      // Use individual commands instead of multi() — pTtl is not available in multi
+      // Use individual commands instead of multi() — pTTL is not available in multi
       const totalHits = await redis.incr(redisKey);
       
       // Only set expiry on first increment (when totalHits is 1)
