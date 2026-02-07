@@ -194,7 +194,8 @@ export function suspiciousRequestLogger(
   ];
 
   const fullUrl = req.originalUrl || req.url;
-  const body = typeof req.body === 'string' ? req.body : '';
+  // Handle both string and object bodies
+  const body = typeof req.body === 'string' ? req.body : (req.body ? JSON.stringify(req.body) : '');
 
   const isSuspicious = suspiciousPatterns.some(
     (pattern) => pattern.test(fullUrl) || pattern.test(body)

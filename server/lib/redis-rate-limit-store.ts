@@ -15,6 +15,8 @@ export class RedisRateLimitStore implements Store {
   windowMs: number;
   localKeys: boolean;
   private localStore: Map<string, { count: number; resetTime: number }> = new Map();
+  private lastCleanup: number = Date.now();
+  private cleanupInterval: number = 60000; // Clean up every 60 seconds
 
   constructor(options: { prefix?: string; windowMs: number; resetExpiryOnChange?: boolean }) {
     this.prefix = options.prefix || 'rl:';
@@ -43,11 +45,17 @@ export class RedisRateLimitStore implements Store {
 
   private cleanExpiredLocal(): void {
     const now = Date.now();
+    // Only clean up periodically to avoid performance issues on high traffic
+    if (now - this.lastCleanup < this.cleanupInterval) {
+      return;
+    }
+    
     for (const [key, value] of this.localStore) {
       if (value.resetTime <= now) {
         this.localStore.delete(key);
       }
     }
+    this.lastCleanup = now;
   }
 
   async increment(key: string): Promise<IncrementResponse> {

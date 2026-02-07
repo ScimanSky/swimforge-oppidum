@@ -29,6 +29,7 @@ import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
 import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
 import { invalidateUserCache } from "./lib/cache";
+import { checkAndAwardBadges as checkAchievementBadges } from "./badge_engine";
 
 // Garmin microservice configuration
 const GARMIN_SERVICE_URL = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
@@ -1169,7 +1170,6 @@ export async function syncGarminActivities(
 
       // Check and award achievement badges
       try {
-        const { checkAndAwardBadges: checkAchievementBadges } = await import("./badge_engine");
         const newBadges = await checkAchievementBadges(userId);
         if (newBadges.length > 0) {
           console.log(`[Badge Engine] Awarded ${newBadges.length} new badges: ${newBadges.join(", ")}`);
