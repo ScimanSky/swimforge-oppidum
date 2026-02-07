@@ -13,50 +13,6 @@ import * as Sentry from '@sentry/node';
 import { Request, Response, NextFunction } from 'express';
 
 // ============================================================================
-// SENTRY INITIALIZATION
-// ============================================================================
-
-/**
- * Inizializza Sentry per error tracking (opzionale)
- */
-export function initSentry() {
-  // Solo se SENTRY_DSN è configurato
-  if (!process.env.SENTRY_DSN) {
-    console.log('[Logger] Sentry DSN non configurato, skipping initialization');
-    return;
-  }
-
-  try {
-    Sentry.init({
-      dsn: process.env.SENTRY_DSN,
-      environment: process.env.NODE_ENV,
-      tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-      integrations: [
-        new Sentry.Integrations.Http({ tracing: true }),
-        new Sentry.Integrations.OnUncaughtException(),
-        new Sentry.Integrations.OnUnhandledRejection(),
-      ],
-      beforeSend(event, hint) {
-        // Filtra errori non critici
-        if (event.exception) {
-          const error = hint.originalException;
-          
-          // Non tracciare errori di validazione
-          if (error instanceof Error && error.message.includes('Validation')) {
-            return null;
-          }
-        }
-
-        return event;
-      },
-    });
-    console.log('[Logger] Sentry initialized successfully');
-  } catch (error) {
-    console.warn('[Logger] Failed to initialize Sentry:', error);
-  }
-}
-
-// ============================================================================
 // WINSTON LOGGER
 // ============================================================================
 
@@ -227,7 +183,8 @@ export function errorHandler(
   // Log errore (skip if no actual error message)
   const errorMessage = err instanceof Error ? err.message : String(err);
   if (!errorMessage || errorMessage === '[object Object]' || errorMessage === '{}') {
-    // Don't log empty errors
+    // Don't log empty errors but still propagate to next handler
+    next(err);
     return;
   }
   
@@ -304,7 +261,6 @@ export function performanceMonitor(
 // ============================================================================
 
 export default {
-  initSentry,
   createLogger,
   logger,
   requestLogger,
