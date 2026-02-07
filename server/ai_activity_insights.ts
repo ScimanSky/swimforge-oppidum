@@ -222,44 +222,51 @@ export async function getPendingActivityInsights(userId: number, limit = 3) {
   `);
   const pending = pendingResult.rows as any[];
 
+  // If we have enough, return immediately
   if (pending.length >= limit) return pending;
 
+  // Schedule background generation (fire-and-forget) for missing insights
+  // This does NOT block the response
   const remaining = limit - pending.length;
+  generateMissingInsightsBackground(userId, remaining).catch((err) => {
+    console.error(`[AI Insights] Background generation failed for user ${userId}:`, err);
+  });
+
+  // Return what we have now (user gets fast response)
+  return pending;
+}
+
+// Separate background function
+async function generateMissingInsightsBackground(userId: number, limit: number) {
+  const db = await getDb();
+  if (!db) return;
+
   const activities = await db.execute(sql`
     SELECT a.*
     FROM swimming_activities a
     LEFT JOIN activity_ai_insights i ON i.activity_id = a.id
     WHERE a.user_id = ${userId} AND i.id IS NULL
     ORDER BY a.activity_date DESC
-    LIMIT ${remaining}
-  `);
-
-  for (const row of activities.rows as any[]) {
-    const insight = await generateActivityInsight(row);
-    if (!insight) continue;
-
-    await db.insert(activityAiInsights).values({
-      userId,
-      activityId: row.id,
-      title: insight.title,
-      summary: insight.summary,
-      bullets: insight.bullets,
-      tags: insight.tags,
-      generatedAt: new Date(),
-    });
-  }
-
-  const freshResult = await db.execute(sql`
-    SELECT i.*, a.distance_meters AS activity_distance_meters, a.duration_seconds AS activity_duration_seconds,
-           a.activity_date AS activity_date
-    FROM activity_ai_insights i
-    LEFT JOIN swimming_activities a ON a.id = i.activity_id
-    WHERE i.user_id = ${userId} AND i.seen_at IS NULL
-    ORDER BY i.generated_at DESC
     LIMIT ${limit}
   `);
 
-  return freshResult.rows;
+  for (const row of activities.rows as any[]) {
+    try {
+      const insight = await generateActivityInsight(row);
+      if (!insight) continue;
+      await db.insert(activityAiInsights).values({
+        userId,
+        activityId: row.id,
+        title: insight.title,
+        summary: insight.summary,
+        bullets: insight.bullets,
+        tags: insight.tags,
+        generatedAt: new Date(),
+      });
+    } catch (err) {
+      console.error(`[AI Insights] Failed to generate insight for activity ${row.id}:`, err);
+    }
+  }
 }
 
 export async function markActivityInsightSeen(userId: number, activityId: number) {

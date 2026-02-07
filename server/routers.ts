@@ -539,6 +539,7 @@ export const appRouter = router({
     // Manual activity creation disabled to prevent cheating
     create: protectedProcedure
       .input(z.object({
+        // Keep schema for documentation purposes
         activityDate: z.string().transform(s => new Date(s)),
         distanceMeters: z.number().min(0),
         durationSeconds: z.number().min(0),
@@ -554,67 +555,12 @@ export const appRouter = router({
         location: z.string().optional(),
         notes: z.string().optional(),
       }))
-      .mutation(async ({ ctx, input }) => {
+      .mutation(async () => {
+        // Manual activity creation is disabled - use Garmin Connect or Strava sync
         throw new TRPCError({ 
           code: "FORBIDDEN", 
-          message: "L'inserimento manuale delle attività è disabilitato. Collega Garmin Connect." 
+          message: "L'inserimento manuale delle attività è disabilitato. Collega Garmin Connect o Strava." 
         });
-        
-        /* DISABLED - Calculate XP for this activity
-        const baseXp = Math.floor(input.distanceMeters / 100); // 1 XP per 100m
-        const sessionBonus = 50; // Bonus for completing a session
-        const intensityBonus = input.isOpenWater ? 25 : 0; // Open water bonus
-        const totalXp = baseXp + sessionBonus + intensityBonus;
-        
-        const activityId = await db.createActivity({
-          userId: ctx.user.id,
-          ...input,
-          xpEarned: totalXp,
-        });
-        
-        if (activityId) {
-          // Record XP transaction
-          await db.createXpTransaction({
-            userId: ctx.user.id,
-            amount: totalXp,
-            reason: "activity",
-            referenceId: activityId,
-            description: `${input.distanceMeters}m nuotati`,
-          });
-          
-          // Update profile stats
-          const profile = await db.getSwimmerProfile(ctx.user.id);
-          if (profile) {
-            const newTotalXp = profile.totalXp + totalXp;
-            const newLevel = await db.getLevelForXp(newTotalXp);
-            
-            await db.updateSwimmerProfile(ctx.user.id, {
-              totalXp: newTotalXp,
-              level: newLevel.level,
-              totalDistanceMeters: profile.totalDistanceMeters + input.distanceMeters,
-              totalTimeSeconds: profile.totalTimeSeconds + input.durationSeconds,
-              totalSessions: profile.totalSessions + 1,
-              totalOpenWaterSessions: input.isOpenWater ? profile.totalOpenWaterSessions + 1 : profile.totalOpenWaterSessions,
-              totalOpenWaterMeters: input.isOpenWater ? profile.totalOpenWaterMeters + input.distanceMeters : profile.totalOpenWaterMeters,
-            });
-            
-            // Check for level up
-            if (newLevel.level > profile.level) {
-              await db.createXpTransaction({
-                userId: ctx.user.id,
-                amount: 0,
-                reason: "level_up",
-                description: `Livello ${newLevel.level} raggiunto: ${newLevel.title}`,
-              });
-            }
-          }
-          
-          // Check and award badges
-          await checkAndAwardBadges(ctx.user.id);
-        }
-        
-        return { id: activityId, xpEarned: totalXp };
-        */
       }),
     
     updateNotes: protectedProcedure
