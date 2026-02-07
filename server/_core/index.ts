@@ -135,18 +135,7 @@ async function startServer() {
     serveStatic(app);
   }
 
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
-
-  if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
-  }
-
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
-  });
-
-  // Error handling middleware (must be last)
+  // Error handling middleware (must be after routes but before server.listen)
   app.use(errorHandler);
 
   // Rollbar error handler (must be after other error handlers)
@@ -158,6 +147,17 @@ async function startServer() {
     });
     // Don't send error details to client
     res.status(500).json({ error: "Internal Server Error" });
+  });
+
+  const preferredPort = parseInt(process.env.PORT || "3000");
+  const port = await findAvailablePort(preferredPort);
+
+  if (port !== preferredPort) {
+    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+  }
+
+  server.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}/`);
   });
 
   // Cron moved to external scheduler via /api/cron/complete-challenges

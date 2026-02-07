@@ -173,10 +173,16 @@ export async function getOrSetCached<T>(
 export async function invalidateCachePattern(pattern: string): Promise<void> {
   try {
     if (!redis.isOpen) return; // Redis not connected
-    const keys = await redis.keys(pattern);
-    if (keys.length > 0) {
-      await redis.del(keys);
-      logger.debug(`Cache invalidate pattern: ${pattern} (${keys.length} keys)`, {
+    const keysToDelete: string[] = [];
+    
+    // Use SCAN instead of KEYS to avoid blocking Redis on Upstash
+    for await (const key of redis.scanIterator({ MATCH: pattern, COUNT: 100 })) {
+      keysToDelete.push(key);
+    }
+    
+    if (keysToDelete.length > 0) {
+      await redis.del(keysToDelete);
+      logger.debug(`Cache invalidate pattern: ${pattern} (${keysToDelete.length} keys)`, {
         event: 'cache:invalidate_pattern',
       });
     }
@@ -211,7 +217,7 @@ export async function invalidateUserCache(userId: string): Promise<void> {
     cacheKeys.userStats(userId),
     cacheKeys.userProfile(userId),
     cacheKeys.badges(userId),
-    `user:activities:${userId}:*`,
+    // REMOVED: `user:activities:${userId}:*` — DEL doesn't support wildcards
   ];
 
   await deleteMultipleCached(keys);

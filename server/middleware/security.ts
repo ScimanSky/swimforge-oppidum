@@ -11,6 +11,7 @@ import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 import helmet from 'helmet';
 import { Request, Response, NextFunction } from 'express';
+import { createRedisStore } from '../lib/redis-rate-limit-store';
 
 // ============================================================================
 // RATE LIMITING - SEMPLIFICATO
@@ -51,6 +52,7 @@ export const loginLimiter = rateLimit({
   skip: (req: any) => {
     return req.ip === process.env.ADMIN_IP;
   },
+  store: createRedisStore({ prefix: 'rl:login:', windowMs: 15 * 60 * 1000 }),
 });
 
 /**
@@ -65,6 +67,7 @@ export const registrationLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createRedisStore({ prefix: 'rl:registration:', windowMs: 60 * 60 * 1000 }),
 });
 
 /**
@@ -82,6 +85,7 @@ export const apiLimiter = rateLimit({
   skip: (req: any) => {
     return req.path === '/health' || req.path === '/status';
   },
+  store: createRedisStore({ prefix: 'rl:api:', windowMs: 1 * 60 * 1000 }),
 });
 
 /**
@@ -96,6 +100,7 @@ export const garminSyncLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createRedisStore({ prefix: 'rl:garmin:', windowMs: 5 * 60 * 1000 }),
 });
 
 /**
@@ -110,6 +115,7 @@ export const aiCoachLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createRedisStore({ prefix: 'rl:ai:', windowMs: 60 * 60 * 1000 }),
 });
 
 // ============================================================================
@@ -260,8 +266,6 @@ export function applySecurityMiddleware() {
     helmet(helmetConfig as any),
     cors(corsOptions),
     userAgentValidation,
-    suspiciousRequestLogger,
-    payloadSizeLimit,
   ];
 }
 
