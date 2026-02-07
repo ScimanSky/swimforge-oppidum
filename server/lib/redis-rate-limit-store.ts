@@ -14,6 +14,7 @@ export class RedisRateLimitStore implements Store {
   resetExpiryOnChange: boolean;
   windowMs: number;
   localKeys: boolean;
+  private localStore: Map<string, { count: number; resetTime: number }> = new Map();
 
   constructor(options: { prefix?: string; windowMs: number; resetExpiryOnChange?: boolean }) {
     this.prefix = options.prefix || 'rl:';
@@ -26,16 +27,40 @@ export class RedisRateLimitStore implements Store {
     return `${this.prefix}${key}`;
   }
 
+  private incrementLocal(key: string): IncrementResponse {
+    const now = Date.now();
+    const existing = this.localStore.get(key);
+    
+    if (existing && existing.resetTime > now) {
+      existing.count++;
+      return { totalHits: existing.count, resetTime: new Date(existing.resetTime) };
+    }
+    
+    const resetTime = now + this.windowMs;
+    this.localStore.set(key, { count: 1, resetTime });
+    return { totalHits: 1, resetTime: new Date(resetTime) };
+  }
+
+  private cleanExpiredLocal(): void {
+    const now = Date.now();
+    for (const [key, value] of this.localStore) {
+      if (value.resetTime <= now) {
+        this.localStore.delete(key);
+      }
+    }
+  }
+
   async increment(key: string): Promise<IncrementResponse> {
     const redisKey = this.getKey(key);
     
     try {
       if (!redis.isOpen) {
-        // Fallback to in-memory behavior - no persistent storage
-        logger.debug('Redis not connected, rate limit not persisted', {
+        // Fallback to in-memory store - better than no rate limiting
+        logger.debug('Redis not connected, using in-memory rate limit fallback', {
           event: 'rate-limit:redis_unavailable',
         });
-        return { totalHits: 1, resetTime: undefined };
+        this.cleanExpiredLocal();
+        return this.incrementLocal(key);
       }
 
       const multi = redis.multi();
@@ -60,8 +85,9 @@ export class RedisRateLimitStore implements Store {
       logger.error(`Rate limit increment failed: ${message}`, {
         event: 'rate-limit:increment_failed',
       });
-      // Fallback: return permissive value to not block users on Redis errors
-      return { totalHits: 1, resetTime: undefined };
+      // Fallback to in-memory store on Redis errors
+      this.cleanExpiredLocal();
+      return this.incrementLocal(key);
     }
   }
 
