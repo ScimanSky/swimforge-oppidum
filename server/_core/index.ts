@@ -48,7 +48,7 @@ async function startServer() {
 
   const app = express();
   // Ensure correct client IPs behind Render/other proxies
-  app.set("trust proxy", 1);
+  app.set("trust proxy", true);
   const server = createServer(app);
 
   // Give Redis a moment to connect in background
@@ -56,7 +56,13 @@ async function startServer() {
 
   // Health check endpoint (before rate limiting)
   app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok', uptime: process.uptime() });
+    res.status(200).json({
+      status: 'ok',
+      uptime: process.uptime(),
+      ip: req.ip,
+      xForwardedFor: req.headers['x-forwarded-for'] || null,
+      trustProxy: req.app.get('trust proxy'),
+    });
   });
 
   // Apply security middleware (CORS, headers, etc.)
