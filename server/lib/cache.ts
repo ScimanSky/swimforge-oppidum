@@ -188,8 +188,12 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
     }
     
     if (keysToDelete.length > 0) {
-      // redis.del accepts multiple keys as variadic arguments
-      await redis.del(keysToDelete as [string, ...string[]]);
+      // Handle single key and multiple keys differently to avoid type assertion issues
+      if (keysToDelete.length === 1) {
+        await redis.del(keysToDelete[0]);
+      } else {
+        await redis.del(keysToDelete as [string, ...string[]]);
+      }
       logger.debug(`Cache invalidate pattern: ${pattern} (${keysToDelete.length} keys)`, {
         event: 'cache:invalidate_pattern',
       });

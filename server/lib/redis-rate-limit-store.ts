@@ -127,8 +127,10 @@ export class RedisRateLimitStore implements Store {
 
   // Optional: Initialize store (called once when store is created)
   init?(): void {
-    logger.info('Redis rate limit store initialized', {
+    const status = redis.isOpen ? 'connected' : 'disconnected';
+    logger.info(`Redis rate limit store initialized (Redis: ${status})`, {
       event: 'rate-limit:store_init',
+      redisConnected: redis.isOpen,
     });
   }
 }
