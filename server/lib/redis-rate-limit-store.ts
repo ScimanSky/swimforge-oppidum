@@ -5,7 +5,7 @@
  * if Redis is not connected.
  */
 
-import { Store } from 'express-rate-limit';
+import type { Store, IncrementResponse } from 'express-rate-limit';
 import { redis } from './cache';
 import { logger } from '../middleware/logger';
 
@@ -13,18 +13,20 @@ export class RedisRateLimitStore implements Store {
   prefix: string;
   resetExpiryOnChange: boolean;
   windowMs: number;
+  localKeys: boolean;
 
   constructor(options: { prefix?: string; windowMs: number; resetExpiryOnChange?: boolean }) {
     this.prefix = options.prefix || 'rl:';
     this.windowMs = options.windowMs;
     this.resetExpiryOnChange = options.resetExpiryOnChange ?? false;
+    this.localKeys = false; // Redis is shared across instances
   }
 
   private getKey(key: string): string {
     return `${this.prefix}${key}`;
   }
 
-  async increment(key: string): Promise<{ totalHits: number; resetTime?: Date }> {
+  async increment(key: string): Promise<IncrementResponse> {
     const redisKey = this.getKey(key);
     
     try {
@@ -33,7 +35,7 @@ export class RedisRateLimitStore implements Store {
         logger.debug('Redis not connected, rate limit not persisted', {
           event: 'rate-limit:redis_unavailable',
         });
-        return { totalHits: 1 };
+        return { totalHits: 1, resetTime: undefined };
       }
 
       const multi = redis.multi();
@@ -47,8 +49,8 @@ export class RedisRateLimitStore implements Store {
         throw new Error('Redis multi command failed');
       }
 
-      const totalHits = results[0] as number;
-      const ttl = results[2] as number;
+      const totalHits = Number(results[0]) || 1;
+      const ttl = Number(results[2]) || -1;
 
       const resetTime = ttl > 0 ? new Date(Date.now() + ttl) : undefined;
 
@@ -59,7 +61,7 @@ export class RedisRateLimitStore implements Store {
         event: 'rate-limit:increment_failed',
       });
       // Fallback: return permissive value to not block users on Redis errors
-      return { totalHits: 1 };
+      return { totalHits: 1, resetTime: undefined };
     }
   }
 
@@ -70,8 +72,11 @@ export class RedisRateLimitStore implements Store {
       if (!redis.isOpen) return;
       
       const current = await redis.get(redisKey);
-      if (current && parseInt(current) > 0) {
-        await redis.decr(redisKey);
+      if (current) {
+        const currentStr = typeof current === 'string' ? current : current.toString();
+        if (parseInt(currentStr) > 0) {
+          await redis.decr(redisKey);
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -96,14 +101,21 @@ export class RedisRateLimitStore implements Store {
   }
 
   // Optional: Get current hit count
-  async get(key: string): Promise<number | undefined> {
+  async get(key: string): Promise<{ totalHits: number; resetTime: Date | undefined } | undefined> {
     const redisKey = this.getKey(key);
     
     try {
       if (!redis.isOpen) return undefined;
       
       const value = await redis.get(redisKey);
-      return value ? parseInt(value) : undefined;
+      if (!value) return undefined;
+      
+      const valueStr = typeof value === 'string' ? value : value.toString();
+      const ttl = await redis.pTtl(redisKey);
+      const ttlNum = typeof ttl === 'number' ? ttl : -1;
+      const resetTime = ttlNum > 0 ? new Date(Date.now() + ttlNum) : undefined;
+      
+      return { totalHits: parseInt(valueStr), resetTime };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Rate limit get failed: ${message}`, {

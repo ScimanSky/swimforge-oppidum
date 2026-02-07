@@ -77,7 +77,9 @@ export async function getCached<T>(key: string): Promise<T | null> {
       event: 'cache:hit',
     });
 
-    return JSON.parse(cached) as T;
+    // Redis get returns string | Buffer, convert to string
+    const cachedStr = typeof cached === 'string' ? cached : cached.toString();
+    return JSON.parse(cachedStr) as T;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`Cache get failed for key ${key}: ${message}`, {
@@ -180,11 +182,14 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
     
     // Use SCAN instead of KEYS to avoid blocking Redis on Upstash
     for await (const key of redis.scanIterator({ MATCH: pattern, COUNT: 100 })) {
-      keysToDelete.push(key);
+      // scanIterator returns string | Buffer, convert to string
+      const keyStr = typeof key === 'string' ? key : key.toString();
+      keysToDelete.push(keyStr);
     }
     
     if (keysToDelete.length > 0) {
-      await redis.del(keysToDelete);
+      // redis.del accepts multiple keys as variadic arguments
+      await redis.del(keysToDelete as [string, ...string[]]);
       logger.debug(`Cache invalidate pattern: ${pattern} (${keysToDelete.length} keys)`, {
         event: 'cache:invalidate_pattern',
       });
