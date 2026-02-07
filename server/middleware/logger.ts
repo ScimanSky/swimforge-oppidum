@@ -128,23 +128,23 @@ export function requestLogger(
   res: Response,
   next: NextFunction
 ) {
+  // Skip logging per path non significativi
+  const SKIP_PATHS = ['/favicon.ico', '/health', '/status', '/robots.txt'];
+  const SKIP_EXTENSIONS = ['.js', '.css', '.png', '.jpg', '.svg', '.ico', '.woff', '.woff2', '.map'];
+  
+  if (SKIP_PATHS.includes(req.path) || SKIP_EXTENSIONS.some(ext => req.path.endsWith(ext))) {
+    return next();
+  }
+
   const startTime = Date.now();
 
-  // Log richiesta in ingresso
-  logger.info('Incoming request', {
-    method: req.method,
-    path: req.path,
-    ip: req.ip,
-    userAgent: req.headers['user-agent'],
-  });
-
-  // Intercetta response
+  // Intercetta response per loggare con statusCode e durata
   const originalSend = res.send;
   res.send = function (data) {
     const duration = Date.now() - startTime;
 
-    // Log risposta
-    logger.info('Outgoing response', {
+    // Log unico per richiesta (con status e durata)
+    logger.info('Request completed', {
       method: req.method,
       path: req.path,
       statusCode: res.statusCode,
