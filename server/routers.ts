@@ -1452,11 +1452,11 @@ export const appRouter = router({
           }))
           .mutation(async ({ input }) => {
             const { updateClubEvent } = await import("./db_social_enhanced");
-            const updates: any = { ...input };
-            delete updates.eventId;
+            const { eventId, ...rest } = input;
+            const updates: Record<string, any> = { ...rest };
             if (updates.startTime) updates.startTime = new Date(updates.startTime);
             if (updates.endTime) updates.endTime = new Date(updates.endTime);
-            const event = await updateClubEvent(input.eventId, updates);
+            const event = await updateClubEvent(eventId, updates);
             return { success: true, event };
           }),
 
@@ -1533,10 +1533,10 @@ export const appRouter = router({
           }))
           .mutation(async ({ input }) => {
             const { updateClubAnnouncement } = await import("./db_social_enhanced");
-            const updates: any = { ...input };
-            delete updates.announcementId;
+            const { announcementId, ...rest } = input;
+            const updates: Record<string, any> = { ...rest };
             if (updates.expiresAt) updates.expiresAt = new Date(updates.expiresAt);
-            const announcement = await updateClubAnnouncement(input.announcementId, updates);
+            const announcement = await updateClubAnnouncement(announcementId, updates);
             return { success: true, announcement };
           }),
 

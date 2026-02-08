@@ -24,6 +24,35 @@ interface DirectMessagesProps {
   recipientName?: string;
 }
 
+interface Message {
+  id: number;
+  senderId: number;
+  receiverId: number;
+  content: string;
+  isRead: boolean;
+  readAt: string | null;
+  createdAt: string;
+}
+
+interface MessageWithSender {
+  message: Message;
+  sender: {
+    id: number;
+    username: string;
+    profilePicture: string | null;
+  };
+}
+
+interface Conversation {
+  lastMessage: Message;
+  otherUser: {
+    id: number;
+    username: string;
+    profilePicture: string | null;
+  };
+  unreadCount: number;
+}
+
 export default function DirectMessages({ recipientId, recipientName }: DirectMessagesProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<number | null>(
@@ -111,7 +140,7 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
 
   const getUnreadCount = () => {
     if (!conversationsQuery.data) return 0;
-    return conversationsQuery.data.reduce((acc: number, conv: any) => acc + (conv.unreadCount || 0), 0);
+    return conversationsQuery.data.reduce((acc: number, conv: Conversation) => acc + (conv.unreadCount || 0), 0);
   };
 
   const renderConversationsList = () => {
@@ -126,7 +155,7 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
 
     return (
       <div className="divide-y">
-        {conversationsQuery.data.map((conv: any) => (
+        {conversationsQuery.data.map((conv: Conversation) => (
           <button
             key={conv.lastMessage.id}
             onClick={() => setSelectedConversation(conv.otherUser.id)}
@@ -196,7 +225,7 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
 
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-4">
-            {conversationQuery.data.map((msg: any) => {
+            {conversationQuery.data.map((msg: MessageWithSender) => {
               const isOwn = msg.message.senderId !== selectedConversation;
               return (
                 <div

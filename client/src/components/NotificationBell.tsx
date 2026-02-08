@@ -20,7 +20,7 @@ export default function NotificationBell() {
   const utils = trpc.useUtils();
 
   const unreadCountQuery = trpc.community.notifications.unreadCount.useQuery(undefined, {
-    refetchInterval: 30000, // Poll ogni 30 secondi
+    refetchInterval: 60000, // Poll ogni 60 secondi (ridotto carico server)
   });
 
   const notificationsQuery = trpc.community.notifications.list.useQuery(
