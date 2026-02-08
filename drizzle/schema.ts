@@ -341,6 +341,112 @@ export const communityClubInvites = pgTable("community_club_invites", {
 });
 
 // ============================================
+// CLUB EVENTS (Allenamenti, gare, eventi sociali)
+// ============================================
+export const clubEvents = pgTable("club_events", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  creatorId: integer("creator_id").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  eventType: varchar("event_type", { length: 30 }).default("training").notNull(), // training, race, social, meeting
+  location: text("location"),
+  locationLat: real("location_lat"),
+  locationLng: real("location_lng"),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time"),
+  maxAttendees: integer("max_attendees"),
+  isRecurring: boolean("is_recurring").default(false).notNull(),
+  recurringRule: text("recurring_rule"), // RRULE format per eventi ricorrenti
+  coverImageUrl: text("cover_image_url"),
+  status: varchar("status", { length: 20 }).default("active").notNull(), // active, cancelled, completed
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const eventAttendees = pgTable("event_attendees", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull(),
+  userId: integer("user_id").notNull(),
+  status: varchar("status", { length: 20 }).default("going").notNull(), // going, maybe, not_going
+  rsvpAt: timestamp("rsvp_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueAttendee: unique().on(table.eventId, table.userId),
+}));
+
+// ============================================
+// DIRECT MESSAGES (Messaggi tra membri)
+// ============================================
+export const directMessages = pgTable("direct_messages", {
+  id: serial("id").primaryKey(),
+  senderId: integer("sender_id").notNull(),
+  receiverId: integer("receiver_id").notNull(),
+  content: text("content").notNull(),
+  isRead: boolean("is_read").default(false).notNull(),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ============================================
+// USER NOTIFICATIONS (Sistema notifiche)
+// ============================================
+export const userNotifications = pgTable("user_notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  type: varchar("type", { length: 50 }).notNull(), // post_like, comment, follow, event_invite, dm, badge_earned, etc.
+  title: varchar("title", { length: 200 }).notNull(),
+  message: text("message").notNull(),
+  link: text("link"), // URL dove portare l'utente
+  referenceId: integer("reference_id"), // ID dell'oggetto correlato (post, evento, etc)
+  isRead: boolean("is_read").default(false).notNull(),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ============================================
+// CLUB ANNOUNCEMENTS (Annunci importanti)
+// ============================================
+export const clubAnnouncements = pgTable("club_announcements", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  authorId: integer("author_id").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  content: text("content").notNull(),
+  isPinned: boolean("is_pinned").default(false).notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// CLUB MEDIA GALLERY (Foto e video condivisi)
+// ============================================
+export const clubMedia = pgTable("club_media", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  uploaderId: integer("uploader_id").notNull(),
+  mediaType: varchar("media_type", { length: 20 }).notNull(), // image, video
+  mediaUrl: text("media_url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  caption: text("caption"),
+  eventId: integer("event_id"), // Opzionale: collegato ad un evento
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ============================================
+// POST REACTIONS (Reazioni emotive avanzate)
+// ============================================
+export const postReactions = pgTable("post_reactions", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").notNull(),
+  userId: integer("user_id").notNull(),
+  reactionType: varchar("reaction_type", { length: 20 }).notNull(), // splash, fire, strong, clap, wave
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueReaction: unique().on(table.postId, table.userId),
+}));
+
+// ============================================
 // USER ACHIEVEMENT BADGES (Earned achievement badges)
 // ============================================
 export const userAchievementBadges = pgTable("user_achievement_badges", {

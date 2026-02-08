@@ -22,6 +22,8 @@ import { trpc } from "@/lib/trpc"
 import { supabase } from "@/lib/supabase"
 import { Switch } from "@/components/ui/switch"
 import { useTheme } from "@/contexts/ThemeContext"
+import NotificationBell from "@/components/NotificationBell"
+import DirectMessages from "@/components/DirectMessages"
 
 interface NavItem {
   label: string
@@ -105,6 +107,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
           {/* Bottom section */}
           <div className="border-t border-border p-4 space-y-3">
+            {/* Notifications and Messages */}
+            <div className="flex items-center justify-center gap-2 pb-2">
+              <NotificationBell />
+              <DirectMessages />
+            </div>
             {switchable && toggleTheme && (
               <div className="flex items-center justify-between rounded-lg bg-accent/40 px-3 py-2 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
@@ -146,14 +153,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <span className="text-lg font-semibold text-foreground">SwimForge</span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-label="Toggle menu"
-        >
-          {mobileMenuOpen ? <X className="size-6" /> : <Menu className="size-6" />}
-        </Button>
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <DirectMessages />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            {mobileMenuOpen ? <X className="size-6" /> : <Menu className="size-6" />}
+          </Button>
+        </div>
       </header>
 
       {/* Mobile Menu Overlay */}

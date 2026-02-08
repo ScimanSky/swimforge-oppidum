@@ -1381,6 +1381,339 @@ export const appRouter = router({
           const { updateMemberRole } = await import("./db_clubs");
           return updateMemberRole(ctx.user.id, input.clubId, input.userId, input.role);
         }),
+
+      // ============================================
+      // CLUB EVENTS (Nuove funzionalità social network)
+      // ============================================
+      events: router({
+        list: protectedProcedure
+          .input(z.object({
+            clubId: z.number(),
+            status: z.enum(["active", "cancelled", "completed"]).optional(),
+            fromDate: z.string().datetime().optional(),
+            toDate: z.string().datetime().optional(),
+            limit: z.number().min(1).max(100).optional(),
+          }))
+          .query(async ({ input }) => {
+            const { getClubEvents } = await import("./db_social_enhanced");
+            return getClubEvents({
+              clubId: input.clubId,
+              status: input.status,
+              fromDate: input.fromDate ? new Date(input.fromDate) : undefined,
+              toDate: input.toDate ? new Date(input.toDate) : undefined,
+              limit: input.limit,
+            });
+          }),
+
+        create: protectedProcedure
+          .input(z.object({
+            clubId: z.number(),
+            title: z.string().min(1).max(200),
+            description: z.string().max(5000).optional(),
+            eventType: z.enum(["training", "race", "social", "meeting"]),
+            location: z.string().max(500).optional(),
+            locationLat: z.number().min(-90).max(90).optional(),
+            locationLng: z.number().min(-180).max(180).optional(),
+            startTime: z.string().datetime(),
+            endTime: z.string().datetime().optional(),
+            maxAttendees: z.number().min(1).optional(),
+            isRecurring: z.boolean().optional(),
+            recurringRule: z.string().optional(),
+            coverImageUrl: z.string().url().optional(),
+          }))
+          .mutation(async ({ ctx, input }) => {
+            const { createClubEvent } = await import("./db_social_enhanced");
+            const event = await createClubEvent({
+              ...input,
+              creatorId: ctx.user.id,
+              startTime: new Date(input.startTime),
+              endTime: input.endTime ? new Date(input.endTime) : undefined,
+            });
+            return { success: true, event };
+          }),
+
+        get: protectedProcedure
+          .input(z.object({ eventId: z.number() }))
+          .query(async ({ input }) => {
+            const { getEventById } = await import("./db_social_enhanced");
+            return getEventById(input.eventId);
+          }),
+
+        update: protectedProcedure
+          .input(z.object({
+            eventId: z.number(),
+            title: z.string().min(1).max(200).optional(),
+            description: z.string().max(5000).optional(),
+            eventType: z.enum(["training", "race", "social", "meeting"]).optional(),
+            location: z.string().max(500).optional(),
+            startTime: z.string().datetime().optional(),
+            endTime: z.string().datetime().optional(),
+            status: z.enum(["active", "cancelled", "completed"]).optional(),
+          }))
+          .mutation(async ({ input }) => {
+            const { updateClubEvent } = await import("./db_social_enhanced");
+            const { eventId, ...rest } = input;
+            const updates: Record<string, any> = { ...rest };
+            if (updates.startTime) updates.startTime = new Date(updates.startTime);
+            if (updates.endTime) updates.endTime = new Date(updates.endTime);
+            const event = await updateClubEvent(eventId, updates);
+            return { success: true, event };
+          }),
+
+        delete: protectedProcedure
+          .input(z.object({ eventId: z.number() }))
+          .mutation(async ({ input }) => {
+            const { deleteClubEvent } = await import("./db_social_enhanced");
+            await deleteClubEvent(input.eventId);
+            return { success: true };
+          }),
+
+        rsvp: protectedProcedure
+          .input(z.object({
+            eventId: z.number(),
+            status: z.enum(["going", "maybe", "not_going"]),
+          }))
+          .mutation(async ({ ctx, input }) => {
+            const { rsvpToEvent } = await import("./db_social_enhanced");
+            const attendee = await rsvpToEvent({
+              eventId: input.eventId,
+              userId: ctx.user.id,
+              status: input.status,
+            });
+            return { success: true, attendee };
+          }),
+
+        attendees: protectedProcedure
+          .input(z.object({ eventId: z.number() }))
+          .query(async ({ input }) => {
+            const { getEventAttendees } = await import("./db_social_enhanced");
+            return getEventAttendees(input.eventId);
+          }),
+      }),
+
+      // ============================================
+      // CLUB ANNOUNCEMENTS
+      // ============================================
+      announcements: router({
+        list: protectedProcedure
+          .input(z.object({
+            clubId: z.number(),
+            includeExpired: z.boolean().optional(),
+          }))
+          .query(async ({ input }) => {
+            const { getClubAnnouncements } = await import("./db_social_enhanced");
+            return getClubAnnouncements(input.clubId, input.includeExpired);
+          }),
+
+        create: protectedProcedure
+          .input(z.object({
+            clubId: z.number(),
+            title: z.string().min(1).max(200),
+            content: z.string().min(1).max(10000),
+            isPinned: z.boolean().optional(),
+            expiresAt: z.string().datetime().optional(),
+          }))
+          .mutation(async ({ ctx, input }) => {
+            const { createClubAnnouncement } = await import("./db_social_enhanced");
+            const announcement = await createClubAnnouncement({
+              ...input,
+              authorId: ctx.user.id,
+              expiresAt: input.expiresAt ? new Date(input.expiresAt) : undefined,
+            });
+            return { success: true, announcement };
+          }),
+
+        update: protectedProcedure
+          .input(z.object({
+            announcementId: z.number(),
+            title: z.string().min(1).max(200).optional(),
+            content: z.string().min(1).max(10000).optional(),
+            isPinned: z.boolean().optional(),
+            expiresAt: z.string().datetime().optional(),
+          }))
+          .mutation(async ({ input }) => {
+            const { updateClubAnnouncement } = await import("./db_social_enhanced");
+            const { announcementId, ...rest } = input;
+            const updates: Record<string, any> = { ...rest };
+            if (updates.expiresAt) updates.expiresAt = new Date(updates.expiresAt);
+            const announcement = await updateClubAnnouncement(announcementId, updates);
+            return { success: true, announcement };
+          }),
+
+        delete: protectedProcedure
+          .input(z.object({ announcementId: z.number() }))
+          .mutation(async ({ input }) => {
+            const { deleteClubAnnouncement } = await import("./db_social_enhanced");
+            await deleteClubAnnouncement(input.announcementId);
+            return { success: true };
+          }),
+      }),
+
+      // ============================================
+      // CLUB MEDIA GALLERY
+      // ============================================
+      media: router({
+        list: protectedProcedure
+          .input(z.object({
+            clubId: z.number(),
+            mediaType: z.enum(["image", "video"]).optional(),
+            eventId: z.number().optional(),
+            limit: z.number().min(1).max(100).optional(),
+            offset: z.number().min(0).optional(),
+          }))
+          .query(async ({ input }) => {
+            const { getClubMediaGallery } = await import("./db_social_enhanced");
+            return getClubMediaGallery(input);
+          }),
+
+        upload: protectedProcedure
+          .input(z.object({
+            clubId: z.number(),
+            mediaType: z.enum(["image", "video"]),
+            mediaUrl: z.string().url(),
+            thumbnailUrl: z.string().url().optional(),
+            caption: z.string().max(500).optional(),
+            eventId: z.number().optional(),
+          }))
+          .mutation(async ({ ctx, input }) => {
+            const { uploadClubMedia } = await import("./db_social_enhanced");
+            const media = await uploadClubMedia({
+              ...input,
+              uploaderId: ctx.user.id,
+            });
+            return { success: true, media };
+          }),
+
+        delete: protectedProcedure
+          .input(z.object({ mediaId: z.number() }))
+          .mutation(async ({ input }) => {
+            const { deleteClubMedia } = await import("./db_social_enhanced");
+            await deleteClubMedia(input.mediaId);
+            return { success: true };
+          }),
+      }),
+    }),
+
+    // ============================================
+    // DIRECT MESSAGES
+    // ============================================
+    messages: router({
+      send: protectedProcedure
+        .input(z.object({
+          receiverId: z.number(),
+          content: z.string().min(1).max(5000),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const { sendDirectMessage } = await import("./db_social_enhanced");
+          const message = await sendDirectMessage({
+            senderId: ctx.user.id,
+            receiverId: input.receiverId,
+            content: input.content,
+          });
+          return { success: true, message };
+        }),
+
+      conversation: protectedProcedure
+        .input(z.object({
+          otherUserId: z.number(),
+          limit: z.number().min(1).max(100).optional(),
+          offset: z.number().min(0).optional(),
+        }))
+        .query(async ({ ctx, input }) => {
+          const { getConversation } = await import("./db_social_enhanced");
+          return getConversation({
+            userId1: ctx.user.id,
+            userId2: input.otherUserId,
+            limit: input.limit,
+            offset: input.offset,
+          });
+        }),
+
+      markRead: protectedProcedure
+        .input(z.object({ senderId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          const { markMessagesAsRead } = await import("./db_social_enhanced");
+          await markMessagesAsRead({
+            receiverId: ctx.user.id,
+            senderId: input.senderId,
+          });
+          return { success: true };
+        }),
+
+      recent: protectedProcedure
+        .input(z.object({ limit: z.number().min(1).max(50).optional() }).optional())
+        .query(async ({ ctx, input }) => {
+          const { getRecentConversations } = await import("./db_social_enhanced");
+          return getRecentConversations(ctx.user.id, input?.limit);
+        }),
+    }),
+
+    // ============================================
+    // NOTIFICATIONS
+    // ============================================
+    notifications: router({
+      list: protectedProcedure
+        .input(z.object({
+          limit: z.number().min(1).max(100).optional(),
+          onlyUnread: z.boolean().optional(),
+        }).optional())
+        .query(async ({ ctx, input }) => {
+          const { getUserNotifications } = await import("./db_social_enhanced");
+          return getUserNotifications({
+            userId: ctx.user.id,
+            limit: input?.limit,
+            onlyUnread: input?.onlyUnread,
+          });
+        }),
+
+      markRead: protectedProcedure
+        .input(z.object({ notificationIds: z.array(z.number()).optional() }).optional())
+        .mutation(async ({ ctx, input }) => {
+          const { markNotificationsAsRead } = await import("./db_social_enhanced");
+          await markNotificationsAsRead(ctx.user.id, input?.notificationIds);
+          return { success: true };
+        }),
+
+      unreadCount: protectedProcedure
+        .query(async ({ ctx }) => {
+          const { getUnreadNotificationCount } = await import("./db_social_enhanced");
+          const count = await getUnreadNotificationCount(ctx.user.id);
+          return { count };
+        }),
+    }),
+
+    // ============================================
+    // POST REACTIONS (Reazioni avanzate)
+    // ============================================
+    reactions: router({
+      toggle: protectedProcedure
+        .input(z.object({
+          postId: z.number(),
+          reactionType: z.enum(["splash", "fire", "strong", "clap", "wave"]),
+        }))
+        .mutation(async ({ ctx, input }) => {
+          const { togglePostReaction } = await import("./db_social_enhanced");
+          const reaction = await togglePostReaction({
+            postId: input.postId,
+            userId: ctx.user.id,
+            reactionType: input.reactionType,
+          });
+          return { success: true, reaction };
+        }),
+
+      list: protectedProcedure
+        .input(z.object({ postId: z.number() }))
+        .query(async ({ input }) => {
+          const { getPostReactions } = await import("./db_social_enhanced");
+          return getPostReactions(input.postId);
+        }),
+
+      userReaction: protectedProcedure
+        .input(z.object({ postId: z.number() }))
+        .query(async ({ ctx, input }) => {
+          const { getUserPostReaction } = await import("./db_social_enhanced");
+          return getUserPostReaction(input.postId, ctx.user.id);
+        }),
     }),
   }),
 
