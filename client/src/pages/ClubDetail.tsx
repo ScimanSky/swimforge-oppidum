@@ -511,9 +511,9 @@ export default function ClubDetail() {
                               createEvent.mutate({
                                 clubId,
                                 title: eventForm.title,
-                                description: eventForm.description || undefined,
+                                description: eventForm.description.trim() || undefined,
                                 eventType: eventForm.eventType,
-                                location: eventForm.location || undefined,
+                                location: eventForm.location.trim() || undefined,
                                 startTime: startTime.toISOString(),
                                 endTime: endTime ? endTime.toISOString() : undefined,
                                 maxAttendees: eventForm.maxAttendees ? Number(eventForm.maxAttendees) : undefined,

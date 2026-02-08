@@ -666,6 +666,27 @@ export async function createClubEvent(
 
   if (!membership.length) throw new Error("Must be a club member to create events");
 
+  // Validate dates
+  const startTime = new Date(input.startTime);
+  const endTime = input.endTime ? new Date(input.endTime) : null;
+
+  if (isNaN(startTime.getTime())) {
+    throw new Error("Invalid start time");
+  }
+
+  if (startTime < new Date()) {
+    throw new Error("Event cannot start in the past");
+  }
+
+  if (endTime) {
+    if (isNaN(endTime.getTime())) {
+      throw new Error("Invalid end time");
+    }
+    if (endTime <= startTime) {
+      throw new Error("End time must be after start time");
+    }
+  }
+
   const result = await db
     .insert(communityClubEvents)
     .values({
@@ -675,8 +696,8 @@ export async function createClubEvent(
       description: input.description ?? null,
       eventType: input.eventType,
       location: input.location ?? null,
-      startTime: new Date(input.startTime),
-      endTime: input.endTime ? new Date(input.endTime) : null,
+      startTime,
+      endTime,
       maxAttendees: input.maxAttendees ?? null,
     })
     .returning({ id: communityClubEvents.id });
