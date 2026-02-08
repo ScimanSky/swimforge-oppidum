@@ -1193,60 +1193,6 @@ export const appRouter = router({
           const { updateMemberRole } = await import("./db_clubs");
           return updateMemberRole(ctx.user.id, input.clubId, input.userId, input.role);
         }),
-
-      // ============================================
-      // CLUB EVENTS
-      // ============================================
-      events: router({
-        list: protectedProcedure
-          .input(z.object({ clubId: z.number() }))
-          .query(async ({ ctx, input }) => {
-            const { listClubEvents } = await import("./db_clubs");
-            return listClubEvents(ctx.user.id, input.clubId);
-          }),
-
-        create: protectedProcedure
-          .input(z.object({
-            clubId: z.number(),
-            title: z.string().min(1).max(200),
-            description: z.string().max(1000).optional(),
-            eventType: z.string().min(1).max(50),
-            location: z.string().max(500).optional(),
-            startTime: z.string().datetime(),
-            endTime: z.string().datetime().optional(),
-            maxAttendees: z.number().min(1).optional(),
-          }))
-          .mutation(async ({ ctx, input }) => {
-            const { createClubEvent } = await import("./db_clubs");
-            return createClubEvent(ctx.user.id, {
-              clubId: input.clubId,
-              title: input.title,
-              description: input.description,
-              eventType: input.eventType,
-              location: input.location,
-              startTime: input.startTime,
-              endTime: input.endTime,
-              maxAttendees: input.maxAttendees,
-            });
-          }),
-
-        delete: protectedProcedure
-          .input(z.object({ eventId: z.number() }))
-          .mutation(async ({ ctx, input }) => {
-            const { deleteClubEvent } = await import("./db_clubs");
-            return deleteClubEvent(ctx.user.id, input.eventId);
-          }),
-
-        rsvp: protectedProcedure
-          .input(z.object({
-            eventId: z.number(),
-            status: z.enum(["going", "maybe", "not_going"]),
-          }))
-          .mutation(async ({ ctx, input }) => {
-            const { rsvpToEvent } = await import("./db_clubs");
-            return rsvpToEvent(ctx.user.id, input.eventId, input.status);
-          }),
-      }),
     }),
   }),
 

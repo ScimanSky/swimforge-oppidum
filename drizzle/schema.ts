@@ -235,35 +235,6 @@ export const communityClubInvites = pgTable("community_club_invites", {
 });
 
 // ============================================
-// CLUB EVENTS
-// ============================================
-export const communityClubEvents = pgTable("community_club_events", {
-  id: serial("id").primaryKey(),
-  clubId: integer("club_id").notNull(),
-  creatorId: integer("creator_id").notNull(),
-  title: varchar("title", { length: 200 }).notNull(),
-  description: text("description"),
-  eventType: varchar("event_type", { length: 50 }).notNull(),
-  location: text("location"),
-  startTime: timestamp("start_time").notNull(),
-  endTime: timestamp("end_time"),
-  maxAttendees: integer("max_attendees"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const communityEventRsvps = pgTable("community_event_rsvps", {
-  id: serial("id").primaryKey(),
-  eventId: integer("event_id").notNull(),
-  userId: integer("user_id").notNull(),
-  status: varchar("status", { length: 20 }).notNull(), // 'going', 'maybe', 'not_going'
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (table) => ({
-  uniqueEventRsvp: unique().on(table.eventId, table.userId),
-}));
-
-// ============================================
 // USER ACHIEVEMENT BADGES (Earned achievement badges)
 // ============================================
 export const userAchievementBadges = pgTable("user_achievement_badges", {
@@ -423,7 +394,3 @@ export type ActivityAiInsight = typeof activityAiInsights.$inferSelect;
 export type InsertActivityAiInsight = typeof activityAiInsights.$inferInsert;
 export type AiCoachWorkout = typeof aiCoachWorkouts.$inferSelect;
 export type InsertAiCoachWorkout = typeof aiCoachWorkouts.$inferInsert;
-export type CommunityClubEvent = typeof communityClubEvents.$inferSelect;
-export type InsertCommunityClubEvent = typeof communityClubEvents.$inferInsert;
-export type CommunityEventRsvp = typeof communityEventRsvps.$inferSelect;
-export type InsertCommunityEventRsvp = typeof communityEventRsvps.$inferInsert;
