@@ -1,6 +1,6 @@
-# SwimForge Oppidum — social + analytics platform for swim activities (OSS)
+# SwimForge — social + analytics platform for swim activities (OSS)
 
-SwimForge Oppidum is a gamified, social swim platform that unifies activity data (Garmin/Strava), computes advanced metrics, and delivers AI-assisted coaching insights. It is designed as a provider-agnostic monorepo with a modern React UI, a Node/Express API, and a PostgreSQL backend.
+SwimForge  is a gamified, social swim platform that unifies activity data (Garmin/Strava), computes advanced metrics, and delivers AI-assisted coaching insights. It is designed as a provider-agnostic monorepo with a modern React UI, a Node/Express API, and a PostgreSQL backend.
 
 ## Overview
 SwimForge helps swimmers track pool and open-water sessions, earn XP and badges, and compare progress with friends. A metrics engine calculates performance/consistency indexes, while the AI layer generates coaching insights and training plans. The community hub enables sharing sessions, giving "Splash" kudos, and forming clubs.
