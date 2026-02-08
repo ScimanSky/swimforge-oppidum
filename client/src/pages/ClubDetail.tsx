@@ -853,12 +853,12 @@ export default function ClubDetail() {
                               createEvent.mutate({
                                 clubId,
                                 title: eventForm.title,
-                                description: eventForm.description || null,
+                                description: eventForm.description || undefined,
                                 eventType: eventForm.eventType,
-                                location: eventForm.location || null,
-                                startTime,
-                                endTime,
-                                maxAttendees: eventForm.maxAttendees ? Number(eventForm.maxAttendees) : null,
+                                location: eventForm.location || undefined,
+                                startTime: startTime.toISOString(),
+                                endTime: endTime ? endTime.toISOString() : undefined,
+                                maxAttendees: eventForm.maxAttendees ? Number(eventForm.maxAttendees) : undefined,
                               });
                             }}
                             disabled={!eventForm.title || !eventForm.startTime}
@@ -903,7 +903,7 @@ export default function ClubDetail() {
                                     <Button
                                       size="sm"
                                       variant="destructive"
-                                      onClick={() => deleteEvent.mutate({ clubId, eventId: event.id })}
+                                      onClick={() => deleteEvent.mutate({ eventId: event.id })}
                                     >
                                       <Trash2 className="h-4 w-4" />
                                     </Button>
@@ -930,7 +930,7 @@ export default function ClubDetail() {
                                   <Button
                                     size="sm"
                                     variant={event.user_rsvp === "going" ? "neon" : "outline-neon"}
-                                    onClick={() => rsvpEvent.mutate({ clubId, eventId: event.id, response: "going" })}
+                                    onClick={() => rsvpEvent.mutate({ eventId: event.id, status: "going" })}
                                   >
                                     <CheckCircle2 className="h-4 w-4 mr-1" />
                                     Partecipo ({event.going_count || 0})
@@ -938,7 +938,7 @@ export default function ClubDetail() {
                                   <Button
                                     size="sm"
                                     variant={event.user_rsvp === "maybe" ? "neon" : "outline-neon"}
-                                    onClick={() => rsvpEvent.mutate({ clubId, eventId: event.id, response: "maybe" })}
+                                    onClick={() => rsvpEvent.mutate({ eventId: event.id, status: "maybe" })}
                                   >
                                     <HelpCircle className="h-4 w-4 mr-1" />
                                     Forse ({event.maybe_count || 0})
@@ -946,7 +946,7 @@ export default function ClubDetail() {
                                   <Button
                                     size="sm"
                                     variant={event.user_rsvp === "not_going" ? "destructive" : "outline-neon"}
-                                    onClick={() => rsvpEvent.mutate({ clubId, eventId: event.id, response: "not_going" })}
+                                    onClick={() => rsvpEvent.mutate({ eventId: event.id, status: "not_going" })}
                                   >
                                     <XCircle className="h-4 w-4 mr-1" />
                                     Non partecipo
