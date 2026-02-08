@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { Users, ArrowLeft, Droplet, MessageCircle, Share2, Plus } from "lucide-react";
+import { Users, ArrowLeft, Droplet, MessageCircle, Share2, Plus, Calendar, MapPin, Clock, X } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import MobileNav from "@/components/MobileNav";
 import { Card, CardContent } from "@/components/ui/card";
@@ -177,6 +177,50 @@ export default function ClubDetail() {
   const [rulesDraft, setRulesDraft] = useState("");
   const [visibilityDraft, setVisibilityDraft] = useState<"public" | "private" | "invite">("public");
 
+  // Event-related state
+  const [eventForm, setEventForm] = useState({
+    title: "",
+    description: "",
+    eventType: "training",
+    location: "",
+    maxAttendees: "",
+  });
+  const [eventStartDate, setEventStartDate] = useState("");
+  const [eventStartTime, setEventStartTime] = useState("");
+  const [eventEndDate, setEventEndDate] = useState("");
+  const [eventEndTime, setEventEndTime] = useState("");
+  const [showEventForm, setShowEventForm] = useState(false);
+
+  // Event queries and mutations
+  const eventsQuery = trpc.community.clubs.events.list.useQuery(
+    { clubId },
+    { enabled: !!clubQuery.data && club?.is_member }
+  );
+
+  const createEvent = trpc.community.clubs.events.create.useMutation({
+    onSuccess: () => {
+      utils.community.clubs.events.list.invalidate({ clubId });
+      setShowEventForm(false);
+      setEventForm({ title: "", description: "", eventType: "training", location: "", maxAttendees: "" });
+      setEventStartDate("");
+      setEventStartTime("");
+      setEventEndDate("");
+      setEventEndTime("");
+    },
+  });
+
+  const deleteEvent = trpc.community.clubs.events.delete.useMutation({
+    onSuccess: () => {
+      utils.community.clubs.events.list.invalidate({ clubId });
+    },
+  });
+
+  const rsvpEvent = trpc.community.clubs.events.rsvp.useMutation({
+    onSuccess: () => {
+      utils.community.clubs.events.list.invalidate({ clubId });
+    },
+  });
+
   const createPost = trpc.community.clubs.createPost.useMutation({
     onSuccess: () => {
       setPostText("");
@@ -339,6 +383,231 @@ export default function ClubDetail() {
                     </CardContent>
                   </Card>
                 )}
+
+                {/* Events Section */}
+                {club?.is_member && (
+                  <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
+                    <CardContent className="p-6 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h2 className="text-xl font-semibold flex items-center gap-2">
+                          <Calendar className="h-5 w-5" />
+                          Eventi
+                        </h2>
+                        <Button
+                          size="sm"
+                          className="bg-[var(--gold)] text-[var(--navy)]"
+                          onClick={() => setShowEventForm(!showEventForm)}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          {showEventForm ? "Annulla" : "Crea Evento"}
+                        </Button>
+                      </div>
+
+                      {showEventForm && (
+                        <div className="space-y-3 p-4 bg-white/5 rounded-lg">
+                          <Input
+                            placeholder="Titolo evento"
+                            value={eventForm.title}
+                            onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
+                            className="bg-white/5 border-white/10"
+                          />
+                          <Input
+                            placeholder="Descrizione (opzionale)"
+                            value={eventForm.description}
+                            onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })}
+                            className="bg-white/5 border-white/10"
+                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            <Input
+                              placeholder="Tipo evento"
+                              value={eventForm.eventType}
+                              onChange={(e) => setEventForm({ ...eventForm, eventType: e.target.value })}
+                              className="bg-white/5 border-white/10"
+                            />
+                            <Input
+                              placeholder="Max partecipanti (opzionale)"
+                              type="number"
+                              value={eventForm.maxAttendees}
+                              onChange={(e) => setEventForm({ ...eventForm, maxAttendees: e.target.value })}
+                              className="bg-white/5 border-white/10"
+                            />
+                          </div>
+                          <Input
+                            placeholder="Luogo (opzionale)"
+                            value={eventForm.location}
+                            onChange={(e) => setEventForm({ ...eventForm, location: e.target.value })}
+                            className="bg-white/5 border-white/10"
+                          />
+                          <div className="space-y-2">
+                            <label className="text-sm text-white/70">Data e ora inizio</label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                type="date"
+                                value={eventStartDate}
+                                onChange={(e) => setEventStartDate(e.target.value)}
+                                className="bg-white/5 border-white/10"
+                              />
+                              <Input
+                                type="time"
+                                value={eventStartTime}
+                                onChange={(e) => setEventStartTime(e.target.value)}
+                                className="bg-white/5 border-white/10"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm text-white/70">Data e ora fine (opzionale)</label>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                type="date"
+                                value={eventEndDate}
+                                onChange={(e) => setEventEndDate(e.target.value)}
+                                className="bg-white/5 border-white/10"
+                              />
+                              <Input
+                                type="time"
+                                value={eventEndTime}
+                                onChange={(e) => setEventEndTime(e.target.value)}
+                                className="bg-white/5 border-white/10"
+                              />
+                            </div>
+                          </div>
+                          <Button
+                            className="w-full bg-[var(--azure)] text-white"
+                            disabled={
+                              !eventForm.title.trim() ||
+                              !eventForm.eventType.trim() ||
+                              !eventStartDate ||
+                              !eventStartTime ||
+                              createEvent.isPending
+                            }
+                            onClick={() => {
+                              const startTime = new Date(`${eventStartDate}T${eventStartTime}`);
+                              const endTime =
+                                eventEndDate && eventEndTime
+                                  ? new Date(`${eventEndDate}T${eventEndTime}`)
+                                  : undefined;
+
+                              // Validation
+                              if (isNaN(startTime.getTime())) {
+                                alert("Data/ora inizio non valida");
+                                return;
+                              }
+                              if (startTime < new Date()) {
+                                alert("L'evento non può iniziare nel passato");
+                                return;
+                              }
+                              if (endTime && isNaN(endTime.getTime())) {
+                                alert("Data/ora fine non valida");
+                                return;
+                              }
+                              if (endTime && endTime <= startTime) {
+                                alert("La data di fine deve essere dopo la data di inizio");
+                                return;
+                              }
+
+                              createEvent.mutate({
+                                clubId,
+                                title: eventForm.title,
+                                description: eventForm.description || undefined,
+                                eventType: eventForm.eventType,
+                                location: eventForm.location || undefined,
+                                startTime: startTime.toISOString(),
+                                endTime: endTime ? endTime.toISOString() : undefined,
+                                maxAttendees: eventForm.maxAttendees ? Number(eventForm.maxAttendees) : undefined,
+                              });
+                            }}
+                          >
+                            Crea Evento
+                          </Button>
+                        </div>
+                      )}
+
+                      <div className="space-y-3">
+                        {eventsQuery.data && eventsQuery.data.length > 0 ? (
+                          eventsQuery.data.map((event: any) => {
+                            const eventDate = new Date(event.start_time);
+                            const isPast = eventDate < new Date();
+                            return (
+                              <Card key={event.id} className="bg-white/5 border-white/10">
+                                <CardContent className="p-4 space-y-2">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <h4 className="font-semibold">{event.title}</h4>
+                                      {event.description && (
+                                        <p className="text-sm text-white/70 mt-1">{event.description}</p>
+                                      )}
+                                    </div>
+                                    {(event.creator_id === clubQuery.data?.owner_id || isStaff) && (
+                                      <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => deleteEvent.mutate({ eventId: event.id })}
+                                        className="text-red-400 hover:text-red-300"
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap gap-3 text-sm text-white/60">
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="h-4 w-4" />
+                                      {eventDate.toLocaleDateString()} {eventDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                    {event.location && (
+                                      <span className="flex items-center gap-1">
+                                        <MapPin className="h-4 w-4" />
+                                        {event.location}
+                                      </span>
+                                    )}
+                                    <span className="flex items-center gap-1">
+                                      <Users className="h-4 w-4" />
+                                      {event.attendee_count}
+                                      {event.max_attendees && ` / ${event.max_attendees}`}
+                                    </span>
+                                  </div>
+                                  {!isPast && (
+                                    <div className="flex gap-2 pt-2">
+                                      <Button
+                                        size="sm"
+                                        variant={event.user_rsvp_status === "going" ? "default" : "outline"}
+                                        onClick={() => rsvpEvent.mutate({ eventId: event.id, status: "going" })}
+                                        className={event.user_rsvp_status === "going" ? "bg-green-600" : ""}
+                                      >
+                                        Partecipo
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant={event.user_rsvp_status === "maybe" ? "default" : "outline"}
+                                        onClick={() => rsvpEvent.mutate({ eventId: event.id, status: "maybe" })}
+                                        className={event.user_rsvp_status === "maybe" ? "bg-yellow-600" : ""}
+                                      >
+                                        Forse
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant={event.user_rsvp_status === "not_going" ? "default" : "outline"}
+                                        onClick={() => rsvpEvent.mutate({ eventId: event.id, status: "not_going" })}
+                                        className={event.user_rsvp_status === "not_going" ? "bg-red-600" : ""}
+                                      >
+                                        Non partecipo
+                                      </Button>
+                                    </div>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            );
+                          })
+                        ) : (
+                          <div className="text-center text-white/50 py-4">
+                            Nessun evento programmato
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
                   <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
                     <CardContent className="p-6 space-y-4">
