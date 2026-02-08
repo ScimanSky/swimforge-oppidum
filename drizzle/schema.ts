@@ -1,4 +1,4 @@
-import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean, json, serial, unique, doublePrecision, date } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean, json, serial, unique, doublePrecision, date, real } from "drizzle-orm/pg-core";
 
 // ============================================
 // ENUMS for PostgreSQL
