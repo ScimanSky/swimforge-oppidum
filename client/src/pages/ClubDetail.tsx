@@ -113,6 +113,9 @@ export default function ClubDetail() {
   });
 
   const utils = trpc.useUtils();
+  
+  const profileQuery = trpc.profile.get.useQuery();
+  const currentUserId = profileQuery.data?.userId;
 
   const clubQuery = trpc.community.clubs.get.useQuery(
     { clubId },
@@ -560,7 +563,7 @@ export default function ClubDetail() {
                           const distance = formatDistance(post.activity_distance_meters);
                           const duration = formatTime(post.activity_duration_seconds);
                           const pace = formatPace(post.activity_distance_meters, post.activity_duration_seconds);
-                          const isClubOwnerPost = post.user_id === club?.owner_id;
+                          const isOwnPost = currentUserId && post.user_id === currentUserId;
                           return (
                             <motion.div
                               key={post.id}
@@ -632,7 +635,7 @@ export default function ClubDetail() {
                                       whileHover={{ scale: 1.05 }}
                                       whileTap={{ scale: 0.95 }}
                                       onClick={() => toggleSplash.mutate({ postId: post.id })}
-                                      disabled={toggleSplash.isPending || isClubOwnerPost}
+                                      disabled={toggleSplash.isPending || isOwnPost}
                                       className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg font-semibold transition-all ${
                                         post.has_splashed
                                           ? "bg-primary/20 text-primary border border-primary/50"
