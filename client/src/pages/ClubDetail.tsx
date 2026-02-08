@@ -73,6 +73,8 @@ export default function ClubDetail() {
     { enabled: match && Number.isFinite(clubId) }
   );
 
+  const profileQuery = trpc.profile.get.useQuery();
+
   const membersQuery = trpc.community.clubs.members.useQuery(
     { clubId },
     { enabled: !!clubQuery.data }
@@ -538,7 +540,7 @@ export default function ClubDetail() {
                                         <p className="text-sm text-white/70 mt-1">{event.description}</p>
                                       )}
                                     </div>
-                                    {(event.creator_id === clubQuery.data?.owner_id || isStaff) && (
+                                    {(event.creator_id === profileQuery.data?.userId || isStaff) && (
                                       <Button
                                         size="sm"
                                         variant="ghost"
