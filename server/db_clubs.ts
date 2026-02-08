@@ -1,6 +1,6 @@
 import { and, eq, ilike, sql } from "drizzle-orm";
 import { getDb } from "./db";
-import { communityClubInvites, communityClubs, communityClubMembers, socialPosts, swimmingActivities } from "../drizzle/schema";
+import { communityClubInvites, communityClubs, communityClubMembers, socialPosts, swimmingActivities, communityClubEvents, communityEventRsvps } from "../drizzle/schema";
 
 export type ClubScope = "all" | "mine";
 
@@ -597,5 +597,216 @@ export async function deleteClub(userId: number, clubId: number) {
   if (club[0].ownerId !== userId) throw new Error("Forbidden");
 
   await db.delete(communityClubs).where(eq(communityClubs.id, clubId));
+  return { success: true };
+}
+
+// ============================================
+// CLUB EVENTS FUNCTIONS
+// ============================================
+
+export async function listClubEvents(userId: number, clubId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const result = await db.execute(sql`
+    SELECT
+      e.id,
+      e.club_id,
+      e.creator_id,
+      e.title,
+      e.description,
+      e.event_type,
+      e.location,
+      e.start_time,
+      e.end_time,
+      e.max_attendees,
+      e.created_at,
+      e.updated_at,
+      u.name AS creator_name,
+      u.email AS creator_email,
+      COALESCE((SELECT COUNT(*) FROM community_event_rsvps r WHERE r.event_id = e.id AND r.status = 'going'), 0) AS attendee_count,
+      (SELECT r.status FROM community_event_rsvps r WHERE r.event_id = e.id AND r.user_id = ${userId} LIMIT 1) AS user_rsvp_status
+    FROM community_club_events e
+    LEFT JOIN users u ON e.creator_id = u.id
+    WHERE e.club_id = ${clubId}
+    ORDER BY e.start_time ASC
+  `);
+
+  return result.rows;
+}
+
+export async function createClubEvent(
+  userId: number,
+  input: {
+    clubId: number;
+    title: string;
+    description?: string;
+    eventType: string;
+    location?: string;
+    startTime: string; // ISO string
+    endTime?: string; // ISO string
+    maxAttendees?: number;
+  }
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Check if user is a member of the club
+  const membership = await db
+    .select()
+    .from(communityClubMembers)
+    .where(
+      and(
+        eq(communityClubMembers.clubId, input.clubId),
+        eq(communityClubMembers.userId, userId),
+        eq(communityClubMembers.status, "active")
+      )
+    )
+    .limit(1);
+
+  if (!membership.length) throw new Error("Must be a club member to create events");
+
+  // Validate dates
+  const startTime = new Date(input.startTime);
+  const endTime = input.endTime ? new Date(input.endTime) : null;
+
+  if (isNaN(startTime.getTime())) {
+    throw new Error("Invalid start time");
+  }
+
+  if (startTime < new Date()) {
+    throw new Error("Event cannot start in the past");
+  }
+
+  if (endTime) {
+    if (isNaN(endTime.getTime())) {
+      throw new Error("Invalid end time");
+    }
+    if (endTime <= startTime) {
+      throw new Error("End time must be after start time");
+    }
+  }
+
+  const result = await db
+    .insert(communityClubEvents)
+    .values({
+      clubId: input.clubId,
+      creatorId: userId,
+      title: input.title,
+      description: input.description ?? null,
+      eventType: input.eventType,
+      location: input.location ?? null,
+      startTime,
+      endTime,
+      maxAttendees: input.maxAttendees ?? null,
+    })
+    .returning({ id: communityClubEvents.id });
+
+  return { success: true, eventId: result[0].id };
+}
+
+export async function deleteClubEvent(userId: number, eventId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const event = await db
+    .select({
+      id: communityClubEvents.id,
+      creatorId: communityClubEvents.creatorId,
+      clubId: communityClubEvents.clubId,
+    })
+    .from(communityClubEvents)
+    .where(eq(communityClubEvents.id, eventId))
+    .limit(1);
+
+  if (!event.length) throw new Error("Event not found");
+
+  // Check if user is the creator or has permission
+  const membership = await db
+    .select()
+    .from(communityClubMembers)
+    .where(
+      and(
+        eq(communityClubMembers.clubId, event[0].clubId),
+        eq(communityClubMembers.userId, userId)
+      )
+    )
+    .limit(1);
+
+  if (!membership.length) throw new Error("Forbidden");
+
+  const isCreator = event[0].creatorId === userId;
+  const isModerator = membership[0].role === "moderator" || membership[0].role === "admin" || membership[0].role === "owner";
+
+  if (!isCreator && !isModerator) {
+    throw new Error("Only the event creator or club moderators can delete events");
+  }
+
+  await db.delete(communityClubEvents).where(eq(communityClubEvents.id, eventId));
+  return { success: true };
+}
+
+export async function rsvpToEvent(
+  userId: number,
+  eventId: number,
+  status: "going" | "maybe" | "not_going"
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // Check if event exists and get club ID
+  const event = await db
+    .select({ clubId: communityClubEvents.clubId })
+    .from(communityClubEvents)
+    .where(eq(communityClubEvents.id, eventId))
+    .limit(1);
+
+  if (!event.length) throw new Error("Event not found");
+
+  // Check if user is a member of the club
+  const membership = await db
+    .select()
+    .from(communityClubMembers)
+    .where(
+      and(
+        eq(communityClubMembers.clubId, event[0].clubId),
+        eq(communityClubMembers.userId, userId),
+        eq(communityClubMembers.status, "active")
+      )
+    )
+    .limit(1);
+
+  if (!membership.length) throw new Error("Must be a club member to RSVP to events");
+
+  // Insert or update RSVP
+  const existingRsvp = await db
+    .select()
+    .from(communityEventRsvps)
+    .where(
+      and(
+        eq(communityEventRsvps.eventId, eventId),
+        eq(communityEventRsvps.userId, userId)
+      )
+    )
+    .limit(1);
+
+  if (existingRsvp.length) {
+    await db
+      .update(communityEventRsvps)
+      .set({ status, updatedAt: new Date() })
+      .where(
+        and(
+          eq(communityEventRsvps.eventId, eventId),
+          eq(communityEventRsvps.userId, userId)
+        )
+      );
+  } else {
+    await db.insert(communityEventRsvps).values({
+      eventId,
+      userId,
+      status,
+    });
+  }
+
   return { success: true };
 }
