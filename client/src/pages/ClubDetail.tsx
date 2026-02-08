@@ -832,6 +832,11 @@ export default function ClubDetail() {
                                 return;
                               }
                               
+                              if (startTime < new Date()) {
+                                toast.error("La data di inizio deve essere nel futuro");
+                                return;
+                              }
+                              
                               if (endTime && isNaN(endTime.getTime())) {
                                 toast.error("Data di fine non valida");
                                 return;
@@ -1254,11 +1259,14 @@ export default function ClubDetail() {
                                   toast.error("Data di scadenza non valida");
                                   return;
                                 }
-                                if (date <= new Date()) {
-                                  toast.error("La data di scadenza deve essere nel futuro");
+                                const today = new Date();
+                                today.setHours(0, 0, 0, 0);
+                                date.setHours(0, 0, 0, 0);
+                                if (date < today) {
+                                  toast.error("La data di scadenza deve essere oggi o nel futuro");
                                   return;
                                 }
-                                expiresAt = date;
+                                expiresAt = new Date(announcementForm.expiresAt);
                               }
                               
                               createAnnouncement.mutate({
