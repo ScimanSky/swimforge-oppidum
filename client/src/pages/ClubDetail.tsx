@@ -560,7 +560,7 @@ export default function ClubDetail() {
                           const distance = formatDistance(post.activity_distance_meters);
                           const duration = formatTime(post.activity_duration_seconds);
                           const pace = formatPace(post.activity_distance_meters, post.activity_duration_seconds);
-                          const isPostOwner = post.user_id === club?.owner_id;
+                          const isClubOwnerPost = post.user_id === club?.owner_id;
                           return (
                             <motion.div
                               key={post.id}
@@ -632,7 +632,7 @@ export default function ClubDetail() {
                                       whileHover={{ scale: 1.05 }}
                                       whileTap={{ scale: 0.95 }}
                                       onClick={() => toggleSplash.mutate({ postId: post.id })}
-                                      disabled={toggleSplash.isPending || isPostOwner}
+                                      disabled={toggleSplash.isPending || isClubOwnerPost}
                                       className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg font-semibold transition-all ${
                                         post.has_splashed
                                           ? "bg-primary/20 text-primary border border-primary/50"
@@ -823,16 +823,36 @@ export default function ClubDetail() {
                           </div>
                           <Button
                             variant="neon"
-                            onClick={() => createEvent.mutate({
-                              clubId,
-                              title: eventForm.title,
-                              description: eventForm.description || null,
-                              eventType: eventForm.eventType,
-                              location: eventForm.location || null,
-                              startTime: new Date(eventForm.startTime),
-                              endTime: eventForm.endTime ? new Date(eventForm.endTime) : null,
-                              maxAttendees: eventForm.maxAttendees ? Number(eventForm.maxAttendees) : null,
-                            })}
+                            onClick={() => {
+                              const startTime = new Date(eventForm.startTime);
+                              const endTime = eventForm.endTime ? new Date(eventForm.endTime) : null;
+                              
+                              if (isNaN(startTime.getTime())) {
+                                toast.error("Data di inizio non valida");
+                                return;
+                              }
+                              
+                              if (endTime && isNaN(endTime.getTime())) {
+                                toast.error("Data di fine non valida");
+                                return;
+                              }
+                              
+                              if (endTime && endTime <= startTime) {
+                                toast.error("La data di fine deve essere dopo la data di inizio");
+                                return;
+                              }
+                              
+                              createEvent.mutate({
+                                clubId,
+                                title: eventForm.title,
+                                description: eventForm.description || null,
+                                eventType: eventForm.eventType,
+                                location: eventForm.location || null,
+                                startTime,
+                                endTime,
+                                maxAttendees: eventForm.maxAttendees ? Number(eventForm.maxAttendees) : null,
+                              });
+                            }}
                             disabled={!eventForm.title || !eventForm.startTime}
                           >
                             <Plus className="h-4 w-4 mr-2" />
@@ -1226,13 +1246,29 @@ export default function ClubDetail() {
                           </div>
                           <Button
                             variant="neon"
-                            onClick={() => createAnnouncement.mutate({
-                              clubId,
-                              title: announcementForm.title,
-                              content: announcementForm.content,
-                              isPinned: announcementForm.isPinned,
-                              expiresAt: announcementForm.expiresAt ? new Date(announcementForm.expiresAt) : null,
-                            })}
+                            onClick={() => {
+                              let expiresAt = null;
+                              if (announcementForm.expiresAt) {
+                                const date = new Date(announcementForm.expiresAt);
+                                if (isNaN(date.getTime())) {
+                                  toast.error("Data di scadenza non valida");
+                                  return;
+                                }
+                                if (date <= new Date()) {
+                                  toast.error("La data di scadenza deve essere nel futuro");
+                                  return;
+                                }
+                                expiresAt = date;
+                              }
+                              
+                              createAnnouncement.mutate({
+                                clubId,
+                                title: announcementForm.title,
+                                content: announcementForm.content,
+                                isPinned: announcementForm.isPinned,
+                                expiresAt,
+                              });
+                            }}
                             disabled={!announcementForm.title || !announcementForm.content}
                           >
                             <Megaphone className="h-4 w-4 mr-2" />
