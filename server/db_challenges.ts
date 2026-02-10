@@ -234,112 +234,122 @@ export async function calculateChallengeProgress(challengeId: number): Promise<v
   const challenge = challengeResult.rows[0] as any;
   if (!challenge) return;
 
-  // Get all participants
-  const participantsResult = await db.execute(sql`
-    SELECT user_id FROM challenge_participants WHERE challenge_id = ${challengeId}
+  // Avoid N+1 queries: compute progress for all participants in one query (grouped by user_id).
+  // Start by resetting all participants to 0 for this challenge.
+  await db.execute(sql`
+    UPDATE challenge_participants
+    SET current_progress = 0
+    WHERE challenge_id = ${challengeId}
   `);
-  const participants = participantsResult.rows as any[];
 
-  for (const participant of participants) {
-    let progress = 0;
+  const baseFilter = sql`
+    activity_date >= ${challenge.start_date}
+    AND activity_date <= ${challenge.end_date}
+    AND (
+      ${challenge.type} = 'both'
+      OR (${challenge.type} = 'pool' AND (is_open_water = false OR is_open_water IS NULL))
+      OR (${challenge.type} = 'open_water' AND is_open_water = true)
+    )
+  `;
 
-    // Calculate progress based on objective
-    switch (challenge.objective as ChallengeObjective) {
-      case "total_distance": {
-        const result = await db.execute(sql`
-          SELECT COALESCE(SUM(distance_meters), 0) as total
+  switch (challenge.objective as ChallengeObjective) {
+    case "total_distance": {
+      await db.execute(sql`
+        WITH progress AS (
+          SELECT user_id, COALESCE(SUM(distance_meters), 0) AS progress
           FROM swimming_activities
-          WHERE user_id = ${participant.user_id}
-            AND activity_date >= ${challenge.start_date}
-            AND activity_date <= ${challenge.end_date}
-            AND (${challenge.type === "both"} OR 
-                 (${challenge.type === "pool"} AND (is_open_water = false OR is_open_water IS NULL)) OR
-                 (${challenge.type === "open_water"} AND is_open_water = true))
-        `);
-        progress = (result.rows[0] as any)?.total || 0;
-        break;
-      }
-
-      case "total_sessions": {
-        const result = await db.execute(sql`
-          SELECT COUNT(*) as total
-          FROM swimming_activities
-          WHERE user_id = ${participant.user_id}
-            AND activity_date >= ${challenge.start_date}
-            AND activity_date <= ${challenge.end_date}
-            AND (${challenge.type === "both"} OR 
-                 (${challenge.type === "pool"} AND (is_open_water = false OR is_open_water IS NULL)) OR
-                 (${challenge.type === "open_water"} AND is_open_water = true))
-        `);
-        progress = (result.rows[0] as any)?.total || 0;
-        break;
-      }
-
-      case "total_time": {
-        const result = await db.execute(sql`
-          SELECT COALESCE(SUM(duration_seconds), 0) as total
-          FROM swimming_activities
-          WHERE user_id = ${participant.user_id}
-            AND activity_date >= ${challenge.start_date}
-            AND activity_date <= ${challenge.end_date}
-            AND (${challenge.type === "both"} OR 
-                 (${challenge.type === "pool"} AND (is_open_water = false OR is_open_water IS NULL)) OR
-                 (${challenge.type === "open_water"} AND is_open_water = true))
-        `);
-        progress = (result.rows[0] as any)?.total || 0;
-        break;
-      }
-
-      case "longest_session": {
-        const result = await db.execute(sql`
-          SELECT COALESCE(MAX(distance_meters), 0) as total
-          FROM swimming_activities
-          WHERE user_id = ${participant.user_id}
-            AND activity_date >= ${challenge.start_date}
-            AND activity_date <= ${challenge.end_date}
-            AND (${challenge.type === "both"} OR 
-                 (${challenge.type === "pool"} AND (is_open_water = false OR is_open_water IS NULL)) OR
-                 (${challenge.type === "open_water"} AND is_open_water = true))
-        `);
-        progress = (result.rows[0] as any)?.total || 0;
-        break;
-      }
-
-      case "consistency": {
-        const result = await db.execute(sql`
-          SELECT COUNT(DISTINCT DATE(activity_date)) as total
-          FROM swimming_activities
-          WHERE user_id = ${participant.user_id}
-            AND activity_date >= ${challenge.start_date}
-            AND activity_date <= ${challenge.end_date}
-            AND (${challenge.type === "both"} OR 
-                 (${challenge.type === "pool"} AND (is_open_water = false OR is_open_water IS NULL)) OR
-                 (${challenge.type === "open_water"} AND is_open_water = true))
-        `);
-        progress = (result.rows[0] as any)?.total || 0;
-        break;
-      }
-
-      case "avg_pace": {
-        const result = await db.execute(sql`
-          SELECT COALESCE(AVG(avg_pace_per_100m), 0) as total
-          FROM swimming_activities
-          WHERE user_id = ${participant.user_id}
-            AND activity_date >= ${challenge.start_date}
-            AND activity_date <= ${challenge.end_date}
-            AND avg_pace_per_100m IS NOT NULL
-            AND (${challenge.type === "both"} OR 
-                 (${challenge.type === "pool"} AND (is_open_water = false OR is_open_water IS NULL)) OR
-                 (${challenge.type === "open_water"} AND is_open_water = true))
-        `);
-        // For avg_pace, lower is better, so invert
-        progress = (result.rows[0] as any)?.total || 0;
-        break;
-      }
+          WHERE ${baseFilter}
+          GROUP BY user_id
+        )
+        UPDATE challenge_participants cp
+        SET current_progress = progress.progress
+        FROM progress
+        WHERE cp.challenge_id = ${challengeId}
+          AND cp.user_id = progress.user_id
+      `);
+      break;
     }
-
-    // Update progress
-    await updateChallengeProgress(challengeId, participant.user_id, progress);
+    case "total_sessions": {
+      await db.execute(sql`
+        WITH progress AS (
+          SELECT user_id, COUNT(*)::int AS progress
+          FROM swimming_activities
+          WHERE ${baseFilter}
+          GROUP BY user_id
+        )
+        UPDATE challenge_participants cp
+        SET current_progress = progress.progress
+        FROM progress
+        WHERE cp.challenge_id = ${challengeId}
+          AND cp.user_id = progress.user_id
+      `);
+      break;
+    }
+    case "total_time": {
+      await db.execute(sql`
+        WITH progress AS (
+          SELECT user_id, COALESCE(SUM(duration_seconds), 0) AS progress
+          FROM swimming_activities
+          WHERE ${baseFilter}
+          GROUP BY user_id
+        )
+        UPDATE challenge_participants cp
+        SET current_progress = progress.progress
+        FROM progress
+        WHERE cp.challenge_id = ${challengeId}
+          AND cp.user_id = progress.user_id
+      `);
+      break;
+    }
+    case "longest_session": {
+      await db.execute(sql`
+        WITH progress AS (
+          SELECT user_id, COALESCE(MAX(distance_meters), 0) AS progress
+          FROM swimming_activities
+          WHERE ${baseFilter}
+          GROUP BY user_id
+        )
+        UPDATE challenge_participants cp
+        SET current_progress = progress.progress
+        FROM progress
+        WHERE cp.challenge_id = ${challengeId}
+          AND cp.user_id = progress.user_id
+      `);
+      break;
+    }
+    case "consistency": {
+      await db.execute(sql`
+        WITH progress AS (
+          SELECT user_id, COUNT(DISTINCT DATE(activity_date))::int AS progress
+          FROM swimming_activities
+          WHERE ${baseFilter}
+          GROUP BY user_id
+        )
+        UPDATE challenge_participants cp
+        SET current_progress = progress.progress
+        FROM progress
+        WHERE cp.challenge_id = ${challengeId}
+          AND cp.user_id = progress.user_id
+      `);
+      break;
+    }
+    case "avg_pace": {
+      await db.execute(sql`
+        WITH progress AS (
+          SELECT user_id, COALESCE(AVG(avg_pace_per_100m), 0) AS progress
+          FROM swimming_activities
+          WHERE ${baseFilter}
+            AND avg_pace_per_100m IS NOT NULL
+          GROUP BY user_id
+        )
+        UPDATE challenge_participants cp
+        SET current_progress = progress.progress
+        FROM progress
+        WHERE cp.challenge_id = ${challengeId}
+          AND cp.user_id = progress.user_id
+      `);
+      break;
+    }
   }
 
   // Update rankings
