@@ -8,6 +8,7 @@ import {
   MessageCircle, 
   Share2, 
   Plus,
+  Settings,
   Calendar,
   Image as ImageIcon,
   Megaphone,
@@ -26,7 +27,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { renderMarkdownPreview } from "@/lib/markdownPreview";
 import { toast } from "sonner";
@@ -488,7 +488,11 @@ export default function ClubDetail() {
 
                 {/* Tab Navigation */}
                 <Tabs defaultValue="feed" className="space-y-6">
-                  <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
+                  <TabsList
+                    className={`grid w-full ${
+                      isStaff ? "grid-cols-4 lg:grid-cols-7" : "grid-cols-3 lg:grid-cols-6"
+                    }`}
+                  >
                     <TabsTrigger value="feed" className="flex items-center gap-2">
                       <Droplet className="h-4 w-4" />
                       <span className="hidden sm:inline">Feed</span>
@@ -513,6 +517,12 @@ export default function ClubDetail() {
                       <BarChart3 className="h-4 w-4" />
                       <span className="hidden sm:inline">Stats</span>
                     </TabsTrigger>
+                    {isStaff && (
+                      <TabsTrigger value="admin" className="flex items-center gap-2">
+                        <Settings className="h-4 w-4" />
+                        <span className="hidden sm:inline">Admin</span>
+                      </TabsTrigger>
+                    )}
                   </TabsList>
 
                   {/* Feed Tab Content */}
@@ -646,99 +656,94 @@ export default function ClubDetail() {
                                       <span>Splash {post.splash_count > 0 ? `(${post.splash_count})` : ""}</span>
                                     </motion.button>
 
-                                    <Dialog
-                                      open={openCommentsId === post.id}
-                                      onOpenChange={(open) => setOpenCommentsId(open ? post.id : null)}
+                                    <Button
+                                      variant="outline-neon"
+                                      className="flex-1 flex items-center justify-center gap-2"
+                                      onClick={() =>
+                                        setOpenCommentsId(openCommentsId === post.id ? null : post.id)
+                                      }
                                     >
-                                      <DialogTrigger asChild>
-                                        <Button
-                                          variant="outline-neon"
-                                          className="flex-1 flex items-center justify-center gap-2"
-                                        >
-                                          <MessageCircle className="h-5 w-5" />
-                                          <span>Commenti</span>
-                                          {post.comment_count > 0 && (
-                                            <span className="ml-1 inline-flex min-w-[22px] h-5 items-center justify-center rounded-full bg-primary/20 px-2 text-xs font-semibold text-primary">
-                                              {post.comment_count}
-                                            </span>
-                                          )}
-                                        </Button>
-                                      </DialogTrigger>
-                                      <DialogContent className="max-w-lg bg-card text-foreground border border-border">
-                                        <DialogHeader>
-                                          <DialogTitle>Commenti</DialogTitle>
-                                        </DialogHeader>
-                                        <div className="space-y-3">
-                                          <div className="space-y-2 text-sm text-muted-foreground max-h-64 overflow-y-auto pr-1">
-                                            {commentsQuery.isLoading ? (
-                                              <div className="text-muted-foreground">Caricamento commenti...</div>
-                                            ) : commentsQuery.data && commentsQuery.data.length > 0 ? (
-                                              commentsQuery.data.map((comment: any) => (
-                                                <div key={comment.id} className="flex items-start gap-2">
-                                                  {comment.user_avatar ? (
-                                                    <img
-                                                      src={comment.user_avatar}
-                                                      alt={comment.user_name || comment.user_email}
-                                                      className="h-6 w-6 rounded-full object-cover"
-                                                    />
-                                                  ) : (
-                                                    <div className="h-6 w-6 rounded-full bg-muted/40 dark:bg-white/10" />
-                                                  )}
-                                                  <div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                      {comment.user_name || comment.user_email}
-                                                    </div>
-                                                    <div>{comment.content}</div>
-                                                  </div>
-                                                </div>
-                                              ))
-                                            ) : (
-                                              <div className="text-muted-foreground">Nessun commento ancora.</div>
-                                            )}
-                                          </div>
-
-                                          <div className="flex flex-col sm:flex-row gap-2">
-                                            <Input
-                                              value={commentTextByPost[post.id] ?? ""}
-                                              onChange={(e) =>
-                                                setCommentTextByPost((prev) => ({ ...prev, [post.id]: e.target.value }))
-                                              }
-                                              onKeyDown={(event) => {
-                                                if (event.key === "Enter" && !event.shiftKey) {
-                                                  event.preventDefault();
-                                                  const content = (commentTextByPost[post.id] ?? "").trim();
-                                                  if (!content || addComment.isPending) return;
-                                                  addComment.mutate({ postId: post.id, content });
-                                                }
-                                              }}
-                                              placeholder="Scrivi un commento..."
-                                            />
-                                            <Button
-                                              variant="neon"
-                                              onClick={() =>
-                                                addComment.mutate({
-                                                  postId: post.id,
-                                                  content: (commentTextByPost[post.id] ?? "").trim(),
-                                                })
-                                              }
-                                              disabled={
-                                                addComment.isPending ||
-                                                (commentTextByPost[post.id] ?? "").trim().length === 0
-                                              }
-                                            >
-                                              Pubblica
-                                            </Button>
-                                          </div>
-                                          <div ref={commentsEndRef} />
-                                        </div>
-                                      </DialogContent>
-                                    </Dialog>
+                                      <MessageCircle className="h-5 w-5" />
+                                      <span>Commenti</span>
+                                      {post.comment_count > 0 && (
+                                        <span className="ml-1 inline-flex min-w-[22px] h-5 items-center justify-center rounded-full bg-primary/20 px-2 text-xs font-semibold text-primary">
+                                          {post.comment_count}
+                                        </span>
+                                      )}
+                                    </Button>
 
                                     <Button variant="outline-neon" className="flex-1 flex items-center justify-center gap-2">
                                       <Share2 className="h-5 w-5" />
                                       <span>Condividi</span>
                                     </Button>
                                   </div>
+                                  {openCommentsId === post.id && (
+                                    <div className="mt-4 rounded-xl border border-border bg-background/60 p-4 space-y-3">
+                                      <div className="max-h-60 overflow-y-auto space-y-3">
+                                        {commentsQuery.isLoading ? (
+                                          <div className="text-sm text-muted-foreground">Caricamento commenti...</div>
+                                        ) : commentsQuery.data && commentsQuery.data.length > 0 ? (
+                                          commentsQuery.data.map((comment: any) => (
+                                            <div key={comment.id} className="flex items-start gap-2">
+                                              {comment.user_avatar ? (
+                                                <img
+                                                  src={comment.user_avatar}
+                                                  alt={comment.user_name || comment.user_email}
+                                                  className="h-8 w-8 rounded-full object-cover"
+                                                />
+                                              ) : (
+                                                <div className="h-8 w-8 rounded-full bg-muted/40 dark:bg-white/10" />
+                                              )}
+                                              <div>
+                                                <p className="text-xs text-muted-foreground">
+                                                  {comment.user_name || comment.user_email}
+                                                </p>
+                                                <p className="text-sm text-foreground">{comment.content}</p>
+                                              </div>
+                                            </div>
+                                          ))
+                                        ) : (
+                                          <div className="text-sm text-muted-foreground">Nessun commento ancora.</div>
+                                        )}
+                                      </div>
+                                      <div className="flex flex-col sm:flex-row gap-2">
+                                        <Input
+                                          value={commentTextByPost[post.id] ?? ""}
+                                          onChange={(e) =>
+                                            setCommentTextByPost((prev) => ({
+                                              ...prev,
+                                              [post.id]: e.target.value,
+                                            }))
+                                          }
+                                          onKeyDown={(event) => {
+                                            if (event.key === "Enter" && !event.shiftKey) {
+                                              event.preventDefault();
+                                              const content = (commentTextByPost[post.id] ?? "").trim();
+                                              if (!content || addComment.isPending) return;
+                                              addComment.mutate({ postId: post.id, content });
+                                            }
+                                          }}
+                                          placeholder="Scrivi un commento..."
+                                        />
+                                        <Button
+                                          variant="neon"
+                                          onClick={() =>
+                                            addComment.mutate({
+                                              postId: post.id,
+                                              content: (commentTextByPost[post.id] ?? "").trim(),
+                                            })
+                                          }
+                                          disabled={
+                                            addComment.isPending ||
+                                            (commentTextByPost[post.id] ?? "").trim().length === 0
+                                          }
+                                        >
+                                          Pubblica
+                                        </Button>
+                                      </div>
+                                      <div ref={commentsEndRef} />
+                                    </div>
+                                  )}
                                 </CardContent>
                               </Card>
                             </motion.div>
@@ -1422,193 +1427,198 @@ export default function ClubDetail() {
                       </CardContent>
                     </Card>
                   </TabsContent>
-                </Tabs>
 
-                {/* Club Settings - Below Tabs (Only for Staff) */}
-                {isStaff && (
-                  <>
-                    <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                      <CardContent className="p-6 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-semibold">Impostazioni club</h3>
-                          <span className="text-xs text-muted-foreground">
-                            {isOwner ? "Owner" : "Moderazione"}
-                          </span>
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-2">
-                          <div className="space-y-2">
-                            <label className="text-xs text-muted-foreground">Visibilità</label>
-                            <select
-                              value={visibilityDraft}
-                              onChange={(e) => setVisibilityDraft(e.target.value as "public" | "private" | "invite")}
-                              disabled={!isOwner}
-                              className="w-full rounded-md bg-background/60 border border-border/60 px-3 py-2 text-sm"
+                  {isStaff && (
+                    <TabsContent value="admin" className="space-y-6">
+                      <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
+                        <CardContent className="p-6 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-semibold">Impostazioni club</h3>
+                            <span className="text-xs text-muted-foreground">
+                              {isOwner ? "Owner" : "Moderazione"}
+                            </span>
+                          </div>
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <label className="text-xs text-muted-foreground">Visibilità</label>
+                              <select
+                                value={visibilityDraft}
+                                onChange={(e) =>
+                                  setVisibilityDraft(e.target.value as "public" | "private" | "invite")
+                                }
+                                disabled={!isOwner}
+                                className="w-full rounded-md bg-background/60 border border-border/60 px-3 py-2 text-sm"
+                              >
+                                <option value="public">Pubblico</option>
+                                <option value="private">Privato</option>
+                                <option value="invite">Solo su invito</option>
+                              </select>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-xs text-muted-foreground">Regole del club</label>
+                              <textarea
+                                value={rulesDraft}
+                                onChange={(e) => setRulesDraft(e.target.value)}
+                                className="min-h-[90px] w-full rounded-md bg-background/60 border border-border/60 px-3 py-2 text-sm"
+                              />
+                            </div>
+                          </div>
+                          {rulesDraft.trim().length > 0 && (
+                            <div className="rounded-lg border border-border/60 bg-background/60 p-3">
+                              <div className="text-xs text-muted-foreground mb-2">Anteprima regole</div>
+                              <div
+                                className="prose dark:prose-invert prose-sm max-w-none"
+                                dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(rulesDraft) }}
+                              />
+                            </div>
+                          )}
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <Button
+                              variant="neon"
+                              onClick={() =>
+                                updateClub.mutate({
+                                  clubId,
+                                  rules: rulesDraft.trim() || null,
+                                  visibility: visibilityDraft,
+                                })
+                              }
                             >
-                              <option value="public">Pubblico</option>
-                              <option value="private">Privato</option>
-                              <option value="invite">Solo su invito</option>
-                            </select>
+                              Salva impostazioni
+                            </Button>
+                            {isOwner && (
+                              <Button
+                                variant="destructive"
+                                onClick={() => {
+                                  if (confirm("Vuoi eliminare definitivamente questo club?")) {
+                                    deleteClub.mutate({ clubId });
+                                  }
+                                }}
+                              >
+                                Elimina club
+                              </Button>
+                            )}
                           </div>
-                          <div className="space-y-2">
-                            <label className="text-xs text-muted-foreground">Regole del club</label>
-                            <textarea
-                              value={rulesDraft}
-                              onChange={(e) => setRulesDraft(e.target.value)}
-                              className="min-h-[90px] w-full rounded-md bg-background/60 border border-border/60 px-3 py-2 text-sm"
-                            />
+                        </CardContent>
+                      </Card>
+
+                      <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
+                        <CardContent className="p-6 space-y-4">
+                          <h3 className="text-lg font-semibold">Inviti</h3>
+                          <div className="grid gap-3 md:grid-cols-3">
+                            <div className="space-y-2">
+                              <label className="text-xs text-muted-foreground">Ruolo</label>
+                              <select
+                                value={inviteRole}
+                                onChange={(e) => setInviteRole(e.target.value as "member" | "moderator")}
+                                className="w-full rounded-md bg-background/60 border border-border/60 px-3 py-2 text-sm"
+                              >
+                                <option value="member">Membro</option>
+                                {(isOwner || club?.member_role === "admin") && (
+                                  <option value="moderator">Moderatore</option>
+                                )}
+                              </select>
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-xs text-muted-foreground">Utilizzi max</label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={100}
+                                value={inviteMaxUses}
+                                onChange={(e) => setInviteMaxUses(Number(e.target.value) || 1)}
+                                className="bg-background/60 border-border/60"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-xs text-muted-foreground">Scadenza (giorni)</label>
+                              <Input
+                                type="number"
+                                min={1}
+                                placeholder="Nessuna"
+                                value={inviteExpiryDays}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  setInviteExpiryDays(value ? Number(value) : "");
+                                }}
+                                className="bg-background/60 border-border/60"
+                              />
+                            </div>
                           </div>
-                        </div>
-                        {rulesDraft.trim().length > 0 && (
-                          <div className="rounded-lg border border-border/60 bg-background/60 p-3">
-                            <div className="text-xs text-muted-foreground mb-2">Anteprima regole</div>
-                            <div
-                              className="prose dark:prose-invert prose-sm max-w-none"
-                              dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(rulesDraft) }}
-                            />
-                          </div>
-                        )}
-                        <div className="flex flex-col sm:flex-row gap-2">
                           <Button
                             variant="neon"
-                            onClick={() =>
-                              updateClub.mutate({
+                            disabled={createInvite.isPending}
+                            onClick={() => {
+                              const days = typeof inviteExpiryDays === "number" ? inviteExpiryDays : 0;
+                              const expiresAt = days
+                                ? new Date(Date.now() + days * 24 * 60 * 60 * 1000)
+                                : null;
+                              createInvite.mutate({
                                 clubId,
-                                rules: rulesDraft.trim() || null,
-                                visibility: visibilityDraft,
-                              })
-                            }
+                                role: inviteRole,
+                                maxUses: inviteMaxUses,
+                                expiresAt,
+                              });
+                            }}
                           >
-                            Salva impostazioni
+                            Crea invito
                           </Button>
-                          {isOwner && (
-                            <Button
-                              variant="destructive"
-                              onClick={() => {
-                                if (confirm("Vuoi eliminare definitivamente questo club?")) {
-                                  deleteClub.mutate({ clubId });
-                                }
-                              }}
-                            >
-                              Elimina club
-                            </Button>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
 
-                    <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                      <CardContent className="p-6 space-y-4">
-                        <h3 className="text-lg font-semibold">Inviti</h3>
-                        <div className="grid gap-3 md:grid-cols-3">
-                          <div className="space-y-2">
-                            <label className="text-xs text-muted-foreground">Ruolo</label>
-                            <select
-                              value={inviteRole}
-                              onChange={(e) => setInviteRole(e.target.value as "member" | "moderator")}
-                              className="w-full rounded-md bg-background/60 border border-border/60 px-3 py-2 text-sm"
-                            >
-                              <option value="member">Membro</option>
-                              {(isOwner || club?.member_role === "admin") && (
-                                <option value="moderator">Moderatore</option>
-                              )}
-                            </select>
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-xs text-muted-foreground">Utilizzi max</label>
-                            <Input
-                              type="number"
-                              min={1}
-                              max={100}
-                              value={inviteMaxUses}
-                              onChange={(e) => setInviteMaxUses(Number(e.target.value) || 1)}
-                              className="bg-background/60 border-border/60"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <label className="text-xs text-muted-foreground">Scadenza (giorni)</label>
-                            <Input
-                              type="number"
-                              min={1}
-                              placeholder="Nessuna"
-                              value={inviteExpiryDays}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                setInviteExpiryDays(value ? Number(value) : "");
-                              }}
-                              className="bg-background/60 border-border/60"
-                            />
-                          </div>
-                        </div>
-                        <Button
-                          variant="neon"
-                          disabled={createInvite.isPending}
-                          onClick={() => {
-                            const days = typeof inviteExpiryDays === "number" ? inviteExpiryDays : 0;
-                            const expiresAt = days ? new Date(Date.now() + days * 24 * 60 * 60 * 1000) : null;
-                            createInvite.mutate({
-                              clubId,
-                              role: inviteRole,
-                              maxUses: inviteMaxUses,
-                              expiresAt,
-                            });
-                          }}
-                        >
-                          Crea invito
-                        </Button>
-
-                        {invites.length === 0 ? (
-                          <div className="text-sm text-muted-foreground">Nessun invito attivo.</div>
-                        ) : (
-                          <div className="space-y-3">
-                            {invites.map((invite) => {
-                              const isExpired =
-                                invite.expires_at && new Date(invite.expires_at).getTime() < Date.now();
-                              const isUsedUp = invite.used_count >= invite.max_uses;
-                              const statusLabel = isExpired
-                                ? "Scaduto"
-                                : isUsedUp
-                                ? "Esaurito"
-                                : invite.status === "revoked"
-                                ? "Revocato"
-                                : "Attivo";
-                              return (
-                                <div
-                                  key={invite.id}
-                                  className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2"
-                                >
-                                  <div className="text-sm">
-                                    <div className="font-semibold">{invite.code}</div>
-                                    <div className="text-xs text-muted-foreground">
-                                      Ruolo: {invite.role} · Usati {invite.used_count}/{invite.max_uses} · {statusLabel}
+                          {invites.length === 0 ? (
+                            <div className="text-sm text-muted-foreground">Nessun invito attivo.</div>
+                          ) : (
+                            <div className="space-y-3">
+                              {invites.map((invite) => {
+                                const isExpired =
+                                  invite.expires_at &&
+                                  new Date(invite.expires_at).getTime() < Date.now();
+                                const isUsedUp = invite.used_count >= invite.max_uses;
+                                const statusLabel = isExpired
+                                  ? "Scaduto"
+                                  : isUsedUp
+                                  ? "Esaurito"
+                                  : invite.status === "revoked"
+                                  ? "Revocato"
+                                  : "Attivo";
+                                return (
+                                  <div
+                                    key={invite.id}
+                                    className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-lg border border-border/60 bg-background/60 px-3 py-2"
+                                  >
+                                    <div className="text-sm">
+                                      <div className="font-semibold">{invite.code}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        Ruolo: {invite.role} · Usati {invite.used_count}/{invite.max_uses} ·{" "}
+                                        {statusLabel}
+                                      </div>
                                     </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline-neon"
-                                      onClick={() => copyInviteLink(invite.code)}
-                                    >
-                                      Copia link
-                                    </Button>
-                                    {invite.status === "active" && !isExpired && !isUsedUp && (
+                                    <div className="flex items-center gap-2">
                                       <Button
                                         size="sm"
-                                        variant="destructive"
-                                        onClick={() => revokeInvite.mutate({ clubId, inviteId: invite.id })}
+                                        variant="outline-neon"
+                                        onClick={() => copyInviteLink(invite.code)}
                                       >
-                                        Revoca
+                                        Copia link
                                       </Button>
-                                    )}
+                                      {invite.status === "active" && !isExpired && !isUsedUp && (
+                                        <Button
+                                          size="sm"
+                                          variant="destructive"
+                                          onClick={() => revokeInvite.mutate({ clubId, inviteId: invite.id })}
+                                        >
+                                          Revoca
+                                        </Button>
+                                      )}
+                                    </div>
                                   </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  </>
-                )}
+                                );
+                              })}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </TabsContent>
+                  )}
+                </Tabs>
               </>
             )}
           </div>
