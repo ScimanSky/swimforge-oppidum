@@ -10,11 +10,11 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_18px_var(--neon-soft)] hover:shadow-[0_0_26px_var(--neon-glow)]',
+          'bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_18px_var(--neon-soft)] hover:shadow-[0_0_28px_var(--neon-glow)] hover:-translate-y-0.5 active:translate-y-0',
         neon:
-          'bg-gradient-to-r from-primary via-accent to-primary text-primary-foreground shadow-[0_0_26px_var(--neon-glow)] hover:shadow-[0_0_34px_var(--neon-glow)]',
+          'bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime),var(--electric-coral))] text-primary-foreground shadow-[0_0_30px_var(--neon-glow)] hover:shadow-[0_0_44px_var(--neon-glow)] hover:-translate-y-0.5 active:translate-y-0',
         'outline-neon':
-          'border border-primary/60 text-primary bg-transparent hover:bg-primary/10 shadow-[0_0_12px_var(--neon-soft)]',
+          'border border-primary/55 text-foreground bg-white/10 hover:bg-white/30 shadow-[0_0_12px_var(--neon-soft)] hover:shadow-[0_0_22px_var(--neon-soft)] hover:-translate-y-0.5 active:translate-y-0',
         'ghost-neon':
           'text-primary hover:bg-primary/10',
         destructive:
