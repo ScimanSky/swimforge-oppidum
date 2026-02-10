@@ -198,7 +198,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex h-full items-center justify-between gap-3 px-4">
           <div className="flex min-w-0 items-center gap-3">
             <div className="min-w-0">
-              <div className="text-xs text-muted-foreground">Electric Ice</div>
+              <div className="text-xs text-muted-foreground">Neon Soft Dark</div>
               <div className="truncate text-lg font-display font-semibold tracking-wide">
                 {pageTitle}
               </div>
