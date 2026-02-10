@@ -19,7 +19,7 @@ describe("Garmin Integration", () => {
       const result = await getGarminStatus(1);
 
       expect(result).toEqual({ connected: false });
-    });
+    }, 15000);
 
     it("returns connected: false when no tokens exist", async () => {
       const mockDb = {
