@@ -30,6 +30,7 @@ import { updateUserProfileBadge } from "./db_profile_badges";
 import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
 import { invalidateUserCache } from "./lib/cache";
 import { checkAndAwardBadges as checkAchievementBadges } from "./badge_engine";
+import { calculateActivityXp as calculateActivityXpCore } from "./lib/utils";
 import { logger } from "./middleware/logger";
 import { classifyAsyncError } from "./lib/withErrorHandling";
 import { config } from "./config";
@@ -900,30 +901,7 @@ export async function autoSyncGarmin(
  * Calculate XP for a swimming activity
  */
 function calculateActivityXp(activity: GarminServiceActivity): number {
-  let xp = 0;
-  
-  // Base XP: 1 XP per 100 meters
-  xp += Math.floor(activity.distance_meters / 100);
-  
-  // Bonus for session completion
-  xp += 50;
-  
-  // Bonus for longer sessions (over 3km)
-  if (activity.distance_meters >= 3000) {
-    xp += 25;
-  }
-  
-  // Bonus for very long sessions (over 4km)
-  if (activity.distance_meters >= 4000) {
-    xp += 25;
-  }
-  
-  // Bonus for open water swimming
-  if (activity.is_open_water) {
-    xp += 50;
-  }
-  
-  return xp;
+  return calculateActivityXpCore(activity.distance_meters, activity.is_open_water);
 }
 
 /**

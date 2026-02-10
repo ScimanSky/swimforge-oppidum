@@ -22,6 +22,7 @@ import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
 import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
 import { invalidateUserCache } from "./lib/cache";
+import { calculateActivityXp } from "./lib/utils";
 import { logger } from "./middleware/logger";
 import { config } from "./config";
 import { fetchWithTimeout } from "./lib/fetchWithTimeout";
@@ -479,26 +480,8 @@ export async function syncStravaActivities(
           continue;
         }
 
-        // Calculate XP (same formula as Garmin)
-        let xpEarned = 0;
-        
-        // Base XP: 1 XP per 100 meters
-        xpEarned += Math.floor(activity.distance_meters / 100);
-        
-        // Bonus for session completion
-        xpEarned += 50;
-        
-        // Bonus for longer sessions (over 3km)
-        if (activity.distance_meters >= 3000) {
-          xpEarned += 25;
-        }
-        
-        // Bonus for very long sessions (over 4km)
-        if (activity.distance_meters >= 4000) {
-          xpEarned += 25;
-        }
-        
-        // Note: Strava doesn't provide open water flag, so we can't add that bonus
+        // Calculate XP (shared formula). Strava doesn't provide open water flag, so keep it false.
+        const xpEarned = calculateActivityXp(activity.distance_meters, false);
 
         console.log(`[Strava] Importing activity ${activity.activity_id}: ${activity.distance_meters}m, ${xpEarned} XP`);
 

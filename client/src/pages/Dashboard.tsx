@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useFormatters } from "@/_core/hooks/useFormatters"
 import {
   Flame,
   Waves,
@@ -17,29 +18,6 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { Link } from "wouter"
-
-const formatDuration = (seconds: number | null | undefined) => {
-  if (seconds === null || seconds === undefined) return "—"
-  if (seconds === 0) return "0 min"
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  if (hours > 0) return `${hours}h ${minutes}m`
-  return `${minutes} min`
-}
-
-const formatDistanceKm = (meters: number | null | undefined) => {
-  if (meters === null || meters === undefined) return "—"
-  if (meters === 0) return "0.0 km"
-  return `${(meters / 1000).toFixed(1)} km`
-}
-
-const formatPace = (secondsPer100m: number | null | undefined) => {
-  if (secondsPer100m === null || secondsPer100m === undefined) return "—"
-  if (!Number.isFinite(secondsPer100m) || secondsPer100m <= 0) return "—"
-  const minutes = Math.floor(secondsPer100m / 60)
-  const seconds = Math.round(secondsPer100m % 60)
-  return `${minutes}:${seconds.toString().padStart(2, "0")}/100m`
-}
 
 const parseActivityDate = (value: string | Date | null | undefined) => {
   if (!value) return null
@@ -109,6 +87,7 @@ const changeLabel = (current: number, previous: number, suffix = "vs last week")
 }
 
 export default function Dashboard() {
+  const { formatDuration, formatDistanceKm, formatPace } = useFormatters()
   const meQuery = trpc.auth.me.useQuery()
   const profileQuery = trpc.profile.get.useQuery()
   const activitiesQuery = trpc.activities.list.useQuery(
