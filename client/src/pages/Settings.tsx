@@ -286,13 +286,12 @@ export default function Settings() {
     if (stored === "nickname") setDisplayNamePreference("nickname")
   }, [])
 
-  const utils = trpc.useContext()
-  const updateProfileMutation = trpc.profile.update.useMutation({
-    onSuccess: () => {
-      void utils.profile.get.invalidate()
-      void utils.auth.me.invalidate()
-    },
-  })
+	const updateProfileMutation = trpc.profile.update.useMutation({
+		onSuccess: () => {
+			void utils.profile.get.invalidate()
+			void utils.auth.me.invalidate()
+		},
+	})
   const uploadMediaMutation = trpc.profile.uploadMedia.useMutation()
 
   const readFileAsBase64 = (file: File) =>
