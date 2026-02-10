@@ -48,6 +48,9 @@ type ClubEventsListItem = {
   event: ClubEventRow;
   creator: { id: number; username: string | null; profilePicture: string | null };
   attendeeCount: number;
+  maybeCount?: number;
+  notGoingCount?: number;
+  userRsvp?: "going" | "maybe" | "not_going" | null;
 };
 
 export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsTabProps) {
@@ -86,7 +89,7 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
         endTime: "",
         maxAttendees: "",
       });
-      utils.community.clubs.events.list.invalidate({ clubId });
+      utils.community.clubs.events.list.invalidate();
     },
     onError: (error) => {
       toast.error(error.message || "Errore nella creazione dell'evento");
@@ -96,7 +99,7 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
   const rsvpMutation = trpc.community.clubs.events.rsvp.useMutation({
     onSuccess: () => {
       toast.success("RSVP aggiornato!");
-      utils.community.clubs.events.list.invalidate({ clubId });
+      utils.community.clubs.events.list.invalidate();
       if (selectedEvent) {
         utils.community.clubs.events.attendees.invalidate({ eventId: selectedEvent.event.id });
       }
@@ -348,6 +351,9 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
             const event = item.event;
             const creator = item.creator;
             const attendeeCount = item.attendeeCount || 0;
+            const maybeCount = item.maybeCount || 0;
+            const notGoingCount = item.notGoingCount || 0;
+            const userRsvp = item.userRsvp || null;
 
             return (
               <motion.div
@@ -418,7 +424,7 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
                         <div className="flex items-center gap-2">
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant={userRsvp === "going" ? "default" : "outline"}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleRsvp(event.id, "going");
@@ -426,11 +432,11 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
                             className="gap-1"
                           >
                             <CheckCircle2 className="h-4 w-4 text-green-500" />
-                            Partecipo
+                            Partecipo ({attendeeCount})
                           </Button>
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant={userRsvp === "maybe" ? "default" : "outline"}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleRsvp(event.id, "maybe");
@@ -438,11 +444,11 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
                             className="gap-1"
                           >
                             <Circle className="h-4 w-4 text-yellow-500" />
-                            Forse
+                            Forse ({maybeCount})
                           </Button>
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant={userRsvp === "not_going" ? "destructive" : "outline"}
                             onClick={(e) => {
                               e.stopPropagation();
                               handleRsvp(event.id, "not_going");
@@ -450,7 +456,7 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
                             className="gap-1"
                           >
                             <XCircle className="h-4 w-4 text-red-500" />
-                            Non partecipo
+                            Non partecipo ({notGoingCount})
                           </Button>
                           <Button
                             size="sm"
@@ -461,6 +467,14 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
                             }}
                           >
                             Dettagli
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            asChild
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <a href={`/community/club/${clubId}/event/${event.id}`}>Apri</a>
                           </Button>
                         </div>
                       </div>
@@ -501,33 +515,47 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
                 </div>
               )}
               <div>
-                <h4 className="font-semibold mb-3">Partecipanti ({attendeesQuery.data?.filter((a: any) => a.status === "going").length || 0})</h4>
+                <h4 className="font-semibold mb-3">Partecipanti</h4>
                 {attendeesQuery.isLoading ? (
                   <div className="flex justify-center py-4">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
                   </div>
                 ) : (
-                  <div className="space-y-2 max-h-60 overflow-y-auto">
-                    {attendeesQuery.data
-                      ?.filter((a: any) => a.status === "going")
-                      .map((attendee: any) => (
-                        <div key={attendee.id} className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={attendee.user.profilePicture || undefined} />
-                            <AvatarFallback>
-                              {attendee.user.username?.[0]?.toUpperCase() || "U"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <p className="text-sm font-medium">{attendee.user.username}</p>
-                            {attendee.user.fullName && (
-                              <p className="text-xs text-muted-foreground">
-                                {attendee.user.fullName}
-                              </p>
-                            )}
-                          </div>
+                  <div className="space-y-4 max-h-80 overflow-y-auto">
+                    {(["going", "maybe", "not_going"] as const).map((status) => {
+                      const title =
+                        status === "going" ? "Partecipo" : status === "maybe" ? "Forse" : "Non partecipo";
+                      const list = (attendeesQuery.data as any[] | undefined)?.filter((a) => a.status === status) ?? [];
+                      return (
+                        <div key={status} className="space-y-2">
+                          <p className="text-sm font-semibold">
+                            {title} ({list.length})
+                          </p>
+                          {list.length === 0 ? (
+                            <p className="text-xs text-muted-foreground">Nessuno.</p>
+                          ) : (
+                            list.map((attendee: any) => (
+                              <div key={attendee.id} className="flex items-center gap-3">
+                                <Avatar className="h-8 w-8">
+                                  <AvatarImage src={attendee.user.profilePicture || undefined} />
+                                  <AvatarFallback>
+                                    {attendee.user.username?.[0]?.toUpperCase() || "U"}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">{attendee.user.username}</p>
+                                  {attendee.user.fullName && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {attendee.user.fullName}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ))
+                          )}
                         </div>
-                      ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

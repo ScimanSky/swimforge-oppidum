@@ -1003,8 +1003,15 @@ export default function ClubDetail() {
 	                                    onClick={() => rsvpEvent.mutate({ eventId: event.id, status: "not_going" })}
 	                                  >
 	                                    <XCircle className="h-4 w-4 mr-1" />
-	                                    Non partecipo
+	                                    Non partecipo ({item.notGoingCount || 0})
 	                                  </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline-neon"
+                                      asChild
+                                    >
+                                      <a href={`/community/club/${clubId}/event/${event.id}`}>Dettagli</a>
+                                    </Button>
 	                                </div>
 	                              </CardContent>
 	                            </Card>

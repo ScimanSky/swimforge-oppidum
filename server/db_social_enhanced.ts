@@ -71,6 +71,7 @@ export async function getClubEvents(params: {
   fromDate?: Date
   toDate?: Date
   limit?: number
+  viewerUserId?: number
 }) {
   const db = await requireDb()
   const conditions = [eq(clubEvents.clubId, params.clubId)]
@@ -87,6 +88,18 @@ export async function getClubEvents(params: {
     conditions.push(lte(clubEvents.startTime, params.toDate))
   }
   
+  const userRsvpExpr = params.viewerUserId
+    ? sql<"going" | "maybe" | "not_going" | null>`
+        (
+          SELECT ${eventAttendees.status}
+          FROM ${eventAttendees}
+          WHERE ${eventAttendees.eventId} = ${clubEvents.id}
+            AND ${eventAttendees.userId} = ${params.viewerUserId}
+          LIMIT 1
+        )
+      `
+    : sql<null>`NULL`
+
   const events = await db
     .select({
       event: clubEvents,
@@ -95,17 +108,36 @@ export async function getClubEvents(params: {
         username: swimmerProfiles.username,
         profilePicture: swimmerProfiles.avatarUrl,
       },
-      attendeeCount: sql<number>`COUNT(DISTINCT ${eventAttendees.id})::int`,
+      attendeeCount: sql<number>`
+        (
+          SELECT COUNT(*)::int
+          FROM ${eventAttendees}
+          WHERE ${eventAttendees.eventId} = ${clubEvents.id}
+            AND ${eventAttendees.status} = 'going'
+        )
+      `,
+      maybeCount: sql<number>`
+        (
+          SELECT COUNT(*)::int
+          FROM ${eventAttendees}
+          WHERE ${eventAttendees.eventId} = ${clubEvents.id}
+            AND ${eventAttendees.status} = 'maybe'
+        )
+      `,
+      notGoingCount: sql<number>`
+        (
+          SELECT COUNT(*)::int
+          FROM ${eventAttendees}
+          WHERE ${eventAttendees.eventId} = ${clubEvents.id}
+            AND ${eventAttendees.status} = 'not_going'
+        )
+      `,
+      userRsvp: userRsvpExpr,
     })
     .from(clubEvents)
     .leftJoin(users, eq(clubEvents.creatorId, users.id))
     .leftJoin(swimmerProfiles, eq(users.id, swimmerProfiles.userId))
-    .leftJoin(eventAttendees, and(
-      eq(eventAttendees.eventId, clubEvents.id),
-      eq(eventAttendees.status, 'going')
-    ))
     .where(and(...conditions))
-    .groupBy(clubEvents.id, users.id, swimmerProfiles.userId, swimmerProfiles.username, swimmerProfiles.avatarUrl)
     .orderBy(clubEvents.startTime)
     .limit(params.limit || 50)
   

@@ -21,6 +21,7 @@ import SessionInsights from "./pages/SessionInsights";
 import Community from "./pages/Community";
 import ClubInvite from "./pages/ClubInvite";
 import ClubDetail from "./pages/ClubDetail";
+import ClubEventDetail from "./pages/ClubEventDetail";
 import Auth from "./pages/Auth";
 import AuthCallback from "./pages/AuthCallback";
 import Login from "./pages/Login";
@@ -63,6 +64,7 @@ function Router() {
       <Route path="/session-iq" component={SessionInsights} />
       <Route path="/community" component={Community} />
       <Route path="/community/invite/:code" component={ClubInvite} />
+      <Route path="/community/club/:clubId/event/:eventId" component={ClubEventDetail} />
       <Route path="/community/club/:id" component={ClubDetail} />
       <Route path="/profile" component={Profile} />
       <Route path="/settings" component={Settings} />

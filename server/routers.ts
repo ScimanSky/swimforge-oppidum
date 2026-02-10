@@ -1552,25 +1552,26 @@ export const appRouter = router({
       // ============================================
       // CLUB EVENTS (Nuove funzionalità social network)
       // ============================================
-      events: router({
-        list: protectedProcedure
-          .input(z.object({
-            clubId: z.number(),
-            status: z.enum(["active", "cancelled", "completed"]).optional(),
-            fromDate: z.string().datetime().optional(),
-            toDate: z.string().datetime().optional(),
-            limit: z.number().min(1).max(100).optional(),
-          }))
-          .query(async ({ input }) => {
-            const { getClubEvents } = await import("./db_social_enhanced");
-            return getClubEvents({
-              clubId: input.clubId,
-              status: input.status,
-              fromDate: input.fromDate ? new Date(input.fromDate) : undefined,
-              toDate: input.toDate ? new Date(input.toDate) : undefined,
-              limit: input.limit,
-            });
-          }),
+	      events: router({
+	        list: protectedProcedure
+	          .input(z.object({
+	            clubId: z.number(),
+	            status: z.enum(["active", "cancelled", "completed"]).optional(),
+	            fromDate: z.string().datetime().optional(),
+	            toDate: z.string().datetime().optional(),
+	            limit: z.number().min(1).max(100).optional(),
+	          }))
+	          .query(async ({ ctx, input }) => {
+	            const { getClubEvents } = await import("./db_social_enhanced");
+	            return getClubEvents({
+	              clubId: input.clubId,
+	              status: input.status,
+	              fromDate: input.fromDate ? new Date(input.fromDate) : undefined,
+	              toDate: input.toDate ? new Date(input.toDate) : undefined,
+	              limit: input.limit,
+	              viewerUserId: ctx.user.id,
+	            });
+	          }),
 
         create: protectedProcedure
           .input(z.object({
