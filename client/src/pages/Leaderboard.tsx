@@ -3,6 +3,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
@@ -26,6 +27,8 @@ interface NormalizedEntry {
   id: number;
   userId: string;
   userName: string;
+  avatarUrl?: string;
+  username?: string;
   level: number;
   totalXp: number;
   badgeCount?: number;
@@ -38,11 +41,15 @@ function normalizeEntry(entry: any): NormalizedEntry {
   const profile = entry.profile || entry;
   const userId = profile.userId ?? entry.userId ?? 0;
   const userName = entry.userName ?? entry.name ?? "Nuotatore";
+  const avatarUrl = profile.avatarUrl ?? profile.avatar_url ?? entry.avatarUrl ?? entry.avatar_url ?? "";
+  const username = profile.username ?? entry.username ?? "";
   
   return {
     id: profile.id ?? entry.id ?? 0,
     userId: String(userId),
     userName,
+    avatarUrl: avatarUrl || undefined,
+    username: username || undefined,
     level: profile.level ?? entry.level ?? 1,
     totalXp: profile.totalXp ?? entry.totalXp ?? 0,
     badgeCount: entry.badgeCount ?? 0,
@@ -99,14 +106,6 @@ export default function Leaderboard() {
 
   // Normalize all entries
   const normalizedLeaderboard = leaderboard?.map(normalizeEntry) || [];
-  
-  // Debug logging
-  console.log('[Leaderboard] Raw data:', leaderboard);
-  console.log('[Leaderboard] Raw data length:', leaderboard?.length);
-  console.log('[Leaderboard] Normalized:', normalizedLeaderboard);
-  console.log('[Leaderboard] Normalized length:', normalizedLeaderboard.length);
-  console.log('[Leaderboard] Order by:', orderBy);
-  console.log('[Leaderboard] isLoading:', isLoading);
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="low">
@@ -237,7 +236,8 @@ export default function Leaderboard() {
                   whileHover={{ scale: 1.02, x: 5 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  <Card className={`${isCurrentUser ? "ring-2 ring-[var(--azure)] bg-[var(--azure)]/5" : ""}`}>
+                  <Link href={`/u/${entry.userId}`}>
+                  <Card className={`${isCurrentUser ? "ring-2 ring-[var(--azure)] bg-[var(--azure)]/5" : ""} cursor-pointer`}>
                     <CardContent className="p-4">
                       <div className="flex items-center gap-4">
                         {/* Position */}
@@ -246,11 +246,12 @@ export default function Leaderboard() {
                         </div>
 
                         {/* Avatar */}
-                        <div 
-                          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold bg-[var(--azure)]"
-                        >
-                          {entry.userName[0].toUpperCase()}
-                        </div>
+                        <Avatar className="h-10 w-10 border border-border">
+                          <AvatarImage src={entry.avatarUrl || ""} alt={entry.userName} />
+                          <AvatarFallback>
+                            {(entry.userName?.[0] || "S").toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
 
                         {/* Name & Level */}
                         <div className="flex-1 min-w-0">
@@ -272,6 +273,7 @@ export default function Leaderboard() {
                       </div>
                     </CardContent>
                   </Card>
+                  </Link>
                 </motion.div>
               );
             })}

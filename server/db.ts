@@ -338,6 +338,8 @@ export async function getLeaderboard(
         .select({
           id: swimmerProfiles.id,
           userId: swimmerProfiles.userId,
+          avatarUrl: swimmerProfiles.avatarUrl,
+          username: swimmerProfiles.username,
           level: swimmerProfiles.level,
           totalXp: swimmerProfiles.totalXp,
           totalDistanceMeters: swimmerProfiles.totalDistanceMeters,
@@ -393,6 +395,8 @@ export async function getLeaderboard(
     SELECT 
       sp.id,
       sp.user_id as "userId",
+      sp.avatar_url as "avatarUrl",
+      sp.username as "username",
       sp.level,
       sp.total_xp as "totalXp",
       sp.total_distance_meters as "totalDistanceMeters",

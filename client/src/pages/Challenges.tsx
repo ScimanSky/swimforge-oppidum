@@ -34,6 +34,7 @@ import {
   Plus,
   ChevronRight,
   Zap,
+  Sparkles,
 } from "lucide-react"
 import { Link } from "wouter"
 import { trpc } from "@/lib/trpc"
@@ -217,16 +218,75 @@ export default function Challenges() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-3xl font-display font-bold neon-gradient-text">Sfide</h1>
-            <p className="text-muted-foreground">Ghost Track e sfide classiche in un unico hub.</p>
+        {/* Hero */}
+        <Card className="relative overflow-hidden">
+          <div className="absolute inset-0">
+            <div className="absolute inset-0 bg-[radial-gradient(70%_80%_at_20%_0%,color-mix(in_oklch,var(--electric-cyan)_38%,transparent)_0%,transparent_70%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_85%_10%,color-mix(in_oklch,var(--electric-lime)_26%,transparent)_0%,transparent_66%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_60%_90%,color-mix(in_oklch,var(--electric-coral)_18%,transparent)_0%,transparent_70%)]" />
           </div>
-        </div>
+          <CardContent className="relative p-6">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-background/60 px-3 py-1 text-xs text-muted-foreground">
+                  <Sparkles className="size-4 text-primary" />
+                  Stagione in corso
+                </div>
+                <h1 className="mt-3 text-3xl font-display font-bold neon-gradient-text">Sfide</h1>
+                <p className="mt-1 text-muted-foreground">
+                  Ghost Track e sfide classiche nello stesso hub. Scegli il tuo campo gara.
+                </p>
+              </div>
+              <div className="grid w-full max-w-xl grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
+                  <div className="flex items-center justify-between">
+                    <Trophy className="size-5 text-primary" />
+                    <Badge variant="neon" className="text-[10px]">
+                      attive
+                    </Badge>
+                  </div>
+                  <div className="mt-3 text-2xl font-display font-bold text-foreground">
+                    {activeChallenges.length + pendingChallenges.length}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Le tue sfide</div>
+                </div>
+                <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
+                  <div className="flex items-center justify-between">
+                    <Medal className="size-5 text-accent" />
+                    <Badge variant="outline" className="border-accent/50 text-accent text-[10px]">
+                      badge
+                    </Badge>
+                  </div>
+                  <div className="mt-3 text-2xl font-display font-bold text-foreground">{badgeCount}</div>
+                  <div className="text-xs text-muted-foreground">Sbloccati</div>
+                </div>
+                <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
+                  <div className="flex items-center justify-between">
+                    <Flame className="size-5 text-chart-4" />
+                    <Badge variant="outline" className="border-chart-4/50 text-chart-4 text-[10px]">
+                      streak
+                    </Badge>
+                  </div>
+                  <div className="mt-3 text-2xl font-display font-bold text-foreground">{streak}</div>
+                  <div className="text-xs text-muted-foreground">Giorni</div>
+                </div>
+                <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
+                  <div className="flex items-center justify-between">
+                    <Zap className="size-5 text-chart-5" />
+                    <Badge variant="outline" className="border-chart-5/50 text-chart-5 text-[10px]">
+                      XP
+                    </Badge>
+                  </div>
+                  <div className="mt-3 text-2xl font-display font-bold text-foreground">{totalXp}</div>
+                  <div className="text-xs text-muted-foreground">Totale</div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Tabs value={sectionTab} onValueChange={setSectionTab} className="space-y-6">
-          <TabsList>
+          <TabsList className="w-full sm:w-fit">
             <TabsTrigger value="ghost">Ghost Track</TabsTrigger>
             <TabsTrigger value="classic">Sfide classiche</TabsTrigger>
           </TabsList>
@@ -360,66 +420,8 @@ export default function Challenges() {
               </Dialog>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <Card className="bg-card border-border">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-primary/10 p-2">
-                      <Trophy className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-display font-bold text-foreground">
-                        {activeChallenges.length + pendingChallenges.length}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Active Challenges</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-card border-border">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-accent/10 p-2">
-                      <Medal className="h-5 w-5 text-accent" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-display font-bold text-foreground">{badgeCount}</p>
-                      <p className="text-xs text-muted-foreground">Badges Earned</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-card border-border">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-chart-4/10 p-2">
-                      <Flame className="h-5 w-5 text-chart-4" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-display font-bold text-foreground">{streak}</p>
-                      <p className="text-xs text-muted-foreground">Day Streak</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-card border-border">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-chart-5/10 p-2">
-                      <Zap className="h-5 w-5 text-chart-5" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-display font-bold text-foreground">{totalXp}</p>
-                      <p className="text-xs text-muted-foreground">Total XP</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
             <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="bg-secondary">
+              <TabsList className="w-full sm:w-fit">
                 <TabsTrigger value="active">
                   Active ({activeChallenges.length + pendingChallenges.length})
                 </TabsTrigger>
