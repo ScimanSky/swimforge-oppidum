@@ -2,13 +2,22 @@ import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
+import { handleError } from "../lib/errors";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
 });
 
 export const router = t.router;
-export const publicProcedure = t.procedure;
+const errorBoundary = t.middleware(async (opts) => {
+  try {
+    return await opts.next();
+  } catch (error) {
+    throw handleError(error);
+  }
+});
+
+export const publicProcedure = t.procedure.use(errorBoundary);
 
 const requireUser = t.middleware(async opts => {
   const { ctx, next } = opts;
@@ -25,9 +34,9 @@ const requireUser = t.middleware(async opts => {
   });
 });
 
-export const protectedProcedure = t.procedure.use(requireUser);
+export const protectedProcedure = t.procedure.use(errorBoundary).use(requireUser);
 
-export const adminProcedure = t.procedure.use(
+export const adminProcedure = t.procedure.use(errorBoundary).use(
   t.middleware(async opts => {
     const { ctx, next } = opts;
 
