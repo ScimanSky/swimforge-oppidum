@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/select"
 import {
   Search,
-  Plus,
   Filter,
   Droplets,
   Timer,
@@ -144,12 +143,6 @@ export default function Activities() {
                   Tutte le sessioni di nuoto, in un unico posto.
                 </p>
               </div>
-              <Button variant="outline-neon" asChild>
-                <Link href="/profile">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Collega dispositivi
-                </Link>
-              </Button>
             </div>
 
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
