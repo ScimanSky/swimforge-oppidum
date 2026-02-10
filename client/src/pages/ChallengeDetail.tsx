@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion } from "framer-motion";
 import { Trophy, ArrowLeft, Calendar, Target, Users, Medal, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -273,25 +274,31 @@ export default function ChallengeDetail() {
                         className="h-8 w-8 justify-center p-0 text-xs"
                       >
                         {index + 1}
-                      </Badge>
+	                      </Badge>
 
-                      <div className="relative h-10 w-10 flex-shrink-0">
-                        {participant.profileBadgeUrl ? (
-                          <img
-                            src={participant.profileBadgeUrl}
-                            alt={participant.profileBadgeName || "Badge"}
-                            className="h-full w-full object-contain"
-                            title={`${participant.profileBadgeName} (Livello ${participant.profileBadgeLevel})`}
-                          />
-                        ) : (
-                          <div
-                            className="flex h-full w-full items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground"
-                            title="Novizio (Livello 1)"
-                          >
-                            1
-                          </div>
-                        )}
-                      </div>
+	                      <div className="flex items-center gap-2">
+	                        <Avatar className="h-10 w-10">
+	                          <AvatarImage src={participant.avatarUrl || undefined} />
+	                          <AvatarFallback>
+	                            {participant.username?.[0]?.toUpperCase() || "U"}
+	                          </AvatarFallback>
+	                        </Avatar>
+	                        {participant.profileBadgeUrl ? (
+	                          <img
+	                            src={participant.profileBadgeUrl}
+	                            alt={participant.profileBadgeName || "Badge"}
+	                            className="h-7 w-7 object-contain opacity-90"
+	                            title={`${participant.profileBadgeName} (Livello ${participant.profileBadgeLevel})`}
+	                          />
+	                        ) : (
+	                          <div
+	                            className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground"
+	                            title="Novizio (Livello 1)"
+	                          >
+	                            1
+	                          </div>
+	                        )}
+	                      </div>
 
                       <span className="flex-1 font-medium text-foreground">
                         {participant.username}
