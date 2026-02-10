@@ -439,24 +439,24 @@ export default function Settings() {
                 <CardDescription>Scegli l&apos;area da aggiornare</CardDescription>
               </CardHeader>
               <CardContent>
-                <TabsList className="flex w-full flex-col items-stretch gap-2">
-                  <TabsTrigger value="profile" className="justify-start gap-2">
+                <TabsList className="flex h-auto w-full flex-col items-stretch gap-2">
+                  <TabsTrigger value="profile" className="h-auto w-full flex-none justify-start gap-2">
                     <User className="w-4 h-4" />
                     Profilo
                   </TabsTrigger>
-                  <TabsTrigger value="connections" className="justify-start gap-2">
+                  <TabsTrigger value="connections" className="h-auto w-full flex-none justify-start gap-2">
                     <Link className="w-4 h-4" />
                     Connessioni
                   </TabsTrigger>
-                  <TabsTrigger value="notifications" className="justify-start gap-2">
+                  <TabsTrigger value="notifications" className="h-auto w-full flex-none justify-start gap-2">
                     <Bell className="w-4 h-4" />
                     Notifiche
                   </TabsTrigger>
-                  <TabsTrigger value="preferences" className="justify-start gap-2">
+                  <TabsTrigger value="preferences" className="h-auto w-full flex-none justify-start gap-2">
                     <Palette className="w-4 h-4" />
                     Preferenze
                   </TabsTrigger>
-                  <TabsTrigger value="privacy" className="justify-start gap-2">
+                  <TabsTrigger value="privacy" className="h-auto w-full flex-none justify-start gap-2">
                     <Shield className="w-4 h-4" />
                     Privacy
                   </TabsTrigger>
