@@ -17,8 +17,9 @@ export default function AuthCallback() {
       setStatus("success");
       toast.success("Accesso effettuato con successo!");
       setTimeout(() => {
-        console.log('[AuthCallback] Redirecting to dashboard...');
-        window.location.href = "/dashboard";
+        const target = data?.isNewUser ? "/settings?tab=profile&onboarding=1" : "/dashboard";
+        console.log('[AuthCallback] Redirecting to:', target);
+        window.location.href = target;
       }, 1000);
     },
     onError: (error) => {

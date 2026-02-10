@@ -187,6 +187,7 @@ export const appRouter = router({
 
         // Verifica che l'utente esista o crealo
         let user = await db.getUserByEmail(supabaseEmail);
+        const isNewUser = !user;
 
         if (!user) {
           // Crea nuovo utente da OAuth
@@ -218,7 +219,7 @@ export const appRouter = router({
         
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
-        return { success: true, user: { id: user.id, email: user.email, name: user.name } };
+        return { success: true, isNewUser, user: { id: user.id, email: user.email, name: user.name } };
       }),
   }),
 

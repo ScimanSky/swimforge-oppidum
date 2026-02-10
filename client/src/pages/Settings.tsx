@@ -36,6 +36,7 @@ import { formatDistanceToNow } from "date-fns"
 import { it } from "date-fns/locale"
 import { toast } from "sonner"
 import GarminSection from "@/components/GarminSection"
+import { useLocation } from "wouter"
 
 const notificationSettings = [
   {
@@ -116,11 +117,58 @@ const strokeOptions = [
 ]
 
 export default function Settings() {
+  const [location, setLocation] = useLocation()
+
+  const urlParams = useMemo(() => {
+    const query = location.split("?")[1] ?? ""
+    return new URLSearchParams(query)
+  }, [location])
+
+  const onboarding = urlParams.get("onboarding") === "1"
+
+  const tabFromUrl = useMemo(() => {
+    const tab = urlParams.get("tab")
+    const allowed = new Set(["profile", "connections", "notifications", "preferences", "privacy"])
+    return tab && allowed.has(tab) ? tab : "profile"
+  }, [urlParams])
+
+  const [activeTab, setActiveTab] = useState(tabFromUrl)
+
+  useEffect(() => {
+    setActiveTab(tabFromUrl)
+  }, [tabFromUrl])
+
+  const updateTabInUrl = (nextTab: string) => {
+    const basePath = location.split("?")[0] || "/settings"
+    const nextParams = new URLSearchParams(urlParams)
+    nextParams.set("tab", nextTab)
+    setActiveTab(nextTab)
+    setLocation(`${basePath}?${nextParams.toString()}`)
+  }
+
+  const utils = trpc.useUtils()
   const { data: me } = trpc.auth.me.useQuery()
   const { data: profile } = trpc.profile.get.useQuery()
   const { data: activities } = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
   const { data: garminStatus } = trpc.garmin.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 })
   const { data: stravaStatus } = trpc.strava.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 })
+
+  type GarminSyncResult = { synced?: number; error?: string }
+
+  const garminSyncMutation = trpc.garmin.sync.useMutation({
+    onSuccess: (data: GarminSyncResult) => {
+      if (data?.error) {
+        toast.error(data.error)
+        return
+      }
+      toast.success(`${data?.synced ?? 0} attività sincronizzate!`)
+      utils.activities.list.invalidate()
+      utils.profile.get.invalidate()
+    },
+    onError: (error) => {
+      toast.error("Errore nella sincronizzazione: " + error.message)
+    },
+  })
 
   const displayName = me?.name || me?.email || "Utente"
   const initials = displayName
@@ -430,7 +478,44 @@ export default function Settings() {
         <p className="text-muted-foreground">Gestisci il tuo account e le preferenze</p>
       </div>
 
-      <Tabs defaultValue="profile">
+      {onboarding && (
+        <Card className="bg-card border-border">
+          <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="font-medium text-foreground">Benvenuto su SwimForge</p>
+              {activeTab === "profile" ? (
+                <p className="text-sm text-muted-foreground">
+                  Step 1: completa il profilo (foto, cover e dati). Poi passa a Connessioni per collegare Garmin.
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Step 2: collega Garmin Connect e avvia la prima sincronizzazione.
+                </p>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {activeTab !== "connections" ? (
+                <Button variant="neon" onClick={() => updateTabInUrl("connections")}>
+                  Vai a Connessioni
+                </Button>
+              ) : (
+                <Button
+                  variant="neon"
+                  onClick={() => garminSyncMutation.mutate({ daysBack: 30 })}
+                  disabled={!garminStatus?.connected || garminSyncMutation.isPending}
+                >
+                  {garminSyncMutation.isPending ? "Sincronizzazione..." : "Sincronizza Garmin"}
+                </Button>
+              )}
+              <Button variant="outline-neon" onClick={() => (window.location.href = "/dashboard")}>
+                Vai alla Dashboard
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Tabs value={activeTab} onValueChange={updateTabInUrl}>
         <div className="grid gap-6 xl:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]">
           <div className="xl:sticky xl:top-24 h-fit">
             <Card className="bg-card border-border glass-panel">

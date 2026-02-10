@@ -39,10 +39,10 @@ export default function Login() {
   }
 
   const syncSupabaseUserMutation = trpc.auth.syncSupabaseUser.useMutation({
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success("Login effettuato con successo!");
       setTimeout(() => {
-        window.location.href = "/dashboard";
+        window.location.href = data?.isNewUser ? "/settings?tab=profile&onboarding=1" : "/dashboard";
       }, 100);
     },
     onError: (error) => {
