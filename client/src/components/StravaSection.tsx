@@ -36,7 +36,7 @@ export function StravaSection() {
         utils.profile.get.invalidate();
         utils.strava.status.invalidate();
       } else {
-        toast.error(data.error || "Errore nella sincronizzazione");
+        toast.error(data.message || "Errore nella sincronizzazione");
       }
     },
     onError: (error) => {

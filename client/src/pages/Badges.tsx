@@ -348,10 +348,14 @@ export default function Badges() {
             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"
           >
             <AnimatePresence mode="popLayout">
-              {filteredBadges?.map((badge, index) => {
-                const isEarned = badge.earned;
-                const colors = rarityColors[badge.rarity] || rarityColors.common;
-                const pngPath = badge.image_url || getBadgeImageUrl(badge.code);
+	              {filteredBadges?.map((badge, index) => {
+	                const isEarned = badge.earned;
+	                const colors = rarityColors[badge.rarity] || rarityColors.common;
+	                const badgeImageUrl =
+	                  typeof (badge as { image_url?: unknown }).image_url === "string"
+	                    ? (badge as { image_url: string }).image_url
+	                    : null;
+	                const pngPath = badgeImageUrl || getBadgeImageUrl(badge.code);
 
                 return (
                   <motion.div
@@ -486,12 +490,16 @@ export default function Badges() {
                       filter: `drop-shadow(0 0 30px ${rarityColors[selectedBadge.rarity]?.glow || rarityColors.common.glow}) drop-shadow(0 0 60px ${rarityColors[selectedBadge.rarity]?.glow || rarityColors.common.glow})`,
                     } : {}}
                   >
-                    {selectedBadge.earned ? (
-                      <img 
-                        src={selectedBadge.image_url || getBadgeImageUrl(selectedBadge.code)} 
-                        alt={selectedBadge.name}
-                        className="w-full h-full object-contain"
-                        onContextMenu={(e) => e.preventDefault()}
+	                    {selectedBadge.earned ? (
+	                      <img 
+	                        src={
+	                          (typeof (selectedBadge as { image_url?: unknown }).image_url === "string"
+	                            ? (selectedBadge as { image_url: string }).image_url
+	                            : null) || getBadgeImageUrl(selectedBadge.code)
+	                        } 
+	                        alt={selectedBadge.name}
+	                        className="w-full h-full object-contain"
+	                        onContextMenu={(e) => e.preventDefault()}
                         draggable={false}
                         style={{ 
                           WebkitTouchCallout: 'none',

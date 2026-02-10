@@ -30,15 +30,15 @@ interface Message {
   receiverId: number;
   content: string;
   isRead: boolean;
-  readAt: string | null;
-  createdAt: string;
+  readAt: Date | null;
+  createdAt: Date;
 }
 
 interface MessageWithSender {
   message: Message;
   sender: {
     id: number;
-    username: string;
+    username: string | null;
     profilePicture: string | null;
   };
 }
@@ -47,7 +47,7 @@ interface Conversation {
   lastMessage: Message;
   otherUser: {
     id: number;
-    username: string;
+    username: string | null;
     profilePicture: string | null;
   };
   unreadCount: number;
@@ -95,7 +95,7 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
   useEffect(() => {
     if (selectedConversation && conversationQuery.data) {
       // Segna come letti i messaggi non letti
-      const hasUnread = conversationQuery.data.some((msg: any) => !msg.message.isRead);
+      const hasUnread = conversationQuery.data.some((msg) => !msg.message.isRead);
       if (hasUnread) {
         markReadMutation.mutate({ senderId: selectedConversation });
       }
@@ -130,8 +130,8 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
     }
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatTime = (dateInput: string | Date) => {
+    const date = new Date(dateInput);
     return date.toLocaleTimeString("it-IT", {
       hour: "2-digit",
       minute: "2-digit",
@@ -140,7 +140,7 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
 
   const getUnreadCount = () => {
     if (!conversationsQuery.data) return 0;
-    return conversationsQuery.data.reduce((acc: number, conv: Conversation) => acc + (conv.unreadCount || 0), 0);
+    return conversationsQuery.data.reduce((acc, conv) => acc + (conv.unreadCount || 0), 0);
   };
 
   const renderConversationsList = () => {
@@ -154,8 +154,8 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
     }
 
     return (
-      <div className="divide-y">
-        {conversationsQuery.data.map((conv: Conversation) => (
+        <div className="divide-y">
+        {conversationsQuery.data.map((conv) => (
           <button
             key={conv.lastMessage.id}
             onClick={() => setSelectedConversation(conv.otherUser.id)}
@@ -225,7 +225,7 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
 
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-4">
-            {conversationQuery.data.map((msg: MessageWithSender) => {
+            {conversationQuery.data.map((msg) => {
               const isOwn = msg.message.senderId !== selectedConversation;
               return (
                 <div

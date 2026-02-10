@@ -11,6 +11,14 @@ import {
   calculatePOI 
 } from "./advanced_metrics";
 
+type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+
+async function requireDb(): Promise<DbClient> {
+  const db = await requireDb();
+  if (!db) throw new Error("Database not available");
+  return db;
+}
+
 // ============================================
 // TYPES
 // ============================================
@@ -101,7 +109,7 @@ export async function getProgressTimeline(
 ): Promise<TimelineDataPoint[]> {
   const startDate = getDaysAgo(days);
 
-  const db = await getDb();
+  const db = await requireDb();
   const rows = await db
     .select({
       date: sql<string>`date(${swimmingActivities.activityDate})`,
@@ -137,7 +145,7 @@ export async function getPerformanceAnalysis(
 ): Promise<PerformanceAnalysis> {
   const startDate = getDaysAgo(days);
 
-  const db = await getDb();
+  const db = await requireDb();
   const aggregates = await db
     .select({
       zone1: sql<number>`coalesce(sum(${swimmingActivities.hrZone1Seconds}), 0)`,
@@ -223,7 +231,7 @@ export async function getAdvancedMetrics(
   const startDate = getDaysAgo(days);
   const previousStartDate = getDaysAgo(days * 2);
 
-  const db = await getDb();
+  const db = await requireDb();
   // Current period
   const currentActivities = await db
     .select()
@@ -490,23 +498,23 @@ export async function getAdvancedMetrics(
 
   // Remove static insight - only AI insights
 
-  return {
-    performanceIndex,
-    consistencyScore,
-    trendIndicator,
-    trendBaseline,
-    insights,
-    predictions,
-    streak: {
-      current: currentStreak,
-      record: recordStreak,
-    },
-    swimmingEfficiencyIndex,
-    technicalConsistencyIndex,
-    strokeEfficiencyRating,
-    aerobicCapacityScore,
-    recoveryReadinessScore,
-    progressiveOverloadIndex,
-    poiBaseline,
-  };
-}
+	  return {
+	    performanceIndex,
+	    consistencyScore,
+	    trendIndicator,
+	    trendBaseline,
+	    insights,
+	    predictions,
+	    streak: {
+	      current: currentStreak,
+	      record: recordStreak,
+	    },
+	    swimmingEfficiencyIndex: swimmingEfficiencyIndex ?? null,
+	    technicalConsistencyIndex: technicalConsistencyIndex ?? null,
+	    strokeEfficiencyRating: strokeEfficiencyRating ?? null,
+	    aerobicCapacityScore: aerobicCapacityScore ?? null,
+	    recoveryReadinessScore: recoveryReadinessScore ?? null,
+	    progressiveOverloadIndex: progressiveOverloadIndex ?? null,
+	    poiBaseline,
+	  };
+	}

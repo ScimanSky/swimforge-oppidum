@@ -10,6 +10,7 @@ import * as garmin from "./garmin";
 import * as strava from "./strava";
 import { sql } from "drizzle-orm";
 import { swimmerProfiles } from "../drizzle/schema";
+import type { clubAnnouncements, clubEvents, swimmingActivities } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { initializeAllUserProfileBadges } from "./db_profile_badges";
 import { TRPCError } from "@trpc/server";
@@ -23,6 +24,10 @@ import { logger } from "./middleware/logger";
 import { sanitizeActivityNotes } from "./lib/sanitize";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+type BadgeDefinitionRow = Awaited<ReturnType<typeof db.getAllBadgeDefinitions>>[number];
+type ClubEventInsert = typeof clubEvents.$inferInsert;
+type ClubAnnouncementInsert = typeof clubAnnouncements.$inferInsert;
+type SwimmingActivityInsert = typeof swimmingActivities.$inferInsert;
 
 function detectImageType(buffer: Buffer): { mimeType: "image/jpeg" | "image/png" | "image/webp"; extension: "jpg" | "png" | "webp" } | null {
   if (buffer.length < 12) return null;
@@ -67,13 +72,13 @@ async function runAutoSync(userId: number, options: { force?: boolean } = {}) {
 }
 
 async function applyRateLimit(
-  limiter: (req: Request, res: Response, next: (err?: any) => void) => void,
+  limiter: (req: Request, res: Response, next: (err?: unknown) => void) => void,
   req: Request,
   res: Response
 ): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     let settled = false;
-    const done = (err?: any) => {
+    const done = (err?: unknown) => {
       if (settled) return;
       settled = true;
       if (err) return reject(err);
@@ -312,7 +317,7 @@ export const appRouter = router({
         preferredStroke: z.enum(["freestyle", "backstroke", "breaststroke", "butterfly", "mixed"]).optional().nullable(),
         preferredPoolLengthMeters: z.number().int().positive().optional().nullable(),
         masterCategory: z.string().max(120).optional(),
-        notificationSettings: z.record(z.boolean()).optional(),
+        notificationSettings: z.record(z.string(), z.boolean()).optional(),
         preferences: z.object({
           units: z.enum(["metric", "imperial"]).optional(),
           paceFormat: z.enum(["100m", "100y"]).optional(),
@@ -410,13 +415,23 @@ export const appRouter = router({
           });
         }
 
-        // Resize (max 1920x1080) to reduce payload + prevent huge images.
-        try {
-          const sharpMod: any = await import("sharp");
-          const sharp = sharpMod?.default ?? sharpMod;
-          const pipeline = sharp(buffer)
-            .rotate()
-            .resize({ width: 1920, height: 1080, fit: "inside", withoutEnlargement: true });
+	        // Resize (max 1920x1080) to reduce payload + prevent huge images.
+	        try {
+	          type SharpPipeline = {
+	            rotate: () => SharpPipeline;
+	            resize: (options: { width: number; height: number; fit: "inside"; withoutEnlargement: boolean }) => SharpPipeline;
+	            jpeg: (options: { quality: number }) => SharpPipeline;
+	            png: (options: { compressionLevel: number }) => SharpPipeline;
+	            webp: (options: { quality: number }) => SharpPipeline;
+	            toBuffer: () => Promise<Buffer>;
+	          };
+	          type SharpFn = (input: Buffer) => SharpPipeline;
+
+	          const sharpMod = (await import("sharp")) as unknown as { default?: unknown };
+	          const sharpFn = ((sharpMod.default ?? sharpMod) as unknown) as SharpFn;
+	          const pipeline = sharpFn(buffer)
+	            .rotate()
+	            .resize({ width: 1920, height: 1080, fit: "inside", withoutEnlargement: true });
 
           if (detected.extension === "jpg") {
             buffer = await pipeline.jpeg({ quality: 85 }).toBuffer();
@@ -524,13 +539,22 @@ export const appRouter = router({
         if (!activity || activity.userId !== ctx.user.id) {
           throw new TRPCError({ code: "NOT_FOUND" });
         }
-        if (activity.activitySource === "garmin" && activity.garminActivityId) {
-          const rawData = (activity.rawData ?? {}) as Record<string, any>;
-          const existingDetails = rawData.garmin_details;
-          const hasExistingDetails =
-            existingDetails && typeof existingDetails === "object" && Object.keys(existingDetails).length > 0;
-          const hasSummary =
-            Boolean(existingDetails?.activity?.summaryDTO ?? existingDetails?.summaryDTO);
+	        if (activity.activitySource === "garmin" && activity.garminActivityId) {
+	          const rawData = (activity.rawData ?? {}) as Record<string, unknown>;
+	          const existingDetails = rawData["garmin_details"];
+	          const hasExistingDetails =
+	            existingDetails && typeof existingDetails === "object" && Object.keys(existingDetails).length > 0;
+	          const hasSummary = (() => {
+	            if (!existingDetails || typeof existingDetails !== "object") return false;
+	            const detailsObj = existingDetails as Record<string, unknown>;
+	            const activityObj = detailsObj["activity"];
+	            if (activityObj && typeof activityObj === "object") {
+	              const activityRec = activityObj as Record<string, unknown>;
+	              if (activityRec["summaryDTO"] !== null && activityRec["summaryDTO"] !== undefined) return true;
+	            }
+	            if (detailsObj["summaryDTO"] !== null && detailsObj["summaryDTO"] !== undefined) return true;
+	            return false;
+	          })();
 
           const fetchedDetails = (!hasExistingDetails || !hasSummary)
             ? await garmin.getGarminActivityFullDetails(
@@ -543,24 +567,27 @@ export const appRouter = router({
             fetchedDetails ??
             (hasExistingDetails ? existingDetails : null);
 
-          if (fullDetails) {
-            const nextRawData = hasExistingDetails
-              ? rawData
-              : {
-                  ...rawData,
-                  garmin_details: fullDetails,
-                };
+	          if (fullDetails) {
+	            const nextRawData = hasExistingDetails
+	              ? rawData
+	              : {
+	                  ...rawData,
+	                  garmin_details: fullDetails,
+	                };
 
-            const advanced = garmin.extractGarminAdvancedFields(fullDetails);
-            const updates: Record<string, any> = {};
+	            const advanced = garmin.extractGarminAdvancedFields(fullDetails);
+	            const updates: Partial<SwimmingActivityInsert> = {};
 
-            const setIfMissing = (key: string, value: any) => {
-              const current = (activity as any)[key];
-              if (value === null || value === undefined) return;
-              if (current === null || current === undefined || current === 0) {
-                updates[key] = value;
-              }
-            };
+	            const setIfMissing = <K extends keyof SwimmingActivityInsert>(
+	              key: K,
+	              value: SwimmingActivityInsert[K]
+	            ) => {
+	              const current = (activity as unknown as Record<string, unknown>)[String(key)];
+	              if (value === null || value === undefined) return;
+	              if (current === null || current === undefined || current === 0) {
+	                updates[key] = value;
+	              }
+	            };
 
             setIfMissing("avgSwolf", advanced.avgSwolf);
             setIfMissing("avgStrokeDistance", advanced.avgStrokeDistance);
@@ -577,7 +604,12 @@ export const appRouter = router({
             setIfMissing("lapsCount", advanced.lapsCount);
             setIfMissing("poolLengthMeters", advanced.poolLengthMeters);
             if (advanced.strokeType && (!activity.strokeType || activity.strokeType === "mixed")) {
-              updates.strokeType = advanced.strokeType;
+              const STROKE_TYPES = ["freestyle", "backstroke", "breaststroke", "butterfly", "mixed"] as const;
+              type StrokeType = (typeof STROKE_TYPES)[number];
+              const nextStroke = String(advanced.strokeType).toLowerCase() as StrokeType;
+              if ((STROKE_TYPES as readonly string[]).includes(nextStroke)) {
+                updates.strokeType = nextStroke;
+              }
             }
 
             if (advanced.hrZones) {
@@ -595,15 +627,15 @@ export const appRouter = router({
             const dbInstance = await getDb();
             if (dbInstance) {
               const { swimmingActivities, garminActivityLaps } = await import("../drizzle/schema");
-              if (Object.keys(updates).length > 0 || nextRawData !== rawData) {
-                await dbInstance
-                  .update(swimmingActivities)
-                  .set({ ...updates, rawData: nextRawData })
-                  .where(eq(swimmingActivities.id, activity.id));
-                activity = { ...activity, ...updates, rawData: nextRawData } as typeof activity;
-              } else if (rawData.garmin_details) {
-                activity.rawData = rawData;
-              }
+	              if (Object.keys(updates).length > 0 || nextRawData !== rawData) {
+	                await dbInstance
+	                  .update(swimmingActivities)
+	                  .set({ ...updates, rawData: nextRawData })
+	                  .where(eq(swimmingActivities.id, activity.id));
+	                activity = { ...activity, ...updates, rawData: nextRawData } as typeof activity;
+	              } else if (rawData["garmin_details"]) {
+	                activity.rawData = rawData;
+	              }
 
               try {
                 const existingLap = await dbInstance
@@ -1181,10 +1213,11 @@ export const appRouter = router({
               throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Creazione sfida fallita" });
             }
             return { success: true, id: result.id };
-          } catch (error: any) {
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : undefined;
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message: error?.message || "Impossibile creare la Ghost Track",
+              message: message || "Impossibile creare la Ghost Track",
             });
           }
         }),
@@ -1406,7 +1439,7 @@ export const appRouter = router({
           return { success: true, postId };
         }),
 
-      update: protectedProcedure
+	        update: protectedProcedure
         .input(z.object({
           clubId: z.number(),
           name: z.string().min(3).max(120).optional(),
@@ -1532,26 +1565,28 @@ export const appRouter = router({
             return getEventById(input.eventId);
           }),
 
-        update: protectedProcedure
-          .input(z.object({
-            eventId: z.number(),
-            title: z.string().min(1).max(200).optional(),
-            description: z.string().max(5000).optional(),
-            eventType: z.enum(["training", "race", "social", "meeting"]).optional(),
-            location: z.string().max(500).optional(),
-            startTime: z.string().datetime().optional(),
-            endTime: z.string().datetime().optional(),
-            status: z.enum(["active", "cancelled", "completed"]).optional(),
-          }))
-          .mutation(async ({ input }) => {
-            const { updateClubEvent } = await import("./db_social_enhanced");
-            const { eventId, ...rest } = input;
-            const updates: Record<string, any> = { ...rest };
-            if (updates.startTime) updates.startTime = new Date(updates.startTime);
-            if (updates.endTime) updates.endTime = new Date(updates.endTime);
-            const event = await updateClubEvent(eventId, updates);
-            return { success: true, event };
-          }),
+	        update: protectedProcedure
+	          .input(z.object({
+	            eventId: z.number(),
+	            title: z.string().min(1).max(200).optional(),
+	            description: z.string().max(5000).optional(),
+	            eventType: z.enum(["training", "race", "social", "meeting"]).optional(),
+	            location: z.string().max(500).optional(),
+	            startTime: z.string().datetime().optional(),
+	            endTime: z.string().datetime().optional(),
+	            status: z.enum(["active", "cancelled", "completed"]).optional(),
+	          }))
+	          .mutation(async ({ input }) => {
+	            const { updateClubEvent } = await import("./db_social_enhanced");
+	            const { eventId, startTime, endTime, ...rest } = input;
+	            const updates: Partial<ClubEventInsert> = {
+	              ...rest,
+	              ...(startTime ? { startTime: new Date(startTime) } : {}),
+	              ...(endTime ? { endTime: new Date(endTime) } : {}),
+	            };
+	            const event = await updateClubEvent(eventId, updates);
+	            return { success: true, event };
+	          }),
 
         delete: protectedProcedure
           .input(z.object({ eventId: z.number() }))
@@ -1616,22 +1651,24 @@ export const appRouter = router({
             return { success: true, announcement };
           }),
 
-        update: protectedProcedure
-          .input(z.object({
-            announcementId: z.number(),
-            title: z.string().min(1).max(200).optional(),
-            content: z.string().min(1).max(10000).optional(),
-            isPinned: z.boolean().optional(),
-            expiresAt: z.string().datetime().optional(),
-          }))
-          .mutation(async ({ input }) => {
-            const { updateClubAnnouncement } = await import("./db_social_enhanced");
-            const { announcementId, ...rest } = input;
-            const updates: Record<string, any> = { ...rest };
-            if (updates.expiresAt) updates.expiresAt = new Date(updates.expiresAt);
-            const announcement = await updateClubAnnouncement(announcementId, updates);
-            return { success: true, announcement };
-          }),
+	        update: protectedProcedure
+	          .input(z.object({
+	            announcementId: z.number(),
+	            title: z.string().min(1).max(200).optional(),
+	            content: z.string().min(1).max(10000).optional(),
+	            isPinned: z.boolean().optional(),
+	            expiresAt: z.string().datetime().optional(),
+	          }))
+	          .mutation(async ({ input }) => {
+	            const { updateClubAnnouncement } = await import("./db_social_enhanced");
+	            const { announcementId, expiresAt, ...rest } = input;
+	            const updates: Partial<ClubAnnouncementInsert> = {
+	              ...rest,
+	              ...(expiresAt ? { expiresAt: new Date(expiresAt) } : {}),
+	            };
+	            const announcement = await updateClubAnnouncement(announcementId, updates);
+	            return { success: true, announcement };
+	          }),
 
         delete: protectedProcedure
           .input(z.object({ announcementId: z.number() }))
@@ -1922,12 +1959,12 @@ export const appRouter = router({
 });
 
 // Helper function to check and award badges
-async function checkAndAwardBadges(userId: number): Promise<any[]> {
+async function checkAndAwardBadges(userId: number): Promise<BadgeDefinitionRow[]> {
   const profile = await db.getSwimmerProfile(userId);
   if (!profile) return [];
   
   const allBadges = await db.getAllBadgeDefinitions();
-  const newlyAwardedBadges: any[] = [];
+  const newlyAwardedBadges: BadgeDefinitionRow[] = [];
   let updatedTotalXp = profile.totalXp;
   
   for (const badge of allBadges) {

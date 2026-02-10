@@ -33,9 +33,26 @@ interface ClubEventsTabProps {
 
 type EventStatus = "going" | "maybe" | "not_going";
 
+type ClubEventRow = {
+  id: number;
+  title: string;
+  description?: string | null;
+  eventType: string;
+  location?: string | null;
+  startTime: string | Date;
+  endTime?: string | Date | null;
+  maxAttendees?: number | null;
+};
+
+type ClubEventsListItem = {
+  event: ClubEventRow;
+  creator: { id: number; username: string | null; profilePicture: string | null };
+  attendeeCount: number;
+};
+
 export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsTabProps) {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [selectedEvent, setSelectedEvent] = useState<ClubEventsListItem | null>(null);
   const [newEvent, setNewEvent] = useState({
     title: "",
     description: "",
@@ -54,6 +71,7 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
     fromDate: new Date().toISOString(),
     limit: 50,
   });
+  const events = (eventsQuery.data ?? []) as unknown as ClubEventsListItem[];
 
   const createMutation = trpc.community.clubs.events.create.useMutation({
     onSuccess: () => {
@@ -112,8 +130,8 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
     rsvpMutation.mutate({ eventId, status });
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatDate = (dateInput: string | Date) => {
+    const date = new Date(dateInput);
     return date.toLocaleDateString("it-IT", {
       weekday: "long",
       day: "numeric",
@@ -123,8 +141,8 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
     });
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
+  const formatTime = (dateInput: string | Date) => {
+    const date = new Date(dateInput);
     return date.toLocaleTimeString("it-IT", {
       hour: "2-digit",
       minute: "2-digit",
@@ -311,7 +329,7 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
         </Card>
       ) : (
         <div className="grid gap-4">
-          {eventsQuery.data.map((item, index) => {
+          {events.map((item, index: number) => {
             const event = item.event;
             const creator = item.creator;
             const attendeeCount = item.attendeeCount || 0;

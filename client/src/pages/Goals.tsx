@@ -587,7 +587,7 @@ export default function Goals() {
                           <div className="mt-4">
                             <h4 className="text-sm font-medium text-foreground mb-2">Milestones</h4>
                             <div className="grid sm:grid-cols-2 gap-2">
-                              {goal.milestones.map((milestone, index) => (
+                              {goal.milestones.map((milestone: { completed: boolean; title: string }, index: number) => (
                                 <div key={index} className="flex items-center gap-2">
                                   {milestone.completed ? (
                                     <CheckCircle2 className="w-4 h-4 text-primary" />

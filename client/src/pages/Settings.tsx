@@ -310,33 +310,45 @@ export default function Settings() {
       reader.readAsDataURL(file)
     })
 
-  const uploadToProfileBucket = async (file: File, kind: "avatar" | "cover") => {
-    if (!me?.id) {
-      toast.error("Devi essere autenticato per caricare immagini.")
-      return null
-    }
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"]
-    if (!allowedTypes.includes(file.type)) {
-      toast.error("Formato non supportato. Usa JPG, PNG o WEBP.")
-      return null
-    }
-    if (file.size > 200 * 1024) {
-      toast.error("File troppo grande. Massimo 200KB.")
-      return null
-    }
+	  const uploadToProfileBucket = async (file: File, kind: "avatar" | "cover") => {
+	    if (!me?.id) {
+	      toast.error("Devi essere autenticato per caricare immagini.")
+	      return null
+	    }
+	    const allowedTypes = ["image/jpeg", "image/png", "image/webp"] as const
+      type AllowedMimeType = (typeof allowedTypes)[number]
+      const isAllowedMimeType = (value: string): value is AllowedMimeType =>
+        (allowedTypes as readonly string[]).includes(value)
 
-    try {
-      const extension = file.name.split(".").pop() || "png"
-      const base64 = await readFileAsBase64(file)
-      const { url } = await uploadMediaMutation.mutateAsync({
-        kind,
-        fileBase64: base64,
-        mimeType: file.type,
-        extension,
-      })
-      return url
-    } catch (error: any) {
-      const message = error?.message || "Upload fallito."
+	    if (!isAllowedMimeType(file.type)) {
+	      toast.error("Formato non supportato. Usa JPG, PNG o WEBP.")
+	      return null
+	    }
+	    if (file.size > 200 * 1024) {
+	      toast.error("File troppo grande. Massimo 200KB.")
+	      return null
+	    }
+
+	    try {
+        const allowedExtensions = ["jpg", "jpeg", "png", "webp"] as const
+        type AllowedExtension = (typeof allowedExtensions)[number]
+        const rawExtension = file.name.split(".").pop()?.toLowerCase()
+        const extension: AllowedExtension =
+          rawExtension && (allowedExtensions as readonly string[]).includes(rawExtension)
+            ? (rawExtension as AllowedExtension)
+            : file.type === "image/jpeg"
+              ? "jpg"
+              : "png"
+	      const base64 = await readFileAsBase64(file)
+	      const { url } = await uploadMediaMutation.mutateAsync({
+	        kind,
+	        fileBase64: base64,
+	        mimeType: file.type,
+	        extension,
+	      })
+	      return url
+	    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Upload fallito."
       const shouldFallback =
         /row-level security/i.test(message) ||
         /rls/i.test(message) ||
@@ -362,9 +374,10 @@ export default function Settings() {
             .from("profile-media")
             .getPublicUrl(filePath)
           return data.publicUrl
-        } catch (fallbackError: any) {
+        } catch (fallbackError: unknown) {
+          const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : undefined
           toast.error(
-            fallbackError?.message ||
+            fallbackMessage ||
               "Upload fallito: controlla le policy di Supabase Storage."
           )
           return null
@@ -463,8 +476,9 @@ export default function Settings() {
   const persistSettings = async (payload: Record<string, unknown>) => {
     try {
       await updateProfileMutation.mutateAsync(payload)
-    } catch (error: any) {
-      toast.error(error?.message || "Impossibile salvare le impostazioni.")
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : undefined
+      toast.error(message || "Impossibile salvare le impostazioni.")
     }
   }
 

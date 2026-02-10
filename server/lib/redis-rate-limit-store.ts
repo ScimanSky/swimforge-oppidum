@@ -106,7 +106,7 @@ export class RedisRateLimitStore implements Store {
       
       const current = await redis.get(redisKey);
       if (current) {
-        const currentStr = typeof current === 'string' ? current : current.toString();
+        const currentStr = current;
         if (parseInt(currentStr) > 0) {
           await redis.decr(redisKey);
         }
@@ -143,7 +143,7 @@ export class RedisRateLimitStore implements Store {
       const value = await redis.get(redisKey);
       if (!value) return undefined;
       
-      const valueStr = typeof value === 'string' ? value : value.toString();
+      const valueStr = value;
       const ttl = await redis.pTTL(redisKey);
       const ttlNum = typeof ttl === 'number' ? ttl : -1;
       const resetTime = ttlNum > 0 ? new Date(Date.now() + ttlNum) : undefined;

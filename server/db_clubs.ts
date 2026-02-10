@@ -1,4 +1,5 @@
 import { and, eq, ilike, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { getDb } from "./db";
 import { communityClubInvites, communityClubs, communityClubMembers, socialPosts, swimmingActivities } from "../drizzle/schema";
 
@@ -10,7 +11,7 @@ export async function listClubs(userId: number, options: { search?: string; scop
 
   const scope = options.scope ?? "all";
   const limit = options.limit ?? 50;
-  const filters: any[] = [];
+  const filters: SQL[] = [];
 
   if (options.search) {
     filters.push(sql`c.name ILIKE ${`%${options.search}%`}`);

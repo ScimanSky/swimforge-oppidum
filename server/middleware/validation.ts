@@ -218,7 +218,7 @@ export function validateInput(schema: z.ZodSchema) {
     } catch (error) {
       if (error instanceof z.ZodError) {
         // Formatta gli errori di validazione
-        const formattedErrors = error.errors.map((err) => ({
+        const formattedErrors = error.issues.map((err: z.ZodIssue) => ({
           field: err.path.join('.'),
           message: err.message,
           code: err.code,
@@ -254,7 +254,7 @@ export function validateQuery(schema: z.ZodSchema) {
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const formattedErrors = error.errors.map((err) => ({
+        const formattedErrors = error.issues.map((err: z.ZodIssue) => ({
           field: err.path.join('.'),
           message: err.message,
         }));
@@ -287,7 +287,7 @@ export function validateParams(schema: z.ZodSchema) {
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const formattedErrors = error.errors.map((err) => ({
+        const formattedErrors = error.issues.map((err: z.ZodIssue) => ({
           field: err.path.join('.'),
           message: err.message,
         }));
@@ -348,8 +348,8 @@ export function validateDistanceForDuration(
  * Formatta errori di validazione in modo leggibile
  */
 export function formatValidationError(error: z.ZodError): string {
-  return error.errors
-    .map((err) => `${err.path.join('.')}: ${err.message}`)
+  return error.issues
+    .map((err: z.ZodIssue) => `${err.path.join('.')}: ${err.message}`)
     .join('; ');
 }
 
@@ -357,7 +357,7 @@ export function formatValidationError(error: z.ZodError): string {
  * Middleware di error handling per validazione
  */
 export function validationErrorHandler(
-  err: any,
+  err: unknown,
   req: Request,
   res: Response,
   next: NextFunction
@@ -366,7 +366,7 @@ export function validationErrorHandler(
     return res.status(400).json({
       error: 'Validation Error',
       message: formatValidationError(err),
-      details: err.errors,
+      details: err.issues,
     });
   }
 

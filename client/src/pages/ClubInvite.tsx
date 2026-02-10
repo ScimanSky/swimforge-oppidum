@@ -12,7 +12,7 @@ export default function ClubInvite() {
   const acceptInvite = trpc.community.clubs.acceptInvite.useMutation();
 
   useEffect(() => {
-    if (match && code && !acceptInvite.isLoading && !acceptInvite.data && !acceptInvite.error) {
+    if (match && code && !acceptInvite.isPending && !acceptInvite.data && !acceptInvite.error) {
       acceptInvite.mutate({ code });
     }
   }, [match, code, acceptInvite]);
@@ -25,7 +25,7 @@ export default function ClubInvite() {
         <Card className="border-border/50 bg-card/70 backdrop-blur-sm">
           <CardContent className="p-6 text-center space-y-4">
             <h1 className="text-xl font-semibold">Invito al Club</h1>
-            {acceptInvite.isLoading && (
+            {acceptInvite.isPending && (
               <p className="text-white/70">Sto accettando l’invito…</p>
             )}
             {acceptInvite.error && (

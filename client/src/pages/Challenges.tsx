@@ -130,11 +130,30 @@ const getStreak = (dates: string[]) => {
   return streak
 }
 
+type ChallengeType = "open_water" | "pool" | "both"
+type ChallengeObjective =
+  | "total_sessions"
+  | "consistency"
+  | "total_distance"
+  | "avg_pace"
+  | "total_time"
+  | "longest_session"
+type ChallengeDuration = "3_days" | "1_week" | "2_weeks" | "1_month"
+
+type ChallengeCreateDraft = {
+  name: string
+  description: string
+  type: ChallengeType
+  objective: ChallengeObjective
+  duration: ChallengeDuration
+  startDate: string
+}
+
 export default function Challenges() {
   const [sectionTab, setSectionTab] = useState("ghost")
   const [activeTab, setActiveTab] = useState("active")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [createDraft, setCreateDraft] = useState({
+  const [createDraft, setCreateDraft] = useState<ChallengeCreateDraft>({
     name: "",
     description: "",
     type: "pool",
@@ -256,12 +275,12 @@ export default function Challenges() {
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Tipo</label>
-                        <Select
-                          value={createDraft.type}
-                          onValueChange={(value) =>
-                            setCreateDraft((prev) => ({ ...prev, type: value }))
-                          }
-                        >
+	                        <Select
+	                          value={createDraft.type}
+	                          onValueChange={(value) =>
+	                            setCreateDraft((prev) => ({ ...prev, type: value as ChallengeType }))
+	                          }
+	                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Tipo" />
                           </SelectTrigger>
@@ -274,12 +293,12 @@ export default function Challenges() {
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Obiettivo</label>
-                        <Select
-                          value={createDraft.objective}
-                          onValueChange={(value) =>
-                            setCreateDraft((prev) => ({ ...prev, objective: value }))
-                          }
-                        >
+	                        <Select
+	                          value={createDraft.objective}
+	                          onValueChange={(value) =>
+	                            setCreateDraft((prev) => ({ ...prev, objective: value as ChallengeObjective }))
+	                          }
+	                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Obiettivo" />
                           </SelectTrigger>
@@ -297,12 +316,12 @@ export default function Challenges() {
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div className="space-y-2">
                         <label className="text-sm font-medium text-foreground">Durata</label>
-                        <Select
-                          value={createDraft.duration}
-                          onValueChange={(value) =>
-                            setCreateDraft((prev) => ({ ...prev, duration: value }))
-                          }
-                        >
+	                        <Select
+	                          value={createDraft.duration}
+	                          onValueChange={(value) =>
+	                            setCreateDraft((prev) => ({ ...prev, duration: value as ChallengeDuration }))
+	                          }
+	                        >
                           <SelectTrigger>
                             <SelectValue placeholder="Durata" />
                           </SelectTrigger>

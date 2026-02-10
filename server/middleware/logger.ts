@@ -175,23 +175,29 @@ export function requestLogger(
  * Middleware per gestire errori
  */
 export function errorHandler(
-  err: any,
+  err: unknown,
   req: Request,
   res: Response,
   next: NextFunction
 ) {
   // Log errore (skip if no actual error message)
-  const errorMessage = err instanceof Error ? err.message : String(err);
+  const errRec = (typeof err === "object" && err !== null) ? (err as Record<string, unknown>) : null;
+  const errorMessage =
+    err instanceof Error
+      ? err.message
+      : (typeof errRec?.["message"] === "string" ? (errRec["message"] as string) : String(err));
   if (!errorMessage || errorMessage === '[object Object]' || errorMessage === '{}') {
     // Don't log empty errors but still propagate to next handler
     next(err);
     return;
   }
   
+  const statusCode = typeof errRec?.["statusCode"] === "number" ? (errRec["statusCode"] as number) : 500;
+
   logger.error(`Request error: ${req.method} ${req.path} - ${errorMessage}`, {
     event: 'request:error',
-    statusCode: err.statusCode || 500,
-    stack: err instanceof Error ? err.stack : undefined,
+    statusCode,
+    stack: err instanceof Error ? err.stack : (typeof errRec?.["stack"] === "string" ? (errRec["stack"] as string) : undefined),
     ip: req.ip,
   });
 
@@ -205,10 +211,10 @@ export function errorHandler(
   }
 
   // Risposta al client
-  res.status(err.statusCode || 500).json({
-    error: err.message || 'Internal Server Error',
-    statusCode: err.statusCode || 500,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+  res.status(statusCode).json({
+    error: errorMessage || 'Internal Server Error',
+    statusCode,
+    ...(process.env.NODE_ENV === 'development' && { stack: err instanceof Error ? err.stack : errRec?.["stack"] }),
   });
 }
 
@@ -222,7 +228,7 @@ export function errorHandler(
 export function auditLog(
   action: string,
   userId: number | string | undefined,
-  details: Record<string, any>
+  details: Record<string, unknown>
 ) {
   logger.info(`[AUDIT] ${action}`, {
     userId,

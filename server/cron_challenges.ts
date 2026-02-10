@@ -1,6 +1,19 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
 
+type ExpiredChallengeRow = {
+  id: number;
+  name: string;
+  objective: string | null;
+  badge_name: string | null;
+  badge_image_url: string | null;
+};
+
+type WinnerRow = {
+  user_id: number;
+  current_progress: number;
+};
+
 /**
  * Cron job to complete expired challenges and determine winners
  * Should be run every hour or daily
@@ -15,13 +28,13 @@ export async function completeChallenges(): Promise<{
   try {
     // Find all active challenges that have ended
     const expiredChallengesResult = await db.execute(sql`
-      SELECT id, name, badge_name, badge_image_url
+      SELECT id, name, objective, badge_name, badge_image_url
       FROM challenges
       WHERE status = 'active'
         AND end_date < NOW()
     `);
 
-    const expiredChallenges = expiredChallengesResult.rows as any[];
+    const expiredChallenges = expiredChallengesResult.rows as unknown as ExpiredChallengeRow[];
     let completedCount = 0;
     let winnersCount = 0;
 
@@ -35,7 +48,7 @@ export async function completeChallenges(): Promise<{
         LIMIT 1
       `);
 
-      const winner = (winnerResult.rows[0] as any);
+      const winner = (winnerResult.rows[0] as unknown as WinnerRow | undefined);
 
       if (winner && winner.current_progress > 0) {
         // Mark winner

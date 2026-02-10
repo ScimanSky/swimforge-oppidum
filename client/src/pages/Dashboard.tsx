@@ -419,7 +419,33 @@ export default function Dashboard() {
     }
   }, [advancedQuery.data?.insights])
 
-  const profile = profileQuery.data
+  type ProfileLike = {
+    firstName?: string | null
+    first_name?: string | null
+    lastName?: string | null
+    last_name?: string | null
+    name?: string | null
+    username?: string | null
+    handle?: string | null
+    displayName?: string | null
+    display_name?: string | null
+    avatarUrl?: string | null
+    avatar_url?: string | null
+    avatar?: string | null
+    coverUrl?: string | null
+    cover_url?: string | null
+    coverImageUrl?: string | null
+    cover_image_url?: string | null
+    totalXp?: number
+    nextLevelXp?: number | null
+    xpToNextLevel?: number
+    levelTitle?: string | null
+    profileBadge?: { name?: string | null } | null
+    xpEarned?: number
+    xp_earned?: number
+  } & Record<string, unknown>
+
+  const profile = profileQuery.data as unknown as ProfileLike | undefined
   const [displayPreference, setDisplayPreference] = useState<"full" | "nickname">("full")
 
   useEffect(() => {
@@ -463,8 +489,9 @@ export default function Dashboard() {
     profile?.cover_image_url ||
     null
   const coverImage = profileCoverImage || "/images/pool-lanes.jpg"
+  const totalXp = profile?.totalXp ?? 0
   const xpProgress = profile?.nextLevelXp
-    ? Math.min(100, (profile.totalXp / profile.nextLevelXp) * 100)
+    ? Math.min(100, (totalXp / profile.nextLevelXp) * 100)
     : 0
 
   return (
@@ -493,15 +520,15 @@ export default function Dashboard() {
                     loading="lazy"
                   />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center bg-primary/10 text-primary text-2xl font-semibold">
-                    {displayName
-                      .split(" ")
-                      .filter(Boolean)
-                      .slice(0, 2)
-                      .map((part) => part[0])
-                      .join("")
-                      .toUpperCase()}
-                  </div>
+	                  <div className="flex h-full w-full items-center justify-center bg-primary/10 text-primary text-2xl font-semibold">
+	                    {displayName
+	                      .split(" ")
+	                      .filter(Boolean)
+	                      .slice(0, 2)
+	                      .map((part: string) => part[0])
+	                      .join("")
+	                      .toUpperCase()}
+	                  </div>
                 )}
               </div>
               <div>
@@ -597,9 +624,9 @@ export default function Dashboard() {
                           <span>❤️ {Math.round(getActivityAvgHeartRate(activity))} bpm</span>
                         ) : null}
                       </div>
-                      <Badge variant="neon" className="text-xs">
-                        +{activity.xpEarned ?? activity.xp_earned ?? 0} XP
-                      </Badge>
+	                      <Badge variant="neon" className="text-xs">
+	                        +{activity.xpEarned ?? 0} XP
+	                      </Badge>
                     </div>
                   ))
                 ) : (

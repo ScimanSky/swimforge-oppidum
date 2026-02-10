@@ -5,6 +5,16 @@ import { activityAiInsights, swimmingActivities } from "../drizzle/schema";
 
 let genAI: GoogleGenerativeAI | null = null;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function toNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
 function getGeminiClient() {
   if (!genAI && process.env.GEMINI_API_KEY) {
     genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
@@ -42,88 +52,84 @@ function formatRawData(rawData: unknown) {
   }
 }
 
-function extractRawActivity(rawData: any) {
-  if (!rawData) return null;
-  if (rawData.activity) return rawData.activity;
+function extractRawActivity(rawData: unknown): Record<string, unknown> | null {
+  if (!isRecord(rawData)) return null;
+  const activity = rawData["activity"];
+  if (isRecord(activity)) return activity;
   return rawData;
 }
 
-function normalizeActivity(activity: any) {
-  const rawData = activity.rawData ?? activity.raw_data ?? null;
+function normalizeActivity(activity: Record<string, unknown>) {
+  const rawData = activity["rawData"] ?? activity["raw_data"] ?? null;
   const raw = extractRawActivity(rawData);
-  const distanceMeters =
-    activity.distanceMeters ?? activity.distance_meters ?? raw?.distance ?? null;
-  const durationSeconds =
-    activity.durationSeconds ??
-    activity.duration_seconds ??
-    raw?.movingDuration ??
-    raw?.duration ??
-    null;
+  const distanceMeters = toNumber(activity["distanceMeters"] ?? activity["distance_meters"] ?? raw?.["distance"]);
+  const durationSeconds = toNumber(
+    activity["durationSeconds"] ??
+      activity["duration_seconds"] ??
+      raw?.["movingDuration"] ??
+      raw?.["duration"]
+  );
   const avgPacePer100m =
-    activity.avgPacePer100m ??
-    activity.avg_pace_per_100m ??
+    toNumber(activity["avgPacePer100m"] ?? activity["avg_pace_per_100m"]) ??
     (distanceMeters && durationSeconds ? (durationSeconds / distanceMeters) * 100 : null);
 
-  const avgHeartRate =
-    activity.avgHeartRate ??
-    activity.avg_heart_rate ??
-    raw?.averageHR ??
-    raw?.avgHeartRate ??
-    raw?.average_heartrate ??
-    null;
-  const maxHeartRate =
-    activity.maxHeartRate ??
-    activity.max_heart_rate ??
-    raw?.maxHR ??
-    raw?.maxHeartRate ??
-    raw?.max_heartrate ??
-    null;
-  const avgSwolf =
-    activity.avgSwolf ??
-    activity.swolf_score ??
-    raw?.averageSwolf ??
-    raw?.avgSwolf ??
-    raw?.swolf ??
-    null;
-  const avgStrokeCadence =
-    activity.avgStrokeCadence ??
-    activity.avg_stroke_cadence ??
-    raw?.averageSwimCadenceInStrokesPerMinute ??
-    raw?.avgStrokeCadenceRpm ??
-    raw?.avgStrokeCadence ??
-    null;
-  const avgStrokeDistance =
-    activity.avgStrokeDistance ??
-    activity.avg_stroke_distance ??
-    raw?.avgStrokeDistance ??
-    null;
-  const trainingEffect =
-    activity.trainingEffect ??
-    activity.training_effect ??
-    raw?.aerobicTrainingEffect ??
-    null;
-  const anaerobicTrainingEffect =
-    activity.anaerobicTrainingEffect ??
-    activity.anaerobic_training_effect ??
-    raw?.anaerobicTrainingEffect ??
-    null;
-  const vo2MaxValue =
-    activity.vo2MaxValue ??
-    activity.vo2_max_value ??
-    raw?.vO2MaxValue ??
-    raw?.vo2_max_value ??
-    null;
+  const avgHeartRate = toNumber(
+    activity["avgHeartRate"] ??
+      activity["avg_heart_rate"] ??
+      raw?.["averageHR"] ??
+      raw?.["avgHeartRate"] ??
+      raw?.["average_heartrate"]
+  );
+  const maxHeartRate = toNumber(
+    activity["maxHeartRate"] ??
+      activity["max_heart_rate"] ??
+      raw?.["maxHR"] ??
+      raw?.["maxHeartRate"] ??
+      raw?.["max_heartrate"]
+  );
+  const avgSwolf = toNumber(
+    activity["avgSwolf"] ??
+      activity["swolf_score"] ??
+      raw?.["averageSwolf"] ??
+      raw?.["avgSwolf"] ??
+      raw?.["swolf"]
+  );
+  const avgStrokeCadence = toNumber(
+    activity["avgStrokeCadence"] ??
+      activity["avg_stroke_cadence"] ??
+      raw?.["averageSwimCadenceInStrokesPerMinute"] ??
+      raw?.["avgStrokeCadenceRpm"] ??
+      raw?.["avgStrokeCadence"]
+  );
+  const avgStrokeDistance = toNumber(
+    activity["avgStrokeDistance"] ?? activity["avg_stroke_distance"] ?? raw?.["avgStrokeDistance"]
+  );
+  const trainingEffect = toNumber(
+    activity["trainingEffect"] ?? activity["training_effect"] ?? raw?.["aerobicTrainingEffect"]
+  );
+  const anaerobicTrainingEffect = toNumber(
+    activity["anaerobicTrainingEffect"] ??
+      activity["anaerobic_training_effect"] ??
+      raw?.["anaerobicTrainingEffect"]
+  );
+  const vo2MaxValue = toNumber(
+    activity["vo2MaxValue"] ?? activity["vo2_max_value"] ?? raw?.["vO2MaxValue"] ?? raw?.["vo2_max_value"]
+  );
 
-  const isOpenWater =
-    activity.isOpenWater ??
-    activity.is_open_water ??
-    (typeof raw?.activityType?.typeKey === "string" &&
-      raw.activityType.typeKey.toLowerCase().includes("open_water"));
+  const isOpenWater = (() => {
+    const direct = activity["isOpenWater"] ?? activity["is_open_water"];
+    if (typeof direct === "boolean") return direct;
+
+    const activityType = raw?.["activityType"];
+    if (isRecord(activityType) && typeof activityType["typeKey"] === "string") {
+      return (activityType["typeKey"] as string).toLowerCase().includes("open_water");
+    }
+    return false;
+  })();
 
   const strokeType =
-    activity.strokeType ??
-    activity.stroke_type ??
-    (typeof raw?.activityName === "string" ? raw.activityName : null) ??
+    (activity["strokeType"] ?? activity["stroke_type"]) ??
+    (typeof raw?.["activityName"] === "string" ? (raw["activityName"] as string) : null) ??
     "n/d";
 
   return {
@@ -144,7 +150,7 @@ function normalizeActivity(activity: any) {
   };
 }
 
-export async function generateActivityInsight(activity: any) {
+export async function generateActivityInsight(activity: Record<string, unknown>) {
   const client = getGeminiClient();
   if (!client) return null;
 

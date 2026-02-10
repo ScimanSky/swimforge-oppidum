@@ -4,6 +4,17 @@ import { swimmingActivities, swimmerProfiles } from "../drizzle/schema";
 import { updateUserProfileBadgeByLevel } from "./db_profile_badges";
 
 type IntensityBand = "low" | "medium" | "high";
+type SwimmingActivityRow = typeof swimmingActivities.$inferSelect;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function toNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
 
 const LEVEL_LABELS: Record<number, string> = {
   1: "Novizio",
@@ -41,54 +52,49 @@ const TRAINING_MULTIPLIERS: Record<IntensityBand, number> = {
   high: 1.04,
 };
 
-function extractRawActivity(rawData: any) {
-  if (!rawData) return null;
-  if (rawData.activity) return rawData.activity;
+function extractRawActivity(rawData: unknown): Record<string, unknown> | null {
+  if (!isRecord(rawData)) return null;
+  const activity = rawData["activity"];
+  if (isRecord(activity)) return activity;
   return rawData;
 }
 
-function getFastest100(activity: any): number | null {
+function getFastest100(activity: SwimmingActivityRow): number | null {
   const raw = extractRawActivity(activity.rawData);
   const fromRaw =
-    raw?.fastestSplit_100 ??
-    raw?.fastestSplit100 ??
-    raw?.fastestSplit_100m ??
+    raw?.["fastestSplit_100"] ??
+    raw?.["fastestSplit100"] ??
+    raw?.["fastestSplit_100m"] ??
     null;
-  if (fromRaw) return Math.round(fromRaw);
-  const pace = activity.avgPacePer100m ?? activity.avg_pace_per_100m ?? null;
-  if (pace) return Math.round(pace);
+  const fromRawNum = toNumber(fromRaw);
+  if (fromRawNum !== null && fromRawNum > 0) return Math.round(fromRawNum);
+
+  const pace = activity.avgPacePer100m ?? null;
+  if (pace !== null && pace !== undefined && pace > 0) return Math.round(pace);
   return null;
 }
 
-function getAvgSwolf(activity: any): number | null {
+function getAvgSwolf(activity: SwimmingActivityRow): number | null {
   const raw = extractRawActivity(activity.rawData);
-  return (
-    activity.avgSwolf ??
-    activity.swolf_score ??
-    raw?.averageSwolf ??
-    raw?.avgSwolf ??
-    null
-  );
+  const rawSwolf = toNumber(raw?.["averageSwolf"] ?? raw?.["avgSwolf"]);
+  return activity.avgSwolf ?? rawSwolf ?? null;
 }
 
-function detectIntensity(activity: any): IntensityBand {
-  const te =
-    activity.trainingEffect ??
-    activity.training_effect ??
-    extractRawActivity(activity.rawData)?.aerobicTrainingEffect ??
-    null;
+function detectIntensity(activity: SwimmingActivityRow): IntensityBand {
+  const raw = extractRawActivity(activity.rawData);
+  const te = toNumber(raw?.["aerobicTrainingEffect"]) ?? activity.trainingEffect ?? null;
   if (te !== null && te !== undefined) {
     if (te >= 3.5) return "high";
     if (te >= 2.5) return "medium";
     return "low";
   }
 
-  const zone4 = activity.hrZone4Seconds ?? activity.hr_zone_4_seconds ?? 0;
-  const zone5 = activity.hrZone5Seconds ?? activity.hr_zone_5_seconds ?? 0;
+  const zone4 = activity.hrZone4Seconds ?? 0;
+  const zone5 = activity.hrZone5Seconds ?? 0;
   const total =
-    (activity.hrZone1Seconds ?? activity.hr_zone_1_seconds ?? 0) +
-    (activity.hrZone2Seconds ?? activity.hr_zone_2_seconds ?? 0) +
-    (activity.hrZone3Seconds ?? activity.hr_zone_3_seconds ?? 0) +
+    (activity.hrZone1Seconds ?? 0) +
+    (activity.hrZone2Seconds ?? 0) +
+    (activity.hrZone3Seconds ?? 0) +
     zone4 +
     zone5;
   if (total <= 0) return "medium";
@@ -170,7 +176,7 @@ export async function evaluateUserSkillLevel(userId: number) {
   const intensities: IntensityBand[] = [];
   const swolfSamples: number[] = [];
 
-  activities.forEach((activity: any) => {
+  activities.forEach((activity) => {
     const fastest = getFastest100(activity);
     if (fastest) fastestSamples.push(fastest);
     intensities.push(detectIntensity(activity));

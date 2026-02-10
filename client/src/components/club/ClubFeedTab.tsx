@@ -62,7 +62,6 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
     createPostMutation.mutate({
       clubId,
       content: postText,
-      visibility: "public",
     });
   };
 

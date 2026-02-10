@@ -117,7 +117,7 @@ async function callGarminService(
     }
 
     return data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     const { kind, message } = classifyAsyncError(error);
     const level = kind === "unknown" ? "error" : "warn";
     logger.log(level, `[Garmin Service] Error calling ${endpoint} (${kind}): ${message}`, {
@@ -170,7 +170,7 @@ async function callGarminServiceWithUser(
     }
 
     return data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     const { kind, message } = classifyAsyncError(error);
     const level = kind === "unknown" ? "error" : "warn";
     logger.log(level, `[Garmin Service] Error calling ${endpoint} (${kind}): ${message}`, {
@@ -235,7 +235,7 @@ async function ensureGarminSessionFromDb(userId: number): Promise<boolean> {
 export async function getGarminActivityFullDetails(
   userId: number,
   garminActivityId: string
-): Promise<any | null> {
+): Promise<unknown | null> {
   try {
     const restored = await ensureGarminSessionFromDb(userId);
     if (!restored) {
@@ -257,18 +257,23 @@ export async function getGarminActivityFullDetails(
   }
 }
 
-const toNumber = (value: any) => {
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object") return null;
+  return value as Record<string, unknown>;
+}
+
+const toNumber = (value: unknown) => {
   if (value === null || value === undefined || value === "") return null;
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
 };
 
-const toInt = (value: any) => {
+const toInt = (value: unknown) => {
   const num = toNumber(value);
   return num !== null ? Math.round(num) : null;
 };
 
-const pickFirst = (obj: any, keys: string[]) => {
+const pickFirst = (obj: Record<string, unknown> | null | undefined, keys: string[]) => {
   if (!obj) return null;
   for (const key of keys) {
     const value = obj[key];
@@ -279,7 +284,7 @@ const pickFirst = (obj: any, keys: string[]) => {
   return null;
 };
 
-const pickFirstFromSources = (sources: any[], keys: string[]) => {
+const pickFirstFromSources = (sources: Array<Record<string, unknown>>, keys: string[]) => {
   for (const source of sources) {
     if (!source) continue;
     const value = pickFirst(source, keys);
@@ -290,7 +295,7 @@ const pickFirstFromSources = (sources: any[], keys: string[]) => {
   return null;
 };
 
-const normalizeStrokeType = (value: any) => {
+const normalizeStrokeType = (value: unknown) => {
   if (!value) return null;
   const raw = String(value).toLowerCase();
   if (raw.includes("free") || raw.includes("stile") || raw.includes("crawl")) return "freestyle";
@@ -301,32 +306,34 @@ const normalizeStrokeType = (value: any) => {
   return "mixed";
 };
 
-const toTimestamp = (value: any) => {
+const toTimestamp = (value: unknown) => {
   if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value !== "string" && typeof value !== "number") return null;
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed;
 };
 
-const normalizeStrokeDistanceCm = (value: any) => {
+const normalizeStrokeDistanceCm = (value: unknown) => {
   const num = toNumber(value);
   if (!num) return null;
   return num < 10 ? Math.round(num * 100) : Math.round(num);
 };
 
-const normalizeTrainingEffect = (value: any) => {
+const normalizeTrainingEffect = (value: unknown) => {
   const num = toNumber(value);
   if (num === null) return null;
   return num <= 10 ? Math.round(num * 10) : Math.round(num);
 };
 
-const normalizeRecoveryHours = (value: any) => {
+const normalizeRecoveryHours = (value: unknown) => {
   const num = toNumber(value);
   if (num === null) return null;
   return num > 48 ? Math.round(num / 60) : Math.round(num);
 };
 
-const normalizeHrZones = (zones: any) => {
+const normalizeHrZones = (zones: unknown) => {
   if (!zones) return null;
   const map: Record<string, number> = {
     hrZone1Seconds: 0,
@@ -338,21 +345,26 @@ const normalizeHrZones = (zones: any) => {
 
   if (Array.isArray(zones)) {
     zones.forEach((zone) => {
-      const zoneNum = zone?.zoneNumber ?? zone?.zone ?? zone?.zoneIndex;
+      const zoneRec = asRecord(zone);
+      const zoneNum = toInt(
+        zoneRec?.["zoneNumber"] ?? zoneRec?.["zone"] ?? zoneRec?.["zoneIndex"]
+      );
       const seconds = toNumber(
-        pickFirst(zone, ["secsInZone", "seconds", "timeInSeconds", "value"])
+        pickFirst(zoneRec, ["secsInZone", "seconds", "timeInSeconds", "value"])
       ) ?? 0;
       if (zoneNum && zoneNum >= 1 && zoneNum <= 5) {
         map[`hrZone${zoneNum}Seconds`] = Math.round(seconds);
       }
     });
   } else if (typeof zones === "object") {
+    const zonesRec = asRecord(zones);
+    if (!zonesRec) return null;
     const zoneValues = [
-      zones.zone1TimeInSeconds ?? zones.zone1 ?? zones.zone1Seconds,
-      zones.zone2TimeInSeconds ?? zones.zone2 ?? zones.zone2Seconds,
-      zones.zone3TimeInSeconds ?? zones.zone3 ?? zones.zone3Seconds,
-      zones.zone4TimeInSeconds ?? zones.zone4 ?? zones.zone4Seconds,
-      zones.zone5TimeInSeconds ?? zones.zone5 ?? zones.zone5Seconds,
+      zonesRec["zone1TimeInSeconds"] ?? zonesRec["zone1"] ?? zonesRec["zone1Seconds"],
+      zonesRec["zone2TimeInSeconds"] ?? zonesRec["zone2"] ?? zonesRec["zone2Seconds"],
+      zonesRec["zone3TimeInSeconds"] ?? zonesRec["zone3"] ?? zonesRec["zone3Seconds"],
+      zonesRec["zone4TimeInSeconds"] ?? zonesRec["zone4"] ?? zonesRec["zone4Seconds"],
+      zonesRec["zone5TimeInSeconds"] ?? zonesRec["zone5"] ?? zonesRec["zone5Seconds"],
     ];
     zoneValues.forEach((value, index) => {
       map[`hrZone${index + 1}Seconds`] = Math.round(toNumber(value) ?? 0);
@@ -362,17 +374,18 @@ const normalizeHrZones = (zones: any) => {
   return map;
 };
 
-export function extractGarminAdvancedFields(fullDetails: any) {
-  const activity = fullDetails?.activity ?? null;
-  const summary = activity?.summaryDTO ?? fullDetails?.summaryDTO ?? null;
-  const details = fullDetails?.details ?? null;
+export function extractGarminAdvancedFields(fullDetails: unknown) {
+  const full = asRecord(fullDetails);
+  const activity = asRecord(full?.["activity"] ?? null);
+  const summary = asRecord(activity?.["summaryDTO"] ?? full?.["summaryDTO"] ?? null);
+  const details = asRecord(full?.["details"] ?? null);
 
-  const sources = [details, summary, activity, fullDetails].filter(Boolean);
+  const sources = [details, summary, activity, full].filter((v): v is Record<string, unknown> => Boolean(v));
 
   const strokeType = normalizeStrokeType(
     pickFirstFromSources(sources, ["strokeType", "swimStrokeType", "avgStrokeType"])
   );
-  const hrZones = normalizeHrZones(fullDetails?.hr_zones);
+  const hrZones = normalizeHrZones(full?.["hr_zones"]);
 
   return {
     avgSwolf: toNumber(
@@ -434,13 +447,17 @@ export function extractGarminAdvancedFields(fullDetails: any) {
 export async function persistGarminLapDetails(
   db: Awaited<ReturnType<typeof getDb>>,
   activityId: number,
-  fullDetails: any
+  fullDetails: unknown
 ) {
   if (!db) return;
-  const lapDtos = Array.isArray(fullDetails?.splits?.lapDTOs)
-    ? fullDetails.splits.lapDTOs
-    : Array.isArray(fullDetails?.splits)
-    ? fullDetails.splits
+  const full = asRecord(fullDetails);
+  const splitsVal = full?.["splits"];
+  const splitsObj = asRecord(splitsVal);
+  const lapDtosVal = splitsObj?.["lapDTOs"];
+  const lapDtos: unknown[] = Array.isArray(lapDtosVal)
+    ? lapDtosVal
+    : Array.isArray(splitsVal)
+    ? splitsVal
     : [];
 
   if (lapDtos.length === 0) {
@@ -451,12 +468,15 @@ export async function persistGarminLapDetails(
   await db.delete(garminActivityLengths).where(eq(garminActivityLengths.activityId, activityId));
   await db.delete(garminActivityLaps).where(eq(garminActivityLaps.activityId, activityId));
 
-  const lapRecords = lapDtos.map((lap: any, index: number) => {
-    const lengthDTOs = Array.isArray(lap?.lengthDTOs) ? lap.lengthDTOs : [];
+  const lapRecords = lapDtos.map((lap, index: number) => {
+    const lapRec = asRecord(lap);
+    const lengthDtosVal = lapRec?.["lengthDTOs"];
+    const lengthDTOs: unknown[] = Array.isArray(lengthDtosVal) ? lengthDtosVal : [];
     const strokeCounts: Record<string, number> = {};
-    lengthDTOs.forEach((length: any) => {
+    lengthDTOs.forEach((length) => {
+      const lengthRec = asRecord(length);
       const strokeKey = normalizeStrokeType(
-        length?.swimStroke ?? length?.strokeType ?? length?.stroke
+        lengthRec?.["swimStroke"] ?? lengthRec?.["strokeType"] ?? lengthRec?.["stroke"]
       );
       if (!strokeKey) return;
       strokeCounts[strokeKey] = (strokeCounts[strokeKey] ?? 0) + 1;
@@ -466,24 +486,24 @@ export async function persistGarminLapDetails(
 
     return {
       activityId,
-      lapIndex: toInt(lap?.lapIndex) ?? index + 1,
-      distanceMeters: toInt(lap?.distance),
-      durationSeconds: toNumber(lap?.duration),
-      movingDurationSeconds: toNumber(lap?.movingDuration),
-      elapsedDurationSeconds: toNumber(lap?.elapsedDuration),
-      averageSpeedMps: toNumber(lap?.averageSpeed),
-      maxSpeedMps: toNumber(lap?.maxSpeed),
-      averageMovingSpeedMps: toNumber(lap?.averageMovingSpeed),
-      averageSwolf: toInt(lap?.averageSWOLF ?? lap?.averageSwolf),
-      averageStrokes: toNumber(lap?.averageStrokes ?? lap?.avgStrokes),
-      totalNumberOfStrokes: toInt(lap?.totalNumberOfStrokes),
-      averageSwimCadence: toInt(lap?.averageSwimCadence),
-      calories: toInt(lap?.calories),
-      avgHeartRate: toInt(lap?.averageHR ?? lap?.avgHeartRate),
-      maxHeartRate: toInt(lap?.maxHR ?? lap?.maxHeartRate),
-      numberOfActiveLengths: toInt(lap?.numberOfActiveLengths),
+      lapIndex: toInt(lapRec?.["lapIndex"]) ?? index + 1,
+      distanceMeters: toInt(lapRec?.["distance"]),
+      durationSeconds: toNumber(lapRec?.["duration"]),
+      movingDurationSeconds: toNumber(lapRec?.["movingDuration"]),
+      elapsedDurationSeconds: toNumber(lapRec?.["elapsedDuration"]),
+      averageSpeedMps: toNumber(lapRec?.["averageSpeed"]),
+      maxSpeedMps: toNumber(lapRec?.["maxSpeed"]),
+      averageMovingSpeedMps: toNumber(lapRec?.["averageMovingSpeed"]),
+      averageSwolf: toInt(lapRec?.["averageSWOLF"] ?? lapRec?.["averageSwolf"]),
+      averageStrokes: toNumber(lapRec?.["averageStrokes"] ?? lapRec?.["avgStrokes"]),
+      totalNumberOfStrokes: toInt(lapRec?.["totalNumberOfStrokes"]),
+      averageSwimCadence: toInt(lapRec?.["averageSwimCadence"]),
+      calories: toInt(lapRec?.["calories"]),
+      avgHeartRate: toInt(lapRec?.["averageHR"] ?? lapRec?.["avgHeartRate"]),
+      maxHeartRate: toInt(lapRec?.["maxHR"] ?? lapRec?.["maxHeartRate"]),
+      numberOfActiveLengths: toInt(lapRec?.["numberOfActiveLengths"]),
       strokeType: dominantStroke,
-      startTimeGmt: toTimestamp(lap?.startTimeGMT),
+      startTimeGmt: toTimestamp(lapRec?.["startTimeGMT"]),
     };
   });
 
@@ -515,30 +535,33 @@ export async function persistGarminLapDetails(
     startTimeGmt?: Date | null;
   }> = [];
 
-  lapDtos.forEach((lap: any, index: number) => {
-    const lapIndex = toInt(lap?.lapIndex) ?? index + 1;
+  lapDtos.forEach((lap, index: number) => {
+    const lapRec = asRecord(lap);
+    const lapIndex = toInt(lapRec?.["lapIndex"]) ?? index + 1;
     const lapId = lapIdByIndex.get(lapIndex);
     if (!lapId) return;
 
-    const lengthDTOs = Array.isArray(lap?.lengthDTOs) ? lap.lengthDTOs : [];
-    lengthDTOs.forEach((length: any, lengthIndex: number) => {
+    const lengthDtosVal = lapRec?.["lengthDTOs"];
+    const lengthDTOs: unknown[] = Array.isArray(lengthDtosVal) ? lengthDtosVal : [];
+    lengthDTOs.forEach((length, lengthIndex: number) => {
+      const lengthRec = asRecord(length);
       const strokeKey = normalizeStrokeType(
-        length?.swimStroke ?? length?.strokeType ?? length?.stroke
+        lengthRec?.["swimStroke"] ?? lengthRec?.["strokeType"] ?? lengthRec?.["stroke"]
       );
       lengthRecords.push({
         activityId,
         lapId,
-        lengthIndex: toInt(length?.lengthIndex) ?? lengthIndex + 1,
-        distanceMeters: toInt(length?.distance),
-        durationSeconds: toNumber(length?.duration),
-        averageSpeedMps: toNumber(length?.averageSpeed),
-        maxSpeedMps: toNumber(length?.maxSpeed),
-        averageSwolf: toInt(length?.averageSWOLF ?? length?.averageSwolf),
-        totalNumberOfStrokes: toInt(length?.totalNumberOfStrokes),
-        avgHeartRate: toInt(length?.averageHR ?? length?.avgHeartRate),
-        maxHeartRate: toInt(length?.maxHR ?? length?.maxHeartRate),
+        lengthIndex: toInt(lengthRec?.["lengthIndex"]) ?? lengthIndex + 1,
+        distanceMeters: toInt(lengthRec?.["distance"]),
+        durationSeconds: toNumber(lengthRec?.["duration"]),
+        averageSpeedMps: toNumber(lengthRec?.["averageSpeed"]),
+        maxSpeedMps: toNumber(lengthRec?.["maxSpeed"]),
+        averageSwolf: toInt(lengthRec?.["averageSWOLF"] ?? lengthRec?.["averageSwolf"]),
+        totalNumberOfStrokes: toInt(lengthRec?.["totalNumberOfStrokes"]),
+        avgHeartRate: toInt(lengthRec?.["averageHR"] ?? lengthRec?.["avgHeartRate"]),
+        maxHeartRate: toInt(lengthRec?.["maxHR"] ?? lengthRec?.["maxHeartRate"]),
         strokeType: strokeKey,
-        startTimeGmt: toTimestamp(length?.startTimeGMT),
+        startTimeGmt: toTimestamp(lengthRec?.["startTimeGMT"]),
       });
     });
   });
@@ -689,7 +712,7 @@ export async function connectGarmin(
       .where(eq(swimmerProfiles.userId, userId));
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`[Garmin] Connection failed: ${message}`, {
       event: "garmin:connect_failed",
@@ -698,7 +721,7 @@ export async function connectGarmin(
     });
     return { 
       success: false, 
-      error: error.message || "Connection failed. Check your credentials." 
+      error: message || "Connection failed. Check your credentials." 
     };
   }
 }
@@ -767,7 +790,7 @@ export async function completeMfa(
       .where(eq(swimmerProfiles.userId, userId));
 
     return { success: true };
-  } catch (error: any) {
+  } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`[Garmin] MFA completion failed: ${message}`, {
       event: "garmin:mfa_failed",
@@ -776,7 +799,7 @@ export async function completeMfa(
     });
     return { 
       success: false, 
-      error: error.message || "MFA verification failed" 
+      error: message || "MFA verification failed" 
     };
   }
 }
@@ -980,14 +1003,16 @@ export async function syncGarminActivities(
         },
       };
 
-      const setIfDefined = (key: string, value: any) => {
+      const setIfDefined = (key: string, value: unknown) => {
         if (value === null || value === undefined) return;
         updates[key] = value;
       };
 
-      const setIfDefinedInt = (key: string, value: any) => {
+      const setIfDefinedInt = (key: string, value: unknown) => {
         if (value === null || value === undefined) return;
-        updates[key] = Math.round(value);
+        const num = toNumber(value);
+        if (num === null) return;
+        updates[key] = Math.round(num);
       };
 
       setIfDefinedInt("avgSwolf", advanced.avgSwolf);
@@ -1342,7 +1367,7 @@ export async function syncGarminActivities(
     }
 
     return { synced: syncedCount, newXp: totalNewXp };
-  } catch (error: any) {
+  } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`[Garmin] Sync failed: ${message}`, {
       event: "garmin:sync_failed",

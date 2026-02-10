@@ -19,11 +19,14 @@ interface BadgeCriteria {
   consecutive_weeks?: number;
 }
 
+type SwimmerProfileRow = typeof swimmerProfiles.$inferSelect;
+type SwimmingActivityRow = typeof swimmingActivities.$inferSelect;
+
 type ActivityForBadges = {
   id: number;
-  activityDate: unknown;
-  distanceMeters: number | null;
-  durationSeconds: number | null;
+  activityDate: Date;
+  distanceMeters: number;
+  durationSeconds: number;
   avgSwolf: number | null;
   avgPacePer100m: number | null;
   maxHeartRate: number | null;
@@ -125,7 +128,7 @@ export async function checkAndAwardBadges(userId: number): Promise<string[]> {
       const weeklyActivities: Map<string, number> = new Map();
 
       while (true) {
-        const batch = await db
+        const batch = (await db
           .select({
             id: swimmingActivities.id,
             activityDate: swimmingActivities.activityDate,
@@ -140,14 +143,14 @@ export async function checkAndAwardBadges(userId: number): Promise<string[]> {
           .from(swimmingActivities)
           .where(and(eq(swimmingActivities.userId, userId), gt(swimmingActivities.id, lastId)))
           .orderBy(swimmingActivities.id)
-          .limit(BATCH_SIZE);
+          .limit(BATCH_SIZE)) as ActivityForBadges[];
 
         if (batch.length === 0) break;
 
-        for (const activity of batch as ActivityForBadges[]) {
+        for (const activity of batch) {
           // Build per-week counts for consistency badges.
           if (consistencyBadges.length > 0) {
-            const date = new Date(activity.activityDate as any);
+            const date = activity.activityDate;
             if (!Number.isNaN(date.getTime())) {
               const weekKey = getWeekKey(date);
               weeklyActivities.set(weekKey, (weeklyActivities.get(weekKey) || 0) + 1);
@@ -165,7 +168,7 @@ export async function checkAndAwardBadges(userId: number): Promise<string[]> {
           }
         }
 
-        lastId = (batch[batch.length - 1] as any).id;
+        lastId = batch[batch.length - 1]!.id;
 
         // If we don't need consistency counts, we can stop early once every single-activity badge is met.
         if (consistencyBadges.length === 0 && metSingleBadges.size === singleActivityBadges.length) {
@@ -201,7 +204,7 @@ export async function checkAndAwardBadges(userId: number): Promise<string[]> {
 /**
  * Check if aggregate totals meet the criteria
  */
-function evaluateAggregateTotalCriteria(criteria: BadgeCriteria, profile: any): boolean {
+function evaluateAggregateTotalCriteria(criteria: BadgeCriteria, profile: SwimmerProfileRow): boolean {
   let value: number | null = null;
 
   switch (criteria.metric) {
@@ -345,14 +348,25 @@ async function evaluateMetricPeakCriteria(criteria: BadgeCriteria, userId: numbe
 /**
  * Get a value from an activity based on the metric name
  */
-function getActivityValue(activity: any, metric: string): number | null {
+type ActivityValueSource = Pick<
+  SwimmingActivityRow,
+  | "distanceMeters"
+  | "durationSeconds"
+  | "avgSwolf"
+  | "avgPacePer100m"
+  | "maxHeartRate"
+  | "avgHeartRate"
+  | "calories"
+>;
+
+function getActivityValue(activity: ActivityValueSource, metric: string): number | null {
   switch (metric) {
     case 'distance':
       return activity.distanceMeters;
     case 'duration':
       return activity.durationSeconds;
     case 'swolf_score':
-      return activity.swolfScore ?? activity.avgSwolf ?? null;
+      return activity.avgSwolf ?? null;
     case 'avg_pace_per_100m':
       return activity.avgPacePer100m;
     case 'max_heart_rate':

@@ -26,6 +26,14 @@ import {
 } from "../drizzle/schema"
 import { and, eq, desc, sql, gte, lte, or, isNull } from "drizzle-orm"
 
+type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>
+
+async function requireDb(): Promise<DbClient> {
+  const db = await getDb()
+  if (!db) throw new Error("Database not available")
+  return db
+}
+
 // ============================================
 // CLUB EVENTS
 // ============================================
@@ -49,7 +57,7 @@ export async function createClubEvent(params: {
   recurringRule?: string
   coverImageUrl?: string
 }) {
-  const db = await getDb()
+  const db = await requireDb()
   const [event] = await db.insert(clubEvents).values(params).returning()
   return event
 }
@@ -64,7 +72,7 @@ export async function getClubEvents(params: {
   toDate?: Date
   limit?: number
 }) {
-  const db = await getDb()
+  const db = await requireDb()
   const conditions = [eq(clubEvents.clubId, params.clubId)]
   
   if (params.status) {
@@ -84,8 +92,8 @@ export async function getClubEvents(params: {
       event: clubEvents,
       creator: {
         id: users.id,
-        username: users.username,
-        profilePicture: swimmerProfiles.profilePictureUrl,
+        username: swimmerProfiles.username,
+        profilePicture: swimmerProfiles.avatarUrl,
       },
       attendeeCount: sql<number>`COUNT(DISTINCT ${eventAttendees.id})::int`,
     })
@@ -97,7 +105,7 @@ export async function getClubEvents(params: {
       eq(eventAttendees.status, 'going')
     ))
     .where(and(...conditions))
-    .groupBy(clubEvents.id, users.id, swimmerProfiles.profilePictureUrl)
+    .groupBy(clubEvents.id, users.id, swimmerProfiles.userId, swimmerProfiles.username, swimmerProfiles.avatarUrl)
     .orderBy(clubEvents.startTime)
     .limit(params.limit || 50)
   
@@ -108,14 +116,14 @@ export async function getClubEvents(params: {
  * Ottiene un singolo evento con dettagli completi
  */
 export async function getEventById(eventId: number) {
-  const db = await getDb()
+  const db = await requireDb()
   const [event] = await db
     .select({
       event: clubEvents,
       creator: {
         id: users.id,
-        username: users.username,
-        profilePicture: swimmerProfiles.profilePictureUrl,
+        username: swimmerProfiles.username,
+        profilePicture: swimmerProfiles.avatarUrl,
       },
       club: communityClubs,
     })
@@ -136,7 +144,7 @@ export async function rsvpToEvent(params: {
   userId: number
   status: 'going' | 'maybe' | 'not_going'
 }) {
-  const db = await getDb()
+  const db = await requireDb()
   
   // Verifica se esiste già un RSVP
   const [existing] = await db
@@ -169,7 +177,7 @@ export async function rsvpToEvent(params: {
  * Ottiene i partecipanti di un evento
  */
 export async function getEventAttendees(eventId: number) {
-  const db = await getDb()
+  const db = await requireDb()
   const attendees = await db
     .select({
       id: eventAttendees.id,
@@ -177,9 +185,11 @@ export async function getEventAttendees(eventId: number) {
       rsvpAt: eventAttendees.rsvpAt,
       user: {
         id: users.id,
-        username: users.username,
-        profilePicture: swimmerProfiles.profilePictureUrl,
-        fullName: swimmerProfiles.fullName,
+        username: swimmerProfiles.username,
+        profilePicture: swimmerProfiles.avatarUrl,
+        fullName: sql<string | null>`
+          NULLIF(TRIM(COALESCE(${users.name}, '') || ' ' || COALESCE(${swimmerProfiles.lastName}, '')), '')
+        `,
       },
     })
     .from(eventAttendees)
@@ -195,7 +205,7 @@ export async function getEventAttendees(eventId: number) {
  * Aggiorna un evento
  */
 export async function updateClubEvent(eventId: number, updates: Partial<typeof clubEvents.$inferInsert>) {
-  const db = await getDb()
+  const db = await requireDb()
   const [updated] = await db
     .update(clubEvents)
     .set({ ...updates, updatedAt: new Date() })
@@ -208,7 +218,7 @@ export async function updateClubEvent(eventId: number, updates: Partial<typeof c
  * Cancella un evento
  */
 export async function deleteClubEvent(eventId: number) {
-  const db = await getDb()
+  const db = await requireDb()
   await db.delete(eventAttendees).where(eq(eventAttendees.eventId, eventId))
   await db.delete(clubEvents).where(eq(clubEvents.id, eventId))
   return true
@@ -226,7 +236,7 @@ export async function sendDirectMessage(params: {
   receiverId: number
   content: string
 }) {
-  const db = await getDb()
+  const db = await requireDb()
   const [message] = await db.insert(directMessages).values(params).returning()
   return message
 }
@@ -240,14 +250,14 @@ export async function getConversation(params: {
   limit?: number
   offset?: number
 }) {
-  const db = await getDb()
+  const db = await requireDb()
   const messages = await db
     .select({
       message: directMessages,
       sender: {
         id: users.id,
-        username: users.username,
-        profilePicture: swimmerProfiles.profilePictureUrl,
+        username: swimmerProfiles.username,
+        profilePicture: swimmerProfiles.avatarUrl,
       },
     })
     .from(directMessages)
@@ -279,7 +289,7 @@ export async function markMessagesAsRead(params: {
   receiverId: number
   senderId: number
 }) {
-  const db = await getDb()
+  const db = await requireDb()
   await db
     .update(directMessages)
     .set({ isRead: true, readAt: new Date() })
@@ -297,7 +307,7 @@ export async function markMessagesAsRead(params: {
  * Ottiene elenco conversazioni recenti di un utente
  */
 export async function getRecentConversations(userId: number, limit: number = 20) {
-  const db = await getDb()
+  const db = await requireDb()
   
   // Query per ottenere l'ultimo messaggio per ogni conversazione
   const conversations = await db
@@ -305,8 +315,8 @@ export async function getRecentConversations(userId: number, limit: number = 20)
       lastMessage: directMessages,
       otherUser: {
         id: users.id,
-        username: users.username,
-        profilePicture: swimmerProfiles.profilePictureUrl,
+        username: swimmerProfiles.username,
+        profilePicture: swimmerProfiles.avatarUrl,
       },
       unreadCount: sql<number>`
         COUNT(CASE WHEN ${directMessages.receiverId} = ${userId} 
@@ -329,7 +339,7 @@ export async function getRecentConversations(userId: number, limit: number = 20)
         eq(directMessages.receiverId, userId)
       )
     )
-    .groupBy(directMessages.id, users.id, swimmerProfiles.profilePictureUrl)
+    .groupBy(directMessages.id, users.id, swimmerProfiles.userId, swimmerProfiles.username, swimmerProfiles.avatarUrl)
     .orderBy(desc(directMessages.createdAt))
     .limit(limit)
   
@@ -351,7 +361,7 @@ export async function createNotification(params: {
   link?: string
   referenceId?: number
 }) {
-  const db = await getDb()
+  const db = await requireDb()
   const [notification] = await db.insert(userNotifications).values(params).returning()
   return notification
 }
@@ -364,7 +374,7 @@ export async function getUserNotifications(params: {
   limit?: number
   onlyUnread?: boolean
 }) {
-  const db = await getDb()
+  const db = await requireDb()
   const conditions = [eq(userNotifications.userId, params.userId)]
   
   if (params.onlyUnread) {
@@ -385,7 +395,7 @@ export async function getUserNotifications(params: {
  * Segna notifiche come lette
  */
 export async function markNotificationsAsRead(userId: number, notificationIds?: number[]) {
-  const db = await getDb()
+  const db = await requireDb()
   
   const conditions = [eq(userNotifications.userId, userId)]
   if (notificationIds && notificationIds.length > 0) {
@@ -404,7 +414,7 @@ export async function markNotificationsAsRead(userId: number, notificationIds?: 
  * Conta notifiche non lette
  */
 export async function getUnreadNotificationCount(userId: number) {
-  const db = await getDb()
+  const db = await requireDb()
   const [result] = await db
     .select({ count: sql<number>`COUNT(*)::int` })
     .from(userNotifications)
@@ -433,7 +443,7 @@ export async function createClubAnnouncement(params: {
   isPinned?: boolean
   expiresAt?: Date
 }) {
-  const db = await getDb()
+  const db = await requireDb()
   const [announcement] = await db.insert(clubAnnouncements).values(params).returning()
   return announcement
 }
@@ -442,16 +452,17 @@ export async function createClubAnnouncement(params: {
  * Ottiene annunci di un club
  */
 export async function getClubAnnouncements(clubId: number, includeExpired: boolean = false) {
-  const db = await getDb()
+  const db = await requireDb()
   const conditions = [eq(clubAnnouncements.clubId, clubId)]
   
   if (!includeExpired) {
-    conditions.push(
-      or(
-        isNull(clubAnnouncements.expiresAt),
-        gte(clubAnnouncements.expiresAt, new Date())
-      )
+    const expirationCondition = or(
+      isNull(clubAnnouncements.expiresAt),
+      gte(clubAnnouncements.expiresAt, new Date())
     )
+    if (expirationCondition) {
+      conditions.push(expirationCondition)
+    }
   }
   
   const announcements = await db
@@ -459,8 +470,8 @@ export async function getClubAnnouncements(clubId: number, includeExpired: boole
       announcement: clubAnnouncements,
       author: {
         id: users.id,
-        username: users.username,
-        profilePicture: swimmerProfiles.profilePictureUrl,
+        username: swimmerProfiles.username,
+        profilePicture: swimmerProfiles.avatarUrl,
       },
     })
     .from(clubAnnouncements)
@@ -482,7 +493,7 @@ export async function updateClubAnnouncement(
   announcementId: number,
   updates: Partial<typeof clubAnnouncements.$inferInsert>
 ) {
-  const db = await getDb()
+  const db = await requireDb()
   const [updated] = await db
     .update(clubAnnouncements)
     .set({ ...updates, updatedAt: new Date() })
@@ -495,7 +506,7 @@ export async function updateClubAnnouncement(
  * Cancella un annuncio
  */
 export async function deleteClubAnnouncement(announcementId: number) {
-  const db = await getDb()
+  const db = await requireDb()
   await db.delete(clubAnnouncements).where(eq(clubAnnouncements.id, announcementId))
   return true
 }
@@ -516,7 +527,7 @@ export async function uploadClubMedia(params: {
   caption?: string
   eventId?: number
 }) {
-  const db = await getDb()
+  const db = await requireDb()
   const [media] = await db.insert(clubMedia).values(params).returning()
   return media
 }
@@ -531,7 +542,7 @@ export async function getClubMediaGallery(params: {
   limit?: number
   offset?: number
 }) {
-  const db = await getDb()
+  const db = await requireDb()
   const conditions = [eq(clubMedia.clubId, params.clubId)]
   
   if (params.mediaType) {
@@ -547,8 +558,8 @@ export async function getClubMediaGallery(params: {
       media: clubMedia,
       uploader: {
         id: users.id,
-        username: users.username,
-        profilePicture: swimmerProfiles.profilePictureUrl,
+        username: swimmerProfiles.username,
+        profilePicture: swimmerProfiles.avatarUrl,
       },
     })
     .from(clubMedia)
@@ -566,7 +577,7 @@ export async function getClubMediaGallery(params: {
  * Cancella un media
  */
 export async function deleteClubMedia(mediaId: number) {
-  const db = await getDb()
+  const db = await requireDb()
   await db.delete(clubMedia).where(eq(clubMedia.id, mediaId))
   return true
 }
@@ -583,7 +594,7 @@ export async function togglePostReaction(params: {
   userId: number
   reactionType: 'splash' | 'fire' | 'strong' | 'clap' | 'wave'
 }) {
-  const db = await getDb()
+  const db = await requireDb()
   
   // Verifica se esiste già una reazione
   const [existing] = await db
@@ -624,17 +635,17 @@ export async function togglePostReaction(params: {
  * Ottiene reazioni di un post raggruppate per tipo
  */
 export async function getPostReactions(postId: number) {
-  const db = await getDb()
+  const db = await requireDb()
   const reactions = await db
     .select({
       reactionType: postReactions.reactionType,
       count: sql<number>`COUNT(*)::int`,
-      users: sql<any[]>`
+      users: sql<Array<{ userId: number; username: string | null; profilePicture: string | null }>>`
         JSON_AGG(
           JSON_BUILD_OBJECT(
             'userId', ${users.id},
-            'username', ${users.username},
-            'profilePicture', ${swimmerProfiles.profilePictureUrl}
+            'username', ${swimmerProfiles.username},
+            'profilePicture', ${swimmerProfiles.avatarUrl}
           )
         )
       `,
@@ -652,7 +663,7 @@ export async function getPostReactions(postId: number) {
  * Verifica se un utente ha reagito ad un post
  */
 export async function getUserPostReaction(postId: number, userId: number) {
-  const db = await getDb()
+  const db = await requireDb()
   const [reaction] = await db
     .select()
     .from(postReactions)

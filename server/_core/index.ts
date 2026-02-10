@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import type { NextFunction, Request, Response } from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -98,7 +99,7 @@ async function startServer() {
     try {
       const result = await completeChallenges();
       return res.json({ success: true, ...result });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[Cron] Failed to complete challenges:", error);
       return res.status(500).json({ success: false, error: "Cron execution failed" });
     }
@@ -120,7 +121,7 @@ async function startServer() {
     try {
       const result = await evaluateAllUsersWeekly();
       return res.json({ success: true, ...result });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[Cron] Failed to evaluate skill level:", error);
       return res.status(500).json({ success: false, error: "Cron execution failed" });
     }
@@ -144,8 +145,9 @@ async function startServer() {
   app.use(errorHandler);
 
   // Rollbar error handler (must be after other error handlers)
-  app.use((err: any, req: any, res: any, next: any) => {
-    captureError(err, {
+  app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+    const error = err instanceof Error ? err : new Error(String(err));
+    captureError(error, {
       url: req.url,
       method: req.method,
       ip: req.ip,

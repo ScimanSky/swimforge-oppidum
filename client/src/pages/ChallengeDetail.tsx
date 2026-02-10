@@ -31,17 +31,8 @@ export default function ChallengeDetail() {
         return;
       }
       
-      // Parse end date - handle both string and Date object
-      let endDate: Date;
-      if (typeof challenge.end_date === 'string') {
-        // Normalize date format: replace space with T if needed
-        const normalizedDate = challenge.end_date.replace(' ', 'T');
-        // If no time component, add end of day
-        const dateWithTime = normalizedDate.includes('T') ? normalizedDate : normalizedDate + 'T23:59:59';
-        endDate = new Date(dateWithTime);
-      } else {
-        endDate = new Date(challenge.end_date);
-      }
+      // Parse end date (API type is Date-like; new Date(...) is resilient to string/Date)
+      let endDate: Date = new Date(challenge.end_date);
       
       // Check if date is valid - if not, calculate from start_date + duration
       if (isNaN(endDate.getTime())) {

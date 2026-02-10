@@ -5,8 +5,8 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getDb } from "./db";
-import { aiCoachWorkouts } from "../drizzle/schema";
-import { eq, and, gt, desc } from "drizzle-orm";
+import { aiCoachWorkouts, swimmerProfiles, swimmingActivities } from "../drizzle/schema";
+import { eq, and, gt, gte, desc } from "drizzle-orm";
 import { logger } from "./middleware/logger";
 import { withErrorHandling } from "./lib/withErrorHandling";
 import { config } from "./config";
@@ -47,6 +47,50 @@ export interface GeneratedWorkout {
   sections: WorkoutSection[];
   coachNotes: string[];
 }
+
+type UserStatsForCoach = {
+  profile: {
+    aiSkillLabel: string | null;
+    level: number;
+    totalXp: number;
+    totalDistanceMeters: number;
+    totalSessions: number;
+  };
+  recent: {
+    activitiesCount: number;
+    totalDistance: number;
+    totalTime: number;
+    avgPace: string;
+    avgSwolf: string;
+    sessionsPerWeek: string;
+  };
+  advancedMetrics: {
+    sei: number;
+    tci: number;
+    ser: number;
+    acs: number;
+    rrs: number;
+    poi: number;
+  };
+  hrZones: {
+    hasData: boolean;
+    activitiesWithHR: number;
+    zone1: string;
+    zone2: string;
+    zone3: string;
+    zone4: string;
+    zone5: string;
+  };
+  latestActivities: Array<{
+    date: Date;
+    distance: number;
+    duration: number;
+    pace: number | null;
+    swolf: number | null;
+    strokes: number | null;
+    strokeRate: number | null;
+  }>;
+};
 
 function buildDefaultWorkout(workoutType: "pool" | "dryland"): GeneratedWorkout {
   if (workoutType === "dryland") {
@@ -275,16 +319,13 @@ async function generateWorkout(
 /**
  * Fetch comprehensive user statistics for workout generation
  */
-async function fetchUserStats(userId: number): Promise<any> {
+async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
   const db = await getDb();
   if (!db) {
     throw new Error("Database not available");
   }
-
-  // Get swimmer profile
-  const { swimmerProfiles, swimmingActivities } = await import("../drizzle/schema");
-  const { eq, and, gte, desc } = await import("drizzle-orm");
   
+  // Get swimmer profile
   const profileResult = await db
     .select()
     .from(swimmerProfiles)
@@ -324,9 +365,9 @@ async function fetchUserStats(userId: number): Promise<any> {
   );
   
   // Calculate average pace from activities that have pace data
-  const activitiesWithPace = recentActivities.filter(a => a.avgPacePerHundredMeters && a.avgPacePerHundredMeters > 0);
+  const activitiesWithPace = recentActivities.filter(a => a.avgPacePer100m && a.avgPacePer100m > 0);
   const avgPace = activitiesWithPace.length > 0
-    ? activitiesWithPace.reduce((sum, a) => sum + (a.avgPacePerHundredMeters || 0), 0) / activitiesWithPace.length
+    ? activitiesWithPace.reduce((sum, a) => sum + (a.avgPacePer100m || 0), 0) / activitiesWithPace.length
     : 0; // seconds per 100m
     
   const avgSwolf =
@@ -361,13 +402,12 @@ async function fetchUserStats(userId: number): Promise<any> {
     ? Math.round(acsScores.reduce((sum, s) => sum + s, 0) / acsScores.length)
     : 0;
 
-  // RRS: Average across all activities
-  const rrsScores = recentActivities
-    .map(a => calculateRRS(a))
-    .filter((s): s is number => s !== null);
-  const avgRRS = rrsScores.length > 0
-    ? Math.round(rrsScores.reduce((sum, s) => sum + s, 0) / rrsScores.length)
-    : 0;
+  // RRS: based on time since last workout (resting HR baseline not available in this context)
+  const lastWorkoutAt = recentActivities[0]?.activityDate ?? null;
+  const hoursSinceLastWorkout = lastWorkoutAt
+    ? (Date.now() - lastWorkoutAt.getTime()) / (1000 * 60 * 60)
+    : 999;
+  const avgRRS = calculateRRS(null, 60, hoursSinceLastWorkout) ?? 0;
 
   // POI: Simplified (would need previous period for proper calculation)
   const avgPOI = 0;
@@ -397,13 +437,14 @@ async function fetchUserStats(userId: number): Promise<any> {
   // Training frequency
   const sessionsPerWeek = (recentActivities.length / 30) * 7;
 
-  return {
-    profile: {
-      level: profile.level,
-      totalXp: profile.totalXp,
-      totalDistanceMeters: profile.totalDistanceMeters,
-      totalSessions: profile.totalSessions,
-    },
+	  return {
+	    profile: {
+	      aiSkillLabel: profile.aiSkillLabel ?? null,
+	      level: profile.level,
+	      totalXp: profile.totalXp,
+	      totalDistanceMeters: profile.totalDistanceMeters,
+	      totalSessions: profile.totalSessions,
+	    },
     recent: {
       activitiesCount: recentActivities.length,
       totalDistance,
@@ -429,22 +470,22 @@ async function fetchUserStats(userId: number): Promise<any> {
       zone4: avgHRZone4Pct.toFixed(1),
       zone5: avgHRZone5Pct.toFixed(1),
     },
-    latestActivities: recentActivities.slice(0, 5).map((a) => ({
-      date: a.activityDate,
-      distance: a.distanceMeters,
-      duration: a.durationSeconds,
-      pace: a.avgPacePerHundredMeters,
-      swolf: a.avgSwolf,
-      strokes: a.avgStrokesPerLength,
-      strokeRate: a.avgStrokeRate,
-    })),
-  };
+	    latestActivities: recentActivities.slice(0, 5).map((a) => ({
+	      date: a.activityDate,
+	      distance: a.distanceMeters,
+	      duration: a.durationSeconds,
+	      pace: a.avgPacePer100m ?? null,
+	      swolf: a.avgSwolf,
+	      strokes: a.avgStrokes ?? null,
+	      strokeRate: a.avgStrokeCadence ?? null,
+	    })),
+	  };
 }
 
 /**
  * Build prompt for pool workout generation
  */
-function buildPoolWorkoutPrompt(userStats: any): string {
+function buildPoolWorkoutPrompt(userStats: UserStatsForCoach): string {
   return `Sei un ALLENATORE OLIMPICO DI NUOTO con 20+ anni di esperienza nell'allenamento di atleti di livello mondiale. Genera un allenamento personalizzato IN VASCA completo e vario per un nuotatore basato sulle sue statistiche.
 
 **STATISTICHE NUOTATORE:**
@@ -580,7 +621,7 @@ Rispondi SOLO con il JSON valido, senza testo aggiuntivo.`;
 /**
  * Build prompt for dryland workout generation
  */
-function buildDrylandWorkoutPrompt(userStats: any): string {
+function buildDrylandWorkoutPrompt(userStats: UserStatsForCoach): string {
   return `Sei un allenatore olimpico di nuoto e preparatore atletico esperto. Genera un allenamento FUORI VASCA (dryland) personalizzato per un nuotatore basato sulle sue statistiche.
 
 **STATISTICHE NUOTATORE:**

@@ -569,12 +569,12 @@ export default function ClubDetail() {
                       </Card>
                     ) : (
                       <div className="space-y-6">
-                        {feedItems.map((post) => {
-                          const distance = formatDistance(post.activity_distance_meters);
-                          const duration = formatTime(post.activity_duration_seconds);
-                          const pace = formatPace(post.activity_distance_meters, post.activity_duration_seconds);
-                          const isOwnPost = currentUserId && post.user_id === currentUserId;
-                          return (
+	                        {feedItems.map((post) => {
+	                          const distance = formatDistance(post.activity_distance_meters);
+	                          const duration = formatTime(post.activity_duration_seconds);
+	                          const pace = formatPace(post.activity_distance_meters, post.activity_duration_seconds);
+	                          const isOwnPost = Boolean(currentUserId && post.user_id === currentUserId);
+	                          return (
                             <motion.div
                               key={post.id}
                               initial={{ opacity: 0, y: 10 }}
@@ -585,11 +585,11 @@ export default function ClubDetail() {
                                 <CardContent className="p-4 sm:p-6">
                                   <div className="flex flex-col sm:flex-row items-start gap-3 mb-4">
                                     {post.user_avatar ? (
-                                      <img
-                                        src={post.user_avatar}
-                                        alt={post.user_name || post.user_email}
-                                        className="h-12 w-12 rounded-full object-cover"
-                                      />
+	                                      <img
+	                                        src={post.user_avatar}
+	                                        alt={post.user_name ?? post.user_email ?? "Utente"}
+	                                        className="h-12 w-12 rounded-full object-cover"
+	                                      />
                                     ) : (
                                       <div className="h-12 w-12 rounded-full bg-muted/40 dark:bg-white/10" />
                                     )}
@@ -1143,15 +1143,16 @@ export default function ClubDetail() {
                               />
                             </div>
                           </div>
-                          <Button
-                            variant="neon"
-                            onClick={() => uploadMedia.mutate({
-                              clubId,
-                              mediaUrl: mediaForm.mediaUrl,
-                              caption: mediaForm.caption || null,
-                            })}
-                            disabled={!mediaForm.mediaUrl}
-                          >
+	                          <Button
+	                            variant="neon"
+	                            onClick={() => uploadMedia.mutate({
+	                              clubId,
+	                              mediaType: "image",
+	                              mediaUrl: mediaForm.mediaUrl,
+	                              caption: mediaForm.caption || undefined,
+	                            })}
+	                            disabled={!mediaForm.mediaUrl}
+	                          >
                             <Upload className="h-4 w-4 mr-2" />
                             Carica
                           </Button>
@@ -1193,13 +1194,13 @@ export default function ClubDetail() {
                                     {formatDate(media.created_at)}
                                   </span>
                                   {isStaff && (
-                                    <Button
-                                      size="sm"
-                                      variant="destructive"
-                                      onClick={() => deleteMedia.mutate({ clubId, mediaId: media.id })}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
+	                                    <Button
+	                                      size="sm"
+	                                      variant="destructive"
+	                                      onClick={() => deleteMedia.mutate({ mediaId: media.id })}
+	                                    >
+	                                      <Trash2 className="h-4 w-4" />
+	                                    </Button>
                                   )}
                                 </div>
                               </CardContent>
@@ -1321,13 +1322,13 @@ export default function ClubDetail() {
                                     {announcement.is_pinned && <Pin className="h-4 w-4 text-primary" />}
                                   </div>
                                   {isStaff && (
-                                    <Button
-                                      size="sm"
-                                      variant="destructive"
-                                      onClick={() => deleteAnnouncement.mutate({ clubId, announcementId: announcement.id })}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
+	                                    <Button
+	                                      size="sm"
+	                                      variant="destructive"
+	                                      onClick={() => deleteAnnouncement.mutate({ announcementId: announcement.id })}
+	                                    >
+	                                      <Trash2 className="h-4 w-4" />
+	                                    </Button>
                                   )}
                                 </div>
                                 <p className="text-muted-foreground mb-3">{announcement.content}</p>

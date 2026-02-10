@@ -79,13 +79,13 @@ const formatNumber = (value?: number | null, suffix?: string) => {
   return `${value}${suffix ?? ""}`
 }
 
-const toNumber = (value: any) => {
+const toNumber = (value: unknown) => {
   if (value === null || value === undefined || value === "") return null
   const num = Number(value)
   return Number.isFinite(num) ? num : null
 }
 
-const pickFirst = (obj: any, keys: string[]) => {
+const pickFirst = (obj: Record<string, unknown> | null | undefined, keys: string[]) => {
   if (!obj) return null
   for (const key of keys) {
     const value = obj[key]
@@ -96,7 +96,7 @@ const pickFirst = (obj: any, keys: string[]) => {
   return null
 }
 
-const getDistanceMeters = (obj: any) =>
+const getDistanceMeters = (obj: Record<string, unknown> | null | undefined) =>
   toNumber(
     pickFirst(obj, [
       "distance",
@@ -107,7 +107,7 @@ const getDistanceMeters = (obj: any) =>
     ])
   )
 
-const getDurationSeconds = (obj: any) =>
+const getDurationSeconds = (obj: Record<string, unknown> | null | undefined) =>
   toNumber(
     pickFirst(obj, [
       "duration",
@@ -119,7 +119,7 @@ const getDurationSeconds = (obj: any) =>
     ])
   )
 
-const getSpeedMps = (obj: any) => {
+const getSpeedMps = (obj: Record<string, unknown> | null | undefined) => {
   const raw = toNumber(
     pickFirst(obj, ["averageSpeed", "avgSpeed", "averageMovingSpeed", "avgMovingSpeed"])
   )
@@ -127,7 +127,7 @@ const getSpeedMps = (obj: any) => {
   return raw > 15 ? raw / 3.6 : raw
 }
 
-const getPacePer100m = (obj: any) => {
+const getPacePer100m = (obj: Record<string, unknown> | null | undefined) => {
   const pace = toNumber(
     pickFirst(obj, ["avgPacePer100m", "averagePace", "avgPace", "pacePer100m"])
   )
@@ -167,17 +167,17 @@ export default function ActivityDetail() {
   const totalHrSeconds = hrZones.reduce((sum, zone) => sum + (zone.seconds || 0), 0)
   const hasDbHrZones = hrZones.some((zone) => (zone.seconds || 0) > 0)
 
-  const garminSummarySource =
-    garminDetails?.activity?.summaryDTO ??
-    garminDetails?.summaryDTO ??
-    garminDetails?.details ??
-    garminDetails?.activity ??
-    null
-  const normalizeStrokeDistanceCm = (value: any) => {
-    const num = toNumber(value)
-    if (!num) return null
-    return num < 10 ? num * 100 : num
-  }
+	  const garminSummarySource =
+	    garminDetails?.activity?.summaryDTO ??
+	    garminDetails?.summaryDTO ??
+	    garminDetails?.details ??
+	    garminDetails?.activity ??
+	    null
+	  const normalizeStrokeDistanceCm = (value: unknown) => {
+	    const num = toNumber(value)
+	    if (!num) return null
+	    return num < 10 ? num * 100 : num
+	  }
 
   const techMetrics = {
     swolf:
@@ -224,34 +224,39 @@ export default function ActivityDetail() {
     activity?.restingHeartRate ??
     toNumber(pickFirst(garminSummarySource, ["restingHeartRate"]))
 
-  const normalizeZones = (zones: any) => {
-    if (!zones) return []
-    const map: Record<string, number> = {}
-    if (Array.isArray(zones)) {
-      zones.forEach((zone) => {
-        const zoneNum = zone?.zoneNumber ?? zone?.zone ?? zone?.zoneIndex
-        const seconds =
-          toNumber(
-            pickFirst(zone, ["secsInZone", "seconds", "timeInSeconds", "value"])
-          ) ?? 0
-        if (zoneNum) {
-          map[`Z${zoneNum}`] = seconds
-        }
+	  const normalizeZones = (zones: unknown) => {
+	    if (!zones) return []
+	    const map: Record<string, number> = {}
+	    if (Array.isArray(zones)) {
+	      zones.forEach((zone) => {
+	        if (!zone || typeof zone !== "object") return
+	        const zoneRec = zone as Record<string, unknown>
+	        const zoneNum = toNumber(
+	          zoneRec["zoneNumber"] ?? zoneRec["zone"] ?? zoneRec["zoneIndex"]
+	        )
+	        const seconds =
+	          toNumber(
+	            pickFirst(zoneRec, ["secsInZone", "seconds", "timeInSeconds", "value"])
+	          ) ?? 0
+	        if (zoneNum) {
+	          map[`Z${zoneNum}`] = seconds
+	        }
       })
-    } else if (typeof zones === "object") {
-      const zoneValues = [
-        zones.zone1TimeInSeconds ?? zones.zone1 ?? zones.zone1Seconds,
-        zones.zone2TimeInSeconds ?? zones.zone2 ?? zones.zone2Seconds,
-        zones.zone3TimeInSeconds ?? zones.zone3 ?? zones.zone3Seconds,
-        zones.zone4TimeInSeconds ?? zones.zone4 ?? zones.zone4Seconds,
-        zones.zone5TimeInSeconds ?? zones.zone5 ?? zones.zone5Seconds,
-      ]
-      zoneValues.forEach((value, index) => {
-        map[`Z${index + 1}`] = toNumber(value) ?? 0
-      })
-    }
-    return Object.entries(map).map(([label, seconds]) => ({ label, seconds }))
-  }
+	    } else if (typeof zones === "object") {
+	      const zonesRec = zones as Record<string, unknown>
+	      const zoneValues = [
+	        zonesRec["zone1TimeInSeconds"] ?? zonesRec["zone1"] ?? zonesRec["zone1Seconds"],
+	        zonesRec["zone2TimeInSeconds"] ?? zonesRec["zone2"] ?? zonesRec["zone2Seconds"],
+	        zonesRec["zone3TimeInSeconds"] ?? zonesRec["zone3"] ?? zonesRec["zone3Seconds"],
+	        zonesRec["zone4TimeInSeconds"] ?? zonesRec["zone4"] ?? zonesRec["zone4Seconds"],
+	        zonesRec["zone5TimeInSeconds"] ?? zonesRec["zone5"] ?? zonesRec["zone5Seconds"],
+	      ]
+	      zoneValues.forEach((value, index) => {
+	        map[`Z${index + 1}`] = toNumber(value) ?? 0
+	      })
+	    }
+	    return Object.entries(map).map(([label, seconds]) => ({ label, seconds }))
+	  }
 
   const garminHrZones = normalizeZones(garminDetails?.hr_zones)
   const displayHrZones = hasDbHrZones ? hrZones : garminHrZones
@@ -286,36 +291,43 @@ export default function ActivityDetail() {
     mixed: "Misto",
   }
 
-  const normalizeStrokeKey = (value: any) => {
-    if (!value) return "mixed"
-    const raw = String(value).toLowerCase().replace(/\s+/g, "_")
-    if (raw.includes("free") || raw.includes("stile") || raw.includes("crawl")) return "freestyle"
+	  const normalizeStrokeKey = (value: unknown) => {
+	    if (!value) return "mixed"
+	    const raw = String(value).toLowerCase().replace(/\s+/g, "_")
+	    if (raw.includes("free") || raw.includes("stile") || raw.includes("crawl")) return "freestyle"
     if (raw.includes("back") || raw.includes("dorso")) return "backstroke"
     if (raw.includes("breast") || raw.includes("rana")) return "breaststroke"
     if (raw.includes("butter") || raw.includes("farf")) return "butterfly"
     if (raw.includes("mix")) return "mixed"
     return raw
-  }
+	  }
 
-  const typedSplitsSummary = garminTypedSplits.reduce(
-    (acc: Record<string, { distance: number; duration: number; laps: number; count: number }>, split) => {
-      const strokeKey = normalizeStrokeKey(
-        pickFirst(split, ["strokeType", "swimStrokeType", "avgStrokeType", "stroke", "type"])
-      )
-      const distance = getDistanceMeters(split) ?? 0
-      const duration = getDurationSeconds(split) ?? 0
-      const laps = toNumber(pickFirst(split, ["lapCount", "totalLaps", "numLaps", "laps"])) ?? 0
-      if (!acc[strokeKey]) {
-        acc[strokeKey] = { distance: 0, duration: 0, laps: 0, count: 0 }
-      }
-      acc[strokeKey].distance += distance
-      acc[strokeKey].duration += duration
-      acc[strokeKey].laps += laps
-      acc[strokeKey].count += 1
-      return acc
-    },
-    {}
-  )
+	  type TypedSplitStats = { distance: number; duration: number; laps: number; count: number }
+    const typedSplitsSource: unknown[] = Array.isArray(garminTypedSplits)
+      ? (garminTypedSplits as unknown[])
+      : []
+
+	  const typedSplitsSummary: Record<string, TypedSplitStats> = typedSplitsSource.reduce(
+	    (acc: Record<string, TypedSplitStats>, split: unknown) => {
+        const splitRec =
+          split && typeof split === "object" ? (split as Record<string, unknown>) : {}
+	      const strokeKey = normalizeStrokeKey(
+	        pickFirst(splitRec, ["strokeType", "swimStrokeType", "avgStrokeType", "stroke", "type"])
+	      )
+	      const distance = getDistanceMeters(splitRec) ?? 0
+	      const duration = getDurationSeconds(splitRec) ?? 0
+	      const laps = toNumber(pickFirst(splitRec, ["lapCount", "totalLaps", "numLaps", "laps"])) ?? 0
+	      if (!acc[strokeKey]) {
+	        acc[strokeKey] = { distance: 0, duration: 0, laps: 0, count: 0 }
+	      }
+	      acc[strokeKey].distance += distance
+	      acc[strokeKey].duration += duration
+	      acc[strokeKey].laps += laps
+	      acc[strokeKey].count += 1
+	      return acc
+	    },
+	    {} as Record<string, TypedSplitStats>
+	  )
 
   const typedSplitsSummaryList = Object.entries(typedSplitsSummary).map(([strokeKey, data]) => {
     const pace = data.distance > 0 ? data.duration / (data.distance / 100) : null
@@ -329,21 +341,22 @@ export default function ActivityDetail() {
     }
   })
 
-  const renderSplitCard = (split: any, index: number) => {
-    const distance = getDistanceMeters(split)
-    const duration = getDurationSeconds(split)
-    const pace = getPacePer100m(split)
-    const avgHr = toNumber(pickFirst(split, ["averageHR", "avgHeartRate", "avgHR"]))
-    const swolf = toNumber(pickFirst(split, ["averageSwolf", "avgSwolf", "averageSWOLF"]))
-    const stroke = pickFirst(split, ["strokeType", "swimStrokeType", "avgStrokeType", "stroke"])
-    const cadence = toNumber(pickFirst(split, ["avgStrokeCadence", "avgStrokeCadenceRpm", "avgCadence"]))
-    const strokes = toNumber(pickFirst(split, ["avgStrokes", "averageStrokes", "strokes"]))
-    return (
-      <div key={`split-${index}`} className="rounded-lg border border-border bg-background/60 p-3">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>Lap {index + 1}</span>
-          {stroke ? <span className="capitalize">{stroke}</span> : null}
-        </div>
+	  const renderSplitCard = (split: Record<string, unknown>, index: number) => {
+	    const distance = getDistanceMeters(split)
+	    const duration = getDurationSeconds(split)
+	    const pace = getPacePer100m(split)
+	    const avgHr = toNumber(pickFirst(split, ["averageHR", "avgHeartRate", "avgHR"]))
+	    const swolf = toNumber(pickFirst(split, ["averageSwolf", "avgSwolf", "averageSWOLF"]))
+	    const stroke = pickFirst(split, ["strokeType", "swimStrokeType", "avgStrokeType", "stroke"])
+	    const strokeText = stroke ? String(stroke) : null
+	    const cadence = toNumber(pickFirst(split, ["avgStrokeCadence", "avgStrokeCadenceRpm", "avgCadence"]))
+	    const strokes = toNumber(pickFirst(split, ["avgStrokes", "averageStrokes", "strokes"]))
+	    return (
+	      <div key={`split-${index}`} className="rounded-lg border border-border bg-background/60 p-3">
+	        <div className="flex items-center justify-between text-xs text-muted-foreground">
+	          <span>Lap {index + 1}</span>
+	          {strokeText ? <span className="capitalize">{strokeText}</span> : null}
+	        </div>
         <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
           <span>Distanza: {distance ? formatDistance(distance) : "—"}</span>
           <span>Durata: {duration ? formatDuration(duration) : "—"}</span>
@@ -357,12 +370,29 @@ export default function ActivityDetail() {
     )
   }
 
-  const lapSplits = (() => {
-    let cumulativeSeconds = 0
-    return garminSplits.map((lap: any, index: number) => {
-      const distance = getDistanceMeters(lap) ?? 0
-      const duration = toNumber(pickFirst(lap, ["duration", "movingDuration", "elapsedDuration"])) ?? 0
-      cumulativeSeconds += duration
+  type LapSplitItem = {
+    index: number
+    distance: number
+    duration: number
+    cumulativeSeconds: number
+    avgSpeed: number | null
+    maxSpeed: number | null
+    avgHr: number | null
+    maxHr: number | null
+    swolf: number | null
+    totalStrokes: number | null
+    avgStrokes: number | null
+    calories: number | null
+    dominantStroke: string | null
+    lengths: unknown[]
+  }
+
+	  const lapSplits: LapSplitItem[] = (() => {
+	    let cumulativeSeconds = 0
+	    return garminSplits.map((lap: Record<string, unknown>, index: number) => {
+	      const distance = getDistanceMeters(lap) ?? 0
+	      const duration = toNumber(pickFirst(lap, ["duration", "movingDuration", "elapsedDuration"])) ?? 0
+	      cumulativeSeconds += duration
       const avgSpeed = getSpeedMps(lap)
       const maxSpeed = toNumber(pickFirst(lap, ["maxSpeed", "peakSpeed"]))
       const avgHr = toNumber(pickFirst(lap, ["averageHR", "avgHeartRate", "avgHR"]))
@@ -371,13 +401,15 @@ export default function ActivityDetail() {
       const totalStrokes = toNumber(pickFirst(lap, ["totalNumberOfStrokes", "totalStrokes"]))
       const avgStrokes = toNumber(pickFirst(lap, ["averageStrokes", "avgStrokes"]))
       const calories = toNumber(pickFirst(lap, ["calories", "caloriesBurned"]))
-      const lengthDTOs = Array.isArray(lap?.lengthDTOs) ? lap.lengthDTOs : []
-      const strokeCounts: Record<string, number> = {}
-      lengthDTOs.forEach((length: any) => {
-        const strokeRaw = length?.swimStroke ?? length?.strokeType ?? length?.stroke
-        const strokeKey = normalizeStrokeKey(strokeRaw)
-        strokeCounts[strokeKey] = (strokeCounts[strokeKey] ?? 0) + 1
-      })
+	      const lapRec = (lap && typeof lap === "object") ? (lap as Record<string, unknown>) : null
+	      const lengthDTOs = Array.isArray(lapRec?.["lengthDTOs"]) ? (lapRec!["lengthDTOs"] as unknown[]) : []
+	      const strokeCounts: Record<string, number> = {}
+	      lengthDTOs.forEach((length) => {
+	        const lengthRec = (length && typeof length === "object") ? (length as Record<string, unknown>) : null
+	        const strokeRaw = lengthRec?.["swimStroke"] ?? lengthRec?.["strokeType"] ?? lengthRec?.["stroke"]
+	        const strokeKey = normalizeStrokeKey(strokeRaw)
+	        strokeCounts[strokeKey] = (strokeCounts[strokeKey] ?? 0) + 1
+	      })
       const dominantStroke =
         Object.entries(strokeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
 
@@ -396,18 +428,18 @@ export default function ActivityDetail() {
         calories,
         dominantStroke,
         lengths: lengthDTOs,
-      }
-    })
-  })()
+		  }
+	    })
+	  })()
 
-  const buildLapSummary = (laps: typeof lapSplits) =>
-    laps.reduce(
-      (acc, lap) => {
-        if (lap.distance) acc.distance += lap.distance
-        if (lap.duration) acc.duration += lap.duration
-        if (lap.swolf !== null && lap.swolf !== undefined) {
-          acc.swolfSum += lap.swolf
-          acc.swolfCount += 1
+	  const buildLapSummary = (laps: LapSplitItem[]) =>
+	    laps.reduce(
+	      (acc: { distance: number; duration: number; swolfSum: number; swolfCount: number; avgHrSum: number; avgHrCount: number }, lap: LapSplitItem) => {
+	        if (lap.distance) acc.distance += lap.distance
+	        if (lap.duration) acc.duration += lap.duration
+	        if (lap.swolf !== null && lap.swolf !== undefined) {
+	          acc.swolfSum += lap.swolf
+	          acc.swolfCount += 1
         }
         if (lap.avgHr !== null && lap.avgHr !== undefined) {
           acc.avgHrSum += lap.avgHr
@@ -503,17 +535,18 @@ export default function ActivityDetail() {
     )
   }
 
-  const renderExerciseSet = (set: any, index: number) => {
-    const name = pickFirst(set, ["exerciseName", "name", "exercise", "activity"])
-    const reps = toNumber(pickFirst(set, ["reps", "repetitions"]))
-    const weight = toNumber(pickFirst(set, ["weight", "weightKg", "weight_kg"]))
-    const duration = toNumber(pickFirst(set, ["duration", "durationSeconds"]))
-    return (
-      <div key={`exercise-${index}`} className="rounded-lg border border-border bg-background/60 p-3 text-xs">
-        <div className="flex items-center justify-between text-muted-foreground">
-          <span>Set {index + 1}</span>
-          {name ? <span className="font-medium text-foreground">{name}</span> : null}
-        </div>
+		  const renderExerciseSet = (set: Record<string, unknown>, index: number) => {
+		    const name = pickFirst(set, ["exerciseName", "name", "exercise", "activity"])
+        const nameText = name ? String(name) : null
+		    const reps = toNumber(pickFirst(set, ["reps", "repetitions"]))
+		    const weight = toNumber(pickFirst(set, ["weight", "weightKg", "weight_kg"]))
+		    const duration = toNumber(pickFirst(set, ["duration", "durationSeconds"]))
+	    return (
+	      <div key={`exercise-${index}`} className="rounded-lg border border-border bg-background/60 p-3 text-xs">
+	        <div className="flex items-center justify-between text-muted-foreground">
+	          <span>Set {index + 1}</span>
+	          {nameText ? <span className="font-medium text-foreground">{nameText}</span> : null}
+	        </div>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <span>Ripetizioni: {reps ?? "—"}</span>
           <span>Peso: {weight ? `${weight} kg` : "—"}</span>

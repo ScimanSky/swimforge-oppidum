@@ -23,7 +23,7 @@ export interface Challenge {
   badgeImageUrl: string | null;
   badgeName: string | null;
   prizeDescription: string | null;
-  rules: any;
+  rules: unknown;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -37,7 +37,7 @@ export interface ChallengeParticipant {
   currentRank: number;
   isWinner: boolean;
   completedAt: Date | null;
-  stats: any;
+  stats: unknown;
 }
 
 // ============================================

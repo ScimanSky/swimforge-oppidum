@@ -44,10 +44,21 @@ export default function ClubDetailEnhanced() {
     { enabled: !!clubQuery.data }
   );
 
-  const club = clubQuery.data;
-  const isStaff = club?.member_role && ["owner", "admin", "moderator"].includes(club.member_role);
-  const isOwner = club?.member_role === "owner";
-  const isMember = club?.is_member;
+  type ClubLike = {
+    name: string
+    description?: string | null
+    cover_image_url?: string | null
+    visibility?: string | null
+    member_count?: number
+    member_role?: string | null
+    is_member?: boolean
+  } & Record<string, unknown>
+
+  const club = clubQuery.data as unknown as ClubLike | undefined
+  const memberRole = club?.member_role ?? null
+  const isStaff = memberRole ? ["owner", "admin", "moderator"].includes(memberRole) : false
+  const isOwner = memberRole === "owner"
+  const isMember = Boolean(club?.is_member)
 
   const joinMutation = trpc.community.clubs.join.useMutation({
     onSuccess: () => {

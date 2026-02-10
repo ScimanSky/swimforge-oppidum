@@ -319,13 +319,12 @@ export default function Statistics() {
     { days: period },
     { staleTime: 5 * 60 * 1000 } // Cache for 5 minutes
   );
-  const { data: advanced, isLoading: advancedLoading } = trpc.statistics.getAdvanced.useQuery(
-    { days: period },
-    { 
-      staleTime: 24 * 60 * 60 * 1000, // Cache for 24 hours (AI insights)
-      cacheTime: 24 * 60 * 60 * 1000  // Keep in cache for 24 hours
-    }
-  );
+	  const { data: advanced, isLoading: advancedLoading } = trpc.statistics.getAdvanced.useQuery(
+	    { days: period },
+	    { 
+	      staleTime: 24 * 60 * 60 * 1000, // Cache for 24 hours (AI insights)
+	    }
+	  );
 
   const isLoading = timelineLoading || performanceLoading || advancedLoading;
 
