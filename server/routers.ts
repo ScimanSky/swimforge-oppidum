@@ -29,6 +29,34 @@ type ClubEventInsert = typeof clubEvents.$inferInsert;
 type ClubAnnouncementInsert = typeof clubAnnouncements.$inferInsert;
 type SwimmingActivityInsert = typeof swimmingActivities.$inferInsert;
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const coerceBoolean = (value: unknown): boolean | undefined => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    if (value.toLowerCase() === "true") return true;
+    if (value.toLowerCase() === "false") return false;
+  }
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  return undefined;
+};
+
+const normalizeBooleanRecord = (value: unknown): Record<string, boolean> => {
+  if (!isRecord(value)) return {};
+  const out: Record<string, boolean> = {};
+  for (const [key, raw] of Object.entries(value)) {
+    const coerced = coerceBoolean(raw);
+    if (coerced !== undefined) {
+      out[key] = coerced;
+    }
+  }
+  return out;
+};
+
 function detectImageType(buffer: Buffer): { mimeType: "image/jpeg" | "image/png" | "image/webp"; extension: "jpg" | "png" | "webp" } | null {
   if (buffer.length < 12) return null;
   // JPEG: FF D8 FF
@@ -292,6 +320,7 @@ export const appRouter = router({
       
       return {
         ...profile,
+        notificationSettings: normalizeBooleanRecord(profile.notificationSettings),
         levelTitle: currentLevelInfo.title,
         levelColor: currentLevelInfo.color,
         xpLevelTitle: currentLevelInfo.title,
@@ -317,7 +346,15 @@ export const appRouter = router({
         preferredStroke: z.enum(["freestyle", "backstroke", "breaststroke", "butterfly", "mixed"]).optional().nullable(),
         preferredPoolLengthMeters: z.number().int().positive().optional().nullable(),
         masterCategory: z.string().max(120).optional(),
-        notificationSettings: z.record(z.string(), z.boolean()).optional(),
+        notificationSettings: z
+          .record(
+            z.string(),
+            z.preprocess((raw) => {
+              const coerced = coerceBoolean(raw);
+              return coerced === undefined ? raw : coerced;
+            }, z.boolean())
+          )
+          .optional(),
         preferences: z.object({
           units: z.enum(["metric", "imperial"]).optional(),
           paceFormat: z.enum(["100m", "100y"]).optional(),

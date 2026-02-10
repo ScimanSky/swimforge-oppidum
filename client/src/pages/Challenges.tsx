@@ -163,7 +163,7 @@ export default function Challenges() {
   })
 
   const profileQuery = trpc.profile.get.useQuery()
-  const activitiesQuery = trpc.activities.list.useQuery({ limit: 200, offset: 0, source: "all" })
+  const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
   const badgesQuery = trpc.badges.userBadges.useQuery()
   const challengesQuery = trpc.challenges.list.useQuery()
   const createChallenge = trpc.challenges.create.useMutation({

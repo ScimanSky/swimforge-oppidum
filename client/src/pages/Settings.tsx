@@ -113,6 +113,36 @@ const defaultPrivacyState = {
   showLeaderboards: true,
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null
+
+const coerceBoolean = (value: unknown): boolean | undefined => {
+  if (typeof value === "boolean") return value
+  if (typeof value === "string") {
+    if (value.toLowerCase() === "true") return true
+    if (value.toLowerCase() === "false") return false
+  }
+  if (typeof value === "number") {
+    if (value === 1) return true
+    if (value === 0) return false
+  }
+  return undefined
+}
+
+const normalizeNotificationSettings = (
+  input: unknown
+): Record<string, boolean> => {
+  const base = { ...defaultNotificationState }
+  if (!isRecord(input)) return base
+  for (const [key, raw] of Object.entries(input)) {
+    const coerced = coerceBoolean(raw)
+    if (coerced !== undefined) {
+      base[key] = coerced
+    }
+  }
+  return base
+}
+
 const strokeOptions = [
   { value: "auto", label: "Auto (da attivita)" },
   { value: "freestyle", label: "Stile libero" },
@@ -459,18 +489,50 @@ export default function Settings() {
 
   useEffect(() => {
     if (!profile) return
-    setNotifications({
-      ...defaultNotificationState,
-      ...(profile.notificationSettings as Record<string, boolean> | undefined),
-    })
-    setPreferences({
-      ...defaultPreferencesState,
-      ...(profile.preferences as typeof defaultPreferencesState | undefined),
-    })
-    setPrivacySettings({
-      ...defaultPrivacyState,
-      ...(profile.privacySettings as typeof defaultPrivacyState | undefined),
-    })
+    setNotifications(normalizeNotificationSettings(profile.notificationSettings))
+    if (isRecord(profile.preferences)) {
+      const units =
+        profile.preferences.units === "metric" || profile.preferences.units === "imperial"
+          ? profile.preferences.units
+          : undefined
+      const paceFormat =
+        profile.preferences.paceFormat === "100m" || profile.preferences.paceFormat === "100y"
+          ? profile.preferences.paceFormat
+          : undefined
+      const language =
+        profile.preferences.language === "it" ||
+        profile.preferences.language === "en" ||
+        profile.preferences.language === "es" ||
+        profile.preferences.language === "fr"
+          ? profile.preferences.language
+          : undefined
+      const timezone = typeof profile.preferences.timezone === "string" ? profile.preferences.timezone : undefined
+
+      setPreferences({
+        ...defaultPreferencesState,
+        ...(units ? { units } : {}),
+        ...(paceFormat ? { paceFormat } : {}),
+        ...(language ? { language } : {}),
+        ...(timezone ? { timezone } : {}),
+      })
+    } else {
+      setPreferences(defaultPreferencesState)
+    }
+
+    if (isRecord(profile.privacySettings)) {
+      const profilePublic = coerceBoolean(profile.privacySettings.profilePublic)
+      const activitiesPublic = coerceBoolean(profile.privacySettings.activitiesPublic)
+      const showLeaderboards = coerceBoolean(profile.privacySettings.showLeaderboards)
+
+      setPrivacySettings({
+        ...defaultPrivacyState,
+        ...(profilePublic !== undefined ? { profilePublic } : {}),
+        ...(activitiesPublic !== undefined ? { activitiesPublic } : {}),
+        ...(showLeaderboards !== undefined ? { showLeaderboards } : {}),
+      })
+    } else {
+      setPrivacySettings(defaultPrivacyState)
+    }
   }, [profile?.notificationSettings, profile?.preferences, profile?.privacySettings])
 
   const persistSettings = async (payload: Record<string, unknown>) => {
@@ -483,7 +545,8 @@ export default function Settings() {
   }
 
   const toggleNotification = async (id: string) => {
-    const next = { ...notifications, [id]: !notifications[id] }
+    // Defense in depth: ensure we're not persisting legacy string values.
+    const next = { ...normalizeNotificationSettings(notifications), [id]: !notifications[id] }
     setNotifications(next)
     await persistSettings({ notificationSettings: next })
   }
@@ -918,7 +981,7 @@ export default function Settings() {
                     <p className="text-sm text-muted-foreground">{setting.description}</p>
                   </div>
                   <Switch
-                    checked={notifications[setting.id]}
+                    checked={Boolean(notifications[setting.id])}
                     onCheckedChange={() => toggleNotification(setting.id)}
                   />
                 </div>

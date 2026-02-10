@@ -15,6 +15,19 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
+const coerceBoolean = (value: unknown): boolean | undefined => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    if (value.toLowerCase() === "true") return true;
+    if (value.toLowerCase() === "false") return false;
+  }
+  if (typeof value === "number") {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  return undefined;
+};
+
 export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const utils = trpc.useUtils();
@@ -23,9 +36,11 @@ export default function NotificationBell() {
     staleTime: 5 * 60 * 1000,
   });
 
-  const inAppEnabled =
-    (profileQuery.data?.notificationSettings as Record<string, boolean> | undefined)
-      ?.in_app_notifications ?? true;
+  const inAppEnabled = (() => {
+    const raw = (profileQuery.data?.notificationSettings as Record<string, unknown> | null | undefined)
+      ?.in_app_notifications;
+    return coerceBoolean(raw) ?? true;
+  })();
 
   const unreadCountQuery = trpc.community.notifications.unreadCount.useQuery(undefined, {
     refetchInterval: 60000, // Poll ogni 60 secondi (ridotto carico server)
