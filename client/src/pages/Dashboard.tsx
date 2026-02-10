@@ -124,8 +124,28 @@ export default function Dashboard() {
   })
   const challengesQuery = trpc.challenges.list.useQuery()
 
+  const normalizedActivities = useMemo(() => {
+    const list = activitiesQuery.data ?? []
+    return list.map((activity) => {
+      const date = parseActivityDate(getActivityDateValue(activity))
+      const dateMs = date?.getTime() ?? 0
+      return {
+        activity,
+        date,
+        dateMs,
+        distance: getActivityDistance(activity),
+        duration: getActivityDuration(activity),
+        pace: getActivityPace(activity),
+      }
+    })
+  }, [activitiesQuery.data])
+
+  const activitiesSortedByDate = useMemo(() => {
+    return [...normalizedActivities].sort((a, b) => b.dateMs - a.dateMs)
+  }, [normalizedActivities])
+
   const stats = useMemo(() => {
-    const activities = activitiesQuery.data ?? []
+    const activities = normalizedActivities
     const timeline = timelineQuery.data ?? []
     const profileTotals = profileQuery.data
     const now = new Date()
@@ -156,17 +176,16 @@ export default function Dashboard() {
 
     let validDates = 0
 
-    activities.forEach((activity) => {
-      const date = parseActivityDate(getActivityDateValue(activity))
+    activities.forEach(({ date, distance, duration }) => {
       if (!date) return
       validDates += 1
       if (date >= startOfWeek && date <= now) {
-        currentDistance += getActivityDistance(activity)
-        currentTime += getActivityDuration(activity)
+        currentDistance += distance
+        currentTime += duration
         currentSessions += 1
       } else if (date >= startPrevWeek && date < startOfWeek) {
-        prevDistance += getActivityDistance(activity)
-        prevTime += getActivityDuration(activity)
+        prevDistance += distance
+        prevTime += duration
         prevSessions += 1
       }
     })
@@ -237,14 +256,8 @@ export default function Dashboard() {
       prevTime = Math.round((prevDistance / 100) * prevPace)
     }
     if (validDates === 0 && activities.length > 0) {
-      currentDistance = activities.reduce(
-        (sum, activity) => sum + getActivityDistance(activity),
-        0
-      )
-      currentTime = activities.reduce(
-        (sum, activity) => sum + getActivityDuration(activity),
-        0
-      )
+      currentDistance = activities.reduce((sum, entry) => sum + entry.distance, 0)
+      currentTime = activities.reduce((sum, entry) => sum + entry.duration, 0)
       currentSessions = activities.length
     }
 
@@ -260,14 +273,9 @@ export default function Dashboard() {
     }
 
     if (currentDistance === 0 && activities.length > 0) {
-      const sorted = [...activities].sort(
-        (a, b) =>
-          (parseActivityDate(getActivityDateValue(b))?.getTime() ?? 0) -
-          (parseActivityDate(getActivityDateValue(a))?.getTime() ?? 0)
-      )
-      const slice = sorted.slice(0, 7)
-      currentDistance = slice.reduce((sum, activity) => sum + getActivityDistance(activity), 0)
-      currentTime = slice.reduce((sum, activity) => sum + getActivityDuration(activity), 0)
+      const slice = activitiesSortedByDate.slice(0, 7)
+      currentDistance = slice.reduce((sum, entry) => sum + entry.distance, 0)
+      currentTime = slice.reduce((sum, entry) => sum + entry.duration, 0)
       currentSessions = slice.length
     }
 
@@ -325,7 +333,7 @@ export default function Dashboard() {
         bgColor: "bg-chart-5/10",
       },
     ]
-  }, [activitiesQuery.data, timelineQuery.data, profileQuery.data])
+  }, [normalizedActivities, activitiesSortedByDate, timelineQuery.data, profileQuery.data])
 
   const weeklyData = useMemo(() => {
     const timeline = timelineQuery.data ?? []
@@ -353,15 +361,8 @@ export default function Dashboard() {
   }, [timelineQuery.data])
 
   const recentActivities = useMemo(() => {
-    const list = activitiesQuery.data ?? []
-    return [...list]
-      .sort(
-        (a, b) =>
-          (parseActivityDate(getActivityDateValue(b))?.getTime() ?? 0) -
-          (parseActivityDate(getActivityDateValue(a))?.getTime() ?? 0)
-      )
-      .slice(0, 3)
-  }, [activitiesQuery.data])
+    return activitiesSortedByDate.slice(0, 3).map((entry) => entry.activity)
+  }, [activitiesSortedByDate])
 
   const leaderboardEntries = useMemo(() => {
     const raw = leaderboardQuery.data ?? []
