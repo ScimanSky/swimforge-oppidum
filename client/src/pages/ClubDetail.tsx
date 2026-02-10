@@ -1218,14 +1218,20 @@ export default function ClubDetail() {
                                     rawExtension === "webp"
                                       ? rawExtension
                                       : undefined;
-                                  const fileBase64 = await readFileAsBase64(mediaFile);
-                                  uploadMediaFile.mutate({
-                                    clubId,
-                                    fileBase64,
-                                    mimeType: mediaFile.type as "image/jpeg" | "image/png" | "image/webp",
-                                    ...(extension ? { extension: extension as "jpg" | "jpeg" | "png" | "webp" } : {}),
-                                    caption: mediaForm.caption || undefined,
-                                  });
+                                  try {
+                                    const fileBase64 = await readFileAsBase64(mediaFile);
+                                    uploadMediaFile.mutate({
+                                      clubId,
+                                      fileBase64,
+                                      mimeType: mediaFile.type as "image/jpeg" | "image/png" | "image/webp",
+                                      ...(extension ? { extension: extension as "jpg" | "jpeg" | "png" | "webp" } : {}),
+                                      caption: mediaForm.caption || undefined,
+                                    });
+                                  } catch (error: unknown) {
+                                    const message =
+                                      error instanceof Error ? error.message : "Upload fallito.";
+                                    toast.error(message);
+                                  }
                                 }}
 		                            disabled={!mediaFile || uploadMediaFile.isPending}
 		                          >
