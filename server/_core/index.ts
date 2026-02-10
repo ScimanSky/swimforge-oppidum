@@ -12,6 +12,7 @@ import { evaluateAllUsersWeekly } from "../ai_skill_level";
 import { setupSwagger } from "../swagger-setup";
 import { connectRedis } from "../lib/cache";
 import { assertAuthEnv } from "./env";
+import { healthRouter } from "../routes/health";
 
 // Security middleware
 import { requestLogger, errorHandler } from "../middleware/logger";
@@ -55,16 +56,8 @@ async function startServer() {
   // Give Redis a moment to connect in background
   await new Promise(resolve => setTimeout(resolve, 500));
 
-  // Health check endpoint (before rate limiting)
-  app.get('/health', (req, res) => {
-    res.status(200).json({
-      status: 'ok',
-      uptime: process.uptime(),
-      ip: req.ip,
-      xForwardedFor: req.headers['x-forwarded-for'] || null,
-      trustProxy: req.app.get('trust proxy'),
-    });
-  });
+  // Health/readiness endpoints (mounted before rate limiting)
+  app.use(healthRouter);
 
   // Apply security middleware (CORS, headers, etc.)
   app.use(...applySecurityMiddleware());
