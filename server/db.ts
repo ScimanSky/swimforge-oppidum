@@ -2,6 +2,7 @@ import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import bcrypt from "bcryptjs";
+import { z } from "zod";
 import { 
   InsertUser, users, User,
   swimmerProfiles, InsertSwimmerProfile,
@@ -268,33 +269,41 @@ export async function getLeaderboard(
   if (!db) {
     return [];
   }  
-  if (period === 'all') {
-    if (orderBy === 'badges') {
-      // Use subquery for badge count
-      const result = await db.execute(sql`
-        SELECT 
-          sp.id,
-          sp.user_id as "userId",
-          sp.level,
-          sp.total_xp as "totalXp",
-          sp.total_distance_meters as "totalDistanceMeters",
-          sp.total_time_seconds as "totalTimeSeconds",
-          sp.total_sessions as "totalSessions",
-          sp.garmin_connected as "garminConnected",
-          sp.created_at as "createdAt",
-          sp.updated_at as "updatedAt",
-          u.name,
-          u.email,
-          COALESCE((SELECT COUNT(*) FROM user_badges WHERE user_id = sp.user_id), 0) as "badgeCount"
-        FROM swimmer_profiles sp
-        JOIN users u ON sp.user_id = u.id
-        ORDER BY "badgeCount" DESC, sp.total_xp DESC
-        LIMIT ${limit}
-      `);
-      return result.rows || [];
+  // Defense in depth: validate/clamp any values that may originate from client input.
+  const orderByValidated = z.enum(["level", "totalXp", "badges"]).safeParse(orderBy).data ?? "totalXp";
+  const periodValidated = z.enum(["all", "week", "month"]).safeParse(period).data ?? "all";
+  const limitValidated = Math.min(100, Math.max(1, Number.isFinite(limit) ? Math.floor(limit) : 50));
+
+  if (periodValidated === "all") {
+    if (orderByValidated === "badges") {
+      // Use Drizzle query builder + aggregation to avoid raw SQL string assembly.
+      const badgeCountExpr = sql<number>`count(${userBadges.id})`;
+      return await db
+        .select({
+          id: swimmerProfiles.id,
+          userId: swimmerProfiles.userId,
+          level: swimmerProfiles.level,
+          totalXp: swimmerProfiles.totalXp,
+          totalDistanceMeters: swimmerProfiles.totalDistanceMeters,
+          totalTimeSeconds: swimmerProfiles.totalTimeSeconds,
+          totalSessions: swimmerProfiles.totalSessions,
+          garminConnected: swimmerProfiles.garminConnected,
+          createdAt: swimmerProfiles.createdAt,
+          updatedAt: swimmerProfiles.updatedAt,
+          name: users.name,
+          email: users.email,
+          badgeCount: badgeCountExpr,
+        })
+        .from(swimmerProfiles)
+        .innerJoin(users, eq(swimmerProfiles.userId, users.id))
+        .leftJoin(userBadges, eq(userBadges.userId, swimmerProfiles.userId))
+        .groupBy(swimmerProfiles.id, users.id)
+        .orderBy(desc(badgeCountExpr), desc(swimmerProfiles.totalXp))
+        .limit(limitValidated);
     }
 
-    const orderColumn = orderBy === 'level' ? swimmerProfiles.level : swimmerProfiles.totalXp;
+    const orderColumn = orderByValidated === "level" ? swimmerProfiles.level : swimmerProfiles.totalXp;
+    // Keep existing shape for non-badges "all" (some clients expect entry.profile)
     return await db
       .select({
         profile: swimmerProfiles,
@@ -304,18 +313,25 @@ export async function getLeaderboard(
       .from(swimmerProfiles)
       .innerJoin(users, eq(swimmerProfiles.userId, users.id))
       .orderBy(desc(orderColumn))
-      .limit(limit);
+      .limit(limitValidated);
   }
 
   const now = new Date();
   const startDate = new Date(now);
-  if (period === 'week') {
+  if (periodValidated === "week") {
     startDate.setHours(0, 0, 0, 0);
     const dayOfWeek = startDate.getDay();
     const diffFromMonday = (dayOfWeek + 6) % 7;
     startDate.setDate(startDate.getDate() - diffFromMonday);
   }
-  if (period === 'month') startDate.setDate(startDate.getDate() - 30);
+  if (periodValidated === "month") startDate.setDate(startDate.getDate() - 30);
+
+  const orderBySql =
+    orderByValidated === "badges"
+      ? sql`"badgeCount" DESC, "periodXp" DESC`
+      : orderByValidated === "totalXp"
+        ? sql`"periodXp" DESC, sp.total_xp DESC`
+        : sql`sp.level DESC, sp.total_xp DESC`;
 
   const result = await db.execute(sql`
     SELECT 
@@ -342,11 +358,8 @@ export async function getLeaderboard(
       ) as "periodXp"
     FROM swimmer_profiles sp
     JOIN users u ON sp.user_id = u.id
-    ORDER BY 
-      ${orderBy === 'badges' ? sql`"badgeCount" DESC, "periodXp" DESC` :
-        orderBy === 'totalXp' ? sql`"periodXp" DESC, sp.total_xp DESC` :
-        sql`sp.level DESC, sp.total_xp DESC`}
-    LIMIT ${limit}
+    ORDER BY ${orderBySql}
+    LIMIT ${limitValidated}
   `);
 
   return result.rows || [];
