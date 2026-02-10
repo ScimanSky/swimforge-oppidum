@@ -26,6 +26,7 @@ import {
 import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
@@ -466,57 +467,90 @@ export default function ClubDetail() {
   return (
     <AppLayout className="text-foreground">
       <div className="min-h-screen pb-24">
-        <section className="relative overflow-hidden bg-gradient-to-b from-background/80 to-background py-12">
-          <div className="pointer-events-none absolute right-0 top-0 h-72 w-72 rounded-full bg-primary/10 blur-3xl" />
-          <div className="container relative z-10 space-y-6">
-            <Link href="/community" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground">
+        <section className="py-8">
+          <div className="container space-y-6">
+            <Link
+              href="/community"
+              className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground"
+            >
               <ArrowLeft className="h-4 w-4" />
               Torna ai club
             </Link>
 
-            <div className="flex flex-col lg:flex-row gap-6 items-start">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <Users className="h-6 w-6 text-primary" />
-                  <span className="text-sm text-muted-foreground">Club</span>
-                </div>
-                <h1 className="text-3xl md:text-4xl font-bold neon-gradient-text">{club?.name ?? "Club"}</h1>
-                <p className="text-muted-foreground mt-2 max-w-2xl">
-                  {club?.description || "Condividi progressi, allenamenti e obiettivi con la tua squadra."}
-                </p>
-                <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                  <span>{club?.member_count ?? 0} membri</span>
-                  <span>{club?.is_private ? "Privato" : "Pubblico"}</span>
-                </div>
+            <Card className="relative overflow-hidden">
+              <div className="absolute inset-0">
+                {club?.cover_image_url ? (
+                  <img
+                    src={club.cover_image_url}
+                    alt={club.name}
+                    className="h-full w-full object-cover opacity-55"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="h-full w-full bg-[radial-gradient(70%_80%_at_18%_0%,color-mix(in_oklch,var(--electric-cyan)_34%,transparent)_0%,transparent_70%)]" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-r from-background/90 via-background/65 to-background/35" />
+                <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_85%_10%,color-mix(in_oklch,var(--electric-lime)_22%,transparent)_0%,transparent_66%)]" />
               </div>
-              {club && (
-                <div className="flex items-center gap-2">
-                  {club.is_member ? (
-                    <Button variant="outline-neon" onClick={() => leaveClub.mutate({ clubId })}>
-                      Lascia Club
-                    </Button>
-                  ) : club.member_status === "pending" ? (
-                    <Button variant="outline-neon" disabled>
-                      Richiesta inviata
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="neon"
-                      onClick={() => joinClub.mutate({ clubId })}
-                    >
-                      {club.visibility === "public" ? "Entra nel Club" : "Richiedi ingresso"}
-                    </Button>
-                  )}
+
+              <CardContent className="relative p-6">
+                <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="bg-background/60">
+                        <Users className="mr-2 h-4 w-4" />
+                        {club?.member_count ?? 0} membri
+                      </Badge>
+                      <Badge variant="outline" className="bg-background/60">
+                        {club?.is_private ? "Privato" : "Pubblico"}
+                      </Badge>
+                      {club?.is_member ? (
+                        <Badge className="bg-primary/20 text-primary border border-primary/35">
+                          Sei nel club
+                        </Badge>
+                      ) : club?.member_status === "pending" ? (
+                        <Badge className="bg-accent/20 text-accent border border-accent/35">
+                          Richiesta inviata
+                        </Badge>
+                      ) : null}
+                    </div>
+
+                    <h1 className="mt-3 text-3xl md:text-4xl font-display font-bold neon-gradient-text truncate">
+                      {club?.name ?? "Club"}
+                    </h1>
+                    <p className="mt-2 text-muted-foreground max-w-2xl">
+                      {club?.description ||
+                        "Condividi progressi, allenamenti e obiettivi con la tua squadra."}
+                    </p>
+                  </div>
+
+                  {club ? (
+                    <div className="flex items-center gap-2">
+                      {club.is_member ? (
+                        <Button variant="outline-neon" onClick={() => leaveClub.mutate({ clubId })}>
+                          Lascia Club
+                        </Button>
+                      ) : club.member_status === "pending" ? (
+                        <Button variant="outline-neon" disabled>
+                          Richiesta inviata
+                        </Button>
+                      ) : (
+                        <Button variant="neon" onClick={() => joinClub.mutate({ clubId })}>
+                          {club.visibility === "public" ? "Entra nel Club" : "Richiedi ingresso"}
+                        </Button>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
-              )}
-            </div>
+              </CardContent>
+            </Card>
           </div>
         </section>
 
         <section className="py-10">
           <div className="container space-y-8">
             {club && club.is_private && !club.is_member ? (
-              <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+              <Card>
                 <CardContent className="p-6 text-muted-foreground">
                   Questo club è privato. Entra nel club per vedere i contenuti.
                 </CardContent>
@@ -524,7 +558,7 @@ export default function ClubDetail() {
             ) : (
               <>
                 {club?.rules && (
-                  <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
+                  <Card>
                     <CardContent className="p-6">
                       <h3 className="text-lg font-semibold mb-3">Regole del club</h3>
                       <div
@@ -538,36 +572,34 @@ export default function ClubDetail() {
                 {/* Tab Navigation */}
                 <Tabs defaultValue="feed" className="space-y-6">
                   <TabsList
-                    className={`grid w-full ${
-                      isStaff ? "grid-cols-4 lg:grid-cols-7" : "grid-cols-3 lg:grid-cols-6"
-                    }`}
+                    className="w-full justify-start overflow-x-auto"
                   >
-                    <TabsTrigger value="feed" className="flex items-center gap-2">
+                    <TabsTrigger value="feed" className="flex-none flex items-center gap-2">
                       <Droplet className="h-4 w-4" />
                       <span className="hidden sm:inline">Feed</span>
                     </TabsTrigger>
-                    <TabsTrigger value="eventi" className="flex items-center gap-2">
+                    <TabsTrigger value="eventi" className="flex-none flex items-center gap-2">
                       <Calendar className="h-4 w-4" />
                       <span className="hidden sm:inline">Eventi</span>
                     </TabsTrigger>
-                    <TabsTrigger value="membri" className="flex items-center gap-2">
+                    <TabsTrigger value="membri" className="flex-none flex items-center gap-2">
                       <Users className="h-4 w-4" />
                       <span className="hidden sm:inline">Membri</span>
                     </TabsTrigger>
-                    <TabsTrigger value="gallery" className="flex items-center gap-2">
+                    <TabsTrigger value="gallery" className="flex-none flex items-center gap-2">
                       <ImageIcon className="h-4 w-4" />
                       <span className="hidden sm:inline">Gallery</span>
                     </TabsTrigger>
-                    <TabsTrigger value="annunci" className="flex items-center gap-2">
+                    <TabsTrigger value="annunci" className="flex-none flex items-center gap-2">
                       <Megaphone className="h-4 w-4" />
                       <span className="hidden sm:inline">Annunci</span>
                     </TabsTrigger>
-                    <TabsTrigger value="stats" className="flex items-center gap-2">
+                    <TabsTrigger value="stats" className="flex-none flex items-center gap-2">
                       <BarChart3 className="h-4 w-4" />
                       <span className="hidden sm:inline">Stats</span>
                     </TabsTrigger>
                     {isStaff && (
-                      <TabsTrigger value="admin" className="flex items-center gap-2">
+                      <TabsTrigger value="admin" className="flex-none flex items-center gap-2">
                         <Settings className="h-4 w-4" />
                         <span className="hidden sm:inline">Admin</span>
                       </TabsTrigger>
