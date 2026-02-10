@@ -20,6 +20,7 @@ import {
   CheckCircle2,
   HelpCircle,
   XCircle,
+  ChevronRight,
   Upload
 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
@@ -1399,41 +1400,62 @@ export default function ClubDetail() {
                       </Card>
                     ) : (
                       <div className="space-y-4">
-                        {announcements.map((announcement: any) => (
-                          <motion.div
-                            key={announcement.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3 }}
-                          >
-                            <Card className={`border-border/50 bg-card/60 backdrop-blur-sm ${announcement.is_pinned ? 'border-primary/50' : ''}`}>
-                              <CardContent className="p-6">
-                                <div className="flex items-start justify-between mb-2">
-                                  <div className="flex items-center gap-2">
-                                    <h3 className="text-lg font-semibold">{announcement.title}</h3>
-                                    {announcement.is_pinned && <Pin className="h-4 w-4 text-primary" />}
+                        {announcements.map((item: any) => {
+                          const announcement = item?.announcement ?? item;
+                          const isPinned = !!(announcement?.isPinned ?? announcement?.is_pinned);
+                          const createdAt = announcement?.createdAt ?? announcement?.created_at;
+                          const expiresAt = announcement?.expiresAt ?? announcement?.expires_at;
+
+                          return (
+                            <motion.div
+                              key={announcement?.id}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.3 }}
+                            >
+                              <Card
+                                className={`border-border/50 bg-card/60 backdrop-blur-sm ${
+                                  isPinned ? "border-primary/50" : ""
+                                }`}
+                              >
+                                <CardContent className="p-6">
+                                  <div className="flex items-start justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <h3 className="text-lg font-semibold">
+                                        {announcement?.title ?? "Annuncio"}
+                                      </h3>
+                                      {isPinned && <Pin className="h-4 w-4 text-primary" />}
+                                    </div>
+                                    {isStaff && (
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() =>
+                                          deleteAnnouncement.mutate({
+                                            announcementId: announcement.id,
+                                          })
+                                        }
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    )}
                                   </div>
-                                  {isStaff && (
-	                                    <Button
-	                                      size="sm"
-	                                      variant="destructive"
-	                                      onClick={() => deleteAnnouncement.mutate({ announcementId: announcement.id })}
-	                                    >
-	                                      <Trash2 className="h-4 w-4" />
-	                                    </Button>
-                                  )}
-                                </div>
-                                <p className="text-muted-foreground mb-3">{announcement.content}</p>
-                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                  <span>{formatDate(announcement.created_at)}</span>
-                                  {announcement.expires_at && (
-                                    <span>Scade: {formatDate(announcement.expires_at)}</span>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        ))}
+                                  {announcement?.content ? (
+                                    <p className="text-muted-foreground mb-3">
+                                      {announcement.content}
+                                    </p>
+                                  ) : null}
+                                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                    <span>{formatDate(createdAt)}</span>
+                                    {expiresAt ? (
+                                      <span>Scade: {formatDate(expiresAt)}</span>
+                                    ) : null}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </motion.div>
+                          );
+                        })}
                       </div>
                     )}
                   </TabsContent>
@@ -1497,6 +1519,45 @@ export default function ClubDetail() {
                         </CardContent>
                       </Card>
                     </div>
+
+                    <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
+                      <CardContent className="p-6 space-y-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <h3 className="text-lg font-semibold">Eventi programmati</h3>
+                          <span className="text-xs text-muted-foreground">{events.length} totali</span>
+                        </div>
+                        {events.length === 0 ? (
+                          <div className="text-sm text-muted-foreground">Nessun evento programmato.</div>
+                        ) : (
+                          <div className="divide-y divide-border/40 rounded-lg border border-border/50 bg-background/40">
+                            {events.slice(0, 6).map((item) => {
+                              const event = item.event;
+                              return (
+                                <Link
+                                  key={event.id}
+                                  href={`/community/club/${clubId}/event/${event.id}`}
+                                  className="flex items-center justify-between gap-3 px-3 py-3 hover:bg-background/60"
+                                >
+                                  <div className="min-w-0">
+                                    <div className="font-semibold truncate">{event.title}</div>
+                                    <div className="text-xs text-muted-foreground truncate">
+                                      {formatDate(event.startTime)}
+                                      {event.location ? ` · ${event.location}` : ""}
+                                    </div>
+                                  </div>
+                                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                </Link>
+                              );
+                            })}
+                          </div>
+                        )}
+                        {events.length > 6 ? (
+                          <div className="text-xs text-muted-foreground">
+                            Apri la tab Eventi per vedere tutti gli eventi.
+                          </div>
+                        ) : null}
+                      </CardContent>
+                    </Card>
 
                     <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
                       <CardContent className="p-6 space-y-3">
