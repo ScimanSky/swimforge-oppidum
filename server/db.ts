@@ -15,6 +15,8 @@ import {
 } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { updateUserProfileBadge } from './db_profile_badges';
+import { logger } from "./middleware/logger";
+import { classifyAsyncError } from "./lib/withErrorHandling";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: Pool | null = null;
@@ -32,7 +34,12 @@ export async function getDb() {
       });
       _db = drizzle(_pool);
     } catch (error) {
-      console.warn("[Database] Failed to connect:", error);
+      const { kind, message } = classifyAsyncError(error);
+      logger.warn(`[Database] Failed to connect (${kind}): ${message}`, {
+        event: "db:connect_failed",
+        kind,
+        message,
+      });
       _db = null;
     }
   }
@@ -83,7 +90,12 @@ export async function registerUser(email: string, password: string, name?: strin
 
     return { success: true, user };
   } catch (error) {
-    console.error("[Database] Failed to register user:", error);
+    const { kind, message } = classifyAsyncError(error);
+    logger.error(`[Database] Failed to register user (${kind}): ${message}`, {
+      event: "auth:register_failed",
+      kind,
+      message,
+    });
     return { success: false, error: "Registration failed" };
   }
 }
@@ -116,7 +128,12 @@ export async function loginUser(email: string, password: string): Promise<{ succ
 
     return { success: true, user };
   } catch (error) {
-    console.error("[Database] Failed to login user:", error);
+    const { kind, message } = classifyAsyncError(error);
+    logger.error(`[Database] Failed to login user (${kind}): ${message}`, {
+      event: "auth:login_failed",
+      kind,
+      message,
+    });
     return { success: false, error: "Login failed" };
   }
 }
@@ -158,7 +175,9 @@ export async function updateUser(
 export async function upsertUser(user: InsertUser): Promise<void> {
   const db = await getDb();
   if (!db) {
-    console.warn("[Database] Cannot upsert user: database not available");
+    logger.warn("[Database] Cannot upsert user: database not available", {
+      event: "db:upsert_skipped",
+    });
     return;
   }
 
@@ -208,7 +227,11 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       }
     }
   } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[Database] Failed to upsert user: ${message}`, {
+      event: "db:upsert_failed",
+      message,
+    });
     throw error;
   }
 }
@@ -713,7 +736,11 @@ export async function createOAuthUser(data: {
 
     return { success: true, user };
   } catch (error) {
-    console.error("[Database] Failed to create OAuth user:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[Database] Failed to create OAuth user: ${message}`, {
+      event: "auth:oauth_create_failed",
+      message,
+    });
     return { success: false, error: "OAuth user creation failed" };
   }
 }
@@ -726,6 +753,11 @@ export async function updateUserLastSignedIn(userId: number): Promise<void> {
   try {
     await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, userId));
   } catch (error) {
-    console.error("[Database] Failed to update last signed in:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[Database] Failed to update last signed in: ${message}`, {
+      event: "auth:last_signed_in_update_failed",
+      userId,
+      message,
+    });
   }
 }

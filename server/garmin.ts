@@ -30,13 +30,12 @@ import { updateUserProfileBadge } from "./db_profile_badges";
 import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
 import { invalidateUserCache } from "./lib/cache";
 import { checkAndAwardBadges as checkAchievementBadges } from "./badge_engine";
+import { logger } from "./middleware/logger";
+import { classifyAsyncError } from "./lib/withErrorHandling";
 
 // Garmin microservice configuration
 const GARMIN_SERVICE_URL = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
 const GARMIN_SERVICE_SECRET = process.env.GARMIN_SERVICE_SECRET;
-if (!GARMIN_SERVICE_SECRET) {
-  throw new Error("GARMIN_SERVICE_SECRET is required");
-}
 
 interface GarminServiceActivity {
   activity_id: string;
@@ -87,7 +86,14 @@ async function callGarminService(
   method: "GET" | "POST" = "GET",
   body?: object
 ): Promise<any> {
+  if (!GARMIN_SERVICE_SECRET) {
+    throw new Error("Garmin service not configured (missing GARMIN_SERVICE_SECRET)");
+  }
+
   const url = `${GARMIN_SERVICE_URL}${endpoint}`;
+  const timeoutMs = 15000;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   
   try {
     const response = await fetch(url, {
@@ -97,6 +103,7 @@ async function callGarminService(
         "X-API-Key": GARMIN_SERVICE_SECRET,
       },
       body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
     });
 
     const data = await response.json().catch(() => ({ detail: "Unknown error" }));
@@ -107,8 +114,21 @@ async function callGarminService(
 
     return data;
   } catch (error: any) {
-    console.error(`[Garmin Service] Error calling ${endpoint}:`, error.message);
+    const { kind, message } = classifyAsyncError(error);
+    const level = kind === "unknown" ? "error" : "warn";
+    logger.log(level, `[Garmin Service] Error calling ${endpoint} (${kind}): ${message}`, {
+      event: "garmin:service_error",
+      endpoint,
+      method,
+      kind,
+      message,
+    });
+    if (kind === "timeout") {
+      throw new Error(`Garmin service timeout after ${timeoutMs}ms`);
+    }
     throw error;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -118,7 +138,14 @@ async function callGarminServiceWithUser(
   method: "GET" | "POST" = "GET",
   body?: object
 ): Promise<any> {
+  if (!GARMIN_SERVICE_SECRET) {
+    throw new Error("Garmin service not configured (missing GARMIN_SERVICE_SECRET)");
+  }
+
   const url = `${GARMIN_SERVICE_URL}${endpoint}`;
+  const timeoutMs = 15000;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(url, {
@@ -129,6 +156,7 @@ async function callGarminServiceWithUser(
         "user-id": userId.toString(),
       },
       body: body ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
     });
 
     const data = await response.json().catch(() => ({ detail: "Unknown error" }));
@@ -139,8 +167,22 @@ async function callGarminServiceWithUser(
 
     return data;
   } catch (error: any) {
-    console.error(`[Garmin Service] Error calling ${endpoint}:`, error.message);
+    const { kind, message } = classifyAsyncError(error);
+    const level = kind === "unknown" ? "error" : "warn";
+    logger.log(level, `[Garmin Service] Error calling ${endpoint} (${kind}): ${message}`, {
+      event: "garmin:service_error",
+      endpoint,
+      method,
+      userId,
+      kind,
+      message,
+    });
+    if (kind === "timeout") {
+      throw new Error(`Garmin service timeout after ${timeoutMs}ms`);
+    }
     throw error;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -178,7 +220,12 @@ async function ensureGarminSessionFromDb(userId: number): Promise<boolean> {
     });
     return Boolean(result?.success);
   } catch (error) {
-    console.warn(`[Garmin] Failed to restore session for user ${userId}:`, error);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`[Garmin] Failed to restore session for user ${userId}: ${message}`, {
+      event: "garmin:restore_failed",
+      userId,
+      message,
+    });
     return false;
   }
 }
@@ -197,10 +244,13 @@ export async function getGarminActivityFullDetails(
       userId
     );
   } catch (error) {
-    console.warn(
-      `[Garmin] Could not fetch full details for activity ${garminActivityId}:`,
-      error
-    );
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`[Garmin] Could not fetch full details for activity ${garminActivityId}: ${message}`, {
+      event: "garmin:activity_full_details_failed",
+      userId,
+      garminActivityId,
+      message,
+    });
     return null;
   }
 }
@@ -530,7 +580,13 @@ export async function getGarminStatus(userId: number): Promise<{
       lastSync: tokens[0].lastSyncAt || undefined,
       displayName: status.display_name,
     };
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`[Garmin] Falling back to local status for user ${userId}: ${message}`, {
+      event: "garmin:status_fallback",
+      userId,
+      message,
+    });
     // Fallback to local data if microservice is unavailable
     return {
       connected: true,
@@ -632,7 +688,12 @@ export async function connectGarmin(
 
     return { success: true };
   } catch (error: any) {
-    console.error("[Garmin] Connection failed:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[Garmin] Connection failed: ${message}`, {
+      event: "garmin:connect_failed",
+      userId,
+      message,
+    });
     return { 
       success: false, 
       error: error.message || "Connection failed. Check your credentials." 
@@ -705,7 +766,12 @@ export async function completeMfa(
 
     return { success: true };
   } catch (error: any) {
-    console.error("[Garmin] MFA completion failed:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[Garmin] MFA completion failed: ${message}`, {
+      event: "garmin:mfa_failed",
+      userId,
+      message,
+    });
     return { 
       success: false, 
       error: error.message || "MFA verification failed" 
@@ -737,7 +803,12 @@ export async function disconnectGarmin(userId: number): Promise<boolean> {
     
     return true;
   } catch (error) {
-    console.error("[Garmin] Disconnect failed:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[Garmin] Disconnect failed: ${message}`, {
+      event: "garmin:disconnect_failed",
+      userId,
+      message,
+    });
     return false;
   }
 }
@@ -778,17 +849,25 @@ export async function autoSyncGarmin(
         syncIntervalHours * 60 * 60 * 1000;
 
     if (shouldSync) {
-      console.log(`[Auto-Sync] Triggering Garmin sync for user ${userId}`);
+      logger.info(`[Auto-Sync] Triggering Garmin sync for user ${userId}`, {
+        event: "garmin:auto_sync_trigger",
+        userId,
+      });
       await syncGarminActivities(userId);
     } else {
-      console.log(
-        `[Auto-Sync] Skipping Garmin sync for user ${userId}, last synced ${Math.round(
-          (now.getTime() - new Date(lastSync).getTime()) / (60 * 60 * 1000)
-        )}h ago`
-      );
+      logger.info(`[Auto-Sync] Skipping Garmin sync for user ${userId}`, {
+        event: "garmin:auto_sync_skip",
+        userId,
+        hoursAgo: Math.round((now.getTime() - new Date(lastSync).getTime()) / (60 * 60 * 1000)),
+      });
     }
   } catch (error) {
-    console.error(`[Auto-Sync] Garmin failed for user ${userId}:`, error);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`[Auto-Sync] Garmin failed for user ${userId}: ${message}`, {
+      event: "garmin:auto_sync_failed",
+      userId,
+      message,
+    });
   }
 }
 
@@ -1010,10 +1089,13 @@ export async function syncGarminActivities(
           try {
             await persistGarminLapDetails(db, existing.id, existingDetails);
           } catch (error) {
-            console.warn(
-              `[Garmin] Failed to persist laps for activity ${activity.activity_id}:`,
-              error
-            );
+            const message = error instanceof Error ? error.message : String(error);
+            logger.warn(`[Garmin] Failed to persist laps for activity ${activity.activity_id}: ${message}`, {
+              event: "garmin:laps_persist_failed",
+              userId,
+              garminActivityId: activity.activity_id,
+              message,
+            });
           }
         }
 
@@ -1026,10 +1108,13 @@ export async function syncGarminActivities(
               baseRawData: existingRaw,
             });
           } catch (error) {
-            console.warn(
-              `[Garmin] Failed to enrich existing activity ${activity.activity_id}:`,
-              error
-            );
+            const message = error instanceof Error ? error.message : String(error);
+            logger.warn(`[Garmin] Failed to enrich existing activity ${activity.activity_id}: ${message}`, {
+              event: "garmin:activity_enrich_failed",
+              userId,
+              garminActivityId: activity.activity_id,
+              message,
+            });
           }
         }
 
@@ -1064,7 +1149,12 @@ export async function syncGarminActivities(
         .limit(1);
 
       if (existingCrossPlatform) {
-        console.log(`[Garmin] Activity ${activity.activity_id} is a duplicate of Strava activity ${existingCrossPlatform.id}, skipping`);
+        logger.info(`[Garmin] Activity ${activity.activity_id} is a duplicate of Strava activity ${existingCrossPlatform.id}, skipping`, {
+          event: "garmin:duplicate_strava_skip",
+          userId,
+          garminActivityId: activity.activity_id,
+          stravaActivityId: existingCrossPlatform.id,
+        });
         continue;
       }
 
@@ -1115,10 +1205,13 @@ export async function syncGarminActivities(
             baseRawData: (activity.raw_data ?? {}) as Record<string, any>,
           });
         } catch (error) {
-          console.warn(
-            `[Garmin] Failed to enrich activity ${activity.activity_id}:`,
-            error
-          );
+          const message = error instanceof Error ? error.message : String(error);
+          logger.warn(`[Garmin] Failed to enrich activity ${activity.activity_id}: ${message}`, {
+            event: "garmin:activity_enrich_failed",
+            userId,
+            garminActivityId: activity.activity_id,
+            message,
+          });
         }
       }
 
@@ -1182,10 +1275,20 @@ export async function syncGarminActivities(
       try {
         const newBadges = await checkAchievementBadges(userId);
         if (newBadges.length > 0) {
-          console.log(`[Badge Engine] Awarded ${newBadges.length} new badges: ${newBadges.join(", ")}`);
+          logger.info(`[Badge Engine] Awarded ${newBadges.length} new badges: ${newBadges.join(", ")}`, {
+            event: "badge_engine:awarded",
+            userId,
+            count: newBadges.length,
+            badges: newBadges,
+          });
         }
       } catch (error) {
-        console.error(`[Badge Engine] Failed for user ${userId}:`, error);
+        const message = error instanceof Error ? error.message : String(error);
+        logger.warn(`[Badge Engine] Failed for user ${userId}: ${message}`, {
+          event: "badge_engine:failed",
+          userId,
+          message,
+        });
       }
 
       // Auto-update challenge progress for active challenges
@@ -1207,23 +1310,44 @@ export async function syncGarminActivities(
       .set({ lastGarminSyncAt: new Date() })
       .where(eq(swimmerProfiles.userId, userId));
 
-    console.log(`[Garmin Sync] Updated last_garmin_sync_at for user ${userId}`);
+    logger.info(`[Garmin Sync] Updated last_garmin_sync_at for user ${userId}`, {
+      event: "garmin:sync_updated_last_sync",
+      userId,
+    });
 
     // Auto-migrate HR zones for activities that don't have them
     if (syncedCount > 0) {
-      console.log(`[Garmin Sync] Starting automatic HR zones migration for ${syncedCount} new activities`);
+      logger.info(`[Garmin Sync] Starting automatic HR zones migration for ${syncedCount} new activities`, {
+        event: "garmin:sync_hr_migration_start",
+        userId,
+        syncedCount,
+      });
       try {
         const migrationResult = await migrateHrZones(userId);
-        console.log(`[Garmin Sync] HR zones migration result: ${migrationResult.message}`);
+        logger.info(`[Garmin Sync] HR zones migration result: ${migrationResult.message}`, {
+          event: "garmin:sync_hr_migration_done",
+          userId,
+          message: migrationResult.message,
+        });
       } catch (error) {
-        console.error(`[Garmin Sync] HR zones migration failed:`, error);
+        const message = error instanceof Error ? error.message : String(error);
+        logger.warn(`[Garmin Sync] HR zones migration failed: ${message}`, {
+          event: "garmin:sync_hr_migration_failed",
+          userId,
+          message,
+        });
       }
     }
 
     return { synced: syncedCount, newXp: totalNewXp };
   } catch (error: any) {
-    console.error("[Garmin] Sync failed:", error);
-    return { synced: 0, newXp: 0, error: error.message || "Sync failed" };
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[Garmin] Sync failed: ${message}`, {
+      event: "garmin:sync_failed",
+      userId,
+      message,
+    });
+    return { synced: 0, newXp: 0, error: message || "Sync failed" };
   }
 }
 
@@ -1458,9 +1582,18 @@ async function updateActiveChallengesProgress(userId: number): Promise<void> {
       await challengesDb.calculateChallengeProgress(challenge.id);
     }
 
-    console.log(`[Garmin] Updated progress for ${challenges.length} active challenges for user ${userId}`);
+    logger.info(`[Garmin] Updated progress for ${challenges.length} active challenges for user ${userId}`, {
+      event: "garmin:challenge_progress_updated",
+      userId,
+      count: challenges.length,
+    });
   } catch (error) {
-    console.error("[Garmin] Error updating challenge progress:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`[Garmin] Error updating challenge progress: ${message}`, {
+      event: "garmin:challenge_progress_update_failed",
+      userId,
+      message,
+    });
   }
 }
 
@@ -1487,7 +1620,20 @@ export async function migrateHrZones(userId: number): Promise<{
   }
 
   try {
-    console.log(`[Garmin] Starting HR zones migration for user ${userId}`);
+    if (!GARMIN_SERVICE_SECRET) {
+      return {
+        success: false,
+        message: "Garmin service not configured",
+        updated: 0,
+        failed: 0,
+        total: 0,
+      };
+    }
+
+    logger.info(`[Garmin] Starting HR zones migration for user ${userId}`, {
+      event: "garmin:hr_migration_start",
+      userId,
+    });
 
     // Get all activities without HR zones data
     const activitiesWithoutHR = await db
@@ -1510,7 +1656,11 @@ export async function migrateHrZones(userId: number): Promise<{
       };
     }
 
-    console.log(`[Garmin] Found ${activitiesWithoutHR.length} activities without HR zones`);
+    logger.info(`[Garmin] Found ${activitiesWithoutHR.length} activities without HR zones`, {
+      event: "garmin:hr_migration_candidates",
+      userId,
+      count: activitiesWithoutHR.length,
+    });
 
     let updated = 0;
     let failed = 0;
@@ -1530,8 +1680,14 @@ export async function migrateHrZones(userId: number): Promise<{
         );
 
         if (!response.ok) {
-          console.error(
-            `[Garmin] Failed to fetch HR zones for activity ${activity.garminActivityId}: ${response.status}`
+          logger.warn(
+            `[Garmin] Failed to fetch HR zones for activity ${activity.garminActivityId}: ${response.status}`,
+            {
+              event: "garmin:hr_migration_fetch_failed",
+              userId,
+              garminActivityId: activity.garminActivityId,
+              status: response.status,
+            }
           );
           failed++;
           continue;
@@ -1559,10 +1715,13 @@ export async function migrateHrZones(userId: number): Promise<{
             }
           }
         } catch (detailsError) {
-          console.warn(
-            `[Garmin] Could not fetch details for activity ${activity.garminActivityId}:`,
-            detailsError
-          );
+          const message = detailsError instanceof Error ? detailsError.message : String(detailsError);
+          logger.warn(`[Garmin] Could not fetch details for activity ${activity.garminActivityId}: ${message}`, {
+            event: "garmin:hr_migration_details_failed",
+            userId,
+            garminActivityId: activity.garminActivityId,
+            message,
+          });
         }
 
         // Update activity with HR zones data and SWOLF (round to integers)
@@ -1579,17 +1738,29 @@ export async function migrateHrZones(userId: number): Promise<{
           .where(eq(swimmingActivities.id, activity.id));
 
         updated++;
-        console.log(`[Garmin] Updated HR zones for activity ${activity.garminActivityId}`);
+        logger.info(`[Garmin] Updated HR zones for activity ${activity.garminActivityId}`, {
+          event: "garmin:hr_migration_activity_updated",
+          userId,
+          garminActivityId: activity.garminActivityId,
+        });
       } catch (error) {
-        console.error(
-          `[Garmin] Error processing activity ${activity.garminActivityId}:`,
-          error
-        );
+        const message = error instanceof Error ? error.message : String(error);
+        logger.warn(`[Garmin] Error processing activity ${activity.garminActivityId}: ${message}`, {
+          event: "garmin:hr_migration_activity_failed",
+          userId,
+          garminActivityId: activity.garminActivityId,
+          message,
+        });
         failed++;
       }
     }
 
-    console.log(`[Garmin] HR zones migration complete: ${updated} updated, ${failed} failed`);
+    logger.info(`[Garmin] HR zones migration complete: ${updated} updated, ${failed} failed`, {
+      event: "garmin:hr_migration_complete",
+      userId,
+      updated,
+      failed,
+    });
 
     return {
       success: true,
@@ -1599,7 +1770,12 @@ export async function migrateHrZones(userId: number): Promise<{
       total: activitiesWithoutHR.length,
     };
   } catch (error) {
-    console.error("[Garmin] Error during HR zones migration:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[Garmin] Error during HR zones migration: ${message}`, {
+      event: "garmin:hr_migration_crash",
+      userId,
+      message,
+    });
     return {
       success: false,
       message: error instanceof Error ? error.message : "Unknown error",

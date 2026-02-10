@@ -6,7 +6,9 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getDb } from "./db";
 import { aiCoachWorkouts } from "../drizzle/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, desc } from "drizzle-orm";
+import { logger } from "./middleware/logger";
+import { withErrorHandling } from "./lib/withErrorHandling";
 import { 
   calculateSEI, 
   calculateTCI, 
@@ -43,6 +45,108 @@ export interface GeneratedWorkout {
   difficulty: string;
   sections: WorkoutSection[];
   coachNotes: string[];
+}
+
+function buildDefaultWorkout(workoutType: "pool" | "dryland"): GeneratedWorkout {
+  if (workoutType === "dryland") {
+    return {
+      type: "dryland",
+      title: "Workout Dryland (Standard)",
+      description: "Allenamento standard generato in fallback (AI non disponibile).",
+      duration: "30-40 min",
+      difficulty: "Intermedio",
+      sections: [
+        {
+          title: "Riscaldamento",
+          exercises: [
+            { name: "Mobilita' spalle e anca", duration: "6-8 min", notes: "Movimenti controllati" },
+          ],
+        },
+        {
+          title: "Forza + Core",
+          exercises: [
+            { name: "Squat a corpo libero", sets: "3", reps: "12" },
+            { name: "Push-up (variante)", sets: "3", reps: "8-12" },
+            { name: "Rematore con elastico", sets: "3", reps: "12-15" },
+            { name: "Plank", sets: "3", duration: "30-45s" },
+          ],
+        },
+        {
+          title: "Defaticamento",
+          exercises: [
+            { name: "Stretching pettorali/dorso", duration: "5 min" },
+          ],
+        },
+      ],
+      coachNotes: [
+        "AI Coach temporaneamente non disponibile: workout standard in fallback.",
+        "Se senti dolore acuto, interrompi l'esercizio.",
+      ],
+    };
+  }
+
+  return {
+    type: "pool",
+    title: "Workout Piscina (Standard)",
+    description: "Allenamento standard generato in fallback (AI non disponibile).",
+    duration: "45-60 min",
+    difficulty: "Intermedio",
+    sections: [
+      {
+        title: "Riscaldamento",
+        exercises: [
+          { name: "200m stile facile", distance: "200m", rest: "20s" },
+          { name: "4x50m tecnica (catch-up / sculling)", distance: "4x50m", rest: "20s" },
+        ],
+      },
+      {
+        title: "Serie Principale",
+        exercises: [
+          { name: "6x100m a ritmo controllato", distance: "6x100m", rest: "20-30s", intensity: "RPE 6-7" },
+          { name: "4x50m forte", distance: "4x50m", rest: "30-40s", intensity: "RPE 8" },
+        ],
+      },
+      {
+        title: "Defaticamento",
+        exercises: [
+          { name: "200m facile", distance: "200m", rest: "0-20s" },
+        ],
+      },
+    ],
+    coachNotes: [
+      "AI Coach temporaneamente non disponibile: workout standard in fallback.",
+      "Mantieni tecnica pulita: priorita' alla qualita'.",
+    ],
+  };
+}
+
+async function getLatestCachedWorkout(
+  userId: number,
+  workoutType: "pool" | "dryland",
+): Promise<GeneratedWorkout | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const cached = await db
+    .select()
+    .from(aiCoachWorkouts)
+    .where(and(eq(aiCoachWorkouts.userId, userId), eq(aiCoachWorkouts.workoutType, workoutType)))
+    .orderBy(desc(aiCoachWorkouts.generatedAt))
+    .limit(1);
+
+  if (cached.length === 0) return null;
+  try {
+    return JSON.parse(cached[0].workoutData);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`[AI Coach] Failed to parse cached workout JSON: ${message}`, {
+      event: "ai_coach:cache_parse_failed",
+      userId,
+      workoutType,
+      message,
+    });
+    return null;
+  }
 }
 
 /**
@@ -111,44 +215,54 @@ async function generateWorkout(
   userId: number,
   workoutType: "pool" | "dryland"
 ): Promise<GeneratedWorkout> {
-  try {
-    console.log(`[AI Coach] Starting workout generation for user ${userId}, type: ${workoutType}`);
-    
-    // Fetch user statistics
-    console.log(`[AI Coach] Fetching user stats for user ${userId}`);
-    const userStats = await fetchUserStats(userId);
-    console.log(`[AI Coach] User stats fetched successfully`);
+  const context = `ai_coach:generateWorkout user=${userId} type=${workoutType}`;
+  const fallback =
+    (await getLatestCachedWorkout(userId, workoutType)) ?? buildDefaultWorkout(workoutType);
 
-    // Build prompt based on workout type
-    const prompt =
-      workoutType === "pool"
-        ? buildPoolWorkoutPrompt(userStats)
-        : buildDrylandWorkoutPrompt(userStats);
-    console.log(`[AI Coach] Prompt built, length: ${prompt.length} chars`);
+  return withErrorHandling(
+    async () => {
+      logger.info(`[AI Coach] Starting workout generation for user ${userId}`, {
+        event: "ai_coach:generate_start",
+        userId,
+        workoutType,
+      });
 
-    // Call Gemini API with timeout
-    console.log(`[AI Coach] Calling Gemini API...`);
-    const result = await Promise.race([
-      model.generateContent(prompt),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Gemini API timeout after 60s')), 60000)
-      )
-    ]) as any;
-    
-    const response = result.response;
-    const text = response.text();
-    console.log(`[AI Coach] Gemini response received, length: ${text.length} chars`);
+      if (!process.env.GEMINI_API_KEY) {
+        throw new Error("Gemini not configured (missing GEMINI_API_KEY)");
+      }
 
-    // Parse the response
-    console.log(`[AI Coach] Parsing workout response...`);
-    const workout = parseWorkoutResponse(text, workoutType);
-    console.log(`[AI Coach] Workout generated successfully with ${workout.sections.length} sections`);
+      const userStats = await fetchUserStats(userId);
 
-    return workout;
-  } catch (error) {
-    console.error(`[AI Coach] Error generating workout for user ${userId}:`, error);
-    throw error;
-  }
+      const prompt =
+        workoutType === "pool"
+          ? buildPoolWorkoutPrompt(userStats)
+          : buildDrylandWorkoutPrompt(userStats);
+
+      // Call Gemini API with timeout
+      const result = (await Promise.race([
+        model.generateContent(prompt),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Gemini API timeout after 60s")), 60000)
+        ),
+      ])) as any;
+
+      const response = result.response;
+      const text = response.text();
+
+      const workout = parseWorkoutResponse(text, workoutType);
+
+      logger.info(`[AI Coach] Workout generated successfully for user ${userId}`, {
+        event: "ai_coach:generate_success",
+        userId,
+        workoutType,
+        sections: workout.sections.length,
+      });
+
+      return workout;
+    },
+    fallback,
+    context
+  );
 }
 
 /**
@@ -598,8 +712,13 @@ function parseWorkoutResponse(
 
     return workout;
   } catch (error) {
-    console.error("Failed to parse workout response:", error);
-    console.error("Raw response:", text);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`Failed to parse workout response: ${message}`, {
+      event: "ai_coach:parse_failed",
+      message,
+      // Keep logs bounded; raw model output can be large and may contain junk.
+      rawPreview: typeof text === "string" ? text.slice(0, 800) : undefined,
+    });
 
     // Return fallback workout
     return createFallbackWorkout(workoutType);
