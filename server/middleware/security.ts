@@ -138,6 +138,7 @@ export const helmetConfig = {
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
+      baseUri: ["'self'"],
       scriptSrc: ["'self'", 'cdn.jsdelivr.net'],
       styleSrc: ["'self'", "'unsafe-inline'", 'fonts.googleapis.com'],
       fontSrc: ["'self'", 'fonts.gstatic.com'],
@@ -151,7 +152,10 @@ export const helmetConfig = {
         'https://*.supabase.co',
       ].filter(Boolean),
       frameSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      formAction: ["'self'"],
       objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
     },
   },
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' } as any,

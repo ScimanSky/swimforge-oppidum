@@ -20,6 +20,7 @@ import { getOrSetCached, cacheKeys, CACHE_TTL, invalidateUserCache } from "./lib
 import { addComment, getComments, getSocialFeed, setActivityShare, toggleSplash, upsertActivityPost } from "./db_social";
 import { getPendingActivityInsights, listActivityInsights, markActivityInsightSeen } from "./ai_activity_insights";
 import { logger } from "./middleware/logger";
+import { sanitizeActivityNotes } from "./lib/sanitize";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 
@@ -645,7 +646,7 @@ export const appRouter = router({
         lapsCount: z.number().optional(),
         isOpenWater: z.boolean().default(false),
         location: z.string().optional(),
-        notes: z.string().optional(),
+        notes: z.string().max(5000).optional().transform((s) => (s ? sanitizeActivityNotes(s) : s)),
       }))
       .mutation(async () => {
         // Manual activity creation is disabled - use Garmin Connect or Strava sync
@@ -658,7 +659,7 @@ export const appRouter = router({
     updateNotes: protectedProcedure
       .input(z.object({
         id: z.number(),
-        notes: z.string(),
+        notes: z.string().max(5000).transform((s) => sanitizeActivityNotes(s)),
       }))
       .mutation(async ({ ctx, input }) => {
         const activity = await db.getActivityById(input.id);
