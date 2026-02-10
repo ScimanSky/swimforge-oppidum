@@ -173,12 +173,12 @@ export default function Home() {
             >
               Progressi
             </a>
-            <Link
-              href="/community"
+            <a
+              href="#features"
               className="text-sm text-muted-foreground transition-colors hover:text-foreground"
             >
               Club
-            </Link>
+            </a>
           </nav>
           {switchable && toggleTheme && (
             <Button
@@ -349,12 +349,12 @@ export default function Home() {
                   </a>
                 </li>
                 <li>
-                  <Link
-                    href="/community"
+                  <a
+                    href="#features"
                     className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                   >
                     Club
-                  </Link>
+                  </a>
                 </li>
               </ul>
             </div>
@@ -379,12 +379,12 @@ export default function Home() {
                   </Link>
                 </li>
                 <li>
-                  <Link
-                    href="/coach"
+                  <a
+                    href="#features"
                     className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                   >
-                    Coach
-                  </Link>
+                    AI Coach
+                  </a>
                 </li>
               </ul>
             </div>
