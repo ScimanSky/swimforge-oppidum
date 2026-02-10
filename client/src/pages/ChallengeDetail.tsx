@@ -162,6 +162,11 @@ export default function ChallengeDetail() {
     }
   };
 
+  const handleOpenUserProfile = (userId: number) => {
+    if (!Number.isFinite(userId) || userId <= 0) return;
+    setLocation(`/u/${userId}`);
+  };
+
   return (
     <AppLayout>
       <div className="pb-24">
@@ -250,7 +255,16 @@ export default function ChallengeDetail() {
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.05 }}
-                      className="flex items-center gap-4 rounded-lg border border-border bg-background/60 p-4"
+                      className="flex items-center gap-4 rounded-lg border border-border bg-background/60 p-4 cursor-pointer hover:bg-background/75 transition-colors"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => handleOpenUserProfile(participant.userId)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          handleOpenUserProfile(participant.userId);
+                        }
+                      }}
                     >
                       <Badge
                         variant={
@@ -269,7 +283,10 @@ export default function ChallengeDetail() {
 
 	                      <div className="flex items-center gap-2">
 	                        <Avatar className="h-10 w-10">
-	                          <AvatarImage src={participant.avatarUrl || undefined} />
+	                          <AvatarImage
+	                            src={participant.avatarUrl || participant.avatar_url || ""}
+	                            alt={participant.username || "Nuotatore"}
+	                          />
 	                          <AvatarFallback>
 	                            {participant.username?.[0]?.toUpperCase() || "U"}
 	                          </AvatarFallback>

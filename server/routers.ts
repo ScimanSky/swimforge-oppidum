@@ -19,6 +19,7 @@ import type { Request, Response } from "express";
 import { loginLimiter, registrationLimiter } from "./middleware/security";
 import { getOrSetCached, cacheKeys, CACHE_TTL, invalidateUserCache } from "./lib/cache";
 import { addComment, getComments, getSocialFeed, setActivityShare, toggleSplash, upsertActivityPost } from "./db_social";
+import { getUserPublicProfile, toggleFollow } from "./db_public_profiles";
 import { getPendingActivityInsights, listActivityInsights, markActivityInsightSeen } from "./ai_activity_insights";
 import { logger } from "./middleware/logger";
 import { sanitizeActivityNotes } from "./lib/sanitize";
@@ -1237,6 +1238,36 @@ export const appRouter = router({
       .query(async ({ input }) => {
         return getComments(input.postId);
       }),
+
+    users: router({
+      getPublicProfile: protectedProcedure
+        .input(z.object({ userId: z.number() }))
+        .query(async ({ ctx, input }) => {
+          const profile = await getUserPublicProfile({
+            viewerUserId: ctx.user.id,
+            targetUserId: input.userId,
+          });
+          if (!profile) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "User not found" });
+          }
+
+          // Enforce profile visibility unless the viewer is the same user.
+          if (!profile.profilePublic && ctx.user.id !== input.userId) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "Questo profilo non è pubblico" });
+          }
+
+          return profile;
+        }),
+
+      toggleFollow: protectedProcedure
+        .input(z.object({ userId: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+          if (input.userId === ctx.user.id) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "Non puoi seguire te stesso" });
+          }
+          return toggleFollow({ followerId: ctx.user.id, followingId: input.userId });
+        }),
+    }),
 
     ghostChallenges: router({
       list: protectedProcedure

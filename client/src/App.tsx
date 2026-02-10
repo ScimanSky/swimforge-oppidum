@@ -14,6 +14,7 @@ import Activities from "./pages/Activities";
 import ActivityDetail from "./pages/ActivityDetail";
 import Goals from "./pages/Goals";
 import Profile from "./pages/Profile";
+import PublicProfile from "./pages/PublicProfile";
 import Statistics from "./pages/Statistics";
 import Coach from "./pages/Coach";
 import CoachDryland from "./pages/CoachDryland";
@@ -67,6 +68,7 @@ function Router() {
       <Route path="/community/club/:clubId/event/:eventId" component={ClubEventDetail} />
       <Route path="/community/club/:id" component={ClubDetail} />
       <Route path="/profile" component={Profile} />
+      <Route path="/u/:id" component={PublicProfile} />
       <Route path="/settings" component={Settings} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
