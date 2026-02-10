@@ -196,7 +196,10 @@ export default function Challenges() {
     (challenge) => challenge.status === "pending" && challenge.isParticipant
   )
   const availableChallenges = challenges.filter(
-    (challenge) => challenge.status === "pending" && !challenge.isParticipant
+    // Allow joining both pending (not started) and active (already running) challenges.
+    (challenge) =>
+      (challenge.status === "pending" || challenge.status === "active") &&
+      !challenge.isParticipant
   )
 
   const streak = useMemo(() => {

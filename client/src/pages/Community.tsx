@@ -425,8 +425,9 @@ export default function Community() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="public">Pubblico</SelectItem>
-                          <SelectItem value="private">Privato</SelectItem>
-                          <SelectItem value="invite">Su invito</SelectItem>
+                          {/* "invite" means visible but requires approval; label it as "Privato" for users */}
+                          <SelectItem value="private">Segreto</SelectItem>
+                          <SelectItem value="invite">Privato</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -488,7 +489,11 @@ export default function Community() {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent" />
                       <Badge className="absolute left-3 top-3 bg-secondary/80 text-secondary-foreground">
-                        {club.visibility === "invite" ? "Su invito" : club.visibility === "private" ? "Privato" : "Pubblico"}
+                        {club.visibility === "invite"
+                          ? "Privato"
+                          : club.visibility === "private"
+                          ? "Segreto"
+                          : "Pubblico"}
                       </Badge>
                     </div>
                     <CardContent className="p-4">

@@ -64,6 +64,7 @@ type Club = {
   member_count: number;
   is_member: boolean;
   member_role?: string | null;
+  member_status?: "active" | "pending" | "banned" | string | null;
 };
 
 type ClubInvite = {
@@ -494,13 +495,16 @@ export default function ClubDetail() {
                     <Button variant="outline-neon" onClick={() => leaveClub.mutate({ clubId })}>
                       Lascia Club
                     </Button>
+                  ) : club.member_status === "pending" ? (
+                    <Button variant="outline-neon" disabled>
+                      Richiesta inviata
+                    </Button>
                   ) : (
                     <Button
                       variant="neon"
                       onClick={() => joinClub.mutate({ clubId })}
-                      disabled={club.visibility !== "public"}
                     >
-                      {club.visibility === "invite" ? "Su invito" : "Entra nel Club"}
+                      {club.visibility === "public" ? "Entra nel Club" : "Richiedi ingresso"}
                     </Button>
                   )}
                 </div>

@@ -12,11 +12,11 @@ body,
 
 :root {
   /* Electric Ice (light, not clinical white; deep ink text; neon accents for UI only) */
-  --background: oklch(0.985 0.010 230);
+  --background: oklch(0.972 0.012 230);
   --foreground: oklch(0.18 0.040 255);
-  --card: oklch(0.995 0.008 230);
+  --card: oklch(0.988 0.010 230);
   --card-foreground: oklch(0.18 0.040 255);
-  --popover: oklch(0.995 0.008 230);
+  --popover: oklch(0.988 0.010 230);
   --popover-foreground: oklch(0.18 0.040 255);
 
   --electric-cyan: oklch(0.88 0.160 200);
@@ -26,16 +26,16 @@ body,
 
   --primary: var(--electric-cyan);
   --primary-foreground: var(--ink);
-  --secondary: oklch(0.955 0.012 230);
+  --secondary: oklch(0.945 0.012 230);
   --secondary-foreground: oklch(0.22 0.040 255);
-  --muted: oklch(0.955 0.012 230);
+  --muted: oklch(0.945 0.012 230);
   --muted-foreground: oklch(0.42 0.035 255);
   --accent: var(--electric-lime);
   --accent-foreground: var(--ink);
   --destructive: var(--electric-coral);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.885 0.015 230);
-  --input: oklch(0.985 0.010 230);
+  --border: oklch(0.865 0.016 230);
+  --input: oklch(0.972 0.012 230);
   --ring: var(--electric-cyan);
 
   --chart-1: var(--electric-cyan);
@@ -219,14 +219,14 @@ body,
   .glass-panel {
     background: linear-gradient(
       135deg,
-      color-mix(in oklch, var(--card) 72%, transparent),
-      color-mix(in oklch, var(--electric-cyan) 8%, transparent) 55%,
-      color-mix(in oklch, var(--card) 68%, transparent)
+      color-mix(in oklch, var(--background) 58%, transparent),
+      color-mix(in oklch, var(--electric-cyan) 7%, transparent) 55%,
+      color-mix(in oklch, var(--background) 52%, transparent)
     );
-    border: 1px solid color-mix(in oklch, white 55%, transparent);
+    border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
     box-shadow:
       0 18px 55px color-mix(in oklch, var(--foreground) 10%, transparent),
-      0 0 0 1px color-mix(in oklch, white 35%, transparent),
+      0 0 0 1px color-mix(in oklch, var(--border) 55%, transparent),
       0 0 26px var(--neon-soft);
     backdrop-filter: blur(16px);
   }

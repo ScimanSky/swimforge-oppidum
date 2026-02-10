@@ -71,10 +71,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-transparent overflow-x-hidden">
       {/* Desktop Sidebar */}
-      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r border-white/40 bg-white/55 backdrop-blur-xl shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_14%,transparent)] lg:block">
+      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-64 border-r border-border/70 bg-card/45 backdrop-blur-xl shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_14%,transparent)] lg:block">
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-16 items-center gap-3 border-b border-white/40 px-6">
+          <div className="flex h-16 items-center gap-3 border-b border-border/70 px-6">
             <div className="flex size-9 items-center justify-center rounded-lg bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime),var(--electric-coral))] shadow-[0_0_26px_var(--neon-soft)]">
               <img
                 src="/swimforge-logo.png"
@@ -99,7 +99,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                     isActive
                       ? "bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime),var(--electric-coral))] text-primary-foreground shadow-[0_0_0_1px_color-mix(in_oklch,white_50%,transparent),0_10px_28px_var(--neon-soft)]"
-                      : "text-muted-foreground hover:bg-white/45 hover:text-foreground"
+                      : "text-muted-foreground hover:bg-card/45 hover:text-foreground"
                   )}
                 >
                   {item.icon}
@@ -117,7 +117,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <DirectMessages />
             </div>
             {switchable && toggleTheme && (
-              <div className="flex items-center justify-between rounded-lg bg-white/45 backdrop-blur-md border border-white/45 px-3 py-2 text-sm">
+              <div className="flex items-center justify-between rounded-lg bg-card/40 backdrop-blur-md border border-border/70 px-3 py-2 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   {theme === "dark" ? (
                     <Moon className="size-4" />
@@ -136,7 +136,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               type="button"
               onClick={handleLogout}
               disabled={isLoggingOut}
-              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-white/45 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-card/45 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
               <LogOut className="size-5" />
               {isLoggingOut ? "Logout..." : "Logout"}
@@ -146,7 +146,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile Header */}
-      <header className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center justify-between border-b border-white/40 bg-white/60 backdrop-blur-xl px-4 lg:hidden">
+      <header className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center justify-between border-b border-border/70 bg-card/45 backdrop-blur-xl px-4 lg:hidden">
         <div className="flex items-center gap-3">
           <div className="flex size-9 items-center justify-center rounded-lg bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime),var(--electric-coral))] shadow-[0_0_26px_var(--neon-soft)]">
             <img
@@ -184,7 +184,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Mobile Menu */}
       <div
         className={cn(
-          "fixed right-0 top-16 z-50 h-[calc(100vh-4rem)] w-64 transform border-l border-white/40 bg-white/60 backdrop-blur-xl transition-transform duration-200 ease-in-out lg:hidden shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_14%,transparent)]",
+          "fixed right-0 top-16 z-50 h-[calc(100vh-4rem)] w-64 transform border-l border-border/70 bg-card/45 backdrop-blur-xl transition-transform duration-200 ease-in-out lg:hidden shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_14%,transparent)]",
           mobileMenuOpen ? "translate-x-0" : "translate-x-full"
         )}
       >
@@ -200,7 +200,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                   isActive
                     ? "bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime),var(--electric-coral))] text-primary-foreground shadow-[0_0_0_1px_color-mix(in_oklch,white_50%,transparent),0_10px_28px_var(--neon-soft)]"
-                    : "text-muted-foreground hover:bg-white/45 hover:text-foreground"
+                    : "text-muted-foreground hover:bg-card/45 hover:text-foreground"
                 )}
               >
                 {item.icon}
@@ -209,7 +209,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )
           })}
           {switchable && toggleTheme && (
-            <div className="mt-3 flex items-center justify-between rounded-lg bg-white/45 backdrop-blur-md border border-white/45 px-3 py-2 text-sm">
+            <div className="mt-3 flex items-center justify-between rounded-lg bg-card/40 backdrop-blur-md border border-border/70 px-3 py-2 text-sm">
               <div className="flex items-center gap-2 text-muted-foreground">
                 {theme === "dark" ? (
                   <Moon className="size-4" />
@@ -231,7 +231,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               void handleLogout()
             }}
             disabled={isLoggingOut}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-white/45 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted-foreground hover:bg-card/45 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
           >
             <LogOut className="size-5" />
             {isLoggingOut ? "Logout..." : "Logout"}
