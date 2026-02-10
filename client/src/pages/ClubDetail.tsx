@@ -370,7 +370,7 @@ export default function ClubDetail() {
     return `${minutes}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const formatDate = (date?: string | null) => {
+  const formatDate = (date?: string | Date | null) => {
     if (!date) return "";
     return new Date(date).toLocaleDateString("it-IT", {
       day: "numeric",
@@ -409,7 +409,30 @@ export default function ClubDetail() {
   const requests = useMemo(() => (requestsQuery.data as any[]) || [], [requestsQuery.data]);
   const bannedMembers = useMemo(() => (bannedQuery.data as any[]) || [], [bannedQuery.data]);
   const invites = useMemo(() => (invitesQuery.data as ClubInvite[]) || [], [invitesQuery.data]);
-  const events = useMemo(() => (eventsQuery.data as any[]) || [], [eventsQuery.data]);
+  type ClubEventRow = {
+    id: number;
+    title: string;
+    description?: string | null;
+    eventType: string;
+    location?: string | null;
+    startTime: string | Date;
+    endTime?: string | Date | null;
+    maxAttendees?: number | null;
+  };
+
+  type ClubEventsListItem = {
+    event: ClubEventRow;
+    creator: { id: number; username: string | null; profilePicture: string | null };
+    attendeeCount: number;
+    maybeCount?: number;
+    notGoingCount?: number;
+    userRsvp?: "going" | "maybe" | "not_going" | null;
+  };
+
+  const events = useMemo(
+    () => (eventsQuery.data as unknown as ClubEventsListItem[]) || [],
+    [eventsQuery.data]
+  );
   const announcements = useMemo(() => (announcementsQuery.data as any[]) || [], [announcementsQuery.data]);
   const mediaItems = useMemo(() => (mediaQuery.data as any[]) || [], [mediaQuery.data]);
 
@@ -875,95 +898,101 @@ export default function ClubDetail() {
                       </Card>
                     )}
 
-                    {eventsQuery.isLoading ? (
-                      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-                        <CardContent className="p-6 text-muted-foreground">Caricamento eventi...</CardContent>
-                      </Card>
-                    ) : events.length === 0 ? (
+	                    {eventsQuery.isLoading ? (
+	                      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+	                        <CardContent className="p-6 text-muted-foreground">Caricamento eventi...</CardContent>
+	                      </Card>
+	                    ) : events.length === 0 ? (
                       <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
                         <CardContent className="p-6 text-muted-foreground">
                           Nessun evento programmato. {isStaff && "Crea il primo evento!"}
                         </CardContent>
                       </Card>
                     ) : (
-                      <div className="space-y-4">
-                        {events.map((event: any) => (
-                          <motion.div
-                            key={event.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.3 }}
-                          >
-                            <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                              <CardContent className="p-6">
-                                <div className="flex items-start justify-between mb-3">
-                                  <div className="flex-1">
-                                    <h3 className="text-lg font-semibold">{event.title}</h3>
-                                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                                      <Calendar className="h-4 w-4" />
-                                      <span>{formatDate(event.start_time)}</span>
-                                    </div>
-                                  </div>
-                                  {isStaff && (
-                                    <Button
-                                      size="sm"
-                                      variant="destructive"
-                                      onClick={() => deleteEvent.mutate({ eventId: event.id })}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                </div>
-                                {event.description && (
-                                  <p className="text-sm text-muted-foreground mb-3">{event.description}</p>
-                                )}
-                                <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mb-4">
-                                  {event.location && (
-                                    <div className="flex items-center gap-1">
-                                      <MapPin className="h-4 w-4" />
-                                      <span>{event.location}</span>
-                                    </div>
-                                  )}
-                                  {event.end_time && (
-                                    <div className="flex items-center gap-1">
-                                      <Clock className="h-4 w-4" />
-                                      <span>Fine: {formatDate(event.end_time)}</span>
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <Button
-                                    size="sm"
-                                    variant={event.user_rsvp === "going" ? "neon" : "outline-neon"}
-                                    onClick={() => rsvpEvent.mutate({ eventId: event.id, status: "going" })}
-                                  >
-                                    <CheckCircle2 className="h-4 w-4 mr-1" />
-                                    Partecipo ({event.going_count || 0})
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant={event.user_rsvp === "maybe" ? "neon" : "outline-neon"}
-                                    onClick={() => rsvpEvent.mutate({ eventId: event.id, status: "maybe" })}
-                                  >
-                                    <HelpCircle className="h-4 w-4 mr-1" />
-                                    Forse ({event.maybe_count || 0})
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant={event.user_rsvp === "not_going" ? "destructive" : "outline-neon"}
-                                    onClick={() => rsvpEvent.mutate({ eventId: event.id, status: "not_going" })}
-                                  >
-                                    <XCircle className="h-4 w-4 mr-1" />
-                                    Non partecipo
-                                  </Button>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        ))}
-                      </div>
-                    )}
-                  </TabsContent>
+	                      <div className="space-y-4">
+	                        {events.map((item) => {
+                            const event = item.event;
+                            const goingCount = item.attendeeCount || 0;
+                            const maybeCount = item.maybeCount || 0;
+                            const userRsvp = item.userRsvp || null;
+                            return (
+	                          <motion.div
+	                            key={event.id}
+	                            initial={{ opacity: 0, y: 10 }}
+	                            animate={{ opacity: 1, y: 0 }}
+	                            transition={{ duration: 0.3 }}
+	                          >
+	                            <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
+	                              <CardContent className="p-6">
+	                                <div className="flex items-start justify-between mb-3">
+	                                  <div className="flex-1">
+	                                    <h3 className="text-lg font-semibold">{event.title}</h3>
+	                                    <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+	                                      <Calendar className="h-4 w-4" />
+	                                      <span>{formatDate(event.startTime)}</span>
+	                                    </div>
+	                                  </div>
+	                                  {isStaff && (
+	                                    <Button
+	                                      size="sm"
+	                                      variant="destructive"
+	                                      onClick={() => deleteEvent.mutate({ eventId: event.id })}
+	                                    >
+	                                      <Trash2 className="h-4 w-4" />
+	                                    </Button>
+	                                  )}
+	                                </div>
+	                                {event.description && (
+	                                  <p className="text-sm text-muted-foreground mb-3">{event.description}</p>
+	                                )}
+	                                <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mb-4">
+	                                  {event.location && (
+	                                    <div className="flex items-center gap-1">
+	                                      <MapPin className="h-4 w-4" />
+	                                      <span>{event.location}</span>
+	                                    </div>
+	                                  )}
+	                                  {event.endTime && (
+	                                    <div className="flex items-center gap-1">
+	                                      <Clock className="h-4 w-4" />
+	                                      <span>Fine: {formatDate(event.endTime)}</span>
+	                                    </div>
+	                                  )}
+	                                </div>
+	                                <div className="flex items-center gap-3">
+	                                  <Button
+	                                    size="sm"
+	                                    variant={userRsvp === "going" ? "neon" : "outline-neon"}
+	                                    onClick={() => rsvpEvent.mutate({ eventId: event.id, status: "going" })}
+	                                  >
+	                                    <CheckCircle2 className="h-4 w-4 mr-1" />
+	                                    Partecipo ({goingCount})
+	                                  </Button>
+	                                  <Button
+	                                    size="sm"
+	                                    variant={userRsvp === "maybe" ? "neon" : "outline-neon"}
+	                                    onClick={() => rsvpEvent.mutate({ eventId: event.id, status: "maybe" })}
+	                                  >
+	                                    <HelpCircle className="h-4 w-4 mr-1" />
+	                                    Forse ({maybeCount})
+	                                  </Button>
+	                                  <Button
+	                                    size="sm"
+	                                    variant={userRsvp === "not_going" ? "destructive" : "outline-neon"}
+	                                    onClick={() => rsvpEvent.mutate({ eventId: event.id, status: "not_going" })}
+	                                  >
+	                                    <XCircle className="h-4 w-4 mr-1" />
+	                                    Non partecipo
+	                                  </Button>
+	                                </div>
+	                              </CardContent>
+	                            </Card>
+	                          </motion.div>
+	                        );
+                          })}
+	                      </div>
+	                    )}
+	                  </TabsContent>
 
                   {/* Membri Tab Content */}
                   <TabsContent value="membri" className="space-y-6">

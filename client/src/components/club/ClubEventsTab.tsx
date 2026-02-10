@@ -114,14 +114,29 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
       return;
     }
 
+    const startTime = new Date(newEvent.startTime);
+    const endTime = newEvent.endTime ? new Date(newEvent.endTime) : null;
+    if (Number.isNaN(startTime.getTime())) {
+      toast.error("Data di inizio non valida");
+      return;
+    }
+    if (endTime && Number.isNaN(endTime.getTime())) {
+      toast.error("Data di fine non valida");
+      return;
+    }
+    if (endTime && endTime <= startTime) {
+      toast.error("La data di fine deve essere dopo la data di inizio");
+      return;
+    }
+
     createMutation.mutate({
       clubId,
       title: newEvent.title,
       description: newEvent.description || undefined,
       eventType: newEvent.eventType,
       location: newEvent.location || undefined,
-      startTime: newEvent.startTime,
-      endTime: newEvent.endTime || undefined,
+      startTime: startTime.toISOString(),
+      endTime: endTime ? endTime.toISOString() : undefined,
       maxAttendees: newEvent.maxAttendees ? Number(newEvent.maxAttendees) : undefined,
     });
   };
