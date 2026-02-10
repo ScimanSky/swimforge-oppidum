@@ -19,13 +19,22 @@ export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const utils = trpc.useUtils();
 
+  const profileQuery = trpc.profile.get.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const inAppEnabled =
+    (profileQuery.data?.notificationSettings as Record<string, boolean> | undefined)
+      ?.in_app_notifications ?? true;
+
   const unreadCountQuery = trpc.community.notifications.unreadCount.useQuery(undefined, {
     refetchInterval: 60000, // Poll ogni 60 secondi (ridotto carico server)
+    enabled: inAppEnabled,
   });
 
   const notificationsQuery = trpc.community.notifications.list.useQuery(
     { limit: 20, onlyUnread: false },
-    { enabled: isOpen }
+    { enabled: isOpen && inAppEnabled }
   );
 
   const markReadMutation = trpc.community.notifications.markRead.useMutation({
@@ -36,6 +45,10 @@ export default function NotificationBell() {
   });
 
   const unreadCount = unreadCountQuery.data?.count || 0;
+
+  if (!inAppEnabled) {
+    return null;
+  }
 
   const handleMarkAllRead = () => {
     markReadMutation.mutate({});

@@ -142,10 +142,11 @@ export async function toggleSplash(userId: number, postId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const owner = await db.execute(sql`
-    SELECT user_id FROM social_posts WHERE id = ${postId} LIMIT 1
+  const postMeta = await db.execute(sql`
+    SELECT user_id, club_id FROM social_posts WHERE id = ${postId} LIMIT 1
   `);
-  const ownerId = (owner.rows[0] as any)?.user_id;
+  const ownerId = (postMeta.rows[0] as any)?.user_id as number | undefined;
+  const clubId = (postMeta.rows[0] as any)?.club_id as number | null | undefined;
   if (ownerId && ownerId === userId) {
     throw new Error("Cannot splash your own post");
   }
@@ -162,6 +163,27 @@ export async function toggleSplash(userId: number, postId: number) {
   }
 
   await db.insert(socialSplashes).values({ postId, userId, createdAt: new Date() });
+
+  // Notification for post owner (only on create)
+  if (ownerId && ownerId !== userId) {
+    try {
+      const actor = await db.execute(sql`SELECT name FROM users WHERE id = ${userId} LIMIT 1`);
+      const actorName = ((actor.rows[0] as any)?.name as string | undefined) || "Qualcuno";
+      const { createNotification } = await import("./db_social_enhanced");
+      const link = clubId ? `/community/club/${clubId}` : "/community";
+      await createNotification({
+        userId: ownerId,
+        type: "splash",
+        title: "Nuovo Splash",
+        message: `${actorName} ha messo Splash al tuo post.`,
+        link,
+        referenceId: postId,
+      });
+    } catch {
+      // Notifications are best-effort; don't break splash interaction if it fails.
+    }
+  }
+
   return { splashed: true };
 }
 
@@ -173,6 +195,33 @@ export async function addComment(userId: number, postId: number, content: string
     .insert(socialComments)
     .values({ postId, userId, content, createdAt: new Date(), updatedAt: new Date() })
     .returning({ id: socialComments.id });
+
+  // Notification for post owner (only on create)
+  try {
+    const postMeta = await db.execute(sql`
+      SELECT user_id, club_id FROM social_posts WHERE id = ${postId} LIMIT 1
+    `);
+    const ownerId = (postMeta.rows[0] as any)?.user_id as number | undefined;
+    const clubId = (postMeta.rows[0] as any)?.club_id as number | null | undefined;
+
+    if (ownerId && ownerId !== userId) {
+      const actor = await db.execute(sql`SELECT name FROM users WHERE id = ${userId} LIMIT 1`);
+      const actorName = ((actor.rows[0] as any)?.name as string | undefined) || "Qualcuno";
+      const preview = content.trim().slice(0, 120);
+      const { createNotification } = await import("./db_social_enhanced");
+      const link = clubId ? `/community/club/${clubId}` : "/community";
+      await createNotification({
+        userId: ownerId,
+        type: "comment",
+        title: "Nuovo commento",
+        message: `${actorName}: ${preview}${content.trim().length > 120 ? "..." : ""}`,
+        link,
+        referenceId: postId,
+      });
+    }
+  } catch {
+    // Best-effort
+  }
 
   return inserted[0]?.id ?? null;
 }

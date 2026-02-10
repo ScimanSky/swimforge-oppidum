@@ -40,6 +40,12 @@ import { useLocation } from "wouter"
 
 const notificationSettings = [
   {
+    id: "in_app_notifications",
+    title: "Notifiche in App",
+    description: "Mostra la campanella e gli avvisi direttamente dentro SwimForge",
+    enabled: true,
+  },
+  {
     id: "activity_sync",
     title: "Sincronizzazione Attivita",
     description: "Notifica quando nuove attivita vengono sincronizzate",
