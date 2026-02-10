@@ -2,8 +2,10 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { activityAiInsights, swimmingActivities } from "../drizzle/schema";
+import { logger } from "./middleware/logger";
 
 let genAI: GoogleGenerativeAI | null = null;
+const log = logger.child({ component: "ai_activity_insights" });
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -235,7 +237,12 @@ export async function getPendingActivityInsights(userId: number, limit = 3) {
   // This does NOT block the response
   const remaining = limit - pending.length;
   generateMissingInsightsBackground(userId, remaining).catch((err) => {
-    console.error(`[AI Insights] Background generation failed for user ${userId}:`, err);
+    log.error("[AI Insights] Background generation failed", {
+      event: "ai_activity_insights:background_failed",
+      userId,
+      message: err instanceof Error ? err.message : String(err),
+      stack: err instanceof Error ? err.stack : undefined,
+    });
   });
 
   // Return what we have now (user gets fast response)
@@ -270,7 +277,13 @@ async function generateMissingInsightsBackground(userId: number, limit: number) 
         generatedAt: new Date(),
       });
     } catch (err) {
-      console.error(`[AI Insights] Failed to generate insight for activity ${row.id}:`, err);
+      log.error("[AI Insights] Failed to generate insight for activity", {
+        event: "ai_activity_insights:generate_failed",
+        userId,
+        activityId: row.id,
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
     }
   }
 }

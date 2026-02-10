@@ -206,7 +206,12 @@ export function errorHandler(
     try {
       // Rollbar will be called by the middleware in index.ts
     } catch (rollbarError) {
-      console.warn('[Logger] Failed to send error to Rollbar:', rollbarError);
+      const message =
+        rollbarError instanceof Error ? rollbarError.message : String(rollbarError);
+      logger.warn("[Logger] Failed to send error to Rollbar", {
+        event: "rollbar:send_failed",
+        message,
+      });
     }
   }
 

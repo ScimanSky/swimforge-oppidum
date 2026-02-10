@@ -651,7 +651,11 @@ export const appRouter = router({
                   );
                 }
               } catch (error) {
-                console.warn("[Garmin] Failed to persist lap details:", error);
+                logger.warn("[Garmin] Failed to persist lap details", {
+                  event: "garmin:persist_lap_details_failed",
+                  message: error instanceof Error ? error.message : String(error),
+                  stack: error instanceof Error ? error.stack : undefined,
+                });
               }
             } else if (rawData.garmin_details) {
               activity.rawData = rawData;

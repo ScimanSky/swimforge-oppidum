@@ -1,5 +1,8 @@
 import { eq, and, desc, asc, gte, lte, sql } from "drizzle-orm";
 import { getDb } from "./db";
+import { logger } from "./middleware/logger";
+
+const log = logger.child({ component: "db_challenges" });
 
 // Types for challenges
 export type ChallengeType = "pool" | "open_water" | "both";
@@ -116,7 +119,11 @@ export async function getActiveChallenges(userId: number): Promise<any[]> {
 
   // Log challenges before update
   const beforeUpdate = await db.execute(sql`SELECT id, name, start_date, end_date, status, duration FROM challenges`);
-  console.log('[getActiveChallenges] BEFORE UPDATE:', JSON.stringify(beforeUpdate.rows, null, 2));
+  log.debug("[getActiveChallenges] BEFORE UPDATE", {
+    event: "challenges:before_update",
+    userId,
+    rows: beforeUpdate.rows,
+  });
 
   // Auto-update challenge statuses based on dates
   await db.execute(sql`
@@ -131,7 +138,11 @@ export async function getActiveChallenges(userId: number): Promise<any[]> {
 
   // Log challenges after update
   const afterUpdate = await db.execute(sql`SELECT id, name, start_date, end_date, status, duration FROM challenges`);
-  console.log('[getActiveChallenges] AFTER UPDATE:', JSON.stringify(afterUpdate.rows, null, 2));
+  log.debug("[getActiveChallenges] AFTER UPDATE", {
+    event: "challenges:after_update",
+    userId,
+    rows: afterUpdate.rows,
+  });
 
   const result = await db.execute(sql`
     SELECT 
@@ -172,7 +183,13 @@ export async function joinChallenge(challengeId: number, userId: number): Promis
     `);
     return true;
   } catch (error) {
-    console.error("Error joining challenge:", error);
+    log.error("Error joining challenge", {
+      event: "challenges:join_error",
+      userId,
+      challengeId,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return false;
   }
 }
@@ -191,7 +208,13 @@ export async function leaveChallenge(challengeId: number, userId: number): Promi
     `);
     return true;
   } catch (error) {
-    console.error("Error leaving challenge:", error);
+    log.error("Error leaving challenge", {
+      event: "challenges:leave_error",
+      userId,
+      challengeId,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return false;
   }
 }
@@ -215,7 +238,13 @@ export async function updateChallengeProgress(
     `);
     return true;
   } catch (error) {
-    console.error("Error updating challenge progress:", error);
+    log.error("Error updating challenge progress", {
+      event: "challenges:update_progress_error",
+      userId,
+      challengeId,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return false;
   }
 }

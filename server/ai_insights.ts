@@ -2,9 +2,11 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getDb } from "./db";
 import { aiInsightsCache } from "../drizzle/schema";
 import { eq, and, gt } from "drizzle-orm";
+import { logger } from "./middleware/logger";
 
 // Initialize Gemini AI
 let genAI: GoogleGenerativeAI | null = null;
+const log = logger.child({ component: "ai_insights" });
 
 function getGeminiClient() {
   if (!genAI && process.env.GEMINI_API_KEY) {
@@ -68,20 +70,34 @@ export async function generateAIInsights(
       .limit(1);
 
     if (cached.length > 0 && cached[0].insights.length > 0) {
-      console.log(`[AI Insights] ✅ Using valid cached insights for user ${userId} (expires: ${cached[0].expiresAt})`);
+      log.debug("[AI Insights] Using valid cached insights", {
+        event: "ai_insights:cache_hit",
+        userId,
+        expiresAt: cached[0].expiresAt,
+      });
       return cached[0].insights;
     }
     
-    console.log(`[AI Insights] 🔄 No valid cache found, generating new insights...`);
+    log.debug("[AI Insights] No valid cache found, generating new insights", {
+      event: "ai_insights:cache_miss",
+      userId,
+    });
   } catch (cacheError) {
-    console.warn("[AI Insights] Cache check failed, proceeding with generation:", cacheError);
+    log.warn("[AI Insights] Cache check failed, proceeding with generation", {
+      event: "ai_insights:cache_check_failed",
+      userId,
+      message: cacheError instanceof Error ? cacheError.message : String(cacheError),
+    });
   }
 
   const client = getGeminiClient();
   
   // If no API key, try to use ANY cache as fallback (even expired)
   if (!client) {
-    console.warn("[AI Insights] No Gemini API key configured, trying ANY cache fallback");
+    log.warn("[AI Insights] No Gemini API key configured, trying ANY cache fallback", {
+      event: "ai_insights:no_api_key",
+      userId,
+    });
     try {
       const anyCached = await db
         .select()
@@ -95,11 +111,18 @@ export async function generateAIInsights(
         .limit(1);
 
       if (anyCached.length > 0 && anyCached[0].insights.length > 0) {
-        console.log(`[AI Insights] Using ANY cached insights (no API key) for user ${userId}`);
+        log.debug("[AI Insights] Using ANY cached insights (no API key)", {
+          event: "ai_insights:any_cache_hit",
+          userId,
+        });
         return anyCached[0].insights;
       }
     } catch (cacheError) {
-      console.warn("[AI Insights] Cache table not available");
+      log.warn("[AI Insights] Cache table not available", {
+        event: "ai_insights:cache_table_unavailable",
+        userId,
+        message: cacheError instanceof Error ? cacheError.message : String(cacheError),
+      });
     }
     return [];
   }
@@ -218,7 +241,11 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
     const response = result.response;
     const text = response.text();
 
-    console.log(`[AI Insights] Raw response from Gemini (first 500 chars):`, text.substring(0, 500));
+    log.debug("[AI Insights] Raw response from Gemini (first 500 chars)", {
+      event: "ai_insights:raw_response",
+      userId,
+      preview: text.substring(0, 500),
+    });
 
     // Parse insights (split by newlines, filter empty)
     // Accept lines that start with emoji OR number + emoji (e.g., "1. 🎯")
@@ -238,9 +265,17 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
         return line.replace(/^\d+\.\s*/, '');
       });
 
-    console.log(`[AI Insights] Parsed ${insights.length} insights from response`);
+    log.debug("[AI Insights] Parsed insights from response", {
+      event: "ai_insights:parsed",
+      userId,
+      count: insights.length,
+    });
     if (insights.length === 0) {
-      console.warn(`[AI Insights] No insights matched regex. Full response:`, text);
+      log.warn("[AI Insights] No insights matched regex", {
+        event: "ai_insights:regex_no_match",
+        userId,
+        preview: text.substring(0, 500),
+      });
     }
 
     // Return first 8 insights and save to cache
@@ -263,16 +298,27 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
           expiresAt,
         });
         
-        console.log(`[AI Insights] Cached ${finalInsights.length} insights for user ${userId}`);
+        log.debug("[AI Insights] Cached insights", {
+          event: "ai_insights:cache_saved",
+          userId,
+          count: finalInsights.length,
+        });
       } catch (cacheError) {
-        console.warn("[AI Insights] Cache table not available yet, skipping cache save:", cacheError);
+        log.warn("[AI Insights] Cache table not available yet, skipping cache save", {
+          event: "ai_insights:cache_save_skipped",
+          userId,
+          message: cacheError instanceof Error ? cacheError.message : String(cacheError),
+        });
       }
       
       return finalInsights;
     }
 
     // If parsing fails, try to use cache as fallback
-    console.warn("[AI Insights] Failed to parse AI response, trying cache fallback");
+    log.warn("[AI Insights] Failed to parse AI response, trying cache fallback", {
+      event: "ai_insights:parse_failed",
+      userId,
+    });
     try {
       const cached = await db
         .select()
@@ -286,16 +332,28 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
         .limit(1);
 
       if (cached.length > 0 && cached[0].insights.length > 0) {
-        console.log(`[AI Insights] Using cached insights (parsing failed) for user ${userId}`);
+        log.debug("[AI Insights] Using cached insights (parsing failed)", {
+          event: "ai_insights:parse_failed_cache_hit",
+          userId,
+        });
         return cached[0].insights;
       }
     } catch (cacheError) {
-      console.warn("[AI Insights] Cache table not available for fallback");
+      log.warn("[AI Insights] Cache table not available for fallback", {
+        event: "ai_insights:cache_fallback_unavailable",
+        userId,
+        message: cacheError instanceof Error ? cacheError.message : String(cacheError),
+      });
     }
     
     return [];
   } catch (error) {
-    console.error("[AI Insights] Error generating AI insights:", error);
+    log.error("[AI Insights] Error generating AI insights", {
+      event: "ai_insights:generate_error",
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     
     // Try to return cached insights even if expired
     try {
@@ -311,11 +369,18 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
         .limit(1);
       
       if (anyCached.length > 0 && anyCached[0].insights.length > 0) {
-        console.log(`[AI Insights] Using expired cache for user ${userId} due to error`);
+        log.warn("[AI Insights] Using expired cache due to error", {
+          event: "ai_insights:expired_cache_fallback",
+          userId,
+        });
         return anyCached[0].insights;
       }
     } catch (fallbackError) {
-      console.warn("[AI Insights] Cache table not available for fallback");
+      log.warn("[AI Insights] Cache table not available for fallback", {
+        event: "ai_insights:expired_cache_fallback_unavailable",
+        userId,
+        message: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+      });
     }
     
     return [];

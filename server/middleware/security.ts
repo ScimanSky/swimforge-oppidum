@@ -12,6 +12,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { Request, Response, NextFunction } from 'express';
 import { createRedisStore } from '../lib/redis-rate-limit-store';
+import { logger } from "./logger";
+
+const log = logger.child({ component: "security" });
 
 // ============================================================================
 // RATE LIMITING - SEMPLIFICATO
@@ -185,7 +188,8 @@ export function userAgentValidation(
   const suspiciousAgents = ['sqlmap', 'nikto', 'nmap', 'masscan', 'nessus'];
 
   if (suspiciousAgents.some((agent) => userAgent.toLowerCase().includes(agent))) {
-    console.warn('[SECURITY] Suspicious user agent detected', {
+    log.warn('[SECURITY] Suspicious user agent detected', {
+      event: "security:suspicious_user_agent",
       ip: req.ip,
       userAgent,
     });

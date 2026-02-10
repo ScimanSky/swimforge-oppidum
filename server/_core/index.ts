@@ -16,9 +16,11 @@ import { assertAuthEnv } from "./env";
 import { healthRouter } from "../routes/health";
 
 // Security middleware
-import { requestLogger, errorHandler } from "../middleware/logger";
+import { requestLogger, errorHandler, logger } from "../middleware/logger";
 import { applySecurityMiddleware, applyRateLimiting } from "../middleware/security";
 import { rollbar, captureError } from "../middleware/rollbar-init";
+
+const log = logger.child({ component: "server" });
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -45,7 +47,10 @@ async function startServer() {
   }
   // Connect to Redis (non-blocking - continue even if it fails)
   connectRedis().catch(err => {
-    console.warn('[Redis] Connection failed, continuing without cache:', err.message);
+    log.warn("[Redis] Connection failed, continuing without cache", {
+      event: "redis:connect_failed",
+      message: err instanceof Error ? err.message : String(err),
+    });
   });
 
   const app = express();
@@ -100,7 +105,11 @@ async function startServer() {
       const result = await completeChallenges();
       return res.json({ success: true, ...result });
     } catch (error: unknown) {
-      console.error("[Cron] Failed to complete challenges:", error);
+      log.error("[Cron] Failed to complete challenges", {
+        event: "cron:complete_challenges_failed",
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return res.status(500).json({ success: false, error: "Cron execution failed" });
     }
   });
@@ -122,7 +131,11 @@ async function startServer() {
       const result = await evaluateAllUsersWeekly();
       return res.json({ success: true, ...result });
     } catch (error: unknown) {
-      console.error("[Cron] Failed to evaluate skill level:", error);
+      log.error("[Cron] Failed to evaluate skill level", {
+        event: "cron:evaluate_skill_level_failed",
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       return res.status(500).json({ success: false, error: "Cron execution failed" });
     }
   });
@@ -160,14 +173,27 @@ async function startServer() {
   const port = await findAvailablePort(preferredPort);
 
   if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+    log.warn("Preferred port is busy; using alternate port", {
+      event: "server:port_fallback",
+      preferredPort,
+      port,
+    });
   }
 
   server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+    log.info("Server running", {
+      event: "server:listening",
+      port,
+    });
   });
 
   // Cron moved to external scheduler via /api/cron/complete-challenges
 }
 
-startServer().catch(console.error);
+startServer().catch((error: unknown) => {
+  log.error("Server failed to start", {
+    event: "server:start_failed",
+    message: error instanceof Error ? error.message : String(error),
+    stack: error instanceof Error ? error.stack : undefined,
+  });
+});

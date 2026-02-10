@@ -7,6 +7,7 @@ import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
+import { logger } from "../middleware/logger";
 import type {
   ExchangeTokenRequest,
   ExchangeTokenResponse,
@@ -17,6 +18,8 @@ import type {
 // Utility function
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
+
+const log = logger.child({ component: "sdk" });
 
 export type SessionPayload = {
   openId: string;
@@ -32,7 +35,10 @@ class OAuthService {
   constructor(private client: ReturnType<typeof axios.create>) {
     // OAuth service is only used for Manus OAuth, not for Supabase OAuth
     if (ENV.oAuthServerUrl) {
-      console.log("[OAuth] Initialized with baseURL:", ENV.oAuthServerUrl);
+      log.info("[OAuth] Initialized with baseURL", {
+        event: "oauth:init",
+        baseURL: ENV.oAuthServerUrl,
+      });
     }
   }
 
@@ -202,7 +208,9 @@ class SDKServer {
     cookieValue: string | undefined | null
   ): Promise<{ openId: string; appId: string; name: string } | null> {
     if (!cookieValue) {
-      console.warn("[Auth] Missing session cookie");
+      log.warn("[Auth] Missing session cookie", {
+        event: "auth:missing_session_cookie",
+      });
       return null;
     }
 
@@ -218,7 +226,9 @@ class SDKServer {
         !isNonEmptyString(appId) ||
         !isNonEmptyString(name)
       ) {
-        console.warn("[Auth] Session payload missing required fields");
+        log.warn("[Auth] Session payload missing required fields", {
+          event: "auth:invalid_session_payload",
+        });
         return null;
       }
 
@@ -228,7 +238,10 @@ class SDKServer {
         name,
       };
     } catch (error) {
-      console.warn("[Auth] Session verification failed", String(error));
+      log.warn("[Auth] Session verification failed", {
+        event: "auth:session_verification_failed",
+        message: error instanceof Error ? error.message : String(error),
+      });
       return null;
     }
   }
@@ -296,7 +309,11 @@ class SDKServer {
         });
         user = await db.getUserByOpenId(userInfo.openId);
       } catch (error) {
-        console.error("[Auth] Failed to sync user from OAuth:", error);
+        log.error("[Auth] Failed to sync user from OAuth", {
+          event: "auth:oauth_sync_failed",
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
         // Don't throw here for email/password auth fallback
       }
     }

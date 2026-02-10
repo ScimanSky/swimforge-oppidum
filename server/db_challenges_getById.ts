@@ -2,6 +2,9 @@ import { getDb } from "./db";
 import { challenges, challengeParticipants } from "../drizzle/schema_challenges";
 import { users, swimmerProfiles } from "../drizzle/schema";
 import { eq, desc, sql } from "drizzle-orm";
+import { logger } from "./middleware/logger";
+
+const log = logger.child({ component: "db_challenges_getById" });
 
 export async function getChallengeById(challengeId: number) {
   const db = await getDb();
@@ -41,7 +44,10 @@ export async function getChallengeById(challengeId: number) {
 
   // Validate dates - if NULL, skip this challenge
   if (!challenge.start_date || !challenge.end_date) {
-    console.warn(`[getChallengeById] Challenge ${challengeId} has NULL dates, skipping`);
+    log.warn("[getChallengeById] Challenge has NULL dates, skipping", {
+      event: "challenges:get_by_id_null_dates",
+      challengeId,
+    });
     return null;
   }
 
