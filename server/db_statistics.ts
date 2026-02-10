@@ -14,7 +14,7 @@ import {
 type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
 async function requireDb(): Promise<DbClient> {
-  const db = await requireDb();
+  const db = await getDb();
   if (!db) throw new Error("Database not available");
   return db;
 }
