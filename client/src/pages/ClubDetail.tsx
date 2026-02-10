@@ -108,9 +108,10 @@ export default function ClubDetail() {
   
   // Media upload form state
   const [mediaForm, setMediaForm] = useState({
-    mediaUrl: "",
     caption: "",
   });
+  const [mediaFile, setMediaFile] = useState<File | null>(null);
+  const mediaFileInputRef = useRef<HTMLInputElement | null>(null);
 
   const utils = trpc.useUtils();
   
@@ -308,10 +309,30 @@ export default function ClubDetail() {
     },
   });
   
+  const readFileAsBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(",")[1];
+        if (!base64) {
+          reject(new Error("Invalid file encoding"));
+          return;
+        }
+        resolve(base64);
+      };
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(file);
+    });
+
   // Media mutations
-  const uploadMedia = trpc.community.clubs.media.upload.useMutation({
+  const uploadMediaFile = trpc.community.clubs.media.uploadFile.useMutation({
     onSuccess: () => {
-      setMediaForm({ mediaUrl: "", caption: "" });
+      setMediaForm({ caption: "" });
+      setMediaFile(null);
+      if (mediaFileInputRef.current) {
+        mediaFileInputRef.current.value = "";
+      }
       utils.community.clubs.media.list.invalidate({ clubId });
       toast.success("Media caricato!");
     },
@@ -1147,47 +1168,73 @@ export default function ClubDetail() {
                   </TabsContent>
 
                   {/* Gallery Tab Content */}
-                  <TabsContent value="gallery" className="space-y-6">
-                    {isStaff && (
-                      <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                        <CardContent className="p-6 space-y-4">
-                          <h3 className="text-lg font-semibold">Carica Media</h3>
-                          <div className="space-y-3">
-                            <div className="space-y-2">
-                              <label className="text-xs text-muted-foreground">URL Media</label>
-                              <Input
-                                value={mediaForm.mediaUrl}
-                                onChange={(e) => setMediaForm({ ...mediaForm, mediaUrl: e.target.value })}
-                                placeholder="https://..."
-                                className="bg-background/60"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <label className="text-xs text-muted-foreground">Didascalia (opzionale)</label>
-                              <Input
-                                value={mediaForm.caption}
-                                onChange={(e) => setMediaForm({ ...mediaForm, caption: e.target.value })}
-                                placeholder="Descrizione..."
-                                className="bg-background/60"
-                              />
-                            </div>
-                          </div>
-	                          <Button
-	                            variant="neon"
-	                            onClick={() => uploadMedia.mutate({
-	                              clubId,
-	                              mediaType: "image",
-	                              mediaUrl: mediaForm.mediaUrl,
-	                              caption: mediaForm.caption || undefined,
-	                            })}
-	                            disabled={!mediaForm.mediaUrl}
-	                          >
-                            <Upload className="h-4 w-4 mr-2" />
-                            Carica
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    )}
+	                  <TabsContent value="gallery" className="space-y-6">
+	                    {isStaff && (
+	                      <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
+	                        <CardContent className="p-6 space-y-4">
+	                          <h3 className="text-lg font-semibold">Carica Media</h3>
+	                          <div className="space-y-3">
+	                            <div className="space-y-2">
+	                              <label className="text-xs text-muted-foreground">File immagine</label>
+                                <Input
+                                  ref={mediaFileInputRef}
+                                  type="file"
+                                  accept="image/jpeg,image/png,image/webp"
+                                  onChange={(e) => setMediaFile(e.target.files?.[0] ?? null)}
+                                  className="bg-background/60"
+                                />
+	                            </div>
+	                            <div className="space-y-2">
+	                              <label className="text-xs text-muted-foreground">Didascalia (opzionale)</label>
+	                              <Input
+	                                value={mediaForm.caption}
+	                                onChange={(e) => setMediaForm({ ...mediaForm, caption: e.target.value })}
+	                                placeholder="Descrizione..."
+	                                className="bg-background/60"
+	                              />
+	                            </div>
+	                          </div>
+		                          <Button
+		                            variant="neon"
+		                            onClick={async () => {
+                                  if (!mediaFile) {
+                                    toast.error("Seleziona un file immagine.");
+                                    return;
+                                  }
+                                  if (mediaFile.size > 5 * 1024 * 1024) {
+                                    toast.error("File troppo grande (max 5MB).");
+                                    return;
+                                  }
+                                  const allowedTypes = ["image/jpeg", "image/png", "image/webp"] as const;
+                                  if (!(allowedTypes as readonly string[]).includes(mediaFile.type)) {
+                                    toast.error("Formato non supportato. Usa JPG, PNG o WEBP.");
+                                    return;
+                                  }
+                                  const rawExtension = mediaFile.name.split(".").pop()?.toLowerCase();
+                                  const extension =
+                                    rawExtension === "jpg" ||
+                                    rawExtension === "jpeg" ||
+                                    rawExtension === "png" ||
+                                    rawExtension === "webp"
+                                      ? rawExtension
+                                      : undefined;
+                                  const fileBase64 = await readFileAsBase64(mediaFile);
+                                  uploadMediaFile.mutate({
+                                    clubId,
+                                    fileBase64,
+                                    mimeType: mediaFile.type as "image/jpeg" | "image/png" | "image/webp",
+                                    ...(extension ? { extension: extension as "jpg" | "jpeg" | "png" | "webp" } : {}),
+                                    caption: mediaForm.caption || undefined,
+                                  });
+                                }}
+		                            disabled={!mediaFile || uploadMediaFile.isPending}
+		                          >
+	                            <Upload className="h-4 w-4 mr-2" />
+	                            {uploadMediaFile.isPending ? "Caricamento..." : "Carica"}
+		                          </Button>
+	                        </CardContent>
+	                      </Card>
+	                    )}
 
                     {mediaQuery.isLoading ? (
                       <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
@@ -1200,45 +1247,48 @@ export default function ClubDetail() {
                         </CardContent>
                       </Card>
                     ) : (
-                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                        {mediaItems.map((media: any) => (
-                          <motion.div
-                            key={media.id}
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ duration: 0.3 }}
-                          >
-                            <Card className="border-border/50 bg-card/60 backdrop-blur-sm overflow-hidden">
-                              <img
-                                src={media.media_url}
-                                alt={media.caption || "Gallery"}
-                                className="w-full h-48 object-cover"
-                              />
-                              <CardContent className="p-4">
-                                {media.caption && (
-                                  <p className="text-sm text-muted-foreground mb-2">{media.caption}</p>
-                                )}
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatDate(media.created_at)}
-                                  </span>
-                                  {isStaff && (
-	                                    <Button
-	                                      size="sm"
-	                                      variant="destructive"
-	                                      onClick={() => deleteMedia.mutate({ mediaId: media.id })}
-	                                    >
-	                                      <Trash2 className="h-4 w-4" />
-	                                    </Button>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </motion.div>
-                        ))}
-                      </div>
-                    )}
-                  </TabsContent>
+	                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+	                        {mediaItems.map((item: any) => {
+                            const media = item.media ?? item;
+                            return (
+	                          <motion.div
+	                            key={media.id}
+	                            initial={{ opacity: 0, scale: 0.95 }}
+	                            animate={{ opacity: 1, scale: 1 }}
+	                            transition={{ duration: 0.3 }}
+	                          >
+	                            <Card className="border-border/50 bg-card/60 backdrop-blur-sm overflow-hidden">
+	                              <img
+	                                src={media.mediaUrl ?? media.media_url}
+	                                alt={media.caption || "Gallery"}
+	                                className="w-full h-48 object-cover"
+	                              />
+	                              <CardContent className="p-4">
+	                                {media.caption && (
+	                                  <p className="text-sm text-muted-foreground mb-2">{media.caption}</p>
+	                                )}
+	                                <div className="flex items-center justify-between">
+	                                  <span className="text-xs text-muted-foreground">
+	                                    {formatDate(media.createdAt ?? media.created_at)}
+	                                  </span>
+	                                  {isStaff && (
+		                                    <Button
+		                                      size="sm"
+		                                      variant="destructive"
+		                                      onClick={() => deleteMedia.mutate({ mediaId: media.id })}
+		                                    >
+		                                      <Trash2 className="h-4 w-4" />
+		                                    </Button>
+	                                  )}
+	                                </div>
+	                              </CardContent>
+	                            </Card>
+	                          </motion.div>
+	                        );
+                          })}
+	                      </div>
+	                    )}
+	                  </TabsContent>
 
                   {/* Annunci Tab Content */}
                   <TabsContent value="annunci" className="space-y-6">

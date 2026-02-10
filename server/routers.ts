@@ -1755,6 +1755,120 @@ export const appRouter = router({
             return { success: true, media };
           }),
 
+        uploadFile: protectedProcedure
+          .input(
+            z.object({
+              clubId: z.number(),
+              caption: z.string().max(500).optional(),
+              eventId: z.number().optional(),
+              // Base64 has ~33% overhead; enforce at input layer and re-check decoded size.
+              fileBase64: z
+                .string()
+                .min(1)
+                .max(7 * 1024 * 1024, "File troppo grande (max 5MB)")
+                .regex(/^[A-Za-z0-9+/=]+$/, "Invalid base64"),
+              mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+              extension: z.enum(["jpg", "jpeg", "png", "webp"]).optional(),
+            })
+          )
+          .mutation(async ({ ctx, input }) => {
+            const { getSupabaseAdminClient } = await import("./_core/supabase_admin");
+            const admin = getSupabaseAdminClient();
+
+            const MAX_BYTES = 5 * 1024 * 1024;
+            let buffer: Buffer;
+            try {
+              buffer = Buffer.from(input.fileBase64, "base64");
+            } catch {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid base64 payload" });
+            }
+            if (buffer.length > MAX_BYTES) {
+              throw new TRPCError({
+                code: "PAYLOAD_TOO_LARGE",
+                message: "File troppo grande (max 5MB)",
+              });
+            }
+
+            const detected = detectImageType(buffer);
+            if (!detected) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Formato immagine non supportato. Usa JPG, PNG o WEBP.",
+              });
+            }
+            if (detected.mimeType !== input.mimeType) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Il MIME type non corrisponde al contenuto del file.",
+              });
+            }
+
+            // Resize (max 1920x1080) to reduce payload + prevent huge images.
+            try {
+              type SharpPipeline = {
+                rotate: () => SharpPipeline;
+                resize: (options: { width: number; height: number; fit: "inside"; withoutEnlargement: boolean }) => SharpPipeline;
+                jpeg: (options: { quality: number }) => SharpPipeline;
+                png: (options: { compressionLevel: number }) => SharpPipeline;
+                webp: (options: { quality: number }) => SharpPipeline;
+                toBuffer: () => Promise<Buffer>;
+              };
+              type SharpFn = (input: Buffer) => SharpPipeline;
+
+              const sharpMod = (await import("sharp")) as unknown as { default?: unknown };
+              const sharpFn = ((sharpMod.default ?? sharpMod) as unknown) as SharpFn;
+              const pipeline = sharpFn(buffer)
+                .rotate()
+                .resize({ width: 1920, height: 1080, fit: "inside", withoutEnlargement: true });
+
+              if (detected.extension === "jpg") {
+                buffer = await pipeline.jpeg({ quality: 85 }).toBuffer();
+              } else if (detected.extension === "png") {
+                buffer = await pipeline.png({ compressionLevel: 9 }).toBuffer();
+              } else {
+                buffer = await pipeline.webp({ quality: 85 }).toBuffer();
+              }
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              // Best-effort: if resize fails, upload original buffer (still size-limited above).
+              logger.warn(`club media uploadFile: image resize failed: ${message}`, {
+                event: "club_media:upload_resize_failed",
+                userId: ctx.user.id,
+                clubId: input.clubId,
+                message,
+              });
+            }
+
+            const filePath = `clubs/${input.clubId}/${ctx.user.id}/${Date.now()}.${detected.extension}`;
+            const { error } = await admin.storage
+              .from("profile-media")
+              .upload(filePath, buffer, {
+                contentType: detected.mimeType,
+                upsert: true,
+              });
+            if (error) {
+              throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: `Upload failed: ${error.message}`,
+              });
+            }
+
+            const { data } = admin.storage.from("profile-media").getPublicUrl(filePath);
+            const publicUrl = data.publicUrl;
+
+            const { uploadClubMedia } = await import("./db_social_enhanced");
+            const media = await uploadClubMedia({
+              clubId: input.clubId,
+              uploaderId: ctx.user.id,
+              mediaType: "image",
+              mediaUrl: publicUrl,
+              caption: input.caption,
+              eventId: input.eventId,
+            });
+
+            return { success: true, media, url: publicUrl };
+          }),
+
         delete: protectedProcedure
           .input(z.object({ mediaId: z.number() }))
           .mutation(async ({ input }) => {
