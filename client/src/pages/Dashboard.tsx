@@ -476,21 +476,21 @@ export default function Dashboard() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <Card className="bg-card border-border relative overflow-hidden glass-panel">
+        <Card className="relative overflow-hidden">
           {coverImage && (
             <div className="absolute inset-0">
               <img
                 src={coverImage}
                 alt="Cover profilo"
-                className="h-full w-full object-cover opacity-45 dark:opacity-55"
+                className="h-full w-full object-cover opacity-55 dark:opacity-65"
                 loading="lazy"
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-background/80 via-background/55 to-background/35" />
+              <div className="absolute inset-0 bg-gradient-to-r from-background/85 via-background/55 to-background/30" />
             </div>
           )}
           <CardContent className="relative p-6 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
-              <div className="size-32 rounded-2xl bg-muted/60 border border-border/60 flex items-center justify-center overflow-hidden">
+              <div className="size-32 rounded-2xl overflow-hidden ei-border-gradient shadow-[0_0_34px_var(--neon-soft)]">
                 {profileAvatarUrl ? (
                   <img
                     src={profileAvatarUrl}
@@ -518,6 +518,26 @@ export default function Dashboard() {
                 <p className="text-sm text-muted-foreground">
                   {profile?.profileBadge?.name || profile?.levelTitle || "Livello"} • {profile?.totalXp ?? 0} XP
                 </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button variant="neon" size="sm" asChild>
+                    <Link href="/activities">
+                      <Waves className="size-4" />
+                      Attività
+                    </Link>
+                  </Button>
+                  <Button variant="outline-neon" size="sm" asChild>
+                    <Link href="/challenges">
+                      <Trophy className="size-4" />
+                      Sfide
+                    </Link>
+                  </Button>
+                  <Button variant="outline-neon" size="sm" asChild>
+                    <Link href="/community">
+                      <ChevronRight className="size-4" />
+                      Club
+                    </Link>
+                  </Button>
+                </div>
               </div>
             </div>
             <div className="flex flex-col gap-3 min-w-[220px]">
@@ -526,9 +546,14 @@ export default function Dashboard() {
                 <span>{profile?.xpToNextLevel ?? 0} XP</span>
               </div>
               <Progress value={xpProgress} className="h-2" />
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Flame className="size-4 text-primary" />
-                Streak attuale: {advancedQuery.data?.streak?.current ?? 0} giorni
+              <div className="rounded-xl border border-border/80 bg-background/60 px-3 py-2 text-xs text-muted-foreground flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Flame className="size-4 text-primary" />
+                  Streak attuale
+                </span>
+                <span className="font-semibold text-foreground">
+                  {advancedQuery.data?.streak?.current ?? 0}g
+                </span>
               </div>
             </div>
           </CardContent>
@@ -536,23 +561,33 @@ export default function Dashboard() {
 
         <div className="grid gap-6 xl:grid-cols-12">
           <div className="space-y-6 xl:col-span-7">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {stats.map((stat) => (
-                <Card key={stat.label} className="bg-card border-border">
+                <Card
+                  key={stat.label}
+                  className="min-h-[170px]"
+                >
                   <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div className={`flex size-10 items-center justify-center rounded-lg ${stat.bgColor} ${stat.color}`}>
-                        <stat.icon className="size-5" />
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div className={`flex size-11 items-center justify-center rounded-xl ${stat.bgColor} ${stat.color} shadow-[0_0_28px_var(--neon-soft)]`}>
+                            <stat.icon className="size-5" />
+                          </div>
+                          <div className="pointer-events-none absolute -inset-2 rounded-2xl bg-[radial-gradient(circle_at_center,color-mix(in_oklch,var(--electric-cyan)_22%,transparent),transparent_65%)] opacity-60 blur-md" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            {stat.label}
+                          </p>
+                          <p className="mt-1 text-2xl font-display font-bold text-foreground">{stat.value}</p>
+                        </div>
                       </div>
                       <Badge variant="neon" className="text-xs">
                         {stat.progress}%
                       </Badge>
                     </div>
-                    <div className="mt-4">
-                      <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-                      <p className="text-sm text-muted-foreground">{stat.label}</p>
-                    </div>
-                    <Progress value={stat.progress} className="mt-3 h-1.5" />
+                    <Progress value={stat.progress} className="mt-4 h-2" />
                     <p className="mt-3 text-xs text-muted-foreground">{stat.change}</p>
                   </CardContent>
                 </Card>

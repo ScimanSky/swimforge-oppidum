@@ -49,14 +49,14 @@ export default function PageBackground({ className }: { className?: string }) {
             backgroundPosition: bg.position ?? "center",
           }}
           initial={{ opacity: 0 }}
-          animate={{ opacity: 0.16 }}
+          animate={{ opacity: 0.24 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         />
       </AnimatePresence>
 
       {/* Bright "ice" wash over the image (70-80% overlay) */}
-      <div className="absolute inset-0 bg-[linear-gradient(to_bottom,color-mix(in_oklch,var(--background)_74%,transparent),color-mix(in_oklch,var(--background)_86%,transparent))]" />
+      <div className="absolute inset-0 bg-[linear-gradient(to_bottom,color-mix(in_oklch,var(--background)_62%,transparent),color-mix(in_oklch,var(--background)_78%,transparent))]" />
 
       {/* Accent glows, kept subtle to avoid harming readability */}
       <div className="absolute -top-40 -right-40 h-[520px] w-[520px] ei-blob" />

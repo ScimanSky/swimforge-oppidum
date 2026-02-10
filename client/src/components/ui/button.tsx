@@ -10,13 +10,28 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_18px_var(--neon-soft)] hover:shadow-[0_0_28px_var(--neon-glow)] hover:-translate-y-0.5 active:translate-y-0',
+          'bg-primary text-primary-foreground shadow-[0_0_22px_var(--neon-soft)] hover:shadow-[0_0_34px_var(--neon-glow)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99]',
         neon:
-          'bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime),var(--electric-coral))] text-primary-foreground shadow-[0_0_30px_var(--neon-glow)] hover:shadow-[0_0_44px_var(--neon-glow)] hover:-translate-y-0.5 active:translate-y-0',
+          [
+            'relative overflow-hidden',
+            'bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime),var(--electric-coral),var(--electric-violet))]',
+            'bg-[length:220%_220%] bg-[position:0%_50%] hover:bg-[position:100%_50%]',
+            'text-primary-foreground',
+            'shadow-[0_0_36px_var(--neon-glow)] hover:shadow-[0_0_56px_var(--neon-glow)]',
+            'hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]',
+            "before:pointer-events-none before:absolute before:inset-0 before:content-['']",
+            'before:bg-[radial-gradient(circle_at_30%_20%,color-mix(in_oklch,white_45%,transparent)_0%,transparent_55%)]',
+            'before:opacity-65 hover:before:opacity-90 before:transition-opacity before:duration-300',
+          ].join(' '),
         'outline-neon':
-          'border border-primary/55 text-foreground bg-white/10 hover:bg-white/30 shadow-[0_0_12px_var(--neon-soft)] hover:shadow-[0_0_22px_var(--neon-soft)] hover:-translate-y-0.5 active:translate-y-0',
+          [
+            'ei-border-gradient',
+            'text-foreground',
+            'shadow-[0_0_16px_var(--neon-soft)] hover:shadow-[0_0_28px_var(--neon-soft)]',
+            'hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99]',
+          ].join(' '),
         'ghost-neon':
-          'text-primary hover:bg-primary/10',
+          'text-primary hover:bg-primary/12 hover:shadow-[0_0_22px_var(--neon-soft)]',
         destructive:
           'bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
         outline:

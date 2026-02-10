@@ -7,7 +7,19 @@ function Card({ className, ...props }: React.ComponentProps<'div'>) {
     <div
       data-slot="card"
       className={cn(
-        'glass-panel text-card-foreground flex flex-col gap-6 rounded-2xl border border-white/50 py-6 shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_12%,transparent)]',
+        [
+          'group/card relative isolate overflow-hidden rounded-2xl py-6',
+          'text-card-foreground flex flex-col gap-6',
+          // Decisive surface + gradient border
+          'ei-border-gradient backdrop-blur-xl',
+          // Interactive lift
+          'transition-[transform,box-shadow] duration-200 will-change-transform',
+          'hover:-translate-y-1 hover:shadow-[0_28px_90px_color-mix(in_oklch,var(--foreground)_18%,transparent),0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_28%,transparent),0_0_46px_var(--neon-soft)]',
+          // Subtle highlight overlay
+          "before:pointer-events-none before:absolute before:inset-0 before:content-['']",
+          'before:bg-[radial-gradient(90%_70%_at_20%_0%,color-mix(in_oklch,var(--electric-cyan)_32%,transparent)_0%,transparent_65%)]',
+          'before:opacity-70 hover:before:opacity-100 before:transition-opacity before:duration-300',
+        ].join(' '),
         className,
       )}
       {...props}
