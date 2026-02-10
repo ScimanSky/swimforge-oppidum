@@ -73,7 +73,7 @@ const stats = [
 ];
 
 function FeatureCard({
-  icon: Icon,
+  icon,
   title,
   description,
   badge,
@@ -85,6 +85,7 @@ function FeatureCard({
   badge: string;
   backgroundImageSrc?: string;
 }) {
+  const Icon = icon;
   return (
     <Card className="relative overflow-hidden border-border/50 bg-card/50 backdrop-blur transition-all hover:border-primary/30 hover:shadow-md">
       {backgroundImageSrc && (
