@@ -55,6 +55,44 @@ export async function generateAIInsights(
     return [];
   }
 
+  // New users (no synced activities) shouldn't trigger AI generation/parsing noise.
+  // Provide a small set of onboarding insights (analysis + direction, no workouts).
+  if ((userData.sessions ?? 0) <= 0 || (userData.totalDistanceMeters ?? 0) <= 0) {
+    const insights = [
+      "📈 Progressione: Sei in una fase perfetta per creare una base. La cosa piu' importante adesso e' costruire regolarita' prima di inseguire la velocita'.",
+      "🔄 Recupero: Parti con calma. Sessioni leggere e costanti ti aiutano a rendere sostenibile l'abitudine senza accumulare fatica.",
+      "🏊 Tecnica: All'inizio i miglioramenti piu' rapidi arrivano dalla tecnica. Concentrarti su scivolamento e controllo del ritmo ti dara' vantaggi immediati.",
+      "💪 Intensita': Prima base, poi intensita'. Quando avrai qualche sessione registrata, potremo capire se e quando alzare il ritmo.",
+      "⚡ Efficienza: Anche a bassa intensita' puoi migliorare l'efficienza. Piccoli progressi sessione dopo sessione fanno una grande differenza nel tempo.",
+      "🎯 Obiettivi: Imposta un obiettivo semplice e misurabile (frequenza settimanale). Una volta che i dati arrivano, potremo renderlo piu' ambizioso.",
+    ];
+
+    // Cache these insights so the UI stays stable and we avoid repeated generation attempts.
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+    try {
+      await db.delete(aiInsightsCache).where(eq(aiInsightsCache.userId, userId));
+      await db.insert(aiInsightsCache).values({
+        userId,
+        insights,
+        periodDays: userData.periodDays,
+        expiresAt,
+      });
+      log.debug("[AI Insights] Cached onboarding insights (no activities yet)", {
+        event: "ai_insights:onboarding_cache_saved",
+        userId,
+      });
+    } catch (cacheError) {
+      log.debug("[AI Insights] Skipping onboarding cache save", {
+        event: "ai_insights:onboarding_cache_save_skipped",
+        userId,
+        message: cacheError instanceof Error ? cacheError.message : String(cacheError),
+      });
+    }
+
+    return insights;
+  }
+
   // 🔥 PRIORITY: Check cache FIRST (before API call)
   try {
     const cached = await db

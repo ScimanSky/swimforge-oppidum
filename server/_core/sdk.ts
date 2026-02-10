@@ -208,7 +208,8 @@ class SDKServer {
     cookieValue: string | undefined | null
   ): Promise<{ openId: string; appId: string; name: string } | null> {
     if (!cookieValue) {
-      log.warn("[Auth] Missing session cookie", {
+      // Missing cookie is expected for anonymous/public requests. Keep it out of warn-level noise.
+      log.debug("[Auth] Missing session cookie", {
         event: "auth:missing_session_cookie",
       });
       return null;

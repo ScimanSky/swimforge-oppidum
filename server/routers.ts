@@ -198,11 +198,12 @@ export const appRouter = router({
         ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
         
         return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
-      }),
+    }),
     
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      // Express deprecates passing maxAge to clearCookie; it will expire the cookie automatically.
+      ctx.res.clearCookie(COOKIE_NAME, cookieOptions);
       return { success: true } as const;
     }),
     
