@@ -32,6 +32,7 @@ import { invalidateUserCache } from "./lib/cache";
 import { checkAndAwardBadges as checkAchievementBadges } from "./badge_engine";
 import { logger } from "./middleware/logger";
 import { classifyAsyncError } from "./lib/withErrorHandling";
+import { config } from "./config";
 
 // Garmin microservice configuration
 const GARMIN_SERVICE_URL = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
@@ -91,7 +92,7 @@ async function callGarminService(
   }
 
   const url = `${GARMIN_SERVICE_URL}${endpoint}`;
-  const timeoutMs = 15000;
+  const timeoutMs = config.GARMIN_SERVICE_TIMEOUT_MS;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   
@@ -143,7 +144,7 @@ async function callGarminServiceWithUser(
   }
 
   const url = `${GARMIN_SERVICE_URL}${endpoint}`;
-  const timeoutMs = 15000;
+  const timeoutMs = config.GARMIN_SERVICE_TIMEOUT_MS;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 

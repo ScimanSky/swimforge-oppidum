@@ -9,6 +9,7 @@ import { aiCoachWorkouts } from "../drizzle/schema";
 import { eq, and, gt, desc } from "drizzle-orm";
 import { logger } from "./middleware/logger";
 import { withErrorHandling } from "./lib/withErrorHandling";
+import { config } from "./config";
 import { 
   calculateSEI, 
   calculateTCI, 
@@ -242,7 +243,13 @@ async function generateWorkout(
       const result = (await Promise.race([
         model.generateContent(prompt),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Gemini API timeout after 60s")), 60000)
+          setTimeout(
+            () =>
+              reject(
+                new Error(`Gemini API timeout after ${config.GEMINI_API_TIMEOUT_MS}ms`)
+              ),
+            config.GEMINI_API_TIMEOUT_MS
+          )
         ),
       ])) as any;
 
