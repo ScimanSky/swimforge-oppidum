@@ -19,8 +19,44 @@ import { loginLimiter, registrationLimiter } from "./middleware/security";
 import { getOrSetCached, cacheKeys, CACHE_TTL, invalidateUserCache } from "./lib/cache";
 import { addComment, getComments, getSocialFeed, setActivityShare, toggleSplash, upsertActivityPost } from "./db_social";
 import { getPendingActivityInsights, listActivityInsights, markActivityInsightSeen } from "./ai_activity_insights";
+import { logger } from "./middleware/logger";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+
+function detectImageType(buffer: Buffer): { mimeType: "image/jpeg" | "image/png" | "image/webp"; extension: "jpg" | "png" | "webp" } | null {
+  if (buffer.length < 12) return null;
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { mimeType: "image/jpeg", extension: "jpg" };
+  }
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return { mimeType: "image/png", extension: "png" };
+  }
+  // WEBP: "RIFF" .... "WEBP"
+  if (
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46 &&
+    buffer[8] === 0x57 &&
+    buffer[9] === 0x45 &&
+    buffer[10] === 0x42 &&
+    buffer[11] === 0x50
+  ) {
+    return { mimeType: "image/webp", extension: "webp" };
+  }
+  return null;
+}
 
 async function runAutoSync(userId: number, options: { force?: boolean } = {}) {
   await Promise.allSettled([
@@ -331,24 +367,79 @@ export const appRouter = router({
       .input(
         z.object({
           kind: z.enum(["avatar", "cover"]),
-          fileBase64: z.string(),
-          mimeType: z.string(),
-          extension: z.string().optional(),
+          // Base64 has ~33% overhead; enforce at input layer and re-check decoded size.
+          fileBase64: z
+            .string()
+            .min(1)
+            .max(7 * 1024 * 1024, "File troppo grande (max 5MB)")
+            .regex(/^[A-Za-z0-9+/=]+$/, "Invalid base64"),
+          mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+          extension: z.enum(["jpg", "jpeg", "png", "webp"]).optional(),
         })
       )
       .mutation(async ({ ctx, input }) => {
         const { getSupabaseAdminClient } = await import("./_core/supabase_admin");
         const admin = getSupabaseAdminClient();
-        const extension =
-          input.extension?.replace(".", "") ||
-          input.mimeType.split("/")[1] ||
-          "png";
-        const filePath = `profiles/${ctx.user.id}/${input.kind}-${Date.now()}.${extension}`;
-        const buffer = Buffer.from(input.fileBase64, "base64");
+
+        const MAX_BYTES = 5 * 1024 * 1024;
+        let buffer: Buffer;
+        try {
+          buffer = Buffer.from(input.fileBase64, "base64");
+        } catch {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid base64 payload" });
+        }
+        if (buffer.length > MAX_BYTES) {
+          throw new TRPCError({
+            code: "PAYLOAD_TOO_LARGE",
+            message: "File troppo grande (max 5MB)",
+          });
+        }
+
+        const detected = detectImageType(buffer);
+        if (!detected) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Formato immagine non supportato. Usa JPG, PNG o WEBP.",
+          });
+        }
+        if (detected.mimeType !== input.mimeType) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Il MIME type non corrisponde al contenuto del file.",
+          });
+        }
+
+        // Resize (max 1920x1080) to reduce payload + prevent huge images.
+        try {
+          const sharpMod: any = await import("sharp");
+          const sharp = sharpMod?.default ?? sharpMod;
+          const pipeline = sharp(buffer)
+            .rotate()
+            .resize({ width: 1920, height: 1080, fit: "inside", withoutEnlargement: true });
+
+          if (detected.extension === "jpg") {
+            buffer = await pipeline.jpeg({ quality: 85 }).toBuffer();
+          } else if (detected.extension === "png") {
+            buffer = await pipeline.png({ compressionLevel: 9 }).toBuffer();
+          } else {
+            buffer = await pipeline.webp({ quality: 85 }).toBuffer();
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          // Best-effort: if resize fails, upload original buffer (still size-limited above).
+          logger.warn(`uploadMedia: image resize failed: ${message}`, {
+            event: "profile:upload_resize_failed",
+            userId: ctx.user.id,
+            kind: input.kind,
+            message,
+          });
+        }
+
+        const filePath = `profiles/${ctx.user.id}/${input.kind}-${Date.now()}.${detected.extension}`;
         const { error } = await admin.storage
           .from("profile-media")
           .upload(filePath, buffer, {
-            contentType: input.mimeType,
+            contentType: detected.mimeType,
             upsert: true,
           });
         if (error) {
