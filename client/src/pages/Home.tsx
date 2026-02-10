@@ -26,24 +26,28 @@ const features = [
     description:
       "Pace, SWOLF, zone cardio e consistenza: insights chiari su ogni sessione.",
     badge: "Analisi",
+    backgroundImageSrc: "/images/detailed_stats_graph.webp",
   },
   {
     icon: Brain,
     title: "AI Coach",
     description: "Consigli personalizzati e allenamenti mirati per vasca e dryland.",
     badge: "AI",
+    backgroundImageSrc: "/images/ai_coach_digital.webp",
   },
   {
     icon: Trophy,
     title: "Badge & XP",
     description: "Sblocca traguardi, ottieni XP e scala i livelli nuotando.",
     badge: "Progressi",
+    backgroundImageSrc: "/images/awards_trophies.webp",
   },
   {
     icon: Users,
     title: "Community & Club",
     description: "Condividi sessioni, dai splash e partecipa ai club.",
     badge: "Social",
+    backgroundImageSrc: "/images/swimmers_team_community.webp",
   },
   {
     icon: Zap,
@@ -51,12 +55,14 @@ const features = [
     description:
       "Integrazione con Garmin e Strava per importare tutto in un unico profilo.",
     badge: "Integrazioni",
+    backgroundImageSrc: "/images/swimmer_smartwatch_tech.webp",
   },
   {
     icon: TrendingUp,
     title: "Progressi Chiari",
     description: "Grafici e trend per capire dove migliori e dove spingere.",
     badge: "Trend",
+    backgroundImageSrc: "/images/predictive_analytics_speed.webp",
   },
 ];
 
@@ -71,15 +77,28 @@ function FeatureCard({
   title,
   description,
   badge,
+  backgroundImageSrc,
 }: {
   icon: typeof Activity;
   title: string;
   description: string;
   badge: string;
+  backgroundImageSrc?: string;
 }) {
   return (
-    <Card className="border-border/50 bg-card/50 backdrop-blur transition-all hover:border-primary/30 hover:shadow-md">
-      <CardContent className="pt-6">
+    <Card className="relative overflow-hidden border-border/50 bg-card/50 backdrop-blur transition-all hover:border-primary/30 hover:shadow-md">
+      {backgroundImageSrc && (
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <img
+            src={backgroundImageSrc}
+            alt=""
+            className="h-full w-full object-cover opacity-15"
+            loading="lazy"
+          />
+          <div className="absolute inset-0 bg-gradient-to-br from-background/40 via-background/70 to-background/90" />
+        </div>
+      )}
+      <CardContent className="relative pt-6">
         <div className="mb-4 flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="size-6" />
         </div>
@@ -249,7 +268,16 @@ export default function Home() {
         </div>
 
         <div className="relative mx-auto max-w-7xl px-4 md:px-6">
-          <div className="grid gap-10 rounded-3xl border border-border bg-card/60 p-10 backdrop-blur lg:grid-cols-[auto_1fr]">
+          <div className="relative grid gap-10 overflow-hidden rounded-3xl border border-border bg-card/60 p-10 backdrop-blur lg:grid-cols-[auto_1fr]">
+            <div aria-hidden className="pointer-events-none absolute inset-0">
+              <img
+                src="/images/swimmer_action_hero.webp"
+                alt=""
+                className="h-full w-full object-cover opacity-10"
+                loading="lazy"
+              />
+              <div className="absolute inset-0 bg-gradient-to-br from-background/30 via-background/75 to-background/95" />
+            </div>
             <div className="flex size-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
               <Waves className="size-8" />
             </div>
