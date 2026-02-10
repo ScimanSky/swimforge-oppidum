@@ -14,14 +14,18 @@ const buttonVariants = cva(
         neon:
           [
             'relative overflow-hidden',
-            'bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime),var(--electric-coral),var(--electric-violet))]',
+            // Neon soft dark: keep accents decisive but not rainbow.
+            'bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime))]',
             'bg-[length:220%_220%] bg-[position:0%_50%] hover:bg-[position:100%_50%]',
             'text-primary-foreground',
             'shadow-[0_0_36px_var(--neon-glow)] hover:shadow-[0_0_56px_var(--neon-glow)]',
             'hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]',
             "before:pointer-events-none before:absolute before:inset-0 before:content-['']",
-            'before:bg-[radial-gradient(circle_at_30%_20%,color-mix(in_oklch,white_45%,transparent)_0%,transparent_55%)]',
-            'before:opacity-65 hover:before:opacity-90 before:transition-opacity before:duration-300',
+            'before:bg-[radial-gradient(circle_at_30%_20%,color-mix(in_oklch,white_35%,transparent)_0%,transparent_58%)]',
+            'before:opacity-60 hover:before:opacity-85 before:transition-opacity before:duration-300',
+            "after:pointer-events-none after:absolute after:inset-0 after:content-['']",
+            'after:bg-[linear-gradient(90deg,transparent,color-mix(in_oklch,white_30%,transparent),transparent)]',
+            'after:translate-x-[-120%] hover:after:translate-x-[120%] after:transition-transform after:duration-700 after:ease-out',
           ].join(' '),
         'outline-neon':
           [

@@ -223,7 +223,7 @@ export default function Challenges() {
           <div className="absolute inset-0">
             <div className="absolute inset-0 bg-[radial-gradient(70%_80%_at_20%_0%,color-mix(in_oklch,var(--electric-cyan)_38%,transparent)_0%,transparent_70%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_85%_10%,color-mix(in_oklch,var(--electric-lime)_26%,transparent)_0%,transparent_66%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_60%_90%,color-mix(in_oklch,var(--electric-coral)_18%,transparent)_0%,transparent_70%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_60%_90%,color-mix(in_oklch,var(--electric-cyan)_16%,transparent)_0%,transparent_72%)]" />
           </div>
           <CardContent className="relative p-6">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">

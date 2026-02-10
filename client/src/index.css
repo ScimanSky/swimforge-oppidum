@@ -73,51 +73,57 @@ body,
 }
 
 .dark {
-  --background: oklch(0.10 0.03 270);
-  --foreground: oklch(0.98 0 0);
-  --card: oklch(0.16 0.04 270);
-  --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.14 0.03 270);
-  --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.82 0.19 55);
-  --primary-foreground: oklch(0.12 0.03 270);
-  --secondary: oklch(0.22 0.04 270);
-  --secondary-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.20 0.03 270);
-  --muted-foreground: oklch(0.70 0.03 270);
-  --accent: oklch(0.70 0.20 320);
-  --accent-foreground: oklch(0.12 0.03 270);
-  --destructive: oklch(0.65 0.22 25);
+  /* Neon Soft Dark: deep navy charcoal, soft off-white text, cyan/lime accents. */
+  --background: oklch(0.125 0.028 255);
+  --foreground: oklch(0.94 0.016 255);
+  --card: oklch(0.165 0.028 255);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.155 0.026 255);
+  --popover-foreground: var(--foreground);
+
+  --primary: var(--electric-cyan);
+  --primary-foreground: oklch(0.105 0.024 255);
+  --secondary: oklch(0.205 0.028 255);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(0.195 0.024 255);
+  --muted-foreground: oklch(0.73 0.020 255);
+  --accent: var(--electric-lime);
+  --accent-foreground: oklch(0.105 0.024 255);
+  --destructive: var(--electric-coral);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.30 0.04 270);
-  --input: oklch(0.22 0.04 270);
-  --ring: oklch(0.82 0.19 55);
-  --chart-1: oklch(0.82 0.19 55);
-  --chart-2: oklch(0.70 0.20 320);
-  --chart-3: oklch(0.78 0.20 145);
-  --chart-4: oklch(0.82 0.20 85);
-  --chart-5: oklch(0.70 0.20 25);
-  --success: oklch(0.78 0.20 145);
-  --warning: oklch(0.82 0.20 85);
-  --danger: oklch(0.70 0.20 25);
-  --neon-glow: oklch(0.82 0.19 55 / 0.55);
-  --neon-soft: oklch(0.82 0.19 55 / 0.25);
-  --sidebar: oklch(0.10 0.03 270);
-  --sidebar-foreground: oklch(0.98 0 0);
-  --sidebar-primary: oklch(0.82 0.19 55);
-  --sidebar-primary-foreground: oklch(0.12 0.03 270);
-  --sidebar-accent: oklch(0.20 0.03 270);
-  --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.30 0.04 270);
-  --sidebar-ring: oklch(0.82 0.19 55);
-  --navy: oklch(0.10 0.03 270);
-  --navy-light: oklch(0.18 0.04 270);
-  --azure: oklch(0.78 0.17 210);
-  --gold: oklch(0.84 0.20 85);
-  --gold-light: oklch(0.90 0.20 85);
-  --badge-spotlight: oklch(0.20 0.05 55 / 0.5);
-  --badge-ring: oklch(0.35 0.05 270 / 0.4);
-  --badge-shadow: oklch(0.55 0.12 270 / 0.4);
+  --border: oklch(0.30 0.030 255);
+  --input: oklch(0.215 0.028 255);
+  --ring: var(--electric-cyan);
+
+  --chart-1: var(--electric-cyan);
+  --chart-2: var(--electric-lime);
+  --chart-3: oklch(0.82 0.120 225);
+  --chart-4: oklch(0.84 0.140 85);
+  --chart-5: var(--electric-coral);
+
+  --success: var(--electric-lime);
+  --warning: oklch(0.84 0.140 85);
+  --danger: var(--electric-coral);
+
+  --neon-glow: oklch(0.84 0.190 205 / 0.62);
+  --neon-soft: oklch(0.84 0.190 205 / 0.26);
+
+  --sidebar: oklch(0.115 0.026 255);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--electric-cyan);
+  --sidebar-primary-foreground: oklch(0.105 0.024 255);
+  --sidebar-accent: oklch(0.185 0.024 255);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: oklch(0.28 0.030 255);
+  --sidebar-ring: var(--electric-cyan);
+  --navy: oklch(0.115 0.026 255);
+  --navy-light: oklch(0.175 0.028 255);
+  --azure: var(--electric-cyan);
+  --gold: oklch(0.84 0.140 85);
+  --gold-light: oklch(0.90 0.120 85);
+  --badge-spotlight: oklch(0.84 0.190 205 / 0.22);
+  --badge-ring: oklch(0.34 0.030 255 / 0.55);
+  --badge-shadow: oklch(0.60 0.080 255 / 0.30);
 }
 
 @theme inline {
@@ -212,8 +218,7 @@ body,
     background: linear-gradient(
       135deg,
       var(--electric-cyan),
-      var(--electric-lime) 55%,
-      var(--electric-coral)
+      var(--electric-lime) 80%
     );
     -webkit-background-clip: text;
     color: transparent;
@@ -224,7 +229,7 @@ body,
       135deg,
       color-mix(in oklch, var(--card) 72%, transparent),
       color-mix(in oklch, var(--electric-cyan) 14%, transparent) 46%,
-      color-mix(in oklch, var(--electric-violet) 10%, transparent) 70%,
+      color-mix(in oklch, var(--electric-lime) 10%, transparent) 72%,
       color-mix(in oklch, var(--card) 68%, transparent)
     );
     border: 1px solid color-mix(in oklch, var(--border) 82%, transparent);
@@ -246,9 +251,7 @@ body,
       linear-gradient(
         135deg,
         var(--electric-cyan),
-        var(--electric-lime),
-        var(--electric-coral),
-        var(--electric-violet)
+        var(--electric-lime)
       )
         border-box;
     border: 1px solid transparent;
