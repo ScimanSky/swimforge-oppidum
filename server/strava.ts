@@ -128,6 +128,13 @@ async function callStravaService(
 /**
  * Get Strava connection status for a user
  */
+/**
+ * Returns current Strava connection status for a user.
+ *
+ * This reads stored OAuth tokens from the database and may refresh tokens if expired.
+ *
+ * @param userId - SwimForge user id.
+ */
 export async function getStravaStatus(userId: number): Promise<{
   connected: boolean;
   athleteId?: number;
@@ -193,6 +200,12 @@ export async function getStravaStatus(userId: number): Promise<{
 /**
  * Generate Strava OAuth authorization URL
  */
+/**
+ * Generates the Strava OAuth authorization URL via the Strava microservice.
+ *
+ * @param userId - SwimForge user id.
+ * @returns Authorization URL to redirect the user to.
+ */
 export async function getStravaAuthorizeUrl(userId: number): Promise<string> {
   try {
     const response: StravaServiceResponse = await callStravaService(
@@ -215,6 +228,12 @@ export async function getStravaAuthorizeUrl(userId: number): Promise<string> {
 
 /**
  * Exchange authorization code for access token
+ */
+/**
+ * Exchanges an OAuth code for Strava access/refresh tokens via microservice and stores them.
+ *
+ * @param userId - SwimForge user id.
+ * @param code - OAuth authorization code from Strava.
  */
 export async function exchangeStravaToken(
   userId: number,
@@ -299,6 +318,12 @@ export async function exchangeStravaToken(
 /**
  * Refresh Strava access token
  */
+/**
+ * Refreshes an expired Strava access token using the stored refresh token.
+ *
+ * @param userId - SwimForge user id.
+ * @returns `true` if refresh succeeded and tokens were updated.
+ */
 export async function refreshStravaToken(userId: number): Promise<boolean> {
   const db = await requireDb();
   
@@ -350,6 +375,12 @@ export async function refreshStravaToken(userId: number): Promise<boolean> {
 
 /**
  * Sync swimming activities from Strava
+ */
+/**
+ * Imports recent swimming activities for the given user from Strava via microservice.
+ *
+ * @param userId - SwimForge user id.
+ * @param daysBack - How many days back to fetch (default 30).
  */
 export async function syncStravaActivities(
   userId: number,
@@ -622,6 +653,11 @@ async function updateActiveChallengesProgress(userId: number): Promise<void> {
 /**
  * Disconnect Strava account
  */
+/**
+ * Disconnects Strava for the user by deleting tokens and updating the profile flag.
+ *
+ * @param userId - SwimForge user id.
+ */
 export async function disconnectStrava(userId: number): Promise<boolean> {
   const db = await requireDb();
   
@@ -647,6 +683,12 @@ export async function disconnectStrava(userId: number): Promise<boolean> {
 
 /**
  * Auto-sync Strava activities on login (if last sync > 6 hours ago)
+ */
+/**
+ * Runs an automatic Strava sync if the last sync is older than the configured interval.
+ *
+ * @param userId - SwimForge user id.
+ * @param options - Pass `force: true` to bypass the interval check.
  */
 export async function autoSyncStrava(
   userId: number,

@@ -127,3 +127,6 @@ assets/coach_drafts/
 # Local-only PDFs
 
 package-lock.json
+
+# Generated API docs
+docs/api/

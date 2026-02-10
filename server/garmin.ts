@@ -573,7 +573,11 @@ export async function persistGarminLapDetails(
 }
 
 /**
- * Get Garmin connection status for a user
+ * Returns Garmin connection status for a user.
+ *
+ * Reads local tokens from the DB and, when available, enriches status via the Garmin microservice.
+ *
+ * @param userId - SwimForge user id.
  */
 export async function getGarminStatus(userId: number): Promise<{
   connected: boolean;
@@ -905,7 +909,11 @@ function calculateActivityXp(activity: GarminServiceActivity): number {
 }
 
 /**
- * Sync swimming activities from Garmin Connect via microservice
+ * Syncs swimming activities from Garmin Connect via the Garmin microservice.
+ *
+ * @param userId - SwimForge user id.
+ * @param daysBack - How many days back to fetch (default 30).
+ * @returns Number of activities synced and newly earned XP.
  */
 export async function syncGarminActivities(
   userId: number,
