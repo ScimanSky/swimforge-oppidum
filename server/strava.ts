@@ -22,13 +22,13 @@ import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
 import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
 import { invalidateUserCache } from "./lib/cache";
+import { logger } from "./middleware/logger";
+import { config } from "./config";
+import { fetchWithTimeout } from "./lib/fetchWithTimeout";
 
 // Strava microservice configuration
 const STRAVA_SERVICE_URL = process.env.STRAVA_SERVICE_URL || "https://swimforge-strava-service.onrender.com";
 const STRAVA_SERVICE_SECRET = process.env.STRAVA_SERVICE_SECRET;
-if (!STRAVA_SERVICE_SECRET) {
-  throw new Error("STRAVA_SERVICE_SECRET is required");
-}
 
 interface StravaServiceActivity {
   activity_id: string;
@@ -69,17 +69,26 @@ async function callStravaService(
   method: "GET" | "POST" = "POST",
   body?: object
 ): Promise<any> {
+  if (!STRAVA_SERVICE_SECRET) {
+    throw new Error("Strava service not configured (missing STRAVA_SERVICE_SECRET)");
+  }
+
   const url = `${STRAVA_SERVICE_URL}${endpoint}`;
   
   try {
-    const response = await fetch(url, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        "X-Service-Secret": STRAVA_SERVICE_SECRET,
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Service-Secret": STRAVA_SERVICE_SECRET,
+        },
+        body: body ? JSON.stringify(body) : undefined,
       },
-      body: body ? JSON.stringify(body) : undefined,
-    });
+      config.EXTERNAL_API_TIMEOUT_MS,
+      `strava:service ${method} ${endpoint}`,
+    );
 
     const data = await response.json().catch(() => ({ error: "Unknown error" }));
 
@@ -89,7 +98,13 @@ async function callStravaService(
 
     return data;
   } catch (error: any) {
-    console.error(`[Strava Service] Error calling ${endpoint}:`, error.message);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`[Strava Service] Error calling ${endpoint}: ${message}`, {
+      event: "strava:service_error",
+      endpoint,
+      method,
+      message,
+    });
     throw error;
   }
 }

@@ -33,6 +33,7 @@ import { checkAndAwardBadges as checkAchievementBadges } from "./badge_engine";
 import { logger } from "./middleware/logger";
 import { classifyAsyncError } from "./lib/withErrorHandling";
 import { config } from "./config";
+import { fetchWithTimeout } from "./lib/fetchWithTimeout";
 
 // Garmin microservice configuration
 const GARMIN_SERVICE_URL = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
@@ -93,19 +94,21 @@ async function callGarminService(
 
   const url = `${GARMIN_SERVICE_URL}${endpoint}`;
   const timeoutMs = config.GARMIN_SERVICE_TIMEOUT_MS;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(
+      url,
+      {
       method,
       headers: {
         "Content-Type": "application/json",
         "X-API-Key": GARMIN_SERVICE_SECRET,
       },
       body: body ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
-    });
+      },
+      timeoutMs,
+      `garmin:service ${method} ${endpoint}`,
+    );
 
     const data = await response.json().catch(() => ({ detail: "Unknown error" }));
 
@@ -128,8 +131,6 @@ async function callGarminService(
       throw new Error(`Garmin service timeout after ${timeoutMs}ms`);
     }
     throw error;
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
@@ -145,11 +146,11 @@ async function callGarminServiceWithUser(
 
   const url = `${GARMIN_SERVICE_URL}${endpoint}`;
   const timeoutMs = config.GARMIN_SERVICE_TIMEOUT_MS;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(
+      url,
+      {
       method,
       headers: {
         "Content-Type": "application/json",
@@ -157,8 +158,10 @@ async function callGarminServiceWithUser(
         "user-id": userId.toString(),
       },
       body: body ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
-    });
+      },
+      timeoutMs,
+      `garmin:service user=${userId} ${method} ${endpoint}`,
+    );
 
     const data = await response.json().catch(() => ({ detail: "Unknown error" }));
 
@@ -182,8 +185,6 @@ async function callGarminServiceWithUser(
       throw new Error(`Garmin service timeout after ${timeoutMs}ms`);
     }
     throw error;
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
@@ -1670,14 +1671,16 @@ export async function migrateHrZones(userId: number): Promise<{
     for (const activity of activitiesWithoutHR) {
       try {
         // Call Garmin Service to get HR zones data
-        const response = await fetch(
+        const response = await fetchWithTimeout(
           `${GARMIN_SERVICE_URL}/activity/${activity.garminActivityId}/hr-zones`,
           {
             headers: {
               "user-id": userId.toString(),
               "X-API-Key": GARMIN_SERVICE_SECRET,
             },
-          }
+          },
+          config.GARMIN_SERVICE_TIMEOUT_MS,
+          `garmin:hr_zones activity=${activity.garminActivityId}`,
         );
 
         if (!response.ok) {
@@ -1699,14 +1702,16 @@ export async function migrateHrZones(userId: number): Promise<{
         // Fetch activity details (including SWOLF)
         let swolfScore = activity.avgSwolf; // Keep existing value if fetch fails
         try {
-          const detailsResponse = await fetch(
+          const detailsResponse = await fetchWithTimeout(
             `${GARMIN_SERVICE_URL}/activity/${activity.garminActivityId}/details`,
             {
               headers: {
                 "user-id": userId.toString(),
                 "X-API-Key": GARMIN_SERVICE_SECRET,
               },
-            }
+            },
+            config.GARMIN_SERVICE_TIMEOUT_MS,
+            `garmin:details activity=${activity.garminActivityId}`,
           );
           
           if (detailsResponse.ok) {

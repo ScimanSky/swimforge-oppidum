@@ -9,7 +9,7 @@ import { z } from "zod";
 const configSchema = z.object({
   GEMINI_API_TIMEOUT_MS: z.coerce.number().int().positive().catch(60_000),
   GARMIN_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().catch(15_000),
+  EXTERNAL_API_TIMEOUT_MS: z.coerce.number().int().positive().catch(30_000),
 });
 
 export const config = configSchema.parse(process.env);
-
