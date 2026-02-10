@@ -35,6 +35,7 @@ import {
   ChevronRight,
   Zap,
 } from "lucide-react"
+import { Link } from "wouter"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
 import GhostTrackTab from "@/components/ghost-track/GhostTrackTab"
@@ -488,9 +489,11 @@ export default function Challenges() {
                           </div>
 
                           <div className="mt-4 flex flex-wrap gap-2">
-                            <Button variant="outline-neon" size="sm" className="gap-2">
-                              View Details
-                              <ChevronRight className="h-4 w-4" />
+                            <Button variant="outline-neon" size="sm" className="gap-2" asChild>
+                              <Link href={`/challenges/${challenge.id}`}>
+                                Dettagli
+                                <ChevronRight className="h-4 w-4" />
+                              </Link>
                             </Button>
                             <Button
                               variant="ghost-neon"
