@@ -21,30 +21,86 @@ import { classifyAsyncError } from "./lib/withErrorHandling";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: Pool | null = null;
+let _dbInitPromise: Promise<ReturnType<typeof drizzle> | null> | null = null;
+let _dbCircuitOpenUntil = 0;
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
-    try {
-      _pool = new Pool({
-        connectionString: process.env.DATABASE_URL,
-        ssl: { rejectUnauthorized: false },
-        max: 10,
-        min: 1,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 10000,
-      });
-      _db = drizzle(_pool);
-    } catch (error) {
-      const { kind, message } = classifyAsyncError(error);
-      logger.warn(`[Database] Failed to connect (${kind}): ${message}`, {
-        event: "db:connect_failed",
-        kind,
-        message,
-      });
-      _db = null;
-    }
+  if (_db) return _db;
+  if (!process.env.DATABASE_URL) return null;
+
+  const now = Date.now();
+  if (_dbCircuitOpenUntil && now < _dbCircuitOpenUntil) {
+    return null;
   }
-  return _db;
+
+  // De-dupe concurrent initializations.
+  if (_dbInitPromise) return _dbInitPromise;
+
+  const MAX_RETRIES = 3;
+  const BASE_DELAY_MS = 1000;
+  const CIRCUIT_BREAKER_MS = 30_000;
+
+  _dbInitPromise = (async () => {
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
+      let pool: Pool | null = null;
+      try {
+        pool = new Pool({
+          connectionString: process.env.DATABASE_URL,
+          ssl: { rejectUnauthorized: false },
+          max: 10,
+          min: 1,
+          idleTimeoutMillis: 30_000,
+          connectionTimeoutMillis: 5_000,
+        });
+
+        // Test connection early to fail fast and avoid half-initialized clients.
+        await pool.query("SELECT 1");
+
+        _pool = pool;
+        _db = drizzle(_pool);
+        _dbCircuitOpenUntil = 0;
+        logger.info("[Database] Connected", { event: "db:connected" });
+        return _db;
+      } catch (error) {
+        const { kind, message } = classifyAsyncError(error);
+        const retryInMs = BASE_DELAY_MS * attempt;
+        logger.warn(`[Database] Connection attempt ${attempt}/${MAX_RETRIES} failed (${kind}): ${message}`, {
+          event: "db:connect_retry",
+          attempt,
+          maxRetries: MAX_RETRIES,
+          retryInMs,
+          kind,
+          message,
+        });
+
+        if (pool) {
+          try {
+            await pool.end();
+          } catch {
+            // ignore
+          }
+        }
+
+        if (attempt >= MAX_RETRIES) {
+          _dbCircuitOpenUntil = Date.now() + CIRCUIT_BREAKER_MS;
+          logger.error("[Database] Max retries reached; opening circuit breaker", {
+            event: "db:connect_circuit_open",
+            circuitMs: CIRCUIT_BREAKER_MS,
+          });
+          return null;
+        }
+
+        await new Promise((r) => setTimeout(r, retryInMs));
+      }
+    }
+
+    return null;
+  })()
+    .finally(() => {
+      _dbInitPromise = null;
+    });
+
+  return _dbInitPromise;
 }
 
 // ============================================
