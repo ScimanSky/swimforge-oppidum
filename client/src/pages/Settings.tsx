@@ -3,7 +3,7 @@
 import AppLayout from "@/components/AppLayout"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -619,7 +619,7 @@ export default function Settings() {
       </div>
 
       {onboarding && (
-        <Card className="bg-card border-border">
+        <section className="surface-panel">
           <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <p className="font-medium text-foreground">Benvenuto su SwimForge</p>
@@ -652,13 +652,13 @@ export default function Settings() {
               </Button>
             </div>
           </CardContent>
-        </Card>
+        </section>
       )}
 
       <Tabs value={activeTab} onValueChange={updateTabInUrl}>
         <div className="grid gap-6 xl:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]">
           <div className="xl:sticky xl:top-24 h-fit">
-            <Card className="bg-card border-border glass-panel">
+            <section className="surface-panel glass-panel">
               <CardHeader>
                 <CardTitle className="font-display text-base">Sezioni</CardTitle>
                 <CardDescription>Scegli l&apos;area da aggiornare</CardDescription>
@@ -687,13 +687,13 @@ export default function Settings() {
                   </TabsTrigger>
                 </TabsList>
               </CardContent>
-            </Card>
+            </section>
           </div>
 
           <div className="min-w-0">
             {/* Profile Tab */}
             <TabsContent value="profile" className="space-y-6">
-          <Card className="bg-card border-border">
+          <section className="surface-panel">
             <CardHeader>
               <CardTitle className="font-display">Informazioni Profilo</CardTitle>
               <CardDescription>Aggiorna le informazioni del tuo profilo pubblico</CardDescription>
@@ -871,10 +871,10 @@ export default function Settings() {
                 {updateProfileMutation.isPending ? "Salvataggio..." : "Salva Modifiche"}
               </Button>
             </CardContent>
-          </Card>
+          </section>
 
           {/* Swimming Profile */}
-          <Card className="bg-card border-border">
+          <section className="surface-panel">
             <CardHeader>
               <CardTitle className="font-display">Profilo Nuotatore</CardTitle>
               <CardDescription>Informazioni specifiche per il nuoto</CardDescription>
@@ -943,12 +943,12 @@ export default function Settings() {
                 {updateProfileMutation.isPending ? "Salvataggio..." : "Salva Profilo Nuotatore"}
               </Button>
             </CardContent>
-          </Card>
+          </section>
         </TabsContent>
 
         {/* Connections Tab */}
         <TabsContent value="connections" className="space-y-4">
-          <Card className="bg-card border-border">
+          <section className="surface-panel">
             <CardHeader>
               <CardTitle className="font-display">Account Collegati</CardTitle>
               <CardDescription>
@@ -1016,14 +1016,14 @@ export default function Settings() {
                 </div>
               ))}
             </CardContent>
-          </Card>
+          </section>
 
           <GarminSection garminConnected={garminStatus?.connected ?? false} />
         </TabsContent>
 
         {/* Notifications Tab */}
         <TabsContent value="notifications">
-          <Card className="bg-card border-border">
+          <section className="surface-panel">
             <CardHeader>
               <CardTitle className="font-display">Preferenze Notifiche</CardTitle>
               <CardDescription>Scegli quali notifiche ricevere</CardDescription>
@@ -1045,12 +1045,12 @@ export default function Settings() {
                 </div>
               ))}
             </CardContent>
-          </Card>
+          </section>
         </TabsContent>
 
         {/* Preferences Tab */}
         <TabsContent value="preferences" className="space-y-4">
-          <Card className="bg-card border-border">
+          <section className="surface-panel">
             <CardHeader>
               <CardTitle className="font-display">Unita di Misura</CardTitle>
             </CardHeader>
@@ -1100,9 +1100,9 @@ export default function Settings() {
                 </Select>
               </div>
             </CardContent>
-          </Card>
+          </section>
 
-          <Card className="bg-card border-border">
+          <section className="surface-panel">
             <CardHeader>
               <CardTitle className="font-display">Lingua e Regione</CardTitle>
             </CardHeader>
@@ -1153,12 +1153,12 @@ export default function Settings() {
                 </Select>
               </div>
             </CardContent>
-          </Card>
+          </section>
         </TabsContent>
 
         {/* Privacy Tab */}
         <TabsContent value="privacy" className="space-y-4">
-          <Card className="bg-card border-border">
+          <section className="surface-panel">
             <CardHeader>
               <CardTitle className="font-display">Privacy Profilo</CardTitle>
             </CardHeader>
@@ -1212,9 +1212,9 @@ export default function Settings() {
                 />
               </div>
             </CardContent>
-          </Card>
+          </section>
 
-          <Card className="bg-card border-border border-destructive/50">
+          <section className="surface-panel border-destructive/50">
             <CardHeader>
               <CardTitle className="font-display text-destructive">Zona Pericolosa</CardTitle>
             </CardHeader>
@@ -1256,7 +1256,7 @@ export default function Settings() {
                 </Button>
               </div>
             </CardContent>
-          </Card>
+          </section>
         </TabsContent>
           </div>
         </div>

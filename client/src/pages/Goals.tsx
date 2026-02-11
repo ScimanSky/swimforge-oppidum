@@ -3,7 +3,7 @@
 import AppLayout from "@/components/AppLayout"
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Progress } from "@/components/ui/progress"
@@ -586,18 +586,18 @@ export default function Goals() {
         {/* Active Goals */}
         <div className="grid gap-6">
           {allActiveGoals.length === 0 ? (
-            <Card className="bg-card border-border">
+            <section className="surface-panel">
               <CardContent className="p-6 text-sm text-muted-foreground">
                 Nessun obiettivo creato. Usa “Crea obiettivo” o aggiungi un suggerimento.
               </CardContent>
-            </Card>
+            </section>
           ) : (
             allActiveGoals.map((goal) => {
               const Icon = categoryIcons[goal.category] || Target
               const colorClass = categoryColors[goal.category] || "text-primary bg-primary/10"
               const isCustom = customGoals.some((item) => item.id === goal.id)
               return (
-                <Card key={goal.id} className="bg-card border-border">
+                <section key={goal.id} className="surface-panel">
                   <CardContent className="p-6">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-6">
                       <div className="flex-1">
@@ -703,7 +703,7 @@ export default function Goals() {
                       </div>
                     </div>
                   </CardContent>
-                </Card>
+                </section>
               )
             })
           )}
@@ -711,7 +711,7 @@ export default function Goals() {
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Completed Goals */}
-          <Card className="bg-card border-border">
+          <section className="surface-panel">
             <CardHeader>
               <CardTitle className="text-lg font-display font-bold text-foreground">
                 Obiettivi Completati
@@ -734,10 +734,10 @@ export default function Goals() {
                 </div>
               ))}
             </CardContent>
-          </Card>
+          </section>
 
           {/* Suggested Goals */}
-          <Card className="bg-card border-border">
+          <section className="surface-panel">
             <CardHeader>
               <CardTitle className="text-lg font-display font-bold text-foreground">
                 Obiettivi Suggeriti
@@ -759,7 +759,7 @@ export default function Goals() {
                 )
               })}
             </CardContent>
-          </Card>
+          </section>
         </div>
       </div>
     </AppLayout>

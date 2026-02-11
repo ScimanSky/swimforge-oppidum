@@ -20,7 +20,7 @@ import { motion } from "framer-motion";
 import { metricsDefinitions } from "@/data/metricsDefinitions";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Link } from "wouter";
 
@@ -425,7 +425,7 @@ export default function Statistics() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
             >
-              <Card className="bg-card/80 border-border/60 shadow-sm">
+              <section className="surface-panel">
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -482,7 +482,7 @@ export default function Statistics() {
                     </p>
                   )}
                 </CardContent>
-              </Card>
+              </section>
             </motion.section>
               </AccordionContent>
             </AccordionItem>
@@ -499,7 +499,7 @@ export default function Statistics() {
             >
               {/* HR Zones */}
               {hrZonesData.length > 0 && (
-                <Card className="bg-card/80 border-border/60 shadow-sm">
+                <section className="surface-panel">
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -559,12 +559,12 @@ export default function Statistics() {
                       </div>
                     </div>
                   </CardContent>
-                </Card>
+                </section>
               )}
 
               {/* Pace Distribution */}
               {performance && performance.paceDistribution.length > 0 && (
-                <Card className="bg-card/80 border-border/60 shadow-sm">
+                <section className="surface-panel">
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -599,13 +599,13 @@ export default function Statistics() {
                       </BarChart>
                     </ResponsiveContainer>
                   </CardContent>
-                </Card>
+                </section>
               )}
 
               {/* Calories & SWOLF */}
               {performance && (
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <Card className="bg-card/80 border-border/60 shadow-sm">
+                  <section className="surface-panel">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">Calorie totali</CardTitle>
                       <CardDescription>Energia spesa nel periodo</CardDescription>
@@ -618,9 +618,9 @@ export default function Statistics() {
                         Media: {performance.avgCaloriesPerSession}/sessione
                       </div>
                     </CardContent>
-                  </Card>
+                  </section>
                   {performance.swolfAvg && (
-                    <Card className="bg-card/80 border-border/60 shadow-sm">
+                    <section className="surface-panel">
                       <CardHeader className="pb-2">
                         <CardTitle className="text-base">SWOLF medio</CardTitle>
                         <CardDescription>Efficienza nuotata</CardDescription>
@@ -633,7 +633,7 @@ export default function Statistics() {
                           Valore più basso = migliore efficienza
                         </div>
                       </CardContent>
-                    </Card>
+                    </section>
                   )}
                 </div>
               )}
@@ -725,7 +725,7 @@ export default function Statistics() {
 
                 {/* Predictions */}
                 {advanced.predictions && (
-                  <Card className="bg-card/80 border-border/60 shadow-sm">
+                  <section className="surface-panel">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-base">Previsioni</CardTitle>
                       <CardDescription>Stima di obiettivi al ritmo attuale.</CardDescription>
@@ -745,7 +745,7 @@ export default function Statistics() {
                         ({advanced.predictions.daysRemaining} giorni rimasti)
                       </p>
                     </CardContent>
-                  </Card>
+                  </section>
                 )}
               </motion.section>
                 </AccordionContent>
