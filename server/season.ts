@@ -789,18 +789,37 @@ export async function getSeasonLeaderboard(limit = 20) {
   const database = await getDb();
   if (!database) return [];
 
-  const seasonXpExpr = sql<number>`
+  const seasonTxXpExpr = sql<number>`
     coalesce(
-      sum(
-        case
-          when ${xpTransactions.createdAt} >= ${season.startAt}
-           and ${xpTransactions.createdAt} <= ${season.endAt}
-          then ${xpTransactions.amount}
-          else 0
-        end
+      (
+        select sum(${xpTransactions.amount})
+        from ${xpTransactions}
+        where ${xpTransactions.userId} = ${swimmerProfiles.userId}
+          and ${xpTransactions.createdAt} >= ${season.startAt}
+          and ${xpTransactions.createdAt} <= ${season.endAt}
       ),
       0
     )
+  `;
+
+  const seasonActivityXpExpr = sql<number>`
+    coalesce(
+      (
+        select sum(${swimmingActivities.xpEarned})
+        from ${swimmingActivities}
+        where ${swimmingActivities.userId} = ${swimmerProfiles.userId}
+          and ${swimmingActivities.activityDate} >= ${season.startAt}
+          and ${swimmingActivities.activityDate} <= ${season.endAt}
+      ),
+      0
+    )
+  `;
+
+  const seasonXpExpr = sql<number>`
+    case
+      when ${seasonTxXpExpr} > 0 then ${seasonTxXpExpr}
+      else ${seasonActivityXpExpr}
+    end
   `;
 
   const rows = await database
@@ -814,8 +833,6 @@ export async function getSeasonLeaderboard(limit = 20) {
     })
     .from(swimmerProfiles)
     .innerJoin(users, eq(users.id, swimmerProfiles.userId))
-    .leftJoin(xpTransactions, eq(xpTransactions.userId, swimmerProfiles.userId))
-    .groupBy(swimmerProfiles.userId, users.id)
     .orderBy(desc(seasonXpExpr), desc(swimmerProfiles.totalXp))
     .limit(safeLimit);
 
