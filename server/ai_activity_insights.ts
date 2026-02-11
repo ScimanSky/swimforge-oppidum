@@ -6,6 +6,9 @@ import { logger } from "./middleware/logger";
 
 let genAI: GoogleGenerativeAI | null = null;
 const log = logger.child({ component: "ai_activity_insights" });
+const inFlightActivityInsightKeys = new Set<string>();
+const userBackgroundGenerationThrottle = new Map<number, number>();
+const BACKGROUND_THROTTLE_MS = 15_000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -236,14 +239,19 @@ export async function getPendingActivityInsights(userId: number, limit = 3) {
   // Schedule background generation (fire-and-forget) for missing insights
   // This does NOT block the response
   const remaining = limit - pending.length;
-  generateMissingInsightsBackground(userId, remaining).catch((err) => {
-    log.error("[AI Insights] Background generation failed", {
-      event: "ai_activity_insights:background_failed",
-      userId,
-      message: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined,
+  const now = Date.now();
+  const lastScheduledAt = userBackgroundGenerationThrottle.get(userId) ?? 0;
+  if (now - lastScheduledAt >= BACKGROUND_THROTTLE_MS) {
+    userBackgroundGenerationThrottle.set(userId, now);
+    generateMissingInsightsBackground(userId, remaining).catch((err) => {
+      log.error("[AI Insights] Background generation failed", {
+        event: "ai_activity_insights:background_failed",
+        userId,
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
     });
-  });
+  }
 
   // Return what we have now (user gets fast response)
   return pending;
@@ -264,26 +272,44 @@ async function generateMissingInsightsBackground(userId: number, limit: number) 
   `);
 
   for (const row of activities.rows as any[]) {
+    const activityId = Number(row.id);
+    if (!Number.isFinite(activityId)) continue;
+    const inFlightKey = `${userId}:${activityId}`;
+    if (inFlightActivityInsightKeys.has(inFlightKey)) continue;
+
+    inFlightActivityInsightKeys.add(inFlightKey);
     try {
+      const alreadyExists = await db
+        .select({ id: activityAiInsights.id })
+        .from(activityAiInsights)
+        .where(eq(activityAiInsights.activityId, activityId))
+        .limit(1);
+      if (alreadyExists.length > 0) continue;
+
       const insight = await generateActivityInsight(row);
       if (!insight) continue;
-      await db.insert(activityAiInsights).values({
-        userId,
-        activityId: row.id,
-        title: insight.title,
-        summary: insight.summary,
-        bullets: insight.bullets,
-        tags: insight.tags,
-        generatedAt: new Date(),
-      });
+      await db
+        .insert(activityAiInsights)
+        .values({
+          userId,
+          activityId,
+          title: insight.title,
+          summary: insight.summary,
+          bullets: insight.bullets,
+          tags: insight.tags,
+          generatedAt: new Date(),
+        })
+        .onConflictDoNothing({ target: activityAiInsights.activityId });
     } catch (err) {
       log.error("[AI Insights] Failed to generate insight for activity", {
         event: "ai_activity_insights:generate_failed",
         userId,
-        activityId: row.id,
+        activityId,
         message: err instanceof Error ? err.message : String(err),
         stack: err instanceof Error ? err.stack : undefined,
       });
+    } finally {
+      inFlightActivityInsightKeys.delete(inFlightKey);
     }
   }
 }
