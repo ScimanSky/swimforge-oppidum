@@ -6,6 +6,7 @@ import { Link } from "wouter"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
@@ -138,6 +139,46 @@ export default function Community() {
 
   const feedItems = useMemo(() => (feedQuery.data as any[]) || [], [feedQuery.data])
   const clubs = useMemo(() => (clubsQuery.data as any[]) || [], [clubsQuery.data])
+  const communityOrbs = useMemo(() => {
+    const totalMembers = clubs.reduce((sum, club) => sum + Number(club.member_count || 0), 0)
+    const totalSplashes = feedItems.reduce((sum, post) => sum + Number(post.splash_count || 0), 0)
+    const totalComments = feedItems.reduce((sum, post) => sum + Number(post.comment_count || 0), 0)
+
+    return [
+      {
+        label: "Post nel feed",
+        value: feedItems.length,
+        progress: Math.min(100, Math.round((feedItems.length / 20) * 100)),
+        helper: "Ultimo caricamento",
+        icon: <MessageCircle className="size-4" />,
+        tone: "cyan" as const,
+      },
+      {
+        label: "Club visibili",
+        value: clubs.length,
+        progress: Math.min(100, Math.round((clubs.length / 12) * 100)),
+        helper: clubScope === "mine" ? "Solo i tuoi club" : "Tutti i club",
+        icon: <Users className="size-4" />,
+        tone: "lime" as const,
+      },
+      {
+        label: "Membri attivi",
+        value: totalMembers.toLocaleString(),
+        progress: Math.min(100, Math.round((totalMembers / 500) * 100)),
+        helper: "Somma club in vista",
+        icon: <Sparkles className="size-4" />,
+        tone: "amber" as const,
+      },
+      {
+        label: "Interazioni",
+        value: totalSplashes + totalComments,
+        progress: Math.min(100, Math.round(((totalSplashes + totalComments) / 150) * 100)),
+        helper: `${totalSplashes} splash • ${totalComments} commenti`,
+        icon: <Droplet className="size-4" />,
+        tone: "sky" as const,
+      },
+    ]
+  }, [clubs, feedItems, clubScope])
 
   const submitComment = (postId: number) => {
     const content = (commentTextByPost[postId] ?? "").trim()
@@ -559,7 +600,7 @@ export default function Community() {
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_60%_90%,color-mix(in_oklch,var(--electric-cyan)_16%,transparent)_0%,transparent_72%)]" />
           </div>
           <CardContent className="relative p-6">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-5">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-background/60 px-3 py-1 text-xs text-muted-foreground">
                   <Sparkles className="size-4 text-primary" />
@@ -570,7 +611,21 @@ export default function Community() {
                   Feed globale, club e conversazioni. Tutto in un’unica plancia.
                 </p>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {communityOrbs.map((item) => (
+                  <MetricOrb
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    progress={item.progress}
+                    helper={item.helper}
+                    icon={item.icon}
+                    tone={item.tone}
+                    size="sm"
+                  />
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                 {createClubDialog}
                 <Button variant="outline-neon" asChild>
                   <Link href="/leaderboard">Leaderboard</Link>

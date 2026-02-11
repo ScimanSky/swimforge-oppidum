@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Progress } from "@/components/ui/progress"
 import {
   Dialog,
@@ -233,6 +234,46 @@ export default function Goals() {
   const allActiveGoals = useMemo(() => {
     return [...customGoals]
   }, [customGoals])
+  const goalsOrbs = useMemo(() => {
+    const xpGoal = activeGoals.find((goal) => goal.id === "xp")
+    const distanceGoal = activeGoals.find((goal) => goal.id === "weekly-distance")
+    const frequencyGoal = activeGoals.find((goal) => goal.id === "weekly-sessions")
+
+    return [
+      {
+        label: "XP livello",
+        value: xpGoal ? `${Math.round(xpGoal.progress)}%` : "0%",
+        progress: xpGoal?.progress ?? 0,
+        helper: xpGoal ? `${xpGoal.currentValue}/${xpGoal.targetValue} XP` : "N/D",
+        icon: <Zap className="size-4" />,
+        tone: "cyan" as const,
+      },
+      {
+        label: "Distanza settimana",
+        value: distanceGoal ? `${distanceGoal.currentValue} km` : "0 km",
+        progress: distanceGoal?.progress ?? 0,
+        helper: distanceGoal ? `Target ${distanceGoal.targetValue} km` : "N/D",
+        icon: <Waves className="size-4" />,
+        tone: "lime" as const,
+      },
+      {
+        label: "Frequenza",
+        value: frequencyGoal ? `${frequencyGoal.currentValue} sedute` : "0 sedute",
+        progress: frequencyGoal?.progress ?? 0,
+        helper: frequencyGoal ? `Target ${frequencyGoal.targetValue}/sett` : "N/D",
+        icon: <Calendar className="size-4" />,
+        tone: "amber" as const,
+      },
+      {
+        label: "Obiettivi custom",
+        value: allActiveGoals.length,
+        progress: Math.min(100, Math.round((allActiveGoals.length / 8) * 100)),
+        helper: allActiveGoals.length ? "In lavorazione" : "Crea il primo",
+        icon: <Target className="size-4" />,
+        tone: "sky" as const,
+      },
+    ]
+  }, [activeGoals, allActiveGoals.length])
 
   const addSuggestedGoal = (goal: any) => {
     const id = `${goal.category}-${goal.title}`.toLowerCase().replace(/\s+/g, "-")
@@ -527,6 +568,21 @@ export default function Goals() {
           </Dialog>
         </div>
 
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {goalsOrbs.map((item) => (
+            <MetricOrb
+              key={item.label}
+              label={item.label}
+              value={item.value}
+              progress={item.progress}
+              helper={item.helper}
+              icon={item.icon}
+              tone={item.tone}
+              size="sm"
+            />
+          ))}
+        </div>
+
         {/* Active Goals */}
         <div className="grid gap-6">
           {allActiveGoals.length === 0 ? (
@@ -573,14 +629,25 @@ export default function Goals() {
                           </Badge>
                         </div>
 
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-sm text-muted-foreground">Progress</span>
-                            <span className="text-sm font-medium text-foreground">
-                              {goal.currentValue} / {goal.targetValue} {goal.unit}
-                            </span>
+                        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between sm:justify-start sm:gap-3">
+                              <span className="text-sm text-muted-foreground">Progress</span>
+                              <span className="text-sm font-medium text-foreground">
+                                {goal.currentValue} / {goal.targetValue} {goal.unit}
+                              </span>
+                            </div>
+                            <Progress value={goal.progress} className="h-2 sm:w-56" />
                           </div>
-                          <Progress value={goal.progress} className="h-2" />
+                          <MetricOrb
+                            label="Completamento"
+                            value={`${Math.round(goal.progress)}%`}
+                            progress={goal.progress}
+                            helper={goal.deadline}
+                            icon={<Icon className="size-4" />}
+                            tone={goal.status === "on-track" ? "lime" : "amber"}
+                            size="sm"
+                          />
                         </div>
 
                         {goal.milestones.length > 0 && (

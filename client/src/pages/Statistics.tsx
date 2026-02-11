@@ -151,7 +151,7 @@ function RingMetric({
               fill="none"
             />
             {hasValue && (
-              <circle
+              <motion.circle
                 cx="50"
                 cy="50"
                 r={radius}
@@ -162,6 +162,9 @@ function RingMetric({
                 strokeDashoffset={offset}
                 strokeLinecap="round"
                 transform="rotate(-90 50 50)"
+                initial={{ strokeDashoffset: circumference }}
+                animate={{ strokeDashoffset: offset }}
+                transition={{ duration: 0.8, ease: [0.2, 0.9, 0.2, 1] }}
                 style={{ filter: `drop-shadow(0 0 10px ${color})` }}
               />
             )}

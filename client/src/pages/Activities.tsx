@@ -5,6 +5,7 @@ import { useMemo, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
@@ -120,6 +121,47 @@ export default function Activities() {
   const totalTime = monthActivities.reduce((sum, a) => sum + (a.durationSeconds || 0), 0)
   const totalXp = monthActivities.reduce((sum, a) => sum + (a.xpEarned || 0), 0)
   const avgEfficiency = advancedQuery.data?.swimmingEfficiencyIndex
+  const summaryOrbs = useMemo(
+    () => [
+      {
+        label: "Distanza totale",
+        value: activitiesQuery.isLoading ? "..." : formatDistance(totalDistance),
+        progress: Math.min(100, Math.round((totalDistance / 20000) * 100)),
+        helper: "Ultimi 30 giorni",
+        icon: <Droplets className="h-4 w-4" />,
+        tone: "cyan" as const,
+      },
+      {
+        label: "Tempo totale",
+        value: activitiesQuery.isLoading ? "..." : formatDuration(totalTime),
+        progress: Math.min(100, Math.round((totalTime / 28800) * 100)),
+        helper: "Ultimi 30 giorni",
+        icon: <Timer className="h-4 w-4" />,
+        tone: "sky" as const,
+      },
+      {
+        label: "XP guadagnati",
+        value: activitiesQuery.isLoading ? "..." : `${totalXp} XP`,
+        progress: Math.min(100, Math.round((totalXp / 1800) * 100)),
+        helper: "Ultimi 30 giorni",
+        icon: <Zap className="h-4 w-4" />,
+        tone: "lime" as const,
+      },
+      {
+        label: "Efficienza media",
+        value:
+          advancedQuery.isLoading || avgEfficiency === null || avgEfficiency === undefined
+            ? "—"
+            : `${Math.round(avgEfficiency)}%`,
+        progress:
+          avgEfficiency !== null && avgEfficiency !== undefined ? Math.round(avgEfficiency) : 0,
+        helper: "SEI Index",
+        icon: <TrendingUp className="h-4 w-4" />,
+        tone: "amber" as const,
+      },
+    ],
+    [activitiesQuery.isLoading, advancedQuery.isLoading, totalDistance, totalTime, totalXp, avgEfficiency]
+  )
 
   const getShareState = (activity: any) =>
     shareOverrides[activity.id] ?? activity.shareToFeed ?? false
@@ -146,70 +188,18 @@ export default function Activities() {
             </div>
 
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              <Card className="bg-background/60 border-border">
-                <CardContent className="p-4">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Droplets className="h-4 w-4 text-primary" />
-                    <span className="text-xs text-muted-foreground">Distanza totale</span>
-                  </div>
-                  {activitiesQuery.isLoading ? (
-                    <Skeleton className="h-6 w-20" />
-                  ) : (
-                    <p className="text-xl font-display font-bold text-foreground">
-                      {formatDistance(totalDistance)}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-primary/80">Ultimi 30 giorni</p>
-                </CardContent>
-              </Card>
-              <Card className="bg-background/60 border-border">
-                <CardContent className="p-4">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Timer className="h-4 w-4 text-primary" />
-                    <span className="text-xs text-muted-foreground">Tempo totale</span>
-                  </div>
-                  {activitiesQuery.isLoading ? (
-                    <Skeleton className="h-6 w-20" />
-                  ) : (
-                    <p className="text-xl font-display font-bold text-foreground">
-                      {formatDuration(totalTime)}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-primary/80">Ultimi 30 giorni</p>
-                </CardContent>
-              </Card>
-              <Card className="bg-background/60 border-border">
-                <CardContent className="p-4">
-                  <div className="mb-2 flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-accent" />
-                    <span className="text-xs text-muted-foreground">XP guadagnati</span>
-                  </div>
-                  {activitiesQuery.isLoading ? (
-                    <Skeleton className="h-6 w-20" />
-                  ) : (
-                    <p className="text-xl font-display font-bold text-foreground">{totalXp} XP</p>
-                  )}
-                  <p className="mt-1 text-xs text-accent">Ultimi 30 giorni</p>
-                </CardContent>
-              </Card>
-              <Card className="bg-background/60 border-border">
-                <CardContent className="p-4">
-                  <div className="mb-2 flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-primary" />
-                    <span className="text-xs text-muted-foreground">Efficienza media</span>
-                  </div>
-                  {advancedQuery.isLoading ? (
-                    <Skeleton className="h-6 w-20" />
-                  ) : (
-                    <p className="text-xl font-display font-bold text-foreground">
-                      {avgEfficiency !== null && avgEfficiency !== undefined
-                        ? `${Math.round(avgEfficiency)}%`
-                        : "—"}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-primary/80">SEI Index</p>
-                </CardContent>
-              </Card>
+              {summaryOrbs.map((item) => (
+                <MetricOrb
+                  key={item.label}
+                  label={item.label}
+                  value={item.value}
+                  progress={item.progress}
+                  helper={item.helper}
+                  icon={item.icon}
+                  tone={item.tone}
+                  size="sm"
+                />
+              ))}
             </div>
           </CardContent>
         </Card>

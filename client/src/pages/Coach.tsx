@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { trpc } from "@/lib/trpc"
@@ -399,23 +400,28 @@ export default function Coach() {
             <div className="flex flex-col gap-4">
               <div className="order-2 lg:order-1">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                  {keyMetricCards.map((metric) => (
-                    <Card key={metric.title} className="bg-card border-border">
-                      <CardContent className="p-4">
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide">
-                          {metric.title}
-                        </p>
-                        <div className="mt-3 flex items-baseline gap-2">
-                          <span className="text-2xl font-display font-bold text-foreground">
-                            {metric.value}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {metric.helper}
-                          </span>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  {keyMetricCards.map((metric, index) => {
+                    const helperProgress = Number(String(metric.helper).replace(/[^\d.-]/g, ""))
+                    const valueProgress = Number(String(metric.value).replace(/[^\d.-]/g, ""))
+                    const progress = Number.isFinite(helperProgress)
+                      ? Math.max(0, Math.min(100, helperProgress))
+                      : Number.isFinite(valueProgress)
+                        ? Math.max(0, Math.min(100, valueProgress))
+                        : 0
+                    const tones = ["cyan", "lime", "amber", "sky"] as const
+
+                    return (
+                      <MetricOrb
+                        key={metric.title}
+                        label={metric.title}
+                        value={metric.value}
+                        progress={progress}
+                        helper={metric.helper}
+                        tone={tones[index % tones.length]}
+                        size="sm"
+                      />
+                    )
+                  })}
                 </div>
               </div>
 

@@ -6,6 +6,7 @@ import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -212,6 +213,46 @@ export default function Challenges() {
 
   const badgeCount = badgesQuery.data?.length ?? 0
   const totalXp = profileQuery.data?.totalXp ?? 0
+  const challengeOrbs = useMemo(
+    () => [
+      {
+        label: "Le tue sfide",
+        value: activeChallenges.length + pendingChallenges.length,
+        progress: Math.min(100, Math.round(((activeChallenges.length + pendingChallenges.length) / 8) * 100)),
+        helper: "Attive + pending",
+        icon: <Trophy className="size-4" />,
+        tone: "cyan" as const,
+      },
+      {
+        label: "Badge sbloccati",
+        value: badgeCount,
+        progress: Math.min(100, Math.round((badgeCount / 40) * 100)),
+        helper: "Progressione",
+        icon: <Medal className="size-4" />,
+        tone: "lime" as const,
+      },
+      {
+        label: "Streak",
+        value: `${streak}g`,
+        progress: Math.min(100, Math.round((streak / 21) * 100)),
+        helper: "Giorni consecutivi",
+        icon: <Flame className="size-4" />,
+        tone: "amber" as const,
+      },
+      {
+        label: "XP totale",
+        value: totalXp.toLocaleString(),
+        progress:
+          profileQuery.data?.nextLevelXp && profileQuery.data.nextLevelXp > 0
+            ? Math.min(100, Math.round((totalXp / profileQuery.data.nextLevelXp) * 100))
+            : Math.min(100, Math.round((totalXp / 6000) * 100)),
+        helper: "Livello corrente",
+        icon: <Zap className="size-4" />,
+        tone: "sky" as const,
+      },
+    ],
+    [activeChallenges.length, pendingChallenges.length, badgeCount, streak, totalXp, profileQuery.data?.nextLevelXp]
+  )
 
   const leaderboard = useMemo(() => (leaderboardQuery.data ?? []) as any[], [leaderboardQuery.data])
 
@@ -237,49 +278,19 @@ export default function Challenges() {
                   Ghost Track e sfide classiche nello stesso hub. Scegli il tuo campo gara.
                 </p>
               </div>
-              <div className="grid w-full max-w-xl grid-cols-2 gap-3 sm:grid-cols-4">
-                <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
-                  <div className="flex items-center justify-between">
-                    <Trophy className="size-5 text-primary" />
-                    <Badge variant="neon" className="text-[10px]">
-                      attive
-                    </Badge>
-                  </div>
-                  <div className="mt-3 text-2xl font-display font-bold text-foreground">
-                    {activeChallenges.length + pendingChallenges.length}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Le tue sfide</div>
-                </div>
-                <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
-                  <div className="flex items-center justify-between">
-                    <Medal className="size-5 text-accent" />
-                    <Badge variant="outline" className="border-accent/50 text-accent text-[10px]">
-                      badge
-                    </Badge>
-                  </div>
-                  <div className="mt-3 text-2xl font-display font-bold text-foreground">{badgeCount}</div>
-                  <div className="text-xs text-muted-foreground">Sbloccati</div>
-                </div>
-                <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
-                  <div className="flex items-center justify-between">
-                    <Flame className="size-5 text-chart-4" />
-                    <Badge variant="outline" className="border-chart-4/50 text-chart-4 text-[10px]">
-                      streak
-                    </Badge>
-                  </div>
-                  <div className="mt-3 text-2xl font-display font-bold text-foreground">{streak}</div>
-                  <div className="text-xs text-muted-foreground">Giorni</div>
-                </div>
-                <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
-                  <div className="flex items-center justify-between">
-                    <Zap className="size-5 text-chart-5" />
-                    <Badge variant="outline" className="border-chart-5/50 text-chart-5 text-[10px]">
-                      XP
-                    </Badge>
-                  </div>
-                  <div className="mt-3 text-2xl font-display font-bold text-foreground">{totalXp}</div>
-                  <div className="text-xs text-muted-foreground">Totale</div>
-                </div>
+              <div className="grid w-full max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4">
+                {challengeOrbs.map((item) => (
+                  <MetricOrb
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    progress={item.progress}
+                    helper={item.helper}
+                    icon={item.icon}
+                    tone={item.tone}
+                    size="sm"
+                  />
+                ))}
               </div>
             </div>
           </CardContent>

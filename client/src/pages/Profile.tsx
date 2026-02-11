@@ -6,6 +6,7 @@ import { getBadgeImageUrl } from "@/lib/badgeImages";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -176,23 +177,10 @@ const strokeLabels: Record<string, string> = {
 interface StatItemProps {
   label: string;
   value: string | number;
+  progress: number;
   icon: React.ReactNode;
-  subtext?: string;
-}
-
-function StatItem({ label, value, icon, subtext }: StatItemProps) {
-  return (
-    <div className="flex items-center gap-3 rounded-lg border border-border bg-background/60 p-4">
-      <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-        {icon}
-      </div>
-      <div>
-        <p className="text-lg font-bold text-foreground">{value}</p>
-        <p className="text-sm text-muted-foreground">{label}</p>
-        {subtext && <p className="text-xs text-chart-4">{subtext}</p>}
-      </div>
-    </div>
-  );
+  helper?: string;
+  tone?: "cyan" | "lime" | "sky" | "amber";
 }
 
 interface BadgeCardProps {
@@ -450,6 +438,72 @@ export default function Profile() {
   const levelProgress = profile?.nextLevelXp
     ? Math.min(100, ((profile.totalXp ?? 0) / profile.nextLevelXp) * 100)
     : 0;
+  const profileOrbs: StatItemProps[] = [
+    {
+      label: "Sessioni totali",
+      value: stats.totalSessions,
+      progress: Math.min(100, Math.round((stats.totalSessions / 120) * 100)),
+      icon: <TrendingUp className="size-4" />,
+      helper: "Carriera",
+      tone: "cyan",
+    },
+    {
+      label: "Distanza totale",
+      value: formatDistance(stats.totalDistance),
+      progress: Math.min(100, Math.round((stats.totalDistance / 200000) * 100)),
+      icon: <Waves className="size-4" />,
+      helper: "Volume",
+      tone: "sky",
+    },
+    {
+      label: "Pace medio",
+      value: formatPace(stats.avgPace),
+      progress: stats.avgPace ? Math.min(100, Math.round((220 / Math.max(stats.avgPace, 1)) * 100)) : 0,
+      icon: <Timer className="size-4" />,
+      helper: "Efficienza",
+      tone: "amber",
+    },
+    {
+      label: "SWOLF medio",
+      value: stats.avgSwolf ?? "—",
+      progress: stats.avgSwolf ? Math.min(100, Math.round((70 / Math.max(stats.avgSwolf, 1)) * 100)) : 0,
+      icon: <Target className="size-4" />,
+      helper: "Tecnica",
+      tone: "lime",
+    },
+    {
+      label: "Tempo totale",
+      value: formatTime(stats.totalTime),
+      progress: Math.min(100, Math.round((stats.totalTime / 50000) * 100)),
+      icon: <Calendar className="size-4" />,
+      helper: "In acqua",
+      tone: "cyan",
+    },
+    {
+      label: "Best SWOLF",
+      value: stats.bestSwolf ?? "—",
+      progress: stats.bestSwolf ? Math.min(100, Math.round((70 / Math.max(stats.bestSwolf, 1)) * 100)) : 0,
+      icon: <Award className="size-4" />,
+      helper: stats.bestSwolf ? "Record personale" : "Nessun record",
+      tone: "lime",
+    },
+    {
+      label: "Streak attuale",
+      value: `${stats.streakCurrent}g`,
+      progress: Math.min(100, Math.round((stats.streakCurrent / 21) * 100)),
+      icon: <Flame className="size-4" />,
+      helper: "Continuita",
+      tone: "amber",
+    },
+    {
+      label: "Streak migliore",
+      value: `${stats.streakBest}g`,
+      progress: Math.min(100, Math.round((stats.streakBest / 30) * 100)),
+      icon: <Trophy className="size-4" />,
+      helper: "Record",
+      tone: "sky",
+    },
+  ];
 
   return (
     <AppLayout>
@@ -568,47 +622,18 @@ export default function Profile() {
             </CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-2">
-                <StatItem
-                  label="Sessioni totali"
-                  value={stats.totalSessions}
-                  icon={<TrendingUp className="size-5" />}
-                />
-                <StatItem
-                  label="Distanza totale"
-                  value={formatDistance(stats.totalDistance)}
-                  icon={<Waves className="size-5" />}
-                />
-                <StatItem
-                  label="Pace medio"
-                  value={formatPace(stats.avgPace)}
-                  icon={<Timer className="size-5" />}
-                />
-                <StatItem
-                  label="SWOLF medio"
-                  value={stats.avgSwolf ?? "—"}
-                  icon={<Target className="size-5" />}
-                />
-                <StatItem
-                  label="Tempo totale"
-                  value={formatTime(stats.totalTime)}
-                  icon={<Calendar className="size-5" />}
-                />
-                <StatItem
-                  label="Best SWOLF"
-                  value={stats.bestSwolf ?? "—"}
-                  icon={<Award className="size-5" />}
-                  subtext={stats.bestSwolf ? "Record personale" : undefined}
-                />
-                <StatItem
-                  label="Streak attuale"
-                  value={`${stats.streakCurrent} giorni`}
-                  icon={<Flame className="size-5" />}
-                />
-                <StatItem
-                  label="Streak migliore"
-                  value={`${stats.streakBest} giorni`}
-                  icon={<Trophy className="size-5" />}
-                />
+                {profileOrbs.map((metric) => (
+                  <MetricOrb
+                    key={metric.label}
+                    label={metric.label}
+                    value={metric.value}
+                    progress={metric.progress}
+                    helper={metric.helper}
+                    icon={metric.icon}
+                    tone={metric.tone}
+                    size="sm"
+                  />
+                ))}
               </div>
             </CardContent>
           </Card>

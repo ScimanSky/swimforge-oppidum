@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { useFormatters } from "@/_core/hooks/useFormatters"
 import {
   Flame,
@@ -563,34 +564,16 @@ export default function Dashboard() {
           <div className="space-y-6 xl:col-span-7">
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {stats.map((stat) => (
-                <Card
+                <MetricOrb
                   key={stat.label}
-                  className="min-h-[170px]"
-                >
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <div className={`flex size-11 items-center justify-center rounded-xl ${stat.bgColor} ${stat.color} shadow-[0_0_28px_var(--neon-soft)]`}>
-                            <stat.icon className="size-5" />
-                          </div>
-                          <div className="pointer-events-none absolute -inset-2 rounded-2xl bg-[radial-gradient(circle_at_center,color-mix(in_oklch,var(--electric-cyan)_22%,transparent),transparent_65%)] opacity-60 blur-md" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            {stat.label}
-                          </p>
-                          <p className="mt-1 text-2xl font-display font-bold text-foreground">{stat.value}</p>
-                        </div>
-                      </div>
-                      <Badge variant="neon" className="text-xs">
-                        {stat.progress}%
-                      </Badge>
-                    </div>
-                    <Progress value={stat.progress} className="mt-4 h-2" />
-                    <p className="mt-3 text-xs text-muted-foreground">{stat.change}</p>
-                  </CardContent>
-                </Card>
+                  label={stat.label}
+                  value={stat.value}
+                  progress={stat.progress}
+                  helper={stat.change}
+                  icon={<stat.icon className="size-4" />}
+                  tone="auto"
+                  className="min-h-[240px]"
+                />
               ))}
             </div>
 
