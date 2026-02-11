@@ -29,7 +29,7 @@ import { getUserPublicProfile, toggleFollow } from "./db_public_profiles";
 import { getPendingActivityInsights, listActivityInsights, markActivityInsightSeen } from "./ai_activity_insights";
 import { logger } from "./middleware/logger";
 import { sanitizeActivityNotes } from "./lib/sanitize";
-import { getCurrentSeasonState, getSeasonLeaderboard } from "./season";
+import { claimSeasonReward, getCurrentSeasonState, getSeasonLeaderboard } from "./season";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 type BadgeDefinitionRow = Awaited<ReturnType<typeof db.getAllBadgeDefinitions>>[number];
@@ -992,6 +992,36 @@ export const appRouter = router({
       )
       .query(async ({ input }) => {
         return getSeasonLeaderboard(input?.limit ?? 20);
+      }),
+    claimReward: protectedProcedure
+      .input(
+        z.object({
+          rewardCode: z.string().min(3).max(120),
+        }),
+      )
+      .mutation(async ({ ctx, input }) => {
+        const result = await claimSeasonReward(ctx.user.id, input.rewardCode);
+        if (!result.success) {
+          if (result.reason === "locked") {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: "Ricompensa non ancora sbloccata.",
+            });
+          }
+          if (result.reason === "not_found") {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Ricompensa non trovata.",
+            });
+          }
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Impossibile riscattare la ricompensa.",
+          });
+        }
+        await invalidateUserCache(String(ctx.user.id));
+        await invalidateLeaderboardCache();
+        return result;
       }),
   }),
 

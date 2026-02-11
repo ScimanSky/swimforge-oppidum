@@ -1,6 +1,7 @@
 import { and, eq, gte, lte, sql, desc } from "drizzle-orm";
 import { getDb } from "./db";
 import {
+  xpReasonEnum,
   swimmerProfiles,
   swimmingActivities,
   users,
@@ -135,6 +136,13 @@ const BATTLE_PASS_REWARDS = [
   { level: 35, rewardCode: "S1-EFFECT-AQUA-FLUX", rewardName: "Effetto: Aqua Flux Trail", rewardType: "effect", rarity: "legendary" as const },
   { level: 40, rewardCode: "S1-BDG-004", rewardName: "Badge: Electric Ice Apex", rewardType: "badge", rarity: "legendary" as const },
 ];
+
+const REWARD_CLAIM_BONUS_XP = {
+  common: 50,
+  rare: 110,
+  epic: 200,
+  legendary: 320,
+} as const;
 
 const SEASON_BADGE_ASSIGNMENTS = [
   {
@@ -432,6 +440,33 @@ async function getSeasonXpForUser(userId: number, startDate: Date, endDate: Date
   return Number(activityRows[0]?.xp ?? 0);
 }
 
+async function getClaimedRewardCodesForSeason(userId: number, seasonId: string): Promise<Set<string>> {
+  const database = await getDb();
+  if (!database) return new Set<string>();
+  const prefix = `season_reward:${seasonId}:`;
+
+  const rows = await database
+    .select({
+      description: xpTransactions.description,
+    })
+    .from(xpTransactions)
+    .where(
+      and(
+        eq(xpTransactions.userId, userId),
+        sql`${xpTransactions.description} like ${`${prefix}%`}`,
+      ),
+    );
+
+  const claimedCodes = new Set<string>();
+  for (const row of rows) {
+    const description = String(row.description ?? "");
+    if (!description.startsWith(prefix)) continue;
+    const rewardCode = description.slice(prefix.length).trim();
+    if (rewardCode) claimedCodes.add(rewardCode);
+  }
+  return claimedCodes;
+}
+
 export async function getCurrentSeasonState(userId: number) {
   const season = getSeasonWindow();
   const thresholds = buildLevelThresholds();
@@ -454,11 +489,12 @@ export async function getCurrentSeasonState(userId: number) {
     : 0;
   const hasActiveClubMembership = clubMembershipCount > 0;
 
-  const [seasonStats, dailySnapshot, weeklySnapshot, seasonXp] = await Promise.all([
+  const [seasonStats, dailySnapshot, weeklySnapshot, seasonXp, claimedRewardCodes] = await Promise.all([
     getMissionSnapshotForRange(userId, season.startAt, season.endAt),
     getMissionSnapshotForRange(userId, todayStart, new Date(tomorrowStart.getTime() - 1)),
     getMissionSnapshotForRange(userId, weekStart, weekEnd),
     getSeasonXpForUser(userId, season.startAt, season.endAt),
+    getClaimedRewardCodesForSeason(userId, season.id),
   ]);
 
   const level = resolveLevelFromXp(seasonXp, thresholds);
@@ -503,7 +539,8 @@ export async function getCurrentSeasonState(userId: number) {
     rewards: BATTLE_PASS_REWARDS.map((reward) => ({
       ...reward,
       unlocked: level.currentLevel >= reward.level,
-      claimed: false,
+      claimed: claimedRewardCodes.has(reward.rewardCode),
+      claimXpBonus: REWARD_CLAIM_BONUS_XP[reward.rarity] ?? 0,
     })),
     badgeAssignments: SEASON_BADGE_ASSIGNMENTS,
   };
@@ -553,4 +590,56 @@ export async function getSeasonLeaderboard(limit = 20) {
     seasonXp: Number(row.seasonXp ?? 0),
     totalXp: Number(row.totalXp ?? 0),
   }));
+}
+
+export async function claimSeasonReward(userId: number, rewardCode: string) {
+  const season = getSeasonWindow();
+  const reward = BATTLE_PASS_REWARDS.find((entry) => entry.rewardCode === rewardCode);
+  if (!reward) {
+    return { success: false as const, reason: "not_found" as const };
+  }
+
+  const state = await getCurrentSeasonState(userId);
+  const rewardState = state.rewards.find((entry) => entry.rewardCode === rewardCode);
+  if (!rewardState) {
+    return { success: false as const, reason: "not_found" as const };
+  }
+  if (!rewardState.unlocked) {
+    return { success: false as const, reason: "locked" as const };
+  }
+  if (rewardState.claimed) {
+    return { success: true as const, alreadyClaimed: true as const, xpAwarded: 0 };
+  }
+
+  const database = await getDb();
+  if (!database) {
+    return { success: false as const, reason: "db_unavailable" as const };
+  }
+
+  const xpBonus = REWARD_CLAIM_BONUS_XP[reward.rarity] ?? 0;
+  const description = `season_reward:${season.id}:${reward.rewardCode}`;
+
+  await database.insert(xpTransactions).values({
+    userId,
+    amount: xpBonus,
+    reason: "bonus" as (typeof xpReasonEnum.enumValues)[number],
+    referenceId: reward.level,
+    description,
+  });
+
+  await database
+    .update(swimmerProfiles)
+    .set({
+      totalXp: sql`${swimmerProfiles.totalXp} + ${xpBonus}`,
+      updatedAt: new Date(),
+    })
+    .where(eq(swimmerProfiles.userId, userId));
+
+  return {
+    success: true as const,
+    alreadyClaimed: false as const,
+    xpAwarded: xpBonus,
+    rewardCode: reward.rewardCode,
+    rewardName: reward.rewardName,
+  };
 }

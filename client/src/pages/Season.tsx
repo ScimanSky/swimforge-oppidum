@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { CalendarDays, ChevronRight, Sparkles, Target, Trophy, Zap } from "lucide-react"
 import { Link } from "wouter"
+import { toast } from "sonner"
 
 function formatRemaining(remainingMs: number) {
   const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000))
@@ -18,6 +19,7 @@ function formatRemaining(remainingMs: number) {
 }
 
 export default function SeasonPage() {
+  const utils = trpc.useUtils()
   const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
     staleTime: 15_000,
     refetchInterval: 30_000,
@@ -33,6 +35,24 @@ export default function SeasonPage() {
       refetchOnMount: "always",
     }
   )
+  const claimRewardMutation = trpc.season.claimReward.useMutation({
+    onSuccess: async (result) => {
+      if (result.alreadyClaimed) {
+        toast.info("Ricompensa già riscattata")
+      } else {
+        toast.success(`Ricompensa riscattata: +${result.xpAwarded} XP`)
+      }
+      await Promise.all([
+        utils.season.getCurrent.invalidate(),
+        utils.season.getLeaderboard.invalidate(),
+        utils.profile.get.invalidate(),
+        utils.leaderboard.get.invalidate(),
+      ])
+    },
+    onError: (error) => {
+      toast.error(error.message || "Riscatto ricompensa non riuscito")
+    },
+  })
 
   const seasonData = seasonQuery.data
   const leaderboard = leaderboardQuery.data ?? []
@@ -182,9 +202,22 @@ export default function SeasonPage() {
                           </p>
                           <p className="text-xs text-muted-foreground capitalize">{reward.rewardType}</p>
                         </div>
-                        <Badge variant={reward.unlocked ? "neon" : "outline"} className="text-xs capitalize">
-                          {reward.unlocked ? "Sbloccata" : "Bloccata"}
-                        </Badge>
+                        <div className="flex flex-col items-end gap-2">
+                          <Badge variant={reward.unlocked ? "neon" : "outline"} className="text-xs capitalize">
+                            {reward.claimed ? "Riscattata" : reward.unlocked ? "Sbloccata" : "Bloccata"}
+                          </Badge>
+                          {reward.unlocked && !reward.claimed ? (
+                            <Button
+                              size="sm"
+                              variant="neon"
+                              className="h-7 px-3 text-[11px]"
+                              disabled={claimRewardMutation.isPending}
+                              onClick={() => claimRewardMutation.mutate({ rewardCode: reward.rewardCode })}
+                            >
+                              Riscatta
+                            </Button>
+                          ) : null}
+                        </div>
                       </div>
                     </div>
                   ))}
