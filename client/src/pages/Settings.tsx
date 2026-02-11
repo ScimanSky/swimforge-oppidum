@@ -3,7 +3,6 @@
 import AppLayout from "@/components/AppLayout"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -619,8 +618,8 @@ export default function Settings() {
       </div>
 
       {onboarding && (
-        <section className="surface-panel">
-          <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <section className="surface-panel p-6">
+          <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <p className="font-medium text-foreground">Benvenuto su SwimForge</p>
               {activeTab === "profile" ? (
@@ -651,19 +650,19 @@ export default function Settings() {
                 Vai alla Dashboard
               </Button>
             </div>
-          </CardContent>
+          </div>
         </section>
       )}
 
       <Tabs value={activeTab} onValueChange={updateTabInUrl}>
         <div className="grid gap-6 xl:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]">
           <div className="xl:sticky xl:top-24 h-fit">
-            <section className="surface-panel glass-panel">
-              <CardHeader>
-                <CardTitle className="font-display text-base">Sezioni</CardTitle>
-                <CardDescription>Scegli l&apos;area da aggiornare</CardDescription>
-              </CardHeader>
-              <CardContent>
+            <section className="surface-panel p-6 glass-panel">
+              <div>
+                <h3 className="font-display text-base">Sezioni</h3>
+                <p>Scegli l&apos;area da aggiornare</p>
+              </div>
+              <div>
                 <TabsList className="flex h-auto w-full flex-col items-stretch gap-2">
                   <TabsTrigger value="profile" className="h-auto w-full flex-none justify-start gap-2">
                     <User className="w-4 h-4" />
@@ -686,19 +685,19 @@ export default function Settings() {
                     Privacy
                   </TabsTrigger>
                 </TabsList>
-              </CardContent>
+              </div>
             </section>
           </div>
 
           <div className="min-w-0">
             {/* Profile Tab */}
             <TabsContent value="profile" className="space-y-6">
-          <section className="surface-panel">
-            <CardHeader>
-              <CardTitle className="font-display">Informazioni Profilo</CardTitle>
-              <CardDescription>Aggiorna le informazioni del tuo profilo pubblico</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+          <section className="surface-panel p-6">
+            <div>
+              <h3 className="font-display">Informazioni Profilo</h3>
+              <p>Aggiorna le informazioni del tuo profilo pubblico</p>
+            </div>
+            <div className="space-y-6">
               {/* Cover Image */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -870,16 +869,16 @@ export default function Settings() {
               <Button variant="neon" onClick={handleSaveProfile} disabled={updateProfileMutation.isPending}>
                 {updateProfileMutation.isPending ? "Salvataggio..." : "Salva Modifiche"}
               </Button>
-            </CardContent>
+            </div>
           </section>
 
           {/* Swimming Profile */}
-          <section className="surface-panel">
-            <CardHeader>
-              <CardTitle className="font-display">Profilo Nuotatore</CardTitle>
-              <CardDescription>Informazioni specifiche per il nuoto</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <section className="surface-panel p-6">
+            <div>
+              <h3 className="font-display">Profilo Nuotatore</h3>
+              <p>Informazioni specifiche per il nuoto</p>
+            </div>
+            <div className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Livello</Label>
@@ -942,20 +941,20 @@ export default function Settings() {
               <Button variant="neon" onClick={handleSaveSwimmerProfile} disabled={updateProfileMutation.isPending}>
                 {updateProfileMutation.isPending ? "Salvataggio..." : "Salva Profilo Nuotatore"}
               </Button>
-            </CardContent>
+            </div>
           </section>
         </TabsContent>
 
         {/* Connections Tab */}
         <TabsContent value="connections" className="space-y-4">
-          <section className="surface-panel">
-            <CardHeader>
-              <CardTitle className="font-display">Account Collegati</CardTitle>
-              <CardDescription>
+          <section className="surface-panel p-6">
+            <div>
+              <h3 className="font-display">Account Collegati</h3>
+              <p>
                 Collega i tuoi dispositivi e app per sincronizzare automaticamente le attivita
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </p>
+            </div>
+            <div className="space-y-4">
               {[
                 {
                   name: "Garmin Connect",
@@ -1015,7 +1014,7 @@ export default function Settings() {
                   )}
                 </div>
               ))}
-            </CardContent>
+            </div>
           </section>
 
           <GarminSection garminConnected={garminStatus?.connected ?? false} />
@@ -1023,12 +1022,12 @@ export default function Settings() {
 
         {/* Notifications Tab */}
         <TabsContent value="notifications">
-          <section className="surface-panel">
-            <CardHeader>
-              <CardTitle className="font-display">Preferenze Notifiche</CardTitle>
-              <CardDescription>Scegli quali notifiche ricevere</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
+          <section className="surface-panel p-6">
+            <div>
+              <h3 className="font-display">Preferenze Notifiche</h3>
+              <p>Scegli quali notifiche ricevere</p>
+            </div>
+            <div className="space-y-6">
               {notificationSettings.map((setting) => (
                 <div
                   key={setting.id}
@@ -1044,17 +1043,17 @@ export default function Settings() {
                   />
                 </div>
               ))}
-            </CardContent>
+            </div>
           </section>
         </TabsContent>
 
         {/* Preferences Tab */}
         <TabsContent value="preferences" className="space-y-4">
-          <section className="surface-panel">
-            <CardHeader>
-              <CardTitle className="font-display">Unita di Misura</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <section className="surface-panel p-6">
+            <div>
+              <h3 className="font-display">Unita di Misura</h3>
+            </div>
+            <div className="space-y-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-medium text-foreground">Sistema Metrico</p>
@@ -1099,14 +1098,14 @@ export default function Settings() {
                   </SelectContent>
                 </Select>
               </div>
-            </CardContent>
+            </div>
           </section>
 
-          <section className="surface-panel">
-            <CardHeader>
-              <CardTitle className="font-display">Lingua e Regione</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <section className="surface-panel p-6">
+            <div>
+              <h3 className="font-display">Lingua e Regione</h3>
+            </div>
+            <div className="space-y-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="font-medium text-foreground">Lingua</p>
@@ -1152,17 +1151,17 @@ export default function Settings() {
                   </SelectContent>
                 </Select>
               </div>
-            </CardContent>
+            </div>
           </section>
         </TabsContent>
 
         {/* Privacy Tab */}
         <TabsContent value="privacy" className="space-y-4">
-          <section className="surface-panel">
-            <CardHeader>
-              <CardTitle className="font-display">Privacy Profilo</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <section className="surface-panel p-6">
+            <div>
+              <h3 className="font-display">Privacy Profilo</h3>
+            </div>
+            <div className="space-y-4">
               <div className="flex items-center justify-between py-3">
                 <div>
                   <p className="font-medium text-foreground">Profilo Pubblico</p>
@@ -1211,14 +1210,14 @@ export default function Settings() {
                   }}
                 />
               </div>
-            </CardContent>
+            </div>
           </section>
 
-          <section className="surface-panel border-destructive/50">
-            <CardHeader>
-              <CardTitle className="font-display text-destructive">Zona Pericolosa</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <section className="surface-panel p-6 border-destructive/50">
+            <div>
+              <h3 className="font-display text-destructive">Zona Pericolosa</h3>
+            </div>
+            <div className="space-y-4">
               <div className="flex items-center justify-between p-4 rounded-lg bg-destructive/5">
                 <div>
                   <p className="font-medium text-foreground">Esporta Dati</p>
@@ -1255,7 +1254,7 @@ export default function Settings() {
                   Elimina
                 </Button>
               </div>
-            </CardContent>
+            </div>
           </section>
         </TabsContent>
           </div>

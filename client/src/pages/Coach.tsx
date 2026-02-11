@@ -3,7 +3,6 @@
 import AppLayout from "@/components/AppLayout"
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Input } from "@/components/ui/input"
@@ -325,8 +324,8 @@ export default function Coach() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <section className="surface-panel glass-panel">
-          <CardContent className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <section className="surface-panel p-6 glass-panel">
+          <div className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
               <div className="rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 p-3">
                 <Brain className="h-8 w-8 text-primary" />
@@ -346,11 +345,11 @@ export default function Coach() {
             <Badge variant="outline" className="text-xs border-primary/40 text-primary">
               Ultimo sync: {lastSyncLabel}
             </Badge>
-          </CardContent>
+          </div>
         </section>
 
-        <section className="surface-panel">
-          <CardContent className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <section className="surface-panel p-6">
+          <div className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
               <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10">
                 <Sparkles className="size-6 text-primary" />
@@ -385,7 +384,7 @@ export default function Coach() {
                 </div>
               </div>
             </div>
-          </CardContent>
+          </div>
         </section>
 
         <Tabs defaultValue="insights">
@@ -427,8 +426,8 @@ export default function Coach() {
 
               <div className="order-1 lg:order-2">
                 {insightCards.length > 0 ? (
-                  <section className="surface-panel">
-                    <CardContent className="p-4 space-y-4">
+                  <section className="surface-panel p-6">
+                    <div className="p-4 space-y-4">
                       <div className="flex flex-wrap items-center gap-2">
                         {insightCards.map((_, index) => (
                           <Button
@@ -461,20 +460,20 @@ export default function Coach() {
                           </p>
                         </div>
                       </div>
-                    </CardContent>
+                    </div>
                   </section>
                 ) : (
-                  <section className="surface-panel">
-                    <CardContent className="p-6 text-sm text-muted-foreground">
+                  <section className="surface-panel p-6">
+                    <div className="p-6 text-sm text-muted-foreground">
                       Nessun insight disponibile. Sincronizza nuove attivita per ottenere suggerimenti AI.
-                    </CardContent>
+                    </div>
                   </section>
                 )}
               </div>
 
               <div className="order-3">
-                <section className="surface-panel">
-                  <CardContent className="p-4">
+                <section className="surface-panel p-6">
+                  <div className="p-4">
                     <div className="flex flex-wrap items-center gap-3">
                       {advancedMetrics.map((metric) => (
                         <div
@@ -490,21 +489,21 @@ export default function Coach() {
                         </div>
                       ))}
                     </div>
-                  </CardContent>
+                  </div>
                 </section>
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="workouts" className="mt-6 space-y-6">
-            <section className="surface-panel">
-              <CardHeader>
-                <CardTitle className="font-display">Allenamenti AI</CardTitle>
-                <CardDescription>
+            <section className="surface-panel p-6">
+              <div>
+                <h3 className="font-display">Allenamenti AI</h3>
+                <p>
                   Un solo allenamento alla volta. Tocca il titolo per cambiare modalità.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+                </p>
+              </div>
+              <div>
                 <div className="space-y-4">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex flex-wrap gap-2">
@@ -688,24 +687,24 @@ export default function Coach() {
                     </div>
                   )}
                 </div>
-              </CardContent>
+              </div>
             </section>
           </TabsContent>
 
           <TabsContent value="session-iq" className="mt-6 space-y-4">
-            <section className="surface-panel">
-              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <section className="surface-panel p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <CardTitle className="font-display">Session IQ</CardTitle>
-                  <CardDescription>
+                  <h3 className="font-display">Session IQ</h3>
+                  <p>
                     Analisi dell&apos;ultima sessione sincronizzata
-                  </CardDescription>
+                  </p>
                 </div>
                 <Button variant="outline-neon" size="sm" asChild>
                   <a href="/session-iq">Apri archivio</a>
                 </Button>
-              </CardHeader>
-              <CardContent>
+              </div>
+              <div>
                 {latestSessionInsight ? (
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
@@ -748,13 +747,13 @@ export default function Coach() {
                     Nessuna analisi disponibile. Sincronizza una nuova attività per generare Session IQ.
                   </div>
                 )}
-              </CardContent>
+              </div>
             </section>
           </TabsContent>
 
           <TabsContent value="chat" className="mt-6">
-            <section className="surface-panel">
-              <CardContent className="p-6 space-y-4 text-sm text-muted-foreground">
+            <section className="surface-panel p-6">
+              <div className="p-6 space-y-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-3">
                   <div className="p-2 rounded-lg bg-primary/10">
                     <MessageSquare className="size-5 text-primary" />
@@ -778,7 +777,7 @@ export default function Coach() {
                     <MessageSquare className="w-4 h-4" />
                   </Button>
                 </div>
-              </CardContent>
+              </div>
             </section>
           </TabsContent>
         </Tabs>

@@ -3,7 +3,6 @@
 import AppLayout from "@/components/AppLayout"
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Progress } from "@/components/ui/progress"
@@ -586,10 +585,10 @@ export default function Goals() {
         {/* Active Goals */}
         <div className="grid gap-6">
           {allActiveGoals.length === 0 ? (
-            <section className="surface-panel">
-              <CardContent className="p-6 text-sm text-muted-foreground">
+            <section className="surface-panel p-6">
+              <div className="p-6 text-sm text-muted-foreground">
                 Nessun obiettivo creato. Usa “Crea obiettivo” o aggiungi un suggerimento.
-              </CardContent>
+              </div>
             </section>
           ) : (
             allActiveGoals.map((goal) => {
@@ -597,8 +596,8 @@ export default function Goals() {
               const colorClass = categoryColors[goal.category] || "text-primary bg-primary/10"
               const isCustom = customGoals.some((item) => item.id === goal.id)
               return (
-                <section key={goal.id} className="surface-panel">
-                  <CardContent className="p-6">
+                <section key={goal.id} className="surface-panel p-6">
+                  <div className="p-6">
                     <div className="flex flex-col lg:flex-row lg:items-center gap-6">
                       <div className="flex-1">
                         <div className="flex items-start justify-between mb-4">
@@ -702,7 +701,7 @@ export default function Goals() {
                         )}
                       </div>
                     </div>
-                  </CardContent>
+                  </div>
                 </section>
               )
             })
@@ -711,13 +710,13 @@ export default function Goals() {
 
         <div className="grid md:grid-cols-2 gap-6">
           {/* Completed Goals */}
-          <section className="surface-panel">
-            <CardHeader>
-              <CardTitle className="text-lg font-display font-bold text-foreground">
+          <section className="surface-panel p-6">
+            <div>
+              <h3 className="text-lg font-display font-bold text-foreground">
                 Obiettivi Completati
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </h3>
+            </div>
+            <div className="space-y-4">
               {completedGoals.length === 0 && (
                 <p className="text-sm text-muted-foreground">Nessun obiettivo completato.</p>
               )}
@@ -733,17 +732,17 @@ export default function Goals() {
                   </div>
                 </div>
               ))}
-            </CardContent>
+            </div>
           </section>
 
           {/* Suggested Goals */}
-          <section className="surface-panel">
-            <CardHeader>
-              <CardTitle className="text-lg font-display font-bold text-foreground">
+          <section className="surface-panel p-6">
+            <div>
+              <h3 className="text-lg font-display font-bold text-foreground">
                 Obiettivi Suggeriti
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </h3>
+            </div>
+            <div className="space-y-4">
               {suggestedGoals.map((goal, index) => {
                 const Icon = categoryIcons[goal.category] || Target
                 return (
@@ -758,7 +757,7 @@ export default function Goals() {
                   </div>
                 )
               })}
-            </CardContent>
+            </div>
           </section>
         </div>
       </div>

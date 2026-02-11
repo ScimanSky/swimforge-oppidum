@@ -20,7 +20,6 @@ import { motion } from "framer-motion";
 import { metricsDefinitions } from "@/data/metricsDefinitions";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Link } from "wouter";
 
@@ -425,14 +424,14 @@ export default function Statistics() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
             >
-              <section className="surface-panel">
-                <CardHeader className="pb-2">
+              <section className="surface-panel p-6">
+                <div className="pb-2">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <CardTitle className="text-base">Progress Timeline</CardTitle>
-                      <CardDescription>
+                      <h3 className="text-base">Progress Timeline</h3>
+                      <p>
                         Distanza e ritmo medio nel periodo selezionato.
-                      </CardDescription>
+                      </p>
                     </div>
                     <div className="group relative mt-1">
                       <Info className="w-4 h-4 text-muted-foreground cursor-help" />
@@ -441,8 +440,8 @@ export default function Statistics() {
                       </div>
                     </div>
                   </div>
-                </CardHeader>
-                <CardContent>
+                </div>
+                <div>
                   {timelineChartData && timelineChartData.length > 0 ? (
                     <ResponsiveContainer width="100%" height={250}>
                       <LineChart data={timelineChartData}>
@@ -481,7 +480,7 @@ export default function Statistics() {
                       Nessun dato disponibile per questo periodo
                     </p>
                   )}
-                </CardContent>
+                </div>
               </section>
             </motion.section>
               </AccordionContent>
@@ -499,14 +498,14 @@ export default function Statistics() {
             >
               {/* HR Zones */}
               {hrZonesData.length > 0 && (
-                <section className="surface-panel">
-                  <CardHeader className="pb-2">
+                <section className="surface-panel p-6">
+                  <div className="pb-2">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <CardTitle className="text-base">Zone frequenza cardiaca</CardTitle>
-                        <CardDescription>
+                        <h3 className="text-base">Zone frequenza cardiaca</h3>
+                        <p>
                           Distribuzione del tempo nelle diverse zone.
-                        </CardDescription>
+                        </p>
                       </div>
                       <div className="group relative mt-1">
                         <Info className="w-4 h-4 text-muted-foreground cursor-help" />
@@ -515,8 +514,8 @@ export default function Statistics() {
                         </div>
                       </div>
                     </div>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <div>
                     <div className="flex flex-col md:flex-row items-center gap-4">
                       <ResponsiveContainer width="100%" height={200}>
                         <PieChart>
@@ -558,20 +557,20 @@ export default function Statistics() {
                         ))}
                       </div>
                     </div>
-                  </CardContent>
+                  </div>
                 </section>
               )}
 
               {/* Pace Distribution */}
               {performance && performance.paceDistribution.length > 0 && (
-                <section className="surface-panel">
-                  <CardHeader className="pb-2">
+                <section className="surface-panel p-6">
+                  <div className="pb-2">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <CardTitle className="text-base">Distribuzione pace</CardTitle>
-                        <CardDescription>
+                        <h3 className="text-base">Distribuzione pace</h3>
+                        <p>
                           Sessioni per fascia di ritmo (min/100m).
-                        </CardDescription>
+                        </p>
                       </div>
                       <div className="group relative mt-1">
                         <Info className="w-4 h-4 text-muted-foreground cursor-help" />
@@ -580,8 +579,8 @@ export default function Statistics() {
                         </div>
                       </div>
                     </div>
-                  </CardHeader>
-                  <CardContent>
+                  </div>
+                  <div>
                     <ResponsiveContainer width="100%" height={200}>
                       <BarChart data={performance.paceDistribution}>
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -598,41 +597,41 @@ export default function Statistics() {
                         <Bar dataKey="count" fill="var(--chart-1)" name="Sessioni" />
                       </BarChart>
                     </ResponsiveContainer>
-                  </CardContent>
+                  </div>
                 </section>
               )}
 
               {/* Calories & SWOLF */}
               {performance && (
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <section className="surface-panel">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Calorie totali</CardTitle>
-                      <CardDescription>Energia spesa nel periodo</CardDescription>
-                    </CardHeader>
-                    <CardContent>
+                  <section className="surface-panel p-6">
+                    <div className="pb-2">
+                      <h3 className="text-base">Calorie totali</h3>
+                      <p>Energia spesa nel periodo</p>
+                    </div>
+                    <div>
                       <div className="text-2xl font-bold text-foreground">
                         {performance.caloriesTotal.toLocaleString()}
                       </div>
                       <div className="text-xs text-muted-foreground mt-1">
                         Media: {performance.avgCaloriesPerSession}/sessione
                       </div>
-                    </CardContent>
+                    </div>
                   </section>
                   {performance.swolfAvg && (
-                    <section className="surface-panel">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-base">SWOLF medio</CardTitle>
-                        <CardDescription>Efficienza nuotata</CardDescription>
-                      </CardHeader>
-                      <CardContent>
+                    <section className="surface-panel p-6">
+                      <div className="pb-2">
+                        <h3 className="text-base">SWOLF medio</h3>
+                        <p>Efficienza nuotata</p>
+                      </div>
+                      <div>
                         <div className="text-2xl font-bold text-foreground">
                           {performance.swolfAvg}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
                           Valore più basso = migliore efficienza
                         </div>
-                      </CardContent>
+                      </div>
                     </section>
                   )}
                 </div>
@@ -725,12 +724,12 @@ export default function Statistics() {
 
                 {/* Predictions */}
                 {advanced.predictions && (
-                  <section className="surface-panel">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">Previsioni</CardTitle>
-                      <CardDescription>Stima di obiettivi al ritmo attuale.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
+                  <section className="surface-panel p-6">
+                    <div className="pb-2">
+                      <h3 className="text-base">Previsioni</h3>
+                      <p>Stima di obiettivi al ritmo attuale.</p>
+                    </div>
+                    <div>
                       <p className="text-sm text-muted-foreground">
                         Al ritmo attuale raggiungerai{" "}
                         <span className="font-bold text-foreground">
@@ -744,7 +743,7 @@ export default function Statistics() {
                       <p className="text-xs text-muted-foreground mt-1">
                         ({advanced.predictions.daysRemaining} giorni rimasti)
                       </p>
-                    </CardContent>
+                    </div>
                   </section>
                 )}
               </motion.section>
