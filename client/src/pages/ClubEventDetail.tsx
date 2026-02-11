@@ -3,6 +3,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { trpc } from "@/lib/trpc";
 import { Calendar, CheckCircle2, HelpCircle, MapPin, Users, XCircle } from "lucide-react";
 import { useMemo } from "react";
@@ -130,6 +131,54 @@ export default function ClubEventDetail() {
                 {event.description}
               </p>
             ) : null}
+
+            <div className="grid grid-cols-2 gap-3 pt-2 lg:grid-cols-4">
+              {[
+                {
+                  label: "Partecipo",
+                  value: going.length,
+                  progress: Math.min(100, Math.round((going.length / Math.max(attendees.length, 1)) * 100)),
+                  helper: "Confermati",
+                  icon: <CheckCircle2 className="h-4 w-4" />,
+                  tone: "lime" as const,
+                },
+                {
+                  label: "Forse",
+                  value: maybe.length,
+                  progress: Math.min(100, Math.round((maybe.length / Math.max(attendees.length, 1)) * 100)),
+                  helper: "In dubbio",
+                  icon: <HelpCircle className="h-4 w-4" />,
+                  tone: "amber" as const,
+                },
+                {
+                  label: "Non partecipo",
+                  value: notGoing.length,
+                  progress: Math.min(100, Math.round((notGoing.length / Math.max(attendees.length, 1)) * 100)),
+                  helper: "Assenti",
+                  icon: <XCircle className="h-4 w-4" />,
+                  tone: "coral" as const,
+                },
+                {
+                  label: "RSVP totali",
+                  value: attendees.length,
+                  progress: Math.min(100, Math.round((attendees.length / 40) * 100)),
+                  helper: "Partecipazione",
+                  icon: <Users className="h-4 w-4" />,
+                  tone: "cyan" as const,
+                },
+              ].map((item) => (
+                <MetricOrb
+                  key={item.label}
+                  label={item.label}
+                  value={item.value}
+                  progress={item.progress}
+                  helper={item.helper}
+                  icon={item.icon}
+                  tone={item.tone}
+                  size="sm"
+                />
+              ))}
+            </div>
 
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <Button
@@ -269,4 +318,3 @@ export default function ClubEventDetail() {
     </AppLayout>
   );
 }
-

@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion } from "framer-motion";
 import { Trophy, ArrowLeft, Calendar, Target, Users, Medal, Clock } from "lucide-react";
@@ -167,6 +168,60 @@ export default function ChallengeDetail() {
     setLocation(`/u/${userId}`);
   };
 
+  const participantsCount = challenge.participants?.length ?? 0;
+  const progressValues = (challenge.participants ?? []).map((p) => Number(p.progress ?? 0));
+  const bestProgress = progressValues.length ? Math.max(...progressValues) : 0;
+  const averageProgress = progressValues.length
+    ? progressValues.reduce((sum, value) => sum + value, 0) / progressValues.length
+    : 0;
+  const targetValue = Number((challenge as any).targetValue ?? (challenge as any).target_value ?? 0);
+
+  const normalizeObjectiveProgress = (value: number) => {
+    if (!Number.isFinite(value) || value <= 0) return 0;
+    if (targetValue > 0) {
+      if (challenge.objective === "avg_pace") {
+        return Math.max(0, Math.min(100, Math.round((targetValue / value) * 100)));
+      }
+      return Math.max(0, Math.min(100, Math.round((value / targetValue) * 100)));
+    }
+    return Math.max(0, Math.min(100, Math.round(value)));
+  };
+
+  const challengeOrbs = [
+    {
+      label: "Partecipanti",
+      value: participantsCount,
+      progress: Math.min(100, Math.round((participantsCount / 24) * 100)),
+      helper: "In gara",
+      icon: <Users className="h-4 w-4" />,
+      tone: "cyan" as const,
+    },
+    {
+      label: "Miglior risultato",
+      value: formatProgress(bestProgress || 0),
+      progress: normalizeObjectiveProgress(bestProgress),
+      helper: "Top score",
+      icon: <Trophy className="h-4 w-4" />,
+      tone: "lime" as const,
+    },
+    {
+      label: "Media gruppo",
+      value: formatProgress(averageProgress || 0),
+      progress: normalizeObjectiveProgress(averageProgress),
+      helper: "Andamento",
+      icon: <Target className="h-4 w-4" />,
+      tone: "amber" as const,
+    },
+    {
+      label: "Stato sfida",
+      value: challenge.status === "active" ? "Attiva" : challenge.status === "pending" ? "Pending" : "Chiusa",
+      progress: challenge.status === "active" ? 100 : challenge.status === "pending" ? 40 : 0,
+      helper: timeLeft && challenge.status === "active" ? timeLeft : "Timeline",
+      icon: <Clock className="h-4 w-4" />,
+      tone: "sky" as const,
+    },
+  ];
+
   return (
     <AppLayout>
       <div className="pb-24">
@@ -228,6 +283,21 @@ export default function ChallengeDetail() {
                   <span className="text-sm text-muted-foreground">rimanenti</span>
                 </div>
               )}
+
+              <div className="grid grid-cols-2 gap-3 pt-2 lg:grid-cols-4">
+                {challengeOrbs.map((item) => (
+                  <MetricOrb
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    progress={item.progress}
+                    helper={item.helper}
+                    icon={item.icon}
+                    tone={item.tone}
+                    size="sm"
+                  />
+                ))}
+              </div>
             </CardContent>
           </Card>
         </motion.div>

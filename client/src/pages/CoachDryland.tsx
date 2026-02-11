@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import {
@@ -109,6 +110,39 @@ export default function CoachDryland() {
     : conditionLabel === "Buona"
     ? "text-amber-500 dark:text-amber-300"
     : "text-rose-500 dark:text-rose-300";
+  const drylandOrbs = useMemo(() => {
+    const recovery = advanced?.recoveryReadinessScore ?? 0;
+    const focusProgress =
+      focusLabel === "Potenza" ? 84 : focusLabel === "Cardio" ? 72 : focusLabel === "Stabilità" ? 68 : 76;
+    const connectedCount = Number(Boolean(garminStatus?.connected)) + Number(Boolean(stravaStatus?.connected));
+
+    return [
+      {
+        label: "Focus oggi",
+        value: focusLabel,
+        progress: focusProgress,
+        helper: "Priorità training",
+        icon: <Zap className="h-4 w-4" />,
+        tone: "amber" as const,
+      },
+      {
+        label: "Condition",
+        value: conditionLabel,
+        progress: Math.min(100, Math.round(recovery)),
+        helper: `RRS ${recovery ? Math.round(recovery) : "N/D"}`,
+        icon: <TrendingUp className="h-4 w-4" />,
+        tone: "cyan" as const,
+      },
+      {
+        label: "Connessioni",
+        value: `${connectedCount}/2`,
+        progress: Math.round((connectedCount / 2) * 100),
+        helper: `${timeline?.length ?? 0} sessioni analizzate`,
+        icon: <Activity className="h-4 w-4" />,
+        tone: "lime" as const,
+      },
+    ];
+  }, [advanced?.recoveryReadinessScore, focusLabel, conditionLabel, garminStatus?.connected, stravaStatus?.connected, timeline?.length]);
 
   const drylandInsights = useMemo<InsightItem[]>(() => {
     if (!advanced) return [];
@@ -321,21 +355,19 @@ export default function CoachDryland() {
                 </div>
               </div>
 
-              <div className="flex gap-4 w-full md:w-auto">
-                <div className="bg-muted/40 rounded-lg p-3 px-5 flex-1 md:flex-none border border-border/60 dark:bg-white/5 dark:border-white/5">
-                  <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Focus Oggi</div>
-                  <div className="text-lg font-bold text-[var(--gold)] flex items-center gap-2">
-                    <Zap className="h-4 w-4" />
-                    {focusLabel}
-                  </div>
-                </div>
-                <div className="bg-muted/40 rounded-lg p-3 px-5 flex-1 md:flex-none border border-border/60 dark:bg-white/5 dark:border-white/5">
-                  <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Condition</div>
-                  <div className={`text-lg font-bold ${conditionClass} flex items-center gap-2`}>
-                    <TrendingUp className="h-4 w-4" />
-                    {conditionLabel}
-                  </div>
-                </div>
+              <div className="grid w-full gap-3 sm:grid-cols-3 md:w-auto">
+                {drylandOrbs.map((item) => (
+                  <MetricOrb
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    progress={item.progress}
+                    helper={item.helper}
+                    icon={item.icon}
+                    tone={item.tone}
+                    size="sm"
+                  />
+                ))}
               </div>
             </div>
           </motion.div>

@@ -3,6 +3,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,7 +18,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 type OrderBy = "level" | "totalXp" | "badges";
 type Period = "all" | "week" | "month";
@@ -106,6 +107,59 @@ export default function Leaderboard() {
 
   // Normalize all entries
   const normalizedLeaderboard = leaderboard?.map(normalizeEntry) || [];
+  const summaryOrbs = useMemo(() => {
+    const numericValue = (entry: NormalizedEntry) => {
+      if (orderBy === "badges") return period === "all" ? entry.badgeCount || 0 : entry.periodBadgeCount || 0;
+      if (orderBy === "level") return entry.level;
+      return period === "all" ? entry.totalXp : entry.periodXp || 0;
+    };
+    const topValue = normalizedLeaderboard.length ? numericValue(normalizedLeaderboard[0]) : 0;
+    const myIndex = normalizedLeaderboard.findIndex((entry) => String(entry.userId) === String(user?.id));
+    const myRank = myIndex >= 0 ? myIndex + 1 : null;
+    const myValue = myIndex >= 0 ? numericValue(normalizedLeaderboard[myIndex]) : 0;
+    const totalPlayers = normalizedLeaderboard.length;
+
+    return [
+      {
+        label: "Nuotatori",
+        value: totalPlayers,
+        progress: Math.min(100, Math.round((totalPlayers / 100) * 100)),
+        helper: "In classifica",
+        icon: <Trophy className="h-4 w-4" />,
+        tone: "cyan" as const,
+      },
+      {
+        label: "Top score",
+        value: formatValue(normalizedLeaderboard[0] || normalizeEntry({})),
+        progress:
+          orderBy === "totalXp"
+            ? Math.min(100, Math.round((topValue / 12000) * 100))
+            : Math.min(100, Math.round((topValue / 120) * 100)),
+        helper: normalizedLeaderboard[0]?.userName || "—",
+        icon: <Crown className="h-4 w-4" />,
+        tone: "lime" as const,
+      },
+      {
+        label: "La tua posizione",
+        value: myRank ? `#${myRank}` : "—",
+        progress: myRank ? Math.min(100, Math.round(((totalPlayers - myRank + 1) / Math.max(totalPlayers, 1)) * 100)) : 0,
+        helper: myRank ? formatValue(normalizedLeaderboard[myIndex]) : "Non in classifica",
+        icon: <Medal className="h-4 w-4" />,
+        tone: "amber" as const,
+      },
+      {
+        label: "Il tuo valore",
+        value: myRank ? formatValue(normalizedLeaderboard[myIndex]) : "—",
+        progress:
+          orderBy === "totalXp"
+            ? Math.min(100, Math.round((myValue / 12000) * 100))
+            : Math.min(100, Math.round((myValue / 120) * 100)),
+        helper: orderBy === "totalXp" ? "XP" : orderBy === "level" ? "Livello" : "Badge",
+        icon: <Zap className="h-4 w-4" />,
+        tone: "sky" as const,
+      },
+    ];
+  }, [normalizedLeaderboard, orderBy, period, user?.id]);
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="low">
@@ -154,6 +208,21 @@ export default function Leaderboard() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
+
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {summaryOrbs.map((item) => (
+            <MetricOrb
+              key={item.label}
+              label={item.label}
+              value={item.value}
+              progress={item.progress}
+              helper={item.helper}
+              icon={item.icon}
+              tone={item.tone}
+              size="sm"
+            />
+          ))}
+        </div>
 
         {/* Leaderboard List */}
         {isLoading ? (

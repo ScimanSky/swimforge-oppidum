@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { trpc } from "@/lib/trpc"
 import { useMemo } from "react"
 import { useParams, Link } from "wouter"
@@ -140,15 +141,25 @@ export default function PublicProfile() {
 
               {bio ? <p className="mt-4 text-foreground">{bio}</p> : null}
 
-              <div className="mt-5 grid grid-cols-2 gap-4 sm:max-w-sm">
-                <div className="rounded-xl border border-border bg-background/60 p-4 text-center">
-                  <div className="text-lg font-bold text-foreground">{followingCount}</div>
-                  <div className="text-xs text-muted-foreground">Following</div>
-                </div>
-                <div className="rounded-xl border border-border bg-background/60 p-4 text-center">
-                  <div className="text-lg font-bold text-foreground">{followerCount}</div>
-                  <div className="text-xs text-muted-foreground">Follower</div>
-                </div>
+              <div className="mt-5 grid grid-cols-2 gap-4 sm:max-w-md">
+                <MetricOrb
+                  label="Following"
+                  value={followingCount}
+                  progress={Math.min(100, Math.round((followingCount / 400) * 100))}
+                  helper="Profili seguiti"
+                  icon={<UserCheck className="size-4" />}
+                  tone="cyan"
+                  size="sm"
+                />
+                <MetricOrb
+                  label="Follower"
+                  value={followerCount}
+                  progress={Math.min(100, Math.round((followerCount / 400) * 100))}
+                  helper="Crescita community"
+                  icon={<UserPlus className="size-4" />}
+                  tone="lime"
+                  size="sm"
+                />
               </div>
             </CardContent>
           </Card>
@@ -157,4 +168,3 @@ export default function PublicProfile() {
     </AppLayout>
   )
 }
-

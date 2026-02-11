@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
+import { MetricOrb } from "@/components/metrics/MetricOrb"
 import {
   ArrowLeft,
   Droplets,
@@ -223,6 +224,77 @@ export default function ActivityDetail() {
   const displayRestingHr =
     activity?.restingHeartRate ??
     toNumber(pickFirst(garminSummarySource, ["restingHeartRate"]))
+  const summaryOrbs = useMemo(() => {
+    const paceValue = formatPace(activity?.avgPacePer100m, activity?.distanceMeters, activity?.durationSeconds)
+    const paceSeconds =
+      activity?.avgPacePer100m && activity.avgPacePer100m > 0
+        ? activity.avgPacePer100m
+        : activity?.distanceMeters && activity?.durationSeconds
+          ? activity.durationSeconds / (activity.distanceMeters / 100)
+          : 0
+
+    return [
+      {
+        label: "Distanza",
+        value: formatDistance(activity?.distanceMeters),
+        progress: Math.min(100, Math.round(((activity?.distanceMeters ?? 0) / 10000) * 100)),
+        helper: "Sessione",
+        icon: <Droplets className="size-4" />,
+        tone: "cyan" as const,
+      },
+      {
+        label: "Durata",
+        value: formatDuration(activity?.durationSeconds),
+        progress: Math.min(100, Math.round(((activity?.durationSeconds ?? 0) / 7200) * 100)),
+        helper: "Tempo in acqua",
+        icon: <Timer className="size-4" />,
+        tone: "sky" as const,
+      },
+      {
+        label: "Pace medio",
+        value: paceValue,
+        progress: paceSeconds > 0 ? Math.min(100, Math.round((240 / paceSeconds) * 100)) : 0,
+        helper: "Efficienza",
+        icon: <Gauge className="size-4" />,
+        tone: "lime" as const,
+      },
+      {
+        label: "XP",
+        value: `+${activity?.xpEarned ?? 0}`,
+        progress: Math.min(100, Math.round(((activity?.xpEarned ?? 0) / 600) * 100)),
+        helper: "Guadagnati",
+        icon: <Trophy className="size-4" />,
+        tone: "amber" as const,
+      },
+    ]
+  }, [activity])
+
+  const hrOrbs = useMemo(
+    () => [
+      {
+        label: "FC media",
+        value: formatNumber(displayAvgHr, " bpm"),
+        progress: Math.min(100, Math.round(((displayAvgHr ?? 0) / 200) * 100)),
+        helper: "Cardio",
+      },
+      {
+        label: "FC massima",
+        value: formatNumber(displayMaxHr, " bpm"),
+        progress: Math.min(100, Math.round(((displayMaxHr ?? 0) / 205) * 100)),
+        helper: "Picco",
+      },
+      {
+        label: "FC riposo",
+        value: formatNumber(displayRestingHr, " bpm"),
+        progress:
+          displayRestingHr && displayRestingHr > 0
+            ? Math.min(100, Math.round((85 / displayRestingHr) * 100))
+            : 0,
+        helper: "Recupero",
+      },
+    ],
+    [displayAvgHr, displayMaxHr, displayRestingHr]
+  )
 
 	  const normalizeZones = (zones: unknown) => {
 	    if (!zones) return []
@@ -599,42 +671,18 @@ export default function ActivityDetail() {
                 <CardTitle className="font-display">Riepilogo</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-xl border border-border bg-background/60 p-4">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Droplets className="size-4 text-primary" />
-                    Distanza
-                  </div>
-                  <p className="mt-2 text-lg font-semibold text-foreground">
-                    {formatDistance(activity.distanceMeters)}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-border bg-background/60 p-4">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Timer className="size-4 text-primary" />
-                    Durata
-                  </div>
-                  <p className="mt-2 text-lg font-semibold text-foreground">
-                    {formatDuration(activity.durationSeconds)}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-border bg-background/60 p-4">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Gauge className="size-4 text-primary" />
-                    Pace medio
-                  </div>
-                  <p className="mt-2 text-lg font-semibold text-foreground">
-                    {formatPace(activity.avgPacePer100m, activity.distanceMeters, activity.durationSeconds)}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-border bg-background/60 p-4">
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Trophy className="size-4 text-primary" />
-                    XP
-                  </div>
-                  <p className="mt-2 text-lg font-semibold text-foreground">
-                    +{activity.xpEarned ?? 0}
-                  </p>
-                </div>
+                {summaryOrbs.map((item) => (
+                  <MetricOrb
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    progress={item.progress}
+                    helper={item.helper}
+                    icon={item.icon}
+                    tone={item.tone}
+                    size="sm"
+                  />
+                ))}
               </CardContent>
             </Card>
 
@@ -742,33 +790,18 @@ export default function ActivityDetail() {
                 </CardHeader>
                 <CardContent className="space-y-4 text-sm">
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-lg border border-border bg-background/60 p-3">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <HeartPulse className="size-4 text-primary" />
-                        Media
-                      </div>
-                      <p className="mt-2 text-lg font-semibold text-foreground">
-                        {formatNumber(displayAvgHr, " bpm")}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-border bg-background/60 p-3">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <HeartPulse className="size-4 text-primary" />
-                        Massima
-                      </div>
-                      <p className="mt-2 text-lg font-semibold text-foreground">
-                        {formatNumber(displayMaxHr, " bpm")}
-                      </p>
-                    </div>
-                    <div className="rounded-lg border border-border bg-background/60 p-3">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <HeartPulse className="size-4 text-primary" />
-                        Riposo
-                      </div>
-                      <p className="mt-2 text-lg font-semibold text-foreground">
-                        {formatNumber(displayRestingHr, " bpm")}
-                      </p>
-                    </div>
+                    {hrOrbs.map((item) => (
+                      <MetricOrb
+                        key={item.label}
+                        label={item.label}
+                        value={item.value}
+                        progress={item.progress}
+                        helper={item.helper}
+                        icon={<HeartPulse className="size-4" />}
+                        tone="coral"
+                        size="sm"
+                      />
+                    ))}
                   </div>
 
                   {displayHrTotal > 0 ? (

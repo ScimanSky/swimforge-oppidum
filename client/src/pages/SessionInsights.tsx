@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { ChevronLeft, Sparkles, Waves, Activity } from "lucide-react";
+import { ChevronLeft, Sparkles, Waves, Activity, Calendar as CalendarIcon } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { Card, CardContent } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
 
@@ -163,6 +164,65 @@ export default function SessionInsights() {
       return [];
     }
   }, [activeEntry]);
+  const sessionOrbs = useMemo(() => {
+    const totalSessions = sessionEntries.length;
+    const withDistance = sessionEntries
+      .map((entry: any) => Number(entry.activity_distance_meters || 0))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    const withDuration = sessionEntries
+      .map((entry: any) => Number(entry.activity_duration_seconds || 0))
+      .filter((value) => Number.isFinite(value) && value > 0);
+    const avgDistance = withDistance.length
+      ? withDistance.reduce((sum, value) => sum + value, 0) / withDistance.length
+      : 0;
+    const avgDuration = withDuration.length
+      ? withDuration.reduce((sum, value) => sum + value, 0) / withDuration.length
+      : 0;
+    const selectedSessions =
+      sessionView === "week"
+        ? weekDateKeys.reduce(
+            (sum, key) => sum + ((sessionByDate.get(key)?.length as number | undefined) ?? 0),
+            0
+          )
+        : activeDateKey
+          ? sessionByDate.get(activeDateKey)?.length ?? 0
+          : 0;
+
+    return [
+      {
+        label: "Analisi disponibili",
+        value: totalSessions,
+        progress: Math.min(100, Math.round((totalSessions / 50) * 100)),
+        helper: "Storico caricato",
+        icon: <Sparkles className="h-4 w-4" />,
+        tone: "cyan" as const,
+      },
+      {
+        label: "Sessioni selezionate",
+        value: selectedSessions,
+        progress: totalSessions > 0 ? Math.min(100, Math.round((selectedSessions / totalSessions) * 100)) : 0,
+        helper: sessionView === "week" ? "Vista settimana" : "Vista giorno",
+        icon: <CalendarIcon className="h-4 w-4" />,
+        tone: "lime" as const,
+      },
+      {
+        label: "Distanza media",
+        value: avgDistance > 0 ? formatDistance(Math.round(avgDistance)) : "—",
+        progress: Math.min(100, Math.round((avgDistance / 4500) * 100)),
+        helper: "Per sessione",
+        icon: <Waves className="h-4 w-4" />,
+        tone: "amber" as const,
+      },
+      {
+        label: "Durata media",
+        value: avgDuration > 0 ? formatTime(Math.round(avgDuration)) : "—",
+        progress: Math.min(100, Math.round((avgDuration / 5400) * 100)),
+        helper: "Per sessione",
+        icon: <Activity className="h-4 w-4" />,
+        tone: "sky" as const,
+      },
+    ];
+  }, [sessionEntries, sessionView, weekDateKeys, sessionByDate, activeDateKey]);
 
   return (
     <AppLayout>
@@ -186,6 +246,21 @@ export default function SessionInsights() {
             <div className="flex items-center gap-2 md:ml-auto">
               <div className="text-xs text-muted-foreground">Analisi singole sessioni</div>
             </div>
+          </div>
+
+          <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {sessionOrbs.map((item) => (
+              <MetricOrb
+                key={item.label}
+                label={item.label}
+                value={item.value}
+                progress={item.progress}
+                helper={item.helper}
+                icon={item.icon}
+                tone={item.tone}
+                size="sm"
+              />
+            ))}
           </div>
 
           <div className="grid lg:grid-cols-12 gap-6">

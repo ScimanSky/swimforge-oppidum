@@ -4,6 +4,7 @@ import AppLayout from "@/components/AppLayout"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -243,6 +244,48 @@ export default function Settings() {
     }
     return labels[strokeKey] || "Misto"
   }, [activities])
+  const settingsOrbs = useMemo(() => {
+    const totalActivities =
+      (activitiesBySource.garmin || 0) + (activitiesBySource.strava || 0) + (activitiesBySource.manual || 0)
+    const totalXp = Number(profile?.totalXp ?? 0)
+    const levelTarget = Number(profile?.nextLevelXp ?? 0)
+    const connected = Number(Boolean(garminStatus?.connected)) + Number(Boolean(stravaStatus?.connected))
+
+    return [
+      {
+        label: "XP totale",
+        value: totalXp.toLocaleString(),
+        progress: levelTarget > 0 ? Math.min(100, Math.round((totalXp / levelTarget) * 100)) : 0,
+        helper: levelTarget > 0 ? `Target ${levelTarget.toLocaleString()}` : "Profilo",
+        icon: <Check className="size-4" />,
+        tone: "cyan" as const,
+      },
+      {
+        label: "Integrazioni",
+        value: `${connected}/2`,
+        progress: Math.round((connected / 2) * 100),
+        helper: "Garmin + Strava",
+        icon: <Smartphone className="size-4" />,
+        tone: "lime" as const,
+      },
+      {
+        label: "Attività importate",
+        value: totalActivities,
+        progress: Math.min(100, Math.round((totalActivities / 250) * 100)),
+        helper: `${activitiesBySource.garmin} G • ${activitiesBySource.strava} S • ${activitiesBySource.manual} M`,
+        icon: <Globe className="size-4" />,
+        tone: "amber" as const,
+      },
+      {
+        label: "Stile preferito",
+        value: favoriteStroke,
+        progress: totalActivities > 0 ? 100 : 0,
+        helper: "Basato su storico",
+        icon: <Palette className="size-4" />,
+        tone: "sky" as const,
+      },
+    ]
+  }, [activitiesBySource, profile?.totalXp, profile?.nextLevelXp, garminStatus?.connected, stravaStatus?.connected, favoriteStroke])
 
   const preferredPool = useMemo(() => {
     const length = activities?.[0]?.poolLengthMeters
@@ -558,6 +601,21 @@ export default function Settings() {
       <div>
         <h1 className="text-2xl font-display font-bold neon-gradient-text">Impostazioni</h1>
         <p className="text-muted-foreground">Gestisci il tuo account e le preferenze</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {settingsOrbs.map((item) => (
+          <MetricOrb
+            key={item.label}
+            label={item.label}
+            value={item.value}
+            progress={item.progress}
+            helper={item.helper}
+            icon={item.icon}
+            tone={item.tone}
+            size="sm"
+          />
+        ))}
       </div>
 
       {onboarding && (

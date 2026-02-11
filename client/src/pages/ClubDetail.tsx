@@ -27,6 +27,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
@@ -1499,61 +1500,51 @@ export default function ClubDetail() {
                   {/* Stats Tab Content */}
                   <TabsContent value="stats" className="space-y-6">
                     <div className="grid gap-6 md:grid-cols-2">
-                      <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                        <CardContent className="p-6">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center">
-                              <Users className="h-6 w-6 text-primary" />
-                            </div>
-                            <div>
-                              <div className="text-2xl font-bold">{club?.member_count || 0}</div>
-                              <div className="text-sm text-muted-foreground">Membri totali</div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                        <CardContent className="p-6">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="h-12 w-12 rounded-full bg-accent/20 flex items-center justify-center">
-                              <Droplet className="h-6 w-6 text-accent" />
-                            </div>
-                            <div>
-                              <div className="text-2xl font-bold">{feedItems.length}</div>
-                              <div className="text-sm text-muted-foreground">Post pubblicati</div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                        <CardContent className="p-6">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="h-12 w-12 rounded-full bg-purple-500/20 flex items-center justify-center">
-                              <Calendar className="h-6 w-6 text-purple-400" />
-                            </div>
-                            <div>
-                              <div className="text-2xl font-bold">{events.length}</div>
-                              <div className="text-sm text-muted-foreground">Eventi programmati</div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-
-                      <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                        <CardContent className="p-6">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center">
-                              <ImageIcon className="h-6 w-6 text-green-400" />
-                            </div>
-                            <div>
-                              <div className="text-2xl font-bold">{mediaItems.length}</div>
-                              <div className="text-sm text-muted-foreground">Media caricati</div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                      {[
+                        {
+                          label: "Membri totali",
+                          value: club?.member_count || 0,
+                          progress: Math.min(100, Math.round(((club?.member_count || 0) / 120) * 100)),
+                          helper: "Team size",
+                          icon: <Users className="h-4 w-4" />,
+                          tone: "cyan" as const,
+                        },
+                        {
+                          label: "Post pubblicati",
+                          value: feedItems.length,
+                          progress: Math.min(100, Math.round((feedItems.length / 80) * 100)),
+                          helper: "Feed activity",
+                          icon: <Droplet className="h-4 w-4" />,
+                          tone: "lime" as const,
+                        },
+                        {
+                          label: "Eventi programmati",
+                          value: events.length,
+                          progress: Math.min(100, Math.round((events.length / 24) * 100)),
+                          helper: "Calendar",
+                          icon: <Calendar className="h-4 w-4" />,
+                          tone: "amber" as const,
+                        },
+                        {
+                          label: "Media caricati",
+                          value: mediaItems.length,
+                          progress: Math.min(100, Math.round((mediaItems.length / 120) * 100)),
+                          helper: "Gallery",
+                          icon: <ImageIcon className="h-4 w-4" />,
+                          tone: "sky" as const,
+                        },
+                      ].map((item) => (
+                        <MetricOrb
+                          key={item.label}
+                          label={item.label}
+                          value={item.value}
+                          progress={item.progress}
+                          helper={item.helper}
+                          icon={item.icon}
+                          tone={item.tone}
+                          size="sm"
+                        />
+                      ))}
                     </div>
 
                     <Card className="border-border/50 bg-card/60 backdrop-blur-sm">

@@ -1,6 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -115,24 +116,6 @@ function FeatureCard({
   );
 }
 
-function StatItem({
-  value,
-  label,
-  description,
-}: {
-  value: string;
-  label: string;
-  description: string;
-}) {
-  return (
-    <div className="text-center">
-      <p className="text-3xl font-bold text-foreground md:text-4xl">{value}</p>
-      <p className="mt-1 text-sm font-medium text-foreground">{label}</p>
-      <p className="text-xs text-muted-foreground">{description}</p>
-    </div>
-  );
-}
-
 export default function Home() {
   const { theme, toggleTheme, switchable } = useTheme();
   const { isAuthenticated, loading } = useAuth();
@@ -226,9 +209,22 @@ export default function Home() {
 
       <section id="progress" className="border-y border-border bg-card/50 py-16">
         <div className="mx-auto max-w-7xl px-4 md:px-6">
-          <div className="grid grid-cols-3 gap-6 sm:gap-8">
-            {stats.map((stat) => (
-              <StatItem key={stat.label} {...stat} />
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+            {[
+              { ...stats[0], icon: <TrendingUp className="size-4" />, progress: 72, tone: "cyan" as const },
+              { ...stats[1], icon: <Trophy className="size-4" />, progress: 82, tone: "lime" as const },
+              { ...stats[2], icon: <Zap className="size-4" />, progress: 100, tone: "amber" as const },
+            ].map((stat) => (
+              <MetricOrb
+                key={stat.label}
+                label={stat.label}
+                value={stat.value}
+                progress={stat.progress}
+                helper={stat.description}
+                icon={stat.icon}
+                tone={stat.tone}
+                size="sm"
+              />
             ))}
           </div>
         </div>
