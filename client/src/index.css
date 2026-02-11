@@ -214,6 +214,18 @@ body,
 }
 
 @layer utilities {
+  .surface-panel {
+    border-radius: 26px;
+    border: 1px solid color-mix(in oklch, var(--border) 44%, transparent);
+    background: linear-gradient(
+      150deg,
+      color-mix(in oklch, var(--card) 44%, transparent),
+      color-mix(in oklch, var(--card) 28%, transparent)
+    );
+    box-shadow: 0 14px 40px color-mix(in oklch, var(--foreground) 10%, transparent);
+    backdrop-filter: blur(18px);
+  }
+
   .neon-gradient-text {
     background: linear-gradient(
       135deg,

@@ -2,7 +2,6 @@ import { AppLayout } from "@/components/AppLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -306,8 +305,7 @@ export default function Leaderboard() {
                   whileTap={{ scale: 0.98 }}
                 >
                   <Link href={`/u/${entry.userId}`}>
-                  <Card className={`${isCurrentUser ? "ring-2 ring-[var(--azure)] bg-[var(--azure)]/5" : ""} cursor-pointer`}>
-                    <CardContent className="p-4">
+                  <div className={`surface-panel p-4 ${isCurrentUser ? "ring-2 ring-[var(--azure)] bg-[var(--azure)]/8" : ""} cursor-pointer`}>
                       <div className="flex items-center gap-4">
                         {/* Position */}
                         <div className="w-8 flex justify-center">
@@ -340,8 +338,7 @@ export default function Leaderboard() {
                           </p>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                  </div>
                   </Link>
                 </motion.div>
               );

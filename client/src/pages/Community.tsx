@@ -3,7 +3,6 @@
 import AppLayout from "@/components/AppLayout"
 import { useMemo, useState } from "react"
 import { Link } from "wouter"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
@@ -277,19 +276,15 @@ export default function Community() {
   const renderFeed = () => {
     if (feedQuery.isLoading) {
       return (
-        <Card>
-          <CardContent className="p-6 text-muted-foreground">Caricamento feed...</CardContent>
-        </Card>
+        <div className="surface-panel p-6 text-muted-foreground">Caricamento feed...</div>
       )
     }
 
     if (feedItems.length === 0) {
       return (
-        <Card>
-          <CardContent className="p-8 text-center text-muted-foreground">
-            Nessun contenuto nel feed. Condividi la tua prossima sessione!
-          </CardContent>
-        </Card>
+        <div className="surface-panel p-8 text-center text-muted-foreground">
+          Nessun contenuto nel feed. Condividi la tua prossima sessione!
+        </div>
       )
     }
 
@@ -311,8 +306,7 @@ export default function Community() {
               animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
               transition={{ duration: 0.35, ease: "easeOut", delay: Math.min(index * 0.035, 0.25) }}
             >
-              <Card>
-                <CardContent className="p-4">
+              <div className="surface-panel p-4">
                   {/* Post Header */}
                   <div className="flex items-start gap-3 mb-4">
                     <Avatar className="w-10 h-10 border border-border">
@@ -471,8 +465,7 @@ export default function Community() {
                       </motion.div>
                     ) : null}
                   </AnimatePresence>
-                </CardContent>
-              </Card>
+              </div>
             </motion.div>
           )
         })}
@@ -523,16 +516,12 @@ export default function Community() {
 
         <div className={wrapperClass}>
           {clubsQuery.isLoading ? (
-            <Card>
-              <CardContent className="p-6 text-muted-foreground">Caricamento club...</CardContent>
-            </Card>
+            <div className="surface-panel p-6 text-muted-foreground">Caricamento club...</div>
           ) : clubs.length === 0 ? (
-            <Card>
-              <CardContent className="p-6 text-muted-foreground">Nessun club trovato.</CardContent>
-            </Card>
+            <div className="surface-panel p-6 text-muted-foreground">Nessun club trovato.</div>
           ) : (
             clubs.map((club: any) => (
-              <Card key={club.id} className="overflow-hidden">
+              <div key={club.id} className="surface-panel overflow-hidden">
                 <div className="relative h-32">
                   <img
                     src={club.cover_image_url || "/images/pool-lanes.jpg"}
@@ -558,7 +547,7 @@ export default function Community() {
                     </Badge>
                   ) : null}
                 </div>
-                <CardContent className="p-4">
+                <div className="p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h3 className="font-semibold text-foreground truncate">{club.name}</h3>
@@ -581,8 +570,8 @@ export default function Community() {
                       <Link href={`/community/club/${club.id}`}>Apri</Link>
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))
           )}
         </div>
@@ -593,13 +582,13 @@ export default function Community() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <Card className="relative overflow-hidden">
+        <section className="surface-panel relative overflow-hidden">
           <div className="absolute inset-0">
             <div className="absolute inset-0 bg-[radial-gradient(70%_80%_at_18%_0%,color-mix(in_oklch,var(--electric-cyan)_34%,transparent)_0%,transparent_70%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_85%_10%,color-mix(in_oklch,var(--electric-lime)_24%,transparent)_0%,transparent_66%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_60%_90%,color-mix(in_oklch,var(--electric-cyan)_16%,transparent)_0%,transparent_72%)]" />
           </div>
-          <CardContent className="relative p-6">
+          <div className="relative p-6">
             <div className="flex flex-col gap-5">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-background/60 px-3 py-1 text-xs text-muted-foreground">
@@ -632,8 +621,8 @@ export default function Community() {
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
 
         {/* Mobile: tabs */}
         <div className="lg:hidden">

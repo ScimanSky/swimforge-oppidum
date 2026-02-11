@@ -2,7 +2,6 @@
 
 import AppLayout from "@/components/AppLayout"
 import { useMemo, useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
@@ -174,8 +173,7 @@ export default function Activities() {
     <AppLayout>
     <div className="space-y-8 p-4 lg:p-6">
       <div className="grid gap-6 xl:grid-cols-12">
-        <Card className="bg-card border-border xl:col-span-8 glass-panel">
-          <CardContent className="space-y-6 p-6">
+        <section className="surface-panel xl:col-span-8 p-6 space-y-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h1 className="text-3xl font-display font-bold neon-gradient-text">
@@ -201,11 +199,9 @@ export default function Activities() {
                 />
               ))}
             </div>
-          </CardContent>
-        </Card>
+        </section>
 
-        <Card className="bg-card border-border xl:col-span-4">
-          <CardContent className="space-y-4 p-6">
+        <aside className="surface-panel xl:col-span-4 p-6 space-y-4">
             <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-primary">
               <Filter className="h-4 w-4" />
               Filtri
@@ -237,16 +233,14 @@ export default function Activities() {
                 <SelectItem value="xp">XP</SelectItem>
               </SelectContent>
             </Select>
-          </CardContent>
-        </Card>
+        </aside>
       </div>
 
       {/* Activities List */}
       <div className="space-y-3">
         {activitiesQuery.isLoading ? (
           Array.from({ length: 3 }).map((_, index) => (
-            <Card key={index} className="bg-card border-border">
-              <CardContent className="p-4">
+            <div key={index} className="surface-panel p-4">
                 <Skeleton className="h-4 w-40 mb-3" />
                 <Skeleton className="h-3 w-28 mb-4" />
                 <div className="grid grid-cols-4 gap-4">
@@ -255,26 +249,23 @@ export default function Activities() {
                   <Skeleton className="h-6 w-16" />
                   <Skeleton className="h-6 w-16" />
                 </div>
-              </CardContent>
-            </Card>
+            </div>
           ))
         ) : filteredActivities.length === 0 ? (
-          <Card className="bg-card border-border">
-            <CardContent className="p-8 text-center text-muted-foreground">
+          <div className="surface-panel p-8 text-center text-muted-foreground">
               Nessuna attività trovata. Sincronizza i dispositivi per vedere le sessioni.
-            </CardContent>
-          </Card>
+          </div>
         ) : (
           filteredActivities.map((activity) => {
             const isOpenWater = Boolean(activity.isOpenWater)
             const shareChecked = getShareState(activity)
             const shareDisabled = pendingShareId === activity.id
             return (
-              <Card
+              <div
                 key={activity.id}
-                className="bg-card border-border transition-all hover:border-primary/50"
+                className="surface-panel transition-all hover:border-primary/40"
               >
-                <CardContent className="p-4">
+                <div className="p-4">
                   <div className="flex items-start gap-4">
                     {/* Activity Icon */}
                     <div
@@ -360,8 +351,8 @@ export default function Activities() {
                       </Link>
                     </Button>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             )
           })
         )}

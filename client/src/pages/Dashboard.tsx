@@ -3,7 +3,7 @@
 import AppLayout from "@/components/AppLayout"
 import { trpc } from "@/lib/trpc"
 import { useEffect, useMemo, useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -577,11 +577,11 @@ export default function Dashboard() {
               ))}
             </div>
 
-            <Card className="bg-card border-border">
-              <CardHeader className="flex flex-row items-center justify-between">
+            <section className="surface-panel p-6">
+              <div className="mb-4 flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="font-display">Attività recenti</CardTitle>
-                  <CardDescription>Le ultime sessioni sincronizzate</CardDescription>
+                  <h2 className="font-display text-lg font-semibold text-foreground">Attività recenti</h2>
+                  <p className="text-sm text-muted-foreground">Le ultime sessioni sincronizzate</p>
                 </div>
                 <Button variant="ghost-neon" size="sm" asChild>
                   <Link href="/activities">
@@ -589,8 +589,8 @@ export default function Dashboard() {
                     <ChevronRight className="ml-2 size-4" />
                   </Link>
                 </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
+              </div>
+              <div className="space-y-4">
                 {recentActivities.length ? (
                   recentActivities.map((activity) => (
                     <div
@@ -631,15 +631,15 @@ export default function Dashboard() {
                     Nessuna attività recente. Sincronizza Garmin o Strava.
                   </p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="font-display">Sfide attive</CardTitle>
-                <CardDescription>Le tue sfide correnti</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <section className="surface-panel p-6">
+              <div className="mb-4">
+                <h2 className="font-display text-lg font-semibold text-foreground">Sfide attive</h2>
+                <p className="text-sm text-muted-foreground">Le tue sfide correnti</p>
+              </div>
+              <div className="space-y-3">
                 {activeChallenges.length ? (
                   activeChallenges.slice(0, 2).map((challenge) => {
                     const leaderboard = (challenge.leaderboard ?? challenge.leaderboardEntries ?? []) as Array<{ progress: number }>
@@ -665,17 +665,17 @@ export default function Dashboard() {
                     Nessuna sfida attiva. Partecipane una dalla sezione Sfide.
                   </p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </div>
 
           <div className="space-y-6 xl:col-span-5">
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="font-display">Progressi settimanali</CardTitle>
-                <CardDescription>Distanza per giorno</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <section className="surface-panel p-6">
+              <div className="mb-4">
+                <h2 className="font-display text-lg font-semibold text-foreground">Progressi settimanali</h2>
+                <p className="text-sm text-muted-foreground">Distanza per giorno</p>
+              </div>
+              <div className="space-y-3">
                 {weeklyData.map((day) => (
                   <div key={day.day} className="flex items-center gap-3">
                     <span className="w-10 text-xs text-muted-foreground">{day.day}</span>
@@ -688,15 +688,15 @@ export default function Dashboard() {
                     </span>
                   </div>
                 ))}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="font-display">Classifica</CardTitle>
-                <CardDescription>Top nuotatori della settimana</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <section className="surface-panel p-6">
+              <div className="mb-4">
+                <h2 className="font-display text-lg font-semibold text-foreground">Classifica</h2>
+                <p className="text-sm text-muted-foreground">Top nuotatori della settimana</p>
+              </div>
+              <div className="space-y-3">
                 {leaderboardEntries.length ? (
                   leaderboardEntries.slice(0, 3).map((entry) => (
                     <div key={entry.rank} className="flex items-center justify-between">
@@ -719,15 +719,15 @@ export default function Dashboard() {
                 ) : (
                   <p className="text-sm text-muted-foreground">Nessuna classifica disponibile.</p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
 
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="font-display">Insight AI</CardTitle>
-                <CardDescription>Focus rapido della settimana</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <section className="surface-panel p-6">
+              <div className="mb-4">
+                <h2 className="font-display text-lg font-semibold text-foreground">Insight AI</h2>
+                <p className="text-sm text-muted-foreground">Focus rapido della settimana</p>
+              </div>
+              <div className="space-y-3">
                 {aiInsight ? (
                   <>
                     <div className="flex items-center gap-2 text-primary">
@@ -744,8 +744,8 @@ export default function Dashboard() {
                     Nessun insight disponibile. Sincronizza nuove attività.
                   </p>
                 )}
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </div>
         </div>
       </div>
