@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   X,
   Sparkles,
+  Orbit,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
 import { useState, useRef, useCallback, useMemo } from "react";
@@ -84,6 +85,13 @@ export default function Badges() {
     undefined,
     { enabled: isAuthenticated }
   );
+  const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
+    enabled: isAuthenticated,
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
+  });
   const { data: achievementDefinitions, isLoading: achievementsLoading } =
     trpc.badges.getAchievementBadgeDefinitions.useQuery(undefined, { enabled: isAuthenticated });
   const { data: userAchievementBadges } =
@@ -286,6 +294,9 @@ export default function Badges() {
             <Link href="/statistics">Statistiche</Link>
           </Button>
           <Button size="sm" variant="outline-neon" asChild>
+            <Link href="/season">Season</Link>
+          </Button>
+          <Button size="sm" variant="outline-neon" asChild>
             <Link href="/goals">Obiettivi</Link>
           </Button>
           <Button size="sm" variant="neon" asChild>
@@ -312,6 +323,34 @@ export default function Badges() {
               className="xp-bar-fill" 
               style={{ width: `${(earnedCount / Math.max(totalCount, 1)) * 100}%` }}
             />
+          </div>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="neon-card p-4"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                <Orbit className="size-3.5 text-primary" />
+                Season attiva
+              </div>
+              <p className="text-sm font-semibold text-foreground mt-1">
+                {seasonQuery.data?.season?.name ?? "Season Electric Ice"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Lv {seasonQuery.data?.progress?.currentLevel ?? 1} ·{" "}
+                {Number(seasonQuery.data?.progress?.seasonXp ?? 0).toLocaleString()} XP ·{" "}
+                {seasonQuery.data?.season?.remainingDays ?? 0} giorni rimanenti
+              </p>
+            </div>
+            <Button size="sm" variant="outline-neon" asChild>
+              <Link href="/season">
+                Apri Season Hub
+              </Link>
+            </Button>
           </div>
         </motion.div>
 

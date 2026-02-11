@@ -165,6 +165,12 @@ export default function Challenges() {
   })
 
   const profileQuery = trpc.profile.get.useQuery()
+  const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
+  })
   const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
   const badgesQuery = trpc.badges.userBadges.useQuery()
   const challengesQuery = trpc.challenges.list.useQuery()
@@ -285,6 +291,20 @@ export default function Challenges() {
                 <p className="mt-1 text-muted-foreground">
                   Ghost Track e sfide classiche nello stesso hub. Scegli il tuo campo gara.
                 </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <Badge variant="outline" className="text-xs">
+                    Season Lv {seasonQuery.data?.progress?.currentLevel ?? 1}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {Number(seasonQuery.data?.progress?.seasonXp ?? 0).toLocaleString()} XP
+                  </Badge>
+                  <Button variant="outline-neon" size="sm" asChild>
+                    <Link href="/season">
+                      Season Hub
+                      <ChevronRight className="ml-2 size-4" />
+                    </Link>
+                  </Button>
+                </div>
               </div>
               <div className="grid w-full max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4">
                 {challengeOrbs.map((item) => (
