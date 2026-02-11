@@ -2,17 +2,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import confetti from "canvas-confetti";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
-
-interface Badge {
-  id: number;
-  code: string;
-  name: string;
-  description: string;
-  image_url: string;
-}
+import type { BadgeNotificationItem } from "@/hooks/useBadgeNotifications";
 
 interface BadgeUnlockNotificationProps {
-  badges: Badge[];
+  badges: BadgeNotificationItem[];
   onComplete: () => void;
 }
 

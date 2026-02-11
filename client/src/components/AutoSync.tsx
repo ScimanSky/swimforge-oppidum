@@ -53,7 +53,9 @@ export function AutoSync() {
             void utils.profile.get.invalidate();
             void utils.badges.userBadges.invalidate();
             void utils.badges.progress.invalidate();
+            void utils.badges.getUserAchievementBadges.invalidate();
             void utils.badges.checkNewBadges.invalidate();
+            void utils.season.getCurrent.invalidate();
           },
           onError: () => {
             toast.error("Errore nella sincronizzazione", { id: toastId });
