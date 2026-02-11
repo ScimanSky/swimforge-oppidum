@@ -1,12 +1,8 @@
 const seasonRewardImageMap: Record<string, string> = {
-  "S1-BDG-001": "s1_bdg_001.png",
-  "S1-BDG-002": "s1_bdg_002.png",
-  "S1-BDG-003": "s1_bdg_003.png",
-  "S1-BDG-004": "s1_bdg_004.png",
-  "S1-TITLE-PULSE-KEEPER": "s1_title_pulse_keeper.png",
-  "S1-TITLE-RHYTHM-ARCHITECT": "s1_title_rhythm_architect.png",
-  "S1-FRAME-GLACIER-RING": "s1_frame_glacier_ring.png",
-  "S1-EFFECT-AQUA-FLUX": "s1_effect_aqua_flux.png",
+  "S1-BDG-001": "S1_BDG_001 · Frequenza Solida.png",
+  "S1-BDG-002": "S1-BDG-002 · Equilibrio Dinamico.png",
+  "S1-BDG-003": "S1-BDG-003 · Voce della Crew.png",
+  "S1-BDG-004": "S1-BDG-004 · Electric Ice Apex.png",
 };
 
 export function getSeasonRewardImageUrl(rewardCode: string): string {
@@ -16,10 +12,18 @@ export function getSeasonRewardImageUrl(rewardCode: string): string {
 }
 
 const seasonAssignmentImageMap: Record<string, string> = {
-  "S1-BDG-001": "s1_bdg_001.png",
-  "S1-BDG-002": "s1_bdg_002.png",
-  "S1-BDG-003": "s1_bdg_003.png",
-  "S1-BDG-004": "s1_bdg_004.png",
+  "S1-BDG-001": "S1_BDG_001 · Frequenza Solida.png",
+  "S1-BDG-002": "S1-BDG-002 · Equilibrio Dinamico.png",
+  "S1-BDG-003": "S1-BDG-003 · Voce della Crew.png",
+  "S1-BDG-004": "S1-BDG-004 · Electric Ice Apex.png",
+  "S1-BDG-005": "S1-BDG-005 · Finestra Cadenza.png",
+  "S1-BDG-006": "S1-BDG-006 · Bilanciamento Zone.png",
+  "S1-BDG-007": "S1-BDG-007 · Segnale al Team.png",
+  "S1-BDG-008": "S1-BDG-008 · Rotazione Avanzata.png",
+  "S1-BDG-009": "S1-BDG-009 · Scintilla Community.png",
+  "S1-BDG-010": "S1-BDG-010 · Commitment Club.png",
+  "S1-BDG-011": "S1-BDG-011 · Pulse Keeper.png",
+  "S1-BDG-012": "S1-BDG-012 · Rhythm Architect.png",
 };
 
 export function getSeasonAssignmentImageUrl(code: string): string {

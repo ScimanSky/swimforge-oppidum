@@ -1,21 +1,27 @@
-Season 1 badge assets go here.
+Season 1 badge assets.
 
-Format:
+Formato consigliato:
 - PNG
-- Transparent background
-- 1024x1024 (source), app will downscale as needed
+- Sfondo trasparente
+- 1024x1024 (sorgente), l'app ridimensiona automaticamente
 
-Naming convention (exact filenames):
-- `s1_bdg_001.png`
-- `s1_bdg_002.png`
-- `s1_bdg_003.png`
-- `s1_bdg_004.png`
-- `s1_title_pulse_keeper.png`
-- `s1_title_rhythm_architect.png`
-- `s1_frame_glacier_ring.png`
-- `s1_effect_aqua_flux.png`
+Tabella codice -> filename (nomi lasciati esattamente come da file presenti):
 
-Notes:
-- Keep all filenames lowercase.
-- Use underscores, no spaces.
-- Keep this folder in git so design assets can be versioned together with code.
+| Codice | Filename |
+| --- | --- |
+| `S1-BDG-001` | `S1_BDG_001 · Frequenza Solida.png` |
+| `S1-BDG-002` | `S1-BDG-002 · Equilibrio Dinamico.png` |
+| `S1-BDG-003` | `S1-BDG-003 · Voce della Crew.png` |
+| `S1-BDG-004` | `S1-BDG-004 · Electric Ice Apex.png` |
+| `S1-BDG-005` | `S1-BDG-005 · Finestra Cadenza.png` |
+| `S1-BDG-006` | `S1-BDG-006 · Bilanciamento Zone.png` |
+| `S1-BDG-007` | `S1-BDG-007 · Segnale al Team.png` |
+| `S1-BDG-008` | `S1-BDG-008 · Rotazione Avanzata.png` |
+| `S1-BDG-009` | `S1-BDG-009 · Scintilla Community.png` |
+| `S1-BDG-010` | `S1-BDG-010 · Commitment Club.png` |
+| `S1-BDG-011` | `S1-BDG-011 · Pulse Keeper.png` |
+| `S1-BDG-012` | `S1-BDG-012 · Rhythm Architect.png` |
+
+Note:
+- Alcuni file `*:Zone.Identifier` sono metadati Windows e non vengono usati dall'app.
+- Manteniamo i nomi correnti per coerenza con il mapping in codice.
