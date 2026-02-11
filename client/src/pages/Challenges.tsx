@@ -177,11 +177,19 @@ export default function Challenges() {
     },
     onError: (err) => toast.error(err.message || "Impossibile creare la sfida"),
   })
-  const leaderboardQuery = trpc.leaderboard.get.useQuery({
-    orderBy: "totalXp",
-    period: "week",
-    limit: 5,
-  })
+  const leaderboardQuery = trpc.leaderboard.get.useQuery(
+    {
+      orderBy: "totalXp",
+      period: "week",
+      limit: 5,
+    },
+    {
+      staleTime: 15_000,
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: true,
+      refetchOnMount: "always",
+    }
+  )
 
   const joinChallenge = trpc.challenges.join.useMutation({
     onSuccess: () => challengesQuery.refetch(),

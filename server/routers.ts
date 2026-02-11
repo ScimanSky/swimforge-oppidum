@@ -17,7 +17,13 @@ import { TRPCError } from "@trpc/server";
 import { verifySupabaseAccessToken } from "./_core/supabase";
 import type { Request, Response } from "express";
 import { loginLimiter, registrationLimiter } from "./middleware/security";
-import { getOrSetCached, cacheKeys, CACHE_TTL, invalidateUserCache } from "./lib/cache";
+import {
+  getOrSetCached,
+  cacheKeys,
+  CACHE_TTL,
+  invalidateUserCache,
+  invalidateLeaderboardCache,
+} from "./lib/cache";
 import { addComment, getComments, getSocialFeed, setActivityShare, toggleSplash, upsertActivityPost } from "./db_social";
 import { getUserPublicProfile, toggleFollow } from "./db_public_profiles";
 import { getPendingActivityInsights, listActivityInsights, markActivityInsightSeen } from "./ai_activity_insights";
@@ -98,6 +104,7 @@ async function runAutoSync(userId: number, options: { force?: boolean } = {}) {
     garmin.autoSyncGarmin(userId, options),
     strava.autoSyncStrava(userId, options),
   ]);
+  await invalidateLeaderboardCache();
 }
 
 async function applyRateLimit(
@@ -2209,6 +2216,7 @@ async function checkAndAwardBadges(userId: number): Promise<BadgeDefinitionRow[]
     await db.updateSwimmerProfile(userId, {
       totalXp: updatedTotalXp,
     });
+    await invalidateLeaderboardCache();
   }
 
   return newlyAwardedBadges;

@@ -97,11 +97,19 @@ export default function Dashboard() {
   )
   const timelineQuery = trpc.statistics.getTimeline.useQuery({ days: 14 })
   const advancedQuery = trpc.statistics.getAdvanced.useQuery({ days: 30 })
-  const leaderboardQuery = trpc.leaderboard.get.useQuery({
-    orderBy: "totalXp",
-    period: "week",
-    limit: 5,
-  })
+  const leaderboardQuery = trpc.leaderboard.get.useQuery(
+    {
+      orderBy: "totalXp",
+      period: "week",
+      limit: 5,
+    },
+    {
+      staleTime: 15_000,
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: true,
+      refetchOnMount: "always",
+    }
+  )
   const challengesQuery = trpc.challenges.list.useQuery()
 
   const normalizedActivities = useMemo(() => {

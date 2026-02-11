@@ -57,7 +57,7 @@ export async function connectRedis() {
  * Cache TTL (Time To Live) in seconds
  */
 export const CACHE_TTL = {
-  LEADERBOARD: 3600,        // 1 hour
+  LEADERBOARD: 120,         // 2 minutes (near-real-time)
   USER_STATS: 300,          // 5 minutes
   BADGES: 86400,            // 24 hours
   ACTIVITIES: 60,           // 1 minute
@@ -284,7 +284,7 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
  */
 export const cacheKeys = {
   leaderboard: (orderBy: string, period: string, limit: number, offset: number) =>
-    `leaderboard:${orderBy}:${period}:${limit}:${offset}`,
+    `leaderboard:v2:${orderBy}:${period}:${limit}:${offset}`,
   userStats: (userId: string) => `user:stats:${userId}`,
   userProfile: (userId: string) => `user:profile:${userId}`,
   badges: (userId: string) => `user:badges:${userId}`,

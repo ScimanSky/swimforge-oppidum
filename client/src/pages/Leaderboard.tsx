@@ -65,7 +65,13 @@ export default function Leaderboard() {
 
   const { data: leaderboard, isLoading } = trpc.leaderboard.get.useQuery(
     { orderBy, period, limit: 50 },
-    { enabled: isAuthenticated }
+    {
+      enabled: isAuthenticated,
+      staleTime: 15_000,
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: true,
+      refetchOnMount: "always",
+    }
   );
 
   // Redirect if not authenticated
