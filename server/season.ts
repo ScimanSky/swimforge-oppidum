@@ -36,105 +36,161 @@ type MissionTemplate = {
   xpReward: number;
 };
 
-const DAILY_MISSIONS = [
-  {
+type MissionBlueprint = Omit<MissionTemplate, "target"> & { baseTarget: number };
+
+const DAILY_MISSION_POOL: Record<string, MissionBlueprint> = {
+  cadence: {
     id: "daily-cadence-window",
-    kind: "daily" as const,
+    kind: "daily",
     title: "Finestra Cadenza",
     description: "Completa una sessione con cadenza tecnica controllata",
-    target: 1,
-    metric: "cadenceControlSessions" as const,
+    baseTarget: 1,
+    metric: "cadenceControlSessions",
     xpReward: 60,
   },
-  {
+  zone: {
     id: "daily-zone-balance",
-    kind: "daily" as const,
+    kind: "daily",
     title: "Bilanciamento Zone",
     description: "Chiudi una sessione con equilibrio aerobico + picco intenso",
-    target: 1,
-    metric: "zoneBalanceDays" as const,
+    baseTarget: 1,
+    metric: "zoneBalanceDays",
     xpReward: 55,
   },
-  {
+  community: {
     id: "daily-community-touch",
-    kind: "daily" as const,
+    kind: "daily",
     title: "Segnale al Team",
     description: "Fai almeno 1 azione social nel feed",
-    target: 1,
-    metric: "socialActions" as const,
+    baseTarget: 1,
+    metric: "socialActions",
     xpReward: 50,
   },
-];
+  active: {
+    id: "daily-active-day",
+    kind: "daily",
+    title: "Presenza Quotidiana",
+    description: "Completa almeno una sessione oggi",
+    baseTarget: 1,
+    metric: "sessions",
+    xpReward: 45,
+  },
+};
 
-const WEEKLY_MISSIONS = [
-  {
+const WEEKLY_MISSION_POOL: Record<string, MissionBlueprint> = {
+  stroke: {
     id: "weekly-stroke-rotation",
-    kind: "weekly" as const,
+    kind: "weekly",
     title: "Rotazione Avanzata",
-    description: "Usa almeno 2 stili diversi nella settimana",
-    target: 2,
-    metric: "strokeVariety" as const,
+    description: "Usa stili differenti in settimana",
+    baseTarget: 2,
+    metric: "strokeVariety",
     xpReward: 180,
   },
-  {
+  social: {
     id: "weekly-community-spark",
-    kind: "weekly" as const,
+    kind: "weekly",
     title: "Scintilla Community",
-    description: "Esegui 3 azioni social (post/commenti/reazioni)",
-    target: 3,
-    metric: "socialActions" as const,
+    description: "Esegui azioni social utili (post/commenti/reazioni)",
+    baseTarget: 3,
+    metric: "socialActions",
     xpReward: 140,
   },
-  {
-    id: "weekly-club-commitment",
-    kind: "weekly" as const,
-    title: "Commitment Club",
-    description: "Conferma la partecipazione a 1 evento club",
-    target: 1,
-    metric: "eventRsvps" as const,
-    xpReward: 160,
-  },
-];
-
-const WEEKLY_MISSIONS_NO_CLUB = [
-  {
-    id: "weekly-stroke-rotation",
-    kind: "weekly" as const,
-    title: "Rotazione Avanzata",
-    description: "Usa almeno 2 stili diversi nella settimana",
-    target: 2,
-    metric: "strokeVariety" as const,
-    xpReward: 180,
-  },
-  {
-    id: "weekly-community-spark",
-    kind: "weekly" as const,
-    title: "Scintilla Community",
-    description: "Esegui 3 azioni social (post/commenti/reazioni)",
-    target: 3,
-    metric: "socialActions" as const,
-    xpReward: 140,
-  },
-  {
+  cadence: {
     id: "weekly-rhythm-lock",
-    kind: "weekly" as const,
+    kind: "weekly",
     title: "Blocco Tecnico",
-    description: "Completa 2 sessioni con cadenza tecnica controllata",
-    target: 2,
-    metric: "cadenceControlSessions" as const,
+    description: "Completa sessioni con cadenza tecnica controllata",
+    baseTarget: 2,
+    metric: "cadenceControlSessions",
     xpReward: 160,
   },
-];
+  zone: {
+    id: "weekly-zone-grid",
+    kind: "weekly",
+    title: "Griglia Zone",
+    description: "Chiudi giornate con bilanciamento cardio completo",
+    baseTarget: 2,
+    metric: "zoneBalanceDays",
+    xpReward: 150,
+  },
+  presence: {
+    id: "weekly-presence-loop",
+    kind: "weekly",
+    title: "Loop di Presenza",
+    description: "Mantieni continuità di sessioni nella settimana",
+    baseTarget: 3,
+    metric: "sessions",
+    xpReward: 145,
+  },
+  club: {
+    id: "weekly-club-commitment",
+    kind: "weekly",
+    title: "Commitment Club",
+    description: "Conferma partecipazioni ad attività club",
+    baseTarget: 1,
+    metric: "eventRsvps",
+    xpReward: 160,
+  },
+};
 
 const BATTLE_PASS_REWARDS = [
-  { level: 5, rewardCode: "S1-BDG-001", rewardName: "Badge: Frammento Neon I", rewardType: "badge", rarity: "common" as const },
-  { level: 10, rewardCode: "S1-BDG-002", rewardName: "Badge: Frammento Neon II", rewardType: "badge", rarity: "rare" as const },
-  { level: 15, rewardCode: "S1-TITLE-PULSE-KEEPER", rewardName: "Titolo: Pulse Keeper", rewardType: "title", rarity: "rare" as const },
-  { level: 20, rewardCode: "S1-BDG-003", rewardName: "Badge: Vector Core", rewardType: "badge", rarity: "epic" as const },
-  { level: 25, rewardCode: "S1-FRAME-GLACIER-RING", rewardName: "Frame: Glacier Ring", rewardType: "frame", rarity: "epic" as const },
-  { level: 30, rewardCode: "S1-TITLE-RHYTHM-ARCHITECT", rewardName: "Titolo: Rhythm Architect", rewardType: "title", rarity: "epic" as const },
-  { level: 35, rewardCode: "S1-EFFECT-AQUA-FLUX", rewardName: "Effetto: Aqua Flux Trail", rewardType: "effect", rarity: "legendary" as const },
-  { level: 40, rewardCode: "S1-BDG-004", rewardName: "Badge: Electric Ice Apex", rewardType: "badge", rarity: "legendary" as const },
+  {
+    level: 5,
+    rewardCode: "S1-BDG-001",
+    rewardName: "Badge: Frammento Neon I",
+    rewardType: "badge",
+    rarity: "common" as const,
+  },
+  {
+    level: 10,
+    rewardCode: "S1-BDG-002",
+    rewardName: "Badge: Frammento Neon II",
+    rewardType: "badge",
+    rarity: "rare" as const,
+  },
+  {
+    level: 15,
+    rewardCode: "S1-TITLE-PULSE-KEEPER",
+    rewardName: "Titolo: Pulse Keeper",
+    rewardType: "title",
+    rarity: "rare" as const,
+  },
+  {
+    level: 20,
+    rewardCode: "S1-BDG-003",
+    rewardName: "Badge: Vector Core",
+    rewardType: "badge",
+    rarity: "epic" as const,
+  },
+  {
+    level: 25,
+    rewardCode: "S1-FRAME-GLACIER-RING",
+    rewardName: "Frame: Glacier Ring",
+    rewardType: "frame",
+    rarity: "epic" as const,
+  },
+  {
+    level: 30,
+    rewardCode: "S1-TITLE-RHYTHM-ARCHITECT",
+    rewardName: "Titolo: Rhythm Architect",
+    rewardType: "title",
+    rarity: "epic" as const,
+  },
+  {
+    level: 35,
+    rewardCode: "S1-EFFECT-AQUA-FLUX",
+    rewardName: "Effetto: Aqua Flux Trail",
+    rewardType: "effect",
+    rarity: "legendary" as const,
+  },
+  {
+    level: 40,
+    rewardCode: "S1-BDG-004",
+    rewardName: "Badge: Electric Ice Apex",
+    rewardType: "badge",
+    rarity: "legendary" as const,
+  },
 ];
 
 const REWARD_CLAIM_BONUS_XP = {
@@ -282,6 +338,89 @@ function mapMissionProgress(template: MissionTemplate, snapshot: MissionMetricSn
     progress: Math.round(progress),
     completed: current >= template.target,
     xpReward: template.xpReward,
+  };
+}
+
+function withTarget(blueprint: MissionBlueprint, target: number): MissionTemplate {
+  return {
+    ...blueprint,
+    target: Math.max(1, Math.round(target)),
+  };
+}
+
+function buildAdaptiveMissionPlan(args: {
+  recentSnapshot: MissionMetricSnapshot;
+  hasActiveClubMembership: boolean;
+}) {
+  const { recentSnapshot, hasActiveClubMembership } = args;
+  const recentSessions = Math.max(1, recentSnapshot.sessions);
+  const cadenceRate = recentSnapshot.cadenceControlSessions / recentSessions;
+  const zoneRate = recentSnapshot.zoneBalanceDays / recentSessions;
+  const socialPerWeek = recentSnapshot.socialActions / 4;
+  const clubSignal = recentSnapshot.eventRsvps;
+
+  const daily: MissionTemplate[] = [
+    withTarget(DAILY_MISSION_POOL.active, 1),
+  ];
+  daily.push(
+    cadenceRate <= zoneRate
+      ? withTarget(DAILY_MISSION_POOL.cadence, 1)
+      : withTarget(DAILY_MISSION_POOL.zone, 1),
+  );
+  daily.push(withTarget(DAILY_MISSION_POOL.community, 1));
+
+  const weeklyStrokeTarget = recentSnapshot.strokeVariety >= 3 ? 3 : 2;
+  const weeklySocialTarget = clamp(Math.round(socialPerWeek + 1), 2, 4);
+  const weeklyCadenceTarget = clamp(Math.round(recentSnapshot.cadenceControlSessions / 4 + 1), 1, 3);
+  const weeklyZoneTarget = clamp(Math.round(recentSnapshot.zoneBalanceDays / 4 + 1), 1, 3);
+  const weeklyPresenceTarget = clamp(Math.round(recentSnapshot.sessions / 4 + 1), 2, 4);
+
+  const weeklyBase: MissionTemplate[] = [
+    withTarget(WEEKLY_MISSION_POOL.stroke, weeklyStrokeTarget),
+  ];
+
+  const weightedCandidates: Array<{ mission: MissionTemplate; weight: number }> = [
+    {
+      mission: withTarget(WEEKLY_MISSION_POOL.cadence, weeklyCadenceTarget),
+      weight: 1 - clamp(cadenceRate, 0, 1),
+    },
+    {
+      mission: withTarget(WEEKLY_MISSION_POOL.zone, weeklyZoneTarget),
+      weight: 1 - clamp(zoneRate, 0, 1),
+    },
+    {
+      mission: withTarget(WEEKLY_MISSION_POOL.social, weeklySocialTarget),
+      weight: socialPerWeek < 2 ? 0.9 : socialPerWeek < 4 ? 0.6 : 0.35,
+    },
+    {
+      mission: withTarget(WEEKLY_MISSION_POOL.presence, weeklyPresenceTarget),
+      weight: recentSnapshot.sessions < 8 ? 0.8 : 0.45,
+    },
+  ];
+
+  if (hasActiveClubMembership && clubSignal > 0) {
+    weightedCandidates.push({
+      mission: withTarget(WEEKLY_MISSION_POOL.club, 1),
+      weight: 0.58,
+    });
+  }
+
+  const selected = weightedCandidates
+    .sort((a, b) => b.weight - a.weight)
+    .slice(0, 2)
+    .map((entry) => entry.mission);
+
+  const weekly = [...weeklyBase, ...selected];
+
+  return {
+    daily,
+    weekly,
+    profile: {
+      cadenceRate: Math.round(cadenceRate * 100),
+      zoneRate: Math.round(zoneRate * 100),
+      socialPerWeek: Number(socialPerWeek.toFixed(1)),
+      baselineSessionsMonthly: recentSnapshot.sessions,
+    },
   };
 }
 
@@ -475,6 +614,7 @@ export async function getCurrentSeasonState(userId: number) {
   const tomorrowStart = new Date(todayStart.getTime() + DAY_MS);
   const weekStart = startOfUtcWeek(new Date());
   const weekEnd = new Date(weekStart.getTime() + 7 * DAY_MS - 1);
+  const recentStart = new Date(Date.now() - 28 * DAY_MS);
 
   const database = await getDb();
   const clubMembershipCount = database
@@ -489,18 +629,22 @@ export async function getCurrentSeasonState(userId: number) {
     : 0;
   const hasActiveClubMembership = clubMembershipCount > 0;
 
-  const [seasonStats, dailySnapshot, weeklySnapshot, seasonXp, claimedRewardCodes] = await Promise.all([
+  const [seasonStats, dailySnapshot, weeklySnapshot, recentSnapshot, seasonXp, claimedRewardCodes] = await Promise.all([
     getMissionSnapshotForRange(userId, season.startAt, season.endAt),
     getMissionSnapshotForRange(userId, todayStart, new Date(tomorrowStart.getTime() - 1)),
     getMissionSnapshotForRange(userId, weekStart, weekEnd),
+    getMissionSnapshotForRange(userId, recentStart, new Date()),
     getSeasonXpForUser(userId, season.startAt, season.endAt),
     getClaimedRewardCodesForSeason(userId, season.id),
   ]);
 
   const level = resolveLevelFromXp(seasonXp, thresholds);
-  const weeklyMissionTemplates = hasActiveClubMembership ? WEEKLY_MISSIONS : WEEKLY_MISSIONS_NO_CLUB;
-  const dailyMissions = DAILY_MISSIONS.map((mission) => mapMissionProgress(mission, dailySnapshot));
-  const weeklyMissions = weeklyMissionTemplates.map((mission) =>
+  const adaptiveMissionPlan = buildAdaptiveMissionPlan({
+    recentSnapshot,
+    hasActiveClubMembership,
+  });
+  const dailyMissions = adaptiveMissionPlan.daily.map((mission) => mapMissionProgress(mission, dailySnapshot));
+  const weeklyMissions = adaptiveMissionPlan.weekly.map((mission) =>
     mapMissionProgress(mission, weeklySnapshot),
   );
 
@@ -535,6 +679,7 @@ export async function getCurrentSeasonState(userId: number) {
       completionRate,
     },
     seasonStats,
+    missionProfile: adaptiveMissionPlan.profile,
     missionMode: hasActiveClubMembership ? "club-enabled" : "solo-fallback",
     rewards: BATTLE_PASS_REWARDS.map((reward) => ({
       ...reward,

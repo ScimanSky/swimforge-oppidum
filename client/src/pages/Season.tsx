@@ -10,6 +10,7 @@ import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { CalendarDays, ChevronRight, Sparkles, Target, Trophy, Zap } from "lucide-react"
 import { Link } from "wouter"
 import { toast } from "sonner"
+import { getSeasonAssignmentImageUrl, getSeasonRewardImageUrl } from "@/lib/seasonBadgeImages"
 
 function formatRemaining(remainingMs: number) {
   const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000))
@@ -196,7 +197,15 @@ export default function SeasonPage() {
                   {rewards.map((reward) => (
                     <div key={reward.rewardCode} className="stream-card">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex items-center gap-3">
+                          <div className="size-11 rounded-xl overflow-hidden border border-border/70 bg-background/65 shrink-0">
+                            <img
+                              src={getSeasonRewardImageUrl(String(reward.rewardCode))}
+                              alt={reward.rewardName}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          </div>
                           <p className="text-sm font-semibold text-foreground truncate">
                             Lv {reward.level} · {reward.rewardName}
                           </p>
@@ -263,9 +272,21 @@ export default function SeasonPage() {
               <div className="space-y-3">
                 {badgeAssignments.map((item) => (
                   <div key={item.code} className="stream-card">
-                    <p className="text-sm font-semibold text-foreground">{item.name}</p>
-                    <p className="text-xs text-muted-foreground">{item.objective}</p>
-                    <div className="mt-2 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="size-10 rounded-xl overflow-hidden border border-border/70 bg-background/65 shrink-0">
+                        <img
+                          src={getSeasonAssignmentImageUrl(String(item.code))}
+                          alt={item.name}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-foreground">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">{item.objective}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between">
                       <Badge variant="outline" className="text-[10px]">{item.code}</Badge>
                       <Badge variant="outline" className="text-[10px] capitalize">{item.rarity}</Badge>
                     </div>
