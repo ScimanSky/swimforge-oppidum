@@ -7,6 +7,8 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 const POPUP_VERSION = "season-launch-s1-v1";
+const PRIMARY_LAUNCH_IMAGE = "/images/season-launch-electric-ice-main.png";
+const FALLBACK_LAUNCH_IMAGE = "/images/season-launch-electric-ice.svg";
 
 function getStorageKey(userId: string) {
   return `swimforge:feature-popup:${POPUP_VERSION}:${userId}`;
@@ -17,6 +19,7 @@ export default function SeasonLaunchPopup() {
   const userId = user?.id ? String(user.id) : "";
   const [open, setOpen] = useState(false);
   const [bootChecked, setBootChecked] = useState(false);
+  const [launchImageSrc, setLaunchImageSrc] = useState(PRIMARY_LAUNCH_IMAGE);
 
   const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
     enabled: isAuthenticated,
@@ -91,10 +94,15 @@ export default function SeasonLaunchPopup() {
             <div className="grid gap-0 md:grid-cols-[1.1fr_1fr]">
               <div className="relative min-h-[280px] md:min-h-[460px]">
                 <img
-                  src="/images/season-launch-electric-ice.svg"
+                  src={launchImageSrc}
                   alt="Presentazione Electric Ice Season 1"
                   className="h-full w-full object-cover"
                   loading="eager"
+                  onError={() => {
+                    if (launchImageSrc !== FALLBACK_LAUNCH_IMAGE) {
+                      setLaunchImageSrc(FALLBACK_LAUNCH_IMAGE);
+                    }
+                  }}
                 />
               </div>
 
@@ -153,4 +161,3 @@ export default function SeasonLaunchPopup() {
     </AnimatePresence>
   );
 }
-
