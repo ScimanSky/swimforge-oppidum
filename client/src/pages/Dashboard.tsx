@@ -573,7 +573,6 @@ export default function Dashboard() {
                     helper={stat.change}
                     icon={<stat.icon className="size-4" />}
                     tone="auto"
-                    className="min-h-[220px]"
                   />
                 ))}
               </div>

@@ -14,9 +14,39 @@ const TONE_RING: Record<Exclude<MetricTone, "auto">, string> = {
 };
 
 const SIZE_CLASSES: Record<OrbSize, string> = {
-  sm: "size-[148px]",
-  md: "size-[168px]",
-  lg: "size-[188px]",
+  sm: "size-[110px] sm:size-[116px]",
+  md: "size-[122px] sm:size-[130px]",
+  lg: "size-[136px] sm:size-[146px]",
+};
+
+const ICON_WRAP_CLASSES: Record<OrbSize, string> = {
+  sm: "size-6",
+  md: "size-7",
+  lg: "size-8",
+};
+
+const VALUE_CLASSES: Record<OrbSize, string> = {
+  sm: "text-lg sm:text-xl",
+  md: "text-xl sm:text-2xl",
+  lg: "text-2xl sm:text-[1.65rem]",
+};
+
+const PROGRESS_CLASSES: Record<OrbSize, string> = {
+  sm: "text-[9px]",
+  md: "text-[10px]",
+  lg: "text-[11px]",
+};
+
+const LABEL_CLASSES: Record<OrbSize, string> = {
+  sm: "text-[10px]",
+  md: "text-[11px]",
+  lg: "text-xs",
+};
+
+const HELPER_CLASSES: Record<OrbSize, string> = {
+  sm: "text-[10px]",
+  md: "text-[11px]",
+  lg: "text-xs",
 };
 
 const getAutoRing = (progress: number) => {
@@ -52,14 +82,14 @@ export function MetricOrb({
   const safeProgress = Math.max(0, Math.min(100, Number.isFinite(progress) ? progress : 0));
   const ringColor = tone === "auto" ? getAutoRing(safeProgress) : TONE_RING[tone];
 
-  const radius = 40;
+  const radius = 38;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - safeProgress / 100);
 
   return (
     <motion.div
       className={cn(
-        "group/orb relative flex flex-col items-center gap-3 px-1 py-1",
+        "group/orb relative flex flex-col items-center gap-2 px-1 py-1",
         className,
       )}
       whileHover={reduceMotion ? undefined : { y: -2, scale: 1.01 }}
@@ -86,7 +116,7 @@ export function MetricOrb({
             cy="60"
             r={radius}
             stroke="color-mix(in oklch, var(--border) 86%, transparent)"
-            strokeWidth="10"
+            strokeWidth="8"
             fill="none"
           />
           <motion.circle
@@ -94,7 +124,7 @@ export function MetricOrb({
             cy="60"
             r={radius}
             stroke={ringColor}
-            strokeWidth="10"
+            strokeWidth="8"
             fill="none"
             strokeDasharray={circumference}
             strokeLinecap="round"
@@ -111,27 +141,27 @@ export function MetricOrb({
           />
         </svg>
 
-        <div className="relative z-10 flex flex-col items-center justify-center gap-1 text-center">
+        <div className="relative z-10 flex flex-col items-center justify-center gap-0.5 text-center">
           {icon ? (
             <div
-              className="flex size-8 items-center justify-center rounded-full text-foreground/90"
+              className={cn("flex items-center justify-center rounded-full text-foreground/90", ICON_WRAP_CLASSES[size])}
               style={{ background: `color-mix(in oklch, ${ringColor} 24%, transparent)` }}
             >
               {icon}
             </div>
           ) : null}
-          <div className="text-2xl font-display font-bold leading-none text-foreground">{value}</div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          <div className={cn("font-display font-bold leading-none text-foreground", VALUE_CLASSES[size])}>{value}</div>
+          <div className={cn("font-semibold uppercase tracking-[0.14em] text-muted-foreground", PROGRESS_CLASSES[size])}>
             {Math.round(safeProgress)}%
           </div>
         </div>
       </div>
 
       <div className="w-full text-center">
-        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        <div className={cn("font-semibold uppercase tracking-[0.14em] text-muted-foreground", LABEL_CLASSES[size])}>
           {label}
         </div>
-        {helper ? <div className="mt-1 text-xs text-foreground/85">{helper}</div> : null}
+        {helper ? <div className={cn("mt-1 text-foreground/85", HELPER_CLASSES[size])}>{helper}</div> : null}
       </div>
     </motion.div>
   );
