@@ -3,7 +3,7 @@
  */
 
 import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -117,23 +117,23 @@ export default function ClubAnnouncementsTab({ clubId, isStaff }: ClubAnnounceme
       </div>
 
       {announcementsQuery.isLoading ? (
-        <Card>
-          <CardContent className="p-8 flex justify-center">
+        <Surface>
+          <SurfaceContent className="p-8 flex justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
       ) : !announcementsQuery.data || announcementsQuery.data.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
+        <Surface>
+          <SurfaceContent className="p-8 text-center">
             <Megaphone className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">Nessun annuncio</p>
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
       ) : (
         <div className="space-y-4">
           {announcementsQuery.data.map((item: any) => (
-            <Card key={item.announcement.id} className={item.announcement.isPinned ? "border-primary" : ""}>
-              <CardContent className="p-6">
+            <Surface key={item.announcement.id} className={item.announcement.isPinned ? "border-primary" : ""}>
+              <SurfaceContent className="p-6">
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <h3 className="text-lg font-semibold flex-1">{item.announcement.title}</h3>
                   {item.announcement.isPinned && (
@@ -151,8 +151,8 @@ export default function ClubAnnouncementsTab({ clubId, isStaff }: ClubAnnounceme
                   <span>•</span>
                   <span>{new Date(item.announcement.createdAt).toLocaleDateString("it-IT")}</span>
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           ))}
         </div>
       )}

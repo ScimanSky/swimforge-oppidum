@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface"
 import { Button } from "@/components/ui/button"
 import { Plus, Upload, Target, Users } from "lucide-react"
 import Link from "next/link"
@@ -32,13 +32,13 @@ const actions = [
 
 export function QuickActions() {
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg font-display font-bold text-foreground">
+    <Surface className="bg-card border-border">
+      <SurfaceHeader className="pb-2">
+        <SurfaceTitle className="text-lg font-display font-bold text-foreground">
           Quick Actions
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="grid grid-cols-2 gap-2">
+        </SurfaceTitle>
+      </SurfaceHeader>
+      <SurfaceContent className="grid grid-cols-2 gap-2">
         {actions.map((action) => (
           <Button
             key={action.label}
@@ -52,7 +52,7 @@ export function QuickActions() {
             </Link>
           </Button>
         ))}
-      </CardContent>
-    </Card>
+      </SurfaceContent>
+    </Surface>
   )
 }

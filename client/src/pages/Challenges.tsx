@@ -4,7 +4,7 @@ import AppLayout from "@/components/AppLayout"
 import { useMemo, useState } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Surface, SurfaceContent } from "@/components/ui/surface"
 import { Badge } from "@/components/ui/badge"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Progress } from "@/components/ui/progress"
@@ -260,13 +260,13 @@ export default function Challenges() {
     <AppLayout>
       <div className="space-y-6">
         {/* Hero */}
-        <Card className="relative overflow-hidden">
+        <Surface className="relative overflow-hidden">
           <div className="absolute inset-0">
             <div className="absolute inset-0 bg-[radial-gradient(70%_80%_at_20%_0%,color-mix(in_oklch,var(--electric-cyan)_38%,transparent)_0%,transparent_70%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_85%_10%,color-mix(in_oklch,var(--electric-lime)_26%,transparent)_0%,transparent_66%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_60%_90%,color-mix(in_oklch,var(--electric-cyan)_16%,transparent)_0%,transparent_72%)]" />
           </div>
-          <CardContent className="relative p-6">
+          <SurfaceContent className="relative p-6">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-background/60 px-3 py-1 text-xs text-muted-foreground">
@@ -293,8 +293,8 @@ export default function Challenges() {
                 ))}
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
 
         <Tabs value={sectionTab} onValueChange={setSectionTab} className="space-y-6">
           <TabsList className="w-full sm:w-fit">
@@ -443,11 +443,11 @@ export default function Challenges() {
 
               <TabsContent value="active" className="mt-6 space-y-4">
                 {[...activeChallenges, ...pendingChallenges].length === 0 && (
-                  <Card className="bg-card border-border">
-                    <CardContent className="p-6 text-muted-foreground">
+                  <Surface className="bg-card border-border">
+                    <SurfaceContent className="p-6 text-muted-foreground">
                       Nessuna sfida attiva. Esplora le nuove sfide disponibili!
-                    </CardContent>
-                  </Card>
+                    </SurfaceContent>
+                  </Surface>
                 )}
                 {[...activeChallenges, ...pendingChallenges].map((challenge) => {
                   const leaderboard = (challenge.leaderboard ?? []) as Array<{ progress: number }>
@@ -460,7 +460,7 @@ export default function Challenges() {
                     maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
 
                   return (
-                    <Card key={challenge.id} className="bg-card border-border overflow-hidden">
+                    <Surface key={challenge.id} className="bg-card border-border overflow-hidden">
                       <div className="flex flex-col md:flex-row">
                         <div className="relative h-32 w-full md:h-auto md:w-48">
                           <Image
@@ -471,7 +471,7 @@ export default function Challenges() {
                           />
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-card md:bg-gradient-to-t md:from-transparent md:to-card/50" />
                         </div>
-                        <CardContent className="flex-1 p-4">
+                        <SurfaceContent className="flex-1 p-4">
                           <div className="mb-3 flex items-start justify-between">
                             <div>
                               <h3 className="text-lg font-display font-bold text-foreground">
@@ -538,24 +538,24 @@ export default function Challenges() {
                               Leave
                             </Button>
                           </div>
-                        </CardContent>
+                        </SurfaceContent>
                       </div>
-                    </Card>
+                    </Surface>
                   )
                 })}
               </TabsContent>
 
               <TabsContent value="available" className="mt-6 space-y-4">
                 {availableChallenges.length === 0 && (
-                  <Card className="bg-card border-border">
-                    <CardContent className="p-6 text-muted-foreground">
+                  <Surface className="bg-card border-border">
+                    <SurfaceContent className="p-6 text-muted-foreground">
                       Nessuna sfida disponibile al momento.
-                    </CardContent>
-                  </Card>
+                    </SurfaceContent>
+                  </Surface>
                 )}
                 {availableChallenges.map((challenge) => (
-                  <Card key={challenge.id} className="bg-card border-border">
-                    <CardContent className="p-4">
+                  <Surface key={challenge.id} className="bg-card border-border">
+                    <SurfaceContent className="p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div>
                           <h3 className="text-lg font-display font-bold text-foreground">
@@ -578,22 +578,22 @@ export default function Challenges() {
                           </Button>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                    </SurfaceContent>
+                  </Surface>
                 ))}
               </TabsContent>
 
               <TabsContent value="completed" className="mt-6">
-                <Card className="bg-card border-border">
-                  <CardContent className="p-6 text-muted-foreground">
+                <Surface className="bg-card border-border">
+                  <SurfaceContent className="p-6 text-muted-foreground">
                     Nessuna sfida completata al momento.
-                  </CardContent>
-                </Card>
+                  </SurfaceContent>
+                </Surface>
               </TabsContent>
 
               <TabsContent value="leaderboard" className="mt-6">
-                <Card className="bg-card border-border">
-                  <CardContent className="p-4">
+                <Surface className="bg-card border-border">
+                  <SurfaceContent className="p-4">
                     <div className="space-y-4">
                       {leaderboard.length === 0 && (
                         <div className="text-muted-foreground">
@@ -635,8 +635,8 @@ export default function Challenges() {
                         )
                       })}
                     </div>
-                  </CardContent>
-                </Card>
+                  </SurfaceContent>
+                </Surface>
               </TabsContent>
             </Tabs>
           </TabsContent>

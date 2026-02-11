@@ -2,7 +2,7 @@
  * Club Stats Tab - Statistiche aggregate del club
  */
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface";
 import { TrendingUp, Droplet, Clock, Award } from "lucide-react";
 
 interface ClubStatsTabProps {
@@ -22,67 +22,67 @@ export default function ClubStatsTab({ clubId }: ClubStatsTabProps) {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Distanza Totale</CardTitle>
+        <Surface>
+          <SurfaceHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <SurfaceTitle className="text-sm font-medium">Distanza Totale</SurfaceTitle>
             <Droplet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+          </SurfaceHeader>
+          <SurfaceContent>
             <div className="text-2xl font-bold">12,450 km</div>
             <p className="text-xs text-muted-foreground">
               +20% rispetto al mese scorso
             </p>
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tempo Totale</CardTitle>
+        <Surface>
+          <SurfaceHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <SurfaceTitle className="text-sm font-medium">Tempo Totale</SurfaceTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+          </SurfaceHeader>
+          <SurfaceContent>
             <div className="text-2xl font-bold">1,234 ore</div>
             <p className="text-xs text-muted-foreground">
               +15% rispetto al mese scorso
             </p>
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Allenamenti</CardTitle>
+        <Surface>
+          <SurfaceHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <SurfaceTitle className="text-sm font-medium">Allenamenti</SurfaceTitle>
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+          </SurfaceHeader>
+          <SurfaceContent>
             <div className="text-2xl font-bold">856</div>
             <p className="text-xs text-muted-foreground">
               Questo mese
             </p>
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Badge Guadagnati</CardTitle>
+        <Surface>
+          <SurfaceHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <SurfaceTitle className="text-sm font-medium">Badge Guadagnati</SurfaceTitle>
             <Award className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
+          </SurfaceHeader>
+          <SurfaceContent>
             <div className="text-2xl font-bold">47</div>
             <p className="text-xs text-muted-foreground">
               Collettivamente
             </p>
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
       </div>
 
-      <Card>
-        <CardContent className="p-8 text-center">
+      <Surface>
+        <SurfaceContent className="p-8 text-center">
           <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">
             Statistiche dettagliate in arrivo...
           </p>
-        </CardContent>
-      </Card>
+        </SurfaceContent>
+      </Surface>
     </div>
   );
 }

@@ -19,13 +19,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Surface,
+  SurfaceContent,
+  SurfaceDescription,
+  SurfaceFooter,
+  SurfaceHeader,
+  SurfaceTitle,
+} from "@/components/ui/surface";
 import {
   Carousel,
   CarouselContent,
@@ -246,8 +246,8 @@ export default function ComponentsShowcase() {
           {/* Text Colors Section */}
           <section className="space-y-4">
             <h3 className="text-2xl font-semibold">Text Colors</h3>
-            <Card>
-              <CardContent className="pt-6">
+            <Surface>
+              <SurfaceContent className="pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <div>
@@ -302,7 +302,7 @@ export default function ComponentsShowcase() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">
-                        Card Foreground
+                        Surface Foreground
                       </p>
                       <p className="text-card-foreground text-lg">
                         Text color on card backgrounds
@@ -318,15 +318,15 @@ export default function ComponentsShowcase() {
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </section>
 
           {/* Color Combinations Section */}
           <section className="space-y-4">
             <h3 className="text-2xl font-semibold">Color Combinations</h3>
-            <Card>
-              <CardContent className="pt-6">
+            <Surface>
+              <SurfaceContent className="pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="bg-primary text-primary-foreground rounded-lg p-4">
                     <p className="font-medium mb-1">Primary</p>
@@ -359,9 +359,9 @@ export default function ComponentsShowcase() {
                     </p>
                   </div>
                   <div className="bg-card text-card-foreground rounded-lg p-4 border">
-                    <p className="font-medium mb-1">Card</p>
+                    <p className="font-medium mb-1">Surface</p>
                     <p className="text-sm opacity-90">
-                      Card background with foreground text
+                      Surface background with foreground text
                     </p>
                   </div>
                   <div className="bg-popover text-popover-foreground rounded-lg p-4 border">
@@ -377,15 +377,15 @@ export default function ComponentsShowcase() {
                     </p>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </section>
 
           {/* Buttons Section */}
           <section className="space-y-4">
             <h3 className="text-2xl font-semibold">Buttons</h3>
-            <Card>
-              <CardContent className="pt-6">
+            <Surface>
+              <SurfaceContent className="pt-6">
                 <div className="flex flex-wrap gap-4">
                   <Button>Default</Button>
                   <Button variant="secondary">Secondary</Button>
@@ -399,15 +399,15 @@ export default function ComponentsShowcase() {
                     <Check className="h-4 w-4" />
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </section>
 
           {/* Form Inputs Section */}
           <section className="space-y-4">
             <h3 className="text-2xl font-semibold">Form Inputs</h3>
-            <Card>
-              <CardContent className="pt-6 space-y-6">
+            <Surface>
+              <SurfaceContent className="pt-6 space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
                   <Input id="email" type="email" placeholder="Email" />
@@ -673,15 +673,15 @@ export default function ComponentsShowcase() {
                     </p>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </section>
 
           {/* Data Display Section */}
           <section className="space-y-4">
             <h3 className="text-2xl font-semibold">Data Display</h3>
-            <Card>
-              <CardContent className="pt-6 space-y-6">
+            <Surface>
+              <SurfaceContent className="pt-6 space-y-6">
                 <div className="space-y-2">
                   <Label>Badges</Label>
                   <div className="flex flex-wrap gap-2">
@@ -792,7 +792,7 @@ export default function ComponentsShowcase() {
                       <TableRow>
                         <TableCell className="font-medium">INV001</TableCell>
                         <TableCell>Paid</TableCell>
-                        <TableCell>Credit Card</TableCell>
+                        <TableCell>Credit Surface</TableCell>
                         <TableCell className="text-right">$250.00</TableCell>
                       </TableRow>
                       <TableRow>
@@ -862,8 +862,8 @@ export default function ComponentsShowcase() {
                     </BreadcrumbList>
                   </Breadcrumb>
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </section>
 
           {/* Alerts Section */}
@@ -897,33 +897,33 @@ export default function ComponentsShowcase() {
                 <TabsTrigger value="settings">Settings</TabsTrigger>
               </TabsList>
               <TabsContent value="account">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Account</CardTitle>
-                    <CardDescription>
+                <Surface>
+                  <SurfaceHeader>
+                    <SurfaceTitle>Account</SurfaceTitle>
+                    <SurfaceDescription>
                       Make changes to your account here.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
+                    </SurfaceDescription>
+                  </SurfaceHeader>
+                  <SurfaceContent className="space-y-2">
                     <div className="space-y-1">
                       <Label htmlFor="name">Name</Label>
                       <Input id="name" defaultValue="Pedro Duarte" />
                     </div>
-                  </CardContent>
-                  <CardFooter>
+                  </SurfaceContent>
+                  <SurfaceFooter>
                     <Button>Save changes</Button>
-                  </CardFooter>
-                </Card>
+                  </SurfaceFooter>
+                </Surface>
               </TabsContent>
               <TabsContent value="password">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Password</CardTitle>
-                    <CardDescription>
+                <Surface>
+                  <SurfaceHeader>
+                    <SurfaceTitle>Password</SurfaceTitle>
+                    <SurfaceDescription>
                       Change your password here.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
+                    </SurfaceDescription>
+                  </SurfaceHeader>
+                  <SurfaceContent className="space-y-2">
                     <div className="space-y-1">
                       <Label htmlFor="current">Current password</Label>
                       <Input id="current" type="password" />
@@ -932,26 +932,26 @@ export default function ComponentsShowcase() {
                       <Label htmlFor="new">New password</Label>
                       <Input id="new" type="password" />
                     </div>
-                  </CardContent>
-                  <CardFooter>
+                  </SurfaceContent>
+                  <SurfaceFooter>
                     <Button>Save password</Button>
-                  </CardFooter>
-                </Card>
+                  </SurfaceFooter>
+                </Surface>
               </TabsContent>
               <TabsContent value="settings">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Settings</CardTitle>
-                    <CardDescription>
+                <Surface>
+                  <SurfaceHeader>
+                    <SurfaceTitle>Settings</SurfaceTitle>
+                    <SurfaceDescription>
                       Manage your settings here.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
+                    </SurfaceDescription>
+                  </SurfaceHeader>
+                  <SurfaceContent>
                     <p className="text-sm text-muted-foreground">
                       Settings content goes here.
                     </p>
-                  </CardContent>
-                </Card>
+                  </SurfaceContent>
+                </Surface>
               </TabsContent>
             </Tabs>
           </section>
@@ -987,16 +987,16 @@ export default function ComponentsShowcase() {
           <section className="space-y-4">
             <h3 className="text-2xl font-semibold">Collapsible</h3>
             <Collapsible>
-              <Card>
-                <CardHeader>
+              <Surface>
+                <SurfaceHeader>
                   <CollapsibleTrigger asChild>
                     <Button variant="ghost" className="w-full justify-between">
-                      <CardTitle>@peduarte starred 3 repositories</CardTitle>
+                      <SurfaceTitle>@peduarte starred 3 repositories</SurfaceTitle>
                     </Button>
                   </CollapsibleTrigger>
-                </CardHeader>
+                </SurfaceHeader>
                 <CollapsibleContent>
-                  <CardContent>
+                  <SurfaceContent>
                     <div className="space-y-2">
                       <div className="rounded-md border px-4 py-3 font-mono text-sm">
                         @radix-ui/primitives
@@ -1008,17 +1008,17 @@ export default function ComponentsShowcase() {
                         @stitches/react
                       </div>
                     </div>
-                  </CardContent>
+                  </SurfaceContent>
                 </CollapsibleContent>
-              </Card>
+              </Surface>
             </Collapsible>
           </section>
 
           {/* Dialog, Sheet, Drawer Section */}
           <section className="space-y-4">
             <h3 className="text-2xl font-semibold">Overlays</h3>
-            <Card>
-              <CardContent className="pt-6">
+            <Surface>
+              <SurfaceContent className="pt-6">
                 <div className="flex flex-wrap gap-4">
                   <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                     <DialogTrigger asChild>
@@ -1114,15 +1114,15 @@ export default function ComponentsShowcase() {
                     </TooltipContent>
                   </Tooltip>
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </section>
 
           {/* Menus Section */}
           <section className="space-y-4">
             <h3 className="text-2xl font-semibold">Menus</h3>
-            <Card>
-              <CardContent className="pt-6">
+            <Surface>
+              <SurfaceContent className="pt-6">
                 <div className="flex flex-wrap gap-4">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -1152,7 +1152,7 @@ export default function ComponentsShowcase() {
 
                   <HoverCard>
                     <HoverCardTrigger asChild>
-                      <Button variant="outline">Hover Card</Button>
+                      <Button variant="outline">Hover Surface</Button>
                     </HoverCardTrigger>
                     <HoverCardContent>
                       <div className="space-y-2">
@@ -1165,42 +1165,42 @@ export default function ComponentsShowcase() {
                     </HoverCardContent>
                   </HoverCard>
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </section>
 
           {/* Calendar Section */}
           <section className="space-y-4">
             <h3 className="text-2xl font-semibold">Calendar</h3>
-            <Card>
-              <CardContent className="pt-6 flex justify-center">
+            <Surface>
+              <SurfaceContent className="pt-6 flex justify-center">
                 <Calendar
                   mode="single"
                   selected={date}
                   onSelect={setDate}
                   className="rounded-md border"
                 />
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </section>
 
           {/* Carousel Section */}
           <section className="space-y-4">
             <h3 className="text-2xl font-semibold">Carousel</h3>
-            <Card>
-              <CardContent className="pt-6">
+            <Surface>
+              <SurfaceContent className="pt-6">
                 <Carousel className="w-full max-w-xs mx-auto">
                   <CarouselContent>
                     {Array.from({ length: 5 }).map((_, index) => (
                       <CarouselItem key={index}>
                         <div className="p-1">
-                          <Card>
-                            <CardContent className="flex aspect-square items-center justify-center p-6">
+                          <Surface>
+                            <SurfaceContent className="flex aspect-square items-center justify-center p-6">
                               <span className="text-4xl font-semibold">
                                 {index + 1}
                               </span>
-                            </CardContent>
-                          </Card>
+                            </SurfaceContent>
+                          </Surface>
                         </div>
                       </CarouselItem>
                     ))}
@@ -1208,15 +1208,15 @@ export default function ComponentsShowcase() {
                   <CarouselPrevious />
                   <CarouselNext />
                 </Carousel>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </section>
 
           {/* Toggle Section */}
           <section className="space-y-4">
             <h3 className="text-2xl font-semibold">Toggle</h3>
-            <Card>
-              <CardContent className="pt-6 space-y-4">
+            <Surface>
+              <SurfaceContent className="pt-6 space-y-4">
                 <div className="space-y-2">
                   <Label>Toggle</Label>
                   <div className="flex gap-2">
@@ -1249,15 +1249,15 @@ export default function ComponentsShowcase() {
                     </ToggleGroupItem>
                   </ToggleGroup>
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </section>
 
           {/* Aspect Ratio & Scroll Area Section */}
           <section className="space-y-4">
             <h3 className="text-2xl font-semibold">Layout Components</h3>
-            <Card>
-              <CardContent className="pt-6 space-y-6">
+            <Surface>
+              <SurfaceContent className="pt-6 space-y-6">
                 <div className="space-y-2">
                   <Label>Aspect Ratio (16/9)</Label>
                   <AspectRatio ratio={16 / 9} className="bg-muted">
@@ -1281,15 +1281,15 @@ export default function ComponentsShowcase() {
                     </div>
                   </ScrollArea>
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </section>
 
           {/* Resizable Section */}
           <section className="space-y-4">
             <h3 className="text-2xl font-semibold">Resizable Panels</h3>
-            <Card>
-              <CardContent className="pt-6">
+            <Surface>
+              <SurfaceContent className="pt-6">
                 <ResizablePanelGroup
                   direction="horizontal"
                   className="min-h-[200px] rounded-lg border"
@@ -1306,15 +1306,15 @@ export default function ComponentsShowcase() {
                     </div>
                   </ResizablePanel>
                 </ResizablePanelGroup>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </section>
 
           {/* Toast Section */}
           <section className="space-y-4">
             <h3 className="text-2xl font-semibold">Toast</h3>
-            <Card>
-              <CardContent className="pt-6 space-y-4">
+            <Surface>
+              <SurfaceContent className="pt-6 space-y-4">
                 <div className="space-y-2">
                   <Label>Sonner Toast</Label>
                   <div className="flex flex-wrap gap-2">
@@ -1387,15 +1387,15 @@ export default function ComponentsShowcase() {
                     </Button>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </section>
 
           {/* AI ChatBox Section */}
           <section className="space-y-4">
             <h3 className="text-2xl font-semibold">AI ChatBox</h3>
-            <Card>
-              <CardContent className="pt-6">
+            <Surface>
+              <SurfaceContent className="pt-6">
                 <div className="space-y-4">
                   <div className="text-sm text-muted-foreground">
                     <p>
@@ -1421,8 +1421,8 @@ export default function ComponentsShowcase() {
                     ]}
                   />
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </section>
         </div>
       </main>

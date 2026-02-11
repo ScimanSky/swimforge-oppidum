@@ -5,12 +5,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Surface,
+  SurfaceContent,
+  SurfaceDescription,
+  SurfaceHeader,
+  SurfaceTitle,
+} from "@/components/ui/surface";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Waves, Eye, EyeOff, ArrowRight } from "lucide-react";
@@ -142,12 +142,12 @@ export default function Login() {
             </span>
           </div>
 
-          <Card className="bg-card border-border">
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-display">Accedi</CardTitle>
-              <CardDescription>Inserisci le tue credenziali per accedere</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+          <Surface className="bg-card border-border">
+            <SurfaceHeader className="text-center">
+              <SurfaceTitle className="text-2xl font-display">Accedi</SurfaceTitle>
+              <SurfaceDescription>Inserisci le tue credenziali per accedere</SurfaceDescription>
+            </SurfaceHeader>
+            <SurfaceContent className="space-y-4">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
                   <Label>Email</Label>
@@ -241,8 +241,8 @@ export default function Login() {
                   Registrati
                 </Link>
               </p>
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
         </div>
       </div>
     </div>

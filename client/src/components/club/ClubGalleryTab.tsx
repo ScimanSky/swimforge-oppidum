@@ -3,7 +3,7 @@
  */
 
 import { useState } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,14 +55,14 @@ export default function ClubGalleryTab({ clubId, isMember }: ClubGalleryTabProps
 
   if (!isMember) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center">
+      <Surface>
+        <SurfaceContent className="p-8 text-center">
           <Images className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">
             Unisciti al club per vedere la galleria
           </p>
-        </CardContent>
-      </Card>
+        </SurfaceContent>
+      </Surface>
     );
   }
 
@@ -119,22 +119,22 @@ export default function ClubGalleryTab({ clubId, isMember }: ClubGalleryTabProps
       </div>
 
       {galleryQuery.isLoading ? (
-        <Card>
-          <CardContent className="p-8 flex justify-center">
+        <Surface>
+          <SurfaceContent className="p-8 flex justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
       ) : !galleryQuery.data || galleryQuery.data.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
+        <Surface>
+          <SurfaceContent className="p-8 text-center">
             <Images className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">Nessun media ancora</p>
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {galleryQuery.data.map((item: any) => (
-            <Card key={item.media.id} className="overflow-hidden group cursor-pointer hover:shadow-lg transition-all">
+            <Surface key={item.media.id} className="overflow-hidden group cursor-pointer hover:shadow-lg transition-all">
               <div className="aspect-square bg-muted relative">
                 {item.media.mediaType === "image" ? (
                   <img
@@ -153,7 +153,7 @@ export default function ClubGalleryTab({ clubId, isMember }: ClubGalleryTabProps
                   </p>
                 </div>
               </div>
-            </Card>
+            </Surface>
           ))}
         </div>
       )}

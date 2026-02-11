@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -388,8 +388,8 @@ export default function CoachDryland() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.1 }}
                   >
-                    <Card className="bg-card/50 backdrop-blur-sm border-border/60 hover:bg-card/60 transition-colors">
-                      <CardContent className="p-5">
+                    <Surface className="bg-card/50 backdrop-blur-sm border-border/60 hover:bg-card/60 transition-colors">
+                      <SurfaceContent className="p-5">
                         <div className="flex justify-between items-start mb-2">
                           <div
                             className={`p-2 rounded-lg ${
@@ -414,21 +414,21 @@ export default function CoachDryland() {
                         </div>
                         <h4 className="font-bold text-foreground mb-1">{insight.title}</h4>
                         <p className="text-sm text-muted-foreground leading-relaxed">{insight.message}</p>
-                      </CardContent>
-                    </Card>
+                      </SurfaceContent>
+                    </Surface>
                   </motion.div>
                 ))
               ) : (
-                <Card className="bg-card/50 backdrop-blur-sm border-border/60">
-                  <CardContent className="p-5 text-sm text-muted-foreground">
+                <Surface className="bg-card/50 backdrop-blur-sm border-border/60">
+                  <SurfaceContent className="p-5 text-sm text-muted-foreground">
                     Nessun insight disponibile. Completa più sessioni per ottenere analisi personalizzate.
-                  </CardContent>
-                </Card>
+                  </SurfaceContent>
+                </Surface>
               )}
 
               {timeline?.length ? (
-                <Card className="bg-gradient-to-br from-purple-200/40 to-indigo-200/40 dark:from-purple-900/40 dark:to-indigo-900/40 border-purple-500/20">
-                  <CardContent className="p-5 text-center">
+                <Surface className="bg-gradient-to-br from-purple-200/40 to-indigo-200/40 dark:from-purple-900/40 dark:to-indigo-900/40 border-purple-500/20">
+                  <SurfaceContent className="p-5 text-center">
                     <p className="text-purple-700 dark:text-purple-200 text-sm mb-3">
                       Analizzati {timeline.length} allenamenti recenti
                     </p>
@@ -441,8 +441,8 @@ export default function CoachDryland() {
                       <RefreshCw className={`h-4 w-4 mr-2 ${insightsRefreshing ? "animate-spin" : ""}`} />
                       Rigenera Insights
                     </Button>
-                  </CardContent>
-                </Card>
+                  </SurfaceContent>
+                </Surface>
               ) : null}
             </div>
 
@@ -466,7 +466,7 @@ export default function CoachDryland() {
                   </Button>
                 </div>
 
-                <Card className="bg-card/50 backdrop-blur-sm border-border/60 overflow-hidden">
+                <Surface className="bg-card/50 backdrop-blur-sm border-border/60 overflow-hidden">
                   <div className="bg-gradient-to-r from-[var(--gold)]/20 to-amber-200/30 dark:to-amber-900/30 p-6 border-b border-border/60 dark:border-white/5">
                     {drylandWorkout ? (
                       <div className="flex flex-wrap justify-between items-center gap-4">
@@ -486,7 +486,7 @@ export default function CoachDryland() {
                     )}
                   </div>
 
-                  <CardContent className="p-0">
+                  <SurfaceContent className="p-0">
                     {drylandWorkoutQuery.isFetching && (
                       <div className="p-5 text-muted-foreground">Sto preparando l'allenamento...</div>
                     )}
@@ -535,16 +535,16 @@ export default function CoachDryland() {
                         </div>
                       );
                     })}
-                  </CardContent>
-                </Card>
+                  </SurfaceContent>
+                </Surface>
 
                 {drylandWorkout ? (
-                  <Card className="mt-6 bg-[var(--gold)]/10 border border-[var(--gold)]/30">
-                    <CardContent className="p-5 space-y-3">
+                  <Surface className="mt-6 bg-[var(--gold)]/10 border border-[var(--gold)]/30">
+                    <SurfaceContent className="p-5 space-y-3">
                       <div className="text-xs uppercase tracking-wider text-[var(--gold)]">Nota Coach Dryland</div>
                       {renderCoachNotes(drylandWorkout.coachNotes)}
-                    </CardContent>
-                  </Card>
+                    </SurfaceContent>
+                  </Surface>
                 ) : null}
               </div>
             </div>

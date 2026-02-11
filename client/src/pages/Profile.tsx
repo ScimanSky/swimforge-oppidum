@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MetricOrb } from "@/components/metrics/MetricOrb";
@@ -509,7 +509,7 @@ export default function Profile() {
     <AppLayout>
       <div className="space-y-6">
         <div className="grid gap-6 xl:grid-cols-12">
-          <Card className="bg-card border-border xl:col-span-7 glass-panel">
+          <Surface className="bg-card border-border xl:col-span-7 glass-panel">
           <div className="relative h-36 overflow-hidden rounded-t-lg bg-muted">
             {profile?.coverUrl ? (
               <img
@@ -524,7 +524,7 @@ export default function Profile() {
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-card/80 to-transparent" />
           </div>
-          <CardContent className="pt-6">
+          <SurfaceContent className="pt-6">
             <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
               <Avatar className="size-24 border border-border">
                 <AvatarImage src={profile?.avatarUrl || ""} alt={displayName} />
@@ -613,14 +613,14 @@ export default function Profile() {
                   : ""}
               </p>
             </div>
-          </CardContent>
-          </Card>
+          </SurfaceContent>
+          </Surface>
 
-          <Card className="bg-card border-border xl:col-span-5">
-            <CardHeader>
-              <CardTitle className="font-display">Snapshot performance</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Surface className="bg-card border-border xl:col-span-5">
+            <SurfaceHeader>
+              <SurfaceTitle className="font-display">Snapshot performance</SurfaceTitle>
+            </SurfaceHeader>
+            <SurfaceContent>
               <div className="grid gap-4 sm:grid-cols-2">
                 {profileOrbs.map((metric) => (
                   <MetricOrb
@@ -635,8 +635,8 @@ export default function Profile() {
                   />
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
         </div>
 
         <Tabs defaultValue="badges" className="w-full">
@@ -660,8 +660,8 @@ export default function Profile() {
             </div>
           </TabsContent>
           <TabsContent value="activities" className="mt-4">
-            <Card className="bg-card border-border">
-              <CardContent className="pt-6">
+            <Surface className="bg-card border-border">
+              <SurfaceContent className="pt-6">
                 {recentActivities.length ? (
                   recentActivities.map((activity) => (
                     <ActivityItem key={activity.id} {...activity} />
@@ -669,15 +669,15 @@ export default function Profile() {
                 ) : (
                   <p className="text-sm text-muted-foreground">Nessuna attivita recente.</p>
                 )}
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </TabsContent>
           <TabsContent value="records" className="mt-4">
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle>Record personali</CardTitle>
-              </CardHeader>
-              <CardContent>
+            <Surface className="bg-card border-border">
+              <SurfaceHeader>
+                <SurfaceTitle>Record personali</SurfaceTitle>
+              </SurfaceHeader>
+              <SurfaceContent>
                 <div className="grid gap-4 sm:grid-cols-2">
                   {records.map((record) => (
                     <div
@@ -697,8 +697,8 @@ export default function Profile() {
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </TabsContent>
         </Tabs>
       </div>

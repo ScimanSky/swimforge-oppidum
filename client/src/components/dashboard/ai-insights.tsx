@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -39,14 +39,14 @@ export function AIInsights({ insights, isLoading }: AIInsightsProps) {
   })
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-2">
+    <Surface className="bg-card border-border">
+      <SurfaceHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Brain className="w-5 h-5 text-primary" />
-            <CardTitle className="text-lg font-display font-bold text-foreground">
+            <SurfaceTitle className="text-lg font-display font-bold text-foreground">
               AI Coach
-            </CardTitle>
+            </SurfaceTitle>
           </div>
           {isLoading ? (
             <Skeleton className="h-5 w-14" />
@@ -56,8 +56,8 @@ export function AIInsights({ insights, isLoading }: AIInsightsProps) {
             </Badge>
           )}
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      </SurfaceHeader>
+      <SurfaceContent className="space-y-3">
         {isLoading ? (
           Array.from({ length: 2 }).map((_, index) => (
             <div key={index} className="p-3 rounded-lg bg-secondary/30 space-y-2">
@@ -95,7 +95,7 @@ export function AIInsights({ insights, isLoading }: AIInsightsProps) {
             <ChevronRight className="w-4 h-4 ml-1" />
           </Link>
         </Button>
-      </CardContent>
-    </Card>
+      </SurfaceContent>
+    </Surface>
   )
 }

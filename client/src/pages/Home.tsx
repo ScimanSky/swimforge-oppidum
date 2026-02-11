@@ -1,5 +1,5 @@
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { cn } from "@/lib/utils";
@@ -88,7 +88,7 @@ function FeatureCard({
 }) {
   const Icon = icon;
   return (
-    <Card className="relative overflow-hidden border-border/50 bg-card/50 backdrop-blur transition-all hover:border-primary/30 hover:shadow-md">
+    <Surface className="relative overflow-hidden border-border/50 bg-card/50 backdrop-blur transition-all hover:border-primary/30 hover:shadow-md">
       {backgroundImageSrc && (
         <div aria-hidden className="pointer-events-none absolute inset-0">
           <img
@@ -100,7 +100,7 @@ function FeatureCard({
           <div className="absolute inset-0 bg-gradient-to-br from-background/40 via-background/70 to-background/90" />
         </div>
       )}
-      <CardContent className="relative pt-6">
+      <SurfaceContent className="relative pt-6">
         <div className="mb-4 flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="size-6" />
         </div>
@@ -111,8 +111,8 @@ function FeatureCard({
         <p className="text-sm leading-relaxed text-muted-foreground">
           {description}
         </p>
-      </CardContent>
-    </Card>
+      </SurfaceContent>
+    </Surface>
   );
 }
 

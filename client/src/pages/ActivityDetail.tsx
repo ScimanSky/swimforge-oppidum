@@ -5,7 +5,7 @@ import { trpc } from "@/lib/trpc"
 import { useRoute, Link } from "wouter"
 import { useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -651,26 +651,26 @@ export default function ActivityDetail() {
         </div>
 
         {isLoading ? (
-          <Card className="bg-card border-border">
-            <CardContent className="p-6 space-y-4">
+          <Surface className="bg-card border-border">
+            <SurfaceContent className="p-6 space-y-4">
               <Skeleton className="h-6 w-48" />
               <Skeleton className="h-24 w-full" />
               <Skeleton className="h-24 w-full" />
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
         ) : !activity ? (
-          <Card className="bg-card border-border">
-            <CardContent className="p-6 text-sm text-muted-foreground">
+          <Surface className="bg-card border-border">
+            <SurfaceContent className="p-6 text-sm text-muted-foreground">
               Attività non trovata.
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
         ) : (
           <>
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle className="font-display">Riepilogo</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Surface className="bg-card border-border">
+              <SurfaceHeader>
+                <SurfaceTitle className="font-display">Riepilogo</SurfaceTitle>
+              </SurfaceHeader>
+              <SurfaceContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {summaryOrbs.map((item) => (
                   <MetricOrb
                     key={item.label}
@@ -683,15 +683,15 @@ export default function ActivityDetail() {
                     size="sm"
                   />
                 ))}
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
 
             <div className="grid gap-6 xl:grid-cols-12">
-              <Card className="bg-card border-border xl:col-span-7">
-                <CardHeader>
-                  <CardTitle className="font-display">Dettagli sessione</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
+              <Surface className="bg-card border-border xl:col-span-7">
+                <SurfaceHeader>
+                  <SurfaceTitle className="font-display">Dettagli sessione</SurfaceTitle>
+                </SurfaceHeader>
+                <SurfaceContent className="space-y-3 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Data</span>
                     <span className="font-medium text-foreground">{formatDateTime(activity.activityDate)}</span>
@@ -735,14 +735,14 @@ export default function ActivityDetail() {
                       {activity.location ?? "—"}
                     </span>
                   </div>
-                </CardContent>
-              </Card>
+                </SurfaceContent>
+              </Surface>
 
-              <Card className="bg-card border-border xl:col-span-5">
-                <CardHeader>
-                  <CardTitle className="font-display">Tecnica & Efficienza</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
+              <Surface className="bg-card border-border xl:col-span-5">
+                <SurfaceHeader>
+                  <SurfaceTitle className="font-display">Tecnica & Efficienza</SurfaceTitle>
+                </SurfaceHeader>
+                <SurfaceContent className="space-y-3 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">SWOLF medio</span>
                     <span className="font-medium text-foreground">{formatNumber(techMetrics.swolf)}</span>
@@ -779,16 +779,16 @@ export default function ActivityDetail() {
                     <span className="text-muted-foreground">Stress medio</span>
                     <span className="font-medium text-foreground">{formatNumber(techMetrics.avgStress)}</span>
                   </div>
-                </CardContent>
-              </Card>
+                </SurfaceContent>
+              </Surface>
             </div>
 
             <div className="grid gap-6 xl:grid-cols-12">
-              <Card className="bg-card border-border xl:col-span-7">
-                <CardHeader>
-                  <CardTitle className="font-display">Frequenza cardiaca</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 text-sm">
+              <Surface className="bg-card border-border xl:col-span-7">
+                <SurfaceHeader>
+                  <SurfaceTitle className="font-display">Frequenza cardiaca</SurfaceTitle>
+                </SurfaceHeader>
+                <SurfaceContent className="space-y-4 text-sm">
                   <div className="grid gap-3 sm:grid-cols-3">
                     {hrOrbs.map((item) => (
                       <MetricOrb
@@ -829,14 +829,14 @@ export default function ActivityDetail() {
                   ) : (
                     <p className="text-xs text-muted-foreground">Zone cardio non disponibili.</p>
                   )}
-                </CardContent>
-              </Card>
+                </SurfaceContent>
+              </Surface>
 
-              <Card className="bg-card border-border xl:col-span-5">
-                <CardHeader>
-                  <CardTitle className="font-display">Lap & Splits</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 text-sm">
+              <Surface className="bg-card border-border xl:col-span-5">
+                <SurfaceHeader>
+                  <SurfaceTitle className="font-display">Lap & Splits</SurfaceTitle>
+                </SurfaceHeader>
+                <SurfaceContent className="space-y-4 text-sm">
                   {!garminDetails ? (
                     <p className="text-xs text-muted-foreground">
                       Dettagli Garmin non disponibili. Assicurati di essere connesso a Garmin e
@@ -1038,8 +1038,8 @@ export default function ActivityDetail() {
 
                     </Accordion>
                   )}
-                </CardContent>
-              </Card>
+                </SurfaceContent>
+              </Surface>
             </div>
           </>
         )}

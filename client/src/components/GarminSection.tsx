@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -137,8 +137,8 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4 }}
     >
-      <Card>
-        <CardContent className="p-4">
+      <Surface>
+        <SurfaceContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
@@ -326,8 +326,8 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
               )}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </SurfaceContent>
+      </Surface>
     </motion.div>
   );
 }

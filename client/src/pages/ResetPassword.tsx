@@ -5,12 +5,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Surface,
+  SurfaceContent,
+  SurfaceDescription,
+  SurfaceHeader,
+  SurfaceTitle,
+} from "@/components/ui/surface";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Waves, Eye, EyeOff, ArrowRight } from "lucide-react";
@@ -114,14 +114,14 @@ export default function ResetPassword() {
             </span>
           </div>
 
-          <Card className="bg-card border-border">
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-display">Nuova password</CardTitle>
-              <CardDescription>
+          <Surface className="bg-card border-border">
+            <SurfaceHeader className="text-center">
+              <SurfaceTitle className="text-2xl font-display">Nuova password</SurfaceTitle>
+              <SurfaceDescription>
                 Inserisci e conferma la nuova password
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </SurfaceDescription>
+            </SurfaceHeader>
+            <SurfaceContent className="space-y-4">
               {!isReady ? (
                 <div className="text-center text-sm text-muted-foreground">
                   Verifica del link in corso...
@@ -200,8 +200,8 @@ export default function ResetPassword() {
                   </Link>
                 </p>
               )}
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
         </div>
       </div>
     </div>

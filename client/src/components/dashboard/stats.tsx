@@ -1,4 +1,4 @@
-import { Card, CardContent } from "@/components/ui/card"
+import { Surface, SurfaceContent } from "@/components/ui/surface"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { LucideIcon } from "lucide-react"
 
@@ -20,8 +20,8 @@ export function DashboardStats({ stats, isLoading }: DashboardStatsProps) {
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {Array.from({ length: 4 }).map((_, index) => (
-          <Card key={index} className="bg-card border-border">
-            <CardContent className="p-4">
+          <Surface key={index} className="bg-card border-border">
+            <SurfaceContent className="p-4">
               <div className="flex items-center gap-3">
                 <Skeleton className="w-10 h-10 rounded-lg" />
                 <div className="flex-1 space-y-2">
@@ -30,8 +30,8 @@ export function DashboardStats({ stats, isLoading }: DashboardStatsProps) {
                 </div>
               </div>
               <Skeleton className="h-3 w-24 mt-3" />
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
         ))}
       </div>
     )
@@ -50,8 +50,8 @@ export function DashboardStats({ stats, isLoading }: DashboardStatsProps) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {safeStats.map((stat, index) => (
-        <Card key={index} className="bg-card border-border">
-          <CardContent className="p-4">
+        <Surface key={index} className="bg-card border-border">
+          <SurfaceContent className="p-4">
             <div className="flex items-center gap-3">
               {stat.icon ? (
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -82,8 +82,8 @@ export function DashboardStats({ stats, isLoading }: DashboardStatsProps) {
             ) : (
               <p className="text-xs mt-2 text-muted-foreground">—</p>
             )}
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
       ))}
     </div>
   )

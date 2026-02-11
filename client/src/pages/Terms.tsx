@@ -1,5 +1,5 @@
 import AppLayout from "@/components/AppLayout";
-import { Card, CardContent } from "@/components/ui/card";
+import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { renderMarkdownPreview } from "@/lib/markdownPreview";
 import { Link } from "wouter";
 import termsMarkdown from "../content/legal/terms.md?raw";
@@ -14,11 +14,11 @@ export default function Terms() {
           </Link>
         </div>
 
-        <Card className="bg-card border-border">
-          <CardContent className="prose dark:prose-invert max-w-none p-6">
+        <Surface className="bg-card border-border">
+          <SurfaceContent className="prose dark:prose-invert max-w-none p-6">
             <div dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(termsMarkdown) }} />
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
       </div>
     </AppLayout>
   );

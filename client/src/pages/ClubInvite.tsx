@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useRoute } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { trpc } from "@/lib/trpc";
 
 export default function ClubInvite() {
@@ -22,8 +22,8 @@ export default function ClubInvite() {
   return (
     <AppLayout>
       <div className="mx-auto w-full max-w-lg py-10">
-        <Card className="border-border/50 bg-card/70 backdrop-blur-sm">
-          <CardContent className="p-6 text-center space-y-4">
+        <Surface className="border-border/50 bg-card/70 backdrop-blur-sm">
+          <SurfaceContent className="p-6 text-center space-y-4">
             <h1 className="text-xl font-semibold">Invito al Club</h1>
             {acceptInvite.isPending && (
               <p className="text-white/70">Sto accettando l’invito…</p>
@@ -48,8 +48,8 @@ export default function ClubInvite() {
                 <a href="/community">Torna alla community</a>
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
       </div>
     </AppLayout>
   );

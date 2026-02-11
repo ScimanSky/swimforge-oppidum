@@ -3,7 +3,7 @@
 import AppLayout from "@/components/AppLayout"
 import { trpc } from "@/lib/trpc"
 import { useEffect, useMemo, useState } from "react"
-import { Card, CardContent } from "@/components/ui/card"
+import { Surface, SurfaceContent } from "@/components/ui/surface"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -477,7 +477,7 @@ export default function Dashboard() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <Card className="relative overflow-hidden">
+        <Surface className="relative overflow-hidden">
           {coverImage && (
             <div className="absolute inset-0">
               <img
@@ -489,7 +489,7 @@ export default function Dashboard() {
               <div className="absolute inset-0 bg-gradient-to-r from-background/85 via-background/55 to-background/30" />
             </div>
           )}
-          <CardContent className="relative p-6 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <SurfaceContent className="relative p-6 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
               <div className="size-32 rounded-2xl overflow-hidden ei-border-gradient shadow-[0_0_34px_var(--neon-soft)]">
                 {profileAvatarUrl ? (
@@ -557,8 +557,8 @@ export default function Dashboard() {
                 </span>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
 
         <div className="stream-shell">
           <section className="stream-main">

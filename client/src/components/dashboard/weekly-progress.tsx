@@ -1,6 +1,6 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface"
 import { Badge } from "@/components/ui/badge"
 import {
   BarChart,
@@ -27,16 +27,16 @@ type WeeklyProgressProps = {
 export function WeeklyProgress({ data, weeklyGoalKm = 14, isLoading }: WeeklyProgressProps) {
   if (isLoading) {
     return (
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-2">
+      <Surface className="bg-card border-border">
+        <SurfaceHeader className="pb-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg font-display font-bold text-foreground">
+            <SurfaceTitle className="text-lg font-display font-bold text-foreground">
               Weekly Progress
-            </CardTitle>
+            </SurfaceTitle>
             <Skeleton className="h-5 w-24" />
           </div>
-        </CardHeader>
-        <CardContent>
+        </SurfaceHeader>
+        <SurfaceContent>
           <Skeleton className="h-[200px] w-full" />
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
             <div className="space-y-2">
@@ -48,8 +48,8 @@ export function WeeklyProgress({ data, weeklyGoalKm = 14, isLoading }: WeeklyPro
               <Skeleton className="h-6 w-16" />
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </SurfaceContent>
+      </Surface>
     )
   }
 
@@ -70,18 +70,18 @@ export function WeeklyProgress({ data, weeklyGoalKm = 14, isLoading }: WeeklyPro
   const weeklyGoal = weeklyGoalKm
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-2">
+    <Surface className="bg-card border-border">
+      <SurfaceHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-display font-bold text-foreground">
+          <SurfaceTitle className="text-lg font-display font-bold text-foreground">
             Weekly Progress
-          </CardTitle>
+          </SurfaceTitle>
           <Badge variant="outline" className="text-xs">
             {totalDistance.toFixed(1)} / {weeklyGoal} km
           </Badge>
         </div>
-      </CardHeader>
-      <CardContent>
+      </SurfaceHeader>
+      <SurfaceContent>
         <div className="h-[200px] mt-4">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={weekData} barSize={24}>
@@ -131,7 +131,7 @@ export function WeeklyProgress({ data, weeklyGoalKm = 14, isLoading }: WeeklyPro
             </p>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </SurfaceContent>
+    </Surface>
   )
 }

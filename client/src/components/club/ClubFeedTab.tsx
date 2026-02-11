@@ -3,7 +3,7 @@
  */
 
 import { useState, useRef } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -73,22 +73,22 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
 
   if (!isMember) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center">
+      <Surface>
+        <SurfaceContent className="p-8 text-center">
           <MessageCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground">
             Unisciti al club per vedere il feed
           </p>
-        </CardContent>
-      </Card>
+        </SurfaceContent>
+      </Surface>
     );
   }
 
   return (
     <div className="space-y-4">
       {/* Create Post */}
-      <Card>
-        <CardContent className="p-4">
+      <Surface>
+        <SurfaceContent className="p-4">
           <Textarea
             placeholder="Condividi qualcosa con il club..."
             value={postText}
@@ -104,26 +104,26 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
               Pubblica
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </SurfaceContent>
+      </Surface>
 
       {/* Feed */}
       {feedQuery.isLoading ? (
-        <Card>
-          <CardContent className="p-8 flex justify-center">
+        <Surface>
+          <SurfaceContent className="p-8 flex justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
       ) : !feedQuery.data || feedQuery.data.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
+        <Surface>
+          <SurfaceContent className="p-8 text-center">
             <MessageCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground">Nessun post ancora</p>
             <p className="text-sm text-muted-foreground mt-2">
               Sii il primo a condividere qualcosa!
             </p>
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
       ) : (
         <div className="space-y-4">
           {feedQuery.data.map((post: any, index: number) => (
@@ -133,8 +133,8 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
             >
-              <Card>
-                <CardContent className="p-6">
+              <Surface>
+                <SurfaceContent className="p-6">
                   <div className="flex items-start gap-3 mb-4">
                     <Avatar>
                       <AvatarImage src={post.user_avatar || undefined} />
@@ -207,8 +207,8 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
                       </div>
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </SurfaceContent>
+              </Surface>
             </motion.div>
           ))}
         </div>

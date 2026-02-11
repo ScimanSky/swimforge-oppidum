@@ -8,7 +8,7 @@ import {
   Calendar, Clock, MapPin, Users as UsersIcon, Plus, 
   CheckCircle2, XCircle, Circle, ChevronRight, Edit, Trash2
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -199,14 +199,14 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
 
   if (!isMember) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center">
+      <Surface>
+        <SurfaceContent className="p-8 text-center">
           <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
           <p className="text-muted-foreground mb-2">
             Unisciti al club per vedere gli eventi
           </p>
-        </CardContent>
-      </Card>
+        </SurfaceContent>
+      </Surface>
     );
   }
 
@@ -328,14 +328,14 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
 
       {/* Events List */}
       {eventsQuery.isLoading ? (
-        <Card>
-          <CardContent className="p-8 flex justify-center">
+        <Surface>
+          <SurfaceContent className="p-8 flex justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
       ) : !eventsQuery.data || eventsQuery.data.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
+        <Surface>
+          <SurfaceContent className="p-8 text-center">
             <Calendar className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-muted-foreground mb-2">Nessun evento in programma</p>
             {isStaff && (
@@ -343,8 +343,8 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
                 Crea il primo evento per il club!
               </p>
             )}
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
       ) : (
         <div className="grid gap-4">
           {events.map((item, index: number) => {
@@ -362,8 +362,8 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <Card className="hover:shadow-lg transition-all cursor-pointer group">
-                  <CardContent className="p-6">
+                <Surface className="hover:shadow-lg transition-all cursor-pointer group">
+                  <SurfaceContent className="p-6">
                     <div className="flex gap-4">
                       {/* Date Badge */}
                       <div className="flex-shrink-0">
@@ -479,8 +479,8 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
                         </div>
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </SurfaceContent>
+                </Surface>
               </motion.div>
             );
           })}

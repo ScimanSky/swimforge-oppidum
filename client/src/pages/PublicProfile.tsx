@@ -1,7 +1,7 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { Card, CardContent } from "@/components/ui/card"
+import { Surface, SurfaceContent } from "@/components/ui/surface"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -75,22 +75,22 @@ export default function PublicProfile() {
         </div>
 
         {profileQuery.isLoading ? (
-          <Card className="bg-card border-border glass-panel">
-            <CardContent className="p-6 text-muted-foreground">Caricamento profilo...</CardContent>
-          </Card>
+          <Surface className="bg-card border-border glass-panel">
+            <SurfaceContent className="p-6 text-muted-foreground">Caricamento profilo...</SurfaceContent>
+          </Surface>
         ) : profileQuery.isError ? (
-          <Card className="bg-card border-border glass-panel">
-            <CardContent className="p-6">
+          <Surface className="bg-card border-border glass-panel">
+            <SurfaceContent className="p-6">
               <p className="text-foreground font-medium">Impossibile caricare il profilo</p>
               <p className="text-muted-foreground text-sm mt-1">{profileQuery.error.message}</p>
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
         ) : !profileQuery.data ? (
-          <Card className="bg-card border-border glass-panel">
-            <CardContent className="p-6 text-muted-foreground">Profilo non trovato.</CardContent>
-          </Card>
+          <Surface className="bg-card border-border glass-panel">
+            <SurfaceContent className="p-6 text-muted-foreground">Profilo non trovato.</SurfaceContent>
+          </Surface>
         ) : (
-          <Card className="bg-card border-border glass-panel overflow-hidden">
+          <Surface className="bg-card border-border glass-panel overflow-hidden">
             <div className="relative h-40 bg-muted">
               {coverUrl ? (
                 <img src={coverUrl} alt="Cover profilo" className="h-full w-full object-cover" />
@@ -99,7 +99,7 @@ export default function PublicProfile() {
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-card/80 to-transparent" />
             </div>
-            <CardContent className="p-6">
+            <SurfaceContent className="p-6">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                 <div className="flex items-center gap-4">
                   <Avatar className="size-20 border border-border">
@@ -161,8 +161,8 @@ export default function PublicProfile() {
                   size="sm"
                 />
               </div>
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
         )}
       </div>
     </AppLayout>

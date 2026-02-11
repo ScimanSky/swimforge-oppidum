@@ -5,12 +5,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Surface,
+  SurfaceContent,
+  SurfaceDescription,
+  SurfaceHeader,
+  SurfaceTitle,
+} from "@/components/ui/surface";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -203,20 +203,20 @@ export default function Register() {
             </span>
           </div>
 
-          <Card className="bg-card border-border">
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-display">Crea Account</CardTitle>
-              <CardDescription>
+          <Surface className="bg-card border-border">
+            <SurfaceHeader className="text-center">
+              <SurfaceTitle className="text-2xl font-display">Crea Account</SurfaceTitle>
+              <SurfaceDescription>
                 {step === 1
                   ? "Inserisci i tuoi dati per registrarti"
                   : "Configura il tuo profilo nuotatore"}
-              </CardDescription>
+              </SurfaceDescription>
               <div className="flex items-center justify-center gap-2 mt-4">
                 <div className={`w-8 h-1 rounded ${step >= 1 ? "bg-primary" : "bg-muted"}`} />
                 <div className={`w-8 h-1 rounded ${step >= 2 ? "bg-primary" : "bg-muted"}`} />
               </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
+            </SurfaceHeader>
+            <SurfaceContent className="space-y-4">
               {emailSent ? (
                 <div className="space-y-3 text-center">
                   <div className="text-sm text-muted-foreground">
@@ -438,8 +438,8 @@ export default function Register() {
                   </p>
                 </>
               )}
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@ import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface";
 import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { motion } from "framer-motion";
@@ -246,8 +246,8 @@ export default function ChallengeDetail() {
           animate={{ opacity: 1, y: 0 }}
           className="space-y-4"
         >
-          <Card className="bg-card border-border glass-panel">
-            <CardContent className="space-y-4 p-6">
+          <Surface className="bg-card border-border glass-panel">
+            <SurfaceContent className="space-y-4 p-6">
               <p className="text-muted-foreground">{challenge.description}</p>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -298,8 +298,8 @@ export default function ChallengeDetail() {
                   />
                 ))}
               </div>
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
         </motion.div>
 
         {/* Leaderboard */}
@@ -309,14 +309,14 @@ export default function ChallengeDetail() {
           transition={{ delay: 0.1 }}
           className="space-y-4"
         >
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 font-display">
+          <Surface className="bg-card border-border">
+            <SurfaceHeader>
+              <SurfaceTitle className="flex items-center gap-2 font-display">
                 <Medal className="h-5 w-5 text-primary" />
                 Classifica
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+              </SurfaceTitle>
+            </SurfaceHeader>
+            <SurfaceContent>
               <div className="space-y-3">
                 {challenge.participants && challenge.participants.length > 0 ? (
                   challenge.participants.map((participant, index) => (
@@ -393,8 +393,8 @@ export default function ChallengeDetail() {
                   </p>
                 )}
               </div>
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
         </motion.div>
         </div>
       </div>

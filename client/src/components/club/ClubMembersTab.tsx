@@ -2,7 +2,7 @@
  * Club Members Tab - Lista membri del club
  */
 
-import { Card, CardContent } from "@/components/ui/card";
+import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,16 +54,16 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
       </div>
 
       {membersQuery.isLoading ? (
-        <Card>
-          <CardContent className="p-8 flex justify-center">
+        <Surface>
+          <SurfaceContent className="p-8 flex justify-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {membersQuery.data?.map((member: any) => (
-            <Card key={member.id}>
-              <CardContent className="p-4">
+            <Surface key={member.id}>
+              <SurfaceContent className="p-4">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-12 w-12">
                     <AvatarImage src={member.profile_picture || undefined} />
@@ -94,8 +94,8 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
                     </Button>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           ))}
         </div>
       )}

@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Surface, SurfaceContent, SurfaceDescription, SurfaceFooter, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
@@ -167,18 +167,18 @@ export default function Auth() {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
       </div>
 
-      <Card className="relative z-10 w-full max-w-md bg-card/90 border-border/70 backdrop-blur-xl glass-panel">
-        <CardHeader className="text-center space-y-4">
+      <Surface className="relative z-10 w-full max-w-md bg-card/90 border-border/70 backdrop-blur-xl glass-panel">
+        <SurfaceHeader className="text-center space-y-4">
           <div className="mx-auto">
             <img src="/swimforge-logo.png" alt="SwimForge" className="h-28 md:h-32 w-auto" />
           </div>
-          <CardTitle className="text-2xl font-bold neon-gradient-text">SwimForge</CardTitle>
-          <CardDescription className="text-muted-foreground">
+          <SurfaceTitle className="text-2xl font-bold neon-gradient-text">SwimForge</SurfaceTitle>
+          <SurfaceDescription className="text-muted-foreground">
             Accedi o registrati per iniziare a tracciare i tuoi progressi
-          </CardDescription>
-        </CardHeader>
+          </SurfaceDescription>
+        </SurfaceHeader>
 
-        <CardContent>
+        <SurfaceContent>
           {/* Google Sign In Button */}
           <div className="space-y-4 mb-6">
             <Button
@@ -367,14 +367,14 @@ export default function Auth() {
               )}
             </TabsContent>
           </Tabs>
-        </CardContent>
+        </SurfaceContent>
 
-        <CardFooter className="text-center text-sm text-muted-foreground">
+        <SurfaceFooter className="text-center text-sm text-muted-foreground">
           <p className="w-full">
             Traccia i tuoi progressi nel nuoto con SwimForge
           </p>
-        </CardFooter>
-      </Card>
+        </SurfaceFooter>
+      </Surface>
     </div>
     </AppLayout>
   );

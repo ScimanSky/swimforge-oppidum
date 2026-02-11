@@ -5,12 +5,12 @@ import Link from "next/link";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  Surface,
+  SurfaceContent,
+  SurfaceDescription,
+  SurfaceHeader,
+  SurfaceTitle,
+} from "@/components/ui/surface";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Waves, ArrowRight } from "lucide-react";
@@ -81,14 +81,14 @@ export default function ForgotPassword() {
             </span>
           </div>
 
-          <Card className="bg-card border-border">
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl font-display">Password dimenticata</CardTitle>
-              <CardDescription>
+          <Surface className="bg-card border-border">
+            <SurfaceHeader className="text-center">
+              <SurfaceTitle className="text-2xl font-display">Password dimenticata</SurfaceTitle>
+              <SurfaceDescription>
                 Inserisci l&apos;email per ricevere il link di recupero
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+              </SurfaceDescription>
+            </SurfaceHeader>
+            <SurfaceContent className="space-y-4">
               {isSent ? (
                 <div className="space-y-3 text-center text-sm text-muted-foreground">
                   Abbiamo inviato il link di recupero a
@@ -131,8 +131,8 @@ export default function ForgotPassword() {
                   </Link>
                 </p>
               )}
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
         </div>
       </div>
     </div>

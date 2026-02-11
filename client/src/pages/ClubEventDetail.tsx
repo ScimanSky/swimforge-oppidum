@@ -1,7 +1,7 @@
 import AppLayout from "@/components/AppLayout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface";
 import { Badge } from "@/components/ui/badge";
 import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { trpc } from "@/lib/trpc";
@@ -108,11 +108,11 @@ export default function ClubEventDetail() {
           )}
         </div>
 
-        <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="font-display">Dettagli</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
+          <SurfaceHeader>
+            <SurfaceTitle className="font-display">Dettagli</SurfaceTitle>
+          </SurfaceHeader>
+          <SurfaceContent className="space-y-3">
             <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
@@ -206,14 +206,14 @@ export default function ClubEventDetail() {
                 <XCircle className="h-4 w-4 mr-1" /> Non partecipo ({notGoing.length})
               </Button>
             </div>
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
 
-        <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="font-display">Partecipanti</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
+        <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
+          <SurfaceHeader>
+            <SurfaceTitle className="font-display">Partecipanti</SurfaceTitle>
+          </SurfaceHeader>
+          <SurfaceContent className="space-y-6">
             <section className="space-y-3">
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
@@ -312,8 +312,8 @@ export default function ClubEventDetail() {
                 </div>
               )}
             </section>
-          </CardContent>
-        </Card>
+          </SurfaceContent>
+        </Surface>
       </div>
     </AppLayout>
   );

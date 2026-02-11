@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -21,18 +21,18 @@ type LeaderboardProps = {
 
 export function Leaderboard({ entries, isLoading }: LeaderboardProps) {
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-2">
+    <Surface className="bg-card border-border">
+      <SurfaceHeader className="pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Trophy className="w-5 h-5 text-chart-4" />
-            <CardTitle className="text-lg font-display font-bold text-foreground">
+            <SurfaceTitle className="text-lg font-display font-bold text-foreground">
               Weekly Leaderboard
-            </CardTitle>
+            </SurfaceTitle>
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      </SurfaceHeader>
+      <SurfaceContent className="space-y-3">
         {isLoading ? (
           Array.from({ length: 3 }).map((_, index) => (
             <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
@@ -91,7 +91,7 @@ export function Leaderboard({ entries, isLoading }: LeaderboardProps) {
             <ChevronRight className="w-4 h-4 ml-1" />
           </Link>
         </Button>
-      </CardContent>
-    </Card>
+      </SurfaceContent>
+    </Surface>
   )
 }

@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { AlertCircle, Home } from "lucide-react";
 import { useLocation } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
@@ -13,8 +13,8 @@ export default function NotFound() {
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4" withShell={false}>
-      <Card className="w-full max-w-lg mx-4 shadow-2xl border border-[oklch(0.25_0.05_220)] bg-[oklch(0.15_0.03_220_/_0.7)] backdrop-blur-lg">
-        <CardContent className="pt-8 pb-8 text-center">
+      <Surface className="w-full max-w-lg mx-4 shadow-2xl border border-[oklch(0.25_0.05_220)] bg-[oklch(0.15_0.03_220_/_0.7)] backdrop-blur-lg">
+        <SurfaceContent className="pt-8 pb-8 text-center">
           <div className="flex justify-center mb-6">
             <div className="relative">
               <div className="absolute inset-0 bg-red-500/20 rounded-full animate-pulse" />
@@ -44,8 +44,8 @@ export default function NotFound() {
               Torna alla home
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </SurfaceContent>
+      </Surface>
     </AppLayout>
   );
 }

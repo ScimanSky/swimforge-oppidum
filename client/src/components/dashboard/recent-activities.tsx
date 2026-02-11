@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -58,12 +58,12 @@ function formatDate(date: string | Date) {
 
 export function RecentActivities({ activities, isLoading }: RecentActivitiesProps) {
   return (
-    <Card className="bg-card border-border">
-      <CardHeader className="pb-2">
+    <Surface className="bg-card border-border">
+      <SurfaceHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-lg font-display font-bold text-foreground">
+          <SurfaceTitle className="text-lg font-display font-bold text-foreground">
             Recent Activities
-          </CardTitle>
+          </SurfaceTitle>
           <Button variant="ghost" size="sm" asChild>
             <Link href="/activities" className="text-xs text-muted-foreground hover:text-foreground">
               View all
@@ -71,8 +71,8 @@ export function RecentActivities({ activities, isLoading }: RecentActivitiesProp
             </Link>
           </Button>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
+      </SurfaceHeader>
+      <SurfaceContent className="space-y-3">
         {isLoading ? (
           Array.from({ length: 3 }).map((_, index) => (
             <div key={index} className="p-4 rounded-xl bg-secondary/30 space-y-3">
@@ -156,7 +156,7 @@ export function RecentActivities({ activities, isLoading }: RecentActivitiesProp
             )
           })
         )}
-      </CardContent>
-    </Card>
+      </SurfaceContent>
+    </Surface>
   )
 }

@@ -24,7 +24,7 @@ import {
   Upload
 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
-import { Card, CardContent } from "@/components/ui/card";
+import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MetricOrb } from "@/components/metrics/MetricOrb";
@@ -478,7 +478,7 @@ export default function ClubDetail() {
               Torna ai club
             </Link>
 
-            <Card className="relative overflow-hidden">
+            <Surface className="relative overflow-hidden">
               <div className="absolute inset-0">
                 {club?.cover_image_url ? (
                   <img
@@ -494,7 +494,7 @@ export default function ClubDetail() {
                 <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_85%_10%,color-mix(in_oklch,var(--electric-lime)_22%,transparent)_0%,transparent_66%)]" />
               </div>
 
-              <CardContent className="relative p-6">
+              <SurfaceContent className="relative p-6">
                 <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -543,31 +543,31 @@ export default function ClubDetail() {
                     </div>
                   ) : null}
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </div>
         </section>
 
         <section className="py-10">
           <div className="container space-y-8">
             {club && club.is_private && !club.is_member ? (
-              <Card>
-                <CardContent className="p-6 text-muted-foreground">
+              <Surface>
+                <SurfaceContent className="p-6 text-muted-foreground">
                   Questo club è privato. Entra nel club per vedere i contenuti.
-                </CardContent>
-              </Card>
+                </SurfaceContent>
+              </Surface>
             ) : (
               <>
                 {club?.rules && (
-                  <Card>
-                    <CardContent className="p-6">
+                  <Surface>
+                    <SurfaceContent className="p-6">
                       <h3 className="text-lg font-semibold mb-3">Regole del club</h3>
                       <div
                         className="prose dark:prose-invert prose-sm max-w-none"
                         dangerouslySetInnerHTML={{ __html: renderMarkdownPreview(club.rules) }}
                       />
-                    </CardContent>
-                  </Card>
+                    </SurfaceContent>
+                  </Surface>
                 )}
 
                 {/* Tab Navigation */}
@@ -609,8 +609,8 @@ export default function ClubDetail() {
 
                   {/* Feed Tab Content */}
                   <TabsContent value="feed" className="space-y-6">
-                    <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                      <CardContent className="p-6 space-y-4">
+                    <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
+                      <SurfaceContent className="p-6 space-y-4">
                         <div className="flex items-center justify-between">
                           <h2 className="text-xl font-semibold">Bacheca del club</h2>
                           <span className="text-sm text-muted-foreground">{feedItems.length} post</span>
@@ -636,19 +636,19 @@ export default function ClubDetail() {
                             Pubblica
                           </Button>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </SurfaceContent>
+                    </Surface>
 
                     {feedQuery.isLoading ? (
-                      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-                        <CardContent className="p-6 text-muted-foreground">Caricamento feed...</CardContent>
-                      </Card>
+                      <Surface className="border-border/50 bg-card/50 backdrop-blur-sm">
+                        <SurfaceContent className="p-6 text-muted-foreground">Caricamento feed...</SurfaceContent>
+                      </Surface>
                     ) : feedItems.length === 0 ? (
-                      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-                        <CardContent className="p-6 text-muted-foreground">
+                      <Surface className="border-border/50 bg-card/50 backdrop-blur-sm">
+                        <SurfaceContent className="p-6 text-muted-foreground">
                           Nessun contenuto nel club. Condividi il primo post!
-                        </CardContent>
-                      </Card>
+                        </SurfaceContent>
+                      </Surface>
                     ) : (
                       <div className="space-y-6">
 	                        {feedItems.map((post) => {
@@ -663,8 +663,8 @@ export default function ClubDetail() {
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ duration: 0.4 }}
                             >
-                              <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                                <CardContent className="p-4 sm:p-6">
+                              <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
+                                <SurfaceContent className="p-4 sm:p-6">
                                   <div className="flex flex-col sm:flex-row items-start gap-3 mb-4">
                                     {post.user_avatar ? (
 	                                      <img
@@ -826,8 +826,8 @@ export default function ClubDetail() {
                                       <div ref={commentsEndRef} />
                                     </div>
                                   )}
-                                </CardContent>
-                              </Card>
+                                </SurfaceContent>
+                              </Surface>
                             </motion.div>
                           );
                         })}
@@ -838,8 +838,8 @@ export default function ClubDetail() {
                   {/* Eventi Tab Content */}
                   <TabsContent value="eventi" className="space-y-6">
                     {isStaff && (
-                      <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                        <CardContent className="p-6 space-y-4">
+                      <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
+                        <SurfaceContent className="p-6 space-y-4">
                           <h3 className="text-lg font-semibold">Crea Evento</h3>
                           <div className="grid gap-3 md:grid-cols-2">
                             <div className="space-y-2">
@@ -953,20 +953,20 @@ export default function ClubDetail() {
                             <Plus className="h-4 w-4 mr-2" />
                             Crea Evento
                           </Button>
-                        </CardContent>
-                      </Card>
+                        </SurfaceContent>
+                      </Surface>
                     )}
 
 	                    {eventsQuery.isLoading ? (
-	                      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-	                        <CardContent className="p-6 text-muted-foreground">Caricamento eventi...</CardContent>
-	                      </Card>
+	                      <Surface className="border-border/50 bg-card/50 backdrop-blur-sm">
+	                        <SurfaceContent className="p-6 text-muted-foreground">Caricamento eventi...</SurfaceContent>
+	                      </Surface>
 	                    ) : events.length === 0 ? (
-                      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-                        <CardContent className="p-6 text-muted-foreground">
+                      <Surface className="border-border/50 bg-card/50 backdrop-blur-sm">
+                        <SurfaceContent className="p-6 text-muted-foreground">
                           Nessun evento programmato. {isStaff && "Crea il primo evento!"}
-                        </CardContent>
-                      </Card>
+                        </SurfaceContent>
+                      </Surface>
                     ) : (
 	                      <div className="space-y-4">
 	                        {events.map((item) => {
@@ -981,8 +981,8 @@ export default function ClubDetail() {
 	                            animate={{ opacity: 1, y: 0 }}
 	                            transition={{ duration: 0.3 }}
 	                          >
-	                            <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-	                              <CardContent className="p-6">
+	                            <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
+	                              <SurfaceContent className="p-6">
 	                                <div className="flex items-start justify-between mb-3">
 	                                  <div className="flex-1">
 	                                    <h3 className="text-lg font-semibold">{event.title}</h3>
@@ -1051,8 +1051,8 @@ export default function ClubDetail() {
                                       <a href={`/community/club/${clubId}/event/${event.id}`}>Dettagli</a>
                                     </Button>
 	                                </div>
-	                              </CardContent>
-	                            </Card>
+	                              </SurfaceContent>
+	                            </Surface>
 	                          </motion.div>
 	                        );
                           })}
@@ -1062,8 +1062,8 @@ export default function ClubDetail() {
 
                   {/* Membri Tab Content */}
                   <TabsContent value="membri" className="space-y-6">
-                    <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                      <CardContent className="p-6 space-y-4">
+                    <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
+                      <SurfaceContent className="p-6 space-y-4">
                         <div className="flex items-center justify-between">
                           <h3 className="text-lg font-semibold">Membri</h3>
                           <span className="text-sm text-muted-foreground">{members.length} membri</span>
@@ -1121,13 +1121,13 @@ export default function ClubDetail() {
                             ))}
                           </div>
                         )}
-                      </CardContent>
-                    </Card>
+                      </SurfaceContent>
+                    </Surface>
 
                     {isStaff && (
                       <div className="grid gap-6 lg:grid-cols-2">
-                        <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                          <CardContent className="p-6 space-y-4">
+                        <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
+                          <SurfaceContent className="p-6 space-y-4">
                             <h3 className="text-lg font-semibold">Richieste di ingresso</h3>
                             {requests.length === 0 ? (
                               <div className="text-muted-foreground text-sm">Nessuna richiesta in attesa.</div>
@@ -1168,11 +1168,11 @@ export default function ClubDetail() {
                                 ))}
                               </div>
                             )}
-                          </CardContent>
-                        </Card>
+                          </SurfaceContent>
+                        </Surface>
 
-                        <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                          <CardContent className="p-6 space-y-4">
+                        <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
+                          <SurfaceContent className="p-6 space-y-4">
                             <h3 className="text-lg font-semibold">Utenti bannati</h3>
                             {bannedMembers.length === 0 ? (
                               <div className="text-muted-foreground text-sm">Nessun utente bannato.</div>
@@ -1206,8 +1206,8 @@ export default function ClubDetail() {
                                 ))}
                               </div>
                             )}
-                          </CardContent>
-                        </Card>
+                          </SurfaceContent>
+                        </Surface>
                       </div>
                     )}
                   </TabsContent>
@@ -1215,8 +1215,8 @@ export default function ClubDetail() {
                   {/* Gallery Tab Content */}
 	                  <TabsContent value="gallery" className="space-y-6">
 	                    {isStaff && (
-	                      <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-	                        <CardContent className="p-6 space-y-4">
+	                      <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
+	                        <SurfaceContent className="p-6 space-y-4">
 	                          <h3 className="text-lg font-semibold">Carica Media</h3>
 	                          <div className="space-y-3">
 	                            <div className="space-y-2">
@@ -1283,20 +1283,20 @@ export default function ClubDetail() {
 	                            <Upload className="h-4 w-4 mr-2" />
 	                            {uploadMediaFile.isPending ? "Caricamento..." : "Carica"}
 		                          </Button>
-	                        </CardContent>
-	                      </Card>
+	                        </SurfaceContent>
+	                      </Surface>
 	                    )}
 
                     {mediaQuery.isLoading ? (
-                      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-                        <CardContent className="p-6 text-muted-foreground">Caricamento gallery...</CardContent>
-                      </Card>
+                      <Surface className="border-border/50 bg-card/50 backdrop-blur-sm">
+                        <SurfaceContent className="p-6 text-muted-foreground">Caricamento gallery...</SurfaceContent>
+                      </Surface>
                     ) : mediaItems.length === 0 ? (
-                      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-                        <CardContent className="p-6 text-muted-foreground">
+                      <Surface className="border-border/50 bg-card/50 backdrop-blur-sm">
+                        <SurfaceContent className="p-6 text-muted-foreground">
                           Nessun media disponibile. {isStaff && "Carica la prima immagine!"}
-                        </CardContent>
-                      </Card>
+                        </SurfaceContent>
+                      </Surface>
                     ) : (
 	                      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 	                        {mediaItems.map((item: any) => {
@@ -1308,13 +1308,13 @@ export default function ClubDetail() {
 	                            animate={{ opacity: 1, scale: 1 }}
 	                            transition={{ duration: 0.3 }}
 	                          >
-	                            <Card className="border-border/50 bg-card/60 backdrop-blur-sm overflow-hidden">
+	                            <Surface className="border-border/50 bg-card/60 backdrop-blur-sm overflow-hidden">
 	                              <img
 	                                src={media.mediaUrl ?? media.media_url}
 	                                alt={media.caption || "Gallery"}
 	                                className="w-full h-48 object-cover"
 	                              />
-	                              <CardContent className="p-4">
+	                              <SurfaceContent className="p-4">
 	                                {media.caption && (
 	                                  <p className="text-sm text-muted-foreground mb-2">{media.caption}</p>
 	                                )}
@@ -1332,8 +1332,8 @@ export default function ClubDetail() {
 		                                    </Button>
 	                                  )}
 	                                </div>
-	                              </CardContent>
-	                            </Card>
+	                              </SurfaceContent>
+	                            </Surface>
 	                          </motion.div>
 	                        );
                           })}
@@ -1344,8 +1344,8 @@ export default function ClubDetail() {
                   {/* Annunci Tab Content */}
                   <TabsContent value="annunci" className="space-y-6">
                     {isStaff && (
-                      <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                        <CardContent className="p-6 space-y-4">
+                      <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
+                        <SurfaceContent className="p-6 space-y-4">
                           <h3 className="text-lg font-semibold">Crea Annuncio</h3>
                           <div className="space-y-3">
                             <div className="space-y-2">
@@ -1421,20 +1421,20 @@ export default function ClubDetail() {
                             <Megaphone className="h-4 w-4 mr-2" />
                             Pubblica Annuncio
                           </Button>
-                        </CardContent>
-                      </Card>
+                        </SurfaceContent>
+                      </Surface>
                     )}
 
                     {announcementsQuery.isLoading ? (
-                      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-                        <CardContent className="p-6 text-muted-foreground">Caricamento annunci...</CardContent>
-                      </Card>
+                      <Surface className="border-border/50 bg-card/50 backdrop-blur-sm">
+                        <SurfaceContent className="p-6 text-muted-foreground">Caricamento annunci...</SurfaceContent>
+                      </Surface>
                     ) : announcements.length === 0 ? (
-                      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-                        <CardContent className="p-6 text-muted-foreground">
+                      <Surface className="border-border/50 bg-card/50 backdrop-blur-sm">
+                        <SurfaceContent className="p-6 text-muted-foreground">
                           Nessun annuncio disponibile. {isStaff && "Crea il primo annuncio!"}
-                        </CardContent>
-                      </Card>
+                        </SurfaceContent>
+                      </Surface>
                     ) : (
                       <div className="space-y-4">
                         {announcements.map((item: any) => {
@@ -1450,12 +1450,12 @@ export default function ClubDetail() {
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ duration: 0.3 }}
                             >
-                              <Card
+                              <Surface
                                 className={`border-border/50 bg-card/60 backdrop-blur-sm ${
                                   isPinned ? "border-primary/50" : ""
                                 }`}
                               >
-                                <CardContent className="p-6">
+                                <SurfaceContent className="p-6">
                                   <div className="flex items-start justify-between mb-2">
                                     <div className="flex items-center gap-2">
                                       <h3 className="text-lg font-semibold">
@@ -1488,8 +1488,8 @@ export default function ClubDetail() {
                                       <span>Scade: {formatDate(expiresAt)}</span>
                                     ) : null}
                                   </div>
-                                </CardContent>
-                              </Card>
+                                </SurfaceContent>
+                              </Surface>
                             </motion.div>
                           );
                         })}
@@ -1547,8 +1547,8 @@ export default function ClubDetail() {
                       ))}
                     </div>
 
-                    <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                      <CardContent className="p-6 space-y-3">
+                    <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
+                      <SurfaceContent className="p-6 space-y-3">
                         <div className="flex items-center justify-between gap-3">
                           <h3 className="text-lg font-semibold">Eventi programmati</h3>
                           <span className="text-xs text-muted-foreground">{events.length} totali</span>
@@ -1583,11 +1583,11 @@ export default function ClubDetail() {
                             Apri la tab Eventi per vedere tutti gli eventi.
                           </div>
                         ) : null}
-                      </CardContent>
-                    </Card>
+                      </SurfaceContent>
+                    </Surface>
 
-                    <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                      <CardContent className="p-6 space-y-3">
+                    <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
+                      <SurfaceContent className="p-6 space-y-3">
                         <h3 className="text-lg font-semibold">Informazioni Club</h3>
                         <div className="grid gap-3 text-sm">
                           <div className="flex justify-between">
@@ -1605,14 +1605,14 @@ export default function ClubDetail() {
                             <span className="font-semibold capitalize">{club?.member_role || "Nessuno"}</span>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+                      </SurfaceContent>
+                    </Surface>
                   </TabsContent>
 
                   {isStaff && (
                     <TabsContent value="admin" className="space-y-6">
-                      <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                        <CardContent className="p-6 space-y-4">
+                      <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
+                        <SurfaceContent className="p-6 space-y-4">
                           <div className="flex items-center justify-between">
                             <h3 className="text-lg font-semibold">Impostazioni club</h3>
                             <span className="text-xs text-muted-foreground">
@@ -1679,11 +1679,11 @@ export default function ClubDetail() {
                               </Button>
                             )}
                           </div>
-                        </CardContent>
-                      </Card>
+                        </SurfaceContent>
+                      </Surface>
 
-                      <Card className="border-border/50 bg-card/60 backdrop-blur-sm">
-                        <CardContent className="p-6 space-y-4">
+                      <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
+                        <SurfaceContent className="p-6 space-y-4">
                           <h3 className="text-lg font-semibold">Inviti</h3>
                           <div className="grid gap-3 md:grid-cols-3">
                             <div className="space-y-2">
@@ -1795,8 +1795,8 @@ export default function ClubDetail() {
                               })}
                             </div>
                           )}
-                        </CardContent>
-                      </Card>
+                        </SurfaceContent>
+                      </Surface>
                     </TabsContent>
                   )}
                 </Tabs>

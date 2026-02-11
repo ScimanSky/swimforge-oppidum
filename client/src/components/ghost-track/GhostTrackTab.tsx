@@ -21,7 +21,7 @@ import {
   Zap,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Surface, SurfaceContent, SurfaceDescription, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface"
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -315,15 +315,15 @@ export default function GhostTrackTab() {
           </div>
 
           {friendsQuery.isLoading ? (
-            <Card className="border-border">
-              <CardContent className="py-10 text-muted-foreground">Caricamento amici...</CardContent>
-            </Card>
+            <Surface className="border-border">
+              <SurfaceContent className="py-10 text-muted-foreground">Caricamento amici...</SurfaceContent>
+            </Surface>
           ) : friends.length === 0 ? (
-            <Card className="border-border">
-              <CardContent className="py-10 text-muted-foreground">
+            <Surface className="border-border">
+              <SurfaceContent className="py-10 text-muted-foreground">
                 Nessun amico disponibile nel feed pubblico o nei club.
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {friends.map((friend, index) => {
@@ -337,12 +337,12 @@ export default function GhostTrackTab() {
                     : null
 
                 return (
-                  <Card
+                  <Surface
                     key={friend.id}
                     className="border-border hover:border-primary/60 transition-colors cursor-pointer"
                     onClick={() => handleSelectFriend(friend)}
                   >
-                    <CardContent className="space-y-4">
+                    <SurfaceContent className="space-y-4">
                       <div className="flex items-start justify-between">
                         <Avatar className="h-12 w-12">
                           <AvatarImage src={friend.avatar_url || ""} />
@@ -384,22 +384,22 @@ export default function GhostTrackTab() {
                       <Button className="w-full">
                         Sfida <ChevronRight className="ml-2 h-4 w-4" />
                       </Button>
-                    </CardContent>
-                  </Card>
+                    </SurfaceContent>
+                  </Surface>
                 )
               })}
             </div>
           )}
 
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
+          <Surface className="border-border">
+            <SurfaceHeader>
+              <SurfaceTitle className="flex items-center gap-2 text-base">
                 <Trophy className="h-5 w-5 text-primary" />
                 Classifica Ghost Track
-              </CardTitle>
-              <CardDescription>Top 5 sfidanti della community.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
+              </SurfaceTitle>
+              <SurfaceDescription>Top 5 sfidanti della community.</SurfaceDescription>
+            </SurfaceHeader>
+            <SurfaceContent className="space-y-3">
               {leaderboardQuery.isLoading ? (
                 <p className="text-sm text-muted-foreground">Caricamento classifica...</p>
               ) : leaderboard.length === 0 ? (
@@ -448,15 +448,15 @@ export default function GhostTrackTab() {
                   <p className="text-xl font-semibold text-foreground">{myChallengeStats.streak}</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
         </div>
       )}
 
       {viewMode === "sessions" && selectedFriend && (
         <div className="space-y-6">
-          <Card className="border-border">
-            <CardContent className="space-y-4">
+          <Surface className="border-border">
+            <SurfaceContent className="space-y-4">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-12 w-12">
@@ -485,24 +485,24 @@ export default function GhostTrackTab() {
                   </SelectContent>
                 </Select>
               </div>
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
 
           {sessionsQuery.isLoading ? (
-            <Card className="border-border">
-              <CardContent className="py-10 text-muted-foreground">Caricamento sessioni...</CardContent>
-            </Card>
+            <Surface className="border-border">
+              <SurfaceContent className="py-10 text-muted-foreground">Caricamento sessioni...</SurfaceContent>
+            </Surface>
           ) : sessions.length === 0 ? (
-            <Card className="border-border">
-              <CardContent className="py-10 text-muted-foreground">
+            <Surface className="border-border">
+              <SurfaceContent className="py-10 text-muted-foreground">
                 Nessuna sessione condivisa disponibile.
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           ) : (
             <div className="space-y-4">
               {sessions.map((session) => (
-                <Card key={session.post_id} className="border-border">
-                  <CardContent className="space-y-4">
+                <Surface key={session.post_id} className="border-border">
+                  <SurfaceContent className="space-y-4">
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
                         <p className="text-lg font-semibold text-foreground">
@@ -549,8 +549,8 @@ export default function GhostTrackTab() {
                       <Flame className="mr-2 h-4 w-4" />
                       Sfida questa sessione
                     </Button>
-                  </CardContent>
-                </Card>
+                  </SurfaceContent>
+                </Surface>
               ))}
             </div>
           )}
@@ -559,21 +559,21 @@ export default function GhostTrackTab() {
 
       {viewMode === "challenge" && challengeContext && (
         <div className="space-y-6">
-          <Card className="border-border">
-            <CardContent className="text-center">
+          <Surface className="border-border">
+            <SurfaceContent className="text-center">
               <h3 className="text-2xl font-bold text-foreground">Sfida in corso</h3>
               <p className="text-sm text-muted-foreground">
                 Tu vs {selectedFriend?.name || selectedFriend?.email?.split("@")[0] || "Amico"}
               </p>
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="text-base">La tua sessione</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <Surface className="border-border">
+              <SurfaceHeader>
+                <SurfaceTitle className="text-base">La tua sessione</SurfaceTitle>
+              </SurfaceHeader>
+              <SurfaceContent className="space-y-3">
                 <div className="rounded-lg border border-border bg-secondary/30 p-3">
                   <p className="text-xs text-muted-foreground">Distanza</p>
                   <p className="text-lg font-semibold text-foreground">
@@ -592,14 +592,14 @@ export default function GhostTrackTab() {
                     {formatPaceValue(challengeContext.challenger.pacePer100m)}
                   </p>
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
 
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="text-base">Sessione avversario</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <Surface className="border-border">
+              <SurfaceHeader>
+                <SurfaceTitle className="text-base">Sessione avversario</SurfaceTitle>
+              </SurfaceHeader>
+              <SurfaceContent className="space-y-3">
                 <div className="rounded-lg border border-border bg-secondary/30 p-3">
                   <p className="text-xs text-muted-foreground">Distanza</p>
                   <p className="text-lg font-semibold text-foreground">
@@ -618,16 +618,16 @@ export default function GhostTrackTab() {
                     {formatPaceValue(challengeContext.opponent.pacePer100m)}
                   </p>
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </div>
 
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="text-base">Confronto lap-by-lap</CardTitle>
-              <CardDescription>Tempo per lap (tu vs avversario)</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Surface className="border-border">
+            <SurfaceHeader>
+              <SurfaceTitle className="text-base">Confronto lap-by-lap</SurfaceTitle>
+              <SurfaceDescription>Tempo per lap (tu vs avversario)</SurfaceDescription>
+            </SurfaceHeader>
+            <SurfaceContent>
               {lapsQuery.isLoading ? (
                 <p className="text-sm text-muted-foreground">Caricamento laps...</p>
               ) : performanceData.length === 0 ? (
@@ -667,15 +667,15 @@ export default function GhostTrackTab() {
                   </LineChart>
                 </ResponsiveContainer>
               )}
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
 
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="text-base">Differenza tempo per lap</CardTitle>
-              <CardDescription>Valori negativi = sei più veloce</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Surface className="border-border">
+            <SurfaceHeader>
+              <SurfaceTitle className="text-base">Differenza tempo per lap</SurfaceTitle>
+              <SurfaceDescription>Valori negativi = sei più veloce</SurfaceDescription>
+            </SurfaceHeader>
+            <SurfaceContent>
               {performanceData.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   Nessun dato lap disponibile per questa sfida.
@@ -698,8 +698,8 @@ export default function GhostTrackTab() {
                   </BarChart>
                 </ResponsiveContainer>
               )}
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
 
           <div className="flex flex-col gap-3 md:flex-row">
             <Button className="flex-1" onClick={handleViewResults} disabled={createChallengeMutation.isPending}>
@@ -722,8 +722,8 @@ export default function GhostTrackTab() {
 
       {viewMode === "results" && challengeContext && (
         <div className="space-y-6">
-          <Card className="border-border">
-            <CardContent className="text-center space-y-2">
+          <Surface className="border-border">
+            <SurfaceContent className="text-center space-y-2">
               <p className="text-3xl">{isDraw ? "🤝" : didWin ? "🏆" : "⚡"}</p>
               <h3 className="text-2xl font-bold text-foreground">
                 {isDraw ? "Pareggio" : didWin ? "Hai vinto!" : "Hai perso"}
@@ -733,15 +733,15 @@ export default function GhostTrackTab() {
                   ? `Differenza finale: ${timeDiffSeconds > 0 ? "+" : ""}${timeDiffSeconds}s`
                   : "Differenza finale non disponibile"}
               </p>
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="text-base">La tua performance</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <Surface className="border-border">
+              <SurfaceHeader>
+                <SurfaceTitle className="text-base">La tua performance</SurfaceTitle>
+              </SurfaceHeader>
+              <SurfaceContent className="space-y-3">
                 <div className="rounded-lg border border-border bg-secondary/30 p-3">
                   <p className="text-xs text-muted-foreground">Tempo totale</p>
                   <p className="text-lg font-semibold text-foreground">
@@ -766,14 +766,14 @@ export default function GhostTrackTab() {
                     {challengeContext.challenger.avgHeartRate ?? "—"}
                   </p>
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
 
-            <Card className="border-border">
-              <CardHeader>
-                <CardTitle className="text-base">Avversario</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
+            <Surface className="border-border">
+              <SurfaceHeader>
+                <SurfaceTitle className="text-base">Avversario</SurfaceTitle>
+              </SurfaceHeader>
+              <SurfaceContent className="space-y-3">
                 <div className="rounded-lg border border-border bg-secondary/30 p-3">
                   <p className="text-xs text-muted-foreground">Tempo totale</p>
                   <p className="text-lg font-semibold text-foreground">
@@ -798,18 +798,18 @@ export default function GhostTrackTab() {
                     {challengeContext.opponent.avgHeartRate ?? "—"}
                   </p>
                 </div>
-              </CardContent>
-            </Card>
+              </SurfaceContent>
+            </Surface>
           </div>
 
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
+          <Surface className="border-border">
+            <SurfaceHeader>
+              <SurfaceTitle className="flex items-center gap-2 text-base">
                 <TrendingUp className="h-4 w-4 text-primary" />
                 Analisi performance
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-3">
+              </SurfaceTitle>
+            </SurfaceHeader>
+            <SurfaceContent className="grid gap-3 md:grid-cols-3">
               <div className="rounded-lg border border-border bg-secondary/30 p-3">
                 <p className="text-xs text-muted-foreground">Laps più veloci</p>
                 <p className="text-lg font-semibold text-foreground">
@@ -828,8 +828,8 @@ export default function GhostTrackTab() {
                   {lapSummary.consistency !== null ? `${lapSummary.consistency}%` : "—"}
                 </p>
               </div>
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
 
           <div className="flex flex-col gap-3 md:flex-row">
             <Button className="flex-1" onClick={() => setViewMode("leaderboard")}>
@@ -854,15 +854,15 @@ export default function GhostTrackTab() {
 
       {viewMode === "leaderboard" && (
         <div className="space-y-6">
-          <Card className="border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
+          <Surface className="border-border">
+            <SurfaceHeader>
+              <SurfaceTitle className="flex items-center gap-2 text-base">
                 <Trophy className="h-5 w-5 text-primary" />
                 Classifica Ghost Track
-              </CardTitle>
-              <CardDescription>Chi domina le sfide 1v1.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
+              </SurfaceTitle>
+              <SurfaceDescription>Chi domina le sfide 1v1.</SurfaceDescription>
+            </SurfaceHeader>
+            <SurfaceContent className="space-y-3">
               {leaderboard.map((entry) => (
                 <div
                   key={entry.id}
@@ -887,8 +887,8 @@ export default function GhostTrackTab() {
                   <div className="text-sm font-semibold text-primary">{entry.points} pts</div>
                 </div>
               ))}
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
           <Button
             className="w-full"
             onClick={() => {

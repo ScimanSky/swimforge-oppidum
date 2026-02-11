@@ -7,7 +7,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MetricOrb } from "@/components/metrics/MetricOrb";
-import { Card, CardContent } from "@/components/ui/card";
+import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { Calendar } from "@/components/ui/calendar";
 
 function formatDistance(meters?: number | null) {
@@ -265,8 +265,8 @@ export default function SessionInsights() {
 
           <div className="grid lg:grid-cols-12 gap-6">
             <div className="lg:col-span-4 space-y-4">
-              <Card className="bg-card border-border glass-panel">
-                <CardContent className="p-5">
+              <Surface className="bg-card border-border glass-panel">
+                <SurfaceContent className="p-5">
                 <div className="flex items-center gap-2 text-primary text-xs uppercase tracking-wider mb-3">
                   <Sparkles className="h-4 w-4" />
                   Overview
@@ -279,22 +279,22 @@ export default function SessionInsights() {
                   <Waves className="h-4 w-4 text-primary" />
                   Nuove analisi compaiono dopo ogni sync.
                 </div>
-                </CardContent>
-              </Card>
+                </SurfaceContent>
+              </Surface>
             </div>
 
             <div className="lg:col-span-8 space-y-4">
               {sessionEntries.length === 0 && (
-                <Card className="bg-card border-border glass-panel">
-                  <CardContent className="p-6 text-muted-foreground">
+                <Surface className="bg-card border-border glass-panel">
+                  <SurfaceContent className="p-6 text-muted-foreground">
                     Nessuna analisi disponibile. Sincronizza nuove attività per generare insight.
-                  </CardContent>
-                </Card>
+                  </SurfaceContent>
+                </Surface>
               )}
 
               {sessionEntries.length > 0 && (
-                <Card className="bg-card border-border">
-                  <CardContent className="p-3 sm:p-4">
+                <Surface className="bg-card border-border">
+                  <SurfaceContent className="p-3 sm:p-4">
                   <div className="flex flex-wrap gap-2">
                     <Button
                       size="sm"
@@ -342,8 +342,8 @@ export default function SessionInsights() {
                       })}
                     </div>
                   )}
-                  </CardContent>
-                </Card>
+                  </SurfaceContent>
+                </Surface>
               )}
 
               {activeEntry && (

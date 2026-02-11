@@ -11,7 +11,7 @@ import {
   Settings, MessageCircle, Bell, TrendingUp
 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -156,8 +156,8 @@ export default function ClubDetailEnhanced() {
 
         {/* Club Info Bar */}
         <div className="container max-w-6xl mx-auto px-4 -mt-16 relative z-10">
-          <Card className="border-2">
-            <CardContent className="p-6">
+          <Surface className="border-2">
+            <SurfaceContent className="p-6">
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
@@ -209,8 +209,8 @@ export default function ClubDetailEnhanced() {
                   )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </SurfaceContent>
+          </Surface>
         </div>
 
         {/* Tabs Navigation */}
