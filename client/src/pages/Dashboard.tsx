@@ -98,19 +98,6 @@ export default function Dashboard() {
   )
   const timelineQuery = trpc.statistics.getTimeline.useQuery({ days: 14 })
   const advancedQuery = trpc.statistics.getAdvanced.useQuery({ days: 30 })
-  const leaderboardQuery = trpc.leaderboard.get.useQuery(
-    {
-      orderBy: "totalXp",
-      period: "week",
-      limit: 5,
-    },
-    {
-      staleTime: 15_000,
-      refetchInterval: 30_000,
-      refetchOnWindowFocus: true,
-      refetchOnMount: "always",
-    }
-  )
   const challengesQuery = trpc.challenges.list.useQuery()
   const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
     staleTime: 15_000,
@@ -118,6 +105,15 @@ export default function Dashboard() {
     refetchOnWindowFocus: true,
     refetchOnMount: "always",
   })
+  const seasonLeaderboardQuery = trpc.season.getLeaderboard.useQuery(
+    { limit: 5 },
+    {
+      staleTime: 15_000,
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: true,
+      refetchOnMount: "always",
+    }
+  )
 
   const normalizedActivities = useMemo(() => {
     const list = activitiesQuery.data ?? []
@@ -359,36 +355,17 @@ export default function Dashboard() {
     return activitiesSortedByDate.slice(0, 3).map((entry) => entry.activity)
   }, [activitiesSortedByDate])
 
-  const leaderboardEntries = useMemo(() => {
-    const raw = leaderboardQuery.data ?? []
-    const normalizeEntry = (entry: any) => {
-      const profile = entry.profile || entry
-      const userName = entry.userName ?? entry.name ?? "Nuotatore"
-      const initials = userName
-        .split(" ")
-        .map((part: string) => part[0])
-        .slice(0, 2)
-        .join("")
-        .toUpperCase()
-      const xpValue = Number(entry.periodXp ?? 0)
-      return {
-        id: profile.id ?? entry.id ?? 0,
-        userId: String(profile.userId ?? entry.userId ?? ""),
-        userName,
-        initials,
-        xpValue,
-      }
-    }
-    return raw.map(normalizeEntry).map((entry, index) => ({
+  const seasonLeaderboardEntries = useMemo(() => {
+    const raw = seasonLeaderboardQuery.data ?? []
+    return raw.map((entry: any, index: number) => ({
       rank: index + 1,
-      name: entry.userName,
-      initials: entry.initials || "SW",
-      value: `${Number(entry.xpValue).toLocaleString()} XP`,
+      name: entry.name ?? `Nuotatore ${entry.userId ?? ""}`,
+      value: `${Number(entry.seasonXp ?? 0).toLocaleString()} XP`,
       isCurrentUser: profileQuery.data?.userId
-        ? String(profileQuery.data.userId) === entry.userId
+        ? String(profileQuery.data.userId) === String(entry.userId)
         : false,
     }))
-  }, [leaderboardQuery.data, profileQuery.data?.userId])
+  }, [seasonLeaderboardQuery.data, profileQuery.data?.userId])
 
   const challenges = useMemo(() => (challengesQuery.data ?? []) as any[], [challengesQuery.data])
   const activeChallenges = useMemo(() => {
@@ -438,6 +415,19 @@ export default function Dashboard() {
       totalMissions: Number(season.missions?.totalMissions ?? 0),
       remainingDays: Number(season.season?.remainingDays ?? 0),
     }
+  }, [seasonQuery.data])
+  const seasonMissionPreview = useMemo(() => {
+    const season = seasonQuery.data
+    if (!season) return []
+    const missionRows = [...(season.missions?.daily ?? []), ...(season.missions?.weekly ?? [])]
+    return missionRows
+      .sort((a, b) => {
+        const aDone = Boolean(a.completed)
+        const bDone = Boolean(b.completed)
+        if (aDone !== bDone) return aDone ? 1 : -1
+        return Number(a.progress ?? 0) - Number(b.progress ?? 0)
+      })
+      .slice(0, 3)
   }, [seasonQuery.data])
 
   type ProfileLike = {
@@ -665,6 +655,45 @@ export default function Dashboard() {
             </div>
 
             <div className="stream-node">
+              <section className="surface-panel p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h2 className="font-display text-lg font-semibold text-foreground">Missioni Season</h2>
+                    <p className="text-sm text-muted-foreground">Focus operativo del giorno</p>
+                  </div>
+                  <Button variant="ghost-neon" size="sm" asChild>
+                    <Link href="/season">
+                      Apri hub
+                      <ChevronRight className="ml-2 size-4" />
+                    </Link>
+                  </Button>
+                </div>
+                <div className="space-y-3">
+                  {seasonMissionPreview.length ? (
+                    seasonMissionPreview.map((mission: any) => (
+                      <div key={mission.id} className="stream-card">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">{mission.title}</p>
+                            <p className="text-xs text-muted-foreground">{mission.description}</p>
+                          </div>
+                          <Badge variant={mission.completed ? "neon" : "outline"} className="text-xs">
+                            +{mission.xpReward} XP
+                          </Badge>
+                        </div>
+                        <Progress value={Number(mission.progress ?? 0)} className="mt-3 h-1.5" />
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Missioni non disponibili. Apri la sezione Season per i dettagli.
+                    </p>
+                  )}
+                </div>
+              </section>
+            </div>
+
+            <div className="stream-node">
               <div className="orb-lane">
                 {stats.map((stat) => (
                   <MetricOrb
@@ -798,12 +827,12 @@ export default function Dashboard() {
           <aside className="space-y-6 xl:sticky xl:top-24">
             <section className="surface-panel p-6">
               <div className="mb-4">
-                <h2 className="font-display text-lg font-semibold text-foreground">Classifica</h2>
-                <p className="text-sm text-muted-foreground">Top nuotatori della settimana</p>
+                <h2 className="font-display text-lg font-semibold text-foreground">Classifica Season</h2>
+                <p className="text-sm text-muted-foreground">Top nuotatori della stagione</p>
               </div>
               <div className="space-y-3">
-                {leaderboardEntries.length ? (
-                  leaderboardEntries.slice(0, 3).map((entry) => (
+                {seasonLeaderboardEntries.length ? (
+                  seasonLeaderboardEntries.slice(0, 3).map((entry) => (
                     <div key={entry.rank} className="stream-card">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
