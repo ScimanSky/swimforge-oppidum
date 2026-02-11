@@ -19,6 +19,7 @@ import Statistics from "./pages/Statistics";
 import Coach from "./pages/Coach";
 import CoachDryland from "./pages/CoachDryland";
 import SessionInsights from "./pages/SessionInsights";
+import SeasonPage from "./pages/Season";
 import Community from "./pages/Community";
 import ClubInvite from "./pages/ClubInvite";
 import ClubDetail from "./pages/ClubDetail";
@@ -63,6 +64,7 @@ function Router() {
       <Route path="/coach" component={Coach} />
       <Route path="/coach-dryland" component={CoachDryland} />
       <Route path="/session-iq" component={SessionInsights} />
+      <Route path="/season" component={SeasonPage} />
       <Route path="/community" component={Community} />
       <Route path="/community/invite/:code" component={ClubInvite} />
       <Route path="/community/club/:clubId/event/:eventId" component={ClubEventDetail} />

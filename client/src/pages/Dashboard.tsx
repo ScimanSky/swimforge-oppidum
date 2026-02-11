@@ -11,6 +11,7 @@ import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { useFormatters } from "@/_core/hooks/useFormatters"
 import {
   Flame,
+  Orbit,
   Waves,
   Timer,
   Target,
@@ -111,6 +112,12 @@ export default function Dashboard() {
     }
   )
   const challengesQuery = trpc.challenges.list.useQuery()
+  const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
+  })
 
   const normalizedActivities = useMemo(() => {
     const list = activitiesQuery.data ?? []
@@ -407,6 +414,32 @@ export default function Dashboard() {
     }
   }, [advancedQuery.data?.insights])
 
+  const seasonSummary = useMemo(() => {
+    const season = seasonQuery.data
+    if (!season) {
+      return {
+        name: "Season Electric Ice",
+        level: 1,
+        seasonXp: 0,
+        levelProgress: 0,
+        completionRate: 0,
+        completedMissions: 0,
+        totalMissions: 0,
+        remainingDays: 0,
+      }
+    }
+    return {
+      name: season.season?.name ?? "Season Electric Ice",
+      level: Number(season.progress?.currentLevel ?? 1),
+      seasonXp: Number(season.progress?.seasonXp ?? 0),
+      levelProgress: Number(season.progress?.levelProgressPercent ?? 0),
+      completionRate: Number(season.missions?.completionRate ?? 0),
+      completedMissions: Number(season.missions?.completedMissions ?? 0),
+      totalMissions: Number(season.missions?.totalMissions ?? 0),
+      remainingDays: Number(season.season?.remainingDays ?? 0),
+    }
+  }, [seasonQuery.data])
+
   type ProfileLike = {
     firstName?: string | null
     first_name?: string | null
@@ -535,6 +568,12 @@ export default function Dashboard() {
                     </Link>
                   </Button>
                   <Button variant="outline-neon" size="sm" asChild>
+                    <Link href="/season">
+                      <Orbit className="size-4" />
+                      Season
+                    </Link>
+                  </Button>
+                  <Button variant="outline-neon" size="sm" asChild>
                     <Link href="/challenges">
                       <Trophy className="size-4" />
                       Sfide
@@ -570,6 +609,61 @@ export default function Dashboard() {
 
         <div className="stream-shell">
           <section className="stream-main">
+            <div className="stream-node">
+              <section className="surface-panel p-6">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div className="space-y-2">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/65 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                      <Orbit className="size-3.5 text-primary" />
+                      Season Live
+                    </div>
+                    <h2 className="font-display text-xl font-semibold text-foreground">
+                      {seasonSummary.name}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Livello {seasonSummary.level} · {seasonSummary.seasonXp.toLocaleString()} XP ·{" "}
+                      {seasonSummary.remainingDays} giorni rimanenti
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <MetricOrb
+                      label="Progressione"
+                      value={`${seasonSummary.levelProgress}%`}
+                      progress={seasonSummary.levelProgress}
+                      helper="Level corrente"
+                      icon={<Trophy className="size-4" />}
+                      tone="cyan"
+                      size="sm"
+                    />
+                    <MetricOrb
+                      label="Missioni"
+                      value={`${seasonSummary.completedMissions}/${seasonSummary.totalMissions || 0}`}
+                      progress={seasonSummary.completionRate}
+                      helper="Weekly+Daily"
+                      icon={<Target className="size-4" />}
+                      tone="lime"
+                      size="sm"
+                    />
+                  </div>
+                </div>
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Battle Pass - livello corrente</span>
+                    <span>{seasonSummary.levelProgress}%</span>
+                  </div>
+                  <Progress value={seasonSummary.levelProgress} className="h-2" />
+                </div>
+                <div className="mt-4">
+                  <Button variant="outline-neon" size="sm" asChild>
+                    <Link href="/season">
+                      Apri Season Hub
+                      <ChevronRight className="ml-2 size-4" />
+                    </Link>
+                  </Button>
+                </div>
+              </section>
+            </div>
+
             <div className="stream-node">
               <div className="orb-lane">
                 {stats.map((stat) => (

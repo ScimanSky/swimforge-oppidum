@@ -8,6 +8,7 @@ import {
   Bot,
   LayoutDashboard,
   LogOut,
+  Orbit,
   Moon,
   MoreHorizontal,
   Settings,
@@ -45,6 +46,7 @@ type NavItem = {
 const navPrimary: NavItem[] = [
   { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard className="size-5" /> },
   { label: "Attività", path: "/activities", icon: <Waves className="size-5" /> },
+  { label: "Season", path: "/season", icon: <Orbit className="size-5" /> },
   { label: "Sfide", path: "/challenges", icon: <Trophy className="size-5" /> },
   { label: "Club", path: "/community", icon: <Users className="size-5" /> },
   { label: "Progressi", path: "/statistics", icon: <BarChart3 className="size-5" /> },
@@ -58,6 +60,7 @@ const navSecondary: NavItem[] = [
 function titleForPath(path: string) {
   if (path === "/" || path.startsWith("/dashboard")) return "Dashboard"
   if (path.startsWith("/activities")) return "Attività"
+  if (path.startsWith("/season")) return "Season"
   if (path.startsWith("/challenges")) return "Sfide"
   if (path.startsWith("/community/club") && path.includes("/event/")) return "Evento Club"
   if (path.startsWith("/community/club")) return "Club"
@@ -219,6 +222,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <DropdownMenuLabel>Menu</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
+                  <Link href="/season" className="flex items-center gap-2">
+                    <Orbit className="size-4" />
+                    Season
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
                   <Link href="/statistics" className="flex items-center gap-2">
                     <BarChart3 className="size-4" />
                     Progressi
@@ -262,7 +271,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Mobile Bottom Nav (new skeleton) */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_58%,transparent),color-mix(in_oklch,var(--background)_70%,transparent))] backdrop-blur-xl lg:hidden pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex h-[calc(4rem+env(safe-area-inset-bottom))] max-w-3xl items-start justify-between px-2 pt-1">
-          {[navPrimary[0], navPrimary[1], navPrimary[2], navPrimary[3], navSecondary[1]].map((item) => {
+          {[navPrimary[0], navPrimary[1], navPrimary[2], navPrimary[4], navSecondary[1]].map((item) => {
             const isActive = location === item.path || location.startsWith(item.path + "/")
             return (
               <Link
