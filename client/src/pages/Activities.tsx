@@ -25,6 +25,7 @@ import {
   ChevronRight,
   Waves,
   MapPin,
+  Orbit,
 } from "lucide-react"
 import { Link } from "wouter"
 import { trpc } from "@/lib/trpc"
@@ -74,6 +75,12 @@ export default function Activities() {
 
   const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
   const advancedQuery = trpc.statistics.getAdvanced.useQuery({ days: 30 })
+  const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
+    staleTime: 15_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
+  })
   const utils = trpc.useContext()
 
   const toggleShareMutation = trpc.community.toggleShare.useMutation({
@@ -182,6 +189,21 @@ export default function Activities() {
                     <p className="text-muted-foreground">
                       Timeline completa delle sessioni con metriche in tempo reale.
                     </p>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        <Orbit className="mr-1 size-3.5 text-primary" />
+                        Season Lv {seasonQuery.data?.progress?.currentLevel ?? 1}
+                      </Badge>
+                      <Badge variant="outline" className="text-xs">
+                        {Number(seasonQuery.data?.progress?.seasonXp ?? 0).toLocaleString()} XP
+                      </Badge>
+                      <Button variant="outline-neon" size="sm" asChild>
+                        <Link href="/season">
+                          Season Hub
+                          <ChevronRight className="ml-2 h-4 w-4" />
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
                 </div>
                 <div className="orb-lane">

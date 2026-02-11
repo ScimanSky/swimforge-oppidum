@@ -763,22 +763,48 @@ export async function claimSeasonReward(userId: number, rewardCode: string) {
 
   const xpBonus = REWARD_CLAIM_BONUS_XP[reward.rarity] ?? 0;
   const description = `season_reward:${season.id}:${reward.rewardCode}`;
+  const claimResult = await database.transaction(async (tx) => {
+    // Serialize claims for the same season reward key (prevents double-claim race conditions).
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${description}))`);
 
-  await database.insert(xpTransactions).values({
-    userId,
-    amount: xpBonus,
-    reason: "bonus" as (typeof xpReasonEnum.enumValues)[number],
-    referenceId: reward.level,
-    description,
+    const existingClaim = await tx
+      .select({
+        count: sql<number>`count(*)`,
+      })
+      .from(xpTransactions)
+      .where(
+        and(
+          eq(xpTransactions.userId, userId),
+          eq(xpTransactions.description, description),
+        ),
+      );
+
+    if (Number(existingClaim[0]?.count ?? 0) > 0) {
+      return { alreadyClaimed: true as const };
+    }
+
+    await tx.insert(xpTransactions).values({
+      userId,
+      amount: xpBonus,
+      reason: "bonus" as (typeof xpReasonEnum.enumValues)[number],
+      referenceId: reward.level,
+      description,
+    });
+
+    await tx
+      .update(swimmerProfiles)
+      .set({
+        totalXp: sql`${swimmerProfiles.totalXp} + ${xpBonus}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(swimmerProfiles.userId, userId));
+
+    return { alreadyClaimed: false as const };
   });
 
-  await database
-    .update(swimmerProfiles)
-    .set({
-      totalXp: sql`${swimmerProfiles.totalXp} + ${xpBonus}`,
-      updatedAt: new Date(),
-    })
-    .where(eq(swimmerProfiles.userId, userId));
+  if (claimResult.alreadyClaimed) {
+    return { success: true as const, alreadyClaimed: true as const, xpAwarded: 0 };
+  }
 
   return {
     success: true as const,
