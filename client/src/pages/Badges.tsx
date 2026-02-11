@@ -14,6 +14,7 @@ import {
 import { Link, Redirect } from "wouter";
 import { useState, useRef, useCallback, useMemo } from "react";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
+import { getSeasonAssignmentImageUrl } from "@/lib/seasonBadgeImages";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 
@@ -28,6 +29,7 @@ const categoryLabels: Record<string, string> = {
   special: "Speciali",
   milestone: "Traguardi",
   achievement: "Achievement",
+  season: "Season",
 };
 
 const rarityLabels: Record<string, string> = {
@@ -135,9 +137,43 @@ export default function Badges() {
     });
   }, [achievementDefinitions, userAchievementBadges]);
 
+  const seasonBadges = useMemo(() => {
+    const season = seasonQuery.data;
+    if (!season?.badgeAssignments?.length) return [];
+
+    const seasonStats = season.seasonStats ?? {};
+    const level = Number(season.progress?.currentLevel ?? 1);
+
+    const metricValue = (metric: string): number => {
+      if (metric === "seasonLevel") return level;
+      return Number((seasonStats as Record<string, unknown>)[metric] ?? 0);
+    };
+
+    return (season.badgeAssignments as any[]).map((assignment) => {
+      const current = metricValue(String(assignment.metric));
+      const target = Math.max(1, Number(assignment.target ?? 1));
+      const progress = Math.min(100, Math.round((current / target) * 100));
+      const earned = current >= target;
+      return {
+        id: `season-${assignment.code}`,
+        code: String(assignment.code),
+        name: String(assignment.name),
+        description: String(assignment.objective),
+        category: "season",
+        rarity: String(assignment.rarity ?? "rare"),
+        requirementType: "season_assignment",
+        requirementValue: target,
+        earned,
+        progress,
+        earnedAt: earned ? new Date().toISOString() : null,
+        image_url: getSeasonAssignmentImageUrl(String(assignment.code)),
+      };
+    });
+  }, [seasonQuery.data]);
+
   const allBadges = useMemo(() => {
-    return [...(badgeProgress || []), ...achievementBadges];
-  }, [badgeProgress, achievementBadges]);
+    return [...(badgeProgress || []), ...achievementBadges, ...seasonBadges];
+  }, [badgeProgress, achievementBadges, seasonBadges]);
 
   // Filter badges by category
   const filteredBadges = allBadges.filter(
