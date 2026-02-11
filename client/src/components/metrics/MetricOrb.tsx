@@ -59,11 +59,10 @@ export function MetricOrb({
   return (
     <motion.div
       className={cn(
-        "group/orb relative flex flex-col items-center gap-3 rounded-3xl border border-border/70 bg-card/45 p-4 backdrop-blur-xl",
-        "shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_12%,transparent)]",
+        "group/orb relative flex flex-col items-center gap-3 px-1 py-1",
         className,
       )}
-      whileHover={reduceMotion ? undefined : { y: -4, scale: 1.01 }}
+      whileHover={reduceMotion ? undefined : { y: -2, scale: 1.01 }}
       transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 320, damping: 24 }}
     >
       <div
@@ -139,4 +138,3 @@ export function MetricOrb({
 }
 
 export default MetricOrb;
-
