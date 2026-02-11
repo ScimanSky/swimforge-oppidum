@@ -26,9 +26,9 @@ const ICON_WRAP_CLASSES: Record<OrbSize, string> = {
 };
 
 const VALUE_CLASSES: Record<OrbSize, string> = {
-  sm: "text-lg sm:text-xl",
-  md: "text-xl sm:text-2xl",
-  lg: "text-2xl sm:text-[1.65rem]",
+  sm: "text-sm sm:text-base",
+  md: "text-base sm:text-lg",
+  lg: "text-lg sm:text-xl",
 };
 
 const PROGRESS_CLASSES: Record<OrbSize, string> = {
@@ -48,6 +48,28 @@ const HELPER_CLASSES: Record<OrbSize, string> = {
   md: "text-[11px]",
   lg: "text-xs",
 };
+
+function getAdaptiveValueClass(value: ReactNode, size: OrbSize) {
+  const base = VALUE_CLASSES[size];
+  const textValue =
+    typeof value === "string" || typeof value === "number" ? String(value) : "";
+  const length = textValue.length;
+
+  if (length < 7) return base;
+  if (length < 9) {
+    if (size === "sm") return "text-xs sm:text-sm";
+    if (size === "md") return "text-sm sm:text-base";
+    return "text-base sm:text-lg";
+  }
+  if (length < 12) {
+    if (size === "sm") return "text-[11px] sm:text-xs";
+    if (size === "md") return "text-xs sm:text-sm";
+    return "text-sm sm:text-base";
+  }
+  if (size === "sm") return "text-[10px] sm:text-[11px]";
+  if (size === "md") return "text-[11px] sm:text-xs";
+  return "text-xs sm:text-sm";
+}
 
 const getAutoRing = (progress: number) => {
   if (progress >= 80) return TONE_RING.lime;
@@ -141,7 +163,7 @@ export function MetricOrb({
           />
         </svg>
 
-        <div className="relative z-10 flex flex-col items-center justify-center gap-0.5 text-center">
+        <div className="relative z-10 flex flex-col items-center justify-center gap-0.5 px-2 text-center">
           {icon ? (
             <div
               className={cn("flex items-center justify-center rounded-full text-foreground/90", ICON_WRAP_CLASSES[size])}
@@ -150,10 +172,22 @@ export function MetricOrb({
               {icon}
             </div>
           ) : null}
-          <div className={cn("font-display font-bold leading-none text-foreground", VALUE_CLASSES[size])}>{value}</div>
-          <div className={cn("font-semibold uppercase tracking-[0.14em] text-muted-foreground", PROGRESS_CLASSES[size])}>
-            {Math.round(safeProgress)}%
+          <div
+            className={cn(
+              "max-w-full whitespace-nowrap font-display font-bold leading-[1.05] tracking-tight text-foreground drop-shadow-[0_1px_6px_color-mix(in_oklch,var(--background)_75%,transparent)]",
+              getAdaptiveValueClass(value, size)
+            )}
+          >
+            {value}
           </div>
+        </div>
+        <div
+          className={cn(
+            "absolute bottom-1.5 left-1/2 z-20 min-w-[2.4rem] -translate-x-1/2 rounded-full border border-border/80 bg-background/92 px-1.5 py-0.5 text-center font-semibold uppercase leading-none tracking-[0.14em] text-foreground shadow-[0_6px_20px_color-mix(in_oklch,var(--foreground)_18%,transparent)] backdrop-blur-sm",
+            PROGRESS_CLASSES[size]
+          )}
+        >
+          {Math.round(safeProgress)}%
         </div>
       </div>
 
