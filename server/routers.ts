@@ -29,6 +29,7 @@ import { getUserPublicProfile, toggleFollow } from "./db_public_profiles";
 import { getPendingActivityInsights, listActivityInsights, markActivityInsightSeen } from "./ai_activity_insights";
 import { logger } from "./middleware/logger";
 import { sanitizeActivityNotes } from "./lib/sanitize";
+import { getCurrentSeasonState, getSeasonLeaderboard } from "./season";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 type BadgeDefinitionRow = Awaited<ReturnType<typeof db.getAllBadgeDefinitions>>[number];
@@ -973,6 +974,24 @@ export const appRouter = router({
           () => db.getLeaderboard(input.orderBy, input.limit, input.period),
           CACHE_TTL.LEADERBOARD
         );
+      }),
+  }),
+
+  // Season (Battle Pass + Missions)
+  season: router({
+    getCurrent: protectedProcedure.query(async ({ ctx }) => {
+      return getCurrentSeasonState(ctx.user.id);
+    }),
+    getLeaderboard: protectedProcedure
+      .input(
+        z
+          .object({
+            limit: z.number().min(1).max(100).optional(),
+          })
+          .optional()
+      )
+      .query(async ({ input }) => {
+        return getSeasonLeaderboard(input?.limit ?? 20);
       }),
   }),
 
