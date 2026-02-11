@@ -260,8 +260,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Mobile Bottom Nav (new skeleton) */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_58%,transparent),color-mix(in_oklch,var(--background)_70%,transparent))] backdrop-blur-xl lg:hidden">
-        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-2">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_58%,transparent),color-mix(in_oklch,var(--background)_70%,transparent))] backdrop-blur-xl lg:hidden pb-[env(safe-area-inset-bottom)]">
+        <div className="mx-auto flex h-[calc(4rem+env(safe-area-inset-bottom))] max-w-3xl items-start justify-between px-2 pt-1">
           {[navPrimary[0], navPrimary[1], navPrimary[2], navPrimary[3], navSecondary[1]].map((item) => {
             const isActive = location === item.path || location.startsWith(item.path + "/")
             return (
@@ -286,7 +286,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Main Content */}
-      <main className="min-h-screen min-w-0 pt-16 pb-[5.5rem] lg:pb-0 lg:pl-[88px]">
+      <main className="min-h-screen min-w-0 pt-16 pb-[calc(6.2rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-[88px]">
         <div className="mx-auto max-w-[1520px] min-w-0 p-4 md:p-5 lg:p-7">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
