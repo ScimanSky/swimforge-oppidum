@@ -36,6 +36,7 @@ import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import BadgeUnlockNotification from "./components/BadgeUnlockNotification";
 import BadgeUnlockWatcher from "./components/BadgeUnlockWatcher";
+import SeasonLaunchPopup from "./components/SeasonLaunchPopup";
 import { useBadgeNotifications } from "./hooks/useBadgeNotifications";
 import AutoSync from "./components/AutoSync";
 import ActivityInsightNotification from "./components/ActivityInsightNotification";
@@ -101,6 +102,7 @@ function App() {
           <Toaster richColors position="top-center" />
           <AutoSync />
           <BadgeUnlockWatcher />
+          <SeasonLaunchPopup />
           <ScrollToTop />
           <Router />
           <ActivityInsightNotification />

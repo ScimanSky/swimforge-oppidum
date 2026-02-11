@@ -1,0 +1,61 @@
+<svg width="1600" height="1200" viewBox="0 0 1600 1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="60" x2="1500" y2="1100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#03162B"/>
+      <stop offset="0.48" stop-color="#071D39"/>
+      <stop offset="1" stop-color="#02111F"/>
+    </linearGradient>
+    <radialGradient id="orbA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(430 330) rotate(38) scale(560 420)">
+      <stop stop-color="#00E5FF" stop-opacity="0.66"/>
+      <stop offset="1" stop-color="#00E5FF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="orbB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1170 860) rotate(32) scale(500 360)">
+      <stop stop-color="#7CFF5E" stop-opacity="0.5"/>
+      <stop offset="1" stop-color="#7CFF5E" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="ring" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(790 610) rotate(90) scale(360 360)">
+      <stop stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.61" stop-color="#4DF0FF" stop-opacity="0.22"/>
+      <stop offset="0.79" stop-color="#84FF9D" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#D5F8FF" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#C1F0FF" stop-opacity="0.09"/>
+    </linearGradient>
+    <filter id="blurBig" x="-300" y="-300" width="2200" height="1800" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="80"/>
+    </filter>
+    <filter id="softGlow" x="420" y="220" width="760" height="760" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="26"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="1200" fill="url(#bg)"/>
+  <g filter="url(#blurBig)">
+    <ellipse cx="430" cy="330" rx="560" ry="420" fill="url(#orbA)"/>
+    <ellipse cx="1170" cy="860" rx="500" ry="360" fill="url(#orbB)"/>
+  </g>
+
+  <g opacity="0.22">
+    <path d="M0 936C180 894 312 924 454 980C601 1038 702 1106 844 1120C986 1134 1128 1068 1262 1024C1396 980 1498 968 1600 1002V1200H0V936Z" fill="#0B3252"/>
+    <path d="M0 1014C176 986 320 1026 448 1074C590 1128 702 1174 846 1184C990 1194 1124 1164 1264 1122C1404 1080 1502 1072 1600 1096V1200H0V1014Z" fill="#0A2842"/>
+  </g>
+
+  <g filter="url(#softGlow)">
+    <circle cx="790" cy="600" r="248" stroke="url(#ring)" stroke-width="40"/>
+  </g>
+  <circle cx="790" cy="600" r="220" fill="url(#glass)" stroke="#8FEFFF" stroke-opacity="0.4" stroke-width="2"/>
+
+  <g opacity="0.92">
+    <path d="M760 494L792 430L824 494H902L840 538L864 606L792 560L720 606L744 538L682 494H760Z" fill="#E8FFFF"/>
+    <path d="M792 700C866 700 926 640 926 566H976C976 668 894 750 792 750C690 750 608 668 608 566H658C658 640 718 700 792 700Z" fill="#7CFF5E"/>
+    <path d="M718 640C730 656 756 666 792 666C828 666 854 656 866 640C850 628 824 620 792 620C760 620 734 628 718 640Z" fill="#20E8FF"/>
+  </g>
+
+  <g opacity="0.85">
+    <rect x="202" y="184" width="264" height="54" rx="27" fill="#072947" stroke="#27EFFF" stroke-opacity="0.42"/>
+    <text x="334" y="219" text-anchor="middle" fill="#A9F9FF" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700" letter-spacing="1.2">SEASON 1</text>
+  </g>
+</svg>
+
