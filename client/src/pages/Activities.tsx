@@ -171,37 +171,153 @@ export default function Activities() {
 
   return (
     <AppLayout>
-    <div className="space-y-8 p-4 lg:p-6">
-      <div className="grid gap-6 xl:grid-cols-12">
-        <section className="surface-panel xl:col-span-8 p-6 space-y-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h1 className="text-3xl font-display font-bold neon-gradient-text">
-                  Attività
-                </h1>
-                <p className="text-muted-foreground">
-                  Tutte le sessioni di nuoto, in un unico posto.
-                </p>
-              </div>
+      <div className="space-y-8 p-4 lg:p-6">
+        <div className="stream-shell">
+          <section className="stream-main">
+            <div className="stream-node">
+              <section className="surface-panel p-6 space-y-6">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h1 className="text-3xl font-display font-bold neon-gradient-text">Attività</h1>
+                    <p className="text-muted-foreground">
+                      Timeline completa delle sessioni con metriche in tempo reale.
+                    </p>
+                  </div>
+                </div>
+                <div className="orb-lane">
+                  {summaryOrbs.map((item) => (
+                    <MetricOrb
+                      key={item.label}
+                      label={item.label}
+                      value={item.value}
+                      progress={item.progress}
+                      helper={item.helper}
+                      icon={item.icon}
+                      tone={item.tone}
+                      size="sm"
+                    />
+                  ))}
+                </div>
+              </section>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              {summaryOrbs.map((item) => (
-                <MetricOrb
-                  key={item.label}
-                  label={item.label}
-                  value={item.value}
-                  progress={item.progress}
-                  helper={item.helper}
-                  icon={item.icon}
-                  tone={item.tone}
-                  size="sm"
-                />
-              ))}
-            </div>
-        </section>
+            <div className="stream-node">
+              <section className="surface-panel p-4 sm:p-6">
+                <div className="space-y-3">
+                  {activitiesQuery.isLoading ? (
+                    Array.from({ length: 3 }).map((_, index) => (
+                      <div key={index} className="stream-card">
+                        <Skeleton className="mb-3 h-4 w-40" />
+                        <Skeleton className="mb-4 h-3 w-28" />
+                        <div className="grid grid-cols-4 gap-4">
+                          <Skeleton className="h-6 w-16" />
+                          <Skeleton className="h-6 w-16" />
+                          <Skeleton className="h-6 w-16" />
+                          <Skeleton className="h-6 w-16" />
+                        </div>
+                      </div>
+                    ))
+                  ) : filteredActivities.length === 0 ? (
+                    <div className="stream-card p-8 text-center text-muted-foreground">
+                      Nessuna attività trovata. Sincronizza i dispositivi per vedere le sessioni.
+                    </div>
+                  ) : (
+                    filteredActivities.map((activity) => {
+                      const isOpenWater = Boolean(activity.isOpenWater)
+                      const shareChecked = getShareState(activity)
+                      const shareDisabled = pendingShareId === activity.id
+                      return (
+                        <div
+                          key={activity.id}
+                          className="stream-card border-l-2 border-l-primary/45 hover:border-l-primary"
+                        >
+                          <div className="flex items-start gap-4">
+                            <div
+                              className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${
+                                isOpenWater ? "bg-accent/10" : "bg-primary/10"
+                              }`}
+                            >
+                              {isOpenWater ? (
+                                <MapPin className="h-6 w-6 text-accent" />
+                              ) : (
+                                <Waves className="h-6 w-6 text-primary" />
+                              )}
+                            </div>
 
-        <aside className="surface-panel xl:col-span-4 p-6 space-y-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="mb-1 flex items-center gap-2">
+                                <h3 className="font-semibold text-foreground truncate">
+                                  {activity.activityName || "Swim Session"}
+                                </h3>
+                                <Badge
+                                  variant="neon"
+                                  className={`flex-shrink-0 text-xs ${isOpenWater ? "text-accent" : "text-primary"}`}
+                                >
+                                  {isOpenWater ? "Open Water" : "Vasca"}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {formatDate(activity.activityDate)} · {formatTime(activity.activityDate)}
+                              </p>
+
+                              <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                                <div>
+                                  <p className="text-lg font-display font-bold text-foreground">
+                                    {formatDistance(activity.distanceMeters)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">Distanza</p>
+                                </div>
+                                <div>
+                                  <p className="text-lg font-display font-bold text-foreground">
+                                    {formatDuration(activity.durationSeconds)}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">Durata</p>
+                                </div>
+                                <div>
+                                  <p className="text-lg font-display font-bold text-foreground">
+                                    {formatPace(
+                                      activity.avgPacePer100m,
+                                      activity.distanceMeters,
+                                      activity.durationSeconds
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">Pace</p>
+                                </div>
+                                <div>
+                                  <p className="text-lg font-display font-bold text-accent">+{activity.xpEarned}</p>
+                                  <p className="text-xs text-muted-foreground">XP</p>
+                                </div>
+                              </div>
+
+                              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-2">
+                                  <Switch
+                                    checked={shareChecked}
+                                    disabled={shareDisabled}
+                                    onCheckedChange={(checked) => handleShareToggle(activity.id, checked)}
+                                  />
+                                  <span>Condividi nel feed</span>
+                                </div>
+                                {shareDisabled && <span>Salvataggio...</span>}
+                              </div>
+                            </div>
+
+                            <Button variant="ghost-neon" size="icon" asChild>
+                              <Link href={`/activities/${activity.id}`}>
+                                <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                              </Link>
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <aside className="surface-panel p-6 space-y-4 xl:sticky xl:top-24">
             <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-primary">
               <Filter className="h-4 w-4" />
               Filtri
@@ -233,131 +349,9 @@ export default function Activities() {
                 <SelectItem value="xp">XP</SelectItem>
               </SelectContent>
             </Select>
-        </aside>
+          </aside>
+        </div>
       </div>
-
-      {/* Activities List */}
-      <div className="space-y-3">
-        {activitiesQuery.isLoading ? (
-          Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="surface-panel p-4">
-                <Skeleton className="h-4 w-40 mb-3" />
-                <Skeleton className="h-3 w-28 mb-4" />
-                <div className="grid grid-cols-4 gap-4">
-                  <Skeleton className="h-6 w-16" />
-                  <Skeleton className="h-6 w-16" />
-                  <Skeleton className="h-6 w-16" />
-                  <Skeleton className="h-6 w-16" />
-                </div>
-            </div>
-          ))
-        ) : filteredActivities.length === 0 ? (
-          <div className="surface-panel p-8 text-center text-muted-foreground">
-              Nessuna attività trovata. Sincronizza i dispositivi per vedere le sessioni.
-          </div>
-        ) : (
-          filteredActivities.map((activity) => {
-            const isOpenWater = Boolean(activity.isOpenWater)
-            const shareChecked = getShareState(activity)
-            const shareDisabled = pendingShareId === activity.id
-            return (
-              <div
-                key={activity.id}
-                className="surface-panel transition-all hover:border-primary/40"
-              >
-                <div className="p-4">
-                  <div className="flex items-start gap-4">
-                    {/* Activity Icon */}
-                    <div
-                      className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${
-                        isOpenWater ? "bg-accent/10" : "bg-primary/10"
-                      }`}
-                    >
-                      {isOpenWater ? (
-                        <MapPin className="h-6 w-6 text-accent" />
-                      ) : (
-                        <Waves className="h-6 w-6 text-primary" />
-                      )}
-                    </div>
-
-                    {/* Activity Details */}
-                    <div className="flex-1 min-w-0">
-                      <div className="mb-1 flex items-center gap-2">
-                        <h3 className="font-semibold text-foreground truncate">
-                          {activity.activityName || "Swim Session"}
-                        </h3>
-                        <Badge
-                          variant="neon"
-                          className={`flex-shrink-0 text-xs ${
-                            isOpenWater ? "text-accent" : "text-primary"
-                          }`}
-                        >
-                          {isOpenWater ? "Open Water" : "Vasca"}
-                        </Badge>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDate(activity.activityDate)} · {formatTime(activity.activityDate)}
-                      </p>
-
-                      {/* Stats Grid */}
-                      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                        <div>
-                          <p className="text-lg font-display font-bold text-foreground">
-                            {formatDistance(activity.distanceMeters)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Distanza</p>
-                        </div>
-                        <div>
-                          <p className="text-lg font-display font-bold text-foreground">
-                            {formatDuration(activity.durationSeconds)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Durata</p>
-                        </div>
-                        <div>
-                          <p className="text-lg font-display font-bold text-foreground">
-                            {formatPace(
-                              activity.avgPacePer100m,
-                              activity.distanceMeters,
-                              activity.durationSeconds
-                            )}
-                          </p>
-                          <p className="text-xs text-muted-foreground">Pace</p>
-                        </div>
-                        <div>
-                          <p className="text-lg font-display font-bold text-accent">
-                            +{activity.xpEarned}
-                          </p>
-                          <p className="text-xs text-muted-foreground">XP</p>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-                        <div className="flex items-center gap-2">
-                          <Switch
-                            checked={shareChecked}
-                            disabled={shareDisabled}
-                            onCheckedChange={(checked) => handleShareToggle(activity.id, checked)}
-                          />
-                          <span>Condividi nel feed</span>
-                        </div>
-                        {shareDisabled && <span>Salvataggio...</span>}
-                      </div>
-                    </div>
-
-                    {/* Arrow */}
-                    <Button variant="ghost-neon" size="icon" asChild>
-                      <Link href={`/activities/${activity.id}`}>
-                        <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
-                      </Link>
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )
-          })
-        )}
-      </div>
-    </div>
     </AppLayout>
   )
 }

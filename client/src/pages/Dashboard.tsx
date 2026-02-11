@@ -560,137 +560,141 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-6 xl:grid-cols-12">
-          <div className="space-y-6 xl:col-span-7">
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {stats.map((stat) => (
-                <MetricOrb
-                  key={stat.label}
-                  label={stat.label}
-                  value={stat.value}
-                  progress={stat.progress}
-                  helper={stat.change}
-                  icon={<stat.icon className="size-4" />}
-                  tone="auto"
-                  className="min-h-[240px]"
-                />
-              ))}
-            </div>
-
-            <section className="surface-panel p-6">
-              <div className="mb-4 flex flex-row items-center justify-between">
-                <div>
-                  <h2 className="font-display text-lg font-semibold text-foreground">Attività recenti</h2>
-                  <p className="text-sm text-muted-foreground">Le ultime sessioni sincronizzate</p>
-                </div>
-                <Button variant="ghost-neon" size="sm" asChild>
-                  <Link href="/activities">
-                    Vai a tutte
-                    <ChevronRight className="ml-2 size-4" />
-                  </Link>
-                </Button>
-              </div>
-              <div className="space-y-4">
-                {recentActivities.length ? (
-                  recentActivities.map((activity) => (
-                    <div
-                      key={activity.id}
-                      className="flex flex-col gap-3 rounded-xl border border-border bg-background/60 p-4 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">
-                          {formatDistanceKm(getActivityDistance(activity))}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {(() => {
-                            const parsed = parseActivityDate(getActivityDateValue(activity))
-                            return parsed
-                              ? parsed.toLocaleDateString("it-IT", {
-                                  day: "numeric",
-                                  month: "short",
-                                  year: "numeric",
-                                })
-                              : "—"
-                          })()}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                        <span>⏱ {formatDuration(getActivityDuration(activity))}</span>
-                        <span>⚡ {formatPace(getActivityPace(activity))}</span>
-                        {getActivityAvgHeartRate(activity) > 0 ? (
-                          <span>❤️ {Math.round(getActivityAvgHeartRate(activity))} bpm</span>
-                        ) : null}
-                      </div>
-	                      <Badge variant="neon" className="text-xs">
-	                        +{activity.xpEarned ?? 0} XP
-	                      </Badge>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Nessuna attività recente. Sincronizza Garmin o Strava.
-                  </p>
-                )}
-              </div>
-            </section>
-
-            <section className="surface-panel p-6">
-              <div className="mb-4">
-                <h2 className="font-display text-lg font-semibold text-foreground">Sfide attive</h2>
-                <p className="text-sm text-muted-foreground">Le tue sfide correnti</p>
-              </div>
-              <div className="space-y-3">
-                {activeChallenges.length ? (
-                  activeChallenges.slice(0, 2).map((challenge) => {
-                    const leaderboard = (challenge.leaderboard ?? challenge.leaderboardEntries ?? []) as Array<{ progress: number }>
-                    const progressValue = Number(
-                      challenge.current_progress ?? challenge.currentProgress ?? challenge.progress ?? 0
-                    )
-                    const maxProgress = Math.max(
-                      progressValue,
-                      ...leaderboard.map((item) => Number(item.progress || 0))
-                    )
-                    const progressPercent =
-                      maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
-                    return (
-                      <div key={challenge.id} className="rounded-xl border border-border bg-background/60 p-4">
-                        <p className="text-sm font-semibold text-foreground">{challenge.name}</p>
-                        <p className="text-xs text-muted-foreground">{challenge.objective}</p>
-                        <Progress value={progressPercent} className="mt-3 h-1.5" />
-                      </div>
-                    )
-                  })
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Nessuna sfida attiva. Partecipane una dalla sezione Sfide.
-                  </p>
-                )}
-              </div>
-            </section>
-          </div>
-
-          <div className="space-y-6 xl:col-span-5">
-            <section className="surface-panel p-6">
-              <div className="mb-4">
-                <h2 className="font-display text-lg font-semibold text-foreground">Progressi settimanali</h2>
-                <p className="text-sm text-muted-foreground">Distanza per giorno</p>
-              </div>
-              <div className="space-y-3">
-                {weeklyData.map((day) => (
-                  <div key={day.day} className="flex items-center gap-3">
-                    <span className="w-10 text-xs text-muted-foreground">{day.day}</span>
-                    <Progress
-                      value={Math.min(100, (day.distance / 2000) * 100)}
-                      className="h-2 flex-1"
-                    />
-                    <span className="text-xs text-muted-foreground">
-                      {(day.distance / 1000).toFixed(1)} km
-                    </span>
-                  </div>
+        <div className="stream-shell">
+          <section className="stream-main">
+            <div className="stream-node">
+              <div className="orb-lane">
+                {stats.map((stat) => (
+                  <MetricOrb
+                    key={stat.label}
+                    label={stat.label}
+                    value={stat.value}
+                    progress={stat.progress}
+                    helper={stat.change}
+                    icon={<stat.icon className="size-4" />}
+                    tone="auto"
+                    className="min-h-[220px]"
+                  />
                 ))}
               </div>
-            </section>
+            </div>
 
+            <div className="stream-node">
+              <section className="surface-panel p-6">
+                <div className="mb-4 flex flex-row items-center justify-between">
+                  <div>
+                    <h2 className="font-display text-lg font-semibold text-foreground">Attività recenti</h2>
+                    <p className="text-sm text-muted-foreground">Le ultime sessioni sincronizzate</p>
+                  </div>
+                  <Button variant="ghost-neon" size="sm" asChild>
+                    <Link href="/activities">
+                      Vai a tutte
+                      <ChevronRight className="ml-2 size-4" />
+                    </Link>
+                  </Button>
+                </div>
+                <div className="space-y-3">
+                  {recentActivities.length ? (
+                    recentActivities.map((activity) => (
+                      <div key={activity.id} className="stream-card">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">
+                              {formatDistanceKm(getActivityDistance(activity))}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {(() => {
+                                const parsed = parseActivityDate(getActivityDateValue(activity))
+                                return parsed
+                                  ? parsed.toLocaleDateString("it-IT", {
+                                      day: "numeric",
+                                      month: "short",
+                                      year: "numeric",
+                                    })
+                                  : "—"
+                              })()}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                            <span>⏱ {formatDuration(getActivityDuration(activity))}</span>
+                            <span>⚡ {formatPace(getActivityPace(activity))}</span>
+                            {getActivityAvgHeartRate(activity) > 0 ? (
+                              <span>❤️ {Math.round(getActivityAvgHeartRate(activity))} bpm</span>
+                            ) : null}
+                          </div>
+                          <Badge variant="neon" className="text-xs">
+                            +{activity.xpEarned ?? 0} XP
+                          </Badge>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Nessuna attività recente. Sincronizza Garmin o Strava.
+                    </p>
+                  )}
+                </div>
+              </section>
+            </div>
+
+            <div className="stream-node">
+              <section className="surface-panel p-6">
+                <div className="mb-4">
+                  <h2 className="font-display text-lg font-semibold text-foreground">Sfide attive</h2>
+                  <p className="text-sm text-muted-foreground">Le tue sfide correnti</p>
+                </div>
+                <div className="space-y-3">
+                  {activeChallenges.length ? (
+                    activeChallenges.slice(0, 2).map((challenge) => {
+                      const leaderboard = (challenge.leaderboard ?? challenge.leaderboardEntries ?? []) as Array<{
+                        progress: number
+                      }>
+                      const progressValue = Number(
+                        challenge.current_progress ?? challenge.currentProgress ?? challenge.progress ?? 0
+                      )
+                      const maxProgress = Math.max(
+                        progressValue,
+                        ...leaderboard.map((item) => Number(item.progress || 0))
+                      )
+                      const progressPercent =
+                        maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
+                      return (
+                        <div key={challenge.id} className="stream-card">
+                          <p className="text-sm font-semibold text-foreground">{challenge.name}</p>
+                          <p className="text-xs text-muted-foreground">{challenge.objective}</p>
+                          <Progress value={progressPercent} className="mt-3 h-1.5" />
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Nessuna sfida attiva. Partecipane una dalla sezione Sfide.
+                    </p>
+                  )}
+                </div>
+              </section>
+            </div>
+
+            <div className="stream-node">
+              <section className="surface-panel p-6">
+                <div className="mb-4">
+                  <h2 className="font-display text-lg font-semibold text-foreground">Progressi settimanali</h2>
+                  <p className="text-sm text-muted-foreground">Distanza per giorno</p>
+                </div>
+                <div className="space-y-3">
+                  {weeklyData.map((day) => (
+                    <div key={day.day} className="flex items-center gap-3">
+                      <span className="w-10 text-xs text-muted-foreground">{day.day}</span>
+                      <Progress value={Math.min(100, (day.distance / 2000) * 100)} className="h-2 flex-1" />
+                      <span className="text-xs text-muted-foreground">{(day.distance / 1000).toFixed(1)} km</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <aside className="space-y-6 xl:sticky xl:top-24">
             <section className="surface-panel p-6">
               <div className="mb-4">
                 <h2 className="font-display text-lg font-semibold text-foreground">Classifica</h2>
@@ -699,21 +703,25 @@ export default function Dashboard() {
               <div className="space-y-3">
                 {leaderboardEntries.length ? (
                   leaderboardEntries.slice(0, 3).map((entry) => (
-                    <div key={entry.rank} className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                          {entry.rank}
+                    <div key={entry.rank} className="stream-card">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+                            {entry.rank}
+                          </div>
+                          <div>
+                            <p className={`text-sm ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
+                              {entry.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{entry.value}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className={`text-sm ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
-                            {entry.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{entry.value}</p>
-                        </div>
+                        {entry.isCurrentUser && (
+                          <Badge variant="neon" className="text-xs">
+                            Tu
+                          </Badge>
+                        )}
                       </div>
-                      {entry.isCurrentUser && (
-                        <Badge variant="neon" className="text-xs">Tu</Badge>
-                      )}
                     </div>
                   ))
                 ) : (
@@ -746,7 +754,7 @@ export default function Dashboard() {
                 )}
               </div>
             </section>
-          </div>
+          </aside>
         </div>
       </div>
     </AppLayout>

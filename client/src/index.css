@@ -322,6 +322,99 @@ body,
     opacity: 0.35;
     animation: ei-float 16s ease-in-out infinite;
   }
+
+  .orb-lane {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(208px, 1fr);
+    gap: 14px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    scrollbar-width: thin;
+    scroll-snap-type: x proximity;
+  }
+
+  .orb-lane > * {
+    scroll-snap-align: start;
+  }
+
+  .stream-shell {
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .stream-main {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .stream-node {
+    position: relative;
+  }
+
+  .stream-card {
+    border-radius: 22px;
+    border: 1px solid color-mix(in oklch, var(--border) 56%, transparent);
+    background: color-mix(in oklch, var(--background) 76%, transparent);
+    padding: 1rem;
+    transition: border-color 180ms ease, transform 180ms ease;
+  }
+
+  .stream-card:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in oklch, var(--electric-cyan) 36%, var(--border));
+  }
+
+  @media (min-width: 1024px) {
+    .stream-main {
+      padding-left: 1.5rem;
+    }
+
+    .stream-main::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0.25rem;
+      bottom: 0.25rem;
+      width: 1px;
+      background: linear-gradient(
+        180deg,
+        color-mix(in oklch, var(--electric-cyan) 52%, transparent),
+        color-mix(in oklch, var(--electric-cyan) 10%, transparent)
+      );
+      opacity: 0.75;
+    }
+
+    .stream-node::before {
+      content: "";
+      position: absolute;
+      left: -1.82rem;
+      top: 1.2rem;
+      width: 11px;
+      height: 11px;
+      border-radius: 999px;
+      background: linear-gradient(
+        135deg,
+        color-mix(in oklch, var(--electric-cyan) 90%, white),
+        color-mix(in oklch, var(--electric-lime) 86%, white)
+      );
+      box-shadow: 0 0 0 4px color-mix(in oklch, var(--background) 82%, transparent);
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .stream-shell {
+      grid-template-columns: minmax(0, 1fr) 22rem;
+      align-items: start;
+    }
+
+    .orb-lane {
+      grid-auto-columns: minmax(170px, 1fr);
+      overflow: visible;
+    }
+  }
 }
 
 @keyframes ei-float {

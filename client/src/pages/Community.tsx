@@ -302,6 +302,7 @@ export default function Community() {
           return (
             <motion.div
               key={post.id}
+              className="stream-node"
               initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
               animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
               transition={{ duration: 0.35, ease: "easeOut", delay: Math.min(index * 0.035, 0.25) }}
@@ -644,24 +645,30 @@ export default function Community() {
           </Tabs>
         </div>
 
-        {/* Desktop: split layout */}
-        <div className="hidden lg:grid lg:grid-cols-12 lg:gap-6">
-          <section className="lg:col-span-7 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-display font-bold text-foreground">Feed</h2>
-                <p className="text-sm text-muted-foreground">Allenamenti pubblici e aggiornamenti</p>
+        {/* Desktop: stream layout */}
+        <div className="hidden lg:block">
+          <div className="stream-shell">
+            <section className="stream-main">
+              <div className="stream-node">
+                <div className="surface-panel p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-lg font-display font-bold text-foreground">Feed</h2>
+                      <p className="text-sm text-muted-foreground">Allenamenti pubblici e aggiornamenti</p>
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {feedItems.length} post
+                    </Badge>
+                  </div>
+                </div>
               </div>
-              <Badge variant="outline" className="text-xs">
-                {feedItems.length} post
-              </Badge>
-            </div>
-            {renderFeed()}
-          </section>
+              {renderFeed()}
+            </section>
 
-          <aside className="lg:col-span-5 space-y-4">
-            {renderClubs("sidebar")}
-          </aside>
+            <aside className="space-y-4 xl:sticky xl:top-24">
+              {renderClubs("sidebar")}
+            </aside>
+          </div>
         </div>
       </div>
     </AppLayout>
