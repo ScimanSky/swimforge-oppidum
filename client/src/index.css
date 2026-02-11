@@ -215,6 +215,9 @@ body,
 
 @layer utilities {
   .surface-panel {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
     border-radius: 26px;
     border: 1px solid color-mix(in oklch, var(--border) 44%, transparent);
     background: linear-gradient(
@@ -224,6 +227,42 @@ body,
     );
     box-shadow: 0 14px 40px color-mix(in oklch, var(--foreground) 10%, transparent);
     backdrop-filter: blur(18px);
+    transition: transform 180ms ease, border-color 180ms ease, box-shadow 220ms ease;
+  }
+
+  .surface-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklch, white 7%, transparent),
+      transparent 32%
+    );
+    opacity: 0.45;
+    z-index: 0;
+  }
+
+  .surface-panel > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  [data-slot="surface-header"] + [data-slot="surface-content"] {
+    margin-top: 0.95rem;
+  }
+
+  [data-slot="surface-footer"] {
+    margin-top: 0.9rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid color-mix(in oklch, var(--border) 50%, transparent);
+  }
+
+  @media (max-width: 767px) {
+    .surface-panel {
+      border-radius: 20px;
+    }
   }
 
   .neon-gradient-text {

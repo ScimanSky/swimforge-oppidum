@@ -26,7 +26,7 @@ function TabsList({
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        'ei-border-gradient text-muted-foreground inline-flex h-11 w-fit items-center justify-center rounded-xl p-1 backdrop-blur-xl shadow-[0_16px_55px_color-mix(in_oklch,var(--foreground)_12%,transparent)]',
+        'ei-border-gradient text-muted-foreground inline-flex min-h-11 w-full sm:w-fit items-center justify-start sm:justify-center rounded-xl p-1 backdrop-blur-xl shadow-[0_16px_55px_color-mix(in_oklch,var(--foreground)_12%,transparent)] overflow-x-auto',
         className,
       )}
       {...props}
@@ -42,7 +42,7 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "data-[state=active]:bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime))] data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_22px_var(--neon-soft)] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring text-foreground dark:text-muted-foreground inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-lg border border-transparent px-3 py-1.5 text-sm font-semibold whitespace-nowrap transition-[color,box-shadow,transform] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 hover:-translate-y-0.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "data-[state=active]:bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime))] data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_0_22px_var(--neon-soft)] focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring text-foreground dark:text-muted-foreground inline-flex h-[calc(100%-1px)] min-w-max flex-1 items-center justify-center gap-1.5 rounded-lg border border-transparent px-3 py-1.5 text-sm font-semibold whitespace-nowrap transition-[color,box-shadow,transform] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 hover:-translate-y-0.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className,
       )}
       {...props}
