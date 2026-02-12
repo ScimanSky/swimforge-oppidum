@@ -30,25 +30,34 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
   );
 
   const createPostMutation = trpc.community.clubs.createPost.useMutation({
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       toast.success("Post pubblicato!");
       setPostText("");
       utils.community.clubs.feed.invalidate({ clubId });
+      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
+        toast.success(`+${data.actionXp.awardedXp} XP Action`);
+      }
     },
   });
 
   const toggleSplashMutation = trpc.community.toggleSplash.useMutation({
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       utils.community.clubs.feed.invalidate({ clubId });
+      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
+        toast.success(`+${data.actionXp.awardedXp} XP Action`);
+      }
     },
   });
 
   const addCommentMutation = trpc.community.addComment.useMutation({
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       toast.success("Commento aggiunto!");
       setCommentTextByPost({});
       utils.community.comments.invalidate();
       utils.community.clubs.feed.invalidate({ clubId });
+      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
+        toast.success(`+${data.actionXp.awardedXp} XP Action`);
+      }
     },
   });
 

@@ -104,7 +104,12 @@ export default function Community() {
     limit: 12,
   })
   const toggleSplash = trpc.community.toggleSplash.useMutation({
-    onSuccess: () => feedQuery.refetch(),
+    onSuccess: (data: any) => {
+      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
+        toast.success(`+${data.actionXp.awardedXp} XP Action`)
+      }
+      feedQuery.refetch()
+    },
     onError: (err) => toast.error(err.message || "Impossibile inviare uno Splash"),
   })
 
@@ -114,7 +119,10 @@ export default function Community() {
   )
 
   const addComment = trpc.community.addComment.useMutation({
-    onSuccess: (_data, variables) => {
+    onSuccess: (data: any, variables) => {
+      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
+        toast.success(`+${data.actionXp.awardedXp} XP Action`)
+      }
       setCommentTextByPost((prev) => ({ ...prev, [variables.postId]: "" }))
       commentsQuery.refetch()
       feedQuery.refetch()

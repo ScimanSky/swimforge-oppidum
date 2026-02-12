@@ -13,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { Droplet } from "lucide-react";
+import { toast } from "sonner";
 
 interface PostReactionsProps {
   postId: number;
@@ -54,12 +55,15 @@ export default function PostReactions({
   );
 
   const toggleReactionMutation = trpc.community.reactions.toggle.useMutation({
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       utils.community.reactions.list.invalidate({ postId });
       utils.community.reactions.userReaction.invalidate({ postId });
       utils.community.feed.invalidate();
       utils.community.clubs.feed.invalidate();
       if (onReactionChange) onReactionChange();
+      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
+        toast.success(`+${data.actionXp.awardedXp} XP Action`);
+      }
     },
   });
 

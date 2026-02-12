@@ -97,11 +97,14 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
   });
 
   const rsvpMutation = trpc.community.clubs.events.rsvp.useMutation({
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       toast.success("RSVP aggiornato!");
       utils.community.clubs.events.list.invalidate();
       if (selectedEvent) {
         utils.community.clubs.events.attendees.invalidate({ eventId: selectedEvent.event.id });
+      }
+      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
+        toast.success(`+${data.actionXp.awardedXp} XP Action`);
       }
     },
   });

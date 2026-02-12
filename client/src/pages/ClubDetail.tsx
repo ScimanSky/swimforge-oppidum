@@ -250,9 +250,12 @@ export default function ClubDetail() {
   const [visibilityDraft, setVisibilityDraft] = useState<"public" | "private" | "invite">("public");
 
   const createPost = trpc.community.clubs.createPost.useMutation({
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       setPostText("");
       utils.community.clubs.feed.invalidate({ clubId, limit: 20 });
+      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
+        toast.success(`+${data.actionXp.awardedXp} XP Action`);
+      }
     },
   });
   
@@ -284,8 +287,11 @@ export default function ClubDetail() {
   });
   
   const rsvpEvent = trpc.community.clubs.events.rsvp.useMutation({
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       utils.community.clubs.events.list.invalidate({ clubId });
+      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
+        toast.success(`+${data.actionXp.awardedXp} XP Action`);
+      }
     },
   });
   
@@ -353,15 +359,23 @@ export default function ClubDetail() {
   });
 
   const toggleSplash = trpc.community.toggleSplash.useMutation({
-    onSuccess: () => utils.community.clubs.feed.invalidate({ clubId, limit: 20 }),
+    onSuccess: (data: any) => {
+      utils.community.clubs.feed.invalidate({ clubId, limit: 20 });
+      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
+        toast.success(`+${data.actionXp.awardedXp} XP Action`);
+      }
+    },
   });
 
   const addComment = trpc.community.addComment.useMutation({
-    onSuccess: (_data, variables) => {
+    onSuccess: (data: any, variables) => {
       setCommentTextByPost((prev) => ({ ...prev, [variables.postId]: "" }));
       setOpenCommentsId(variables.postId);
       utils.community.clubs.feed.invalidate({ clubId, limit: 20 });
       utils.community.comments.invalidate({ postId: variables.postId });
+      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
+        toast.success(`+${data.actionXp.awardedXp} XP Action`);
+      }
     },
   });
 

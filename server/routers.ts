@@ -30,6 +30,16 @@ import { getPendingActivityInsights, listActivityInsights, markActivityInsightSe
 import { logger } from "./middleware/logger";
 import { sanitizeActivityNotes } from "./lib/sanitize";
 import { claimSeasonReward, getCurrentSeasonState, getSeasonLeaderboard } from "./season";
+import {
+  awardActionXp,
+  claimCurrentClubQuestReward,
+  createSeasonActivityPrediction,
+  evaluateSeasonPredictionWithActivity,
+  getActionXpStatus,
+  getCurrentClubQuestStates,
+  getSeasonEngagementSnapshot,
+  listSeasonActivityPredictions,
+} from "./season_engagement";
 
 const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
 type BadgeDefinitionRow = Awaited<ReturnType<typeof db.getAllBadgeDefinitions>>[number];
@@ -982,6 +992,12 @@ export const appRouter = router({
     getCurrent: protectedProcedure.query(async ({ ctx }) => {
       return getCurrentSeasonState(ctx.user.id);
     }),
+    getEngagement: protectedProcedure.query(async ({ ctx }) => {
+      return getSeasonEngagementSnapshot(ctx.user.id);
+    }),
+    actionXpStatus: protectedProcedure.query(async ({ ctx }) => {
+      return getActionXpStatus(ctx.user.id);
+    }),
     getLeaderboard: protectedProcedure
       .input(
         z
@@ -1023,6 +1039,82 @@ export const appRouter = router({
         await invalidateLeaderboardCache();
         return result;
       }),
+    predictions: router({
+      list: protectedProcedure
+        .input(
+          z
+            .object({
+              limit: z.number().min(1).max(30).optional(),
+            })
+            .optional(),
+        )
+        .query(async ({ ctx, input }) => {
+          return listSeasonActivityPredictions(ctx.user.id, input?.limit ?? 12);
+        }),
+      create: protectedProcedure
+        .input(
+          z.object({
+            targetDistanceMeters: z.number().min(100).max(50000).optional().nullable(),
+            targetPacePer100m: z.number().min(50).max(600).optional().nullable(),
+            targetDurationSeconds: z.number().min(300).max(21600).optional().nullable(),
+            targetRpe: z.number().min(1).max(10).optional().nullable(),
+            note: z.string().max(500).optional().nullable(),
+          }),
+        )
+        .mutation(async ({ ctx, input }) => {
+          const created = await createSeasonActivityPrediction({
+            userId: ctx.user.id,
+            targetDistanceMeters: input.targetDistanceMeters ?? null,
+            targetPacePer100m: input.targetPacePer100m ?? null,
+            targetDurationSeconds: input.targetDurationSeconds ?? null,
+            targetRpe: input.targetRpe ?? null,
+            note: input.note ?? null,
+          });
+          await invalidateUserCache(String(ctx.user.id));
+          return { success: true, prediction: created };
+        }),
+      evaluateLatest: protectedProcedure
+        .input(
+          z
+            .object({
+              activityId: z.number().optional(),
+            })
+            .optional(),
+        )
+        .mutation(async ({ ctx, input }) => {
+          const result = await evaluateSeasonPredictionWithActivity({
+            userId: ctx.user.id,
+            activityId: input?.activityId,
+          });
+          if (result.status === "evaluated" && result.xpAwarded > 0) {
+            await invalidateUserCache(String(ctx.user.id));
+            await invalidateLeaderboardCache();
+          }
+          return result;
+        }),
+    }),
+    clubQuest: router({
+      getCurrent: protectedProcedure.query(async ({ ctx }) => {
+        return getCurrentClubQuestStates(ctx.user.id);
+      }),
+      claim: protectedProcedure
+        .input(
+          z.object({
+            clubId: z.number(),
+          }),
+        )
+        .mutation(async ({ ctx, input }) => {
+          const result = await claimCurrentClubQuestReward({
+            userId: ctx.user.id,
+            clubId: input.clubId,
+          });
+          if (result.success && result.xpAwarded > 0) {
+            await invalidateUserCache(String(ctx.user.id));
+            await invalidateLeaderboardCache();
+          }
+          return result;
+        }),
+    }),
   }),
 
   // Personal Records
@@ -1274,7 +1366,20 @@ export const appRouter = router({
         postId: z.number(),
       }))
       .mutation(async ({ ctx, input }) => {
-        return toggleSplash(ctx.user.id, input.postId);
+        const splashResult = await toggleSplash(ctx.user.id, input.postId);
+        let actionXp = null;
+        if (splashResult?.splashed) {
+          actionXp = await awardActionXp({
+            userId: ctx.user.id,
+            actionType: "splash",
+            entityId: input.postId,
+          });
+          if (actionXp.awardedXp > 0) {
+            await invalidateUserCache(String(ctx.user.id));
+            await invalidateLeaderboardCache();
+          }
+        }
+        return { ...splashResult, actionXp };
       }),
 
     addComment: protectedProcedure
@@ -1284,7 +1389,16 @@ export const appRouter = router({
       }))
       .mutation(async ({ ctx, input }) => {
         const commentId = await addComment(ctx.user.id, input.postId, input.content);
-        return { success: true, commentId };
+        const actionXp = await awardActionXp({
+          userId: ctx.user.id,
+          actionType: "comment",
+          entityId: input.postId,
+        });
+        if (actionXp.awardedXp > 0) {
+          await invalidateUserCache(String(ctx.user.id));
+          await invalidateLeaderboardCache();
+        }
+        return { success: true, commentId, actionXp };
       }),
 
     comments: protectedProcedure
@@ -1565,7 +1679,16 @@ export const appRouter = router({
             content: input.content ?? null,
             mediaUrl: input.mediaUrl ?? null,
           });
-          return { success: true, postId };
+          const actionXp = await awardActionXp({
+            userId: ctx.user.id,
+            actionType: "club_post",
+            entityId: Number(postId ?? input.clubId),
+          });
+          if (actionXp.awardedXp > 0) {
+            await invalidateUserCache(String(ctx.user.id));
+            await invalidateLeaderboardCache();
+          }
+          return { success: true, postId, actionXp };
         }),
 
 	        update: protectedProcedure
@@ -1738,7 +1861,19 @@ export const appRouter = router({
               userId: ctx.user.id,
               status: input.status,
             });
-            return { success: true, attendee };
+            let actionXp = null;
+            if (input.status === "going" || input.status === "maybe") {
+              actionXp = await awardActionXp({
+                userId: ctx.user.id,
+                actionType: "rsvp",
+                entityId: input.eventId,
+              });
+              if (actionXp.awardedXp > 0) {
+                await invalidateUserCache(String(ctx.user.id));
+                await invalidateLeaderboardCache();
+              }
+            }
+            return { success: true, attendee, actionXp };
           }),
 
         attendees: protectedProcedure
@@ -2072,7 +2207,19 @@ export const appRouter = router({
             userId: ctx.user.id,
             reactionType: input.reactionType,
           });
-          return { success: true, reaction };
+          let actionXp = null;
+          if (reaction) {
+            actionXp = await awardActionXp({
+              userId: ctx.user.id,
+              actionType: "reaction",
+              entityId: input.postId,
+            });
+            if (actionXp.awardedXp > 0) {
+              await invalidateUserCache(String(ctx.user.id));
+              await invalidateLeaderboardCache();
+            }
+          }
+          return { success: true, reaction, actionXp };
         }),
 
       list: protectedProcedure

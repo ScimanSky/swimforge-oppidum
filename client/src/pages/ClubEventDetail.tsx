@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { Calendar, CheckCircle2, HelpCircle, MapPin, Users, XCircle } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useRoute } from "wouter";
+import { toast } from "sonner";
 
 type EventRsvpStatus = "going" | "maybe" | "not_going";
 
@@ -48,9 +49,12 @@ export default function ClubEventDetail() {
   );
 
   const rsvpMutation = trpc.community.clubs.events.rsvp.useMutation({
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       utils.community.clubs.events.attendees.invalidate({ eventId });
       utils.community.clubs.events.list.invalidate();
+      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
+        toast.success(`+${data.actionXp.awardedXp} XP Action`);
+      }
     },
   });
 
