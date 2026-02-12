@@ -564,96 +564,114 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
-      <div className="space-y-6 lg:space-y-3 lg:h-full lg:flex lg:flex-col lg:overflow-hidden">
-        <Surface className="relative overflow-hidden">
-          {coverImage && (
-            <div className="absolute inset-0">
-              <img
-                src={coverImage}
-                alt="Cover profilo"
-                className="h-full w-full object-cover opacity-55 dark:opacity-65"
-                loading="lazy"
-              />
-              <div className="absolute inset-0 bg-gradient-to-r from-background/85 via-background/55 to-background/30" />
-            </div>
-          )}
-          <SurfaceContent className="relative p-6 lg:p-4 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="size-24 lg:size-20 rounded-2xl overflow-hidden ei-border-gradient shadow-[0_0_34px_var(--neon-soft)]">
-                {profileAvatarUrl ? (
-                  <img
-                    src={profileAvatarUrl}
-                    alt={displayName}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                  />
-                ) : (
-	                  <div className="flex h-full w-full items-center justify-center bg-primary/10 text-primary text-2xl font-semibold">
-	                    {displayName
-	                      .split(" ")
-	                      .filter(Boolean)
-	                      .slice(0, 2)
-	                      .map((part: string) => part[0])
-	                      .join("")
-	                      .toUpperCase()}
-	                  </div>
-                )}
+      <div className="dashboard-shell space-y-6 lg:space-y-3 lg:h-full lg:flex lg:flex-col lg:overflow-hidden">
+        <div className="grid gap-3 lg:grid-cols-12">
+          <Surface className="relative overflow-hidden lg:col-span-8">
+            {coverImage ? (
+              <div className="absolute inset-0">
+                <img
+                  src={coverImage}
+                  alt="Cover profilo"
+                  className="h-full w-full object-cover opacity-34"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-background/88 via-background/72 to-background/55" />
               </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Bentornato,</p>
-                <h1 className="text-2xl lg:text-xl font-display font-bold neon-gradient-text">
-                  {displayName}
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  {profile?.profileBadge?.name || profile?.levelTitle || "Livello"} • {profile?.totalXp ?? 0} XP
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2 lg:mt-2">
-                  <Button variant="neon" size="sm" asChild>
-                    <Link href="/activities">
-                      <Waves className="size-4" />
-                      Attività
-                    </Link>
-                  </Button>
-                  <Button variant="outline-neon" size="sm" asChild>
-                    <Link href="/season">
-                      <Orbit className="size-4" />
-                      Season
-                    </Link>
-                  </Button>
-                  <Button variant="outline-neon" size="sm" asChild>
-                    <Link href="/challenges">
-                      <Trophy className="size-4" />
-                      Sfide
-                    </Link>
-                  </Button>
-                  <Button variant="outline-neon" size="sm" asChild>
-                    <Link href="/community">
-                      <ChevronRight className="size-4" />
-                      Club
-                    </Link>
-                  </Button>
-                  <SeasonRecapDialog triggerLabel="Recap video" buttonVariant="neon" />
+            ) : null}
+            <SurfaceContent className="relative z-10 flex h-full flex-col justify-between gap-4 p-5 lg:p-5">
+              <div className="flex items-start gap-4">
+                <div className="size-20 rounded-2xl overflow-hidden ei-border-gradient shadow-[0_0_34px_var(--neon-soft)] shrink-0">
+                  {profileAvatarUrl ? (
+                    <img
+                      src={profileAvatarUrl}
+                      alt={displayName}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-primary/10 text-primary text-xl font-semibold">
+                      {displayName
+                        .split(" ")
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((part: string) => part[0])
+                        .join("")
+                        .toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm text-muted-foreground">Bentornato,</p>
+                  <h1 className="truncate text-2xl font-display font-bold neon-gradient-text">{displayName}</h1>
+                  <p className="mt-1 text-sm text-foreground/85">
+                    {profile?.profileBadge?.name || profile?.levelTitle || "Livello"} · {profile?.totalXp ?? 0} XP totali
+                  </p>
+                  <p className="mt-1 max-w-[56ch] text-xs leading-relaxed text-muted-foreground">
+                    Panorama rapido: completa missioni, migliora la classifica season e monitora trend senza uscire da questa vista.
+                  </p>
                 </div>
               </div>
-            </div>
-            <div className="flex flex-col gap-3 min-w-[220px]">
+              <div className="flex flex-wrap gap-2">
+                <Button variant="neon" size="sm" asChild>
+                  <Link href="/activities">
+                    <Waves className="size-4" />
+                    Attività
+                  </Link>
+                </Button>
+                <Button variant="outline-neon" size="sm" asChild>
+                  <Link href="/season">
+                    <Orbit className="size-4" />
+                    Season
+                  </Link>
+                </Button>
+                <Button variant="outline-neon" size="sm" asChild>
+                  <Link href="/challenges">
+                    <Trophy className="size-4" />
+                    Sfide
+                  </Link>
+                </Button>
+                <Button variant="outline-neon" size="sm" asChild>
+                  <Link href="/community">
+                    <ChevronRight className="size-4" />
+                    Club
+                  </Link>
+                </Button>
+                <SeasonRecapDialog triggerLabel="Recap video" buttonVariant="neon" />
+              </div>
+            </SurfaceContent>
+          </Surface>
+
+          <Surface className="lg:col-span-4">
+            <SurfaceContent className="space-y-4 p-4">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Status atleta</p>
+                <p className="mt-1 text-base font-semibold text-foreground">Prossimo livello</p>
+              </div>
               <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>Prossimo livello</span>
-                <span>{profile?.xpToNextLevel ?? 0} XP</span>
+                <span>XP mancanti</span>
+                <span className="font-semibold text-foreground">{profile?.xpToNextLevel ?? 0}</span>
               </div>
               <Progress value={xpProgress} className="h-2" />
-              <div className="rounded-xl border border-border/80 bg-background/60 px-3 py-2 text-xs text-muted-foreground flex items-center justify-between">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="stream-card px-3 py-2">
+                  <p className="text-[11px] text-muted-foreground">Season XP</p>
+                  <p className="text-base font-semibold text-foreground">{seasonSummary.seasonXp.toLocaleString()}</p>
+                </div>
+                <div className="stream-card px-3 py-2">
+                  <p className="text-[11px] text-muted-foreground">Giorni rimasti</p>
+                  <p className="text-base font-semibold text-foreground">{seasonSummary.remainingDays}</p>
+                </div>
+              </div>
+              <div className="rounded-xl border border-border/80 bg-background/70 px-3 py-2 text-xs text-muted-foreground flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <Flame className="size-4 text-primary" />
                   Streak attuale
                 </span>
-                <span className="font-semibold text-foreground">
-                  {advancedQuery.data?.streak?.current ?? 0}g
-                </span>
+                <span className="font-semibold text-foreground">{advancedQuery.data?.streak?.current ?? 0}g</span>
               </div>
-            </div>
-          </SurfaceContent>
-        </Surface>
+            </SurfaceContent>
+          </Surface>
+        </div>
 
         <div className="hidden lg:grid lg:flex-1 lg:min-h-0 lg:grid-cols-12 lg:grid-rows-[minmax(0,1.08fr)_auto_minmax(0,1fr)] lg:gap-3 lg:overflow-hidden">
           <section className="surface-panel col-span-8 min-h-0 p-4">
