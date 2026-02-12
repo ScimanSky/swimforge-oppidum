@@ -554,13 +554,17 @@ export default function Dashboard() {
   const xpProgress = profile?.nextLevelXp
     ? Math.min(100, (totalXp / profile.nextLevelXp) * 100)
     : 0
-  const compactSeasonMissions = seasonMissionPreview.slice(0, 2)
+  const compactSeasonMissions = seasonMissionPreview.slice(0, 1)
   const compactRecentActivities = recentActivities.slice(0, 2)
   const compactLeaderboard = seasonLeaderboardEntries.slice(0, 3)
   const compactChallenges = activeChallenges.slice(0, 1)
-  const compactWeekly = weeklyData.slice(Math.max(0, weeklyData.length - 4))
+  const compactWeekly = weeklyData.slice(Math.max(0, weeklyData.length - 3))
   const activityDialogRows = useMemo(() => activitiesSortedByDate.slice(0, 12), [activitiesSortedByDate])
   const challengeDialogRows = useMemo(() => activeChallenges.slice(0, 8), [activeChallenges])
+  const currentUserRank = useMemo(() => {
+    const found = seasonLeaderboardEntries.find((entry) => entry.isCurrentUser)
+    return found?.rank ?? null
+  }, [seasonLeaderboardEntries])
 
   return (
     <AppLayout>
@@ -578,7 +582,25 @@ export default function Dashboard() {
                 <div className="absolute inset-0 bg-gradient-to-r from-background/88 via-background/72 to-background/55" />
               </div>
             ) : null}
-            <SurfaceContent className="relative z-10 flex h-full flex-col justify-between gap-3 p-4 lg:p-4">
+            <SurfaceContent className="relative z-10 flex flex-col gap-3 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                  <Orbit className="size-3.5 text-primary" />
+                  Dashboard live
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <div className="stream-card px-2.5 py-1.5 text-[11px]">
+                    Lv {seasonSummary.level}
+                  </div>
+                  <div className="stream-card px-2.5 py-1.5 text-[11px]">
+                    Rank {currentUserRank ? `#${currentUserRank}` : "—"}
+                  </div>
+                  <div className="stream-card px-2.5 py-1.5 text-[11px]">
+                    Missioni {seasonSummary.completedMissions}/{seasonSummary.totalMissions || 0}
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-start gap-4">
                 <div className="size-16 rounded-2xl overflow-hidden ei-border-gradient shadow-[0_0_28px_var(--neon-soft)] shrink-0">
                   {profileAvatarUrl ? (
@@ -608,8 +630,17 @@ export default function Dashboard() {
                   </p>
                 </div>
               </div>
+
+              <div className="grid grid-cols-4 gap-2">
+                {stats.map((stat) => (
+                  <div key={`top-${stat.label}`} className="stream-card px-2.5 py-2">
+                    <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{stat.label}</p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">{stat.value}</p>
+                  </div>
+                ))}
+              </div>
+
               <div className="flex flex-wrap gap-2">
-                <SeasonRecapDialog triggerLabel="Recap video" buttonVariant="neon" />
                 <Button variant="neon" size="sm" asChild>
                   <Link href="/activities">
                     <Waves className="size-4" />
@@ -634,15 +665,104 @@ export default function Dashboard() {
                     Club
                   </Link>
                 </Button>
+                <DashboardDetailDialog
+                  title="Feed attività"
+                  description="Lista completa delle attività recenti."
+                  triggerLabel="Feed"
+                >
+                  {activityDialogRows.length ? (
+                    activityDialogRows.map(({ activity }) => (
+                      <Link
+                        key={activity.id}
+                        href={`/activities/${activity.id}`}
+                        className="stream-card block px-3 py-2"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">
+                              {formatDistanceKm(getActivityDistance(activity))}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatShortDate(getActivityDateValue(activity))}
+                            </p>
+                          </div>
+                          <Badge variant="neon" className="text-[11px]">
+                            +{activity.xpEarned ?? 0} XP
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatDuration(getActivityDuration(activity))} · {formatPace(getActivityPace(activity))}
+                        </p>
+                      </Link>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Nessuna attività recente.</p>
+                  )}
+                </DashboardDetailDialog>
+                <DashboardDetailDialog
+                  title="Trend e sfide"
+                  description="Andamento settimana e progressi sfide."
+                  triggerLabel="Trend"
+                >
+                  <div className="stream-card px-3 py-2">
+                    <p className="text-xs font-semibold text-foreground">Progressi settimanali</p>
+                    <div className="mt-2 space-y-1.5">
+                      {weeklyData.map((day) => (
+                        <div key={`top-weekly-${day.day}`} className="flex items-center gap-2">
+                          <span className="w-8 text-[11px] text-muted-foreground">{day.day}</span>
+                          <Progress value={Math.min(100, (day.distance / 2000) * 100)} className="h-1.5 flex-1" />
+                          <span className="text-[11px] text-muted-foreground">{(day.distance / 1000).toFixed(1)} km</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {challengeDialogRows.length ? (
+                    challengeDialogRows.map((challenge) => {
+                      const leaderboard = (challenge.leaderboard ?? challenge.leaderboardEntries ?? []) as Array<{
+                        progress: number
+                      }>
+                      const progressValue = Number(
+                        challenge.current_progress ?? challenge.currentProgress ?? challenge.progress ?? 0
+                      )
+                      const maxProgress = Math.max(progressValue, ...leaderboard.map((item) => Number(item.progress || 0)))
+                      const progressPercent = maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
+                      return (
+                        <div key={`top-challenge-${challenge.id}`} className="stream-card px-3 py-2">
+                          <p className="text-sm font-semibold text-foreground">{challenge.name}</p>
+                          <p className="text-xs text-muted-foreground">{challenge.objective}</p>
+                          <Progress value={progressPercent} className="mt-2 h-1.5" />
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Nessuna sfida attiva.</p>
+                  )}
+                </DashboardDetailDialog>
+                <DashboardDetailDialog title="Insight AI" description="Analisi completa della settimana." triggerLabel="Insight">
+                  {aiInsight ? (
+                    <div className="stream-card px-3 py-2">
+                      <p className="text-sm font-semibold text-primary">{aiInsight.title}</p>
+                      <p className="mt-2 text-sm text-muted-foreground">{aiInsight.message}</p>
+                      <Button variant="outline-neon" size="sm" className="mt-3" asChild>
+                        <Link href="/coach">Apri AI Coach</Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Nessun insight disponibile.</p>
+                  )}
+                </DashboardDetailDialog>
               </div>
             </SurfaceContent>
           </Surface>
 
           <Surface className="lg:col-span-4">
             <SurfaceContent className="space-y-4 p-4">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Status atleta</p>
-                <p className="mt-1 text-base font-semibold text-foreground">Prossimo livello</p>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Status atleta</p>
+                  <p className="mt-1 text-base font-semibold text-foreground">Prossimo livello</p>
+                </div>
+                <SeasonRecapDialog triggerLabel="Video recap" buttonVariant="neon" />
               </div>
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span>XP mancanti</span>
@@ -658,6 +778,16 @@ export default function Dashboard() {
                   <p className="text-[11px] text-muted-foreground">Giorni rimasti</p>
                   <p className="text-base font-semibold text-foreground">{seasonSummary.remainingDays}</p>
                 </div>
+                <div className="stream-card px-3 py-2">
+                  <p className="text-[11px] text-muted-foreground">Rank season</p>
+                  <p className="text-base font-semibold text-foreground">{currentUserRank ? `#${currentUserRank}` : "—"}</p>
+                </div>
+                <div className="stream-card px-3 py-2">
+                  <p className="text-[11px] text-muted-foreground">Missioni</p>
+                  <p className="text-base font-semibold text-foreground">
+                    {seasonSummary.completedMissions}/{seasonSummary.totalMissions || 0}
+                  </p>
+                </div>
               </div>
               <div className="rounded-xl border border-border/80 bg-background/70 px-3 py-2 text-xs text-muted-foreground flex items-center justify-between">
                 <span className="flex items-center gap-2">
@@ -666,11 +796,19 @@ export default function Dashboard() {
                 </span>
                 <span className="font-semibold text-foreground">{advancedQuery.data?.streak?.current ?? 0}g</span>
               </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline-neon" size="sm" asChild>
+                  <Link href="/statistics">Progressi</Link>
+                </Button>
+                <Button variant="outline-neon" size="sm" asChild>
+                  <Link href="/season">Season Hub</Link>
+                </Button>
+              </div>
             </SurfaceContent>
           </Surface>
         </div>
 
-        <div className="hidden lg:grid lg:flex-1 lg:min-h-0 lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-2 lg:overflow-hidden">
+        <div className="hidden lg:grid lg:flex-1 lg:min-h-0 lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)] lg:gap-2 lg:overflow-hidden">
           <section className="surface-panel col-span-8 min-h-0 p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -834,7 +972,7 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="surface-panel col-span-4 min-h-0 p-4">
+          <section className="hidden surface-panel col-span-4 min-h-0 p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h2 className="font-display text-base font-semibold text-foreground">Attività recenti</h2>
@@ -905,7 +1043,7 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="surface-panel col-span-4 min-h-0 p-4">
+          <section className="hidden surface-panel col-span-4 min-h-0 p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <h2 className="font-display text-base font-semibold text-foreground">Sfide & Trend</h2>
@@ -992,7 +1130,7 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="surface-panel col-span-4 min-h-0 p-4">
+          <section className="hidden surface-panel col-span-4 min-h-0 p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <h2 className="font-display text-base font-semibold text-foreground">Insight & Azioni</h2>
