@@ -84,7 +84,7 @@ export default function PageBackground({ className }: { className?: string }) {
             backgroundPosition: bg.position ?? "center",
           }}
           initial={{ opacity: 0 }}
-          animate={{ opacity: isDark ? 0.17 : 0.26 }}
+          animate={{ opacity: isDark ? 0.3 : 0.38 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         />
@@ -94,7 +94,7 @@ export default function PageBackground({ className }: { className?: string }) {
         className="absolute inset-0 bg-cover bg-center bg-no-repeat mix-blend-screen"
         style={{ backgroundImage: "url('/images/theme-v2/overlay-caustics.png')" }}
         animate={{
-          opacity: isDark ? [0.13, 0.18, 0.13] : [0.1, 0.15, 0.1],
+          opacity: isDark ? [0.16, 0.24, 0.16] : [0.13, 0.2, 0.13],
           scale: [1, 1.015, 1],
         }}
         transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
@@ -104,7 +104,7 @@ export default function PageBackground({ className }: { className?: string }) {
         className="absolute inset-0 bg-cover bg-center bg-no-repeat mix-blend-screen"
         style={{ backgroundImage: "url('/images/theme-v2/overlay-energy-rings.png')" }}
         animate={{
-          opacity: isDark ? [0.11, 0.18, 0.11] : [0.08, 0.13, 0.08],
+          opacity: isDark ? [0.14, 0.22, 0.14] : [0.11, 0.18, 0.11],
           scale: [1.01, 1.03, 1.01],
           rotate: [0, 0.4, 0],
         }}
@@ -116,8 +116,8 @@ export default function PageBackground({ className }: { className?: string }) {
         className={cn(
           "absolute inset-0",
           isDark
-            ? "bg-[linear-gradient(to_bottom,color-mix(in_oklch,var(--background)_55%,black),color-mix(in_oklch,var(--background)_88%,black))]"
-            : "bg-[linear-gradient(to_bottom,color-mix(in_oklch,var(--background)_62%,transparent),color-mix(in_oklch,var(--background)_78%,transparent))]",
+            ? "bg-[linear-gradient(to_bottom,color-mix(in_oklch,var(--background)_34%,black),color-mix(in_oklch,var(--background)_74%,black))]"
+            : "bg-[linear-gradient(to_bottom,color-mix(in_oklch,var(--background)_44%,transparent),color-mix(in_oklch,var(--background)_70%,transparent))]",
         )}
       />
 
