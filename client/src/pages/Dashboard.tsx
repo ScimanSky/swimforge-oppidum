@@ -2,11 +2,20 @@
 
 import AppLayout from "@/components/AppLayout"
 import { trpc } from "@/lib/trpc"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { Surface, SurfaceContent } from "@/components/ui/surface"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { useFormatters } from "@/_core/hooks/useFormatters"
 import {
@@ -87,6 +96,47 @@ const changeLabel = (current: number, previous: number, suffix = "vs last week")
   const sign = diff > 0 ? "+" : ""
   const type = diff > 0 ? "positive" : diff < 0 ? "negative" : "neutral"
   return { label: `${sign}${diff.toFixed(0)}% ${suffix}`, type }
+}
+
+const formatShortDate = (value: string | Date | null | undefined) => {
+  const parsed = parseActivityDate(value)
+  if (!parsed) return "—"
+  return parsed.toLocaleDateString("it-IT", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+function DashboardDetailDialog({
+  title,
+  description,
+  triggerLabel = "Dettagli",
+  children,
+}: {
+  title: string
+  description?: string
+  triggerLabel?: string
+  children: ReactNode
+}) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button variant="ghost-neon" size="sm" className="h-7 px-2.5 text-[11px]">
+          {triggerLabel}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl border-border/80 bg-background/95 backdrop-blur-xl">
+        <DialogHeader>
+          <DialogTitle className="font-display text-lg text-foreground">{title}</DialogTitle>
+          {description ? <DialogDescription>{description}</DialogDescription> : null}
+        </DialogHeader>
+        <ScrollArea className="max-h-[62dvh] pr-4">
+          <div className="space-y-2">{children}</div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 export default function Dashboard() {
@@ -417,19 +467,18 @@ export default function Dashboard() {
       remainingDays: Number(season.season?.remainingDays ?? 0),
     }
   }, [seasonQuery.data])
-  const seasonMissionPreview = useMemo(() => {
+  const seasonMissionRows = useMemo(() => {
     const season = seasonQuery.data
     if (!season) return []
-    const missionRows = [...(season.missions?.daily ?? []), ...(season.missions?.weekly ?? [])]
-    return missionRows
+    return [...(season.missions?.daily ?? []), ...(season.missions?.weekly ?? [])]
       .sort((a, b) => {
         const aDone = Boolean(a.completed)
         const bDone = Boolean(b.completed)
         if (aDone !== bDone) return aDone ? 1 : -1
         return Number(a.progress ?? 0) - Number(b.progress ?? 0)
       })
-      .slice(0, 3)
   }, [seasonQuery.data])
+  const seasonMissionPreview = useMemo(() => seasonMissionRows.slice(0, 3), [seasonMissionRows])
 
   type ProfileLike = {
     firstName?: string | null
@@ -510,10 +559,12 @@ export default function Dashboard() {
   const compactLeaderboard = seasonLeaderboardEntries.slice(0, 4)
   const compactChallenges = activeChallenges.slice(0, 1)
   const compactWeekly = weeklyData.slice(Math.max(0, weeklyData.length - 4))
+  const activityDialogRows = useMemo(() => activitiesSortedByDate.slice(0, 12), [activitiesSortedByDate])
+  const challengeDialogRows = useMemo(() => activeChallenges.slice(0, 8), [activeChallenges])
 
   return (
     <AppLayout>
-      <div className="space-y-6 lg:space-y-3 lg:h-[calc(100dvh-10rem)] lg:flex lg:flex-col lg:overflow-hidden">
+      <div className="space-y-6 lg:space-y-3 lg:h-full lg:flex lg:flex-col lg:overflow-hidden">
         <Surface className="relative overflow-hidden">
           {coverImage && (
             <div className="absolute inset-0">
@@ -604,22 +655,23 @@ export default function Dashboard() {
           </SurfaceContent>
         </Surface>
 
-        <div className="hidden lg:grid lg:flex-1 lg:min-h-0 lg:grid-cols-12 lg:grid-rows-[auto_auto_minmax(0,1fr)] lg:gap-3 lg:overflow-hidden">
-          <section className="surface-panel p-4 col-span-7 min-h-0">
+        <div className="hidden lg:grid lg:flex-1 lg:min-h-0 lg:grid-cols-12 lg:grid-rows-[minmax(0,1.08fr)_auto_minmax(0,1fr)] lg:gap-3 lg:overflow-hidden">
+          <section className="surface-panel col-span-8 min-h-0 p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/65 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
                   <Orbit className="size-3.5 text-primary" />
                   Season Live
                 </div>
-                <h2 className="mt-2 font-display text-lg font-semibold text-foreground truncate">
+                <h2 className="mt-2 truncate font-display text-lg font-semibold text-foreground">
                   {seasonSummary.name}
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Lv {seasonSummary.level} · {seasonSummary.seasonXp.toLocaleString()} XP · {seasonSummary.remainingDays} giorni
+                  Lv {seasonSummary.level} · {seasonSummary.seasonXp.toLocaleString()} XP ·{" "}
+                  {seasonSummary.remainingDays} giorni
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-2 shrink-0">
+              <div className="grid grid-cols-2 gap-2">
                 <MetricOrb
                   label="Progressione"
                   value={`${seasonSummary.levelProgress}%`}
@@ -652,7 +704,7 @@ export default function Dashboard() {
                 compactSeasonMissions.map((mission: any) => (
                   <div key={mission.id} className="stream-card px-3 py-2">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-semibold text-foreground truncate">{mission.title}</p>
+                      <p className="truncate text-xs font-semibold text-foreground">{mission.title}</p>
                       <Badge variant={mission.completed ? "neon" : "outline"} className="text-[10px]">
                         +{mission.xpReward} XP
                       </Badge>
@@ -664,38 +716,92 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground">Nessuna missione disponibile.</p>
               )}
             </div>
+            <div className="mt-3 flex items-center justify-between gap-2">
+              <Button variant="outline-neon" size="sm" asChild>
+                <Link href="/season">
+                  Apri hub
+                  <ChevronRight className="ml-1 size-3.5" />
+                </Link>
+              </Button>
+              <DashboardDetailDialog
+                title="Missioni Season"
+                description="Tutte le missioni disponibili (daily + weekly)."
+              >
+                {seasonMissionRows.length ? (
+                  seasonMissionRows.map((mission: any) => (
+                    <div key={mission.id} className="stream-card px-3 py-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-semibold text-foreground">{mission.title}</p>
+                        <Badge variant={mission.completed ? "neon" : "outline"} className="text-[11px]">
+                          +{mission.xpReward} XP
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{mission.description}</p>
+                      <Progress value={Number(mission.progress ?? 0)} className="mt-2 h-1.5" />
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nessuna missione disponibile.</p>
+                )}
+              </DashboardDetailDialog>
+            </div>
           </section>
 
-          <section className="surface-panel p-4 col-span-5 min-h-0">
-            <div className="mb-3 flex items-center justify-between">
+          <section className="surface-panel col-span-4 min-h-0 p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
               <div>
                 <h2 className="font-display text-base font-semibold text-foreground">Classifica Season</h2>
                 <p className="text-xs text-muted-foreground">Aggiornamento live</p>
               </div>
-              <Button variant="ghost-neon" size="sm" asChild>
-                <Link href="/season">
-                  Hub
-                  <ChevronRight className="ml-1 size-3.5" />
-                </Link>
-              </Button>
+              <DashboardDetailDialog
+                title="Classifica completa"
+                description="Posizionamento attuale dei nuotatori della season."
+              >
+                {seasonLeaderboardEntries.length ? (
+                  seasonLeaderboardEntries.map((entry) => (
+                    <div key={`${entry.rank}-${entry.name}`} className="stream-card px-3 py-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
+                            {entry.rank}
+                          </div>
+                          <div>
+                            <p className={`text-sm ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
+                              {entry.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{entry.value}</p>
+                          </div>
+                        </div>
+                        {entry.isCurrentUser ? <Badge variant="neon">Tu</Badge> : null}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nessuna classifica disponibile.</p>
+                )}
+              </DashboardDetailDialog>
             </div>
             <div className="space-y-2">
               {compactLeaderboard.length ? (
                 compactLeaderboard.map((entry) => (
                   <div key={`${entry.rank}-${entry.name}`} className="stream-card px-3 py-2">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="size-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <div className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
                           {entry.rank}
                         </div>
                         <div className="min-w-0">
-                          <p className={`text-xs truncate ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
+                          <p className={`truncate text-xs ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
                             {entry.name}
                           </p>
                           <p className="text-[11px] text-muted-foreground">{entry.value}</p>
                         </div>
                       </div>
-                      {entry.isCurrentUser ? <Badge variant="neon" className="text-[10px]">Tu</Badge> : null}
+                      {entry.isCurrentUser ? (
+                        <Badge variant="neon" className="text-[10px]">
+                          Tu
+                        </Badge>
+                      ) : null}
                     </div>
                   </div>
                 ))
@@ -703,10 +809,30 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground">Nessuna classifica disponibile.</p>
               )}
             </div>
+            <div className="mt-3">
+              <Button variant="outline-neon" size="sm" asChild>
+                <Link href="/season">
+                  Hub season
+                  <ChevronRight className="ml-1 size-3.5" />
+                </Link>
+              </Button>
+            </div>
           </section>
 
-          <section className="surface-panel p-4 col-span-12 min-h-0">
-            <div className="grid grid-cols-4 gap-2">
+          <section className="surface-panel col-span-12 min-h-0 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div>
+                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">KPI settimanali</p>
+                <p className="text-[11px] text-muted-foreground">Vista rapida senza scroll</p>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <Button variant="outline-neon" size="sm" asChild className="h-7 text-[11px]">
+                  <Link href="/statistics">Apri progressi</Link>
+                </Button>
+                <SeasonRecapDialog triggerLabel="Recap video" buttonVariant="neon" />
+              </div>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5">
               {stats.map((stat) => (
                 <MetricOrb
                   key={stat.label}
@@ -722,18 +848,45 @@ export default function Dashboard() {
             </div>
           </section>
 
-          <section className="surface-panel p-4 col-span-4 min-h-0 overflow-hidden">
+          <section className="surface-panel col-span-4 min-h-0 p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <h2 className="font-display text-base font-semibold text-foreground">Attività recenti</h2>
                 <p className="text-xs text-muted-foreground">Ultime sessioni</p>
               </div>
-              <Button variant="ghost-neon" size="sm" asChild>
-                <Link href="/activities">
-                  Tutte
-                  <ChevronRight className="ml-1 size-3.5" />
-                </Link>
-              </Button>
+              <DashboardDetailDialog
+                title="Attività recenti"
+                description="Storico sintetico delle attività più recenti."
+              >
+                {activityDialogRows.length ? (
+                  activityDialogRows.map(({ activity }) => (
+                    <Link
+                      key={activity.id}
+                      href={`/activities/${activity.id}`}
+                      className="stream-card block px-3 py-2"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">
+                            {formatDistanceKm(getActivityDistance(activity))}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatShortDate(getActivityDateValue(activity))}
+                          </p>
+                        </div>
+                        <Badge variant="neon" className="text-[11px]">
+                          +{activity.xpEarned ?? 0} XP
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatDuration(getActivityDuration(activity))} · {formatPace(getActivityPace(activity))}
+                      </p>
+                    </Link>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nessuna attività recente.</p>
+                )}
+              </DashboardDetailDialog>
             </div>
             <div className="space-y-2">
               {compactRecentActivities.length ? (
@@ -743,10 +896,12 @@ export default function Dashboard() {
                       <div className="min-w-0">
                         <p className="text-xs font-semibold text-foreground">{formatDistanceKm(getActivityDistance(activity))}</p>
                         <p className="text-[11px] text-muted-foreground">
-                          {formatDuration(getActivityDuration(activity))} · {formatPace(getActivityPace(activity))}
+                          {formatShortDate(getActivityDateValue(activity))} · {formatDuration(getActivityDuration(activity))}
                         </p>
                       </div>
-                      <Badge variant="neon" className="text-[10px]">+{activity.xpEarned ?? 0} XP</Badge>
+                      <Badge variant="neon" className="text-[10px]">
+                        +{activity.xpEarned ?? 0} XP
+                      </Badge>
                     </div>
                   </div>
                 ))
@@ -754,24 +909,74 @@ export default function Dashboard() {
                 <p className="text-xs text-muted-foreground">Nessuna attività recente.</p>
               )}
             </div>
+            <div className="mt-3">
+              <Button variant="outline-neon" size="sm" asChild>
+                <Link href="/activities">
+                  Vai a tutte
+                  <ChevronRight className="ml-1 size-3.5" />
+                </Link>
+              </Button>
+            </div>
           </section>
 
-          <section className="surface-panel p-4 col-span-4 min-h-0 overflow-hidden">
-            <div className="mb-3">
-              <h2 className="font-display text-base font-semibold text-foreground">Sfide & Trend</h2>
-              <p className="text-xs text-muted-foreground">Situazione rapida</p>
+          <section className="surface-panel col-span-4 min-h-0 p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <h2 className="font-display text-base font-semibold text-foreground">Sfide & Trend</h2>
+                <p className="text-xs text-muted-foreground">Situazione rapida</p>
+              </div>
+              <DashboardDetailDialog
+                title="Trend settimanale e sfide attive"
+                description="Dettaglio completo su progressi e performance del periodo."
+              >
+                {challengeDialogRows.length ? (
+                  challengeDialogRows.map((challenge) => {
+                    const leaderboard = (challenge.leaderboard ?? challenge.leaderboardEntries ?? []) as Array<{
+                      progress: number
+                    }>
+                    const progressValue = Number(
+                      challenge.current_progress ?? challenge.currentProgress ?? challenge.progress ?? 0
+                    )
+                    const maxProgress = Math.max(progressValue, ...leaderboard.map((item) => Number(item.progress || 0)))
+                    const progressPercent = maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
+                    return (
+                      <div key={challenge.id} className="stream-card px-3 py-2">
+                        <p className="text-sm font-semibold text-foreground">{challenge.name}</p>
+                        <p className="text-xs text-muted-foreground">{challenge.objective}</p>
+                        <Progress value={progressPercent} className="mt-2 h-1.5" />
+                      </div>
+                    )
+                  })
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nessuna sfida attiva.</p>
+                )}
+                <div className="stream-card px-3 py-2">
+                  <p className="text-sm font-semibold text-foreground">Progressi settimanali</p>
+                  <div className="mt-2 space-y-2">
+                    {weeklyData.map((day) => (
+                      <div key={day.day} className="flex items-center gap-3">
+                        <span className="w-10 text-xs text-muted-foreground">{day.day}</span>
+                        <Progress value={Math.min(100, (day.distance / 2000) * 100)} className="h-1.5 flex-1" />
+                        <span className="text-xs text-muted-foreground">{(day.distance / 1000).toFixed(1)} km</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </DashboardDetailDialog>
             </div>
             <div className="space-y-2">
               {compactChallenges.length ? (
                 compactChallenges.map((challenge) => {
-                  const leaderboard = (challenge.leaderboard ?? challenge.leaderboardEntries ?? []) as Array<{ progress: number }>
+                  const leaderboard = (challenge.leaderboard ?? challenge.leaderboardEntries ?? []) as Array<{
+                    progress: number
+                  }>
                   const progressValue = Number(challenge.current_progress ?? challenge.currentProgress ?? challenge.progress ?? 0)
                   const maxProgress = Math.max(progressValue, ...leaderboard.map((item) => Number(item.progress || 0)))
                   const progressPercent = maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
                   return (
                     <div key={challenge.id} className="stream-card px-3 py-2">
-                      <p className="text-xs font-semibold text-foreground truncate">{challenge.name}</p>
-                      <p className="text-[11px] text-muted-foreground truncate">{challenge.objective}</p>
+                      <p className="truncate text-xs font-semibold text-foreground">{challenge.name}</p>
+                      <p className="truncate text-[11px] text-muted-foreground">{challenge.objective}</p>
                       <Progress value={progressPercent} className="mt-2 h-1" />
                     </div>
                   )
@@ -791,12 +996,35 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+            <div className="mt-3 flex gap-2">
+              <Button variant="outline-neon" size="sm" asChild className="flex-1">
+                <Link href="/challenges">Sfide</Link>
+              </Button>
+              <Button variant="outline-neon" size="sm" asChild className="flex-1">
+                <Link href="/statistics">Trend</Link>
+              </Button>
+            </div>
           </section>
 
-          <section className="surface-panel p-4 col-span-4 min-h-0 overflow-hidden">
-            <div className="mb-3">
-              <h2 className="font-display text-base font-semibold text-foreground">Insight & Azioni</h2>
-              <p className="text-xs text-muted-foreground">Focus operativo</p>
+          <section className="surface-panel col-span-4 min-h-0 p-4">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div>
+                <h2 className="font-display text-base font-semibold text-foreground">Insight & Azioni</h2>
+                <p className="text-xs text-muted-foreground">Focus operativo</p>
+              </div>
+              <DashboardDetailDialog title="Insight AI completo" description="Analisi estesa della settimana corrente.">
+                {aiInsight ? (
+                  <div className="stream-card px-3 py-2">
+                    <p className="text-sm font-semibold text-primary">{aiInsight.title}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">{aiInsight.message}</p>
+                    <Button variant="outline-neon" size="sm" className="mt-3" asChild>
+                      <Link href="/coach">Apri AI Coach</Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nessun insight disponibile.</p>
+                )}
+              </DashboardDetailDialog>
             </div>
             <div className="space-y-2">
               <div className="stream-card px-3 py-2">
@@ -807,7 +1035,7 @@ export default function Dashboard() {
                       className="mt-1 text-[11px] text-muted-foreground"
                       style={{
                         display: "-webkit-box",
-                        WebkitLineClamp: 3,
+                        WebkitLineClamp: 4,
                         WebkitBoxOrient: "vertical",
                         overflow: "hidden",
                       }}
@@ -826,17 +1054,19 @@ export default function Dashboard() {
                 <p className="text-xs font-semibold text-foreground">Link rapidi</p>
                 <div className="mt-2 grid grid-cols-2 gap-2">
                   <Button variant="outline-neon" size="sm" className="h-7 text-[11px]" asChild>
-                    <Link href="/challenges">Sfide</Link>
-                  </Button>
-                  <Button variant="outline-neon" size="sm" className="h-7 text-[11px]" asChild>
                     <Link href="/community">Club</Link>
-                  </Button>
-                  <Button variant="outline-neon" size="sm" className="h-7 text-[11px]" asChild>
-                    <Link href="/statistics">Progressi</Link>
                   </Button>
                   <Button variant="outline-neon" size="sm" className="h-7 text-[11px]" asChild>
                     <Link href="/season">Season</Link>
                   </Button>
+                  <Button variant="outline-neon" size="sm" className="h-7 text-[11px]" asChild>
+                    <Link href="/profile">Profilo</Link>
+                  </Button>
+                  <Button variant="outline-neon" size="sm" className="h-7 text-[11px]" asChild>
+                    <Link href="/settings">Impostazioni</Link>
+                  </Button>
+                </div>
+                <div className="mt-2">
                   <SeasonRecapDialog triggerLabel="Video recap" buttonVariant="outline-neon" />
                 </div>
               </div>
