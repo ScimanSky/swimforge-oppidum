@@ -72,6 +72,7 @@ export default function Activities() {
   const [sort, setSort] = useState("recent")
   const [shareOverrides, setShareOverrides] = useState<Record<number, boolean>>({})
   const [pendingShareId, setPendingShareId] = useState<number | null>(null)
+  const [isDesktopWide, setIsDesktopWide] = useState(false)
   const [page, setPage] = useState(1)
 
   const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
@@ -119,7 +120,16 @@ export default function Activities() {
       return new Date(b.activityDate).getTime() - new Date(a.activityDate).getTime()
       })
   }, [activities, filter, search, sort])
-  const pageSize = 4
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const media = window.matchMedia("(min-width: 1280px)")
+    const sync = () => setIsDesktopWide(media.matches)
+    sync()
+    media.addEventListener("change", sync)
+    return () => media.removeEventListener("change", sync)
+  }, [])
+
+  const pageSize = isDesktopWide ? 3 : 4
   const totalPages = Math.max(1, Math.ceil(filteredActivities.length / pageSize))
   const pagedActivities = useMemo(() => {
     const start = (page - 1) * pageSize
@@ -193,18 +203,18 @@ export default function Activities() {
 
   return (
     <AppLayout>
-      <div className="compact-shell space-y-6 lg:space-y-3 p-3 lg:p-0">
-        <div className="stream-shell lg:min-h-0">
-          <section className="stream-main lg:min-h-0">
+      <div className="compact-shell space-y-4 lg:space-y-2 p-3 lg:h-full lg:overflow-hidden lg:p-0">
+        <div className="stream-shell lg:min-h-0 lg:h-full lg:gap-2">
+          <section className="stream-main lg:min-h-0 lg:gap-2">
             <div className="stream-node">
-              <section className="surface-panel p-6 space-y-6">
+              <section className="surface-panel p-4 lg:p-4 space-y-4 lg:space-y-3">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h1 className="text-3xl font-display font-bold neon-gradient-text">Attività</h1>
-                    <p className="text-muted-foreground">
+                    <h1 className="text-2xl sm:text-3xl font-display font-bold neon-gradient-text">Attività</h1>
+                    <p className="text-sm text-muted-foreground">
                       Timeline completa delle sessioni con metriche in tempo reale.
                     </p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <div className="mt-2.5 flex flex-wrap items-center gap-2">
                       <Badge variant="outline" className="text-xs">
                         <Orbit className="mr-1 size-3.5 text-primary" />
                         Season Lv {seasonQuery.data?.progress?.currentLevel ?? 1}
@@ -239,8 +249,8 @@ export default function Activities() {
             </div>
 
             <div className="stream-node">
-              <section className="surface-panel p-4 sm:p-6">
-                <div className="space-y-3">
+              <section className="surface-panel p-4 sm:p-5 lg:p-4">
+                <div className="space-y-2.5">
                   {activitiesQuery.isLoading ? (
                     Array.from({ length: 3 }).map((_, index) => (
                       <div key={index} className="stream-card">
@@ -297,7 +307,7 @@ export default function Activities() {
                                 {formatDate(activity.activityDate)} · {formatTime(activity.activityDate)}
                               </p>
 
-                              <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
                                 <div>
                                   <p className="text-lg font-display font-bold text-foreground">
                                     {formatDistance(activity.distanceMeters)}
@@ -326,7 +336,7 @@ export default function Activities() {
                                 </div>
                               </div>
 
-                              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+                              <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
                                 <div className="flex items-center gap-2">
                                   <Switch
                                     checked={shareChecked}
@@ -379,7 +389,7 @@ export default function Activities() {
             </div>
           </section>
 
-          <aside className="surface-panel p-6 space-y-4 xl:sticky xl:top-24">
+          <aside className="surface-panel p-5 space-y-3 xl:sticky xl:top-20">
             <div className="flex items-center gap-2 text-xs uppercase tracking-wider text-primary">
               <Filter className="h-4 w-4" />
               Filtri
