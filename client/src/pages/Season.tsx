@@ -23,6 +23,7 @@ import {
 import { Link } from "wouter"
 import { toast } from "sonner"
 import { getSeasonAssignmentImageUrl, getSeasonRewardImageUrl } from "@/lib/seasonBadgeImages"
+import { SeasonRecapDialog } from "@/components/video/SeasonRecapDialog"
 
 function formatRemaining(remainingMs: number) {
   const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000))
@@ -243,6 +244,7 @@ export default function SeasonPage() {
                     {formatRemaining(Number(seasonData?.season?.remainingMs ?? 0))} rimanenti
                   </Badge>
                   <Badge variant="outline">{seasonData?.missionMode === "solo-fallback" ? "Modalità Solo" : "Modalità Club"}</Badge>
+                  <SeasonRecapDialog triggerLabel="Recap video" />
                 </div>
               </div>
 

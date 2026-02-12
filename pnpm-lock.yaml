@@ -97,6 +97,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.8
         version: 1.2.8(@types/react-dom@19.2.1(@types/react@19.2.1))(@types/react@19.2.1)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+      '@remotion/player':
+        specifier: ^4.0.421
+        version: 4.0.421(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
       '@sentry/node':
         specifier: ^10.37.0
         version: 10.37.0
@@ -205,6 +208,9 @@ importers:
       redis:
         specifier: ^5.10.0
         version: 5.10.0
+      remotion:
+        specifier: ^4.0.421
+        version: 4.0.421(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
       rollbar:
         specifier: ^2.26.5
         version: 2.26.5
@@ -2026,6 +2032,12 @@ packages:
     engines: {node: '>= 18'}
     peerDependencies:
       '@redis/client': ^5.10.0
+
+  '@remotion/player@4.0.421':
+    resolution: {integrity: sha512-vZrvvl3OMmxsmIk+vqUOrcbLpNUL0Q1JIWdqcgNt0d3Jn0mK6fYCDBnAHuhiltuMSqHBguUaQL4eWbceDBsm2g==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
 
   '@rolldown/pluginutils@1.0.0-beta.38':
     resolution: {integrity: sha512-N/ICGKleNhA5nc9XXQG/kkKHJ7S55u0x0XUJbbkmdCnFuoRkM1Il12q9q0eX19+M7KKUEPw/daUPIRnxhcxAIw==}
@@ -4620,6 +4632,12 @@ packages:
   remark-stringify@11.0.0:
     resolution: {integrity: sha512-1OSmLd3awB/t8qdoEOMazZkNsfVTeY4fTsgzcQFdXNq8ToTN4ZGwrMnlda4K6smTFKD+GRV6O48i6Z4iKgPPpw==}
 
+  remotion@4.0.421:
+    resolution: {integrity: sha512-j64KtcwObNYpxskxBPd7zDXVOwSHxH31RIM6Vs/+rUj/NBry/LXc8cNWDwFC4fYaJweOAeM7zXY16kW/9t3X+w==}
+    peerDependencies:
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
+
   request-ip@3.3.0:
     resolution: {integrity: sha512-cA6Xh6e0fDBBBwH77SLJaJPBmD3nWVAcF9/XAcsrIHdjhFzFiB5aNQFytdjCGPezU3ROwrR11IddKAM08vohxA==}
 
@@ -6809,6 +6827,12 @@ snapshots:
   '@redis/time-series@5.10.0(@redis/client@5.10.0)':
     dependencies:
       '@redis/client': 5.10.0
+
+  '@remotion/player@4.0.421(react-dom@19.2.1(react@19.2.1))(react@19.2.1)':
+    dependencies:
+      react: 19.2.1
+      react-dom: 19.2.1(react@19.2.1)
+      remotion: 4.0.421(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
 
   '@rolldown/pluginutils@1.0.0-beta.38': {}
 
@@ -9810,6 +9834,11 @@ snapshots:
       '@types/mdast': 4.0.4
       mdast-util-to-markdown: 2.1.2
       unified: 11.0.5
+
+  remotion@4.0.421(react-dom@19.2.1(react@19.2.1))(react@19.2.1):
+    dependencies:
+      react: 19.2.1
+      react-dom: 19.2.1(react@19.2.1)
 
   request-ip@3.3.0: {}
 

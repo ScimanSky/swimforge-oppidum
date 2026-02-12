@@ -20,6 +20,7 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { Link } from "wouter"
+import { SeasonRecapDialog } from "@/components/video/SeasonRecapDialog"
 
 const parseActivityDate = (value: string | Date | null | undefined) => {
   if (!value) return null
@@ -580,6 +581,7 @@ export default function Dashboard() {
                       Club
                     </Link>
                   </Button>
+                  <SeasonRecapDialog triggerLabel="Recap video" />
                 </div>
               </div>
             </div>

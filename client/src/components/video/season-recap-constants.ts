@@ -1,0 +1,4 @@
+export const SEASON_RECAP_FPS = 30;
+export const SEASON_RECAP_DURATION_FRAMES = 480;
+export const SEASON_RECAP_WIDTH = 1280;
+export const SEASON_RECAP_HEIGHT = 720;
