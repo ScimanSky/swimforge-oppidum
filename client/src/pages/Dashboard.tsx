@@ -504,10 +504,15 @@ export default function Dashboard() {
   const xpProgress = profile?.nextLevelXp
     ? Math.min(100, (totalXp / profile.nextLevelXp) * 100)
     : 0
+  const compactSeasonMissions = seasonMissionPreview.slice(0, 2)
+  const compactRecentActivities = recentActivities.slice(0, 2)
+  const compactLeaderboard = seasonLeaderboardEntries.slice(0, 4)
+  const compactChallenges = activeChallenges.slice(0, 1)
+  const compactWeekly = weeklyData.slice(Math.max(0, weeklyData.length - 4))
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 lg:space-y-3 lg:h-[calc(100dvh-10rem)] lg:flex lg:flex-col lg:overflow-hidden">
         <Surface className="relative overflow-hidden">
           {coverImage && (
             <div className="absolute inset-0">
@@ -520,9 +525,9 @@ export default function Dashboard() {
               <div className="absolute inset-0 bg-gradient-to-r from-background/85 via-background/55 to-background/30" />
             </div>
           )}
-          <SurfaceContent className="relative p-6 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <SurfaceContent className="relative p-6 lg:p-4 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-4">
-              <div className="size-32 rounded-2xl overflow-hidden ei-border-gradient shadow-[0_0_34px_var(--neon-soft)]">
+              <div className="size-24 lg:size-20 rounded-2xl overflow-hidden ei-border-gradient shadow-[0_0_34px_var(--neon-soft)]">
                 {profileAvatarUrl ? (
                   <img
                     src={profileAvatarUrl}
@@ -544,13 +549,13 @@ export default function Dashboard() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Bentornato,</p>
-                <h1 className="text-2xl font-display font-bold neon-gradient-text">
+                <h1 className="text-2xl lg:text-xl font-display font-bold neon-gradient-text">
                   {displayName}
                 </h1>
                 <p className="text-sm text-muted-foreground">
                   {profile?.profileBadge?.name || profile?.levelTitle || "Livello"} • {profile?.totalXp ?? 0} XP
                 </p>
-                <div className="mt-3 flex flex-wrap gap-2">
+                <div className="mt-3 flex flex-wrap gap-2 lg:mt-2">
                   <Button variant="neon" size="sm" asChild>
                     <Link href="/activities">
                       <Waves className="size-4" />
@@ -597,7 +602,246 @@ export default function Dashboard() {
           </SurfaceContent>
         </Surface>
 
-        <div className="stream-shell">
+        <div className="hidden lg:grid lg:flex-1 lg:min-h-0 lg:grid-cols-12 lg:grid-rows-[auto_auto_minmax(0,1fr)] lg:gap-3 lg:overflow-hidden">
+          <section className="surface-panel p-4 col-span-7 min-h-0">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/65 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                  <Orbit className="size-3.5 text-primary" />
+                  Season Live
+                </div>
+                <h2 className="mt-2 font-display text-lg font-semibold text-foreground truncate">
+                  {seasonSummary.name}
+                </h2>
+                <p className="text-xs text-muted-foreground">
+                  Lv {seasonSummary.level} · {seasonSummary.seasonXp.toLocaleString()} XP · {seasonSummary.remainingDays} giorni
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 shrink-0">
+                <MetricOrb
+                  label="Progressione"
+                  value={`${seasonSummary.levelProgress}%`}
+                  progress={seasonSummary.levelProgress}
+                  helper="Livello"
+                  icon={<Trophy className="size-4" />}
+                  tone="cyan"
+                  size="sm"
+                />
+                <MetricOrb
+                  label="Missioni"
+                  value={`${seasonSummary.completedMissions}/${seasonSummary.totalMissions || 0}`}
+                  progress={seasonSummary.completionRate}
+                  helper="Completate"
+                  icon={<Target className="size-4" />}
+                  tone="lime"
+                  size="sm"
+                />
+              </div>
+            </div>
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Battle Pass</span>
+                <span>{seasonSummary.levelProgress}%</span>
+              </div>
+              <Progress value={seasonSummary.levelProgress} className="h-2" />
+            </div>
+            <div className="mt-3 space-y-2">
+              {compactSeasonMissions.length ? (
+                compactSeasonMissions.map((mission: any) => (
+                  <div key={mission.id} className="stream-card px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-foreground truncate">{mission.title}</p>
+                      <Badge variant={mission.completed ? "neon" : "outline"} className="text-[10px]">
+                        +{mission.xpReward} XP
+                      </Badge>
+                    </div>
+                    <Progress value={Number(mission.progress ?? 0)} className="mt-2 h-1" />
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground">Nessuna missione disponibile.</p>
+              )}
+            </div>
+          </section>
+
+          <section className="surface-panel p-4 col-span-5 min-h-0">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h2 className="font-display text-base font-semibold text-foreground">Classifica Season</h2>
+                <p className="text-xs text-muted-foreground">Aggiornamento live</p>
+              </div>
+              <Button variant="ghost-neon" size="sm" asChild>
+                <Link href="/season">
+                  Hub
+                  <ChevronRight className="ml-1 size-3.5" />
+                </Link>
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {compactLeaderboard.length ? (
+                compactLeaderboard.map((entry) => (
+                  <div key={`${entry.rank}-${entry.name}`} className="stream-card px-3 py-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="size-6 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-bold text-primary">
+                          {entry.rank}
+                        </div>
+                        <div className="min-w-0">
+                          <p className={`text-xs truncate ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
+                            {entry.name}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">{entry.value}</p>
+                        </div>
+                      </div>
+                      {entry.isCurrentUser ? <Badge variant="neon" className="text-[10px]">Tu</Badge> : null}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground">Nessuna classifica disponibile.</p>
+              )}
+            </div>
+          </section>
+
+          <section className="surface-panel p-4 col-span-12 min-h-0">
+            <div className="grid grid-cols-4 gap-2">
+              {stats.map((stat) => (
+                <MetricOrb
+                  key={stat.label}
+                  label={stat.label}
+                  value={stat.value}
+                  progress={stat.progress}
+                  helper={stat.change}
+                  icon={<stat.icon className="size-4" />}
+                  tone="auto"
+                  size="sm"
+                />
+              ))}
+            </div>
+          </section>
+
+          <section className="surface-panel p-4 col-span-4 min-h-0 overflow-hidden">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h2 className="font-display text-base font-semibold text-foreground">Attività recenti</h2>
+                <p className="text-xs text-muted-foreground">Ultime sessioni</p>
+              </div>
+              <Button variant="ghost-neon" size="sm" asChild>
+                <Link href="/activities">
+                  Tutte
+                  <ChevronRight className="ml-1 size-3.5" />
+                </Link>
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {compactRecentActivities.length ? (
+                compactRecentActivities.map((activity) => (
+                  <div key={activity.id} className="stream-card px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-foreground">{formatDistanceKm(getActivityDistance(activity))}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {formatDuration(getActivityDuration(activity))} · {formatPace(getActivityPace(activity))}
+                        </p>
+                      </div>
+                      <Badge variant="neon" className="text-[10px]">+{activity.xpEarned ?? 0} XP</Badge>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-muted-foreground">Nessuna attività recente.</p>
+              )}
+            </div>
+          </section>
+
+          <section className="surface-panel p-4 col-span-4 min-h-0 overflow-hidden">
+            <div className="mb-3">
+              <h2 className="font-display text-base font-semibold text-foreground">Sfide & Trend</h2>
+              <p className="text-xs text-muted-foreground">Situazione rapida</p>
+            </div>
+            <div className="space-y-2">
+              {compactChallenges.length ? (
+                compactChallenges.map((challenge) => {
+                  const leaderboard = (challenge.leaderboard ?? challenge.leaderboardEntries ?? []) as Array<{ progress: number }>
+                  const progressValue = Number(challenge.current_progress ?? challenge.currentProgress ?? challenge.progress ?? 0)
+                  const maxProgress = Math.max(progressValue, ...leaderboard.map((item) => Number(item.progress || 0)))
+                  const progressPercent = maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
+                  return (
+                    <div key={challenge.id} className="stream-card px-3 py-2">
+                      <p className="text-xs font-semibold text-foreground truncate">{challenge.name}</p>
+                      <p className="text-[11px] text-muted-foreground truncate">{challenge.objective}</p>
+                      <Progress value={progressPercent} className="mt-2 h-1" />
+                    </div>
+                  )
+                })
+              ) : (
+                <p className="text-xs text-muted-foreground">Nessuna sfida attiva.</p>
+              )}
+              <div className="stream-card px-3 py-2">
+                <p className="text-xs font-semibold text-foreground">Progressi settimanali</p>
+                <div className="mt-2 space-y-1">
+                  {compactWeekly.map((day) => (
+                    <div key={day.day} className="flex items-center gap-2">
+                      <span className="w-7 text-[10px] text-muted-foreground">{day.day}</span>
+                      <Progress value={Math.min(100, (day.distance / 2000) * 100)} className="h-1.5 flex-1" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="surface-panel p-4 col-span-4 min-h-0 overflow-hidden">
+            <div className="mb-3">
+              <h2 className="font-display text-base font-semibold text-foreground">Insight & Azioni</h2>
+              <p className="text-xs text-muted-foreground">Focus operativo</p>
+            </div>
+            <div className="space-y-2">
+              <div className="stream-card px-3 py-2">
+                {aiInsight ? (
+                  <>
+                    <p className="text-xs font-semibold text-primary">{aiInsight.title}</p>
+                    <p
+                      className="mt-1 text-[11px] text-muted-foreground"
+                      style={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {aiInsight.message}
+                    </p>
+                    <Button variant="outline-neon" size="sm" className="mt-2 h-7 text-[11px]" asChild>
+                      <Link href="/coach">Apri AI Coach</Link>
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-xs text-muted-foreground">Nessun insight disponibile.</p>
+                )}
+              </div>
+              <div className="stream-card px-3 py-2">
+                <p className="text-xs font-semibold text-foreground">Link rapidi</p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <Button variant="outline-neon" size="sm" className="h-7 text-[11px]" asChild>
+                    <Link href="/challenges">Sfide</Link>
+                  </Button>
+                  <Button variant="outline-neon" size="sm" className="h-7 text-[11px]" asChild>
+                    <Link href="/community">Club</Link>
+                  </Button>
+                  <Button variant="outline-neon" size="sm" className="h-7 text-[11px]" asChild>
+                    <Link href="/statistics">Progressi</Link>
+                  </Button>
+                  <Button variant="outline-neon" size="sm" className="h-7 text-[11px]" asChild>
+                    <Link href="/season">Season</Link>
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div className="stream-shell lg:hidden">
           <section className="stream-main">
             <div className="stream-node">
               <section className="surface-panel p-6">
