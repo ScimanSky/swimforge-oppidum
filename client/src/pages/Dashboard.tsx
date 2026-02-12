@@ -618,6 +618,36 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              <div className="flex w-fit items-center gap-3 rounded-2xl border border-border/70 bg-background/65 px-2.5 py-2 backdrop-blur-sm">
+                <div className="size-12 rounded-xl overflow-hidden ei-border-gradient shadow-[0_0_20px_var(--neon-soft)] shrink-0">
+                  {profileAvatarUrl ? (
+                    <img
+                      src={profileAvatarUrl}
+                      alt={displayName}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-primary/10 text-primary text-sm font-semibold">
+                      {displayName
+                        .split(" ")
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((part: string) => part[0])
+                        .join("")
+                        .toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Bentornato,</p>
+                  <h1 className="truncate text-lg font-display font-bold neon-gradient-text">{displayName}</h1>
+                  <p className="text-sm text-foreground/85">
+                    {profile?.profileBadge?.name || profile?.levelTitle || "Livello"} · {profile?.totalXp ?? 0} XP totali
+                  </p>
+                </div>
+              </div>
+
               <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
                 {stats.map((stat) => (
                   <MetricOrb
@@ -646,36 +676,6 @@ export default function Dashboard() {
                     size="sm"
                   />
                 ))}
-              </div>
-
-              <div className="flex items-start gap-4">
-                <div className="size-16 rounded-2xl overflow-hidden ei-border-gradient shadow-[0_0_28px_var(--neon-soft)] shrink-0">
-                  {profileAvatarUrl ? (
-                    <img
-                      src={profileAvatarUrl}
-                      alt={displayName}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center bg-primary/10 text-primary text-xl font-semibold">
-                      {displayName
-                        .split(" ")
-                        .filter(Boolean)
-                        .slice(0, 2)
-                        .map((part: string) => part[0])
-                        .join("")
-                        .toUpperCase()}
-                    </div>
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm text-muted-foreground">Bentornato,</p>
-                  <h1 className="truncate text-xl font-display font-bold neon-gradient-text">{displayName}</h1>
-                  <p className="mt-1 text-sm text-foreground/85">
-                    {profile?.profileBadge?.name || profile?.levelTitle || "Livello"} · {profile?.totalXp ?? 0} XP totali
-                  </p>
-                </div>
               </div>
 
               <div className="flex flex-wrap gap-2">
