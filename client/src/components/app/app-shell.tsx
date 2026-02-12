@@ -136,7 +136,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-transparent overflow-x-hidden lg:h-[100dvh] lg:overflow-hidden">
+    <div className="min-h-screen bg-transparent overflow-x-hidden">
       {/* Desktop Rail */}
       <aside className="fixed left-0 top-0 z-40 hidden h-screen w-[88px] border-r border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_50%,transparent),color-mix(in_oklch,var(--background)_65%,transparent))] backdrop-blur-xl shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_14%,transparent)] lg:flex">
         <div className="flex h-full w-full flex-col items-center">
@@ -295,12 +295,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Main Content */}
-      <main className="min-h-screen min-w-0 pt-16 pb-[calc(6.2rem+env(safe-area-inset-bottom))] lg:h-[100dvh] lg:overflow-hidden lg:pb-0 lg:pl-[88px]">
-        <div className="mx-auto max-w-[1520px] min-w-0 p-4 md:p-5 lg:h-[calc(100dvh-4rem)] lg:min-h-0 lg:p-6">
+      <main className="min-h-screen min-w-0 pt-16 pb-[calc(6.2rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-[88px]">
+        <div className="mx-auto max-w-[1520px] min-w-0 p-4 md:p-5 lg:p-6">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={location}
-              className="lg:h-full lg:min-h-0"
               initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10, filter: "blur(4px)" }}
               animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: "blur(0px)" }}
               exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -8, filter: "blur(4px)" }}

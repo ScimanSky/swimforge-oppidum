@@ -303,7 +303,7 @@ export default function Challenges() {
 
   return (
     <AppLayout>
-      <div className="compact-shell space-y-4 lg:space-y-2 lg:h-full lg:overflow-hidden">
+      <div className="compact-shell space-y-4 lg:space-y-2">
         {/* Hero */}
         <Surface className="relative overflow-hidden">
           <div className="absolute inset-0">

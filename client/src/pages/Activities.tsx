@@ -203,9 +203,9 @@ export default function Activities() {
 
   return (
     <AppLayout>
-      <div className="compact-shell space-y-4 lg:space-y-2 p-3 lg:h-full lg:overflow-hidden lg:p-0">
-        <div className="stream-shell lg:min-h-0 lg:h-full lg:gap-2">
-          <section className="stream-main lg:min-h-0 lg:gap-2">
+      <div className="compact-shell space-y-4 lg:space-y-2 p-3 lg:p-0">
+        <div className="stream-shell lg:gap-2">
+          <section className="stream-main lg:gap-2">
             <div className="stream-node">
               <section className="surface-panel p-4 lg:p-4 space-y-4 lg:space-y-3">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

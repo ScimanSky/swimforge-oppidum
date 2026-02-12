@@ -119,7 +119,11 @@ function DashboardDetailDialog({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="outline-neon" size="sm" className="h-8 px-3 text-xs">
+        <Button
+          variant="outline-neon"
+          size="sm"
+          className="h-8 px-3 text-xs rounded-xl border-primary/40 bg-background/55 hover:bg-primary/12"
+        >
           {triggerLabel}
         </Button>
       </DialogTrigger>
@@ -581,7 +585,7 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
-      <div className="dashboard-shell space-y-6 lg:space-y-3 lg:h-full lg:flex lg:flex-col lg:overflow-hidden">
+      <div className="dashboard-shell space-y-6 lg:space-y-3">
         <div className="grid gap-3 lg:grid-cols-12">
           <Surface className="relative overflow-hidden lg:col-span-8">
             {coverImage ? (
@@ -602,15 +606,15 @@ export default function Dashboard() {
                   Dashboard live
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <div className="stream-card px-2.5 py-1.5 text-[11px]">
+                  <Badge variant="outline" className="text-[11px]">
                     Lv {seasonSummary.level}
-                  </div>
-                  <div className="stream-card px-2.5 py-1.5 text-[11px]">
+                  </Badge>
+                  <Badge variant="outline" className="text-[11px]">
                     Rank {currentUserRank ? `#${currentUserRank}` : "—"}
-                  </div>
-                  <div className="stream-card px-2.5 py-1.5 text-[11px]">
+                  </Badge>
+                  <Badge variant="outline" className="text-[11px]">
                     Missioni {seasonSummary.completedMissions}/{seasonSummary.totalMissions || 0}
-                  </div>
+                  </Badge>
                 </div>
               </div>
 

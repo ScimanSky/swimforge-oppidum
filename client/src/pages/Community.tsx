@@ -671,7 +671,7 @@ export default function Community() {
 
   return (
     <AppLayout>
-      <div className="compact-shell space-y-4 lg:space-y-2 lg:h-full lg:overflow-hidden">
+      <div className="compact-shell space-y-4 lg:space-y-2">
         <section className="surface-panel relative overflow-hidden">
           <div className="absolute inset-0">
             <div className="absolute inset-0 bg-[radial-gradient(70%_80%_at_18%_0%,color-mix(in_oklch,var(--electric-cyan)_34%,transparent)_0%,transparent_70%)]" />
@@ -736,7 +736,7 @@ export default function Community() {
 
         {/* Desktop: stream layout */}
         <div className="hidden lg:block">
-          <div className="stream-shell lg:h-full lg:gap-2">
+          <div className="stream-shell lg:gap-2">
             <section className="stream-main lg:gap-2">
               <div className="stream-node">
                 <div className="surface-panel p-4">

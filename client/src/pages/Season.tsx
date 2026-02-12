@@ -223,7 +223,7 @@ export default function SeasonPage() {
 
   return (
     <AppLayout>
-      <div className="compact-shell space-y-4 lg:space-y-2 lg:h-full lg:overflow-hidden">
+      <div className="compact-shell space-y-4 lg:space-y-2">
         <Surface className="relative overflow-hidden">
           <SurfaceContent className="relative p-6 md:p-7">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -281,8 +281,8 @@ export default function SeasonPage() {
           </SurfaceContent>
         </Surface>
 
-        <div className="stream-shell lg:min-h-0 lg:h-full lg:gap-2">
-          <section className="stream-main lg:min-h-0 lg:gap-2">
+        <div className="stream-shell lg:gap-2">
+          <section className="stream-main lg:gap-2">
             <div className="stream-node">
               <section className="surface-panel p-4 lg:p-5">
                 <Accordion type="single" collapsible defaultValue="daily" className="space-y-2">
