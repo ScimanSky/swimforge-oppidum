@@ -78,9 +78,6 @@ const getActivityPace = (activity: any) =>
       0
   )
 
-const getActivityAvgHeartRate = (activity: any) =>
-  toNumber(activity?.avgHeartRate ?? activity?.avg_heart_rate ?? 0)
-
 const getActivityDateValue = (activity: any) =>
   activity?.activityDate ??
   activity?.activity_date ??
@@ -122,7 +119,7 @@ function DashboardDetailDialog({
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="ghost-neon" size="sm" className="h-7 px-2.5 text-[11px]">
+        <Button variant="outline-neon" size="sm" className="h-8 px-3 text-xs">
           {triggerLabel}
         </Button>
       </DialogTrigger>
@@ -402,10 +399,6 @@ export default function Dashboard() {
     })
   }, [timelineQuery.data])
 
-  const recentActivities = useMemo(() => {
-    return activitiesSortedByDate.slice(0, 3).map((entry) => entry.activity)
-  }, [activitiesSortedByDate])
-
   const seasonLeaderboardEntries = useMemo(() => {
     const raw = seasonLeaderboardQuery.data ?? []
     return raw.map((entry: any, index: number) => ({
@@ -467,19 +460,6 @@ export default function Dashboard() {
       remainingDays: Number(season.season?.remainingDays ?? 0),
     }
   }, [seasonQuery.data])
-  const seasonMissionPreview = useMemo(() => {
-    const season = seasonQuery.data
-    if (!season) return []
-    return [...(season.missions?.daily ?? []), ...(season.missions?.weekly ?? [])]
-      .sort((a, b) => {
-        const aDone = Boolean(a.completed)
-        const bDone = Boolean(b.completed)
-        if (aDone !== bDone) return aDone ? 1 : -1
-        return Number(a.progress ?? 0) - Number(b.progress ?? 0)
-      })
-      .slice(0, 3)
-  }, [seasonQuery.data])
-
   type ProfileLike = {
     firstName?: string | null
     first_name?: string | null
@@ -561,6 +541,43 @@ export default function Dashboard() {
     const found = seasonLeaderboardEntries.find((entry) => entry.isCurrentUser)
     return found?.rank ?? null
   }, [seasonLeaderboardEntries])
+  const seasonHeroOrbs = useMemo(() => {
+    const totalMissions = Math.max(seasonSummary.totalMissions || 0, 1)
+    return [
+      {
+        label: "Season XP",
+        value: seasonSummary.seasonXp.toLocaleString(),
+        progress: seasonSummary.levelProgress,
+        helper: `Livello ${seasonSummary.level}`,
+        icon: <Zap className="size-4" />,
+        tone: "cyan" as const,
+      },
+      {
+        label: "Giorni",
+        value: `${seasonSummary.remainingDays}`,
+        progress: Math.min(100, Math.round((seasonSummary.remainingDays / 30) * 100)),
+        helper: "Rimanenti",
+        icon: <Timer className="size-4" />,
+        tone: "sky" as const,
+      },
+      {
+        label: "Rank",
+        value: currentUserRank ? `#${currentUserRank}` : "—",
+        progress: currentUserRank ? Math.max(6, 100 - (currentUserRank - 1) * 12) : 0,
+        helper: "Stagione",
+        icon: <Trophy className="size-4" />,
+        tone: "amber" as const,
+      },
+      {
+        label: "Missioni",
+        value: `${seasonSummary.completedMissions}/${totalMissions}`,
+        progress: seasonSummary.completionRate,
+        helper: "Weekly+Daily",
+        icon: <Target className="size-4" />,
+        tone: "lime" as const,
+      },
+    ]
+  }, [seasonSummary, currentUserRank])
 
   return (
     <AppLayout>
@@ -597,6 +614,36 @@ export default function Dashboard() {
                 </div>
               </div>
 
+              <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+                {stats.map((stat) => (
+                  <MetricOrb
+                    key={`top-${stat.label}`}
+                    label={stat.label}
+                    value={stat.value}
+                    progress={stat.progress}
+                    helper={stat.change}
+                    icon={<stat.icon className="size-4" />}
+                    tone="auto"
+                    size="sm"
+                  />
+                ))}
+              </div>
+
+              <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+                {seasonHeroOrbs.map((metric) => (
+                  <MetricOrb
+                    key={`season-${metric.label}`}
+                    label={metric.label}
+                    value={metric.value}
+                    progress={metric.progress}
+                    helper={metric.helper}
+                    icon={metric.icon}
+                    tone={metric.tone}
+                    size="sm"
+                  />
+                ))}
+              </div>
+
               <div className="flex items-start gap-4">
                 <div className="size-16 rounded-2xl overflow-hidden ei-border-gradient shadow-[0_0_28px_var(--neon-soft)] shrink-0">
                   {profileAvatarUrl ? (
@@ -625,15 +672,6 @@ export default function Dashboard() {
                     {profile?.profileBadge?.name || profile?.levelTitle || "Livello"} · {profile?.totalXp ?? 0} XP totali
                   </p>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-4 gap-2">
-                {stats.map((stat) => (
-                  <div key={`top-${stat.label}`} className="stream-card px-2.5 py-2">
-                    <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{stat.label}</p>
-                    <p className="mt-1 text-sm font-semibold text-foreground">{stat.value}</p>
-                  </div>
-                ))}
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -748,51 +786,6 @@ export default function Dashboard() {
                   )}
                 </DashboardDetailDialog>
               </div>
-              <div className="rounded-xl border border-border/80 bg-background/65 p-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/65 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                      <Orbit className="size-3 text-primary" />
-                      Season Live
-                    </div>
-                    <p className="mt-2 truncate text-sm font-semibold text-foreground">{seasonSummary.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      Lv {seasonSummary.level} · {seasonSummary.seasonXp.toLocaleString()} XP · {seasonSummary.remainingDays} giorni
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="stream-card px-2.5 py-2">
-                      <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Progressione</p>
-                      <p className="mt-1 text-sm font-semibold text-foreground">{seasonSummary.levelProgress}%</p>
-                    </div>
-                    <div className="stream-card px-2.5 py-2">
-                      <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Missioni</p>
-                      <p className="mt-1 text-sm font-semibold text-foreground">
-                        {seasonSummary.completedMissions}/{seasonSummary.totalMissions || 0}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                  <span>Battle Pass</span>
-                  <span>{seasonSummary.levelProgress}%</span>
-                </div>
-                <Progress value={seasonSummary.levelProgress} className="mt-1 h-1.5" />
-                {seasonMissionPreview.length ? (
-                  <div className="mt-2 stream-card px-2.5 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-xs font-semibold text-foreground">{seasonMissionPreview[0].title}</p>
-                      <Badge
-                        variant={seasonMissionPreview[0].completed ? "neon" : "outline"}
-                        className="text-[10px]"
-                      >
-                        +{seasonMissionPreview[0].xpReward} XP
-                      </Badge>
-                    </div>
-                    <Progress value={Number(seasonMissionPreview[0].progress ?? 0)} className="mt-1.5 h-1" />
-                  </div>
-                ) : null}
-              </div>
             </SurfaceContent>
           </Surface>
 
@@ -810,26 +803,6 @@ export default function Dashboard() {
                 <span className="font-semibold text-foreground">{profile?.xpToNextLevel ?? 0}</span>
               </div>
               <Progress value={xpProgress} className="h-2" />
-              <div className="grid grid-cols-2 gap-2">
-                <div className="stream-card px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">Season XP</p>
-                  <p className="text-base font-semibold text-foreground">{seasonSummary.seasonXp.toLocaleString()}</p>
-                </div>
-                <div className="stream-card px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">Giorni rimasti</p>
-                  <p className="text-base font-semibold text-foreground">{seasonSummary.remainingDays}</p>
-                </div>
-                <div className="stream-card px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">Rank season</p>
-                  <p className="text-base font-semibold text-foreground">{currentUserRank ? `#${currentUserRank}` : "—"}</p>
-                </div>
-                <div className="stream-card px-3 py-2">
-                  <p className="text-[11px] text-muted-foreground">Missioni</p>
-                  <p className="text-base font-semibold text-foreground">
-                    {seasonSummary.completedMissions}/{seasonSummary.totalMissions || 0}
-                  </p>
-                </div>
-              </div>
               <div className="rounded-xl border border-border/80 bg-background/70 px-3 py-2 text-xs text-muted-foreground flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <Flame className="size-4 text-primary" />
@@ -913,295 +886,6 @@ export default function Dashboard() {
           </Surface>
         </div>
 
-        <div className="stream-shell lg:hidden">
-          <section className="stream-main">
-            <div className="stream-node">
-              <section className="surface-panel p-6">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                  <div className="space-y-2">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/65 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                      <Orbit className="size-3.5 text-primary" />
-                      Season Live
-                    </div>
-                    <h2 className="font-display text-xl font-semibold text-foreground">
-                      {seasonSummary.name}
-                    </h2>
-                    <p className="text-sm text-muted-foreground">
-                      Livello {seasonSummary.level} · {seasonSummary.seasonXp.toLocaleString()} XP ·{" "}
-                      {seasonSummary.remainingDays} giorni rimanenti
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <MetricOrb
-                      label="Progressione"
-                      value={`${seasonSummary.levelProgress}%`}
-                      progress={seasonSummary.levelProgress}
-                      helper="Level corrente"
-                      icon={<Trophy className="size-4" />}
-                      tone="cyan"
-                      size="sm"
-                    />
-                    <MetricOrb
-                      label="Missioni"
-                      value={`${seasonSummary.completedMissions}/${seasonSummary.totalMissions || 0}`}
-                      progress={seasonSummary.completionRate}
-                      helper="Weekly+Daily"
-                      icon={<Target className="size-4" />}
-                      tone="lime"
-                      size="sm"
-                    />
-                  </div>
-                </div>
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>Battle Pass - livello corrente</span>
-                    <span>{seasonSummary.levelProgress}%</span>
-                  </div>
-                  <Progress value={seasonSummary.levelProgress} className="h-2" />
-                </div>
-                <div className="mt-4">
-                  <Button variant="outline-neon" size="sm" asChild>
-                    <Link href="/season">
-                      Apri Season Hub
-                      <ChevronRight className="ml-2 size-4" />
-                    </Link>
-                  </Button>
-                </div>
-              </section>
-            </div>
-
-            <div className="stream-node">
-              <section className="surface-panel p-6">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <h2 className="font-display text-lg font-semibold text-foreground">Missioni Season</h2>
-                    <p className="text-sm text-muted-foreground">Focus operativo del giorno</p>
-                  </div>
-                  <Button variant="ghost-neon" size="sm" asChild>
-                    <Link href="/season">
-                      Apri hub
-                      <ChevronRight className="ml-2 size-4" />
-                    </Link>
-                  </Button>
-                </div>
-                <div className="space-y-3">
-                  {seasonMissionPreview.length ? (
-                    seasonMissionPreview.map((mission: any) => (
-                      <div key={mission.id} className="stream-card">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">{mission.title}</p>
-                            <p className="text-xs text-muted-foreground">{mission.description}</p>
-                          </div>
-                          <Badge variant={mission.completed ? "neon" : "outline"} className="text-xs">
-                            +{mission.xpReward} XP
-                          </Badge>
-                        </div>
-                        <Progress value={Number(mission.progress ?? 0)} className="mt-3 h-1.5" />
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Missioni non disponibili. Apri la sezione Season per i dettagli.
-                    </p>
-                  )}
-                </div>
-              </section>
-            </div>
-
-            <div className="stream-node">
-              <div className="orb-lane">
-                {stats.map((stat) => (
-                  <MetricOrb
-                    key={stat.label}
-                    label={stat.label}
-                    value={stat.value}
-                    progress={stat.progress}
-                    helper={stat.change}
-                    icon={<stat.icon className="size-4" />}
-                    tone="auto"
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="stream-node">
-              <section className="surface-panel p-6">
-                <div className="mb-4 flex flex-row items-center justify-between">
-                  <div>
-                    <h2 className="font-display text-lg font-semibold text-foreground">Attività recenti</h2>
-                    <p className="text-sm text-muted-foreground">Le ultime sessioni sincronizzate</p>
-                  </div>
-                  <Button variant="ghost-neon" size="sm" asChild>
-                    <Link href="/activities">
-                      Vai a tutte
-                      <ChevronRight className="ml-2 size-4" />
-                    </Link>
-                  </Button>
-                </div>
-                <div className="space-y-3">
-                  {recentActivities.length ? (
-                    recentActivities.map((activity) => (
-                      <div key={activity.id} className="stream-card">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">
-                              {formatDistanceKm(getActivityDistance(activity))}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {(() => {
-                                const parsed = parseActivityDate(getActivityDateValue(activity))
-                                return parsed
-                                  ? parsed.toLocaleDateString("it-IT", {
-                                      day: "numeric",
-                                      month: "short",
-                                      year: "numeric",
-                                    })
-                                  : "—"
-                              })()}
-                            </p>
-                          </div>
-                          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                            <span>⏱ {formatDuration(getActivityDuration(activity))}</span>
-                            <span>⚡ {formatPace(getActivityPace(activity))}</span>
-                            {getActivityAvgHeartRate(activity) > 0 ? (
-                              <span>❤️ {Math.round(getActivityAvgHeartRate(activity))} bpm</span>
-                            ) : null}
-                          </div>
-                          <Badge variant="neon" className="text-xs">
-                            +{activity.xpEarned ?? 0} XP
-                          </Badge>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Nessuna attività recente. Sincronizza Garmin o Strava.
-                    </p>
-                  )}
-                </div>
-              </section>
-            </div>
-
-            <div className="stream-node">
-              <section className="surface-panel p-6">
-                <div className="mb-4">
-                  <h2 className="font-display text-lg font-semibold text-foreground">Sfide attive</h2>
-                  <p className="text-sm text-muted-foreground">Le tue sfide correnti</p>
-                </div>
-                <div className="space-y-3">
-                  {activeChallenges.length ? (
-                    activeChallenges.slice(0, 2).map((challenge) => {
-                      const leaderboard = (challenge.leaderboard ?? challenge.leaderboardEntries ?? []) as Array<{
-                        progress: number
-                      }>
-                      const progressValue = Number(
-                        challenge.current_progress ?? challenge.currentProgress ?? challenge.progress ?? 0
-                      )
-                      const maxProgress = Math.max(
-                        progressValue,
-                        ...leaderboard.map((item) => Number(item.progress || 0))
-                      )
-                      const progressPercent =
-                        maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
-                      return (
-                        <div key={challenge.id} className="stream-card">
-                          <p className="text-sm font-semibold text-foreground">{challenge.name}</p>
-                          <p className="text-xs text-muted-foreground">{challenge.objective}</p>
-                          <Progress value={progressPercent} className="mt-3 h-1.5" />
-                        </div>
-                      )
-                    })
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Nessuna sfida attiva. Partecipane una dalla sezione Sfide.
-                    </p>
-                  )}
-                </div>
-              </section>
-            </div>
-
-            <div className="stream-node">
-              <section className="surface-panel p-6">
-                <div className="mb-4">
-                  <h2 className="font-display text-lg font-semibold text-foreground">Progressi settimanali</h2>
-                  <p className="text-sm text-muted-foreground">Distanza per giorno</p>
-                </div>
-                <div className="space-y-3">
-                  {weeklyData.map((day) => (
-                    <div key={day.day} className="flex items-center gap-3">
-                      <span className="w-10 text-xs text-muted-foreground">{day.day}</span>
-                      <Progress value={Math.min(100, (day.distance / 2000) * 100)} className="h-2 flex-1" />
-                      <span className="text-xs text-muted-foreground">{(day.distance / 1000).toFixed(1)} km</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-          </section>
-
-          <aside className="space-y-6 xl:sticky xl:top-24">
-            <section className="surface-panel p-6">
-              <div className="mb-4">
-                <h2 className="font-display text-lg font-semibold text-foreground">Classifica Season</h2>
-                <p className="text-sm text-muted-foreground">Top nuotatori della stagione</p>
-              </div>
-              <div className="space-y-3">
-                {seasonLeaderboardEntries.length ? (
-                  seasonLeaderboardEntries.slice(0, 3).map((entry) => (
-                    <div key={entry.rank} className="stream-card">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                            {entry.rank}
-                          </div>
-                          <div>
-                            <p className={`text-sm ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
-                              {entry.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{entry.value}</p>
-                          </div>
-                        </div>
-                        {entry.isCurrentUser && (
-                          <Badge variant="neon" className="text-xs">
-                            Tu
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">Nessuna classifica disponibile.</p>
-                )}
-              </div>
-            </section>
-
-            <section className="surface-panel p-6">
-              <div className="mb-4">
-                <h2 className="font-display text-lg font-semibold text-foreground">Insight AI</h2>
-                <p className="text-sm text-muted-foreground">Focus rapido della settimana</p>
-              </div>
-              <div className="space-y-3">
-                {aiInsight ? (
-                  <>
-                    <div className="flex items-center gap-2 text-primary">
-                      <Trophy className="size-5" />
-                      <span className="text-sm font-semibold">{aiInsight.title}</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{aiInsight.message}</p>
-                    <Button variant="outline-neon" size="sm" asChild>
-                      <Link href="/coach">Apri AI Coach</Link>
-                    </Button>
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Nessun insight disponibile. Sincronizza nuove attività.
-                  </p>
-                )}
-              </div>
-            </section>
-          </aside>
-        </div>
       </div>
     </AppLayout>
   )
