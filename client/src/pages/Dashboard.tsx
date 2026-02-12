@@ -556,7 +556,7 @@ export default function Dashboard() {
     : 0
   const compactSeasonMissions = seasonMissionPreview.slice(0, 2)
   const compactRecentActivities = recentActivities.slice(0, 2)
-  const compactLeaderboard = seasonLeaderboardEntries.slice(0, 4)
+  const compactLeaderboard = seasonLeaderboardEntries.slice(0, 3)
   const compactChallenges = activeChallenges.slice(0, 1)
   const compactWeekly = weeklyData.slice(Math.max(0, weeklyData.length - 4))
   const activityDialogRows = useMemo(() => activitiesSortedByDate.slice(0, 12), [activitiesSortedByDate])
@@ -578,9 +578,9 @@ export default function Dashboard() {
                 <div className="absolute inset-0 bg-gradient-to-r from-background/88 via-background/72 to-background/55" />
               </div>
             ) : null}
-            <SurfaceContent className="relative z-10 flex h-full flex-col justify-between gap-4 p-5 lg:p-5">
+            <SurfaceContent className="relative z-10 flex h-full flex-col justify-between gap-3 p-4 lg:p-4">
               <div className="flex items-start gap-4">
-                <div className="size-20 rounded-2xl overflow-hidden ei-border-gradient shadow-[0_0_34px_var(--neon-soft)] shrink-0">
+                <div className="size-16 rounded-2xl overflow-hidden ei-border-gradient shadow-[0_0_28px_var(--neon-soft)] shrink-0">
                   {profileAvatarUrl ? (
                     <img
                       src={profileAvatarUrl}
@@ -602,16 +602,14 @@ export default function Dashboard() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm text-muted-foreground">Bentornato,</p>
-                  <h1 className="truncate text-2xl font-display font-bold neon-gradient-text">{displayName}</h1>
+                  <h1 className="truncate text-xl font-display font-bold neon-gradient-text">{displayName}</h1>
                   <p className="mt-1 text-sm text-foreground/85">
                     {profile?.profileBadge?.name || profile?.levelTitle || "Livello"} · {profile?.totalXp ?? 0} XP totali
-                  </p>
-                  <p className="mt-1 max-w-[56ch] text-xs leading-relaxed text-muted-foreground">
-                    Panorama rapido: completa missioni, migliora la classifica season e monitora trend senza uscire da questa vista.
                   </p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
+                <SeasonRecapDialog triggerLabel="Recap video" buttonVariant="neon" />
                 <Button variant="neon" size="sm" asChild>
                   <Link href="/activities">
                     <Waves className="size-4" />
@@ -636,7 +634,6 @@ export default function Dashboard() {
                     Club
                   </Link>
                 </Button>
-                <SeasonRecapDialog triggerLabel="Recap video" buttonVariant="neon" />
               </div>
             </SurfaceContent>
           </Surface>
@@ -673,7 +670,7 @@ export default function Dashboard() {
           </Surface>
         </div>
 
-        <div className="hidden lg:grid lg:flex-1 lg:min-h-0 lg:grid-cols-12 lg:grid-rows-[minmax(0,1.08fr)_auto_minmax(0,1fr)] lg:gap-3 lg:overflow-hidden">
+        <div className="hidden lg:grid lg:flex-1 lg:min-h-0 lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-2 lg:overflow-hidden">
           <section className="surface-panel col-span-8 min-h-0 p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
@@ -834,35 +831,6 @@ export default function Dashboard() {
                   <ChevronRight className="ml-1 size-3.5" />
                 </Link>
               </Button>
-            </div>
-          </section>
-
-          <section className="surface-panel col-span-12 min-h-0 p-3">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <div>
-                <p className="text-xs uppercase tracking-[0.14em] text-muted-foreground">KPI settimanali</p>
-                <p className="text-[11px] text-muted-foreground">Vista rapida senza scroll</p>
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <Button variant="outline-neon" size="sm" asChild className="h-7 text-[11px]">
-                  <Link href="/statistics">Apri progressi</Link>
-                </Button>
-                <SeasonRecapDialog triggerLabel="Recap video" buttonVariant="neon" />
-              </div>
-            </div>
-            <div className="grid grid-cols-4 gap-1.5">
-              {stats.map((stat) => (
-                <MetricOrb
-                  key={stat.label}
-                  label={stat.label}
-                  value={stat.value}
-                  progress={stat.progress}
-                  helper={stat.change}
-                  icon={<stat.icon className="size-4" />}
-                  tone="auto"
-                  size="sm"
-                />
-              ))}
             </div>
           </section>
 
