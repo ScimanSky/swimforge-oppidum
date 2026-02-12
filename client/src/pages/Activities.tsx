@@ -193,7 +193,7 @@ export default function Activities() {
 
   return (
     <AppLayout>
-      <div className="space-y-6 lg:space-y-3 p-3 lg:p-0">
+      <div className="compact-shell space-y-6 lg:space-y-3 p-3 lg:p-0">
         <div className="stream-shell lg:min-h-0">
           <section className="stream-main lg:min-h-0">
             <div className="stream-node">

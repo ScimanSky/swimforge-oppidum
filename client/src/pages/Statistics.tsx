@@ -362,7 +362,7 @@ export default function Statistics() {
 
   return (
     <AppLayout className="text-foreground">
-      <div className="space-y-6 lg:space-y-3 pb-12 lg:pb-2">
+      <div className="compact-shell space-y-6 lg:space-y-3 pb-12 lg:pb-2">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">Progressi</p>

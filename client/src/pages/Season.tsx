@@ -222,7 +222,7 @@ export default function SeasonPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-6 lg:space-y-3">
+      <div className="compact-shell space-y-6 lg:space-y-3">
         <Surface className="relative overflow-hidden">
           <SurfaceContent className="relative p-6 md:p-7">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
