@@ -467,7 +467,7 @@ export default function Dashboard() {
       remainingDays: Number(season.season?.remainingDays ?? 0),
     }
   }, [seasonQuery.data])
-  const seasonMissionRows = useMemo(() => {
+  const seasonMissionPreview = useMemo(() => {
     const season = seasonQuery.data
     if (!season) return []
     return [...(season.missions?.daily ?? []), ...(season.missions?.weekly ?? [])]
@@ -477,8 +477,8 @@ export default function Dashboard() {
         if (aDone !== bDone) return aDone ? 1 : -1
         return Number(a.progress ?? 0) - Number(b.progress ?? 0)
       })
+      .slice(0, 3)
   }, [seasonQuery.data])
-  const seasonMissionPreview = useMemo(() => seasonMissionRows.slice(0, 3), [seasonMissionRows])
 
   type ProfileLike = {
     firstName?: string | null
@@ -554,11 +554,7 @@ export default function Dashboard() {
   const xpProgress = profile?.nextLevelXp
     ? Math.min(100, (totalXp / profile.nextLevelXp) * 100)
     : 0
-  const compactSeasonMissions = seasonMissionPreview.slice(0, 1)
-  const compactRecentActivities = recentActivities.slice(0, 2)
   const compactLeaderboard = seasonLeaderboardEntries.slice(0, 3)
-  const compactChallenges = activeChallenges.slice(0, 1)
-  const compactWeekly = weeklyData.slice(Math.max(0, weeklyData.length - 3))
   const activityDialogRows = useMemo(() => activitiesSortedByDate.slice(0, 12), [activitiesSortedByDate])
   const challengeDialogRows = useMemo(() => activeChallenges.slice(0, 8), [activeChallenges])
   const currentUserRank = useMemo(() => {
@@ -752,6 +748,51 @@ export default function Dashboard() {
                   )}
                 </DashboardDetailDialog>
               </div>
+              <div className="rounded-xl border border-border/80 bg-background/65 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/65 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                      <Orbit className="size-3 text-primary" />
+                      Season Live
+                    </div>
+                    <p className="mt-2 truncate text-sm font-semibold text-foreground">{seasonSummary.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Lv {seasonSummary.level} · {seasonSummary.seasonXp.toLocaleString()} XP · {seasonSummary.remainingDays} giorni
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="stream-card px-2.5 py-2">
+                      <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Progressione</p>
+                      <p className="mt-1 text-sm font-semibold text-foreground">{seasonSummary.levelProgress}%</p>
+                    </div>
+                    <div className="stream-card px-2.5 py-2">
+                      <p className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground">Missioni</p>
+                      <p className="mt-1 text-sm font-semibold text-foreground">
+                        {seasonSummary.completedMissions}/{seasonSummary.totalMissions || 0}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Battle Pass</span>
+                  <span>{seasonSummary.levelProgress}%</span>
+                </div>
+                <Progress value={seasonSummary.levelProgress} className="mt-1 h-1.5" />
+                {seasonMissionPreview.length ? (
+                  <div className="mt-2 stream-card px-2.5 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-xs font-semibold text-foreground">{seasonMissionPreview[0].title}</p>
+                      <Badge
+                        variant={seasonMissionPreview[0].completed ? "neon" : "outline"}
+                        className="text-[10px]"
+                      >
+                        +{seasonMissionPreview[0].xpReward} XP
+                      </Badge>
+                    </div>
+                    <Progress value={Number(seasonMissionPreview[0].progress ?? 0)} className="mt-1.5 h-1" />
+                  </div>
+                ) : null}
+              </div>
             </SurfaceContent>
           </Surface>
 
@@ -870,396 +911,6 @@ export default function Dashboard() {
               </div>
             </SurfaceContent>
           </Surface>
-        </div>
-
-        <div className="hidden">
-          <section className="surface-panel col-span-8 min-h-0 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/65 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                  <Orbit className="size-3.5 text-primary" />
-                  Season Live
-                </div>
-                <h2 className="mt-2 truncate font-display text-lg font-semibold text-foreground">
-                  {seasonSummary.name}
-                </h2>
-                <p className="text-xs text-muted-foreground">
-                  Lv {seasonSummary.level} · {seasonSummary.seasonXp.toLocaleString()} XP ·{" "}
-                  {seasonSummary.remainingDays} giorni
-                </p>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <MetricOrb
-                  label="Progressione"
-                  value={`${seasonSummary.levelProgress}%`}
-                  progress={seasonSummary.levelProgress}
-                  helper="Livello"
-                  icon={<Trophy className="size-4" />}
-                  tone="cyan"
-                  size="sm"
-                />
-                <MetricOrb
-                  label="Missioni"
-                  value={`${seasonSummary.completedMissions}/${seasonSummary.totalMissions || 0}`}
-                  progress={seasonSummary.completionRate}
-                  helper="Completate"
-                  icon={<Target className="size-4" />}
-                  tone="lime"
-                  size="sm"
-                />
-              </div>
-            </div>
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Battle Pass</span>
-                <span>{seasonSummary.levelProgress}%</span>
-              </div>
-              <Progress value={seasonSummary.levelProgress} className="h-2" />
-            </div>
-            <div className="mt-3 space-y-2">
-              {compactSeasonMissions.length ? (
-                compactSeasonMissions.map((mission: any) => (
-                  <div key={mission.id} className="stream-card px-3 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="truncate text-xs font-semibold text-foreground">{mission.title}</p>
-                      <Badge variant={mission.completed ? "neon" : "outline"} className="text-[10px]">
-                        +{mission.xpReward} XP
-                      </Badge>
-                    </div>
-                    <Progress value={Number(mission.progress ?? 0)} className="mt-2 h-1" />
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-muted-foreground">Nessuna missione disponibile.</p>
-              )}
-            </div>
-            <div className="mt-3 flex items-center justify-between gap-2">
-              <Button variant="outline-neon" size="sm" asChild>
-                <Link href="/season">
-                  Apri hub
-                  <ChevronRight className="ml-1 size-3.5" />
-                </Link>
-              </Button>
-              <DashboardDetailDialog
-                title="Missioni Season"
-                description="Tutte le missioni disponibili (daily + weekly)."
-              >
-                {seasonMissionRows.length ? (
-                  seasonMissionRows.map((mission: any) => (
-                    <div key={mission.id} className="stream-card px-3 py-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-foreground">{mission.title}</p>
-                        <Badge variant={mission.completed ? "neon" : "outline"} className="text-[11px]">
-                          +{mission.xpReward} XP
-                        </Badge>
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">{mission.description}</p>
-                      <Progress value={Number(mission.progress ?? 0)} className="mt-2 h-1.5" />
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">Nessuna missione disponibile.</p>
-                )}
-              </DashboardDetailDialog>
-            </div>
-          </section>
-
-          <section className="surface-panel col-span-4 min-h-0 p-4">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div>
-                <h2 className="font-display text-base font-semibold text-foreground">Classifica Season</h2>
-                <p className="text-xs text-muted-foreground">Aggiornamento live</p>
-              </div>
-              <DashboardDetailDialog
-                title="Classifica completa"
-                description="Posizionamento attuale dei nuotatori della season."
-              >
-                {seasonLeaderboardEntries.length ? (
-                  seasonLeaderboardEntries.map((entry) => (
-                    <div key={`${entry.rank}-${entry.name}`} className="stream-card px-3 py-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
-                            {entry.rank}
-                          </div>
-                          <div>
-                            <p className={`text-sm ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
-                              {entry.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground">{entry.value}</p>
-                          </div>
-                        </div>
-                        {entry.isCurrentUser ? <Badge variant="neon">Tu</Badge> : null}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">Nessuna classifica disponibile.</p>
-                )}
-              </DashboardDetailDialog>
-            </div>
-            <div className="space-y-2">
-              {compactLeaderboard.length ? (
-                compactLeaderboard.map((entry) => (
-                  <div key={`${entry.rank}-${entry.name}`} className="stream-card px-3 py-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <div className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                          {entry.rank}
-                        </div>
-                        <div className="min-w-0">
-                          <p className={`truncate text-xs ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
-                            {entry.name}
-                          </p>
-                          <p className="text-[11px] text-muted-foreground">{entry.value}</p>
-                        </div>
-                      </div>
-                      {entry.isCurrentUser ? (
-                        <Badge variant="neon" className="text-[10px]">
-                          Tu
-                        </Badge>
-                      ) : null}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-muted-foreground">Nessuna classifica disponibile.</p>
-              )}
-            </div>
-            <div className="mt-3">
-              <Button variant="outline-neon" size="sm" asChild>
-                <Link href="/season">
-                  Hub season
-                  <ChevronRight className="ml-1 size-3.5" />
-                </Link>
-              </Button>
-            </div>
-          </section>
-
-          <section className="hidden surface-panel col-span-4 min-h-0 p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <h2 className="font-display text-base font-semibold text-foreground">Attività recenti</h2>
-                <p className="text-xs text-muted-foreground">Ultime sessioni</p>
-              </div>
-              <DashboardDetailDialog
-                title="Attività recenti"
-                description="Storico sintetico delle attività più recenti."
-              >
-                {activityDialogRows.length ? (
-                  activityDialogRows.map(({ activity }) => (
-                    <Link
-                      key={activity.id}
-                      href={`/activities/${activity.id}`}
-                      className="stream-card block px-3 py-2"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">
-                            {formatDistanceKm(getActivityDistance(activity))}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatShortDate(getActivityDateValue(activity))}
-                          </p>
-                        </div>
-                        <Badge variant="neon" className="text-[11px]">
-                          +{activity.xpEarned ?? 0} XP
-                        </Badge>
-                      </div>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {formatDuration(getActivityDuration(activity))} · {formatPace(getActivityPace(activity))}
-                      </p>
-                    </Link>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">Nessuna attività recente.</p>
-                )}
-              </DashboardDetailDialog>
-            </div>
-            <div className="space-y-2">
-              {compactRecentActivities.length ? (
-                compactRecentActivities.map((activity) => (
-                  <div key={activity.id} className="stream-card px-3 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold text-foreground">{formatDistanceKm(getActivityDistance(activity))}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {formatShortDate(getActivityDateValue(activity))} · {formatDuration(getActivityDuration(activity))}
-                        </p>
-                      </div>
-                      <Badge variant="neon" className="text-[10px]">
-                        +{activity.xpEarned ?? 0} XP
-                      </Badge>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <p className="text-xs text-muted-foreground">Nessuna attività recente.</p>
-              )}
-            </div>
-            <div className="mt-3">
-              <Button variant="outline-neon" size="sm" asChild>
-                <Link href="/activities">
-                  Vai a tutte
-                  <ChevronRight className="ml-1 size-3.5" />
-                </Link>
-              </Button>
-            </div>
-          </section>
-
-          <section className="hidden surface-panel col-span-4 min-h-0 p-4">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div>
-                <h2 className="font-display text-base font-semibold text-foreground">Sfide & Trend</h2>
-                <p className="text-xs text-muted-foreground">Situazione rapida</p>
-              </div>
-              <DashboardDetailDialog
-                title="Trend settimanale e sfide attive"
-                description="Dettaglio completo su progressi e performance del periodo."
-              >
-                {challengeDialogRows.length ? (
-                  challengeDialogRows.map((challenge) => {
-                    const leaderboard = (challenge.leaderboard ?? challenge.leaderboardEntries ?? []) as Array<{
-                      progress: number
-                    }>
-                    const progressValue = Number(
-                      challenge.current_progress ?? challenge.currentProgress ?? challenge.progress ?? 0
-                    )
-                    const maxProgress = Math.max(progressValue, ...leaderboard.map((item) => Number(item.progress || 0)))
-                    const progressPercent = maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
-                    return (
-                      <div key={challenge.id} className="stream-card px-3 py-2">
-                        <p className="text-sm font-semibold text-foreground">{challenge.name}</p>
-                        <p className="text-xs text-muted-foreground">{challenge.objective}</p>
-                        <Progress value={progressPercent} className="mt-2 h-1.5" />
-                      </div>
-                    )
-                  })
-                ) : (
-                  <p className="text-sm text-muted-foreground">Nessuna sfida attiva.</p>
-                )}
-                <div className="stream-card px-3 py-2">
-                  <p className="text-sm font-semibold text-foreground">Progressi settimanali</p>
-                  <div className="mt-2 space-y-2">
-                    {weeklyData.map((day) => (
-                      <div key={day.day} className="flex items-center gap-3">
-                        <span className="w-10 text-xs text-muted-foreground">{day.day}</span>
-                        <Progress value={Math.min(100, (day.distance / 2000) * 100)} className="h-1.5 flex-1" />
-                        <span className="text-xs text-muted-foreground">{(day.distance / 1000).toFixed(1)} km</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </DashboardDetailDialog>
-            </div>
-            <div className="space-y-2">
-              {compactChallenges.length ? (
-                compactChallenges.map((challenge) => {
-                  const leaderboard = (challenge.leaderboard ?? challenge.leaderboardEntries ?? []) as Array<{
-                    progress: number
-                  }>
-                  const progressValue = Number(challenge.current_progress ?? challenge.currentProgress ?? challenge.progress ?? 0)
-                  const maxProgress = Math.max(progressValue, ...leaderboard.map((item) => Number(item.progress || 0)))
-                  const progressPercent = maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
-                  return (
-                    <div key={challenge.id} className="stream-card px-3 py-2">
-                      <p className="truncate text-xs font-semibold text-foreground">{challenge.name}</p>
-                      <p className="truncate text-[11px] text-muted-foreground">{challenge.objective}</p>
-                      <Progress value={progressPercent} className="mt-2 h-1" />
-                    </div>
-                  )
-                })
-              ) : (
-                <p className="text-xs text-muted-foreground">Nessuna sfida attiva.</p>
-              )}
-              <div className="stream-card px-3 py-2">
-                <p className="text-xs font-semibold text-foreground">Progressi settimanali</p>
-                <div className="mt-2 space-y-1">
-                  {compactWeekly.map((day) => (
-                    <div key={day.day} className="flex items-center gap-2">
-                      <span className="w-7 text-[10px] text-muted-foreground">{day.day}</span>
-                      <Progress value={Math.min(100, (day.distance / 2000) * 100)} className="h-1.5 flex-1" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="mt-3 flex gap-2">
-              <Button variant="outline-neon" size="sm" asChild className="flex-1">
-                <Link href="/challenges">Sfide</Link>
-              </Button>
-              <Button variant="outline-neon" size="sm" asChild className="flex-1">
-                <Link href="/statistics">Trend</Link>
-              </Button>
-            </div>
-          </section>
-
-          <section className="hidden surface-panel col-span-4 min-h-0 p-4">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div>
-                <h2 className="font-display text-base font-semibold text-foreground">Insight & Azioni</h2>
-                <p className="text-xs text-muted-foreground">Focus operativo</p>
-              </div>
-              <DashboardDetailDialog title="Insight AI completo" description="Analisi estesa della settimana corrente.">
-                {aiInsight ? (
-                  <div className="stream-card px-3 py-2">
-                    <p className="text-sm font-semibold text-primary">{aiInsight.title}</p>
-                    <p className="mt-2 text-sm text-muted-foreground">{aiInsight.message}</p>
-                    <Button variant="outline-neon" size="sm" className="mt-3" asChild>
-                      <Link href="/coach">Apri AI Coach</Link>
-                    </Button>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Nessun insight disponibile.</p>
-                )}
-              </DashboardDetailDialog>
-            </div>
-            <div className="space-y-2">
-              <div className="stream-card px-3 py-2">
-                {aiInsight ? (
-                  <>
-                    <p className="text-xs font-semibold text-primary">{aiInsight.title}</p>
-                    <p
-                      className="mt-1 text-[11px] text-muted-foreground"
-                      style={{
-                        display: "-webkit-box",
-                        WebkitLineClamp: 4,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {aiInsight.message}
-                    </p>
-                    <Button variant="outline-neon" size="sm" className="mt-2 h-7 text-[11px]" asChild>
-                      <Link href="/coach">Apri AI Coach</Link>
-                    </Button>
-                  </>
-                ) : (
-                  <p className="text-xs text-muted-foreground">Nessun insight disponibile.</p>
-                )}
-              </div>
-              <div className="stream-card px-3 py-2">
-                <p className="text-xs font-semibold text-foreground">Link rapidi</p>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <Button variant="outline-neon" size="sm" className="h-7 text-[11px]" asChild>
-                    <Link href="/community">Club</Link>
-                  </Button>
-                  <Button variant="outline-neon" size="sm" className="h-7 text-[11px]" asChild>
-                    <Link href="/season">Season</Link>
-                  </Button>
-                  <Button variant="outline-neon" size="sm" className="h-7 text-[11px]" asChild>
-                    <Link href="/profile">Profilo</Link>
-                  </Button>
-                  <Button variant="outline-neon" size="sm" className="h-7 text-[11px]" asChild>
-                    <Link href="/settings">Impostazioni</Link>
-                  </Button>
-                </div>
-                <div className="mt-2">
-                  <SeasonRecapDialog triggerLabel="Video recap" buttonVariant="outline-neon" />
-                </div>
-              </div>
-            </div>
-          </section>
         </div>
 
         <div className="stream-shell lg:hidden">
