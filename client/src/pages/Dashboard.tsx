@@ -804,11 +804,75 @@ export default function Dashboard() {
                   <Link href="/season">Season Hub</Link>
                 </Button>
               </div>
+              <div className="rounded-xl border border-border/80 bg-background/65 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Classifica Season</p>
+                    <p className="text-[11px] text-muted-foreground">Top nuotatori della stagione</p>
+                  </div>
+                  <DashboardDetailDialog
+                    title="Classifica completa"
+                    description="Posizionamento attuale dei nuotatori della season."
+                    triggerLabel="Dettagli"
+                  >
+                    {seasonLeaderboardEntries.length ? (
+                      seasonLeaderboardEntries.map((entry) => (
+                        <div key={`status-${entry.rank}-${entry.name}`} className="stream-card px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
+                                {entry.rank}
+                              </div>
+                              <div className="min-w-0">
+                                <p className={`truncate text-sm ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
+                                  {entry.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{entry.value}</p>
+                              </div>
+                            </div>
+                            {entry.isCurrentUser ? <Badge variant="neon">Tu</Badge> : null}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Nessuna classifica disponibile.</p>
+                    )}
+                  </DashboardDetailDialog>
+                </div>
+                <div className="space-y-1.5">
+                  {compactLeaderboard.length ? (
+                    compactLeaderboard.map((entry) => (
+                      <div key={`status-preview-${entry.rank}-${entry.name}`} className="stream-card px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <div className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                              {entry.rank}
+                            </div>
+                            <div className="min-w-0">
+                              <p className={`truncate text-xs ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
+                                {entry.name}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">{entry.value}</p>
+                            </div>
+                          </div>
+                          {entry.isCurrentUser ? (
+                            <Badge variant="neon" className="text-[10px]">
+                              Tu
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Nessuna classifica disponibile.</p>
+                  )}
+                </div>
+              </div>
             </SurfaceContent>
           </Surface>
         </div>
 
-        <div className="hidden lg:grid lg:flex-1 lg:min-h-0 lg:grid-cols-12 lg:grid-rows-[minmax(0,1fr)] lg:gap-2 lg:overflow-hidden">
+        <div className="hidden">
           <section className="surface-panel col-span-8 min-h-0 p-4">
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
