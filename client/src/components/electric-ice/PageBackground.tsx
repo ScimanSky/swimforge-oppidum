@@ -117,8 +117,8 @@ export default function PageBackground({ className }: { className?: string }) {
         className={cn(
           "absolute inset-0",
           isDark
-            ? "bg-[linear-gradient(to_bottom,color-mix(in_oklch,var(--background)_34%,black),color-mix(in_oklch,var(--background)_74%,black))]"
-            : "bg-[linear-gradient(to_bottom,color-mix(in_oklch,var(--background)_44%,transparent),color-mix(in_oklch,var(--background)_70%,transparent))]",
+            ? "bg-[linear-gradient(to_bottom,color-mix(in_oklch,var(--background)_22%,transparent),color-mix(in_oklch,var(--background)_52%,transparent))]"
+            : "bg-[linear-gradient(to_bottom,color-mix(in_oklch,var(--background)_26%,transparent),color-mix(in_oklch,var(--background)_46%,transparent))]",
         )}
       />
 
@@ -131,8 +131,8 @@ export default function PageBackground({ className }: { className?: string }) {
         className={cn(
           "absolute inset-0",
           isDark
-            ? "bg-[radial-gradient(circle_at_center,transparent_0%,transparent_58%,color-mix(in_oklch,var(--background)_78%,black)_100%)]"
-            : "bg-[radial-gradient(circle_at_center,transparent_0%,transparent_55%,color-mix(in_oklch,var(--background)_75%,transparent)_100%)]",
+            ? "bg-[radial-gradient(circle_at_center,transparent_0%,transparent_62%,color-mix(in_oklch,var(--background)_56%,transparent)_100%)]"
+            : "bg-[radial-gradient(circle_at_center,transparent_0%,transparent_60%,color-mix(in_oklch,var(--background)_50%,transparent)_100%)]",
         )}
       />
     </div>
