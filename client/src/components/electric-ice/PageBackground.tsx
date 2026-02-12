@@ -76,23 +76,23 @@ export default function PageBackground({ className }: { className?: string }) {
       <div className={cn("absolute inset-0 ei-bg-grid", isDark ? "opacity-[0.06]" : "opacity-[0.07]")} />
 
       <AnimatePresence initial={false} mode="wait">
-        <motion.div
+        <motion.img
           key={bg.key}
-          className="absolute inset-0 bg-cover bg-no-repeat"
-          style={{
-            backgroundImage: `url(${bg.image})`,
-            backgroundPosition: bg.position ?? "center",
-          }}
+          src={bg.image}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          style={{ objectPosition: bg.position ?? "center" }}
           initial={{ opacity: 0 }}
-          animate={{ opacity: isDark ? 0.3 : 0.38 }}
+          animate={{ opacity: isDark ? 0.58 : 0.68 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.6, ease: "easeOut" }}
         />
       </AnimatePresence>
 
-      <motion.div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat mix-blend-screen"
-        style={{ backgroundImage: "url('/images/theme-v2/overlay-caustics.png')" }}
+      <motion.img
+        src="/images/theme-v2/overlay-caustics.png"
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover mix-blend-screen"
         animate={{
           opacity: isDark ? [0.16, 0.24, 0.16] : [0.13, 0.2, 0.13],
           scale: [1, 1.015, 1],
@@ -100,9 +100,10 @@ export default function PageBackground({ className }: { className?: string }) {
         transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
       />
 
-      <motion.div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat mix-blend-screen"
-        style={{ backgroundImage: "url('/images/theme-v2/overlay-energy-rings.png')" }}
+      <motion.img
+        src="/images/theme-v2/overlay-energy-rings.png"
+        alt=""
+        className="absolute inset-0 h-full w-full object-cover mix-blend-screen"
         animate={{
           opacity: isDark ? [0.14, 0.22, 0.14] : [0.11, 0.18, 0.11],
           scale: [1.01, 1.03, 1.01],
