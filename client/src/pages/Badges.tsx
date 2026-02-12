@@ -12,11 +12,12 @@ import {
   Orbit,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
-import { useState, useRef, useCallback, useMemo } from "react";
+import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
 import { getSeasonAssignmentImageUrl } from "@/lib/seasonBadgeImages";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
+import { createPortal } from "react-dom";
 
 // Badge images are now handled by getBadgeImageUrl from badgeImages.ts
 
@@ -80,6 +81,7 @@ export default function Badges() {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedBadge, setSelectedBadge] = useState<any | null>(null);
   const [showUnlockAnimation, setShowUnlockAnimation] = useState(false);
+  const [portalReady, setPortalReady] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [currentSoundUrl, setCurrentSoundUrl] = useState<string>("");
 
@@ -225,6 +227,19 @@ export default function Badges() {
       setTimeout(() => setShowUnlockAnimation(false), 1200);
     }
   };
+
+  useEffect(() => {
+    setPortalReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedBadge) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [selectedBadge]);
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="low">
@@ -516,144 +531,150 @@ export default function Badges() {
           </motion.div>
         )}
 
-        {/* Badge Detail Modal */}
-        <AnimatePresence>
-          {selectedBadge && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-              onClick={() => setSelectedBadge(null)}
-            >
-              <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.8, opacity: 0 }}
-                className="neon-card p-6 max-w-sm w-full relative overflow-hidden"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* Sparkle particles for unlock animation */}
-                {selectedBadge.earned && showUnlockAnimation && (
-                  <>
-                    <div className="sparkle-particle" />
-                    <div className="sparkle-particle" />
-                    <div className="sparkle-particle" />
-                    <div className="sparkle-particle" />
-                    <div className="sparkle-particle" />
-                    <div className="sparkle-particle" />
-                  </>
-                )}
-
-                {/* Close button */}
-                <button 
+        {/* Badge Detail Modal (rendered in portal to stay centered in viewport) */}
+        {portalReady &&
+          createPortal(
+            <AnimatePresence>
+              {selectedBadge && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
                   onClick={() => setSelectedBadge(null)}
-                  className="absolute top-4 right-4 text-[oklch(0.60_0.03_220)] hover:text-[oklch(0.80_0.03_220)] z-10"
                 >
-                  <X className="w-5 w-5" />
-                </button>
-
-                {/* Badge Display */}
-                <div className="flex flex-col items-center text-center relative">
-                  {/* Large Badge */}
-                  <div 
-                    className="w-48 h-48 flex items-center justify-center relative mb-4">
-                    <div className={`w-full h-full flex items-center justify-center ${
-                      selectedBadge.earned && showUnlockAnimation ? 'badge-unlock-animation' : ''
-                    }`}
-                    style={selectedBadge.earned ? {
-                      filter: `drop-shadow(0 0 30px ${rarityColors[selectedBadge.rarity]?.glow || rarityColors.common.glow}) drop-shadow(0 0 60px ${rarityColors[selectedBadge.rarity]?.glow || rarityColors.common.glow})`,
-                    } : {}}
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0.8, opacity: 0 }}
+                    className="neon-card p-6 max-w-sm w-full relative overflow-hidden"
+                    onClick={(e) => e.stopPropagation()}
                   >
-	                    {selectedBadge.earned ? (
-	                      <img 
-	                        src={
-	                          (typeof (selectedBadge as { image_url?: unknown }).image_url === "string"
-	                            ? (selectedBadge as { image_url: string }).image_url
-	                            : null) || getBadgeImageUrl(selectedBadge.code)
-	                        } 
-	                        alt={selectedBadge.name}
-	                        className="w-full h-full object-contain"
-	                        onContextMenu={(e) => e.preventDefault()}
-                        draggable={false}
-                        style={{ 
-                          WebkitTouchCallout: 'none',
-                          WebkitUserSelect: 'none',
-                          userSelect: 'none',
-                          touchAction: 'manipulation'
-                        }}
-                      />
-                    ) : (
-                      <div 
-                        className="w-32 h-32 rounded-full flex items-center justify-center"
-                        style={{ 
-                          background: 'oklch(0.18 0.03 250)',
-                          border: '3px dashed oklch(0.35 0.02 250)',
+                    {/* Sparkle particles for unlock animation */}
+                    {selectedBadge.earned && showUnlockAnimation && (
+                      <>
+                        <div className="sparkle-particle" />
+                        <div className="sparkle-particle" />
+                        <div className="sparkle-particle" />
+                        <div className="sparkle-particle" />
+                        <div className="sparkle-particle" />
+                        <div className="sparkle-particle" />
+                      </>
+                    )}
+
+                    {/* Close button */}
+                    <button
+                      onClick={() => setSelectedBadge(null)}
+                      className="absolute top-4 right-4 text-[oklch(0.60_0.03_220)] hover:text-[oklch(0.80_0.03_220)] z-10"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+
+                    {/* Badge Display */}
+                    <div className="flex flex-col items-center text-center relative">
+                      {/* Large Badge */}
+                      <div className="w-48 h-48 flex items-center justify-center relative mb-4">
+                        <div
+                          className={`w-full h-full flex items-center justify-center ${
+                            selectedBadge.earned && showUnlockAnimation ? "badge-unlock-animation" : ""
+                          }`}
+                          style={
+                            selectedBadge.earned
+                              ? {
+                                  filter: `drop-shadow(0 0 30px ${rarityColors[selectedBadge.rarity]?.glow || rarityColors.common.glow}) drop-shadow(0 0 60px ${rarityColors[selectedBadge.rarity]?.glow || rarityColors.common.glow})`,
+                                }
+                              : {}
+                          }
+                        >
+                          {selectedBadge.earned ? (
+                            <img
+                              src={
+                                (typeof (selectedBadge as { image_url?: unknown }).image_url === "string"
+                                  ? (selectedBadge as { image_url: string }).image_url
+                                  : null) || getBadgeImageUrl(selectedBadge.code)
+                              }
+                              alt={selectedBadge.name}
+                              className="w-full h-full object-contain"
+                              onContextMenu={(e) => e.preventDefault()}
+                              draggable={false}
+                              style={{
+                                WebkitTouchCallout: "none",
+                                WebkitUserSelect: "none",
+                                userSelect: "none",
+                                touchAction: "manipulation",
+                              }}
+                            />
+                          ) : (
+                            <div
+                              className="w-32 h-32 rounded-full flex items-center justify-center"
+                              style={{
+                                background: "oklch(0.18 0.03 250)",
+                                border: "3px dashed oklch(0.35 0.02 250)",
+                              }}
+                            >
+                              <Lock className="w-16 h-16 text-[oklch(0.40_0.02_250)]" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Badge Info */}
+                      <h3
+                        className="text-xl font-bold mb-1"
+                        style={{ color: rarityColors[selectedBadge.rarity]?.text || rarityColors.common.text }}
+                      >
+                        {selectedBadge.name}
+                      </h3>
+
+                      <span
+                        className="text-xs font-medium px-3 py-1 rounded-full mb-3 flex items-center gap-1"
+                        style={{
+                          background: rarityColors[selectedBadge.rarity]?.bg || rarityColors.common.bg,
+                          color: rarityColors[selectedBadge.rarity]?.text || rarityColors.common.text,
                         }}
                       >
-                        <Lock className="w-16 h-16 text-[oklch(0.40_0.02_250)]" />
-                      </div>
-                    )}
-                  </div>
-                  </div>
+                        {selectedBadge.rarity === "legendary" && <Sparkles className="w-3 h-3" />}
+                        {rarityLabels[selectedBadge.rarity] || "Comune"}
+                        {selectedBadge.rarity === "legendary" && <Sparkles className="w-3 h-3" />}
+                      </span>
 
-                  {/* Badge Info */}
-                  <h3 
-                    className="text-xl font-bold mb-1"
-                    style={{ color: rarityColors[selectedBadge.rarity]?.text || rarityColors.common.text }}
-                  >
-                    {selectedBadge.name}
-                  </h3>
-                  
-                  <span 
-                    className="text-xs font-medium px-3 py-1 rounded-full mb-3 flex items-center gap-1"
-                    style={{
-                      background: rarityColors[selectedBadge.rarity]?.bg || rarityColors.common.bg,
-                      color: rarityColors[selectedBadge.rarity]?.text || rarityColors.common.text,
-                    }}
-                  >
-                    {selectedBadge.rarity === 'legendary' && <Sparkles className="w-3 h-3" />}
-                    {rarityLabels[selectedBadge.rarity] || "Comune"}
-                    {selectedBadge.rarity === 'legendary' && <Sparkles className="w-3 h-3" />}
-                  </span>
-                  
-                  <p className="text-[oklch(0.70_0.03_220)] text-sm mb-2">
-                    {selectedBadge.description}
-                  </p>
-                  {selectedBadge.requirementType === "single_session_distance_km" &&
-                    typeof selectedBadge.bestSessionKm === "number" && (
-                      <p className="text-[oklch(0.55_0.03_220)] text-xs mb-3">
-                        Miglior sessione: {selectedBadge.bestSessionKm.toFixed(2)} km
-                      </p>
-                    )}
+                      <p className="text-[oklch(0.70_0.03_220)] text-sm mb-2">{selectedBadge.description}</p>
+                      {selectedBadge.requirementType === "single_session_distance_km" &&
+                        typeof selectedBadge.bestSessionKm === "number" && (
+                          <p className="text-[oklch(0.55_0.03_220)] text-xs mb-3">
+                            Miglior sessione: {selectedBadge.bestSessionKm.toFixed(2)} km
+                          </p>
+                        )}
 
-                  {/* Progress or Earned Date */}
-                  {selectedBadge.earned ? (
-                    <div className="text-[oklch(0.60_0.03_220)] text-xs">
-                      Sbloccato il {new Date(selectedBadge.earnedAt).toLocaleDateString('it-IT')}
+                      {/* Progress or Earned Date */}
+                      {selectedBadge.earned ? (
+                        <div className="text-[oklch(0.60_0.03_220)] text-xs">
+                          Sbloccato il {new Date(selectedBadge.earnedAt).toLocaleDateString("it-IT")}
+                        </div>
+                      ) : (
+                        <div className="w-full">
+                          <div className="flex justify-between text-xs mb-1">
+                            <span className="text-[oklch(0.60_0.03_220)]">Progresso</span>
+                            <span className="text-[oklch(0.70_0.18_220)]">{selectedBadge.progress}%</span>
+                          </div>
+                          <div className="h-2 bg-[oklch(0.20_0.03_250_/_0.55)] rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{
+                                width: `${selectedBadge.progress}%`,
+                                background: "linear-gradient(90deg, oklch(0.50 0.08 220), oklch(0.70 0.18 220))",
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="w-full">
-                      <div className="flex justify-between text-xs mb-1">
-                        <span className="text-[oklch(0.60_0.03_220)]">Progresso</span>
-                        <span className="text-[oklch(0.70_0.18_220)]">{selectedBadge.progress}%</span>
-                      </div>
-                      <div className="h-2 bg-[oklch(0.20_0.03_250_/_0.55)] rounded-full overflow-hidden">
-                        <div 
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{ 
-                            width: `${selectedBadge.progress}%`,
-                            background: 'linear-gradient(90deg, oklch(0.50 0.08 220), oklch(0.70 0.18 220))',
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            </motion.div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>,
+            document.body
           )}
-        </AnimatePresence>
       </main>
 
       </div>
