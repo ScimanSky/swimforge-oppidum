@@ -581,7 +581,7 @@ export default function Dashboard() {
                       Club
                     </Link>
                   </Button>
-                  <SeasonRecapDialog triggerLabel="Recap video" />
+                  <SeasonRecapDialog triggerLabel="Recap video" buttonVariant="neon" />
                 </div>
               </div>
             </div>
@@ -837,6 +837,7 @@ export default function Dashboard() {
                   <Button variant="outline-neon" size="sm" className="h-7 text-[11px]" asChild>
                     <Link href="/season">Season</Link>
                   </Button>
+                  <SeasonRecapDialog triggerLabel="Video recap" buttonVariant="outline-neon" />
                 </div>
               </div>
             </div>

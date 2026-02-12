@@ -221,7 +221,15 @@ body,
     .sf-page-root {
       height: 100%;
       min-height: 0;
-      overflow: hidden;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    .sf-page-root::-webkit-scrollbar {
+      width: 0;
+      height: 0;
     }
 
     .sf-page-root > * {
@@ -231,19 +239,19 @@ body,
     .sf-page-root .stream-shell {
       height: 100%;
       min-height: 0;
-      overflow: hidden;
+      overflow: visible;
       gap: 0.9rem;
     }
 
     .sf-page-root .stream-main {
       min-height: 0;
-      overflow: hidden;
+      overflow: visible;
       gap: 0.75rem;
     }
 
     .sf-page-root .stream-shell > aside {
       min-height: 0;
-      overflow: hidden;
+      overflow: visible;
     }
 
     .sf-page-root .stream-card {
