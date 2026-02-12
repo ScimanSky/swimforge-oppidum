@@ -155,6 +155,9 @@ export default function Challenges() {
   const [sectionTab, setSectionTab] = useState("ghost")
   const [activeTab, setActiveTab] = useState("active")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [activePage, setActivePage] = useState(1)
+  const [availablePage, setAvailablePage] = useState(1)
+  const [leaderboardPage, setLeaderboardPage] = useState(1)
   const [createDraft, setCreateDraft] = useState<ChallengeCreateDraft>({
     name: "",
     description: "",
@@ -217,6 +220,26 @@ export default function Challenges() {
       (challenge.status === "pending" || challenge.status === "active") &&
       !challenge.isParticipant
   )
+  const participatingChallenges = [...activeChallenges, ...pendingChallenges]
+  const activePageSize = 2
+  const availablePageSize = 3
+  const leaderboardPageSize = 4
+  const activeTotalPages = Math.max(1, Math.ceil(participatingChallenges.length / activePageSize))
+  const availableTotalPages = Math.max(1, Math.ceil(availableChallenges.length / availablePageSize))
+  const leaderboard = useMemo(() => (leaderboardQuery.data ?? []) as any[], [leaderboardQuery.data])
+  const leaderboardTotalPages = Math.max(1, Math.ceil(leaderboard.length / leaderboardPageSize))
+  const pagedParticipatingChallenges = useMemo(() => {
+    const start = (activePage - 1) * activePageSize
+    return participatingChallenges.slice(start, start + activePageSize)
+  }, [participatingChallenges, activePage])
+  const pagedAvailableChallenges = useMemo(() => {
+    const start = (availablePage - 1) * availablePageSize
+    return availableChallenges.slice(start, start + availablePageSize)
+  }, [availableChallenges, availablePage])
+  const pagedLeaderboard = useMemo(() => {
+    const start = (leaderboardPage - 1) * leaderboardPageSize
+    return leaderboard.slice(start, start + leaderboardPageSize)
+  }, [leaderboard, leaderboardPage])
 
   const streak = useMemo(() => {
     const dates = (activitiesQuery.data ?? [])
@@ -267,8 +290,6 @@ export default function Challenges() {
     ],
     [activeChallenges.length, pendingChallenges.length, badgeCount, streak, totalXp, profileQuery.data?.nextLevelXp]
   )
-
-  const leaderboard = useMemo(() => (leaderboardQuery.data ?? []) as any[], [leaderboardQuery.data])
 
   return (
     <AppLayout>
@@ -459,7 +480,15 @@ export default function Challenges() {
               </Dialog>
             </div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) => {
+                setActiveTab(value)
+                if (value === "active") setActivePage(1)
+                if (value === "available") setAvailablePage(1)
+                if (value === "leaderboard") setLeaderboardPage(1)
+              }}
+            >
               <TabsList className="w-full sm:w-fit">
                 <TabsTrigger value="active">
                   Active ({activeChallenges.length + pendingChallenges.length})
@@ -470,14 +499,14 @@ export default function Challenges() {
               </TabsList>
 
               <TabsContent value="active" className="mt-6 space-y-4">
-                {[...activeChallenges, ...pendingChallenges].length === 0 && (
+                {participatingChallenges.length === 0 && (
                   <Surface className="bg-card border-border">
                     <SurfaceContent className="p-6 text-muted-foreground">
                       Nessuna sfida attiva. Esplora le nuove sfide disponibili!
                     </SurfaceContent>
                   </Surface>
                 )}
-                {[...activeChallenges, ...pendingChallenges].map((challenge) => {
+                {pagedParticipatingChallenges.map((challenge) => {
                   const leaderboard = (challenge.leaderboard ?? []) as Array<{ progress: number }>
                   const maxProgress = leaderboard.reduce(
                     (max, item) => Math.max(max, item.progress || 0),
@@ -571,6 +600,29 @@ export default function Challenges() {
                     </Surface>
                   )
                 })}
+                {participatingChallenges.length > activePageSize && (
+                  <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2">
+                    <p className="text-xs text-muted-foreground">Pagina {activePage} di {activeTotalPages}</p>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline-neon"
+                        onClick={() => setActivePage((prev) => Math.max(1, prev - 1))}
+                        disabled={activePage === 1}
+                      >
+                        Indietro
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline-neon"
+                        onClick={() => setActivePage((prev) => Math.min(activeTotalPages, prev + 1))}
+                        disabled={activePage === activeTotalPages}
+                      >
+                        Avanti
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="available" className="mt-6 space-y-4">
@@ -581,7 +633,7 @@ export default function Challenges() {
                     </SurfaceContent>
                   </Surface>
                 )}
-                {availableChallenges.map((challenge) => (
+                {pagedAvailableChallenges.map((challenge) => (
                   <Surface key={challenge.id} className="bg-card border-border">
                     <SurfaceContent className="p-4">
                       <div className="flex items-start justify-between gap-4">
@@ -609,6 +661,29 @@ export default function Challenges() {
                     </SurfaceContent>
                   </Surface>
                 ))}
+                {availableChallenges.length > availablePageSize && (
+                  <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2">
+                    <p className="text-xs text-muted-foreground">Pagina {availablePage} di {availableTotalPages}</p>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline-neon"
+                        onClick={() => setAvailablePage((prev) => Math.max(1, prev - 1))}
+                        disabled={availablePage === 1}
+                      >
+                        Indietro
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline-neon"
+                        onClick={() => setAvailablePage((prev) => Math.min(availableTotalPages, prev + 1))}
+                        disabled={availablePage === availableTotalPages}
+                      >
+                        Avanti
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="completed" className="mt-6">
@@ -628,7 +703,8 @@ export default function Challenges() {
                           Nessuna classifica disponibile.
                         </div>
                       )}
-                      {leaderboard.map((entry, index) => {
+                      {pagedLeaderboard.map((entry, index) => {
+                        const absoluteIndex = (leaderboardPage - 1) * leaderboardPageSize + index
                         const profile = entry.profile ?? entry
                         const name = entry.name ?? profile.name ?? "Nuotatore"
                         return (
@@ -637,11 +713,11 @@ export default function Challenges() {
                             className="flex items-center gap-4 rounded-lg bg-secondary/30 p-3"
                           >
                             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                              {index === 0 ? (
+                              {absoluteIndex === 0 ? (
                                 <Crown className="h-4 w-4 text-primary" />
                               ) : (
                                 <span className="text-sm font-bold text-foreground">
-                                  {index + 1}
+                                  {absoluteIndex + 1}
                                 </span>
                               )}
                             </div>
@@ -662,6 +738,31 @@ export default function Challenges() {
                           </div>
                         )
                       })}
+                      {leaderboard.length > leaderboardPageSize && (
+                        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2">
+                          <p className="text-xs text-muted-foreground">
+                            Pagina {leaderboardPage} di {leaderboardTotalPages}
+                          </p>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="outline-neon"
+                              onClick={() => setLeaderboardPage((prev) => Math.max(1, prev - 1))}
+                              disabled={leaderboardPage === 1}
+                            >
+                              Indietro
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline-neon"
+                              onClick={() => setLeaderboardPage((prev) => Math.min(leaderboardTotalPages, prev + 1))}
+                              disabled={leaderboardPage === leaderboardTotalPages}
+                            >
+                              Avanti
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </SurfaceContent>
                 </Surface>

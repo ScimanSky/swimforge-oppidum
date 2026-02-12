@@ -188,6 +188,12 @@ export default function SeasonPage() {
   const weeklyMissions = seasonData?.missions?.weekly ?? []
   const rewards = seasonData?.rewards ?? []
   const badgeAssignments = seasonData?.badgeAssignments ?? []
+  const dailyPreview = dailyMissions.slice(0, 3)
+  const weeklyPreview = weeklyMissions.slice(0, 3)
+  const rewardsPreview = rewards.slice(0, 4)
+  const questsPreview = clubQuests.slice(0, 2)
+  const leaderboardPreview = leaderboard.slice(0, 5)
+  const badgeAssignmentsPreview = badgeAssignments.slice(0, 6)
 
   const handleCreatePrediction = () => {
     const targetDistanceMeters = toOptionalNumber(predictionForm.targetDistanceMeters)
@@ -283,7 +289,7 @@ export default function SeasonPage() {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  {dailyMissions.map((mission) => (
+                  {dailyPreview.map((mission) => (
                     <div key={mission.id} className="stream-card">
                       <div className="flex items-center justify-between gap-3">
                         <div>
@@ -505,7 +511,7 @@ export default function SeasonPage() {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  {weeklyMissions.map((mission) => (
+                  {weeklyPreview.map((mission) => (
                     <div key={mission.id} className="stream-card">
                       <div className="flex items-center justify-between gap-3">
                         <div>
@@ -532,7 +538,7 @@ export default function SeasonPage() {
                   </div>
                 </div>
                 <div className="space-y-3">
-                  {rewards.map((reward) => (
+                  {rewardsPreview.map((reward) => (
                     <div key={reward.rewardCode} className="stream-card">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0 flex items-center gap-3">
@@ -581,7 +587,7 @@ export default function SeasonPage() {
               </div>
               <div className="space-y-3">
                 {clubQuests.length ? (
-                  clubQuests.map((quest) => (
+                  questsPreview.map((quest) => (
                     <div key={quest.clubId} className="stream-card">
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-semibold text-foreground truncate">{quest.clubName}</p>
@@ -655,7 +661,7 @@ export default function SeasonPage() {
               </div>
               <div className="space-y-3">
                 {leaderboard.length ? (
-                  leaderboard.slice(0, 8).map((entry) => (
+                  leaderboardPreview.map((entry) => (
                     <div key={entry.userId} className="stream-card">
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
@@ -682,7 +688,7 @@ export default function SeasonPage() {
                 <p className="text-sm text-muted-foreground">Obiettivi nuovi dedicati alla season</p>
               </div>
               <div className="space-y-3">
-                {badgeAssignments.map((item) => (
+                {badgeAssignmentsPreview.map((item) => (
                   <div key={item.code} className="stream-card">
                     <div className="flex items-center gap-3">
                       <div className="size-10 rounded-xl overflow-hidden border border-border/70 bg-background/65 shrink-0">

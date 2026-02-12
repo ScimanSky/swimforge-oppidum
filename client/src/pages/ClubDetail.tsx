@@ -775,11 +775,11 @@ export default function ClubDetail() {
                                   </div>
                                   {openCommentsId === post.id && (
                                     <div className="mt-4 rounded-xl border border-border bg-background/60 p-4 space-y-3">
-                                      <div className="max-h-60 overflow-y-auto space-y-3">
+                                      <div className="space-y-3">
                                         {commentsQuery.isLoading ? (
                                           <div className="text-sm text-muted-foreground">Caricamento commenti...</div>
                                         ) : commentsQuery.data && commentsQuery.data.length > 0 ? (
-                                          commentsQuery.data.map((comment: any) => (
+                                          commentsQuery.data.slice(0, 3).map((comment: any) => (
                                             <div key={comment.id} className="flex items-start gap-2">
                                               {comment.user_avatar ? (
                                                 <img
@@ -801,6 +801,11 @@ export default function ClubDetail() {
                                         ) : (
                                           <div className="text-sm text-muted-foreground">Nessun commento ancora.</div>
                                         )}
+                                        {commentsQuery.data && commentsQuery.data.length > 3 ? (
+                                          <div className="text-xs text-muted-foreground">
+                                            +{commentsQuery.data.length - 3} commenti aggiuntivi
+                                          </div>
+                                        ) : null}
                                       </div>
                                       <div className="flex flex-col sm:flex-row gap-2">
                                         <Input

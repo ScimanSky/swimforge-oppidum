@@ -1,7 +1,7 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Link } from "wouter"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -86,6 +86,8 @@ export default function Community() {
   const [openCommentsId, setOpenCommentsId] = useState<number | null>(null)
   const [clubScope, setClubScope] = useState<"all" | "mine">("all")
   const [clubSearch, setClubSearch] = useState("")
+  const [feedPage, setFeedPage] = useState(1)
+  const [clubsPage, setClubsPage] = useState(1)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [createDraft, setCreateDraft] = useState({
     name: "",
@@ -146,6 +148,26 @@ export default function Community() {
 
   const feedItems = useMemo(() => (feedQuery.data as any[]) || [], [feedQuery.data])
   const clubs = useMemo(() => (clubsQuery.data as any[]) || [], [clubsQuery.data])
+  const feedPageSize = 2
+  const clubsPageSize = 4
+  const feedTotalPages = Math.max(1, Math.ceil(feedItems.length / feedPageSize))
+  const clubsTotalPages = Math.max(1, Math.ceil(clubs.length / clubsPageSize))
+  const pagedFeedItems = useMemo(() => {
+    const start = (feedPage - 1) * feedPageSize
+    return feedItems.slice(start, start + feedPageSize)
+  }, [feedItems, feedPage])
+  const pagedClubs = useMemo(() => {
+    const start = (clubsPage - 1) * clubsPageSize
+    return clubs.slice(start, start + clubsPageSize)
+  }, [clubs, clubsPage])
+
+  useEffect(() => {
+    setFeedPage(1)
+  }, [feedItems.length])
+
+  useEffect(() => {
+    setClubsPage(1)
+  }, [clubScope, clubSearch, clubs.length])
   const communityOrbs = useMemo(() => {
     const totalMembers = clubs.reduce((sum, club) => sum + Number(club.member_count || 0), 0)
     const totalSplashes = feedItems.reduce((sum, post) => sum + Number(post.splash_count || 0), 0)
@@ -297,8 +319,9 @@ export default function Community() {
     }
 
     return (
+      <>
       <div className="space-y-4">
-        {feedItems.map((post, index) => {
+        {pagedFeedItems.map((post, index) => {
           const name = post.user_name || post.user_email?.split("@")[0] || "Nuotatore"
           const initials = getInitials(name)
           const distance = formatDistance(post.activity_distance_meters)
@@ -420,11 +443,11 @@ export default function Community() {
                         className="overflow-hidden"
                       >
                         <div className="mt-4 rounded-2xl border border-border bg-background/60 p-4 space-y-3">
-                          <div className="max-h-64 overflow-y-auto space-y-3 pr-1">
+                          <div className="space-y-3">
                             {commentsQuery.isLoading && openCommentsId === post.id ? (
                               <div className="text-sm text-muted-foreground">Caricamento...</div>
                             ) : (commentsQuery.data ?? []).length > 0 ? (
-                              (commentsQuery.data ?? []).map((comment: any) => (
+                              (commentsQuery.data ?? []).slice(0, 3).map((comment: any) => (
                                 <div key={comment.id} className="flex items-start gap-2">
                                   <Avatar className="h-8 w-8 border border-border">
                                     <AvatarImage src={comment.user_avatar || ""} />
@@ -479,6 +502,30 @@ export default function Community() {
           )
         })}
       </div>
+      {feedItems.length > feedPageSize && (
+        <div className="mt-3 flex items-center justify-between rounded-xl border border-border/60 bg-card/50 px-3 py-2">
+          <p className="text-xs text-muted-foreground">Pagina {feedPage} di {feedTotalPages}</p>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline-neon"
+              onClick={() => setFeedPage((prev) => Math.max(1, prev - 1))}
+              disabled={feedPage === 1}
+            >
+              Indietro
+            </Button>
+            <Button
+              size="sm"
+              variant="outline-neon"
+              onClick={() => setFeedPage((prev) => Math.min(feedTotalPages, prev + 1))}
+              disabled={feedPage === feedTotalPages}
+            >
+              Avanti
+            </Button>
+          </div>
+        </div>
+      )}
+      </>
     )
   }
 
@@ -529,7 +576,7 @@ export default function Community() {
           ) : clubs.length === 0 ? (
             <div className="surface-panel p-6 text-muted-foreground">Nessun club trovato.</div>
           ) : (
-            clubs.map((club: any) => (
+            pagedClubs.map((club: any) => (
               <div key={club.id} className="surface-panel overflow-hidden">
                 <div className="relative h-32">
                   <img
@@ -584,6 +631,29 @@ export default function Community() {
             ))
           )}
         </div>
+        {clubs.length > clubsPageSize && (
+          <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/50 px-3 py-2">
+            <p className="text-xs text-muted-foreground">Pagina {clubsPage} di {clubsTotalPages}</p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline-neon"
+                onClick={() => setClubsPage((prev) => Math.max(1, prev - 1))}
+                disabled={clubsPage === 1}
+              >
+                Indietro
+              </Button>
+              <Button
+                size="sm"
+                variant="outline-neon"
+                onClick={() => setClubsPage((prev) => Math.min(clubsTotalPages, prev + 1))}
+                disabled={clubsPage === clubsTotalPages}
+              >
+                Avanti
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }

@@ -410,9 +410,10 @@ export default function Statistics() {
           </div>
         ) : (
           <Accordion
-            type="multiple"
-            defaultValue={["timeline", "performance", "advanced"]}
-            className="space-y-4"
+            type="single"
+            collapsible
+            defaultValue="timeline"
+            className="space-y-3"
           >
             <AccordionItem value="timeline" className="border-0">
               <AccordionTrigger className="text-left">Progress Timeline</AccordionTrigger>

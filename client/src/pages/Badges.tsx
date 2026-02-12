@@ -82,6 +82,7 @@ export default function Badges() {
   const [selectedBadge, setSelectedBadge] = useState<any | null>(null);
   const [showUnlockAnimation, setShowUnlockAnimation] = useState(false);
   const [portalReady, setPortalReady] = useState(false);
+  const [badgePage, setBadgePage] = useState(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [currentSoundUrl, setCurrentSoundUrl] = useState<string>("");
 
@@ -181,6 +182,12 @@ export default function Badges() {
   const filteredBadges = allBadges.filter(
     (b) => selectedCategory === "all" || b.category === selectedCategory
   );
+  const badgePageSize = 10;
+  const badgeTotalPages = Math.max(1, Math.ceil(filteredBadges.length / badgePageSize));
+  const pagedBadges = useMemo(() => {
+    const start = (badgePage - 1) * badgePageSize;
+    return filteredBadges.slice(start, start + badgePageSize);
+  }, [filteredBadges, badgePage]);
 
   // Count earned badges
   const earnedCount = allBadges.filter((b) => b.earned).length || 0;
@@ -231,6 +238,14 @@ export default function Badges() {
   useEffect(() => {
     setPortalReady(true);
   }, []);
+
+  useEffect(() => {
+    setBadgePage(1);
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    if (badgePage > badgeTotalPages) setBadgePage(badgeTotalPages);
+  }, [badgePage, badgeTotalPages]);
 
   useEffect(() => {
     if (!selectedBadge) return;
@@ -438,7 +453,7 @@ export default function Badges() {
             className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"
           >
             <AnimatePresence mode="popLayout">
-	              {filteredBadges?.map((badge, index) => {
+	              {pagedBadges?.map((badge, index) => {
 	                const isEarned = badge.earned;
 	                const colors = rarityColors[badge.rarity] || rarityColors.common;
 	                const badgeImageUrl =
@@ -529,6 +544,31 @@ export default function Badges() {
               })}
             </AnimatePresence>
           </motion.div>
+        )}
+        {!isLoading && !achievementsLoading && filteredBadges.length > badgePageSize && (
+          <div className="mt-4 flex items-center justify-between rounded-xl border border-border/60 bg-card/50 px-3 py-2">
+            <p className="text-xs text-muted-foreground">
+              Pagina {badgePage} di {badgeTotalPages}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline-neon"
+                onClick={() => setBadgePage((prev) => Math.max(1, prev - 1))}
+                disabled={badgePage === 1}
+              >
+                Indietro
+              </Button>
+              <Button
+                size="sm"
+                variant="outline-neon"
+                onClick={() => setBadgePage((prev) => Math.min(badgeTotalPages, prev + 1))}
+                disabled={badgePage === badgeTotalPages}
+              >
+                Avanti
+              </Button>
+            </div>
+          </div>
         )}
 
         {/* Badge Detail Modal (rendered in portal to stay centered in viewport) */}

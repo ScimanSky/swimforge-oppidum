@@ -17,7 +17,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type OrderBy = "level" | "totalXp" | "badges";
 type Period = "all" | "week" | "month";
@@ -62,6 +62,7 @@ export default function Leaderboard() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [orderBy, setOrderBy] = useState<OrderBy>("totalXp");
   const [period, setPeriod] = useState<Period>("all");
+  const [listPage, setListPage] = useState(1);
 
   const { data: leaderboard, isLoading } = trpc.leaderboard.get.useQuery(
     { orderBy, period, limit: 50 },
@@ -112,6 +113,22 @@ export default function Leaderboard() {
 
   // Normalize all entries
   const normalizedLeaderboard = leaderboard?.map(normalizeEntry) || [];
+  const podiumOffset = normalizedLeaderboard.length >= 3 ? 3 : 0;
+  const restEntries = normalizedLeaderboard.slice(podiumOffset);
+  const restPageSize = 4;
+  const restTotalPages = Math.max(1, Math.ceil(restEntries.length / restPageSize));
+  const pagedRestEntries = useMemo(() => {
+    const start = (listPage - 1) * restPageSize;
+    return restEntries.slice(start, start + restPageSize);
+  }, [restEntries, listPage]);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [period, orderBy]);
+
+  useEffect(() => {
+    if (listPage > restTotalPages) setListPage(restTotalPages);
+  }, [listPage, restTotalPages]);
   const summaryOrbs = useMemo(() => {
     const numericValue = (entry: NormalizedEntry) => {
       if (orderBy === "badges") return period === "all" ? entry.badgeCount || 0 : entry.periodBadgeCount || 0;
@@ -297,8 +314,8 @@ export default function Leaderboard() {
             )}
 
             {/* Rest of the list */}
-            {normalizedLeaderboard.slice(normalizedLeaderboard.length >= 3 ? 3 : 0).map((entry, index) => {
-              const position = normalizedLeaderboard.length >= 3 ? index + 4 : index + 1;
+            {pagedRestEntries.map((entry, index) => {
+              const position = podiumOffset + (listPage - 1) * restPageSize + index + 1;
               const isCurrentUser = String(entry.userId) === String(user?.id);
 
               return (
@@ -349,6 +366,31 @@ export default function Leaderboard() {
                 </motion.div>
               );
             })}
+            {restEntries.length > restPageSize && (
+              <div className="mt-3 flex items-center justify-between rounded-xl border border-border/60 bg-card/50 px-3 py-2">
+                <p className="text-xs text-muted-foreground">
+                  Pagina {listPage} di {restTotalPages}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline-neon"
+                    onClick={() => setListPage((prev) => Math.max(1, prev - 1))}
+                    disabled={listPage === 1}
+                  >
+                    Indietro
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline-neon"
+                    onClick={() => setListPage((prev) => Math.min(restTotalPages, prev + 1))}
+                    disabled={listPage === restTotalPages}
+                  >
+                    Avanti
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {normalizedLeaderboard.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">

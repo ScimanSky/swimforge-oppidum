@@ -1,7 +1,7 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
@@ -72,6 +72,7 @@ export default function Activities() {
   const [sort, setSort] = useState("recent")
   const [shareOverrides, setShareOverrides] = useState<Record<number, boolean>>({})
   const [pendingShareId, setPendingShareId] = useState<number | null>(null)
+  const [page, setPage] = useState(1)
 
   const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
   const advancedQuery = trpc.statistics.getAdvanced.useQuery({ days: 30 })
@@ -118,6 +119,20 @@ export default function Activities() {
       return new Date(b.activityDate).getTime() - new Date(a.activityDate).getTime()
       })
   }, [activities, filter, search, sort])
+  const pageSize = 4
+  const totalPages = Math.max(1, Math.ceil(filteredActivities.length / pageSize))
+  const pagedActivities = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filteredActivities.slice(start, start + pageSize)
+  }, [filteredActivities, page])
+
+  useEffect(() => {
+    setPage(1)
+  }, [filter, search, sort])
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
 
   const monthStart = new Date()
   monthStart.setDate(monthStart.getDate() - 30)
@@ -244,7 +259,7 @@ export default function Activities() {
                       Nessuna attività trovata. Sincronizza i dispositivi per vedere le sessioni.
                     </div>
                   ) : (
-                    filteredActivities.map((activity) => {
+                    pagedActivities.map((activity) => {
                       const isOpenWater = Boolean(activity.isOpenWater)
                       const shareChecked = getShareState(activity)
                       const shareDisabled = pendingShareId === activity.id
@@ -335,6 +350,31 @@ export default function Activities() {
                     })
                   )}
                 </div>
+                {!activitiesQuery.isLoading && filteredActivities.length > pageSize && (
+                  <div className="mt-3 flex items-center justify-between rounded-xl border border-border/70 bg-background/50 px-3 py-2">
+                    <p className="text-xs text-muted-foreground">
+                      Pagina {page} di {totalPages}
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline-neon"
+                        onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                        disabled={page === 1}
+                      >
+                        Indietro
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline-neon"
+                        onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                        disabled={page === totalPages}
+                      >
+                        Avanti
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </section>
             </div>
           </section>

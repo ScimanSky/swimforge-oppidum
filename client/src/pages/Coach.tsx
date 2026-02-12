@@ -575,7 +575,7 @@ export default function Coach() {
                           ))}
                         </div>
                         {activePoolSection ? (
-                          <div className="max-h-[420px] overflow-auto rounded-lg border border-border bg-background/60 p-4">
+                          <div className="rounded-lg border border-border bg-background/60 p-4">
                             <div className="mb-2 flex flex-wrap items-center gap-2">
                               <Badge variant="neon">{activePoolSection.title}</Badge>
                               {activePoolSection.notes && (
@@ -585,7 +585,7 @@ export default function Coach() {
                               )}
                             </div>
                             <div className="space-y-3">
-                              {activePoolSection.exercises.map((exercise, exIdx) => (
+                              {activePoolSection.exercises.slice(0, 4).map((exercise, exIdx) => (
                                 <div
                                   key={exIdx}
                                   className="rounded-md bg-background/80 p-3 text-sm"
@@ -608,6 +608,11 @@ export default function Coach() {
                                 </div>
                               ))}
                             </div>
+                            {activePoolSection.exercises.length > 4 && (
+                              <p className="mt-3 text-xs text-muted-foreground">
+                                +{activePoolSection.exercises.length - 4} esercizi aggiuntivi. Apri l&apos;allenamento completo nel dettaglio sessione.
+                              </p>
+                            )}
                           </div>
                         ) : null}
                       </>
@@ -645,7 +650,7 @@ export default function Coach() {
                         ))}
                       </div>
                       {activeDrySection ? (
-                        <div className="max-h-[420px] overflow-auto rounded-lg border border-border bg-background/60 p-4">
+                        <div className="rounded-lg border border-border bg-background/60 p-4">
                           <div className="mb-2 flex flex-wrap items-center gap-2">
                             <Badge variant="neon">{activeDrySection.title}</Badge>
                             {activeDrySection.notes && (
@@ -655,7 +660,7 @@ export default function Coach() {
                             )}
                           </div>
                           <div className="space-y-3">
-                            {activeDrySection.exercises.map((exercise, exIdx) => (
+                            {activeDrySection.exercises.slice(0, 4).map((exercise, exIdx) => (
                               <div
                                 key={exIdx}
                                 className="rounded-md bg-background/80 p-3 text-sm"
@@ -678,6 +683,11 @@ export default function Coach() {
                               </div>
                             ))}
                           </div>
+                          {activeDrySection.exercises.length > 4 && (
+                            <p className="mt-3 text-xs text-muted-foreground">
+                              +{activeDrySection.exercises.length - 4} esercizi aggiuntivi. Apri la scheda completa dal coach.
+                            </p>
+                          )}
                         </div>
                       ) : null}
                     </>

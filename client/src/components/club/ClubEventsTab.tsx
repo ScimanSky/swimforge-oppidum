@@ -524,7 +524,7 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
                   </div>
                 ) : (
-                  <div className="space-y-4 max-h-80 overflow-y-auto">
+                  <div className="space-y-4">
                     {(["going", "maybe", "not_going"] as const).map((status) => {
                       const title =
                         status === "going" ? "Partecipo" : status === "maybe" ? "Forse" : "Non partecipo";
@@ -537,7 +537,7 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
                           {list.length === 0 ? (
                             <p className="text-xs text-muted-foreground">Nessuno.</p>
                           ) : (
-                            list.map((attendee: any) => (
+                            list.slice(0, 4).map((attendee: any) => (
                               <div key={attendee.id} className="flex items-center gap-3">
                                 <Avatar className="h-8 w-8">
                                   <AvatarImage src={attendee.user.profilePicture || undefined} />
@@ -556,6 +556,9 @@ export default function ClubEventsTab({ clubId, isMember, isStaff }: ClubEventsT
                               </div>
                             ))
                           )}
+                          {list.length > 4 ? (
+                            <p className="text-xs text-muted-foreground">+{list.length - 4} altri partecipanti</p>
+                          ) : null}
                         </div>
                       );
                     })}
