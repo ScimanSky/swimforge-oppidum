@@ -21,7 +21,7 @@ export default function ClubInvite() {
 
   return (
     <AppLayout>
-      <div className="mx-auto w-full max-w-lg py-10">
+      <div className="mx-auto w-full max-w-lg py-6 lg:py-3">
         <Surface className="border-border/50 bg-card/70 backdrop-blur-sm">
           <SurfaceContent className="p-6 text-center space-y-4">
             <h1 className="text-xl font-semibold">Invito al Club</h1>

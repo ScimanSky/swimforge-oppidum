@@ -323,7 +323,7 @@ export default function Coach() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 lg:space-y-3">
         <section className="surface-panel p-6 glass-panel">
           <div className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">

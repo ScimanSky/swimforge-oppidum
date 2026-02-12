@@ -88,7 +88,7 @@ export default function ClubEventDetail() {
 
   return (
     <AppLayout className="text-foreground">
-      <div className="container py-10 space-y-6">
+      <div className="container py-6 lg:py-3 space-y-6 lg:space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-1">
             <Link

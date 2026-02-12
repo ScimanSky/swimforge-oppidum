@@ -481,9 +481,9 @@ export default function ClubDetail() {
 
   return (
     <AppLayout className="text-foreground">
-      <div className="min-h-screen pb-24">
-        <section className="py-8">
-          <div className="container space-y-6">
+      <div className="pb-12 lg:pb-2">
+        <section className="py-6 lg:py-3">
+          <div className="container space-y-6 lg:space-y-3">
             <Link
               href="/community"
               className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground"
@@ -562,8 +562,8 @@ export default function ClubDetail() {
           </div>
         </section>
 
-        <section className="py-10">
-          <div className="container space-y-8">
+        <section className="py-6 lg:py-3">
+          <div className="container space-y-8 lg:space-y-3">
             {club && club.is_private && !club.is_member ? (
               <Surface>
                 <SurfaceContent className="p-6 text-muted-foreground">
@@ -585,7 +585,7 @@ export default function ClubDetail() {
                 )}
 
                 {/* Tab Navigation */}
-                <Tabs defaultValue="feed" className="space-y-6">
+                <Tabs defaultValue="feed" className="space-y-6 lg:space-y-3">
                   <TabsList
                     className="w-full justify-start overflow-x-auto"
                   >

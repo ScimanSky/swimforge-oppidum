@@ -226,8 +226,8 @@ export default function SessionInsights() {
 
   return (
     <AppLayout>
-      <div className="min-h-screen overflow-x-hidden font-sans text-foreground relative pb-24">
-        <div className="container py-8 md:py-12">
+      <div className="overflow-x-hidden font-sans text-foreground relative pb-12 lg:pb-2">
+        <div className="container py-6 md:py-8 lg:py-3">
           <div className="flex flex-col gap-3 mb-8 md:flex-row md:items-center md:gap-4">
             <div className="flex items-center gap-3">
               <Link href="/coach">

@@ -168,7 +168,7 @@ export default function Leaderboard() {
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="low">
-    <div className="pb-20">
+    <div className="pb-12 lg:pb-2">
       {/* Header */}
       <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-foreground">
         <div className="container py-4">
@@ -186,7 +186,7 @@ export default function Leaderboard() {
         </div>
       </header>
 
-      <main className="container py-6 space-y-6">
+      <main className="container py-5 lg:py-3 space-y-6 lg:space-y-3">
         {/* Period Tabs */}
         <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
           <TabsList className="grid w-full grid-cols-3">

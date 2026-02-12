@@ -77,7 +77,7 @@ export default function ClubDetailEnhanced() {
   if (!match || !Number.isFinite(clubId)) {
     return (
       <AppLayout>
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="flex items-center justify-center py-12 lg:py-4">
           <p className="text-muted-foreground">Club non trovato</p>
         </div>
       </AppLayout>
@@ -87,7 +87,7 @@ export default function ClubDetailEnhanced() {
   if (clubQuery.isLoading) {
     return (
       <AppLayout>
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="flex items-center justify-center py-12 lg:py-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
         </div>
       </AppLayout>
@@ -97,7 +97,7 @@ export default function ClubDetailEnhanced() {
   if (!club) {
     return (
       <AppLayout>
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="flex items-center justify-center py-12 lg:py-4">
           <div className="text-center">
             <p className="text-muted-foreground mb-4">Club non trovato</p>
             <Link href="/community">
@@ -114,7 +114,7 @@ export default function ClubDetailEnhanced() {
 
   return (
     <AppLayout>
-      <div className="min-h-screen pb-20">
+      <div className="pb-12 lg:pb-2">
         {/* Header with Cover Image */}
         <div className="relative">
           {club.cover_image_url ? (
@@ -214,7 +214,7 @@ export default function ClubDetailEnhanced() {
         </div>
 
         {/* Tabs Navigation */}
-        <div className="container max-w-6xl mx-auto px-4 mt-6">
+        <div className="container max-w-6xl mx-auto px-4 mt-4 lg:mt-2">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex mb-6">
               <TabsTrigger value="feed" className="gap-2">

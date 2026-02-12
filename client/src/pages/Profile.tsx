@@ -507,7 +507,7 @@ export default function Profile() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 lg:space-y-3">
         <div className="grid gap-6 xl:grid-cols-12">
           <Surface className="bg-card border-border xl:col-span-7 glass-panel">
           <div className="relative h-36 overflow-hidden rounded-t-lg bg-muted">

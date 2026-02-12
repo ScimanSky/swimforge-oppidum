@@ -272,7 +272,7 @@ export default function Challenges() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 lg:space-y-3">
         {/* Hero */}
         <Surface className="relative overflow-hidden">
           <div className="absolute inset-0">
@@ -324,7 +324,7 @@ export default function Challenges() {
           </SurfaceContent>
         </Surface>
 
-        <Tabs value={sectionTab} onValueChange={setSectionTab} className="space-y-6">
+        <Tabs value={sectionTab} onValueChange={setSectionTab} className="space-y-6 lg:space-y-3">
           <TabsList className="w-full sm:w-fit">
             <TabsTrigger value="ghost">Ghost Track</TabsTrigger>
             <TabsTrigger value="classic">Sfide classiche</TabsTrigger>
@@ -334,7 +334,7 @@ export default function Challenges() {
             <GhostTrackTab />
           </TabsContent>
 
-          <TabsContent value="classic" className="space-y-6">
+          <TabsContent value="classic" className="space-y-6 lg:space-y-3">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-display font-bold text-foreground">Sfide classiche</h2>

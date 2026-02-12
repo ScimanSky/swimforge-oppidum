@@ -260,7 +260,7 @@ export default function CoachDryland() {
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="medium">
-      <div className="min-h-screen overflow-x-hidden font-sans text-foreground relative pb-24">
+      <div className="overflow-x-hidden font-sans text-foreground relative pb-12 lg:pb-2">
         {/* Background Image with low opacity */}
         <div className="fixed inset-0 opacity-10 pointer-events-none -z-40">
           <img
@@ -294,7 +294,7 @@ export default function CoachDryland() {
           ))}
         </div>
 
-        <div className="container py-8 md:py-12">
+        <div className="container py-6 md:py-8 lg:py-3">
           {/* Navigation & Header */}
           <div className="flex flex-col gap-3 mb-8 md:flex-row md:items-center md:gap-4">
             <div className="flex items-center gap-3">

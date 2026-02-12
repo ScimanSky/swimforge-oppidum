@@ -215,7 +215,7 @@ export default function SeasonPage() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 lg:space-y-3">
         <Surface className="relative overflow-hidden">
           <SurfaceContent className="relative p-6 md:p-7">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
@@ -272,8 +272,8 @@ export default function SeasonPage() {
           </SurfaceContent>
         </Surface>
 
-        <div className="stream-shell">
-          <section className="stream-main">
+        <div className="stream-shell lg:min-h-0">
+          <section className="stream-main lg:min-h-0">
             <div className="stream-node">
               <section className="surface-panel p-6">
                 <div className="mb-4 flex items-center justify-between">

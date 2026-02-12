@@ -96,7 +96,7 @@ export default function ChallengeDetail() {
   if (isLoading) {
     return (
       <AppLayout>
-        <div className="pb-24">
+        <div className="pb-8 lg:pb-2">
           <div className="container mx-auto px-4 py-8">
             <p className="text-center text-muted-foreground">Caricamento...</p>
           </div>
@@ -108,7 +108,7 @@ export default function ChallengeDetail() {
   if (!challenge) {
     return (
       <AppLayout>
-        <div className="pb-24">
+        <div className="pb-8 lg:pb-2">
           <div className="container mx-auto px-4 py-8">
             <p className="text-center text-muted-foreground">Sfida non trovata</p>
           </div>
@@ -224,8 +224,8 @@ export default function ChallengeDetail() {
 
   return (
     <AppLayout>
-      <div className="pb-24">
-        <div className="container mx-auto px-4 py-8 space-y-8">
+      <div className="pb-10 lg:pb-2">
+        <div className="container mx-auto px-4 py-6 lg:py-3 space-y-8 lg:space-y-3">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Button

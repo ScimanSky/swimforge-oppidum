@@ -178,9 +178,9 @@ export default function Activities() {
 
   return (
     <AppLayout>
-      <div className="space-y-8 p-4 lg:p-6">
-        <div className="stream-shell">
-          <section className="stream-main">
+      <div className="space-y-6 lg:space-y-3 p-3 lg:p-0">
+        <div className="stream-shell lg:min-h-0">
+          <section className="stream-main lg:min-h-0">
             <div className="stream-node">
               <section className="surface-panel p-6 space-y-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

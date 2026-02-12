@@ -20,13 +20,15 @@ export function AppLayout({
   className = "",
   withShell = true,
 }: AppLayoutProps) {
+  const wrappedChildren = withShell ? <div className="sf-page-root">{children}</div> : children;
+
   const layout = (
     <div
       className={`relative min-h-screen bg-background text-foreground ${className}`}
     >
       <PageBackground />
       <div className="relative z-10">
-        {withShell ? <AppShell>{children}</AppShell> : children}
+        {withShell ? <AppShell>{wrappedChildren}</AppShell> : wrappedChildren}
       </div>
     </div>
   );

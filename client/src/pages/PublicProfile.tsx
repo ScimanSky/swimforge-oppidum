@@ -61,7 +61,7 @@ export default function PublicProfile() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 lg:space-y-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost-neon" size="icon" asChild>
             <Link href="/challenges">

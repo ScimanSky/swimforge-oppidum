@@ -630,7 +630,7 @@ export default function ActivityDetail() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 lg:space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="ghost-neon" size="icon" asChild>
             <Link href="/activities">
