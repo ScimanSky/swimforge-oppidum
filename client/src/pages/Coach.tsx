@@ -323,7 +323,7 @@ export default function Coach() {
 
   return (
     <AppLayout>
-      <div className="space-y-6 lg:space-y-3">
+      <div className="compact-shell space-y-4 lg:space-y-2 lg:h-full lg:overflow-hidden">
         <section className="surface-panel p-6 glass-panel">
           <div className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
@@ -387,7 +387,7 @@ export default function Coach() {
           </div>
         </section>
 
-        <Tabs defaultValue="insights">
+	        <Tabs defaultValue="insights" className="space-y-3">
           <TabsList>
             <TabsTrigger value="insights">Insights</TabsTrigger>
             <TabsTrigger value="workouts">Piano</TabsTrigger>
@@ -395,10 +395,10 @@ export default function Coach() {
             <TabsTrigger value="chat">Chat</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="insights" className="mt-6">
+	          <TabsContent value="insights" className="mt-3">
             <div className="flex flex-col gap-4">
               <div className="order-2 lg:order-1">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                   {keyMetricCards.map((metric, index) => {
                     const helperProgress = Number(String(metric.helper).replace(/[^\d.-]/g, ""))
                     const valueProgress = Number(String(metric.value).replace(/[^\d.-]/g, ""))
@@ -419,6 +419,43 @@ export default function Coach() {
                         tone={tones[index % tones.length]}
                         size="sm"
                       />
+                    )
+                  })}
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                  {advancedMetrics.map((metric, index) => {
+                    const numeric = typeof metric.display === "number" ? metric.display : Number(metric.display)
+                    const safe = Number.isFinite(numeric) ? Math.max(0, Math.min(100, numeric)) : 0
+                    const color = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--primary)"][index % 6]
+                    const radius = 19
+                    const circumference = 2 * Math.PI * radius
+                    const offset = circumference * (1 - safe / 100)
+                    return (
+                      <div key={metric.key} className="stream-card px-2 py-2 text-center">
+                        <div className="mx-auto relative h-14 w-14">
+                          <svg viewBox="0 0 60 60" className="h-full w-full -rotate-90">
+                            <circle cx="30" cy="30" r={radius} stroke="var(--border)" strokeWidth="5" fill="none" />
+                            <circle
+                              cx="30"
+                              cy="30"
+                              r={radius}
+                              stroke={color}
+                              strokeWidth="5"
+                              fill="none"
+                              strokeLinecap="round"
+                              strokeDasharray={circumference}
+                              strokeDashoffset={offset}
+                              style={{ filter: `drop-shadow(0 0 8px ${color})` }}
+                            />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-foreground">
+                            {metric.display}
+                          </div>
+                        </div>
+                        <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                          {metric.key}
+                        </p>
+                      </div>
                     )
                   })}
                 </div>
@@ -471,32 +508,11 @@ export default function Coach() {
                 )}
               </div>
 
-              <div className="order-3">
-                <section className="surface-panel p-6">
-                  <div className="p-4">
-                    <div className="flex flex-wrap items-center gap-3">
-                      {advancedMetrics.map((metric) => (
-                        <div
-                          key={metric.key}
-                          className="flex items-center gap-2 rounded-full bg-secondary/40 px-3 py-1 text-xs"
-                        >
-                          <span className="text-muted-foreground">
-                            {metric.key}
-                          </span>
-                          <span className="text-foreground font-semibold">
-                            {metric.display}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </section>
-              </div>
             </div>
           </TabsContent>
 
-          <TabsContent value="workouts" className="mt-6 space-y-6">
-            <section className="surface-panel p-6">
+	          <TabsContent value="workouts" className="mt-3 space-y-3">
+	            <section className="surface-panel p-4 lg:p-5">
               <div>
                 <h3 className="font-display">Allenamenti AI</h3>
                 <p>
@@ -585,7 +601,7 @@ export default function Coach() {
                               )}
                             </div>
                             <div className="space-y-3">
-                              {activePoolSection.exercises.slice(0, 4).map((exercise, exIdx) => (
+                              {activePoolSection.exercises.slice(0, 3).map((exercise, exIdx) => (
                                 <div
                                   key={exIdx}
                                   className="rounded-md bg-background/80 p-3 text-sm"
@@ -608,9 +624,9 @@ export default function Coach() {
                                 </div>
                               ))}
                             </div>
-                            {activePoolSection.exercises.length > 4 && (
+                            {activePoolSection.exercises.length > 3 && (
                               <p className="mt-3 text-xs text-muted-foreground">
-                                +{activePoolSection.exercises.length - 4} esercizi aggiuntivi. Apri l&apos;allenamento completo nel dettaglio sessione.
+                                +{activePoolSection.exercises.length - 3} esercizi aggiuntivi. Apri l&apos;allenamento completo nel dettaglio sessione.
                               </p>
                             )}
                           </div>
@@ -660,7 +676,7 @@ export default function Coach() {
                             )}
                           </div>
                           <div className="space-y-3">
-                            {activeDrySection.exercises.slice(0, 4).map((exercise, exIdx) => (
+                            {activeDrySection.exercises.slice(0, 3).map((exercise, exIdx) => (
                               <div
                                 key={exIdx}
                                 className="rounded-md bg-background/80 p-3 text-sm"
@@ -683,9 +699,9 @@ export default function Coach() {
                               </div>
                             ))}
                           </div>
-                          {activeDrySection.exercises.length > 4 && (
+                          {activeDrySection.exercises.length > 3 && (
                             <p className="mt-3 text-xs text-muted-foreground">
-                              +{activeDrySection.exercises.length - 4} esercizi aggiuntivi. Apri la scheda completa dal coach.
+                              +{activeDrySection.exercises.length - 3} esercizi aggiuntivi. Apri la scheda completa dal coach.
                             </p>
                           )}
                         </div>
@@ -701,7 +717,7 @@ export default function Coach() {
             </section>
           </TabsContent>
 
-          <TabsContent value="session-iq" className="mt-6 space-y-4">
+	          <TabsContent value="session-iq" className="mt-3 space-y-3">
             <section className="surface-panel p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -761,7 +777,7 @@ export default function Coach() {
             </section>
           </TabsContent>
 
-          <TabsContent value="chat" className="mt-6">
+	          <TabsContent value="chat" className="mt-3">
             <section className="surface-panel p-6">
               <div className="p-6 space-y-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-3">

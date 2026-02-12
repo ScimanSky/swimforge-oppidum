@@ -11,12 +11,12 @@ body,
 }
 
 :root {
-  /* Electric Ice Balanced Light: softer than pure white, better photo visibility */
-  --background: oklch(0.91 0.020 232);
+  /* Electric Ice Light Contrast: less bright, better readability over photos */
+  --background: oklch(0.87 0.022 232);
   --foreground: oklch(0.21 0.038 255);
-  --card: oklch(0.95 0.012 232);
+  --card: oklch(0.90 0.014 232);
   --card-foreground: oklch(0.18 0.040 255);
-  --popover: oklch(0.95 0.012 232);
+  --popover: oklch(0.90 0.014 232);
   --popover-foreground: oklch(0.18 0.040 255);
 
   /* Stronger neons (UI accents, not body text) */
@@ -28,16 +28,16 @@ body,
 
   --primary: var(--electric-cyan);
   --primary-foreground: var(--ink);
-  --secondary: oklch(0.89 0.018 232);
+  --secondary: oklch(0.84 0.020 232);
   --secondary-foreground: oklch(0.22 0.040 255);
-  --muted: oklch(0.89 0.018 232);
-  --muted-foreground: oklch(0.46 0.032 255);
+  --muted: oklch(0.83 0.018 232);
+  --muted-foreground: oklch(0.42 0.030 255);
   --accent: var(--electric-lime);
   --accent-foreground: var(--ink);
   --destructive: var(--electric-coral);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.74 0.028 232);
-  --input: oklch(0.93 0.016 232);
+  --border: oklch(0.66 0.026 232);
+  --input: oklch(0.88 0.016 232);
   --ring: var(--electric-cyan);
 
   --chart-1: var(--electric-cyan);
@@ -53,20 +53,20 @@ body,
   --neon-glow: oklch(0.84 0.190 205 / 0.46);
   --neon-soft: oklch(0.84 0.190 205 / 0.22);
   --radius: 0.625rem;
-  --sidebar: oklch(0.95 0.012 230);
+  --sidebar: oklch(0.89 0.014 230);
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--electric-cyan);
   --sidebar-primary-foreground: var(--ink);
-  --sidebar-accent: oklch(0.915 0.014 230);
+  --sidebar-accent: oklch(0.85 0.016 230);
   --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: oklch(0.80 0.018 230);
+  --sidebar-border: oklch(0.72 0.020 230);
   --sidebar-ring: var(--electric-cyan);
-  --navy: oklch(0.95 0.012 230);
-  --navy-light: oklch(0.915 0.014 230);
+  --navy: oklch(0.90 0.014 230);
+  --navy-light: oklch(0.85 0.016 230);
   --azure: var(--electric-cyan);
   --gold: oklch(0.84 0.140 85);
   --gold-light: oklch(0.90 0.120 85);
-  --badge-spotlight: oklch(0.95 0.014 230);
+  --badge-spotlight: oklch(0.89 0.016 230);
   --badge-ring: oklch(0.78 0.022 230);
   --badge-shadow: oklch(0.28 0.055 255 / 0.12);
 }

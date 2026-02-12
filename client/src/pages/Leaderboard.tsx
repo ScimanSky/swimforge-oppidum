@@ -273,12 +273,18 @@ export default function Leaderboard() {
               >
                 {/* Second Place */}
                 <div className="flex flex-col items-center pt-8">
-                  <div className="w-16 h-16 rounded-full bg-gray-100 border-4 border-gray-400 flex items-center justify-center mb-2 shadow-lg">
-                    <span className="text-2xl font-bold text-gray-600">2</span>
-                  </div>
-                  <p className="text-sm font-medium text-center truncate w-full">
+                  <Link href={`/u/${normalizedLeaderboard[1]?.userId ?? ""}`}>
+                    <div className="relative mb-2 cursor-pointer">
+                      <Avatar className="w-16 h-16 border-4 border-gray-400 shadow-lg">
+                        <AvatarImage src={normalizedLeaderboard[1]?.avatarUrl || ""} alt={normalizedLeaderboard[1]?.userName || "Nuotatore"} />
+                        <AvatarFallback>{(normalizedLeaderboard[1]?.userName?.[0] || "N").toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 border border-gray-400 text-xs font-bold text-gray-700">2</div>
+                    </div>
+                  </Link>
+                  <Link href={`/u/${normalizedLeaderboard[1]?.userId ?? ""}`} className="text-sm font-medium text-center truncate w-full hover:underline">
                     {normalizedLeaderboard[1]?.userName || "Nuotatore"}
-                  </p>
+                  </Link>
                   <p className="text-xs text-muted-foreground">
                     {normalizedLeaderboard[1] ? formatValue(normalizedLeaderboard[1]) : "—"}
                   </p>
@@ -287,12 +293,18 @@ export default function Leaderboard() {
                 {/* First Place */}
                 <div className="flex flex-col items-center">
                   <Crown className="h-8 w-8 text-yellow-500 mb-1" />
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 border-4 border-yellow-500 flex items-center justify-center mb-2 shadow-xl">
-                    <span className="text-3xl font-bold text-white">1</span>
-                  </div>
-                  <p className="text-sm font-bold text-center truncate w-full">
+                  <Link href={`/u/${normalizedLeaderboard[0]?.userId ?? ""}`}>
+                    <div className="relative mb-2 cursor-pointer">
+                      <Avatar className="w-20 h-20 border-4 border-yellow-500 shadow-xl">
+                        <AvatarImage src={normalizedLeaderboard[0]?.avatarUrl || ""} alt={normalizedLeaderboard[0]?.userName || "Nuotatore"} />
+                        <AvatarFallback>{(normalizedLeaderboard[0]?.userName?.[0] || "N").toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 border border-yellow-500 text-sm font-bold text-white">1</div>
+                    </div>
+                  </Link>
+                  <Link href={`/u/${normalizedLeaderboard[0]?.userId ?? ""}`} className="text-sm font-bold text-center truncate w-full hover:underline">
                     {normalizedLeaderboard[0]?.userName || "Nuotatore"}
-                  </p>
+                  </Link>
                   <p className="text-xs text-[var(--gold)] font-semibold">
                     {normalizedLeaderboard[0] ? formatValue(normalizedLeaderboard[0]) : "—"}
                   </p>
@@ -300,12 +312,18 @@ export default function Leaderboard() {
 
                 {/* Third Place */}
                 <div className="flex flex-col items-center pt-12">
-                  <div className="w-14 h-14 rounded-full bg-amber-100 border-4 border-amber-600 flex items-center justify-center mb-2 shadow-lg">
-                    <span className="text-xl font-bold text-amber-700">3</span>
-                  </div>
-                  <p className="text-sm font-medium text-center truncate w-full">
+                  <Link href={`/u/${normalizedLeaderboard[2]?.userId ?? ""}`}>
+                    <div className="relative mb-2 cursor-pointer">
+                      <Avatar className="w-14 h-14 border-4 border-amber-600 shadow-lg">
+                        <AvatarImage src={normalizedLeaderboard[2]?.avatarUrl || ""} alt={normalizedLeaderboard[2]?.userName || "Nuotatore"} />
+                        <AvatarFallback>{(normalizedLeaderboard[2]?.userName?.[0] || "N").toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 border border-amber-600 text-[10px] font-bold text-amber-700">3</div>
+                    </div>
+                  </Link>
+                  <Link href={`/u/${normalizedLeaderboard[2]?.userId ?? ""}`} className="text-sm font-medium text-center truncate w-full hover:underline">
                     {normalizedLeaderboard[2]?.userName || "Nuotatore"}
-                  </p>
+                  </Link>
                   <p className="text-xs text-muted-foreground">
                     {normalizedLeaderboard[2] ? formatValue(normalizedLeaderboard[2]) : "—"}
                   </p>

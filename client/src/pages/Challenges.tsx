@@ -1,7 +1,7 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Surface, SurfaceContent } from "@/components/ui/surface"
@@ -155,6 +155,7 @@ export default function Challenges() {
   const [sectionTab, setSectionTab] = useState("ghost")
   const [activeTab, setActiveTab] = useState("active")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isDesktopWide, setIsDesktopWide] = useState(false)
   const [activePage, setActivePage] = useState(1)
   const [availablePage, setAvailablePage] = useState(1)
   const [leaderboardPage, setLeaderboardPage] = useState(1)
@@ -221,9 +222,18 @@ export default function Challenges() {
       !challenge.isParticipant
   )
   const participatingChallenges = [...activeChallenges, ...pendingChallenges]
-  const activePageSize = 2
-  const availablePageSize = 3
-  const leaderboardPageSize = 4
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const media = window.matchMedia("(min-width: 1280px)")
+    const sync = () => setIsDesktopWide(media.matches)
+    sync()
+    media.addEventListener("change", sync)
+    return () => media.removeEventListener("change", sync)
+  }, [])
+
+  const activePageSize = isDesktopWide ? 1 : 2
+  const availablePageSize = isDesktopWide ? 2 : 3
+  const leaderboardPageSize = isDesktopWide ? 3 : 4
   const activeTotalPages = Math.max(1, Math.ceil(participatingChallenges.length / activePageSize))
   const availableTotalPages = Math.max(1, Math.ceil(availableChallenges.length / availablePageSize))
   const leaderboard = useMemo(() => (leaderboardQuery.data ?? []) as any[], [leaderboardQuery.data])
@@ -293,7 +303,7 @@ export default function Challenges() {
 
   return (
     <AppLayout>
-      <div className="compact-shell space-y-6 lg:space-y-3">
+      <div className="compact-shell space-y-4 lg:space-y-2 lg:h-full lg:overflow-hidden">
         {/* Hero */}
         <Surface className="relative overflow-hidden">
           <div className="absolute inset-0">
@@ -301,7 +311,7 @@ export default function Challenges() {
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_85%_10%,color-mix(in_oklch,var(--electric-lime)_26%,transparent)_0%,transparent_66%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_60%_90%,color-mix(in_oklch,var(--electric-cyan)_16%,transparent)_0%,transparent_72%)]" />
           </div>
-          <SurfaceContent className="relative p-6">
+          <SurfaceContent className="relative p-4 lg:p-5">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-background/60 px-3 py-1 text-xs text-muted-foreground">
@@ -345,7 +355,7 @@ export default function Challenges() {
           </SurfaceContent>
         </Surface>
 
-        <Tabs value={sectionTab} onValueChange={setSectionTab} className="space-y-6 lg:space-y-3">
+        <Tabs value={sectionTab} onValueChange={setSectionTab} className="space-y-4 lg:space-y-2">
           <TabsList className="w-full sm:w-fit">
             <TabsTrigger value="ghost">Ghost Track</TabsTrigger>
             <TabsTrigger value="classic">Sfide classiche</TabsTrigger>
@@ -355,7 +365,7 @@ export default function Challenges() {
             <GhostTrackTab />
           </TabsContent>
 
-          <TabsContent value="classic" className="space-y-6 lg:space-y-3">
+          <TabsContent value="classic" className="space-y-4 lg:space-y-2">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-display font-bold text-foreground">Sfide classiche</h2>
@@ -498,7 +508,7 @@ export default function Challenges() {
                 <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="active" className="mt-6 space-y-4">
+              <TabsContent value="active" className="mt-3 space-y-3">
                 {participatingChallenges.length === 0 && (
                   <Surface className="bg-card border-border">
                     <SurfaceContent className="p-6 text-muted-foreground">
@@ -625,7 +635,7 @@ export default function Challenges() {
                 )}
               </TabsContent>
 
-              <TabsContent value="available" className="mt-6 space-y-4">
+              <TabsContent value="available" className="mt-3 space-y-3">
                 {availableChallenges.length === 0 && (
                   <Surface className="bg-card border-border">
                     <SurfaceContent className="p-6 text-muted-foreground">
@@ -686,7 +696,7 @@ export default function Challenges() {
                 )}
               </TabsContent>
 
-              <TabsContent value="completed" className="mt-6">
+              <TabsContent value="completed" className="mt-3">
                 <Surface className="bg-card border-border">
                   <SurfaceContent className="p-6 text-muted-foreground">
                     Nessuna sfida completata al momento.
@@ -694,7 +704,7 @@ export default function Challenges() {
                 </Surface>
               </TabsContent>
 
-              <TabsContent value="leaderboard" className="mt-6">
+              <TabsContent value="leaderboard" className="mt-3">
                 <Surface className="bg-card border-border">
                   <SurfaceContent className="p-4">
                     <div className="space-y-4">

@@ -9,7 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Calendar,
   Droplets,
@@ -612,6 +611,17 @@ export default function Profile() {
                     }`
                   : ""}
               </p>
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <Button variant="outline-neon" size="sm" asChild>
+                  <Link href="/badges">Badge</Link>
+                </Button>
+                <Button variant="outline-neon" size="sm" asChild>
+                  <Link href="/activities">Attività recenti</Link>
+                </Button>
+                <Button variant="outline-neon" size="sm" asChild>
+                  <Link href="/statistics">Record e progressi</Link>
+                </Button>
+              </div>
             </div>
           </SurfaceContent>
           </Surface>
@@ -639,68 +649,6 @@ export default function Profile() {
           </Surface>
         </div>
 
-        <Tabs defaultValue="badges" className="w-full">
-          <TabsList>
-            <TabsTrigger value="badges">Badge</TabsTrigger>
-            <TabsTrigger value="activities">Attivita recenti</TabsTrigger>
-            <TabsTrigger value="records">Record personali</TabsTrigger>
-          </TabsList>
-          <TabsContent value="badges" className="mt-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              {badgeProgress.map((badge) => (
-                <BadgeCard
-                  key={badge.id}
-                  title={badge.name}
-                  description={badge.description}
-                  imageUrl={badge.iconName ? getBadgeImageUrl(badge.iconName) : null}
-                  unlocked={badge.earned}
-                  rarity={badge.rarity}
-                />
-              ))}
-            </div>
-          </TabsContent>
-          <TabsContent value="activities" className="mt-4">
-            <Surface className="bg-card border-border">
-              <SurfaceContent className="pt-6">
-                {recentActivities.length ? (
-                  recentActivities.map((activity) => (
-                    <ActivityItem key={activity.id} {...activity} />
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">Nessuna attivita recente.</p>
-                )}
-              </SurfaceContent>
-            </Surface>
-          </TabsContent>
-          <TabsContent value="records" className="mt-4">
-            <Surface className="bg-card border-border">
-              <SurfaceHeader>
-                <SurfaceTitle>Record personali</SurfaceTitle>
-              </SurfaceHeader>
-              <SurfaceContent>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  {records.map((record) => (
-                    <div
-                      key={record.label}
-                      className="flex items-center justify-between rounded-lg border border-border bg-background/60 p-4"
-                    >
-                      <div>
-                        <p className="font-medium text-foreground">{record.label}</p>
-                        <p className="text-sm text-muted-foreground">{record.date}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-primary">{record.value}</p>
-                        <Badge variant="neon" className="text-xs">
-                          PR
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </SurfaceContent>
-            </Surface>
-          </TabsContent>
-        </Tabs>
       </div>
     </AppLayout>
   );

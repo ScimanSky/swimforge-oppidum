@@ -84,6 +84,8 @@ const getInitials = (name: string) =>
 export default function Community() {
   const [commentTextByPost, setCommentTextByPost] = useState<Record<number, string>>({})
   const [openCommentsId, setOpenCommentsId] = useState<number | null>(null)
+  const [desktopSection, setDesktopSection] = useState<"feed" | "clubs">("feed")
+  const [isDesktopWide, setIsDesktopWide] = useState(false)
   const [clubScope, setClubScope] = useState<"all" | "mine">("all")
   const [clubSearch, setClubSearch] = useState("")
   const [feedPage, setFeedPage] = useState(1)
@@ -148,8 +150,8 @@ export default function Community() {
 
   const feedItems = useMemo(() => (feedQuery.data as any[]) || [], [feedQuery.data])
   const clubs = useMemo(() => (clubsQuery.data as any[]) || [], [clubsQuery.data])
-  const feedPageSize = 2
-  const clubsPageSize = 4
+  const feedPageSize = isDesktopWide ? 1 : 2
+  const clubsPageSize = isDesktopWide ? 3 : 4
   const feedTotalPages = Math.max(1, Math.ceil(feedItems.length / feedPageSize))
   const clubsTotalPages = Math.max(1, Math.ceil(clubs.length / clubsPageSize))
   const pagedFeedItems = useMemo(() => {
@@ -164,6 +166,15 @@ export default function Community() {
   useEffect(() => {
     setFeedPage(1)
   }, [feedItems.length])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const media = window.matchMedia("(min-width: 1280px)")
+    const sync = () => setIsDesktopWide(media.matches)
+    sync()
+    media.addEventListener("change", sync)
+    return () => media.removeEventListener("change", sync)
+  }, [])
 
   useEffect(() => {
     setClubsPage(1)
@@ -338,7 +349,7 @@ export default function Community() {
               animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
               transition={{ duration: 0.35, ease: "easeOut", delay: Math.min(index * 0.035, 0.25) }}
             >
-              <div className="surface-panel p-4">
+              <div className="surface-panel p-3.5">
                   {/* Post Header */}
                   <div className="flex items-start gap-3 mb-4">
                     <Avatar className="w-10 h-10 border border-border">
@@ -376,7 +387,7 @@ export default function Community() {
                   </div>
 
                   {/* Activity Bento */}
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-3 gap-2.5">
                     <div className="rounded-2xl border border-border/80 bg-background/60 p-3">
                       <p className="text-sm font-display font-bold text-foreground">{distance}</p>
                       <p className="text-[10px] text-muted-foreground">Distanza</p>
@@ -396,7 +407,7 @@ export default function Community() {
                   ) : null}
 
                   {/* Actions */}
-                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Button
                       variant={post.has_splashed ? "neon" : "outline-neon"}
                       size="sm"
@@ -660,7 +671,7 @@ export default function Community() {
 
   return (
     <AppLayout>
-      <div className="compact-shell space-y-6 lg:space-y-3">
+      <div className="compact-shell space-y-4 lg:space-y-2 lg:h-full lg:overflow-hidden">
         <section className="surface-panel relative overflow-hidden">
           <div className="absolute inset-0">
             <div className="absolute inset-0 bg-[radial-gradient(70%_80%_at_18%_0%,color-mix(in_oklch,var(--electric-cyan)_34%,transparent)_0%,transparent_70%)]" />
@@ -676,7 +687,7 @@ export default function Community() {
                 </div>
                 <h1 className="mt-3 text-3xl font-display font-bold neon-gradient-text">Community</h1>
                 <p className="mt-1 text-muted-foreground">
-                  Feed globale, club e conversazioni. Tutto in un’unica plancia.
+                  Passa tra Feed e Club con un click, mantenendo la vista pulita e focalizzata.
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -725,27 +736,48 @@ export default function Community() {
 
         {/* Desktop: stream layout */}
         <div className="hidden lg:block">
-          <div className="stream-shell">
-            <section className="stream-main">
+          <div className="stream-shell lg:h-full lg:gap-2">
+            <section className="stream-main lg:gap-2">
               <div className="stream-node">
-                <div className="surface-panel p-5">
-                  <div className="flex items-center justify-between">
+                <div className="surface-panel p-4">
+                  <div className="flex items-center justify-between gap-3">
                     <div>
-                      <h2 className="text-lg font-display font-bold text-foreground">Feed</h2>
-                      <p className="text-sm text-muted-foreground">Allenamenti pubblici e aggiornamenti</p>
+                      <h2 className="text-lg font-display font-bold text-foreground">
+                        {desktopSection === "feed" ? "Feed" : "Club"}
+                      </h2>
+                      <p className="text-sm text-muted-foreground">
+                        {desktopSection === "feed"
+                          ? "Allenamenti pubblici e aggiornamenti"
+                          : "Scopri club, membri e accessi rapidi"}
+                      </p>
                     </div>
-                    <Badge variant="outline" className="text-xs">
-                      {feedItems.length} post
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">
+                        {desktopSection === "feed" ? `${feedItems.length} post` : `${clubs.length} club`}
+                      </Badge>
+                      {desktopSection === "feed" ? (
+                        <Button
+                          variant="outline-neon"
+                          size="sm"
+                          onClick={() => setDesktopSection("clubs")}
+                        >
+                          Vai a Club
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline-neon"
+                          size="sm"
+                          onClick={() => setDesktopSection("feed")}
+                        >
+                          Vai al Feed
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
-              {renderFeed()}
+              {desktopSection === "feed" ? renderFeed() : renderClubs("grid")}
             </section>
-
-            <aside className="space-y-4 xl:sticky xl:top-24">
-              {renderClubs("sidebar")}
-            </aside>
           </div>
         </div>
       </div>

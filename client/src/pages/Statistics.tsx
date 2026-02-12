@@ -15,7 +15,7 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { Info } from "lucide-react";
+import { BarChart3, Gauge, Info, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { metricsDefinitions } from "@/data/metricsDefinitions";
 import { AppLayout } from "@/components/AppLayout";
@@ -416,7 +416,12 @@ export default function Statistics() {
             className="space-y-3"
           >
             <AccordionItem value="timeline" className="border-0">
-              <AccordionTrigger className="text-left">Progress Timeline</AccordionTrigger>
+              <AccordionTrigger className="rounded-xl border border-border/70 bg-card/60 px-4 py-3 text-left font-medium hover:no-underline">
+                <span className="inline-flex items-center gap-2">
+                  <BarChart3 className="size-4 text-primary" />
+                  Progress Timeline
+                </span>
+              </AccordionTrigger>
               <AccordionContent>
                 {/* Progress Timeline */}
                 <motion.section 
@@ -488,7 +493,12 @@ export default function Statistics() {
             </AccordionItem>
 
             <AccordionItem value="performance" className="border-0">
-              <AccordionTrigger className="text-left">Analisi prestazioni</AccordionTrigger>
+              <AccordionTrigger className="rounded-xl border border-border/70 bg-card/60 px-4 py-3 text-left font-medium hover:no-underline">
+                <span className="inline-flex items-center gap-2">
+                  <Gauge className="size-4 text-primary" />
+                  Analisi prestazioni
+                </span>
+              </AccordionTrigger>
               <AccordionContent>
                 {/* Analisi Prestazioni */}
                 <motion.section 
@@ -644,7 +654,12 @@ export default function Statistics() {
             {/* Analisi Avanzate */}
             {advanced && (
               <AccordionItem value="advanced" className="border-0">
-                <AccordionTrigger className="text-left">Analisi avanzate</AccordionTrigger>
+                <AccordionTrigger className="rounded-xl border border-border/70 bg-card/60 px-4 py-3 text-left font-medium hover:no-underline">
+                  <span className="inline-flex items-center gap-2">
+                    <Sparkles className="size-4 text-primary" />
+                    Analisi avanzate
+                  </span>
+                </AccordionTrigger>
                 <AccordionContent>
                   <motion.section 
                 className="space-y-3"
