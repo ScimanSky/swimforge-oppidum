@@ -90,17 +90,6 @@ export default function PageBackground({ className }: { className?: string }) {
       </AnimatePresence>
 
       <motion.img
-        src="/images/theme-v2/overlay-caustics.png"
-        alt=""
-        className="absolute inset-0 h-full w-full object-cover mix-blend-screen"
-        animate={{
-          opacity: isDark ? [0.16, 0.24, 0.16] : [0.13, 0.2, 0.13],
-          scale: [1, 1.015, 1],
-        }}
-        transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-      />
-
-      <motion.img
         src="/images/theme-v2/overlay-energy-rings.png"
         alt=""
         className="absolute inset-0 h-full w-full object-cover mix-blend-screen"
