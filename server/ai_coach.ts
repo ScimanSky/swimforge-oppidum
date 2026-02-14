@@ -332,28 +332,31 @@ export async function generateBothWorkouts(userId: number): Promise<WorkoutsResp
           workoutType: type
         });
       }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+    } catch (error: any) {
+      const message = error.message || String(error);
       logger.error(`[AI Coach] Persistence failed for ${type}: ${message}`, {
         event: "ai_coach:persistence_error",
         userId,
         workoutType: type,
-        error: message
+        error: message,
+        code: error.code,
+        detail: error.detail,
+        hint: error.hint
       });
       throw error;
     }
   }
 
 
-const nextAvailableAt = new Date(now.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+  const nextAvailableAt = new Date(now.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
 
-return {
-  pool: poolWorkout,
-  dryland: drylandWorkout,
-  generatedAt: now.toISOString(),
-  nextAvailableAt: nextAvailableAt.toISOString(),
-  canGenerate: false,
-};
+  return {
+    pool: poolWorkout,
+    dryland: drylandWorkout,
+    generatedAt: now.toISOString(),
+    nextAvailableAt: nextAvailableAt.toISOString(),
+    canGenerate: false,
+  };
 }
 
 /**
