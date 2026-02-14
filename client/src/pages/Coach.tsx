@@ -124,15 +124,28 @@ export default function Coach() {
 
   const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
-    { staleTime: 24 * 60 * 60 * 1000 }
+    { staleTime: 24 * 60 * 60 * 1000, refetchOnWindowFocus: false }
   )
+  // Always fetch with forceRegenerate: false — the backend has its own 24h cache.
+  // Regeneration is triggered via refetch() in the button handlers, which will
+  // re-run the query and let the backend generate a fresh workout.
   const poolWorkoutQuery = trpc.aiCoach.getPoolWorkout.useQuery(
-    { forceRegenerate: poolRegenerate },
-    { staleTime: poolRegenerate ? 0 : 24 * 60 * 60 * 1000 }
+    { forceRegenerate: false },
+    {
+      staleTime: 24 * 60 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      retry: false,
+    }
   )
   const drylandWorkoutQuery = trpc.aiCoach.getDrylandWorkout.useQuery(
-    { forceRegenerate: dryRegenerate },
-    { staleTime: dryRegenerate ? 0 : 24 * 60 * 60 * 1000 }
+    { forceRegenerate: false },
+    {
+      staleTime: 24 * 60 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: false,
+      retry: false,
+    }
   )
   const sessionInsightsQuery = trpc.activityInsights.list.useQuery(
     { limit: 50, offset: 0 },
@@ -303,10 +316,15 @@ export default function Coach() {
     return formatDate(latestSessionInsight.activity_date) ?? "—"
   }, [latestSessionInsight])
 
+  const utils = trpc.useUtils()
+
   const handleRegeneratePool = async () => {
     setPoolRegenerate(true)
     try {
-      await poolWorkoutQuery.refetch()
+      // Fetch with forceRegenerate: true to bypass the 24h cache on the backend.
+      // Then invalidate the regular query so it picks up the newly generated workout.
+      await utils.aiCoach.getPoolWorkout.fetch({ forceRegenerate: true })
+      await utils.aiCoach.getPoolWorkout.invalidate()
     } finally {
       setPoolRegenerate(false)
     }
@@ -315,7 +333,8 @@ export default function Coach() {
   const handleRegenerateDryland = async () => {
     setDryRegenerate(true)
     try {
-      await drylandWorkoutQuery.refetch()
+      await utils.aiCoach.getDrylandWorkout.fetch({ forceRegenerate: true })
+      await utils.aiCoach.getDrylandWorkout.invalidate()
     } finally {
       setDryRegenerate(false)
     }
@@ -387,7 +406,7 @@ export default function Coach() {
           </div>
         </section>
 
-	        <Tabs defaultValue="insights" className="space-y-3">
+        <Tabs defaultValue="insights" className="space-y-3">
           <TabsList>
             <TabsTrigger value="insights">Insights</TabsTrigger>
             <TabsTrigger value="workouts">Piano</TabsTrigger>
@@ -395,7 +414,7 @@ export default function Coach() {
             <TabsTrigger value="chat">Chat</TabsTrigger>
           </TabsList>
 
-	          <TabsContent value="insights" className="mt-3">
+          <TabsContent value="insights" className="mt-3">
             <div className="flex flex-col gap-4">
               <div className="order-2 lg:order-1">
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
@@ -511,8 +530,8 @@ export default function Coach() {
             </div>
           </TabsContent>
 
-	          <TabsContent value="workouts" className="mt-3 space-y-3">
-	            <section className="surface-panel p-4 lg:p-5">
+          <TabsContent value="workouts" className="mt-3 space-y-3">
+            <section className="surface-panel p-4 lg:p-5">
               <div>
                 <h3 className="font-display">Allenamenti AI</h3>
                 <p>
@@ -551,11 +570,10 @@ export default function Coach() {
                       }
                     >
                       <RefreshCw
-                        className={`mr-2 h-4 w-4 ${
-                          activeWorkout === "pool"
-                            ? (poolRegenerate ? "animate-spin" : "")
-                            : (dryRegenerate ? "animate-spin" : "")
-                        }`}
+                        className={`mr-2 h-4 w-4 ${activeWorkout === "pool"
+                          ? (poolRegenerate ? "animate-spin" : "")
+                          : (dryRegenerate ? "animate-spin" : "")
+                          }`}
                       />
                       Rigenera
                     </Button>
@@ -717,7 +735,7 @@ export default function Coach() {
             </section>
           </TabsContent>
 
-	          <TabsContent value="session-iq" className="mt-3 space-y-3">
+          <TabsContent value="session-iq" className="mt-3 space-y-3">
             <section className="surface-panel p-6">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -777,7 +795,7 @@ export default function Coach() {
             </section>
           </TabsContent>
 
-	          <TabsContent value="chat" className="mt-3">
+          <TabsContent value="chat" className="mt-3">
             <section className="surface-panel p-6">
               <div className="p-6 space-y-4 text-sm text-muted-foreground">
                 <div className="flex items-center gap-3">
