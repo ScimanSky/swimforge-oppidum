@@ -118,9 +118,6 @@ importers:
       '@trpc/server':
         specifier: ^11.6.0
         version: 11.6.0(typescript@5.9.3)
-      '@types/pg':
-        specifier: ^8.16.0
-        version: 8.16.0
       axios:
         specifier: ^1.12.0
         version: 1.12.2
@@ -293,6 +290,9 @@ importers:
       '@types/node':
         specifier: ^24.7.0
         version: 24.7.0
+      '@types/pg':
+        specifier: ^8.16.0
+        version: 8.16.0
       '@types/react':
         specifier: ^19.2.1
         version: 19.2.1
