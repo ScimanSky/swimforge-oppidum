@@ -11,7 +11,6 @@ import {
   Activity,
   Users,
   Trophy,
-  BarChart3,
   User,
   Settings,
   Waves,
@@ -20,11 +19,10 @@ import {
 } from "lucide-react"
 
 const mainNav = [
-  { href: "/home", icon: Home, label: "Home" },
+  { href: "/home", icon: Home, label: "Social" },
   { href: "/track", icon: Activity, label: "Track" },
   { href: "/season/challenges", icon: Trophy, label: "Sfide" },
   { href: "/home/community", icon: Users, label: "Club" },
-  { href: "/profile/performance", icon: BarChart3, label: "Progressi" },
   { href: "/coach", icon: Brain, label: "Coach" },
   { href: "/profile", icon: User, label: "Profilo" },
 ]

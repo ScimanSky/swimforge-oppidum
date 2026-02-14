@@ -3,14 +3,13 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { Home, Activity, Users, Trophy, BarChart3, User } from "lucide-react"
+import { Home, Activity, Users, Trophy, User } from "lucide-react"
 
 const navItems = [
-  { href: "/home", icon: Home, label: "Home" },
+  { href: "/home", icon: Home, label: "Social" },
   { href: "/track", icon: Activity, label: "Track" },
   { href: "/season/challenges", icon: Trophy, label: "Sfide" },
   { href: "/home/community", icon: Users, label: "Club" },
-  { href: "/profile/performance", icon: BarChart3, label: "Progressi" },
   { href: "/profile", icon: User, label: "Profilo" },
 ]
 

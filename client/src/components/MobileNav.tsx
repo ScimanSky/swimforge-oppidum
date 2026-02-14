@@ -1,13 +1,12 @@
 import { Link, useLocation } from "wouter";
-import { Home, Users, Activity, BarChart3, Trophy, User } from "lucide-react";
+import { Home, Users, Activity, Trophy, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/home", icon: Home, label: "Home" },
+  { href: "/home", icon: Home, label: "Social" },
   { href: "/track", icon: Activity, label: "Track" },
   { href: "/season/challenges", icon: Trophy, label: "Sfide" },
   { href: "/home/community", icon: Users, label: "Club" },
-  { href: "/profile/performance", icon: BarChart3, label: "Progressi" },
   { href: "/profile", icon: User, label: "Profilo" },
 ];
 

@@ -44,12 +44,11 @@ type NavItem = {
 }
 
 const navPrimary: NavItem[] = [
-  { label: "Home", path: "/home", icon: <Home className="size-5" /> },
+  { label: "Social", path: "/home", icon: <Home className="size-5" /> },
   { label: "Track", path: "/track", icon: <Waves className="size-5" /> },
   { label: "Season", path: "/season", icon: <Orbit className="size-5" /> },
   { label: "Sfide", path: "/season/challenges", icon: <Trophy className="size-5" /> },
   { label: "Club", path: "/home/community", icon: <Users className="size-5" /> },
-  { label: "Progressi", path: "/profile/performance", icon: <BarChart3 className="size-5" /> },
 ]
 
 const navSecondary: NavItem[] = [
@@ -60,9 +59,9 @@ const navSecondary: NavItem[] = [
 function titleForPath(path: string) {
   if (path.startsWith("/community/club") && path.includes("/event/")) return "Evento Club"
   if (path.startsWith("/community/club")) return "Club"
-  if (path.startsWith("/home/community") || path.startsWith("/community")) return "Community"
+  if (path.startsWith("/home/community") || path.startsWith("/community")) return "Club"
   if (path.startsWith("/season/challenges") || path.startsWith("/challenges")) return "Sfide"
-  if (path === "/" || path.startsWith("/home") || path.startsWith("/dashboard")) return "Home"
+  if (path === "/" || path === "/home" || path.startsWith("/dashboard")) return "Social"
   if (path.startsWith("/track") || path.startsWith("/activities")) return "Track"
   if (path.startsWith("/season")) return "Season"
   if (path.startsWith("/profile/performance") || path.startsWith("/statistics")) return "Progressi"

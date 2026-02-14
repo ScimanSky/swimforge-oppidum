@@ -2,7 +2,7 @@
 
 import AppLayout from "@/components/AppLayout"
 import { useEffect, useMemo, useState } from "react"
-import { Link } from "wouter"
+import { Link, useLocation } from "wouter"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
@@ -82,9 +82,12 @@ const getInitials = (name: string) =>
     .toUpperCase() || "SW"
 
 export default function Community() {
+  const [location] = useLocation()
+  const defaultSection = location.startsWith("/home/community") ? "clubs" : "feed"
   const [commentTextByPost, setCommentTextByPost] = useState<Record<number, string>>({})
   const [openCommentsId, setOpenCommentsId] = useState<number | null>(null)
-  const [desktopSection, setDesktopSection] = useState<"feed" | "clubs">("feed")
+  const [desktopSection, setDesktopSection] = useState<"feed" | "clubs">(defaultSection)
+  const [mobileSection, setMobileSection] = useState<"feed" | "clubs">(defaultSection)
   const [isDesktopWide, setIsDesktopWide] = useState(false)
   const [clubScope, setClubScope] = useState<"all" | "mine">("all")
   const [clubSearch, setClubSearch] = useState("")
@@ -166,6 +169,12 @@ export default function Community() {
   useEffect(() => {
     setFeedPage(1)
   }, [feedItems.length])
+
+  useEffect(() => {
+    const section = location.startsWith("/home/community") ? "clubs" : "feed"
+    setDesktopSection(section)
+    setMobileSection(section)
+  }, [location])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -716,7 +725,11 @@ export default function Community() {
 
         {/* Mobile: tabs */}
         <div className="lg:hidden">
-          <Tabs defaultValue="feed" className="space-y-6">
+          <Tabs
+            value={mobileSection}
+            onValueChange={(value) => setMobileSection(value as "feed" | "clubs")}
+            className="space-y-6"
+          >
             <TabsList className="w-full">
               <TabsTrigger value="feed" className="flex items-center gap-2">
                 Feed

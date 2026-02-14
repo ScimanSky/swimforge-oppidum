@@ -55,10 +55,11 @@ function Router() {
       <Route path="/signup" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
-      <Route path="/home" component={Dashboard} />
+      <Route path="/home" component={Community} />
       <Route path="/dashboard">
         <Redirect to="/home" />
       </Route>
+      <Route path="/home/dashboard" component={Dashboard} />
       <Route path="/badges" component={Badges} />
       <Route path="/season/challenges" component={Challenges} />
       <Route path="/challenges">
