@@ -75,7 +75,7 @@ export default function SeasonLaunchPopup() {
           onClick={handleClose}
         >
           <motion.div
-            className="relative w-full max-w-4xl overflow-hidden rounded-3xl border border-primary/30 bg-background/90 shadow-[0_0_80px_rgba(0,229,255,0.24)]"
+            className="relative w-full max-w-4xl overflow-y-auto max-h-[90dvh] rounded-3xl border border-primary/30 bg-background/90 shadow-[0_0_80px_rgba(0,229,255,0.24)] scrollbar-hide"
             initial={{ y: 24, opacity: 0, scale: 0.98 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 18, opacity: 0, scale: 0.98 }}
@@ -84,7 +84,7 @@ export default function SeasonLaunchPopup() {
           >
             <button
               type="button"
-              className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-background/80 text-muted-foreground transition hover:border-primary/40 hover:text-primary"
+              className="absolute right-3 top-3 z-50 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-background/80 text-muted-foreground transition hover:border-primary/40 hover:text-primary backdrop-blur-sm"
               onClick={handleClose}
               aria-label="Chiudi annuncio stagione"
             >
