@@ -249,7 +249,7 @@ export default function SeasonPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 md:gap-6">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                 <MetricOrb
                   label="Level Season"
                   value={String(currentLevel)}

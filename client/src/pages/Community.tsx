@@ -690,7 +690,7 @@ export default function Community() {
                   Passa tra Feed e Club con un click, mantenendo la vista pulita e focalizzata.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                 {communityOrbs.map((item) => (
                   <MetricOrb
                     key={item.label}

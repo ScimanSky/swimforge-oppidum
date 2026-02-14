@@ -248,7 +248,7 @@ export default function SessionInsights() {
             </div>
           </div>
 
-          <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="mb-6 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
             {sessionOrbs.map((item) => (
               <MetricOrb
                 key={item.label}

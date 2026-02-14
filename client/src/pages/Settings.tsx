@@ -602,7 +602,7 @@ export default function Settings() {
         <p className="text-muted-foreground">Gestisci il tuo account e le preferenze</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
         {settingsOrbs.map((item) => (
           <MetricOrb
             key={item.label}

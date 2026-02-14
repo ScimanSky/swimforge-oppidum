@@ -416,7 +416,7 @@ export default function Coach() {
           <TabsContent value="insights" className="mt-3">
             <div className="flex flex-col gap-4">
               <div className="order-2 lg:order-1">
-                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                   {keyMetricCards.map((metric, index) => {
                     const helperProgress = Number(String(metric.helper).replace(/[^\d.-]/g, ""))
                     const valueProgress = Number(String(metric.value).replace(/[^\d.-]/g, ""))

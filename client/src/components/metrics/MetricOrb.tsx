@@ -14,27 +14,27 @@ const TONE_RING: Record<Exclude<MetricTone, "auto">, string> = {
 };
 
 const SIZE_CLASSES: Record<OrbSize, string> = {
-  sm: "size-[110px] sm:size-[116px]",
-  md: "size-[122px] sm:size-[130px]",
-  lg: "size-[136px] sm:size-[146px]",
+  sm: "size-[88px] sm:size-[96px]",
+  md: "size-[98px] sm:size-[106px]",
+  lg: "size-[110px] sm:size-[120px]",
 };
 
 const ICON_WRAP_CLASSES: Record<OrbSize, string> = {
-  sm: "size-6",
-  md: "size-7",
-  lg: "size-8",
+  sm: "size-5",
+  md: "size-6",
+  lg: "size-7",
 };
 
 const VALUE_CLASSES: Record<OrbSize, string> = {
-  sm: "text-sm sm:text-base",
-  md: "text-base sm:text-lg",
-  lg: "text-lg sm:text-xl",
+  sm: "text-xs sm:text-sm",
+  md: "text-sm sm:text-base",
+  lg: "text-base sm:text-lg",
 };
 
 const PROGRESS_CLASSES: Record<OrbSize, string> = {
-  sm: "text-[11px] sm:text-xs",
-  md: "text-xs",
-  lg: "text-xs sm:text-sm",
+  sm: "text-[10px] sm:text-[11px]",
+  md: "text-[10px] sm:text-xs",
+  lg: "text-[10px] sm:text-xs",
 };
 
 const LABEL_CLASSES: Record<OrbSize, string> = {
@@ -55,20 +55,20 @@ function getAdaptiveValueClass(value: ReactNode, size: OrbSize) {
     typeof value === "string" || typeof value === "number" ? String(value) : "";
   const length = textValue.length;
 
-  if (length < 7) return base;
-  if (length < 9) {
-    if (size === "sm") return "text-xs sm:text-sm";
-    if (size === "md") return "text-sm sm:text-base";
-    return "text-base sm:text-lg";
-  }
-  if (length < 12) {
+  if (length < 6) return base;
+  if (length < 8) {
     if (size === "sm") return "text-[11px] sm:text-xs";
     if (size === "md") return "text-xs sm:text-sm";
     return "text-sm sm:text-base";
   }
-  if (size === "sm") return "text-[10px] sm:text-[11px]";
-  if (size === "md") return "text-[11px] sm:text-xs";
-  return "text-xs sm:text-sm";
+  if (length < 10) {
+    if (size === "sm") return "text-[10px] sm:text-[11px]";
+    if (size === "md") return "text-[11px] sm:text-xs";
+    return "text-xs sm:text-sm";
+  }
+  if (size === "sm") return "text-[9px] sm:text-[10px]";
+  if (size === "md") return "text-[10px] sm:text-[11px]";
+  return "text-[11px] sm:text-xs";
 }
 
 const getAutoRing = (progress: number) => {
@@ -101,10 +101,16 @@ export function MetricOrb({
   className,
 }: MetricOrbProps) {
   const reduceMotion = useReducedMotion();
+  const canHover =
+    !reduceMotion &&
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches;
   const safeProgress = Math.max(0, Math.min(100, Number.isFinite(progress) ? progress : 0));
   const ringColor = tone === "auto" ? getAutoRing(safeProgress) : TONE_RING[tone];
 
-  const radius = 38;
+  const radius = 34;
+  const strokeWidth = 6;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - safeProgress / 100);
 
@@ -114,7 +120,7 @@ export function MetricOrb({
         "group/orb relative flex flex-col items-center gap-2 px-1 py-1",
         className,
       )}
-      whileHover={reduceMotion ? undefined : { y: -2, scale: 1.01 }}
+      whileHover={canHover ? { y: -2, scale: 1.01 } : undefined}
       transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 320, damping: 24 }}
     >
       <div
@@ -125,7 +131,7 @@ export function MetricOrb({
           SIZE_CLASSES[size],
         )}
         style={{
-          boxShadow: `0 0 0 1px color-mix(in oklch, var(--border) 85%, transparent), 0 0 34px color-mix(in oklch, ${ringColor} 30%, transparent)`,
+          boxShadow: `0 0 0 1px color-mix(in oklch, var(--border) 85%, transparent), 0 0 24px color-mix(in oklch, ${ringColor} 22%, transparent)`,
         }}
       >
         <svg
@@ -138,7 +144,7 @@ export function MetricOrb({
             cy="60"
             r={radius}
             stroke="color-mix(in oklch, var(--border) 86%, transparent)"
-            strokeWidth="8"
+            strokeWidth={strokeWidth}
             fill="none"
           />
           <motion.circle
@@ -146,7 +152,7 @@ export function MetricOrb({
             cy="60"
             r={radius}
             stroke={ringColor}
-            strokeWidth="8"
+            strokeWidth={strokeWidth}
             fill="none"
             strokeDasharray={circumference}
             strokeLinecap="round"
@@ -155,10 +161,10 @@ export function MetricOrb({
             transition={
               reduceMotion
                 ? { duration: 0 }
-                : { duration: 0.85, ease: [0.2, 0.9, 0.2, 1] }
+                : { duration: 0.65, ease: [0.2, 0.9, 0.2, 1] }
             }
             style={{
-              filter: `drop-shadow(0 0 12px color-mix(in oklch, ${ringColor} 60%, transparent))`,
+              filter: `drop-shadow(0 0 8px color-mix(in oklch, ${ringColor} 45%, transparent))`,
             }}
           />
         </svg>
@@ -183,7 +189,7 @@ export function MetricOrb({
         </div>
         <div
           className={cn(
-            "absolute bottom-1.5 left-1/2 z-20 min-w-[2.4rem] -translate-x-1/2 rounded-full border border-border/80 bg-background/92 px-1.5 py-0.5 text-center font-semibold uppercase leading-none tracking-[0.14em] text-foreground shadow-[0_6px_20px_color-mix(in_oklch,var(--foreground)_18%,transparent)] backdrop-blur-sm",
+            "absolute bottom-1 left-1/2 z-20 min-w-[2.1rem] -translate-x-1/2 rounded-full border border-border/80 bg-background/92 px-1.5 py-[2px] text-center font-semibold uppercase leading-none tracking-[0.12em] text-foreground shadow-[0_5px_14px_color-mix(in_oklch,var(--foreground)_14%,transparent)] backdrop-blur-sm",
             PROGRESS_CLASSES[size]
           )}
         >
@@ -192,10 +198,10 @@ export function MetricOrb({
       </div>
 
       <div className="w-full text-center">
-        <div className={cn("font-semibold uppercase tracking-[0.14em] text-muted-foreground", LABEL_CLASSES[size])}>
+        <div className={cn("max-w-full truncate font-semibold uppercase tracking-[0.14em] text-muted-foreground", LABEL_CLASSES[size])}>
           {label}
         </div>
-        {helper ? <div className={cn("mt-1 text-foreground/85", HELPER_CLASSES[size])}>{helper}</div> : null}
+        {helper ? <div className={cn("mt-1 max-w-full truncate text-foreground/85", HELPER_CLASSES[size])}>{helper}</div> : null}
       </div>
     </motion.div>
   );

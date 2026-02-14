@@ -631,7 +631,7 @@ export default function Profile() {
               <SurfaceTitle className="font-display">Snapshot performance</SurfaceTitle>
             </SurfaceHeader>
             <SurfaceContent>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
                 {profileOrbs.map((metric) => (
                   <MetricOrb
                     key={metric.label}
