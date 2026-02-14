@@ -284,63 +284,84 @@ export async function generateBothWorkouts(userId: number): Promise<WorkoutsResp
   const expiresAt = new Date(now.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
 
   // Save both
+  logger.info(`[AI Coach] Starting persistence for user ${userId}`, { event: "ai_coach:persistence_start" });
+
   for (const { type, workout } of [
     { type: "pool" as const, workout: poolWorkout },
     { type: "dryland" as const, workout: drylandWorkout },
   ]) {
-    // Manual upsert to avoid issues if unique constraint is missing
-    const existing = await db
-      .select({ id: aiCoachWorkouts.id })
-      .from(aiCoachWorkouts)
-      .where(
-        and(
-          eq(aiCoachWorkouts.userId, userId),
-          eq(aiCoachWorkouts.workoutType, type)
+    try {
+      // Manual upsert to avoid issues if unique constraint is missing
+      const existing = await db
+        .select({ id: aiCoachWorkouts.id })
+        .from(aiCoachWorkouts)
+        .where(
+          and(
+            eq(aiCoachWorkouts.userId, userId),
+            eq(aiCoachWorkouts.workoutType, type)
+          )
         )
-      )
-      .limit(1);
+        .limit(1);
 
-    if (existing.length > 0) {
-      await db
-        .update(aiCoachWorkouts)
-        .set({
+      if (existing.length > 0) {
+        await db
+          .update(aiCoachWorkouts)
+          .set({
+            workoutData: JSON.stringify(workout),
+            generatedAt: now,
+            expiresAt,
+          })
+          .where(eq(aiCoachWorkouts.id, existing[0].id));
+
+        logger.info(`[AI Coach] Updated existing workout for user ${userId} type ${type}`, {
+          event: "ai_coach:workout_updated",
+          userId,
+          workoutType: type
+        });
+      } else {
+        await db.insert(aiCoachWorkouts).values({
+          userId,
+          workoutType: type,
           workoutData: JSON.stringify(workout),
-          generatedAt: now,
           expiresAt,
-        })
-        .where(eq(aiCoachWorkouts.id, existing[0].id));
+        });
 
-      logger.info(`[AI Coach] Updated existing workout for user ${userId} type ${type}`, {
-        event: "ai_coach:workout_updated",
-        userId,
-        workoutType: type
-      });
-    } else {
-      await db.insert(aiCoachWorkouts).values({
+        logger.info(`[AI Coach] Inserted new workout for user ${userId} type ${type}`, {
+          event: "ai_coach:workout_inserted",
+          userId,
+          workoutType: type
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.error(`[AI Coach] Persistence failed for ${type}: ${message}`, {
+        event: "ai_coach:persistence_error",
         userId,
         workoutType: type,
-        workoutData: JSON.stringify(workout),
-        expiresAt,
+        error: message
       });
-
-      logger.info(`[AI Coach] Inserted new workout for user ${userId} type ${type}`, {
-        event: "ai_coach:workout_inserted",
-        userId,
-        workoutType: type
-      });
+      throw error;
     }
+  }
+
+  logger.info(`[AI Coach] Inserted new workout for user ${userId} type ${type}`, {
+    event: "ai_coach:workout_inserted",
+    userId,
+    workoutType: type
+  });
+}
 
   }
 
-  const nextAvailableAt = new Date(now.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+const nextAvailableAt = new Date(now.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
 
-  return {
-    pool: poolWorkout,
-    dryland: drylandWorkout,
-    generatedAt: now.toISOString(),
-    nextAvailableAt: nextAvailableAt.toISOString(),
-    canGenerate: false,
-  };
+return {
+  pool: poolWorkout,
+  dryland: drylandWorkout,
+  generatedAt: now.toISOString(),
+  nextAvailableAt: nextAvailableAt.toISOString(),
+  canGenerate: false,
+};
 }
 
 /**
