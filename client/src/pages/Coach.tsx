@@ -115,45 +115,69 @@ const getFocusLabel = (
 
 export default function Coach() {
   const [message, setMessage] = useState("")
-  const [poolRegenerate, setPoolRegenerate] = useState(false)
-  const [dryRegenerate, setDryRegenerate] = useState(false)
   const [activeInsightIndex, setActiveInsightIndex] = useState(0)
   const [activePoolSectionIndex, setActivePoolSectionIndex] = useState(0)
   const [activeDrySectionIndex, setActiveDrySectionIndex] = useState(0)
   const [activeWorkout, setActiveWorkout] = useState<"pool" | "dryland">("pool")
+  const [isGenerating, setIsGenerating] = useState(false)
 
   const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
     { staleTime: 24 * 60 * 60 * 1000, refetchOnWindowFocus: false }
   )
-  // Always fetch with forceRegenerate: false — the backend has its own 24h cache.
-  // Regeneration is triggered via refetch() in the button handlers, which will
-  // re-run the query and let the backend generate a fresh workout.
-  const poolWorkoutQuery = trpc.aiCoach.getPoolWorkout.useQuery(
-    { forceRegenerate: false },
-    {
-      staleTime: 24 * 60 * 60 * 1000,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-      retry: false,
+
+  // Read-only: fetch existing workouts (no generation)
+  const workoutsQuery = trpc.aiCoach.getWorkouts.useQuery(undefined, {
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  })
+
+  const utils = trpc.useUtils()
+
+  const generateMutation = trpc.aiCoach.generateWorkouts.useMutation({
+    onSuccess: () => {
+      utils.aiCoach.getWorkouts.invalidate()
+    },
+  })
+
+  const workoutsData = workoutsQuery.data
+  const poolWorkout = workoutsData?.pool as GeneratedWorkout | undefined
+  const drylandWorkout = workoutsData?.dryland as GeneratedWorkout | undefined
+  const canGenerate = workoutsData?.canGenerate ?? true
+
+  const cooldownLabel = useMemo(() => {
+    if (canGenerate) return null
+    if (!workoutsData?.nextAvailableAt) return null
+    const next = new Date(workoutsData.nextAvailableAt)
+    const now = new Date()
+    const diffMs = next.getTime() - now.getTime()
+    if (diffMs <= 0) return null
+    const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+    if (days === 1) return "Disponibile domani"
+    return `Disponibile tra ${days} giorni`
+  }, [canGenerate, workoutsData?.nextAvailableAt])
+
+  const generatedAtLabel = useMemo(() => {
+    if (!workoutsData?.generatedAt) return null
+    return formatDate(workoutsData.generatedAt)
+  }, [workoutsData?.generatedAt])
+
+  const handleGenerate = async () => {
+    setIsGenerating(true)
+    try {
+      await generateMutation.mutateAsync()
+    } catch (error) {
+      console.error("Generation failed:", error)
+    } finally {
+      setIsGenerating(false)
     }
-  )
-  const drylandWorkoutQuery = trpc.aiCoach.getDrylandWorkout.useQuery(
-    { forceRegenerate: false },
-    {
-      staleTime: 24 * 60 * 60 * 1000,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: false,
-      retry: false,
-    }
-  )
+  }
+
   const sessionInsightsQuery = trpc.activityInsights.list.useQuery(
     { limit: 50, offset: 0 },
     { staleTime: 60 * 1000 }
   )
-
-  const poolWorkout = poolWorkoutQuery.data as GeneratedWorkout | undefined
-  const drylandWorkout = drylandWorkoutQuery.data as GeneratedWorkout | undefined
 
   const insightCards = useMemo(() => {
     const insights = advanced?.insights ?? []
@@ -315,30 +339,6 @@ export default function Coach() {
     if (!latestSessionInsight?.activity_date) return "—"
     return formatDate(latestSessionInsight.activity_date) ?? "—"
   }, [latestSessionInsight])
-
-  const utils = trpc.useUtils()
-
-  const handleRegeneratePool = async () => {
-    setPoolRegenerate(true)
-    try {
-      // Fetch with forceRegenerate: true to bypass the 24h cache on the backend.
-      // Then invalidate the regular query so it picks up the newly generated workout.
-      await utils.aiCoach.getPoolWorkout.fetch({ forceRegenerate: true })
-      await utils.aiCoach.getPoolWorkout.invalidate()
-    } finally {
-      setPoolRegenerate(false)
-    }
-  }
-
-  const handleRegenerateDryland = async () => {
-    setDryRegenerate(true)
-    try {
-      await utils.aiCoach.getDrylandWorkout.fetch({ forceRegenerate: true })
-      await utils.aiCoach.getDrylandWorkout.invalidate()
-    } finally {
-      setDryRegenerate(false)
-    }
-  }
 
   return (
     <AppLayout>
@@ -533,201 +533,215 @@ export default function Coach() {
           <TabsContent value="workouts" className="mt-3 space-y-3">
             <section className="surface-panel p-4 lg:p-5">
               <div>
-                <h3 className="font-display">Allenamenti AI</h3>
-                <p>
-                  Un solo allenamento alla volta. Tocca il titolo per cambiare modalità.
-                </p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="font-display">Allenamenti AI</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Allenamenti personalizzati in base alle tue statistiche.
+                      {generatedAtLabel && (
+                        <span className="ml-1">Generati il {generatedAtLabel}.</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <Button
+                      variant="neon"
+                      size="sm"
+                      onClick={handleGenerate}
+                      disabled={!canGenerate || isGenerating}
+                    >
+                      <Sparkles
+                        className={`mr-2 h-4 w-4 ${isGenerating ? "animate-spin" : ""}`}
+                      />
+                      {isGenerating ? "Generazione in corso..." : "Genera workouts"}
+                    </Button>
+                    {cooldownLabel && (
+                      <span className="text-xs text-muted-foreground">{cooldownLabel}</span>
+                    )}
+                  </div>
+                </div>
               </div>
               <div>
-                <div className="space-y-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={activeWorkout === "pool" ? "neon" : "outline-neon"}
-                        onClick={() => setActiveWorkout("pool")}
-                      >
-                        Allenamento in Vasca
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant={activeWorkout === "dryland" ? "neon" : "outline-neon"}
-                        onClick={() => setActiveWorkout("dryland")}
-                      >
-                        Allenamento Dryland
-                      </Button>
-                    </div>
-                    <Button
-                      variant="outline-neon"
-                      size="sm"
-                      onClick={activeWorkout === "pool" ? handleRegeneratePool : handleRegenerateDryland}
-                      disabled={
-                        activeWorkout === "pool"
-                          ? poolRegenerate || poolWorkoutQuery.isFetching
-                          : dryRegenerate || drylandWorkoutQuery.isFetching
-                      }
-                    >
-                      <RefreshCw
-                        className={`mr-2 h-4 w-4 ${activeWorkout === "pool"
-                          ? (poolRegenerate ? "animate-spin" : "")
-                          : (dryRegenerate ? "animate-spin" : "")
-                          }`}
-                      />
-                      Rigenera
-                    </Button>
-                  </div>
+                <div className="space-y-4 mt-4">
+                  {(poolWorkout || drylandWorkout) ? (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={activeWorkout === "pool" ? "neon" : "outline-neon"}
+                          onClick={() => setActiveWorkout("pool")}
+                        >
+                          Allenamento in Vasca
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={activeWorkout === "dryland" ? "neon" : "outline-neon"}
+                          onClick={() => setActiveWorkout("dryland")}
+                        >
+                          Allenamento Dryland
+                        </Button>
+                      </div>
 
-                  {activeWorkout === "pool" ? (
-                    poolWorkout ? (
-                      <>
-                        <div className="text-sm text-muted-foreground">
-                          Generato dall&apos;AI
-                        </div>
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                          <span className="font-semibold text-foreground">
-                            {poolWorkout.title}
-                          </span>
-                          <span>• {poolWorkout.duration}</span>
-                          <span>• {poolWorkout.difficulty}</span>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          {poolWorkout.description}
-                        </p>
-                        <div className="flex flex-wrap gap-2">
-                          {poolWorkout.sections.map((section, idx) => (
-                            <Button
-                              key={idx}
-                              type="button"
-                              size="sm"
-                              variant={idx === activePoolSectionIndex ? "default" : "outline"}
-                              onClick={() => setActivePoolSectionIndex(idx)}
-                            >
-                              {section.title}
-                            </Button>
-                          ))}
-                        </div>
-                        {activePoolSection ? (
-                          <div className="rounded-lg border border-border bg-background/60 p-4">
-                            <div className="mb-2 flex flex-wrap items-center gap-2">
-                              <Badge variant="neon">{activePoolSection.title}</Badge>
-                              {activePoolSection.notes && (
-                                <span className="text-xs text-muted-foreground">
-                                  {activePoolSection.notes}
-                                </span>
-                              )}
+                      {activeWorkout === "pool" ? (
+                        poolWorkout ? (
+                          <>
+                            <div className="text-sm text-muted-foreground">
+                              Generato dall&apos;AI
                             </div>
-                            <div className="space-y-3">
-                              {activePoolSection.exercises.slice(0, 3).map((exercise, exIdx) => (
-                                <div
-                                  key={exIdx}
-                                  className="rounded-md bg-background/80 p-3 text-sm"
+                            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                              <span className="font-semibold text-foreground">
+                                {poolWorkout.title}
+                              </span>
+                              <span>• {poolWorkout.duration}</span>
+                              <span>• {poolWorkout.difficulty}</span>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {poolWorkout.description}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {poolWorkout.sections.map((section, idx) => (
+                                <Button
+                                  key={idx}
+                                  type="button"
+                                  size="sm"
+                                  variant={idx === activePoolSectionIndex ? "default" : "outline"}
+                                  onClick={() => setActivePoolSectionIndex(idx)}
                                 >
-                                  <div className="font-medium text-foreground">
-                                    {exercise.name}
-                                  </div>
-                                  <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                    {getExerciseDetails(exercise).map(
-                                      (detail, detailIdx) => (
-                                        <span key={detailIdx}>{detail}</span>
-                                      )
-                                    )}
-                                  </div>
-                                  {exercise.notes && (
-                                    <p className="mt-2 text-xs text-muted-foreground">
-                                      {exercise.notes}
-                                    </p>
-                                  )}
-                                </div>
+                                  {section.title}
+                                </Button>
                               ))}
                             </div>
-                            {activePoolSection.exercises.length > 3 && (
-                              <p className="mt-3 text-xs text-muted-foreground">
-                                +{activePoolSection.exercises.length - 3} esercizi aggiuntivi. Apri l&apos;allenamento completo nel dettaglio sessione.
-                              </p>
-                            )}
-                          </div>
-                        ) : null}
-                      </>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">
-                        Allenamento in vasca non disponibile. Sincronizza nuove attività.
-                      </div>
-                    )
-                  ) : drylandWorkout ? (
-                    <>
-                      <div className="text-sm text-muted-foreground">
-                        Forza, core e mobilità
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                        <span className="font-semibold text-foreground">
-                          {drylandWorkout.title}
-                        </span>
-                        <span>• {drylandWorkout.duration}</span>
-                        <span>• {drylandWorkout.difficulty}</span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        {drylandWorkout.description}
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {drylandWorkout.sections.map((section, idx) => (
-                          <Button
-                            key={idx}
-                            type="button"
-                            size="sm"
-                            variant={idx === activeDrySectionIndex ? "default" : "outline"}
-                            onClick={() => setActiveDrySectionIndex(idx)}
-                          >
-                            {section.title}
-                          </Button>
-                        ))}
-                      </div>
-                      {activeDrySection ? (
-                        <div className="rounded-lg border border-border bg-background/60 p-4">
-                          <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <Badge variant="neon">{activeDrySection.title}</Badge>
-                            {activeDrySection.notes && (
-                              <span className="text-xs text-muted-foreground">
-                                {activeDrySection.notes}
-                              </span>
-                            )}
-                          </div>
-                          <div className="space-y-3">
-                            {activeDrySection.exercises.slice(0, 3).map((exercise, exIdx) => (
-                              <div
-                                key={exIdx}
-                                className="rounded-md bg-background/80 p-3 text-sm"
-                              >
-                                <div className="font-medium text-foreground">
-                                  {exercise.name}
-                                </div>
-                                <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                                  {getExerciseDetails(exercise).map(
-                                    (detail, detailIdx) => (
-                                      <span key={detailIdx}>{detail}</span>
-                                    )
+                            {activePoolSection ? (
+                              <div className="rounded-lg border border-border bg-background/60 p-4">
+                                <div className="mb-2 flex flex-wrap items-center gap-2">
+                                  <Badge variant="neon">{activePoolSection.title}</Badge>
+                                  {activePoolSection.notes && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {activePoolSection.notes}
+                                    </span>
                                   )}
                                 </div>
-                                {exercise.notes && (
-                                  <p className="mt-2 text-xs text-muted-foreground">
-                                    {exercise.notes}
+                                <div className="space-y-3">
+                                  {activePoolSection.exercises.slice(0, 3).map((exercise, exIdx) => (
+                                    <div
+                                      key={exIdx}
+                                      className="rounded-md bg-background/80 p-3 text-sm"
+                                    >
+                                      <div className="font-medium text-foreground">
+                                        {exercise.name}
+                                      </div>
+                                      <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                        {getExerciseDetails(exercise).map(
+                                          (detail, detailIdx) => (
+                                            <span key={detailIdx}>{detail}</span>
+                                          )
+                                        )}
+                                      </div>
+                                      {exercise.notes && (
+                                        <p className="mt-2 text-xs text-muted-foreground">
+                                          {exercise.notes}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                                {activePoolSection.exercises.length > 3 && (
+                                  <p className="mt-3 text-xs text-muted-foreground">
+                                    +{activePoolSection.exercises.length - 3} esercizi aggiuntivi. Apri l&apos;allenamento completo nel dettaglio sessione.
                                   </p>
                                 )}
                               </div>
+                            ) : null}
+                          </>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">
+                            Allenamento in vasca non disponibile. Sincronizza nuove attività.
+                          </div>
+                        )
+                      ) : drylandWorkout ? (
+                        <>
+                          <div className="text-sm text-muted-foreground">
+                            Forza, core e mobilità
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                            <span className="font-semibold text-foreground">
+                              {drylandWorkout.title}
+                            </span>
+                            <span>• {drylandWorkout.duration}</span>
+                            <span>• {drylandWorkout.difficulty}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {drylandWorkout.description}
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {drylandWorkout.sections.map((section, idx) => (
+                              <Button
+                                key={idx}
+                                type="button"
+                                size="sm"
+                                variant={idx === activeDrySectionIndex ? "default" : "outline"}
+                                onClick={() => setActiveDrySectionIndex(idx)}
+                              >
+                                {section.title}
+                              </Button>
                             ))}
                           </div>
-                          {activeDrySection.exercises.length > 3 && (
-                            <p className="mt-3 text-xs text-muted-foreground">
-                              +{activeDrySection.exercises.length - 3} esercizi aggiuntivi. Apri la scheda completa dal coach.
-                            </p>
-                          )}
+                          {activeDrySection ? (
+                            <div className="rounded-lg border border-border bg-background/60 p-4">
+                              <div className="mb-2 flex flex-wrap items-center gap-2">
+                                <Badge variant="neon">{activeDrySection.title}</Badge>
+                                {activeDrySection.notes && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {activeDrySection.notes}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="space-y-3">
+                                {activeDrySection.exercises.slice(0, 3).map((exercise, exIdx) => (
+                                  <div
+                                    key={exIdx}
+                                    className="rounded-md bg-background/80 p-3 text-sm"
+                                  >
+                                    <div className="font-medium text-foreground">
+                                      {exercise.name}
+                                    </div>
+                                    <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                      {getExerciseDetails(exercise).map(
+                                        (detail, detailIdx) => (
+                                          <span key={detailIdx}>{detail}</span>
+                                        )
+                                      )}
+                                    </div>
+                                    {exercise.notes && (
+                                      <p className="mt-2 text-xs text-muted-foreground">
+                                        {exercise.notes}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                              {activeDrySection.exercises.length > 3 && (
+                                <p className="mt-3 text-xs text-muted-foreground">
+                                  +{activeDrySection.exercises.length - 3} esercizi aggiuntivi. Apri la scheda completa dal coach.
+                                </p>
+                              )}
+                            </div>
+                          ) : null}
+                        </>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">
+                          Allenamento dryland non disponibile. Sincronizza nuove attività.
                         </div>
-                      ) : null}
+                      )}
                     </>
                   ) : (
-                    <div className="text-sm text-muted-foreground">
-                      Allenamento dryland non disponibile. Sincronizza nuove attività.
+                    <div className="flex flex-col items-center gap-3 py-8 text-center">
+                      <Sparkles className="h-10 w-10 text-muted-foreground/40" />
+                      <p className="text-sm text-muted-foreground">
+                        Nessun allenamento generato. Premi il pulsante per creare i tuoi allenamenti personalizzati.
+                      </p>
                     </div>
                   )}
                 </div>

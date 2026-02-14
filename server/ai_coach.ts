@@ -10,12 +10,12 @@ import { eq, and, gt, gte, desc } from "drizzle-orm";
 import { logger } from "./middleware/logger";
 import { withErrorHandling } from "./lib/withErrorHandling";
 import { config } from "./config";
-import { 
-  calculateSEI, 
-  calculateTCI, 
-  calculateSER, 
-  calculateACS, 
-  calculateRRS 
+import {
+  calculateSEI,
+  calculateTCI,
+  calculateSER,
+  calculateACS,
+  calculateRRS
 } from "./advanced_metrics";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
@@ -194,63 +194,127 @@ async function getLatestCachedWorkout(
   }
 }
 
+const COOLDOWN_DAYS = 7;
+
+export interface WorkoutsResponse {
+  pool: GeneratedWorkout | null;
+  dryland: GeneratedWorkout | null;
+  generatedAt: string | null;
+  nextAvailableAt: string | null;
+  canGenerate: boolean;
+}
+
 /**
- * Get cached workout or generate new one
+ * Get existing cached workouts (read-only, no generation)
  */
-export async function getOrGenerateWorkout(
-  userId: number,
-  workoutType: "pool" | "dryland",
-  forceRegenerate: boolean = false
-): Promise<GeneratedWorkout> {
+export async function getExistingWorkouts(userId: number): Promise<WorkoutsResponse> {
   const db = await getDb();
   if (!db) {
     throw new Error("Database not available");
   }
 
-  // Check cache first (unless force regenerate)
-  if (!forceRegenerate) {
-    const cached = await db
-      .select()
-      .from(aiCoachWorkouts)
-      .where(
-        and(
-          eq(aiCoachWorkouts.userId, userId),
-          eq(aiCoachWorkouts.workoutType, workoutType),
-          gt(aiCoachWorkouts.expiresAt, new Date())
-        )
-      )
-      .limit(1);
+  const cached = await db
+    .select()
+    .from(aiCoachWorkouts)
+    .where(eq(aiCoachWorkouts.userId, userId))
+    .orderBy(desc(aiCoachWorkouts.generatedAt));
 
-    if (cached.length > 0) {
-      return JSON.parse(cached[0].workoutData);
+  let pool: GeneratedWorkout | null = null;
+  let dryland: GeneratedWorkout | null = null;
+  let latestGeneratedAt: Date | null = null;
+
+  for (const row of cached) {
+    try {
+      const workout = JSON.parse(row.workoutData) as GeneratedWorkout;
+      if (row.workoutType === "pool" && !pool) pool = workout;
+      if (row.workoutType === "dryland" && !dryland) dryland = workout;
+      if (!latestGeneratedAt || row.generatedAt > latestGeneratedAt) {
+        latestGeneratedAt = row.generatedAt;
+      }
+    } catch {
+      // skip corrupt cache entries
     }
   }
 
-  // Generate new workout
-  const workout = await generateWorkout(userId, workoutType);
+  const nextAvailableAt = latestGeneratedAt
+    ? new Date(latestGeneratedAt.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000)
+    : null;
+  const canGenerate = !nextAvailableAt || nextAvailableAt <= new Date();
 
-  // Cache the workout (24 hour expiration)
-  const expiresAt = new Date();
-  expiresAt.setHours(expiresAt.getHours() + 24);
+  return {
+    pool,
+    dryland,
+    generatedAt: latestGeneratedAt?.toISOString() ?? null,
+    nextAvailableAt: nextAvailableAt?.toISOString() ?? null,
+    canGenerate,
+  };
+}
 
-  await db
-    .insert(aiCoachWorkouts)
-    .values({
-      userId,
-      workoutType,
-      workoutData: JSON.stringify(workout),
-      expiresAt,
-    })
-    .onConflictDoUpdate({
-      target: [aiCoachWorkouts.userId, aiCoachWorkouts.workoutType],
-      set: {
+/**
+ * Generate both pool + dryland workouts (7-day cooldown)
+ */
+export async function generateBothWorkouts(userId: number): Promise<WorkoutsResponse> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  // Check cooldown: find the most recent generation
+  const latest = await db
+    .select({ generatedAt: aiCoachWorkouts.generatedAt })
+    .from(aiCoachWorkouts)
+    .where(eq(aiCoachWorkouts.userId, userId))
+    .orderBy(desc(aiCoachWorkouts.generatedAt))
+    .limit(1);
+
+  if (latest.length > 0) {
+    const cooldownEnd = new Date(latest[0].generatedAt.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+    if (cooldownEnd > new Date()) {
+      throw new Error(`Workout generation is on cooldown until ${cooldownEnd.toISOString()}`);
+    }
+  }
+
+  // Generate both workouts in parallel
+  const [poolWorkout, drylandWorkout] = await Promise.all([
+    generateWorkout(userId, "pool"),
+    generateWorkout(userId, "dryland"),
+  ]);
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+
+  // Save both
+  for (const { type, workout } of [
+    { type: "pool" as const, workout: poolWorkout },
+    { type: "dryland" as const, workout: drylandWorkout },
+  ]) {
+    await db
+      .insert(aiCoachWorkouts)
+      .values({
+        userId,
+        workoutType: type,
         workoutData: JSON.stringify(workout),
-        generatedAt: new Date(),
         expiresAt,
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: [aiCoachWorkouts.userId, aiCoachWorkouts.workoutType],
+        set: {
+          workoutData: JSON.stringify(workout),
+          generatedAt: now,
+          expiresAt,
+        },
+      });
+  }
 
-  return workout;
+  const nextAvailableAt = new Date(now.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+
+  return {
+    pool: poolWorkout,
+    dryland: drylandWorkout,
+    generatedAt: now.toISOString(),
+    nextAvailableAt: nextAvailableAt.toISOString(),
+    canGenerate: false,
+  };
 }
 
 /**
@@ -324,7 +388,7 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
   if (!db) {
     throw new Error("Database not available");
   }
-  
+
   // Get swimmer profile
   const profileResult = await db
     .select()
@@ -335,7 +399,7 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
   if (profileResult.length === 0) {
     throw new Error("Swimmer profile not found");
   }
-  
+
   const profile = profileResult[0];
 
   // Get recent activities (last 30 days)
@@ -363,13 +427,13 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
     (sum, a) => sum + (a.durationSeconds || 0),
     0
   );
-  
+
   // Calculate average pace from activities that have pace data
   const activitiesWithPace = recentActivities.filter(a => a.avgPacePer100m && a.avgPacePer100m > 0);
   const avgPace = activitiesWithPace.length > 0
     ? activitiesWithPace.reduce((sum, a) => sum + (a.avgPacePer100m || 0), 0) / activitiesWithPace.length
     : 0; // seconds per 100m
-    
+
   const avgSwolf =
     recentActivities.reduce((sum, a) => sum + (a.avgSwolf || 0), 0) /
     (recentActivities.length || 1);
@@ -413,12 +477,12 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
   const avgPOI = 0;
 
   // HR zones analysis - only from activities with HR data (using hrZoneXSeconds)
-  const activitiesWithHR = recentActivities.filter(a => 
+  const activitiesWithHR = recentActivities.filter(a =>
     (a.hrZone1Seconds || 0) + (a.hrZone2Seconds || 0) + (a.hrZone3Seconds || 0) + (a.hrZone4Seconds || 0) + (a.hrZone5Seconds || 0) > 0
   );
-  
+
   const hasHRData = activitiesWithHR.length > 0;
-  
+
   // Calculate total seconds in each zone across all activities with HR data
   const zone1Total = activitiesWithHR.reduce((sum, a) => sum + (a.hrZone1Seconds || 0), 0);
   const zone2Total = activitiesWithHR.reduce((sum, a) => sum + (a.hrZone2Seconds || 0), 0);
@@ -426,7 +490,7 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
   const zone4Total = activitiesWithHR.reduce((sum, a) => sum + (a.hrZone4Seconds || 0), 0);
   const zone5Total = activitiesWithHR.reduce((sum, a) => sum + (a.hrZone5Seconds || 0), 0);
   const totalHRSeconds = zone1Total + zone2Total + zone3Total + zone4Total + zone5Total;
-  
+
   // Convert to percentages
   const avgHRZone1Pct = totalHRSeconds > 0 ? (zone1Total / totalHRSeconds) * 100 : 0;
   const avgHRZone2Pct = totalHRSeconds > 0 ? (zone2Total / totalHRSeconds) * 100 : 0;
@@ -437,14 +501,14 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
   // Training frequency
   const sessionsPerWeek = (recentActivities.length / 30) * 7;
 
-	  return {
-	    profile: {
-	      aiSkillLabel: profile.aiSkillLabel ?? null,
-	      level: profile.level,
-	      totalXp: profile.totalXp,
-	      totalDistanceMeters: profile.totalDistanceMeters,
-	      totalSessions: profile.totalSessions,
-	    },
+  return {
+    profile: {
+      aiSkillLabel: profile.aiSkillLabel ?? null,
+      level: profile.level,
+      totalXp: profile.totalXp,
+      totalDistanceMeters: profile.totalDistanceMeters,
+      totalSessions: profile.totalSessions,
+    },
     recent: {
       activitiesCount: recentActivities.length,
       totalDistance,
@@ -470,16 +534,16 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
       zone4: avgHRZone4Pct.toFixed(1),
       zone5: avgHRZone5Pct.toFixed(1),
     },
-	    latestActivities: recentActivities.slice(0, 5).map((a) => ({
-	      date: a.activityDate,
-	      distance: a.distanceMeters,
-	      duration: a.durationSeconds,
-	      pace: a.avgPacePer100m ?? null,
-	      swolf: a.avgSwolf,
-	      strokes: a.avgStrokes ?? null,
-	      strokeRate: a.avgStrokeCadence ?? null,
-	    })),
-	  };
+    latestActivities: recentActivities.slice(0, 5).map((a) => ({
+      date: a.activityDate,
+      distance: a.distanceMeters,
+      duration: a.durationSeconds,
+      pace: a.avgPacePer100m ?? null,
+      swolf: a.avgSwolf,
+      strokes: a.avgStrokes ?? null,
+      strokeRate: a.avgStrokeCadence ?? null,
+    })),
+  };
 }
 
 /**
@@ -736,18 +800,18 @@ function parseWorkoutResponse(
   try {
     // Remove markdown code blocks if present
     let cleanText = text.trim();
-    
+
     // More robust markdown block removal
-    const jsonMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/) || 
-                      cleanText.match(/```\s*([\s\S]*?)\s*```/);
-    
+    const jsonMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/) ||
+      cleanText.match(/```\s*([\s\S]*?)\s*```/);
+
     if (jsonMatch) {
       cleanText = jsonMatch[1];
     } else {
       // Fallback: strip any backticks and common text before/after
       cleanText = cleanText.replace(/```json/g, "")
-                          .replace(/```/g, "")
-                          .trim();
+        .replace(/```/g, "")
+        .trim();
     }
 
     // Parse JSON

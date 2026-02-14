@@ -166,24 +166,18 @@ export const statisticsRouter = router({
 
 // AI Coach
 export const aiCoachRouter = router({
-    // Get pool workout (cached or generate new)
-    getPoolWorkout: protectedProcedure
-        .input(z.object({
-            forceRegenerate: z.boolean().default(false),
-        }))
-        .query(async ({ ctx, input }) => {
-            const { getOrGenerateWorkout } = await import("../ai_coach");
-            return await getOrGenerateWorkout(ctx.user.id, "pool", input.forceRegenerate);
+    // Get existing workouts (read-only, no generation)
+    getWorkouts: protectedProcedure
+        .query(async ({ ctx }) => {
+            const { getExistingWorkouts } = await import("../ai_coach");
+            return await getExistingWorkouts(ctx.user.id);
         }),
 
-    // Get dryland workout (cached or generate new)
-    getDrylandWorkout: protectedProcedure
-        .input(z.object({
-            forceRegenerate: z.boolean().default(false),
-        }))
-        .query(async ({ ctx, input }) => {
-            const { getOrGenerateWorkout } = await import("../ai_coach");
-            return await getOrGenerateWorkout(ctx.user.id, "dryland", input.forceRegenerate);
+    // Generate both pool + dryland workouts (7-day cooldown)
+    generateWorkouts: protectedProcedure
+        .mutation(async ({ ctx }) => {
+            const { generateBothWorkouts } = await import("../ai_coach");
+            return await generateBothWorkouts(ctx.user.id);
         }),
 });
 

@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   Zap,
   Flame,
+  Sparkles,
   RefreshCw,
 } from "lucide-react";
 import { trpc } from "../lib/trpc";
@@ -56,15 +57,24 @@ type InsightItem = {
 };
 
 export default function CoachDryland() {
-  const [dryRegenerate, setDryRegenerate] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [insightsRefreshing, setInsightsRefreshing] = useState(false);
 
-  const drylandWorkoutQuery = trpc.aiCoach.getDrylandWorkout.useQuery(
-    { forceRegenerate: dryRegenerate },
-    {
-      staleTime: dryRegenerate ? 0 : 1000 * 60 * 60 * 24,
-    }
-  );
+  const workoutsQuery = trpc.aiCoach.getWorkouts.useQuery(undefined, {
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+
+  const utils = trpc.useUtils();
+  const generateMutation = trpc.aiCoach.generateWorkouts.useMutation({
+    onSuccess: () => {
+      utils.aiCoach.getWorkouts.invalidate();
+    },
+  });
+
+  const workoutsData = workoutsQuery.data;
+  const canGenerate = workoutsData?.canGenerate ?? true;
 
   const advancedQuery = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
@@ -79,7 +89,7 @@ export default function CoachDryland() {
   const { data: garminStatus } = trpc.garmin.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
   const { data: stravaStatus } = trpc.strava.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
 
-  const drylandWorkout = drylandWorkoutQuery.data as GeneratedWorkout | undefined;
+  const drylandWorkout = workoutsData?.dryland as GeneratedWorkout | undefined;
 
   const lastSyncDate = useMemo(() => {
     const garmin = garminStatus?.lastSync ? new Date(garminStatus.lastSync) : null;
@@ -108,8 +118,8 @@ export default function CoachDryland() {
   const conditionClass = conditionLabel === "Ottima"
     ? "text-emerald-500 dark:text-cyan-200"
     : conditionLabel === "Buona"
-    ? "text-amber-500 dark:text-amber-300"
-    : "text-rose-500 dark:text-rose-300";
+      ? "text-amber-500 dark:text-amber-300"
+      : "text-rose-500 dark:text-rose-300";
   const drylandOrbs = useMemo(() => {
     const recovery = advanced?.recoveryReadinessScore ?? 0;
     const focusProgress =
@@ -163,8 +173,8 @@ export default function CoachDryland() {
           cardioScore === null || cardioScore === undefined
             ? "Dati insufficienti: completa più sessioni per stimare la base aerobica."
             : cardioScore < 55
-            ? "Base aerobica da rinforzare: inserisci blocchi cardio continui e recuperi controllati."
-            : "Buona base cardio: mantieni volume costante e lavora su progressioni graduali.",
+              ? "Base aerobica da rinforzare: inserisci blocchi cardio continui e recuperi controllati."
+              : "Buona base cardio: mantieni volume costante e lavora su progressioni graduali.",
         metric: cardioMetric,
       },
       {
@@ -174,8 +184,8 @@ export default function CoachDryland() {
           strengthScore === null || strengthScore === undefined
             ? "Mancano dati per la progressione di carico."
             : strengthScore < 0
-            ? "Progressione ridotta: integra sessioni di forza con carichi gestibili e tecnica pulita."
-            : "Buona spinta: continua con esercizi multiarticolari e controllo del core.",
+              ? "Progressione ridotta: integra sessioni di forza con carichi gestibili e tecnica pulita."
+              : "Buona spinta: continua con esercizi multiarticolari e controllo del core.",
         metric: strengthMetric,
       },
       {
@@ -185,19 +195,21 @@ export default function CoachDryland() {
           recoveryScore === null || recoveryScore === undefined
             ? "Recupero non stimabile: servono più dati HR/sonno."
             : recoveryScore < 50
-            ? "Recupero basso: scegli intensità moderate e cura mobilità e sonno."
-            : "Recupero solido: ottimo momento per una seduta secca intensa.",
+              ? "Recupero basso: scegli intensità moderate e cura mobilità e sonno."
+              : "Recupero solido: ottimo momento per una seduta secca intensa.",
         metric: recoveryMetric,
       },
     ];
   }, [advanced]);
 
-  const handleRegenerateDryland = async () => {
-    setDryRegenerate(true);
+  const handleGenerateWorkouts = async () => {
+    setIsGenerating(true);
     try {
-      await drylandWorkoutQuery.refetch();
+      await generateMutation.mutateAsync();
+    } catch (error) {
+      console.error("Generation failed:", error);
     } finally {
-      setDryRegenerate(false);
+      setIsGenerating(false);
     }
   };
 
@@ -392,13 +404,12 @@ export default function CoachDryland() {
                       <SurfaceContent className="p-5">
                         <div className="flex justify-between items-start mb-2">
                           <div
-                            className={`p-2 rounded-lg ${
-                              insight.type === "warning"
+                            className={`p-2 rounded-lg ${insight.type === "warning"
                                 ? "bg-orange-500/20 text-orange-400"
                                 : insight.type === "success"
-                                ? "bg-green-500/20 text-green-400"
-                                : "bg-blue-500/20 text-blue-400"
-                            }`}
+                                  ? "bg-green-500/20 text-green-400"
+                                  : "bg-blue-500/20 text-blue-400"
+                              }`}
                           >
                             {insight.type === "warning" ? (
                               <AlertCircle className="h-5 w-5" />
@@ -457,12 +468,12 @@ export default function CoachDryland() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={handleRegenerateDryland}
-                    disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
+                    onClick={handleGenerateWorkouts}
+                    disabled={!canGenerate || isGenerating}
                     className="text-[var(--gold)] hover:text-foreground hover:bg-muted/60"
                   >
-                    <RefreshCw className={`h-4 w-4 mr-2 ${dryRegenerate ? "animate-spin" : ""}`} />
-                    Rigenera
+                    <Sparkles className={`h-4 w-4 mr-2 ${isGenerating ? "animate-spin" : ""}`} />
+                    {isGenerating ? "Generazione..." : "Genera workouts"}
                   </Button>
                 </div>
 
@@ -487,10 +498,10 @@ export default function CoachDryland() {
                   </div>
 
                   <SurfaceContent className="p-0">
-                    {drylandWorkoutQuery.isFetching && (
+                    {workoutsQuery.isFetching && (
                       <div className="p-5 text-muted-foreground">Sto preparando l'allenamento...</div>
                     )}
-                    {drylandWorkoutQuery.isError && (
+                    {workoutsQuery.isError && (
                       <div className="p-5 text-red-300">Errore nel caricamento dell'allenamento.</div>
                     )}
                     {drylandWorkout?.sections?.map((section, idx) => {
