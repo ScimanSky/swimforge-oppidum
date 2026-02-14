@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils"
 import { Home, Activity, Users, Trophy, BarChart3, User } from "lucide-react"
 
 const navItems = [
-  { href: "/dashboard", icon: Home, label: "Home" },
-  { href: "/activities", icon: Activity, label: "Attività" },
+  { href: "/home", icon: Home, label: "Home" },
+  { href: "/track", icon: Activity, label: "Track" },
   { href: "/challenges", icon: Trophy, label: "Sfide" },
   { href: "/community", icon: Users, label: "Club" },
   { href: "/statistics", icon: BarChart3, label: "Progressi" },

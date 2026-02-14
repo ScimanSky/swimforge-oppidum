@@ -680,7 +680,7 @@ export default function Dashboard() {
 
               <div className="flex flex-wrap gap-2">
                 <Button variant="neon" size="sm" asChild>
-                  <Link href="/activities">
+                  <Link href="/track">
                     <Waves className="size-4" />
                     Attività
                   </Link>
@@ -712,7 +712,7 @@ export default function Dashboard() {
                     activityDialogRows.map(({ activity }) => (
                       <Link
                         key={activity.id}
-                        href={`/activities/${activity.id}`}
+                        href={`/track/${activity.id}`}
                         className="stream-card block px-3 py-2"
                       >
                         <div className="flex items-center justify-between gap-3">

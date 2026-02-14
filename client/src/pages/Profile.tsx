@@ -616,7 +616,7 @@ export default function Profile() {
                   <Link href="/badges">Badge</Link>
                 </Button>
                 <Button variant="outline-neon" size="sm" asChild>
-                  <Link href="/activities">Attività recenti</Link>
+                  <Link href="/track">Attività recenti</Link>
                 </Button>
                 <Button variant="outline-neon" size="sm" asChild>
                   <Link href="/statistics">Record e progressi</Link>

@@ -330,7 +330,7 @@ export default function Badges() {
       <header className="sticky top-0 z-40 bg-[var(--navy)]/95 backdrop-blur-lg border-b border-border/60">
         <div className="container py-4">
           <div className="flex items-center gap-3">
-            <Link href="/dashboard">
+            <Link href="/home">
               <Button variant="ghost" size="icon" className="text-primary hover:bg-primary/10">
                 <ChevronLeft className="h-5 w-5" />
               </Button>

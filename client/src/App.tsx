@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
 import NotFound from "@/pages/NotFound";
-import { Route, Switch, useLocation } from "wouter";
+import { Redirect, Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import BadgeUnlockNotification from "./components/BadgeUnlockNotification";
@@ -57,13 +57,20 @@ function Router() {
       <Route path="/signup" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
-      <Route path="/dashboard" component={Dashboard} />
+      <Route path="/home" component={Dashboard} />
+      <Route path="/dashboard">
+        <Redirect to="/home" />
+      </Route>
       <Route path="/badges" component={Badges} />
       <Route path="/challenges" component={Challenges} />
       <Route path="/challenges/:id" component={ChallengeDetail} />
       <Route path="/leaderboard" component={Leaderboard} />
-      <Route path="/activities/:id" component={ActivityDetail} />
-      <Route path="/activities" component={Activities} />
+      <Route path="/track/:id" component={ActivityDetail} />
+      <Route path="/activities/:id">{(params: { id: string }) => <Redirect to={`/track/${params.id}`} />}</Route>
+      <Route path="/track" component={Activities} />
+      <Route path="/activities">
+        <Redirect to="/track" />
+      </Route>
       <Route path="/goals" component={Goals} />
       <Route path="/statistics" component={Statistics} />
       <Route path="/coach" component={Coach} />

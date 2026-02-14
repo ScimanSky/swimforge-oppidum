@@ -350,7 +350,7 @@ export default function Activities() {
                             </div>
 
                             <Button variant="ghost-neon" size="icon" asChild>
-                              <Link href={`/activities/${activity.id}`}>
+                              <Link href={`/track/${activity.id}`}>
                                 <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
                               </Link>
                             </Button>

@@ -123,7 +123,7 @@ export default function Home() {
   useEffect(() => {
     if (loading) return;
     if (!isAuthenticated) return;
-    window.location.href = "/dashboard";
+    window.location.href = "/home";
   }, [isAuthenticated, loading]);
 
   if (loading || isAuthenticated) {

@@ -646,7 +646,7 @@ export default function Settings() {
                   {garminSyncMutation.isPending ? "Sincronizzazione..." : "Sincronizza Garmin"}
                 </Button>
               )}
-              <Button variant="outline-neon" onClick={() => (window.location.href = "/dashboard")}>
+              <Button variant="outline-neon" onClick={() => (window.location.href = "/home")}>
                 Vai alla Dashboard
               </Button>
             </div>

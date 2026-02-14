@@ -142,8 +142,13 @@ const getPacePer100m = (obj: Record<string, unknown> | null | undefined) => {
 }
 
 export default function ActivityDetail() {
-  const [, params] = useRoute<{ id: string }>("/activities/:id")
-  const activityId = params?.id ? Number(params.id) : NaN
+  const [, trackParams] = useRoute<{ id: string }>("/track/:id")
+  const [, legacyParams] = useRoute<{ id: string }>("/activities/:id")
+  const activityId = trackParams?.id
+    ? Number(trackParams.id)
+    : legacyParams?.id
+      ? Number(legacyParams.id)
+      : NaN
   const activityQuery = trpc.activities.get.useQuery(
     { id: activityId },
     { enabled: Number.isFinite(activityId) }
@@ -633,7 +638,7 @@ export default function ActivityDetail() {
       <div className="space-y-6 lg:space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="ghost-neon" size="icon" asChild>
-            <Link href="/activities">
+            <Link href="/track">
               <ArrowLeft className="size-5" />
             </Link>
           </Button>

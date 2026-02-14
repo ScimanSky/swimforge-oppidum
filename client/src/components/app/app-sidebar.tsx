@@ -20,8 +20,8 @@ import {
 } from "lucide-react"
 
 const mainNav = [
-  { href: "/dashboard", icon: Home, label: "Dashboard" },
-  { href: "/activities", icon: Activity, label: "Attività" },
+  { href: "/home", icon: Home, label: "Home" },
+  { href: "/track", icon: Activity, label: "Track" },
   { href: "/challenges", icon: Trophy, label: "Sfide" },
   { href: "/community", icon: Users, label: "Club" },
   { href: "/statistics", icon: BarChart3, label: "Progressi" },
@@ -45,7 +45,7 @@ export function AppSidebar({ open, onOpenChange }: AppSidebarProps) {
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="p-4 flex items-center justify-between">
-        <Link href="/dashboard" className="flex items-center gap-2">
+        <Link href="/home" className="flex items-center gap-2">
           <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
             <Waves className="w-6 h-6 text-primary-foreground" />
           </div>

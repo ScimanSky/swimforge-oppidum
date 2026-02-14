@@ -32,7 +32,7 @@ export default function Auth() {
   useEffect(() => {
     if (authLoading) return;
     if (!isAuthenticated) return;
-    window.location.href = "/dashboard";
+    window.location.href = "/home";
   }, [authLoading, isAuthenticated]);
 
   if (authLoading || isAuthenticated) {
@@ -43,7 +43,7 @@ export default function Auth() {
     onSuccess: (data) => {
       toast.success("Login effettuato con successo!");
       setTimeout(() => {
-        window.location.href = data?.isNewUser ? "/settings?tab=profile&onboarding=1" : "/dashboard";
+        window.location.href = data?.isNewUser ? "/settings?tab=profile&onboarding=1" : "/home";
       }, 100);
     },
     onError: (error) => {

@@ -22,10 +22,10 @@ const pickBackground = (path: string): BgSpec => {
   ) {
     return { key: "auth-v2", image: "/images/theme-v2/auth-hero.png", position: "center 34%" };
   }
-  if (path.startsWith("/dashboard")) {
+  if (path.startsWith("/home") || path.startsWith("/dashboard")) {
     return { key: "dashboard-v2", image: "/images/theme-v2/dashboard-hero.png", position: "center 36%" };
   }
-  if (path.startsWith("/activities")) {
+  if (path.startsWith("/track") || path.startsWith("/activities")) {
     return { key: "activities-v2", image: "/images/theme-v2/activities-hero.png", position: "center 40%" };
   }
   if (path.startsWith("/statistics")) {

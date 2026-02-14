@@ -65,7 +65,7 @@ export function RecentActivities({ activities, isLoading }: RecentActivitiesProp
             Recent Activities
           </SurfaceTitle>
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/activities" className="text-xs text-muted-foreground hover:text-foreground">
+            <Link href="/track" className="text-xs text-muted-foreground hover:text-foreground">
               View all
               <ChevronRight className="w-4 h-4 ml-1" />
             </Link>
@@ -95,7 +95,7 @@ export function RecentActivities({ activities, isLoading }: RecentActivitiesProp
             return (
               <Link
                 key={activity.id}
-                href={`/activities/${activity.id}`}
+                href={`/track/${activity.id}`}
                 className="block p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors"
               >
                 <div className="flex items-start justify-between gap-4">

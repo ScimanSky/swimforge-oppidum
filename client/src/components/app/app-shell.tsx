@@ -6,7 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import {
   BarChart3,
   Bot,
-  LayoutDashboard,
+  Home,
   LogOut,
   Orbit,
   Moon,
@@ -44,8 +44,8 @@ type NavItem = {
 }
 
 const navPrimary: NavItem[] = [
-  { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard className="size-5" /> },
-  { label: "Attività", path: "/activities", icon: <Waves className="size-5" /> },
+  { label: "Home", path: "/home", icon: <Home className="size-5" /> },
+  { label: "Track", path: "/track", icon: <Waves className="size-5" /> },
   { label: "Season", path: "/season", icon: <Orbit className="size-5" /> },
   { label: "Sfide", path: "/challenges", icon: <Trophy className="size-5" /> },
   { label: "Club", path: "/community", icon: <Users className="size-5" /> },
@@ -58,8 +58,8 @@ const navSecondary: NavItem[] = [
 ]
 
 function titleForPath(path: string) {
-  if (path === "/" || path.startsWith("/dashboard")) return "Dashboard"
-  if (path.startsWith("/activities")) return "Attività"
+  if (path === "/" || path.startsWith("/home") || path.startsWith("/dashboard")) return "Home"
+  if (path.startsWith("/track") || path.startsWith("/activities")) return "Track"
   if (path.startsWith("/season")) return "Season"
   if (path.startsWith("/challenges")) return "Sfide"
   if (path.startsWith("/community/club") && path.includes("/event/")) return "Evento Club"
@@ -142,9 +142,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex h-full w-full flex-col items-center">
           <div className="flex h-16 items-center justify-center">
             <Link
-              href="/dashboard"
+              href="/home"
               className="group relative flex size-11 items-center justify-center rounded-2xl ei-border-gradient shadow-[0_0_32px_var(--neon-soft)] transition-transform hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
-              aria-label="Vai al Dashboard"
+              aria-label="Vai alla Home"
             >
               <img
                 src="/swimforge-logo.png"
