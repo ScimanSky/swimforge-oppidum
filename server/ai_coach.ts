@@ -288,22 +288,48 @@ export async function generateBothWorkouts(userId: number): Promise<WorkoutsResp
     { type: "pool" as const, workout: poolWorkout },
     { type: "dryland" as const, workout: drylandWorkout },
   ]) {
-    await db
-      .insert(aiCoachWorkouts)
-      .values({
+    // Manual upsert to avoid issues if unique constraint is missing
+    const existing = await db
+      .select({ id: aiCoachWorkouts.id })
+      .from(aiCoachWorkouts)
+      .where(
+        and(
+          eq(aiCoachWorkouts.userId, userId),
+          eq(aiCoachWorkouts.workoutType, type)
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      await db
+        .update(aiCoachWorkouts)
+        .set({
+          workoutData: JSON.stringify(workout),
+          generatedAt: now,
+          expiresAt,
+        })
+        .where(eq(aiCoachWorkouts.id, existing[0].id));
+
+      logger.info(`[AI Coach] Updated existing workout for user ${userId} type ${type}`, {
+        event: "ai_coach:workout_updated",
+        userId,
+        workoutType: type
+      });
+    } else {
+      await db.insert(aiCoachWorkouts).values({
         userId,
         workoutType: type,
         workoutData: JSON.stringify(workout),
         expiresAt,
-      })
-      .onConflictDoUpdate({
-        target: [aiCoachWorkouts.userId, aiCoachWorkouts.workoutType],
-        set: {
-          workoutData: JSON.stringify(workout),
-          generatedAt: now,
-          expiresAt,
-        },
       });
+
+      logger.info(`[AI Coach] Inserted new workout for user ${userId} type ${type}`, {
+        event: "ai_coach:workout_inserted",
+        userId,
+        workoutType: type
+      });
+    }
+
   }
 
   const nextAvailableAt = new Date(now.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
