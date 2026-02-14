@@ -32,9 +32,6 @@ export const loginLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req: Request) => {
-    return req.ip === process.env.ADMIN_IP;
-  },
   store: createRedisStore({ prefix: 'rl:login:', windowMs: 15 * 60 * 1000 }),
 });
 
@@ -185,7 +182,7 @@ export const helmetConfig = {
         'api.garmin.com',
         'api.strava.com',
         'https://sentry.io',
-        process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://wpnxaadvyxmhlcgdobla.supabase.co',
+        process.env.SUPABASE_URL || '',
         'https://*.supabase.co',
       ].filter(Boolean),
       frameSrc: ["'none'"],
