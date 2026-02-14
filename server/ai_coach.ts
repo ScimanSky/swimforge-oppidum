@@ -344,14 +344,6 @@ export async function generateBothWorkouts(userId: number): Promise<WorkoutsResp
     }
   }
 
-  logger.info(`[AI Coach] Inserted new workout for user ${userId} type ${type}`, {
-    event: "ai_coach:workout_inserted",
-    userId,
-    workoutType: type
-  });
-}
-
-  }
 
 const nextAvailableAt = new Date(now.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
 
