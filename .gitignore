@@ -23,6 +23,9 @@ build/
 # Supabase CLI local metadata
 supabase/
 
+# Claude Code local settings
+.claude/
+
 # IDE and editor files
 .vscode/
 .idea/
