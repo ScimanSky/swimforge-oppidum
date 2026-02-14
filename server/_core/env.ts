@@ -1,10 +1,12 @@
+import { logger } from "../middleware/logger";
+
 function requireEnv(name: string, fallbackName?: string): string {
   const value = process.env[name] ?? (fallbackName ? process.env[fallbackName] : undefined);
   if (!value) {
     if (process.env.NODE_ENV === "production") {
       throw new Error(`Required environment variable missing: ${name}`);
     }
-    console.warn(`[env] WARNING: ${name} is not set`);
+    logger.warn(`[env] WARNING: ${name} is not set`);
     return "";
   }
   return value;
