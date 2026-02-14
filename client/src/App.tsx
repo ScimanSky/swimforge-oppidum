@@ -26,8 +26,6 @@ const Profile = lazy(() => import("./pages/Profile"));
 const PublicProfile = lazy(() => import("./pages/PublicProfile"));
 const Statistics = lazy(() => import("./pages/Statistics"));
 const Coach = lazy(() => import("./pages/Coach"));
-const CoachDryland = lazy(() => import("./pages/CoachDryland"));
-const SessionInsights = lazy(() => import("./pages/SessionInsights"));
 const SeasonPage = lazy(() => import("./pages/Season"));
 const Community = lazy(() => import("./pages/Community"));
 const ClubInvite = lazy(() => import("./pages/ClubInvite"));
@@ -87,8 +85,12 @@ function Router() {
         <Redirect to="/profile/performance" />
       </Route>
       <Route path="/coach" component={Coach} />
-      <Route path="/coach-dryland" component={CoachDryland} />
-      <Route path="/session-iq" component={SessionInsights} />
+      <Route path="/coach-dryland">
+        <Redirect to="/coach?tab=workouts&workout=dryland" />
+      </Route>
+      <Route path="/session-iq">
+        <Redirect to="/coach?tab=session-iq" />
+      </Route>
       <Route path="/season" component={SeasonPage} />
       <Route path="/community/invite/:code" component={ClubInvite} />
       <Route path="/community/club/:clubId/event/:eventId" component={ClubEventDetail} />

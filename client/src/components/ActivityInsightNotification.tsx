@@ -127,7 +127,7 @@ export default function ActivityInsightNotification() {
                 )}
               </div>
               <div className="p-6 pt-2">
-                <Link href="/session-iq">
+                <Link href="/coach?tab=session-iq">
                   <Button
                     className="w-full bg-[var(--gold)] text-slate-900 dark:text-[var(--navy)] hover:bg-[var(--gold-light)]"
                     onClick={handleClose}

@@ -320,7 +320,7 @@ export default function CoachDryland() {
               </div>
             </div>
             <div className="md:ml-auto w-full md:w-auto flex flex-col sm:flex-row gap-2">
-              <Link href="/session-iq" className="w-full sm:w-auto">
+              <Link href="/coach?tab=session-iq" className="w-full sm:w-auto">
                 <Button variant="outline" className="w-full sm:w-auto border-[var(--gold)]/40 text-[var(--gold)] hover:bg-[var(--gold)]/10">
                   Session IQ
                 </Button>

@@ -73,10 +73,11 @@ function titleForPath(path: string) {
 }
 
 function isNavItemActive(path: string, location: string) {
-  if (path === "/home" && location.startsWith("/home/community")) {
+  const normalized = location.split("?")[0].split("#")[0]
+  if (path === "/home" && normalized.startsWith("/home/community")) {
     return false
   }
-  return location === path || location.startsWith(path + "/")
+  return normalized === path || normalized.startsWith(path + "/")
 }
 
 function RailLink({ item, location }: { item: NavItem; location: string }) {

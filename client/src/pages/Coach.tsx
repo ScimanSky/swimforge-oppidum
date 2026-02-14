@@ -17,6 +17,7 @@ import {
   Activity,
   MessageSquare,
 } from "lucide-react"
+import { useLocation } from "wouter"
 
 
 
@@ -114,7 +115,9 @@ const getFocusLabel = (
 }
 
 export default function Coach() {
+  const [location] = useLocation()
   const [message, setMessage] = useState("")
+  const [activeTab, setActiveTab] = useState<"insights" | "workouts" | "session-iq" | "chat">("insights")
   const [activeInsightIndex, setActiveInsightIndex] = useState(0)
   const [activePoolSectionIndex, setActivePoolSectionIndex] = useState(0)
   const [activeDrySectionIndex, setActiveDrySectionIndex] = useState(0)
@@ -339,6 +342,22 @@ export default function Coach() {
     return formatDate(latestSessionInsight.activity_date) ?? "—"
   }, [latestSessionInsight])
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const tab = params.get("tab")
+    const workout = params.get("workout")
+    if (tab === "insights" || tab === "workouts" || tab === "session-iq" || tab === "chat") {
+      setActiveTab(tab)
+    } else {
+      setActiveTab("insights")
+    }
+
+    if (workout === "pool" || workout === "dryland") {
+      setActiveWorkout(workout)
+    }
+  }, [location])
+
   return (
     <AppLayout>
       <div className="compact-shell space-y-4 lg:space-y-2">
@@ -405,7 +424,7 @@ export default function Coach() {
           </div>
         </section>
 
-        <Tabs defaultValue="insights" className="space-y-3">
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "insights" | "workouts" | "session-iq" | "chat")} className="space-y-3">
           <TabsList>
             <TabsTrigger value="insights">Insights</TabsTrigger>
             <TabsTrigger value="workouts">Piano</TabsTrigger>
@@ -758,7 +777,7 @@ export default function Coach() {
                   </p>
                 </div>
                 <Button variant="outline-neon" size="sm" asChild>
-                  <a href="/session-iq">Apri archivio</a>
+                  <a href="/coach?tab=session-iq">Apri archivio</a>
                 </Button>
               </div>
               <div>
