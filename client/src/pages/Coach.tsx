@@ -135,11 +135,22 @@ export default function Coach() {
 
   const utils = trpc.useUtils()
 
-  const generateMutation = trpc.aiCoach.generateWorkouts.useMutation({
-    onSuccess: () => {
-      utils.aiCoach.getWorkouts.invalidate()
-    },
-  })
+  const generateMutation = trpc.aiCoach.generateWorkouts.useMutation()
+
+  const handleGenerate = async () => {
+    setIsGenerating(true)
+    try {
+      const result = await generateMutation.mutateAsync()
+      // Immediately update the query cache with the mutation result
+      utils.aiCoach.getWorkouts.setData(undefined, result)
+      // Also refetch to ensure consistency
+      await utils.aiCoach.getWorkouts.refetch()
+    } catch (error) {
+      console.error("Generation failed:", error)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
 
   const workoutsData = workoutsQuery.data
   const poolWorkout = workoutsData?.pool as GeneratedWorkout | undefined
@@ -162,18 +173,6 @@ export default function Coach() {
     if (!workoutsData?.generatedAt) return null
     return formatDate(workoutsData.generatedAt)
   }, [workoutsData?.generatedAt])
-
-  const handleGenerate = async () => {
-    setIsGenerating(true)
-    try {
-      await generateMutation.mutateAsync()
-    } catch (error) {
-      console.error("Generation failed:", error)
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
   const sessionInsightsQuery = trpc.activityInsights.list.useQuery(
     { limit: 50, offset: 0 },
     { staleTime: 60 * 1000 }

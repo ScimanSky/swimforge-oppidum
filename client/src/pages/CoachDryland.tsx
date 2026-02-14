@@ -67,11 +67,7 @@ export default function CoachDryland() {
   });
 
   const utils = trpc.useUtils();
-  const generateMutation = trpc.aiCoach.generateWorkouts.useMutation({
-    onSuccess: () => {
-      utils.aiCoach.getWorkouts.invalidate();
-    },
-  });
+  const generateMutation = trpc.aiCoach.generateWorkouts.useMutation();
 
   const workoutsData = workoutsQuery.data;
   const canGenerate = workoutsData?.canGenerate ?? true;
@@ -205,7 +201,9 @@ export default function CoachDryland() {
   const handleGenerateWorkouts = async () => {
     setIsGenerating(true);
     try {
-      await generateMutation.mutateAsync();
+      const result = await generateMutation.mutateAsync();
+      utils.aiCoach.getWorkouts.setData(undefined, result);
+      await utils.aiCoach.getWorkouts.refetch();
     } catch (error) {
       console.error("Generation failed:", error);
     } finally {
@@ -405,10 +403,10 @@ export default function CoachDryland() {
                         <div className="flex justify-between items-start mb-2">
                           <div
                             className={`p-2 rounded-lg ${insight.type === "warning"
-                                ? "bg-orange-500/20 text-orange-400"
-                                : insight.type === "success"
-                                  ? "bg-green-500/20 text-green-400"
-                                  : "bg-blue-500/20 text-blue-400"
+                              ? "bg-orange-500/20 text-orange-400"
+                              : insight.type === "success"
+                                ? "bg-green-500/20 text-green-400"
+                                : "bg-blue-500/20 text-blue-400"
                               }`}
                           >
                             {insight.type === "warning" ? (
