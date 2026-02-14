@@ -101,6 +101,36 @@ export const aiCoachLimiter = rateLimit({
   store: createRedisStore({ prefix: 'rl:ai:', windowMs: 60 * 60 * 1000 }),
 });
 
+/**
+ * Rate limiter per sync endpoints (Strava / Garmin)
+ */
+export const syncLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minuti
+  max: 5, // 5 richieste ogni 5 minuti
+  message: {
+    error: 'Sync Rate Limit',
+    message: 'Troppi tentativi di sincronizzazione. Riprova tra 5 minuti.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createRedisStore({ prefix: 'rl:sync:', windowMs: 5 * 60 * 1000 }),
+});
+
+/**
+ * Rate limiter per commenti community
+ */
+export const commentLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minuto
+  max: 20, // 20 commenti al minuto
+  message: {
+    error: 'Comment Rate Limit',
+    message: 'Troppi commenti. Riprova tra 1 minuto.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createRedisStore({ prefix: 'rl:comment:', windowMs: 1 * 60 * 1000 }),
+});
+
 // ============================================================================
 // CORS CONFIGURATION
 // ============================================================================
@@ -117,7 +147,11 @@ export const corsOptions: cors.CorsOptions = {
       .map(value => value.trim())
       .filter(Boolean);
 
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin) {
+      // Allow missing origin only in development (same-site requests)
+      return callback(null, process.env.NODE_ENV !== "production");
+    }
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error(`CORS policy: origin ${origin} not allowed`));
@@ -256,6 +290,8 @@ export default {
   apiLimiter,
   garminSyncLimiter,
   aiCoachLimiter,
+  syncLimiter,
+  commentLimiter,
   corsOptions,
   helmetConfig,
   userAgentValidation,

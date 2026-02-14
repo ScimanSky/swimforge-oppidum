@@ -52,6 +52,14 @@ body,
 
   --neon-glow: oklch(0.84 0.190 205 / 0.46);
   --neon-soft: oklch(0.84 0.190 205 / 0.22);
+
+  --z-base: 1;
+  --z-nav: 40;
+  --z-header: 50;
+  --z-overlay: 60;
+  --z-modal: 70;
+  --z-toast: 80;
+
   --radius: 0.625rem;
   --sidebar: oklch(0.89 0.014 230);
   --sidebar-foreground: var(--foreground);
@@ -213,6 +221,16 @@ body,
 }
 
 @layer utilities {
+  .min-h-screen {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
+
+  .h-screen {
+    height: 100vh;
+    height: 100dvh;
+  }
+
   .sf-page-root {
     min-width: 0;
     overflow-x: hidden;

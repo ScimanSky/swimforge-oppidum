@@ -32,20 +32,20 @@ const VALUE_CLASSES: Record<OrbSize, string> = {
 };
 
 const PROGRESS_CLASSES: Record<OrbSize, string> = {
-  sm: "text-[9px]",
-  md: "text-[10px]",
-  lg: "text-[11px]",
+  sm: "text-[11px] sm:text-xs",
+  md: "text-xs",
+  lg: "text-xs sm:text-sm",
 };
 
 const LABEL_CLASSES: Record<OrbSize, string> = {
-  sm: "text-[10px]",
-  md: "text-[11px]",
+  sm: "text-xs",
+  md: "text-xs sm:text-sm",
   lg: "text-xs",
 };
 
 const HELPER_CLASSES: Record<OrbSize, string> = {
-  sm: "text-[10px]",
-  md: "text-[11px]",
+  sm: "text-xs",
+  md: "text-xs sm:text-sm",
   lg: "text-xs",
 };
 

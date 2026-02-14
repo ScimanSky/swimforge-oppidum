@@ -46,7 +46,9 @@ export async function getDb() {
       try {
         pool = new Pool({
           connectionString: process.env.DATABASE_URL,
-          ssl: { rejectUnauthorized: false },
+          ssl: process.env.NODE_ENV === 'production'
+            ? { rejectUnauthorized: true }
+            : { rejectUnauthorized: false },
           max: 10,
           min: 1,
           idleTimeoutMillis: 30_000,

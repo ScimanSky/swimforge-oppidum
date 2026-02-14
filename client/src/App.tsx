@@ -1,49 +1,52 @@
+import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { Spinner } from "@/components/ui/spinner";
 import NotFound from "@/pages/NotFound";
 import { Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
-import Dashboard from "./pages/Dashboard";
-import Badges from "./pages/Badges";
-import Challenges from "./pages/Challenges";
-import ChallengeDetail from "./pages/ChallengeDetail";
-import Leaderboard from "./pages/Leaderboard";
-import Activities from "./pages/Activities";
-import ActivityDetail from "./pages/ActivityDetail";
-import Goals from "./pages/Goals";
-import Profile from "./pages/Profile";
-import PublicProfile from "./pages/PublicProfile";
-import Statistics from "./pages/Statistics";
-import Coach from "./pages/Coach";
-import CoachDryland from "./pages/CoachDryland";
-import SessionInsights from "./pages/SessionInsights";
-import SeasonPage from "./pages/Season";
-import Community from "./pages/Community";
-import ClubInvite from "./pages/ClubInvite";
-import ClubDetail from "./pages/ClubDetail";
-import ClubEventDetail from "./pages/ClubEventDetail";
-import Auth from "./pages/Auth";
-import AuthCallback from "./pages/AuthCallback";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import StravaConnect from "./pages/StravaConnect";
-import Settings from "./pages/Settings";
-import Privacy from "./pages/Privacy";
-import Terms from "./pages/Terms";
 import BadgeUnlockNotification from "./components/BadgeUnlockNotification";
 import BadgeUnlockWatcher from "./components/BadgeUnlockWatcher";
 import SeasonLaunchPopup from "./components/SeasonLaunchPopup";
 import { useBadgeNotifications } from "./hooks/useBadgeNotifications";
 import AutoSync from "./components/AutoSync";
 import ActivityInsightNotification from "./components/ActivityInsightNotification";
-import { useEffect } from "react";
+
+const Home = lazy(() => import("./pages/Home"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Badges = lazy(() => import("./pages/Badges"));
+const Challenges = lazy(() => import("./pages/Challenges"));
+const ChallengeDetail = lazy(() => import("./pages/ChallengeDetail"));
+const Leaderboard = lazy(() => import("./pages/Leaderboard"));
+const Activities = lazy(() => import("./pages/Activities"));
+const ActivityDetail = lazy(() => import("./pages/ActivityDetail"));
+const Goals = lazy(() => import("./pages/Goals"));
+const Profile = lazy(() => import("./pages/Profile"));
+const PublicProfile = lazy(() => import("./pages/PublicProfile"));
+const Statistics = lazy(() => import("./pages/Statistics"));
+const Coach = lazy(() => import("./pages/Coach"));
+const CoachDryland = lazy(() => import("./pages/CoachDryland"));
+const SessionInsights = lazy(() => import("./pages/SessionInsights"));
+const SeasonPage = lazy(() => import("./pages/Season"));
+const Community = lazy(() => import("./pages/Community"));
+const ClubInvite = lazy(() => import("./pages/ClubInvite"));
+const ClubDetail = lazy(() => import("./pages/ClubDetail"));
+const ClubEventDetail = lazy(() => import("./pages/ClubEventDetail"));
+const Auth = lazy(() => import("./pages/Auth"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const StravaConnect = lazy(() => import("./pages/StravaConnect"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
 
 function Router() {
   return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen"><Spinner /></div>}>
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/auth" component={Auth} />
@@ -79,6 +82,7 @@ function Router() {
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
+    </Suspense>
   );
 }
 

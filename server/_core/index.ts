@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { timingSafeEqual } from "crypto";
 import express from "express";
 import type { NextFunction, Request, Response } from "express";
 import { createServer } from "http";
@@ -96,9 +97,13 @@ async function startServer() {
     }
 
     const authHeader = req.headers["authorization"];
-    const token = authHeader?.toString().replace(/^Bearer\s+/i, "");
-    if (process.env.NODE_ENV === "production" && token !== cronSecret) {
-      return res.status(401).json({ success: false, error: "Unauthorized" });
+    const token = authHeader?.toString().replace(/^Bearer\s+/i, "") ?? "";
+    if (process.env.NODE_ENV === "production") {
+      const tokenBuf = Buffer.from(token);
+      const secretBuf = Buffer.from(cronSecret as string);
+      if (tokenBuf.length !== secretBuf.length || !timingSafeEqual(tokenBuf, secretBuf)) {
+        return res.status(401).json({ success: false, error: "Unauthorized" });
+      }
     }
 
     try {
@@ -122,9 +127,13 @@ async function startServer() {
     }
 
     const authHeader = req.headers["authorization"];
-    const token = authHeader?.toString().replace(/^Bearer\s+/i, "");
-    if (process.env.NODE_ENV === "production" && token !== cronSecret) {
-      return res.status(401).json({ success: false, error: "Unauthorized" });
+    const token = authHeader?.toString().replace(/^Bearer\s+/i, "") ?? "";
+    if (process.env.NODE_ENV === "production") {
+      const tokenBuf = Buffer.from(token);
+      const secretBuf = Buffer.from(cronSecret as string);
+      if (tokenBuf.length !== secretBuf.length || !timingSafeEqual(tokenBuf, secretBuf)) {
+        return res.status(401).json({ success: false, error: "Unauthorized" });
+      }
     }
 
     try {
