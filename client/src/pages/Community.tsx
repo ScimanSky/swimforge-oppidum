@@ -707,7 +707,7 @@ export default function Community() {
               <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                 {createClubDialog}
                 <Button variant="outline-neon" asChild>
-                  <Link href="/leaderboard">Leaderboard</Link>
+                  <Link href="/season/leaderboard">Leaderboard</Link>
                 </Button>
               </div>
             </div>

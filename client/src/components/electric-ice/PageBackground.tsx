@@ -28,10 +28,15 @@ const pickBackground = (path: string): BgSpec => {
   if (path.startsWith("/track") || path.startsWith("/activities")) {
     return { key: "activities-v2", image: "/images/theme-v2/activities-hero.png", position: "center 40%" };
   }
-  if (path.startsWith("/statistics")) {
+  if (path.startsWith("/profile/performance") || path.startsWith("/statistics")) {
     return { key: "statistics-v2", image: "/images/theme-v2/statistics-hero.png", position: "center 35%" };
   }
-  if (path.startsWith("/challenges") || path.startsWith("/leaderboard")) {
+  if (
+    path.startsWith("/season/challenges") ||
+    path.startsWith("/season/leaderboard") ||
+    path.startsWith("/challenges") ||
+    path.startsWith("/leaderboard")
+  ) {
     return { key: "challenges-v2", image: "/images/theme-v2/challenges-hero.png", position: "center 38%" };
   }
   if (path.startsWith("/season")) {
@@ -43,13 +48,13 @@ const pickBackground = (path: string): BgSpec => {
   if (path.startsWith("/community/club")) {
     return { key: "club-detail-v2", image: "/images/theme-v2/club-detail-hero.png", position: "center 40%" };
   }
-  if (path.startsWith("/community")) {
+  if (path.startsWith("/home/community") || path.startsWith("/community")) {
     return { key: "community-v2", image: "/images/theme-v2/community-hero.png", position: "center 37%" };
   }
   if (path.startsWith("/coach")) {
     return { key: "coach-v2", image: "/images/theme-v2/coach-ai-hero.png", position: "center 36%" };
   }
-  if (path.startsWith("/goals")) {
+  if (path.startsWith("/season/objectives") || path.startsWith("/goals")) {
     return { key: "goals-v2", image: "/images/theme-v2/goals-hero.png", position: "center 35%" };
   }
   if (path.startsWith("/profile") || path.startsWith("/settings")) {

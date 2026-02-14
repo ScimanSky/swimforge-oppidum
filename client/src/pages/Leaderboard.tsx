@@ -190,7 +190,7 @@ export default function Leaderboard() {
       <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-foreground">
         <div className="container py-4">
           <div className="flex items-center gap-3">
-            <Link href="/challenges">
+            <Link href="/season/challenges">
               <Button variant="ghost" size="icon" className="text-foreground hover:bg-muted/60">
                 <ChevronLeft className="h-5 w-5" />
               </Button>

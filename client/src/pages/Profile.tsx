@@ -619,7 +619,7 @@ export default function Profile() {
                   <Link href="/track">Attività recenti</Link>
                 </Button>
                 <Button variant="outline-neon" size="sm" asChild>
-                  <Link href="/statistics">Record e progressi</Link>
+                  <Link href="/profile/performance">Record e progressi</Link>
                 </Button>
               </div>
             </div>

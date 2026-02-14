@@ -692,13 +692,13 @@ export default function Dashboard() {
                   </Link>
                 </Button>
                 <Button variant="outline-neon" size="sm" asChild>
-                  <Link href="/challenges">
+                  <Link href="/season/challenges">
                     <Trophy className="size-4" />
                     Sfide
                   </Link>
                 </Button>
                 <Button variant="outline-neon" size="sm" asChild>
-                  <Link href="/community">
+                  <Link href="/home/community">
                     <ChevronRight className="size-4" />
                     Club
                   </Link>
@@ -816,7 +816,7 @@ export default function Dashboard() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <Button variant="outline-neon" size="sm" asChild>
-                  <Link href="/statistics">Progressi</Link>
+                  <Link href="/profile/performance">Progressi</Link>
                 </Button>
                 <Button variant="outline-neon" size="sm" asChild>
                   <Link href="/season">Season Hub</Link>

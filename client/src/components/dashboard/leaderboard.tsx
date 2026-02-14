@@ -86,7 +86,7 @@ export function Leaderboard({ entries, isLoading }: LeaderboardProps) {
         )}
 
         <Button variant="ghost" size="sm" className="w-full mt-2" asChild>
-          <Link href="/challenges">
+          <Link href="/season/challenges">
             View full rankings
             <ChevronRight className="w-4 h-4 ml-1" />
           </Link>

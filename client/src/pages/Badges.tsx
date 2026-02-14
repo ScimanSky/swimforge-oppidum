@@ -357,13 +357,13 @@ export default function Badges() {
       <main className="container py-6 space-y-6">
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline-neon" asChild>
-            <Link href="/statistics">Statistiche</Link>
+            <Link href="/profile/performance">Statistiche</Link>
           </Button>
           <Button size="sm" variant="outline-neon" asChild>
             <Link href="/season">Season</Link>
           </Button>
           <Button size="sm" variant="outline-neon" asChild>
-            <Link href="/goals">Obiettivi</Link>
+            <Link href="/season/objectives">Obiettivi</Link>
           </Button>
           <Button size="sm" variant="neon" asChild>
             <Link href="/badges">Badge</Link>

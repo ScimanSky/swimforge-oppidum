@@ -22,9 +22,9 @@ import {
 const mainNav = [
   { href: "/home", icon: Home, label: "Home" },
   { href: "/track", icon: Activity, label: "Track" },
-  { href: "/challenges", icon: Trophy, label: "Sfide" },
-  { href: "/community", icon: Users, label: "Club" },
-  { href: "/statistics", icon: BarChart3, label: "Progressi" },
+  { href: "/season/challenges", icon: Trophy, label: "Sfide" },
+  { href: "/home/community", icon: Users, label: "Club" },
+  { href: "/profile/performance", icon: BarChart3, label: "Progressi" },
   { href: "/coach", icon: Brain, label: "Coach" },
   { href: "/profile", icon: User, label: "Profilo" },
 ]

@@ -100,7 +100,7 @@ export default function ClubDetailEnhanced() {
         <div className="flex items-center justify-center py-12 lg:py-4">
           <div className="text-center">
             <p className="text-muted-foreground mb-4">Club non trovato</p>
-            <Link href="/community">
+            <Link href="/home/community">
               <Button variant="outline">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Torna alla Community
@@ -131,7 +131,7 @@ export default function ClubDetailEnhanced() {
           )}
           
           {/* Back Button */}
-          <Link href="/community">
+          <Link href="/home/community">
             <Button
               variant="ghost"
               size="sm"

@@ -19,13 +19,13 @@ const actions = [
   {
     icon: Target,
     label: "Set Goal",
-    href: "/goals",
+    href: "/season/objectives",
     variant: "outline" as const,
   },
   {
     icon: Users,
     label: "Join Club",
-    href: "/community/clubs",
+    href: "/home/community",
     variant: "outline" as const,
   },
 ]

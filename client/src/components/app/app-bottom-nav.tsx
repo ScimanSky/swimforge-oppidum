@@ -8,9 +8,9 @@ import { Home, Activity, Users, Trophy, BarChart3, User } from "lucide-react"
 const navItems = [
   { href: "/home", icon: Home, label: "Home" },
   { href: "/track", icon: Activity, label: "Track" },
-  { href: "/challenges", icon: Trophy, label: "Sfide" },
-  { href: "/community", icon: Users, label: "Club" },
-  { href: "/statistics", icon: BarChart3, label: "Progressi" },
+  { href: "/season/challenges", icon: Trophy, label: "Sfide" },
+  { href: "/home/community", icon: Users, label: "Club" },
+  { href: "/profile/performance", icon: BarChart3, label: "Progressi" },
   { href: "/profile", icon: User, label: "Profilo" },
 ]
 

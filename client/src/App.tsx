@@ -62,25 +62,41 @@ function Router() {
         <Redirect to="/home" />
       </Route>
       <Route path="/badges" component={Badges} />
-      <Route path="/challenges" component={Challenges} />
-      <Route path="/challenges/:id" component={ChallengeDetail} />
-      <Route path="/leaderboard" component={Leaderboard} />
+      <Route path="/season/challenges" component={Challenges} />
+      <Route path="/challenges">
+        <Redirect to="/season/challenges" />
+      </Route>
+      <Route path="/season/challenges/:id" component={ChallengeDetail} />
+      <Route path="/challenges/:id">{(params: { id: string }) => <Redirect to={`/season/challenges/${params.id}`} />}</Route>
+      <Route path="/season/leaderboard" component={Leaderboard} />
+      <Route path="/leaderboard">
+        <Redirect to="/season/leaderboard" />
+      </Route>
       <Route path="/track/:id" component={ActivityDetail} />
       <Route path="/activities/:id">{(params: { id: string }) => <Redirect to={`/track/${params.id}`} />}</Route>
       <Route path="/track" component={Activities} />
       <Route path="/activities">
         <Redirect to="/track" />
       </Route>
-      <Route path="/goals" component={Goals} />
-      <Route path="/statistics" component={Statistics} />
+      <Route path="/season/objectives" component={Goals} />
+      <Route path="/goals">
+        <Redirect to="/season/objectives" />
+      </Route>
+      <Route path="/profile/performance" component={Statistics} />
+      <Route path="/statistics">
+        <Redirect to="/profile/performance" />
+      </Route>
       <Route path="/coach" component={Coach} />
       <Route path="/coach-dryland" component={CoachDryland} />
       <Route path="/session-iq" component={SessionInsights} />
       <Route path="/season" component={SeasonPage} />
-      <Route path="/community" component={Community} />
       <Route path="/community/invite/:code" component={ClubInvite} />
       <Route path="/community/club/:clubId/event/:eventId" component={ClubEventDetail} />
       <Route path="/community/club/:id" component={ClubDetail} />
+      <Route path="/home/community" component={Community} />
+      <Route path="/community">
+        <Redirect to="/home/community" />
+      </Route>
       <Route path="/profile" component={Profile} />
       <Route path="/u/:id" component={PublicProfile} />
       <Route path="/settings" component={Settings} />

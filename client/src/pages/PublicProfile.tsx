@@ -64,7 +64,7 @@ export default function PublicProfile() {
       <div className="space-y-6 lg:space-y-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost-neon" size="icon" asChild>
-            <Link href="/challenges">
+            <Link href="/season/challenges">
               <ArrowLeft className="size-5" />
             </Link>
           </Button>

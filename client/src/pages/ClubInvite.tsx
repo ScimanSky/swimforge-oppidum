@@ -45,7 +45,7 @@ export default function ClubInvite() {
                 </Button>
               )}
               <Button variant="outline" asChild>
-                <a href="/community">Torna alla community</a>
+                <a href="/home/community">Torna alla community</a>
               </Button>
             </div>
           </SurfaceContent>

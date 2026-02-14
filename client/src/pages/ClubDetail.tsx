@@ -197,7 +197,7 @@ export default function ClubDetail() {
 
   const deleteClub = trpc.community.clubs.delete.useMutation({
     onSuccess: () => {
-      window.location.href = "/community";
+      window.location.href = "/home/community";
     },
   });
 
@@ -485,7 +485,7 @@ export default function ClubDetail() {
         <section className="py-6 lg:py-3">
           <div className="container space-y-6 lg:space-y-3">
             <Link
-              href="/community"
+              href="/home/community"
               className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="h-4 w-4" />

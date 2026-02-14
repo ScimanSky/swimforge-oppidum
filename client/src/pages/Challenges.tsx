@@ -592,7 +592,7 @@ export default function Challenges() {
 
                           <div className="mt-4 flex flex-wrap gap-2">
                             <Button variant="outline-neon" size="sm" className="gap-2" asChild>
-                              <Link href={`/challenges/${challenge.id}`}>
+                              <Link href={`/season/challenges/${challenge.id}`}>
                                 Dettagli
                                 <ChevronRight className="h-4 w-4" />
                               </Link>

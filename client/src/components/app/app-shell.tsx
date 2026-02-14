@@ -47,9 +47,9 @@ const navPrimary: NavItem[] = [
   { label: "Home", path: "/home", icon: <Home className="size-5" /> },
   { label: "Track", path: "/track", icon: <Waves className="size-5" /> },
   { label: "Season", path: "/season", icon: <Orbit className="size-5" /> },
-  { label: "Sfide", path: "/challenges", icon: <Trophy className="size-5" /> },
-  { label: "Club", path: "/community", icon: <Users className="size-5" /> },
-  { label: "Progressi", path: "/statistics", icon: <BarChart3 className="size-5" /> },
+  { label: "Sfide", path: "/season/challenges", icon: <Trophy className="size-5" /> },
+  { label: "Club", path: "/home/community", icon: <Users className="size-5" /> },
+  { label: "Progressi", path: "/profile/performance", icon: <BarChart3 className="size-5" /> },
 ]
 
 const navSecondary: NavItem[] = [
@@ -58,22 +58,29 @@ const navSecondary: NavItem[] = [
 ]
 
 function titleForPath(path: string) {
+  if (path.startsWith("/community/club") && path.includes("/event/")) return "Evento Club"
+  if (path.startsWith("/community/club")) return "Club"
+  if (path.startsWith("/home/community") || path.startsWith("/community")) return "Community"
+  if (path.startsWith("/season/challenges") || path.startsWith("/challenges")) return "Sfide"
   if (path === "/" || path.startsWith("/home") || path.startsWith("/dashboard")) return "Home"
   if (path.startsWith("/track") || path.startsWith("/activities")) return "Track"
   if (path.startsWith("/season")) return "Season"
-  if (path.startsWith("/challenges")) return "Sfide"
-  if (path.startsWith("/community/club") && path.includes("/event/")) return "Evento Club"
-  if (path.startsWith("/community/club")) return "Club"
-  if (path.startsWith("/community")) return "Community"
-  if (path.startsWith("/statistics")) return "Progressi"
+  if (path.startsWith("/profile/performance") || path.startsWith("/statistics")) return "Progressi"
   if (path.startsWith("/coach")) return "Coach"
   if (path.startsWith("/profile")) return "Profilo"
   if (path.startsWith("/settings")) return "Impostazioni"
   return "SwimForge"
 }
 
+function isNavItemActive(path: string, location: string) {
+  if (path === "/home" && location.startsWith("/home/community")) {
+    return false
+  }
+  return location === path || location.startsWith(path + "/")
+}
+
 function RailLink({ item, location }: { item: NavItem; location: string }) {
-  const isActive = location === item.path || location.startsWith(item.path + "/")
+  const isActive = isNavItemActive(item.path, location)
 
   return (
     <Tooltip>
@@ -228,7 +235,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/statistics" className="flex items-center gap-2">
+                  <Link href="/profile/performance" className="flex items-center gap-2">
                     <BarChart3 className="size-4" />
                     Progressi
                   </Link>
@@ -272,7 +279,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_58%,transparent),color-mix(in_oklch,var(--background)_70%,transparent))] backdrop-blur-xl lg:hidden pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex h-[calc(4rem+env(safe-area-inset-bottom))] max-w-3xl items-start justify-between px-2 pt-1">
           {[navPrimary[0], navPrimary[1], navPrimary[2], navPrimary[4], navSecondary[1]].map((item) => {
-            const isActive = location === item.path || location.startsWith(item.path + "/")
+            const isActive = isNavItemActive(item.path, location)
             return (
               <Link
                 key={item.path}
