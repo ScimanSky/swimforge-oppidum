@@ -19,7 +19,6 @@ import {
   Target,
   Trophy,
   Users,
-  Zap,
 } from "lucide-react"
 import { Link } from "wouter"
 import { toast } from "sonner"
@@ -713,18 +712,7 @@ export default function SeasonPage() {
           </aside>
         </div>
 
-        <section className="surface-panel p-5 flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-foreground">Progressione live attiva</p>
-            <p className="text-xs text-muted-foreground">
-              I punti Season si aggiornano automaticamente con sync attività e azioni community.
-            </p>
-          </div>
-          <Badge variant="neon" className="shrink-0">
-            <Zap className="mr-1 size-3.5" />
-            Live
-          </Badge>
-        </section>
+
       </div>
     </AppLayout>
   )
