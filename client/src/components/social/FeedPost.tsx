@@ -29,7 +29,7 @@ export default function FeedPost({ post, currentUserId, index = 0 }: FeedPostPro
       }}
     >
       <div className="surface-panel overflow-hidden p-0">
-        <FeedPostHeader post={post} isOwner={isOwner} />
+        <FeedPostHeader post={post} isOwner={isOwner} isFollowing={post.is_following} />
 
         <FeedPostMetrics
           distanceMeters={post.activity_distance_meters}

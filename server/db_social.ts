@@ -53,7 +53,11 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
       EXISTS(
         SELECT 1 FROM social_splashes s
         WHERE s.post_id = p.id AND s.user_id = ${userId}
-      ) AS has_splashed
+      ) AS has_splashed,
+      EXISTS(
+        SELECT 1 FROM social_follows f
+        WHERE f.follower_id = ${userId} AND f.following_id = p.user_id AND f.status = 'accepted'
+      ) AS is_following
     FROM social_posts p
     JOIN users u ON u.id = p.user_id
     LEFT JOIN swimmer_profiles sp ON sp.user_id = u.id

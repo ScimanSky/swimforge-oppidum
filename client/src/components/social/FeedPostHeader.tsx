@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Link } from "wouter"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -33,6 +33,10 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
   const initials = getInitials(name)
   const activityType = post.activity_is_open_water ? "Open Water" : "Pool"
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing ?? false)
+
+  useEffect(() => {
+    setIsFollowing(initialIsFollowing ?? false)
+  }, [initialIsFollowing])
 
   const utils = trpc.useUtils()
   const toggleFollow = trpc.community.users.toggleFollow.useMutation({
