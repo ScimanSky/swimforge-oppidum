@@ -1078,6 +1078,33 @@ export const communityRouter = router({
                         await invalidateUserCache(String(ctx.user.id));
                         await invalidateLeaderboardCache();
                     }
+
+                    // Notify post owner about the reaction
+                    try {
+                        const { getDb } = await import("../db");
+                        const { sql } = await import("drizzle-orm");
+                        const db = await getDb();
+                        if (!db) throw new Error("db not available");
+                        const postResult = await db.execute(sql`SELECT user_id FROM social_posts WHERE id = ${input.postId} LIMIT 1`);
+                        const postOwnerId = (postResult.rows[0] as any)?.user_id as number | undefined;
+                        if (postOwnerId && postOwnerId !== ctx.user.id) {
+                            const actorResult = await db.execute(sql`SELECT name FROM users WHERE id = ${ctx.user.id} LIMIT 1`);
+                            const actorName = ((actorResult.rows[0] as any)?.name as string | undefined) || "Qualcuno";
+                            const emojiMap: Record<string, string> = { splash: "💧", fire: "🔥", strong: "💪", clap: "👏", wave: "🌊" };
+                            const emoji = emojiMap[input.reactionType] || "✨";
+                            const { createNotification } = await import("../db_social_enhanced");
+                            await createNotification({
+                                userId: postOwnerId,
+                                type: "reaction",
+                                title: "Nuova reazione",
+                                message: `${actorName} ha reagito ${emoji} al tuo post.`,
+                                link: "/home/community",
+                                referenceId: input.postId,
+                            });
+                        }
+                    } catch {
+                        // Notifications are best-effort
+                    }
                 }
                 return { success: true, reaction, actionXp };
             }),

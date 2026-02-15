@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { trpc } from "@/lib/trpc";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
 const coerceBoolean = (value: unknown): boolean | undefined => {
@@ -43,7 +44,7 @@ export default function NotificationBell() {
   })();
 
   const unreadCountQuery = trpc.community.notifications.unreadCount.useQuery(undefined, {
-    refetchInterval: 60000, // Poll ogni 60 secondi (ridotto carico server)
+    refetchInterval: 30000, // Polling fallback ogni 30s (Realtime è primario)
     enabled: inAppEnabled,
   });
 
@@ -58,6 +59,33 @@ export default function NotificationBell() {
       utils.community.notifications.list.invalidate();
     },
   });
+
+  // Supabase Realtime: invalidate on new notification INSERT
+  const currentUserId = profileQuery.data?.userId;
+  useEffect(() => {
+    if (!currentUserId || !inAppEnabled) return;
+
+    const channel = supabase
+      .channel(`notifications:${currentUserId}`)
+      .on(
+        "postgres_changes" as any,
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "user_notifications",
+          filter: `user_id=eq.${currentUserId}`,
+        },
+        () => {
+          utils.community.notifications.unreadCount.invalidate();
+          utils.community.notifications.list.invalidate();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId, inAppEnabled, utils]);
 
   const unreadCount = unreadCountQuery.data?.count || 0;
 
@@ -98,6 +126,8 @@ export default function NotificationBell() {
         return "🏅";
       case "club_invite":
         return "🏊";
+      case "reaction":
+        return "✨";
       default:
         return "🔔";
     }

@@ -147,19 +147,22 @@ export default function SocialFeed() {
   return (
     <AppLayout>
       <div className="compact-shell">
-        {/* Desktop: centered feed + sidebar */}
-        <div className="xl:flex xl:gap-6 xl:justify-center">
-          {/* Feed column */}
-          <div className="w-full max-w-[580px] mx-auto xl:mx-0 space-y-3 lg:space-y-4">
-            {/* Story Bar - hidden on xl+ (shown in sidebar instead) */}
-            <div className="border-b border-border/30 pb-3 xl:hidden">
-              <StoryBar
-                currentUserId={currentUserId}
-                onViewStory={handleViewStory}
-                onCreateStory={handleCreateStory}
-              />
-            </div>
+        <div className="w-full max-w-[580px] mx-auto">
+          {/* Sticky top strip: story bar + profile + stats + suggested */}
+          <div className="sticky top-14 z-20 pb-2 bg-background/80 backdrop-blur-md -mx-2 px-2">
+            <FeedSidebar
+              storyBarSlot={
+                <StoryBar
+                  currentUserId={currentUserId}
+                  onViewStory={handleViewStory}
+                  onCreateStory={handleCreateStory}
+                />
+              }
+            />
+          </div>
 
+          {/* Feed content */}
+          <div className="space-y-3 lg:space-y-4">
             {/* Pull-to-refresh indicator */}
             {firstPageQuery.isFetching && !isInitialLoading && (
               <div className="flex justify-center py-2">
@@ -219,19 +222,6 @@ export default function SocialFeed() {
                 )}
               </div>
             )}
-          </div>
-
-          {/* Right Sidebar - xl+ only */}
-          <div className="hidden xl:block w-[280px] shrink-0">
-            <FeedSidebar
-              storyBarSlot={
-                <StoryBar
-                  currentUserId={currentUserId}
-                  onViewStory={handleViewStory}
-                  onCreateStory={handleCreateStory}
-                />
-              }
-            />
           </div>
         </div>
       </div>
