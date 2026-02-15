@@ -34,6 +34,7 @@ export default function AuthCallback() {
     const handleAuthCallback = async () => {
       try {
         console.log('[AuthCallback] Starting auth callback...');
+        console.log('[AuthCallback] Full URL:', window.location.href);
 
         let session = null;
         let error = null;
@@ -65,7 +66,16 @@ export default function AuthCallback() {
           session = result.data.session;
           error = result.error;
         } else {
-          throw new Error("Nessun access token o codice di autorizzazione trovato nell'URL");
+          // Supabase with detectSessionInUrl may have already consumed the params.
+          // Wait briefly and check if a session was established automatically.
+          console.log('[AuthCallback] No URL params found, checking existing session...');
+          await new Promise((r) => setTimeout(r, 1000));
+          const { data } = await supabase.auth.getSession();
+          session = data.session;
+          if (!session) {
+            throw new Error("Nessun access token o codice di autorizzazione trovato nell'URL");
+          }
+          console.log('[AuthCallback] Found existing session from auto-detection');
         }
 
         console.log('[AuthCallback] Session result:', { session: !!session, error });
