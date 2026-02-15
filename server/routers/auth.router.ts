@@ -6,7 +6,7 @@ import {
     ONE_YEAR_MS, applyRateLimit,
 } from "./_shared";
 import { getSupabaseAdminClient } from "../_core/supabase_admin";
-import { isEmailServiceConfigured, sendAccountDeletionConfirmationEmail } from "../_core/email";
+import { sendAccountDeletionConfirmationEmail } from "../_core/email";
 
 export const authRouter = router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -199,13 +199,6 @@ export const authRouter = router({
             const passwordValid = await db.verifyUserPassword(ctx.user.id, input.password);
             if (!passwordValid) {
                 throw new TRPCError({ code: "UNAUTHORIZED", message: "Password non corretta" });
-            }
-
-            if (!isEmailServiceConfigured()) {
-                throw new TRPCError({
-                    code: "PRECONDITION_FAILED",
-                    message: "Servizio email non configurato. Imposta RESEND_API_KEY e RESEND_FROM_EMAIL.",
-                });
             }
 
             const deletedAt = new Date();
