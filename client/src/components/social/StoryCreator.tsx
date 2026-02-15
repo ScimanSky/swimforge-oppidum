@@ -11,7 +11,7 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet"
-import { Camera, Type } from "lucide-react"
+import { Camera, Type, Video } from "lucide-react"
 import { toast } from "sonner"
 
 interface StoryCreatorProps {
@@ -19,21 +19,30 @@ interface StoryCreatorProps {
   onOpenChange: (open: boolean) => void
 }
 
-type Mode = "pick" | "image" | "text"
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const
+const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/x-m4v"] as const
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024
+const MAX_VIDEO_BYTES = 25 * 1024 * 1024
+const MAX_VIDEO_DURATION_SECONDS = 20
 
-const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"] as const
-type AcceptedMime = (typeof ACCEPTED_TYPES)[number]
+type ModeWithVideo = "pick" | "image" | "video" | "text"
+type PreviewKind = "image" | "video" | null
 
 export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
-  const [mode, setMode] = useState<Mode>("pick")
+  const [mode, setMode] = useState<ModeWithVideo>("pick")
   const [caption, setCaption] = useState("")
   const [preview, setPreview] = useState<string | null>(null)
-  const fileRef = useRef<{ base64: string; mimeType: AcceptedMime } | null>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [previewKind, setPreviewKind] = useState<PreviewKind>(null)
+  const imageFileRef = useRef<File | null>(null)
+  const videoFileRef = useRef<File | null>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const videoInputRef = useRef<HTMLInputElement>(null)
 
   const utils = trpc.useUtils()
 
-  const uploadFile = trpc.community.stories.uploadFile.useMutation({
+  const imageKitAuth = trpc.community.stories.imageKitAuth.useMutation()
+
+  const createStory = trpc.community.stories.create.useMutation({
     onSuccess: () => {
       utils.community.stories.active.invalidate()
       toast.success("Storia pubblicata!")
@@ -44,70 +53,173 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     },
   })
 
-  const createTextStory = trpc.community.stories.create.useMutation({
-    onSuccess: () => {
-      utils.community.stories.active.invalidate()
-      toast.success("Storia pubblicata!")
-      resetAndClose()
-    },
-    onError: (err) => {
-      toast.error(err.message || "Errore nella pubblicazione")
-    },
-  })
+  const clearPreviewUrl = () => {
+    if (preview && preview.startsWith("blob:")) {
+      URL.revokeObjectURL(preview)
+    }
+  }
 
   const resetAndClose = () => {
+    clearPreviewUrl()
     setMode("pick")
     setCaption("")
     setPreview(null)
-    fileRef.current = null
+    setPreviewKind(null)
+    imageFileRef.current = null
+    videoFileRef.current = null
+    if (imageInputRef.current) {
+      imageInputRef.current.value = ""
+    }
+    if (videoInputRef.current) {
+      videoInputRef.current.value = ""
+    }
     onOpenChange(false)
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (!ACCEPTED_TYPES.includes(file.type as AcceptedMime)) {
+    if (!ACCEPTED_IMAGE_TYPES.includes(file.type as (typeof ACCEPTED_IMAGE_TYPES)[number])) {
       toast.error("Formato non supportato. Usa JPG, PNG o WEBP.")
       return
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("File troppo grande (max 5MB)")
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error("File troppo grande (max 20MB)")
       return
     }
 
-    const reader = new FileReader()
-    reader.onload = () => {
-      const result = reader.result as string
-      setPreview(result)
-      // Extract base64 from data URL
-      const base64 = result.split(",")[1]
-      fileRef.current = { base64, mimeType: file.type as AcceptedMime }
-      setMode("image")
-    }
-    reader.readAsDataURL(file)
+    clearPreviewUrl()
+    const objectUrl = URL.createObjectURL(file)
+    setPreview(objectUrl)
+    setPreviewKind("image")
+    imageFileRef.current = file
+    videoFileRef.current = null
+    setMode("image")
   }
 
-  const handleSubmitImage = () => {
-    if (!fileRef.current) return
-    uploadFile.mutate({
-      fileBase64: fileRef.current.base64,
-      mimeType: fileRef.current.mimeType,
-      caption: caption.trim() || undefined,
-      type: "image",
+  const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    if (!ACCEPTED_VIDEO_TYPES.includes(file.type as (typeof ACCEPTED_VIDEO_TYPES)[number])) {
+      toast.error("Formato video non supportato. Usa MP4 o WEBM.")
+      return
+    }
+
+    if (file.size > MAX_VIDEO_BYTES) {
+      toast.error("Video troppo grande (max 25MB)")
+      return
+    }
+
+    const objectUrl = URL.createObjectURL(file)
+    const video = document.createElement("video")
+    video.preload = "metadata"
+    video.src = objectUrl
+    video.onloadedmetadata = () => {
+      const duration = Number(video.duration)
+      if (!Number.isFinite(duration) || duration <= 0) {
+        URL.revokeObjectURL(objectUrl)
+        toast.error("Impossibile leggere la durata del video.")
+        return
+      }
+
+      if (duration > MAX_VIDEO_DURATION_SECONDS) {
+        URL.revokeObjectURL(objectUrl)
+        toast.error(`Video troppo lungo (max ${MAX_VIDEO_DURATION_SECONDS} secondi)`)
+        return
+      }
+
+      clearPreviewUrl()
+      setPreview(objectUrl)
+      setPreviewKind("video")
+      videoFileRef.current = file
+      imageFileRef.current = null
+      setMode("video")
+    }
+    video.onerror = () => {
+      URL.revokeObjectURL(objectUrl)
+      toast.error("Impossibile leggere il video selezionato.")
+    }
+  }
+
+  const uploadMediaToImageKit = async (file: File) => {
+    const auth = await imageKitAuth.mutateAsync()
+    const fileNameSafe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
+    const fileName = `story-${Date.now()}-${fileNameSafe}`
+
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("fileName", fileName)
+    formData.append("publicKey", auth.publicKey)
+    formData.append("token", auth.token)
+    formData.append("signature", auth.signature)
+    formData.append("expire", String(auth.expire))
+    formData.append("folder", auth.folder)
+    formData.append("useUniqueFileName", "true")
+    formData.append("tags", "story,swimforge")
+
+    const uploadResponse = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
+      method: "POST",
+      body: formData,
     })
+
+    if (!uploadResponse.ok) {
+      const detail = await uploadResponse.text().catch(() => "")
+      throw new Error(detail || "Upload su ImageKit fallito")
+    }
+
+    const uploaded = (await uploadResponse.json()) as { url?: string }
+    if (!uploaded.url) {
+      throw new Error("ImageKit non ha restituito un URL valido")
+    }
+    return uploaded.url
+  }
+
+  const handleSubmitImage = async () => {
+    const file = imageFileRef.current
+    if (!file) return
+
+    try {
+      const mediaUrl = await uploadMediaToImageKit(file)
+      await createStory.mutateAsync({
+        mediaUrl,
+        caption: caption.trim() || undefined,
+        type: "image",
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Errore nella pubblicazione della foto"
+      toast.error(message)
+    }
+  }
+
+  const handleSubmitVideo = async () => {
+    const file = videoFileRef.current
+    if (!file) return
+
+    try {
+      const mediaUrl = await uploadMediaToImageKit(file)
+      await createStory.mutateAsync({
+        mediaUrl,
+        caption: caption.trim() || undefined,
+        type: "video",
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Errore nella pubblicazione del video"
+      toast.error(message)
+    }
   }
 
   const handleSubmitText = () => {
     if (!caption.trim()) return
-    createTextStory.mutate({
+    createStory.mutate({
       caption: caption.trim(),
       type: "text",
     })
   }
 
-  const isPending = uploadFile.isPending || createTextStory.isPending
+  const isPending = createStory.isPending || imageKitAuth.isPending
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) resetAndClose(); else onOpenChange(o) }}>
@@ -121,7 +233,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
           <div className="flex flex-col gap-3 px-4 pb-4">
             <button
               type="button"
-              onClick={() => inputRef.current?.click()}
+              onClick={() => imageInputRef.current?.click()}
               className="flex items-center gap-4 rounded-2xl border border-border/80 bg-background/60 p-4 text-left transition-colors hover:bg-card/60"
             >
               <div className="flex size-12 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--electric-cyan)_15%,transparent)]">
@@ -130,6 +242,20 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
               <div>
                 <div className="font-semibold">Foto</div>
                 <div className="text-sm text-muted-foreground">Carica un'immagine</div>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => videoInputRef.current?.click()}
+              className="flex items-center gap-4 rounded-2xl border border-border/80 bg-background/60 p-4 text-left transition-colors hover:bg-card/60"
+            >
+              <div className="flex size-12 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--electric-cyan)_15%,transparent)]">
+                <Video className="size-6 text-[var(--electric-cyan)]" />
+              </div>
+              <div>
+                <div className="font-semibold">Video</div>
+                <div className="text-sm text-muted-foreground">Carica un video breve (max 20s)</div>
               </div>
             </button>
 
@@ -148,11 +274,18 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
             </button>
 
             <input
-              ref={inputRef}
+              ref={imageInputRef}
               type="file"
               accept="image/jpeg,image/png,image/webp"
               className="hidden"
-              onChange={handleFileChange}
+              onChange={handleImageChange}
+            />
+            <input
+              ref={videoInputRef}
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime,video/x-m4v"
+              className="hidden"
+              onChange={handleVideoChange}
             />
           </div>
         )}
@@ -174,11 +307,43 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
             />
             <Button
               variant="neon"
-              onClick={handleSubmitImage}
+              onClick={() => void handleSubmitImage()}
               disabled={isPending}
               className="w-full"
             >
               {isPending ? "Pubblicazione..." : "Pubblica storia"}
+            </Button>
+          </div>
+        )}
+
+        {mode === "video" && (
+          <div className="flex flex-col gap-4 px-4 pb-4">
+            {preview && previewKind === "video" && (
+              <div className="overflow-hidden rounded-2xl">
+                <video
+                  src={preview}
+                  className="max-h-[40dvh] w-full object-contain"
+                  controls
+                  playsInline
+                  preload="metadata"
+                />
+              </div>
+            )}
+            <Textarea
+              placeholder="Aggiungi una didascalia... (opzionale)"
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              maxLength={500}
+              className="resize-none"
+              rows={2}
+            />
+            <Button
+              variant="neon"
+              onClick={() => void handleSubmitVideo()}
+              disabled={isPending}
+              className="w-full"
+            >
+              {isPending ? "Pubblicazione..." : "Pubblica video"}
             </Button>
           </div>
         )}

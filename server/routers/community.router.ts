@@ -10,6 +10,7 @@ import {
     detectImageType, logger,
 } from "./_shared";
 import type { ClubEventInsert, ClubAnnouncementInsert } from "./_shared";
+import { ENV } from "../_core/env";
 
 export const communityRouter = router({
     feed: protectedProcedure
@@ -185,6 +186,32 @@ export const communityRouter = router({
                 return getActiveStories(ctx.user.id);
             }),
 
+        imageKitAuth: protectedProcedure
+            .mutation(async ({ ctx }) => {
+                if (!ENV.imagekitPrivateKey || !ENV.imagekitPublicKey || !ENV.imagekitUrlEndpoint) {
+                    throw new TRPCError({
+                        code: "PRECONDITION_FAILED",
+                        message: "ImageKit non configurato sul server.",
+                    });
+                }
+
+                const { createHmac, randomBytes } = await import("crypto");
+                const token = randomBytes(16).toString("hex");
+                const expire = Math.floor(Date.now() / 1000) + 60 * 10;
+                const signature = createHmac("sha1", ENV.imagekitPrivateKey)
+                    .update(token + String(expire))
+                    .digest("hex");
+
+                return {
+                    token,
+                    expire,
+                    signature,
+                    publicKey: ENV.imagekitPublicKey,
+                    urlEndpoint: ENV.imagekitUrlEndpoint,
+                    folder: `/stories/`,
+                } as const;
+            }),
+
         create: protectedProcedure
             .input(z.object({
                 mediaUrl: z.string().url().optional(),
@@ -208,7 +235,7 @@ export const communityRouter = router({
                 fileBase64: z
                     .string()
                     .min(1)
-                    .max(7 * 1024 * 1024, "File troppo grande (max 5MB)")
+                    .max(28 * 1024 * 1024, "File troppo grande (max 20MB)")
                     .regex(/^[A-Za-z0-9+/=]+$/, "Invalid base64"),
                 mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
             }))
@@ -216,7 +243,7 @@ export const communityRouter = router({
                 const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
                 const admin = getSupabaseAdminClient();
 
-                const MAX_BYTES = 5 * 1024 * 1024;
+                const MAX_BYTES = 20 * 1024 * 1024;
                 let buffer: Buffer;
                 try {
                     buffer = Buffer.from(input.fileBase64, "base64");
@@ -224,7 +251,7 @@ export const communityRouter = router({
                     throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid base64 payload" });
                 }
                 if (buffer.length > MAX_BYTES) {
-                    throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "File troppo grande (max 5MB)" });
+                    throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "File troppo grande (max 20MB)" });
                 }
 
                 const detected = detectImageType(buffer);
@@ -893,7 +920,7 @@ export const communityRouter = router({
                         fileBase64: z
                             .string()
                             .min(1)
-                            .max(7 * 1024 * 1024, "File troppo grande (max 5MB)")
+                            .max(28 * 1024 * 1024, "File troppo grande (max 20MB)")
                             .regex(/^[A-Za-z0-9+/=]+$/, "Invalid base64"),
                         mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
                         extension: z.enum(["jpg", "jpeg", "png", "webp"]).optional(),
@@ -903,7 +930,7 @@ export const communityRouter = router({
                     const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
                     const admin = getSupabaseAdminClient();
 
-                    const MAX_BYTES = 5 * 1024 * 1024;
+                    const MAX_BYTES = 20 * 1024 * 1024;
                     let buffer: Buffer;
                     try {
                         buffer = Buffer.from(input.fileBase64, "base64");
@@ -913,7 +940,7 @@ export const communityRouter = router({
                     if (buffer.length > MAX_BYTES) {
                         throw new TRPCError({
                             code: "PAYLOAD_TOO_LARGE",
-                            message: "File troppo grande (max 5MB)",
+                            message: "File troppo grande (max 20MB)",
                         });
                     }
 

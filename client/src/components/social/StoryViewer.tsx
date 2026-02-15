@@ -31,15 +31,15 @@ interface StoryViewerProps {
   onClose: () => void
 }
 
-const STORY_DURATION = 5000
+const STORY_IMAGE_DURATION = 5000
 
 export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerProps) {
   const [groupIdx, setGroupIdx] = useState(initialGroupIndex)
   const [storyIdx, setStoryIdx] = useState(0)
   const [progress, setProgress] = useState(0)
-  const timerRef = useRef<number>(0)
   const startRef = useRef(0)
   const rafRef = useRef(0)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
 
   const group = groups[groupIdx]
   const story = group?.stories[storyIdx]
@@ -69,12 +69,20 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
 
   // Auto-advance timer
   useEffect(() => {
+    if (!story) return
     setProgress(0)
-    startRef.current = Date.now()
+    cancelAnimationFrame(rafRef.current)
 
+    if (story.type === "video") {
+      return () => {
+        cancelAnimationFrame(rafRef.current)
+      }
+    }
+
+    startRef.current = Date.now()
     const tick = () => {
       const elapsed = Date.now() - startRef.current
-      const pct = Math.min(elapsed / STORY_DURATION, 1)
+      const pct = Math.min(elapsed / STORY_IMAGE_DURATION, 1)
       setProgress(pct)
       if (pct >= 1) {
         goNext()
@@ -85,14 +93,13 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
     rafRef.current = requestAnimationFrame(tick)
 
     return () => cancelAnimationFrame(rafRef.current)
-  }, [groupIdx, storyIdx, goNext])
+  }, [groupIdx, storyIdx, goNext, story])
 
   // Mark viewed
   useEffect(() => {
     if (story && !story.hasViewed) {
       markViewed.mutate({ storyId: story.id })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [story?.id])
 
   // Keyboard
@@ -129,6 +136,25 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
   }
 
   if (!group || !story) return null
+
+  const handleVideoLoadedMetadata = () => {
+    const video = videoRef.current
+    if (!video) return
+    const duration = video.duration
+    if (!Number.isFinite(duration) || duration <= 0) return
+    if (video.paused) {
+      void video.play().catch(() => {
+        // autoplay can fail on some browsers; user can tap to continue
+      })
+    }
+  }
+
+  const handleVideoTimeUpdate = () => {
+    const video = videoRef.current
+    if (!video) return
+    if (!Number.isFinite(video.duration) || video.duration <= 0) return
+    setProgress(Math.min(video.currentTime / video.duration, 1))
+  }
 
   return createPortal(
     <AnimatePresence>
@@ -197,6 +223,21 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
                 {story.caption}
               </p>
             </div>
+          ) : story.type === "video" ? (
+            <video
+              key={story.id}
+              ref={videoRef}
+              src={story.mediaUrl}
+              className="max-h-full max-w-full object-contain"
+              autoPlay
+              playsInline
+              preload="metadata"
+              onLoadedMetadata={handleVideoLoadedMetadata}
+              onTimeUpdate={handleVideoTimeUpdate}
+              onEnded={goNext}
+              onClick={(e) => e.stopPropagation()}
+              controls
+            />
           ) : (
             <img
               src={story.mediaUrl}

@@ -26,6 +26,9 @@ export const ENV = {
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   resendApiKey: process.env.RESEND_API_KEY ?? "",
   resendFromEmail: process.env.RESEND_FROM_EMAIL ?? "",
+  imagekitPublicKey: process.env.IMAGEKIT_PUBLIC_KEY ?? "",
+  imagekitPrivateKey: process.env.IMAGEKIT_PRIVATE_KEY ?? "",
+  imagekitUrlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT ?? "",
 };
 
 export function assertAuthEnv() {
