@@ -26,6 +26,7 @@ const MAX_VIDEO_BYTES = 100 * 1024 * 1024
 const MAX_VIDEO_DURATION_SECONDS = 60
 const STORY_VIDEO_CLIP_SECONDS = 20
 const MAX_VIDEO_SEGMENTS = 3
+const ACCEPTED_VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".m4v"] as const
 
 type ModeWithVideo = "pick" | "image" | "video" | "text"
 type PreviewKind = "image" | "video" | null
@@ -98,8 +99,11 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (!ACCEPTED_VIDEO_TYPES.includes(file.type as (typeof ACCEPTED_VIDEO_TYPES)[number])) {
-      toast.error("Formato video non supportato. Usa MP4 o WEBM.")
+    const fileNameLower = file.name.toLowerCase()
+    const hasSupportedMime = ACCEPTED_VIDEO_TYPES.includes(file.type as (typeof ACCEPTED_VIDEO_TYPES)[number])
+    const hasSupportedExtension = ACCEPTED_VIDEO_EXTENSIONS.some((ext) => fileNameLower.endsWith(ext))
+    if (!hasSupportedMime && !hasSupportedExtension) {
+      toast.error("Formato video non supportato. Usa MP4, WEBM o MOV.")
       return
     }
 
@@ -111,12 +115,21 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     const objectUrl = URL.createObjectURL(file)
     const video = document.createElement("video")
     video.preload = "metadata"
+    video.muted = true
+    video.playsInline = true
     video.src = objectUrl
     video.onloadedmetadata = () => {
       const duration = Number(video.duration)
       if (!Number.isFinite(duration) || duration <= 0) {
+        clearPreviewUrl()
+        setPreview(null)
+        setPreviewKind("video")
+        videoFileRef.current = file
+        videoDurationRef.current = STORY_VIDEO_CLIP_SECONDS
+        imageFileRef.current = null
+        setMode("video")
         URL.revokeObjectURL(objectUrl)
-        toast.error("Impossibile leggere la durata del video.")
+        toast.warning("Durata non leggibile: verrà caricato come clip singola.")
         return
       }
 
@@ -135,8 +148,15 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
       setMode("video")
     }
     video.onerror = () => {
+      clearPreviewUrl()
+      setPreview(null)
+      setPreviewKind("video")
+      videoFileRef.current = file
+      videoDurationRef.current = STORY_VIDEO_CLIP_SECONDS
+      imageFileRef.current = null
+      setMode("video")
       URL.revokeObjectURL(objectUrl)
-      toast.error("Impossibile leggere il video selezionato.")
+      toast.warning("Codec non supportato dal browser: caricamento consentito senza anteprima locale.")
     }
   }
 
