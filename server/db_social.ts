@@ -7,6 +7,7 @@ import {
   socialHiddenPosts,
   socialPostReports,
   swimmingActivities,
+  userNotifications,
 } from "../drizzle/schema";
 
 export type FeedScope = "global" | "self" | "following";
@@ -246,11 +247,42 @@ export async function updatePostReportStatus(input: {
       updatedAt: now,
     })
     .where(eq(socialPostReports.id, input.reportId))
-    .returning({ id: socialPostReports.id });
+    .returning({
+      id: socialPostReports.id,
+      postId: socialPostReports.postId,
+      reporterUserId: socialPostReports.reporterUserId,
+    });
 
   if (!updated.length) {
     throw new Error("Report not found");
   }
+
+  const statusLabel: Record<PostReportStatus, string> = {
+    open: "aperta",
+    in_review: "in revisione",
+    resolved: "risolta",
+    rejected: "respinta",
+  };
+  const statusMessage: Record<PostReportStatus, string> = {
+    open: "La tua segnalazione è stata riaperta.",
+    in_review: "La tua segnalazione è ora in revisione.",
+    resolved: "La tua segnalazione è stata risolta.",
+    rejected: "La tua segnalazione è stata respinta.",
+  };
+
+  const adminNote = input.adminNote?.trim();
+  const message = adminNote
+    ? `${statusMessage[input.status]} Nota admin: ${adminNote}`
+    : statusMessage[input.status];
+
+  await db.insert(userNotifications).values({
+    userId: updated[0].reporterUserId,
+    type: "report_update",
+    title: `Segnalazione ${statusLabel[input.status]}`,
+    message,
+    link: "/home",
+    referenceId: updated[0].id,
+  });
 
   return { success: true };
 }

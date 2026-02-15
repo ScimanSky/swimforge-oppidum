@@ -138,6 +138,8 @@ export default function NotificationBell() {
         return "🏊";
       case "reaction":
         return "✨";
+      case "report_update":
+        return "🛡️";
       default:
         return "🔔";
     }
