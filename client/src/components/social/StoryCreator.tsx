@@ -22,7 +22,7 @@ interface StoryCreatorProps {
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const
 const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/x-m4v"] as const
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024
-const MAX_VIDEO_BYTES = 25 * 1024 * 1024
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024
 const MAX_VIDEO_DURATION_SECONDS = 60
 const STORY_VIDEO_CLIP_SECONDS = 20
 const MAX_VIDEO_SEGMENTS = 3
@@ -104,7 +104,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     }
 
     if (file.size > MAX_VIDEO_BYTES) {
-      toast.error("Video troppo grande (max 25MB)")
+      toast.error("Video troppo grande (max 100MB)")
       return
     }
 

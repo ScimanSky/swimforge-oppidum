@@ -83,7 +83,7 @@ type ClubInvite = {
 const CLUB_ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
 const CLUB_ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"] as const;
 const MAX_CLUB_IMAGE_BYTES = 20 * 1024 * 1024;
-const MAX_CLUB_VIDEO_BYTES = 120 * 1024 * 1024;
+const MAX_CLUB_VIDEO_BYTES = 100 * 1024 * 1024;
 
 export default function ClubDetail() {
   const [match, params] = useRoute("/community/club/:id");
