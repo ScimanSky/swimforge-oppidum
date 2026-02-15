@@ -63,14 +63,16 @@ export default function FeedSidebar({ storyBarSlot }: { storyBarSlot?: React.Rea
   const displayName = profile?.username || profile?.userId?.toString() || "Nuotatore"
 
   return (
-    <div className="space-y-2.5">
-      {/* Story bar */}
-      {storyBarSlot && (
-        <div className="surface-panel p-3">{storyBarSlot}</div>
-      )}
-
-      {/* Cards row: profile | stats | suggested */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+    <div>
+      {/* Single row: story bar + profile + stats + suggested */}
+      {/* On mobile: 2-col grid. On md+: single row with story bar as first item */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+        {/* Story bar card */}
+        {storyBarSlot && (
+          <div className="surface-panel p-3 col-span-2 md:col-span-1 overflow-hidden">
+            {storyBarSlot}
+          </div>
+        )}
         {/* Profile card */}
         {profile && (
           <Link href="/profile" className="block">
