@@ -27,6 +27,7 @@ const PublicProfile = lazy(() => import("./pages/PublicProfile"));
 const Statistics = lazy(() => import("./pages/Statistics"));
 const Coach = lazy(() => import("./pages/Coach"));
 const SeasonPage = lazy(() => import("./pages/Season"));
+const SocialFeed = lazy(() => import("./pages/SocialFeed"));
 const Community = lazy(() => import("./pages/Community"));
 const ClubInvite = lazy(() => import("./pages/ClubInvite"));
 const ClubDetail = lazy(() => import("./pages/ClubDetail"));
@@ -55,7 +56,7 @@ function Router() {
       <Route path="/signup" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
-      <Route path="/home" component={Community} />
+      <Route path="/home" component={SocialFeed} />
       <Route path="/dashboard">
         <Redirect to="/home" />
       </Route>

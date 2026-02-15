@@ -299,6 +299,28 @@ export const socialFollows = pgTable("social_follows", {
 }));
 
 // ============================================
+// STORIES (Ephemeral 24h content)
+// ============================================
+export const stories = pgTable("stories", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  mediaUrl: text("media_url"),
+  caption: text("caption"),
+  type: varchar("type", { length: 10 }).notNull(), // image, video, text
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const storyViews = pgTable("story_views", {
+  id: serial("id").primaryKey(),
+  storyId: integer("story_id").notNull(),
+  viewerId: integer("viewer_id").notNull(),
+  viewedAt: timestamp("viewed_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueView: unique().on(table.storyId, table.viewerId),
+}));
+
+// ============================================
 // COMMUNITY CLUBS
 // ============================================
 export const communityClubs = pgTable("community_clubs", {
@@ -606,3 +628,7 @@ export type ActivityAiInsight = typeof activityAiInsights.$inferSelect;
 export type InsertActivityAiInsight = typeof activityAiInsights.$inferInsert;
 export type AiCoachWorkout = typeof aiCoachWorkouts.$inferSelect;
 export type InsertAiCoachWorkout = typeof aiCoachWorkouts.$inferInsert;
+export type Story = typeof stories.$inferSelect;
+export type InsertStory = typeof stories.$inferInsert;
+export type StoryView = typeof storyViews.$inferSelect;
+export type InsertStoryView = typeof storyViews.$inferInsert;

@@ -11,9 +11,9 @@ import {
   Orbit,
   Moon,
   MoreHorizontal,
+  Plus,
   Settings,
   Sun,
-  Trophy,
   User,
   Users,
   Waves,
@@ -36,6 +36,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import NotificationBell from "@/components/NotificationBell"
 import DirectMessages from "@/components/DirectMessages"
+import { CreatePostSheet } from "@/components/social/CreatePostSheet"
 
 type NavItem = {
   label: string
@@ -44,15 +45,14 @@ type NavItem = {
 }
 
 const navPrimary: NavItem[] = [
-  { label: "Social", path: "/home", icon: <Home className="size-5" /> },
-  { label: "Track", path: "/track", icon: <Waves className="size-5" /> },
-  { label: "Season", path: "/season", icon: <Orbit className="size-5" /> },
-  { label: "Sfide", path: "/season/challenges", icon: <Trophy className="size-5" /> },
+  { label: "Feed", path: "/home", icon: <Home className="size-5" /> },
   { label: "Club", path: "/home/community", icon: <Users className="size-5" /> },
+  { label: "Season", path: "/season", icon: <Orbit className="size-5" /> },
 ]
 
 const navSecondary: NavItem[] = [
   { label: "Coach", path: "/coach", icon: <Bot className="size-5" /> },
+  { label: "Track", path: "/track", icon: <Waves className="size-5" /> },
   { label: "Profilo", path: "/profile", icon: <User className="size-5" /> },
 ]
 
@@ -61,7 +61,7 @@ function titleForPath(path: string) {
   if (path.startsWith("/community/club")) return "Club"
   if (path.startsWith("/home/community") || path.startsWith("/community")) return "Club"
   if (path.startsWith("/season/challenges") || path.startsWith("/challenges")) return "Sfide"
-  if (path === "/" || path === "/home" || path.startsWith("/dashboard")) return "Social"
+  if (path === "/" || path === "/home" || path.startsWith("/dashboard")) return "Feed"
   if (path.startsWith("/track") || path.startsWith("/activities")) return "Track"
   if (path.startsWith("/season")) return "Season"
   if (path.startsWith("/profile/performance") || path.startsWith("/statistics")) return "Progressi"
@@ -118,6 +118,7 @@ function RailLink({ item, location }: { item: NavItem; location: string }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
   const { theme, toggleTheme, switchable } = useTheme()
   const logoutMutation = trpc.auth.logout.useMutation()
   const reduceMotion = useReducedMotion()
@@ -165,6 +166,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {navPrimary.map((item) => (
               <RailLink key={item.path} item={item} location={location} />
             ))}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOpen(true)}
+                  className="group relative my-1 flex size-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime))] text-background shadow-[0_0_22px_var(--neon-soft)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
+                  aria-label="Crea post"
+                >
+                  <Plus className="size-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={10}>
+                Crea
+              </TooltipContent>
+            </Tooltip>
             <div className="my-2 h-px w-full bg-border/70" />
             {navSecondary.map((item) => (
               <RailLink key={item.path} item={item} location={location} />
@@ -278,7 +294,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* Mobile Bottom Nav (new skeleton) */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_58%,transparent),color-mix(in_oklch,var(--background)_70%,transparent))] backdrop-blur-xl lg:hidden pb-[env(safe-area-inset-bottom)]">
         <div className="mx-auto flex h-[calc(4rem+env(safe-area-inset-bottom))] max-w-3xl items-start justify-between px-2 pt-1">
-          {[navPrimary[0], navPrimary[1], navPrimary[2], navPrimary[4], navSecondary[1]].map((item) => {
+          {[navPrimary[0], navPrimary[1]].map((item) => {
+            const isActive = isNavItemActive(item.path, location)
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={cn(
+                  "flex h-14 w-full flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold transition-[transform,box-shadow,background-color,color] active:scale-[0.98]",
+                  isActive
+                    ? "text-foreground bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_14%,transparent))] shadow-[0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_22%,transparent),0_10px_26px_var(--neon-soft)]"
+                    : "text-muted-foreground hover:bg-card/45 hover:text-foreground",
+                )}
+              >
+                <span className={cn("transition-colors", isActive && "text-foreground")}>
+                  {item.icon}
+                </span>
+                <span className="leading-none">{item.label}</span>
+              </Link>
+            )
+          })}
+
+          {/* Create button */}
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            className="flex h-14 w-full flex-col items-center justify-center gap-1 text-xs font-semibold active:scale-[0.98]"
+            aria-label="Crea post"
+          >
+            <span className="flex size-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime))] text-background shadow-[0_0_18px_var(--neon-soft)]">
+              <Plus className="size-5" />
+            </span>
+          </button>
+
+          {[navPrimary[2], navSecondary[2]].map((item) => {
             const isActive = isNavItemActive(item.path, location)
             return (
               <Link
@@ -317,6 +366,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </AnimatePresence>
         </div>
       </main>
+      <CreatePostSheet open={isCreateOpen} onOpenChange={setIsCreateOpen} />
     </div>
   )
 }

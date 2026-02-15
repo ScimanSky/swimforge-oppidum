@@ -14,7 +14,7 @@ export const communityRouter = router({
     feed: protectedProcedure
         .input(z.object({
             limit: z.number().min(1).max(50).optional(),
-            scope: z.enum(["global", "self"]).optional(),
+            scope: z.enum(["global", "self", "following"]).optional(),
             before: z.string().datetime().optional(),
         }).optional())
         .query(async ({ ctx, input }) => {
@@ -100,6 +100,181 @@ export const communityRouter = router({
         .query(async ({ input }) => {
             return getComments(input.postId);
         }),
+
+    createTextPost: protectedProcedure
+        .input(z.object({
+            content: z.string().min(1).max(2000),
+            mediaUrl: z.string().url().optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            const { getDb } = await import("../db");
+            const { sql } = await import("drizzle-orm");
+            const db = await getDb();
+            if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+            const result = await db.execute(sql`
+                INSERT INTO social_posts (user_id, activity_id, club_id, content, media_url, visibility, is_deleted, created_at, updated_at)
+                VALUES (${ctx.user.id}, NULL, NULL, ${input.content}, ${input.mediaUrl ?? null}, 'public', false, NOW(), NOW())
+                RETURNING id
+            `);
+            const postId = (result.rows[0] as any)?.id ?? null;
+            return { success: true, postId };
+        }),
+
+    unsharedActivities: protectedProcedure
+        .query(async ({ ctx }) => {
+            const { getDb } = await import("../db");
+            const { sql } = await import("drizzle-orm");
+            const db = await getDb();
+            if (!db) return [];
+
+            const result = await db.execute(sql`
+                SELECT id, activity_name, distance_meters, duration_seconds, activity_date, activity_source
+                FROM swimming_activities
+                WHERE user_id = ${ctx.user.id}
+                  AND share_to_feed = false
+                  AND activity_date > NOW() - INTERVAL '30 days'
+                ORDER BY activity_date DESC
+                LIMIT 20
+            `);
+            return result.rows;
+        }),
+
+    stories: router({
+        active: protectedProcedure
+            .query(async ({ ctx }) => {
+                const { getActiveStories } = await import("../db_stories");
+                return getActiveStories(ctx.user.id);
+            }),
+
+        create: protectedProcedure
+            .input(z.object({
+                mediaUrl: z.string().url().optional(),
+                caption: z.string().max(500).optional(),
+                type: z.enum(["image", "video", "text"]),
+            }))
+            .mutation(async ({ ctx, input }) => {
+                const { createStory } = await import("../db_stories");
+                const story = await createStory(ctx.user.id, {
+                    mediaUrl: input.mediaUrl ?? null,
+                    caption: input.caption ?? null,
+                    type: input.type,
+                });
+                return { success: true, story };
+            }),
+
+        uploadFile: protectedProcedure
+            .input(z.object({
+                caption: z.string().max(500).optional(),
+                type: z.enum(["image", "video", "text"]),
+                fileBase64: z
+                    .string()
+                    .min(1)
+                    .max(7 * 1024 * 1024, "File troppo grande (max 5MB)")
+                    .regex(/^[A-Za-z0-9+/=]+$/, "Invalid base64"),
+                mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+            }))
+            .mutation(async ({ ctx, input }) => {
+                const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
+                const admin = getSupabaseAdminClient();
+
+                const MAX_BYTES = 5 * 1024 * 1024;
+                let buffer: Buffer;
+                try {
+                    buffer = Buffer.from(input.fileBase64, "base64");
+                } catch {
+                    throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid base64 payload" });
+                }
+                if (buffer.length > MAX_BYTES) {
+                    throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "File troppo grande (max 5MB)" });
+                }
+
+                const detected = detectImageType(buffer);
+                if (!detected) {
+                    throw new TRPCError({ code: "BAD_REQUEST", message: "Formato immagine non supportato. Usa JPG, PNG o WEBP." });
+                }
+                if (detected.mimeType !== input.mimeType) {
+                    throw new TRPCError({ code: "BAD_REQUEST", message: "Il MIME type non corrisponde al contenuto del file." });
+                }
+
+                try {
+                    type SharpPipeline = {
+                        rotate: () => SharpPipeline;
+                        resize: (options: { width: number; height: number; fit: "inside"; withoutEnlargement: boolean }) => SharpPipeline;
+                        jpeg: (options: { quality: number }) => SharpPipeline;
+                        png: (options: { compressionLevel: number }) => SharpPipeline;
+                        webp: (options: { quality: number }) => SharpPipeline;
+                        toBuffer: () => Promise<Buffer>;
+                    };
+                    type SharpFn = (input: Buffer) => SharpPipeline;
+
+                    const sharpMod = (await import("sharp")) as unknown as { default?: unknown };
+                    const sharpFn = ((sharpMod.default ?? sharpMod) as unknown) as SharpFn;
+                    const pipeline = sharpFn(buffer)
+                        .rotate()
+                        .resize({ width: 1080, height: 1920, fit: "inside", withoutEnlargement: true });
+
+                    if (detected.extension === "jpg") {
+                        buffer = await pipeline.jpeg({ quality: 85 }).toBuffer();
+                    } else if (detected.extension === "png") {
+                        buffer = await pipeline.png({ compressionLevel: 9 }).toBuffer();
+                    } else {
+                        buffer = await pipeline.webp({ quality: 85 }).toBuffer();
+                    }
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error);
+                    logger.warn(`story uploadFile: image resize failed: ${message}`, {
+                        event: "story:upload_resize_failed",
+                        userId: ctx.user.id,
+                        message,
+                    });
+                }
+
+                const filePath = `stories/${ctx.user.id}/${Date.now()}.${detected.extension}`;
+                const { error } = await admin.storage
+                    .from("profile-media")
+                    .upload(filePath, buffer, {
+                        contentType: detected.mimeType,
+                        upsert: true,
+                    });
+                if (error) {
+                    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Upload failed: ${error.message}` });
+                }
+
+                const { data } = admin.storage.from("profile-media").getPublicUrl(filePath);
+                const publicUrl = data.publicUrl;
+
+                const { createStory } = await import("../db_stories");
+                const story = await createStory(ctx.user.id, {
+                    mediaUrl: publicUrl,
+                    caption: input.caption ?? null,
+                    type: input.type,
+                });
+
+                return { success: true, story, url: publicUrl };
+            }),
+
+        markViewed: protectedProcedure
+            .input(z.object({ storyId: z.number() }))
+            .mutation(async ({ ctx, input }) => {
+                const { markStoryViewed } = await import("../db_stories");
+                return markStoryViewed(input.storyId, ctx.user.id);
+            }),
+
+        delete: protectedProcedure
+            .input(z.object({ storyId: z.number() }))
+            .mutation(async ({ ctx, input }) => {
+                const { deleteStory } = await import("../db_stories");
+                return deleteStory(input.storyId, ctx.user.id);
+            }),
+
+        viewers: protectedProcedure
+            .input(z.object({ storyId: z.number() }))
+            .query(async ({ input }) => {
+                const { getStoryViewers } = await import("../db_stories");
+                return getStoryViewers(input.storyId);
+            }),
+    }),
 
     users: router({
         getPublicProfile: protectedProcedure

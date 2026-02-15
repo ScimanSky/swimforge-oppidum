@@ -7,7 +7,7 @@ import {
   swimmingActivities,
 } from "../drizzle/schema";
 
-export type FeedScope = "global" | "self";
+export type FeedScope = "global" | "self" | "following";
 
 export async function getSocialFeed(userId: number, options: { limit?: number; scope?: FeedScope; before?: Date } = {}) {
   const db = await getDb();
@@ -19,6 +19,8 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
 
   if (scope === "self") {
     filters.push(sql`p.user_id = ${userId}`);
+  } else if (scope === "following") {
+    filters.push(sql`p.user_id IN (SELECT following_id FROM social_follows WHERE follower_id = ${userId} AND status = 'accepted')`);
   }
   if (options.before) {
     filters.push(sql`p.created_at < ${options.before}`);
