@@ -4,7 +4,6 @@ import AppLayout from "@/components/AppLayout"
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
@@ -15,14 +14,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import StatisticsAccordion from "@/components/statistics/StatisticsAccordion"
 import {
   Search,
   Filter,
-  Droplets,
-  Timer,
-  Zap,
-  TrendingUp,
   ChevronRight,
   Waves,
   MapPin,
@@ -78,7 +72,6 @@ export default function Activities() {
   const [page, setPage] = useState(1)
 
   const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
-  const advancedQuery = trpc.statistics.getAdvanced.useQuery({ days: 30 })
   const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
     staleTime: 15_000,
     refetchInterval: 30_000,
@@ -146,55 +139,6 @@ export default function Activities() {
     if (page > totalPages) setPage(totalPages)
   }, [page, totalPages])
 
-  const monthStart = new Date()
-  monthStart.setDate(monthStart.getDate() - 30)
-  monthStart.setHours(0, 0, 0, 0)
-  const monthActivities = activities.filter((activity) => new Date(activity.activityDate) >= monthStart)
-  const totalDistance = monthActivities.reduce((sum, a) => sum + (a.distanceMeters || 0), 0)
-  const totalTime = monthActivities.reduce((sum, a) => sum + (a.durationSeconds || 0), 0)
-  const totalXp = monthActivities.reduce((sum, a) => sum + (a.xpEarned || 0), 0)
-  const avgEfficiency = advancedQuery.data?.swimmingEfficiencyIndex
-  const summaryOrbs = useMemo(
-    () => [
-      {
-        label: "Distanza totale",
-        value: activitiesQuery.isLoading ? "..." : formatDistance(totalDistance),
-        progress: Math.min(100, Math.round((totalDistance / 20000) * 100)),
-        helper: "Ultimi 30 giorni",
-        icon: <Droplets className="h-4 w-4" />,
-        tone: "cyan" as const,
-      },
-      {
-        label: "Tempo totale",
-        value: activitiesQuery.isLoading ? "..." : formatDuration(totalTime),
-        progress: Math.min(100, Math.round((totalTime / 28800) * 100)),
-        helper: "Ultimi 30 giorni",
-        icon: <Timer className="h-4 w-4" />,
-        tone: "sky" as const,
-      },
-      {
-        label: "XP guadagnati",
-        value: activitiesQuery.isLoading ? "..." : `${totalXp} XP`,
-        progress: Math.min(100, Math.round((totalXp / 1800) * 100)),
-        helper: "Ultimi 30 giorni",
-        icon: <Zap className="h-4 w-4" />,
-        tone: "lime" as const,
-      },
-      {
-        label: "Efficienza media",
-        value:
-          advancedQuery.isLoading || avgEfficiency === null || avgEfficiency === undefined
-            ? "—"
-            : `${Math.round(avgEfficiency)}%`,
-        progress:
-          avgEfficiency !== null && avgEfficiency !== undefined ? Math.round(avgEfficiency) : 0,
-        helper: "SEI Index",
-        icon: <TrendingUp className="h-4 w-4" />,
-        tone: "amber" as const,
-      },
-    ],
-    [activitiesQuery.isLoading, advancedQuery.isLoading, totalDistance, totalTime, totalXp, avgEfficiency]
-  )
 
   const getShareState = (activity: any) =>
     shareOverrides[activity.id] ?? activity.shareToFeed ?? false
@@ -239,23 +183,6 @@ export default function Activities() {
                     </div>
                   </div>
                 </div>
-                <div className="orb-lane">
-                  {summaryOrbs.map((item) => (
-                    <MetricOrb
-                      key={item.label}
-                      label={item.label}
-                      value={item.value}
-                      progress={item.progress}
-                      helper={item.helper}
-                      icon={item.icon}
-                      tone={item.tone}
-                      size="sm"
-                    />
-                  ))}
-                </div>
-
-                {/* Statistics accordion */}
-                <StatisticsAccordion />
               </section>
             </div>
 
