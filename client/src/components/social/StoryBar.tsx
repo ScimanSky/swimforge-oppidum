@@ -17,10 +17,12 @@ export function StoryBar({ currentUserId, onViewStory, onCreateStory }: StoryBar
   const groups = storyGroups ?? []
 
   const currentUserGroup = currentUserId
-    ? groups.find((g) => g.userId === currentUserId)
+    ? groups.find((g: any) => Number(g.userId) === Number(currentUserId))
     : undefined
 
-  const otherGroups = groups.filter((g) => g.userId !== currentUserId)
+  const hasOwnStories = (currentUserGroup?.stories?.length ?? 0) > 0
+
+  const otherGroups = groups.filter((g: any) => Number(g.userId) !== Number(currentUserId))
 
   // Sort: unviewed first
   const sorted = [...otherGroups].sort((a, b) => {
@@ -40,9 +42,9 @@ export function StoryBar({ currentUserId, onViewStory, onCreateStory }: StoryBar
             userId={currentUserId}
             userName={currentUserGroup?.userName ?? "Tu"}
             avatarUrl={currentUserGroup?.userAvatar}
-            hasUnviewed={false}
+            hasUnviewed={hasOwnStories}
             isCurrentUser
-            onClick={onCreateStory}
+            onClick={hasOwnStories ? () => onViewStory?.(currentUserId) : onCreateStory}
           />
         </div>
       )}

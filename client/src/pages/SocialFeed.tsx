@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import AppLayout from "@/components/AppLayout"
 import { StoryBar } from "@/components/social/StoryBar"
 import { StoryViewer } from "@/components/social/StoryViewer"
@@ -13,8 +13,8 @@ import { trpc } from "@/lib/trpc"
 
 export default function SocialFeed() {
   const [tab, setTab] = useState<"perte" | "seguiti">("perte")
-  const [posts, setPosts] = useState<any[]>([])
   const [cursor, setCursor] = useState<string | undefined>(undefined)
+  const [extraPosts, setExtraPosts] = useState<any[]>([])
   const [hasMore, setHasMore] = useState(true)
   const [storyViewerOpen, setStoryViewerOpen] = useState(false)
   const [storyViewerGroupIdx, setStoryViewerGroupIdx] = useState(0)
@@ -29,7 +29,7 @@ export default function SocialFeed() {
 
   const handleViewStory = useCallback((userId: number) => {
     const groups = storyGroups ?? []
-    const idx = groups.findIndex((g: any) => g.userId === userId)
+    const idx = groups.findIndex((g: any) => Number(g.userId) === Number(userId))
     if (idx >= 0) {
       setStoryViewerGroupIdx(idx)
       setStoryViewerOpen(true)
@@ -42,49 +42,64 @@ export default function SocialFeed() {
 
   const scope = tab === "seguiti" ? "following" : "global"
 
-  const feedQuery = trpc.community.feed.useQuery(
-    { limit: 20, scope, before: cursor },
-    { enabled: true }
+  // First page query (no cursor)
+  const firstPageQuery = trpc.community.feed.useQuery(
+    { limit: 20, scope },
+    { staleTime: 30_000 }
   )
 
-  // Accumulate posts when new data arrives
+  // Pagination query (only when cursor is set)
+  const nextPageQuery = trpc.community.feed.useQuery(
+    { limit: 20, scope, before: cursor },
+    { enabled: !!cursor, staleTime: 30_000 }
+  )
+
+  // Accumulate extra pages
+  const lastCursorRef = useRef<string | undefined>(undefined)
   useEffect(() => {
-    if (!feedQuery.data) return
-    const newPosts = feedQuery.data as any[]
+    if (!cursor || cursor === lastCursorRef.current) return
+    if (!nextPageQuery.data) return
+    lastCursorRef.current = cursor
 
-    if (!cursor) {
-      // First load or tab change — replace all posts
-      setPosts(newPosts)
-    } else {
-      // Infinite scroll — append only new posts
-      setPosts((prev) => {
-        const existingIds = new Set(prev.map((p: any) => p.id))
-        const fresh = newPosts.filter((p: any) => !existingIds.has(p.id))
-        return [...prev, ...fresh]
-      })
-    }
+    const newPosts = nextPageQuery.data as any[]
+    if (newPosts.length < 20) setHasMore(false)
 
-    if (newPosts.length < 20) {
-      setHasMore(false)
-    }
-  }, [feedQuery.data, cursor])
+    setExtraPosts((prev) => {
+      const existingIds = new Set(prev.map((p: any) => p.id))
+      const fresh = newPosts.filter((p: any) => !existingIds.has(p.id))
+      return [...prev, ...fresh]
+    })
+  }, [cursor, nextPageQuery.data])
 
-  // Reset when tab changes
+  // Reset on tab change
   useEffect(() => {
-    setPosts([])
     setCursor(undefined)
+    setExtraPosts([])
     setHasMore(true)
+    lastCursorRef.current = undefined
   }, [tab])
 
+  // Combine first page + extra pages
+  const firstPagePosts = (firstPageQuery.data as any[]) ?? []
+  const allPosts = cursor ? [...firstPagePosts, ...extraPosts] : firstPagePosts
+
+  // Deduplicate (safety)
+  const seen = new Set<number>()
+  const posts = allPosts.filter((p: any) => {
+    if (seen.has(p.id)) return false
+    seen.add(p.id)
+    return true
+  })
+
   const loadMore = useCallback(() => {
-    if (posts.length === 0 || feedQuery.isFetching) return
+    if (posts.length === 0 || nextPageQuery.isFetching) return
     const oldest = posts[posts.length - 1]
     if (oldest?.created_at) {
       setCursor(new Date(oldest.created_at).toISOString())
     }
-  }, [posts, feedQuery.isFetching])
+  }, [posts, nextPageQuery.isFetching])
 
-  const isInitialLoading = feedQuery.isLoading && posts.length === 0
+  const isInitialLoading = firstPageQuery.isLoading && posts.length === 0
 
   return (
     <AppLayout>
@@ -123,7 +138,7 @@ export default function SocialFeed() {
             <InfiniteScrollSentinel
               onIntersect={loadMore}
               hasMore={hasMore}
-              isLoading={feedQuery.isFetching}
+              isLoading={nextPageQuery.isFetching}
             />
           </div>
         )}
