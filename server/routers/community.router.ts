@@ -1048,12 +1048,32 @@ export const communityRouter = router({
                 content: z.string().min(1).max(5000),
             }))
             .mutation(async ({ ctx, input }) => {
-                const { sendDirectMessage } = await import("../db_social_enhanced");
+                const { sendDirectMessage, createNotification } = await import("../db_social_enhanced");
                 const message = await sendDirectMessage({
                     senderId: ctx.user.id,
                     receiverId: input.receiverId,
                     content: input.content,
                 });
+
+                // Notify recipient (fire-and-forget)
+                try {
+                    const { getDb } = await import("../db");
+                    const { sql } = await import("drizzle-orm");
+                    const db = await getDb();
+                    const actor = await db!.execute(sql`SELECT name FROM users WHERE id = ${ctx.user.id} LIMIT 1`);
+                    const actorName = ((actor.rows[0] as any)?.name as string | undefined) || "Qualcuno";
+                    const preview = input.content.trim().slice(0, 80);
+                    await createNotification({
+                        userId: input.receiverId,
+                        type: "dm",
+                        title: "Nuovo messaggio",
+                        message: `${actorName}: ${preview}${input.content.trim().length > 80 ? "…" : ""}`,
+                        link: `/home`,
+                    });
+                } catch {
+                    // non-critical
+                }
+
                 return { success: true, message };
             }),
 
