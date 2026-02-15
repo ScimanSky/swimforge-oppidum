@@ -196,6 +196,11 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
     total: story.reactionsTotal ?? 0,
   }
   const canReact = !!currentUserId && currentUserId !== group.userId
+  const isOwnerStory = !!currentUserId && currentUserId === group.userId
+  const showReactions = canReact || (isOwnerStory && reactionSummary.total > 0)
+  const visibleReactionChoices = canReact
+    ? STORY_REACTION_CHOICES
+    : STORY_REACTION_CHOICES.filter((choice) => (reactionSummary.counts[choice.type] ?? 0) > 0)
 
   const handleVideoLoadedMetadata = () => {
     const video = videoRef.current
@@ -336,13 +341,13 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
         )}
 
         {/* Reactions */}
-        {canReact && (
+        {showReactions && (
           <div
             className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 backdrop-blur-sm">
-              {STORY_REACTION_CHOICES.map((choice) => {
+              {visibleReactionChoices.map((choice) => {
                 const isActive = reactionSummary.userReaction === choice.type
                 const count = reactionSummary.counts[choice.type] ?? 0
                 return (
@@ -354,9 +359,11 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
                     }`}
                     onClick={(e) => {
                       e.stopPropagation()
+                      if (!canReact) return
                       if (reactToStory.isPending) return
                       reactToStory.mutate({ storyId: story.id, reactionType: choice.type })
                     }}
+                    disabled={!canReact}
                   >
                     <span>{choice.emoji}</span>
                     {count > 0 && <span className="text-xs text-white">{count}</span>}

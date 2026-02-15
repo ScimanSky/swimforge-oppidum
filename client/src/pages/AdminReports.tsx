@@ -37,6 +37,16 @@ const reasonLabel: Record<string, string> = {
 export default function AdminReports() {
   const [status, setStatus] = useState<ReportStatus>("open")
   const [noteById, setNoteById] = useState<Record<number, string>>({})
+  const [cleanupLimit, setCleanupLimit] = useState("300")
+  const [lastCleanupResult, setLastCleanupResult] = useState<null | {
+    scanned: number
+    deletedStories: number
+    deletedFiles: number
+    notFoundFiles: number
+    failedFiles: number
+    skippedStories: number
+    ranAt: string
+  }>(null)
 
   const meQuery = trpc.auth.me.useQuery()
   const isAdmin = meQuery.data?.role === "admin"
@@ -45,6 +55,7 @@ export default function AdminReports() {
     { status, limit: 50, offset: 0 },
     { enabled: isAdmin }
   )
+  const cleanupStatsQuery = trpc.admin.storyCleanupStats.useQuery(undefined, { enabled: isAdmin })
 
   const utils = trpc.useUtils()
   const updateMutation = trpc.admin.updatePostReportStatus.useMutation({
@@ -53,6 +64,14 @@ export default function AdminReports() {
       utils.admin.listPostReports.invalidate()
     },
     onError: (err) => toast.error(err.message || "Aggiornamento fallito"),
+  })
+  const runCleanupMutation = trpc.admin.runStoryCleanup.useMutation({
+    onSuccess: (data) => {
+      setLastCleanupResult(data)
+      utils.admin.storyCleanupStats.invalidate()
+      toast.success("Cleanup stories completato")
+    },
+    onError: (err) => toast.error(err.message || "Cleanup fallito"),
   })
 
   const items = useMemo(() => {
@@ -130,6 +149,81 @@ export default function AdminReports() {
                 ))}
               </select>
             </div>
+          </SurfaceContent>
+        </Surface>
+
+        <Surface>
+          <SurfaceContent className="p-6 space-y-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Story Cleanup Monitor</h2>
+                <p className="text-xs text-muted-foreground">
+                  Monitoraggio cleanup stories scadute e file ImageKit.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <label htmlFor="cleanup-limit" className="text-xs text-muted-foreground">
+                  Limit run
+                </label>
+                <input
+                  id="cleanup-limit"
+                  type="number"
+                  min={1}
+                  max={2000}
+                  value={cleanupLimit}
+                  onChange={(event) => setCleanupLimit(event.target.value)}
+                  className="h-9 w-24 rounded-md border border-border bg-background px-2 text-sm"
+                />
+                <Button
+                  size="sm"
+                  variant="outline-neon"
+                  disabled={runCleanupMutation.isPending}
+                  onClick={() => {
+                    const parsed = Number(cleanupLimit)
+                    const limit =
+                      Number.isFinite(parsed) && parsed > 0 ? Math.min(Math.floor(parsed), 2000) : 300
+                    runCleanupMutation.mutate({ limit })
+                  }}
+                >
+                  {runCleanupMutation.isPending ? "Esecuzione..." : "Esegui ora"}
+                </Button>
+              </div>
+            </div>
+
+            {cleanupStatsQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">Caricamento statistiche cleanup...</p>
+            ) : cleanupStatsQuery.data ? (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4 text-sm">
+                <div className="rounded-md border border-border/60 p-3">
+                  <div className="text-muted-foreground text-xs">Stories attive</div>
+                  <div className="font-semibold">{cleanupStatsQuery.data.activeStories}</div>
+                </div>
+                <div className="rounded-md border border-border/60 p-3">
+                  <div className="text-muted-foreground text-xs">Stories scadute</div>
+                  <div className="font-semibold">{cleanupStatsQuery.data.expiredStories}</div>
+                </div>
+                <div className="rounded-md border border-border/60 p-3">
+                  <div className="text-muted-foreground text-xs">Scadute con file ID</div>
+                  <div className="font-semibold">{cleanupStatsQuery.data.expiredWithImagekit}</div>
+                </div>
+                <div className="rounded-md border border-border/60 p-3">
+                  <div className="text-muted-foreground text-xs">Stories totali</div>
+                  <div className="font-semibold">{cleanupStatsQuery.data.totalStories}</div>
+                </div>
+              </div>
+            ) : null}
+
+            {lastCleanupResult ? (
+              <div className="rounded-md border border-border/60 p-3 text-xs text-muted-foreground space-y-1">
+                <div className="font-medium text-foreground">Ultimo run manuale: {formatTimeAgo(lastCleanupResult.ranAt)}</div>
+                <div>
+                  scanned={lastCleanupResult.scanned} | deletedStories={lastCleanupResult.deletedStories} | deletedFiles={lastCleanupResult.deletedFiles}
+                </div>
+                <div>
+                  notFoundFiles={lastCleanupResult.notFoundFiles} | failedFiles={lastCleanupResult.failedFiles} | skippedStories={lastCleanupResult.skippedStories}
+                </div>
+              </div>
+            ) : null}
           </SurfaceContent>
         </Surface>
 

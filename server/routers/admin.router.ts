@@ -165,6 +165,29 @@ export const adminRouter = router({
                 adminNote: input.adminNote ?? null,
             });
         }),
+
+    storyCleanupStats: protectedProcedure
+        .query(async ({ ctx }) => {
+            if (ctx.user.role !== "admin") {
+                throw new TRPCError({ code: "FORBIDDEN" });
+            }
+            const { getStoryCleanupStats } = await import("../db_stories");
+            return getStoryCleanupStats();
+        }),
+
+    runStoryCleanup: protectedProcedure
+        .input(z.object({ limit: z.number().min(1).max(2000).optional() }).optional())
+        .mutation(async ({ ctx, input }) => {
+            if (ctx.user.role !== "admin") {
+                throw new TRPCError({ code: "FORBIDDEN" });
+            }
+            const { cleanupExpiredStories } = await import("../db_stories");
+            const result = await cleanupExpiredStories(input?.limit ?? 300);
+            return {
+                ...result,
+                ranAt: new Date().toISOString(),
+            };
+        }),
 });
 
 // Statistics

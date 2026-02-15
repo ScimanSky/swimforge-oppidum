@@ -157,7 +157,7 @@ export async function deleteStory(storyId: number, userId: number) {
     throw new Error("Story not found or not owned by user");
   }
 
-  const result = await db.execute(sql`
+  await db.execute(sql`
     DELETE FROM story_reactions
     WHERE story_id = ${storyId}
   `);
@@ -173,8 +173,7 @@ export async function deleteStory(storyId: number, userId: number) {
     RETURNING id, imagekit_file_id
   `);
 
-  const deleted = (existing.rows[0] ??
-    result.rows[0]) as { id: number; imagekit_file_id: string | null };
+  const deleted = existing.rows[0] as { id: number; imagekit_file_id: string | null };
   return {
     success: true,
     storyId: deleted.id,
@@ -410,5 +409,49 @@ export async function cleanupExpiredStories(limit = 300) {
     notFoundFiles,
     failedFiles,
     skippedStories,
+  };
+}
+
+export async function getStoryCleanupStats() {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const result = await db.execute(sql`
+    SELECT
+      (SELECT COUNT(*)::int FROM stories) AS total_stories,
+      (SELECT COUNT(*)::int FROM stories WHERE expires_at > NOW()) AS active_stories,
+      (SELECT COUNT(*)::int FROM stories WHERE expires_at <= NOW()) AS expired_stories,
+      (SELECT COUNT(*)::int FROM stories WHERE expires_at <= NOW() AND imagekit_file_id IS NOT NULL AND imagekit_file_id <> '') AS expired_with_imagekit,
+      (SELECT COUNT(*)::int FROM stories WHERE imagekit_file_id IS NOT NULL AND imagekit_file_id <> '') AS stories_with_imagekit,
+      (SELECT COUNT(*)::int FROM story_reactions) AS total_reactions,
+      (SELECT COUNT(*)::int FROM story_views) AS total_views
+  `);
+
+  const row = (result.rows[0] as {
+    total_stories: number;
+    active_stories: number;
+    expired_stories: number;
+    expired_with_imagekit: number;
+    stories_with_imagekit: number;
+    total_reactions: number;
+    total_views: number;
+  } | undefined) ?? {
+    total_stories: 0,
+    active_stories: 0,
+    expired_stories: 0,
+    expired_with_imagekit: 0,
+    stories_with_imagekit: 0,
+    total_reactions: 0,
+    total_views: 0,
+  };
+
+  return {
+    totalStories: Number(row.total_stories ?? 0),
+    activeStories: Number(row.active_stories ?? 0),
+    expiredStories: Number(row.expired_stories ?? 0),
+    expiredWithImagekit: Number(row.expired_with_imagekit ?? 0),
+    storiesWithImagekit: Number(row.stories_with_imagekit ?? 0),
+    totalReactions: Number(row.total_reactions ?? 0),
+    totalViews: Number(row.total_views ?? 0),
   };
 }
