@@ -168,6 +168,15 @@ export async function getEventById(eventId: number) {
   return event
 }
 
+export async function getClubEventById(eventId: number) {
+  const db = await requireDb()
+  const [event] = await db
+    .select()
+    .from(clubEvents)
+    .where(eq(clubEvents.id, eventId))
+  return event
+}
+
 /**
  * RSVP ad un evento
  */
@@ -378,6 +387,23 @@ export async function getRecentConversations(userId: number, limit: number = 20)
   return conversations
 }
 
+/**
+ * Conta messaggi non letti totali per un utente
+ */
+export async function getUnreadDmCount(userId: number): Promise<number> {
+  const db = await requireDb()
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(directMessages)
+    .where(
+      and(
+        eq(directMessages.receiverId, userId),
+        eq(directMessages.isRead, false)
+      )
+    )
+  return row?.count ?? 0
+}
+
 // ============================================
 // NOTIFICATIONS
 // ============================================
@@ -549,6 +575,15 @@ export async function deleteClubAnnouncement(announcementId: number) {
   return true
 }
 
+export async function getClubAnnouncementById(announcementId: number) {
+  const db = await requireDb()
+  const [announcement] = await db
+    .select()
+    .from(clubAnnouncements)
+    .where(eq(clubAnnouncements.id, announcementId))
+  return announcement
+}
+
 // ============================================
 // CLUB MEDIA GALLERY
 // ============================================
@@ -618,6 +653,15 @@ export async function deleteClubMedia(mediaId: number) {
   const db = await requireDb()
   await db.delete(clubMedia).where(eq(clubMedia.id, mediaId))
   return true
+}
+
+export async function getClubMediaById(mediaId: number) {
+  const db = await requireDb()
+  const [media] = await db
+    .select()
+    .from(clubMedia)
+    .where(eq(clubMedia.id, mediaId))
+  return media
 }
 
 // ============================================

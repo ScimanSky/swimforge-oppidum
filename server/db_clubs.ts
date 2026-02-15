@@ -42,7 +42,7 @@ export async function listClubs(userId: number, options: { search?: string; scop
         SELECT 1 FROM community_club_members m
         WHERE m.club_id = c.id AND m.user_id = ${userId} AND m.status = 'active'
       ) AS is_member,
-      (SELECT m.role FROM community_club_members m WHERE m.club_id = c.id AND m.user_id = ${userId} LIMIT 1) AS member_role,
+      (SELECT m.role FROM community_club_members m WHERE m.club_id = c.id AND m.user_id = ${userId} AND m.status = 'active' LIMIT 1) AS member_role,
       (SELECT m.status FROM community_club_members m WHERE m.club_id = c.id AND m.user_id = ${userId} LIMIT 1) AS member_status
     FROM community_clubs c
     ${whereClause}
@@ -73,7 +73,7 @@ export async function getClubById(userId: number, clubId: number) {
         SELECT 1 FROM community_club_members m
         WHERE m.club_id = c.id AND m.user_id = ${userId} AND m.status = 'active'
       ) AS is_member,
-      (SELECT m.role FROM community_club_members m WHERE m.club_id = c.id AND m.user_id = ${userId} LIMIT 1) AS member_role,
+      (SELECT m.role FROM community_club_members m WHERE m.club_id = c.id AND m.user_id = ${userId} AND m.status = 'active' LIMIT 1) AS member_role,
       (SELECT m.status FROM community_club_members m WHERE m.club_id = c.id AND m.user_id = ${userId} LIMIT 1) AS member_status
     FROM community_clubs c
     WHERE c.id = ${clubId}
@@ -282,7 +282,11 @@ export async function joinClub(userId: number, clubId: number) {
   if (!club.length) throw new Error("Club not found");
 
   const existing = await db
-    .select({ id: communityClubMembers.id, status: communityClubMembers.status })
+    .select({
+      id: communityClubMembers.id,
+      status: communityClubMembers.status,
+      role: communityClubMembers.role,
+    })
     .from(communityClubMembers)
     .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)))
     .limit(1);
@@ -291,18 +295,14 @@ export async function joinClub(userId: number, clubId: number) {
     if (existing[0].status === "banned") {
       throw new Error("Banned");
     }
-    if (club[0].visibility !== "public") {
-      await db
-        .update(communityClubMembers)
-        .set({ status: "pending" })
-        .where(eq(communityClubMembers.id, existing[0].id));
-      return { requested: true };
-    }
+    const hasStaffRole = ["owner", "admin", "moderator"].includes(existing[0].role);
+    const nextStatus = hasStaffRole || club[0].visibility === "public" ? "active" : "pending";
+
     await db
       .update(communityClubMembers)
-      .set({ status: "active" })
+      .set({ status: nextStatus, joinedAt: new Date() })
       .where(eq(communityClubMembers.id, existing[0].id));
-    return { joined: true };
+    return nextStatus === "active" ? { joined: true } : { requested: true };
   }
 
   await db.insert(communityClubMembers).values({
@@ -320,9 +320,23 @@ export async function leaveClub(userId: number, clubId: number) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
+  const existing = await db
+    .select({ id: communityClubMembers.id, status: communityClubMembers.status })
+    .from(communityClubMembers)
+    .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)))
+    .limit(1);
+
+  if (!existing.length) {
+    throw new Error("Not a club member");
+  }
+  if (existing[0].status === "banned") {
+    throw new Error("Banned");
+  }
+
   await db
-    .delete(communityClubMembers)
-    .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)));
+    .update(communityClubMembers)
+    .set({ status: "left" })
+    .where(eq(communityClubMembers.id, existing[0].id));
 
   return { left: true };
 }
@@ -529,7 +543,11 @@ export async function acceptClubInvite(userId: number, code: string) {
   }
 
   const existing = await db
-    .select({ id: communityClubMembers.id, status: communityClubMembers.status })
+    .select({
+      id: communityClubMembers.id,
+      status: communityClubMembers.status,
+      role: communityClubMembers.role,
+    })
     .from(communityClubMembers)
     .where(and(eq(communityClubMembers.clubId, invite.clubId), eq(communityClubMembers.userId, userId)))
     .limit(1);
@@ -547,9 +565,13 @@ export async function acceptClubInvite(userId: number, code: string) {
       joinedAt: new Date(),
     });
   } else {
+    const nextRole =
+      existing[0].role && existing[0].role !== "member"
+        ? existing[0].role
+        : (invite.role ?? existing[0].role ?? "member");
     await db
       .update(communityClubMembers)
-      .set({ status: "active", role: invite.role ?? "member", joinedAt: new Date() })
+      .set({ status: "active", role: nextRole, joinedAt: new Date() })
       .where(eq(communityClubMembers.id, existing[0].id));
   }
 

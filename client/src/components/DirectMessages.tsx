@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
+import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { getInitials } from "@/lib/format";
 
@@ -69,16 +70,27 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
   const searchInputRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
 
+  const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 5 * 60_000 });
+  const currentUserId = profileQuery.data?.userId;
+
+  // Unread DM count — always active (shows badge on icon)
+  const unreadDmQuery = trpc.community.messages.unreadCount.useQuery(undefined, {
+    refetchInterval: 30_000,
+  });
+
   // Lista conversazioni recenti
   const conversationsQuery = trpc.community.messages.recent.useQuery(
     { limit: 20 },
     { enabled: isOpen && !recipientId }
   );
 
-  // Conversazione specifica
+  // Conversazione specifica — poll every 5s when open
   const conversationQuery = trpc.community.messages.conversation.useQuery(
     { otherUserId: selectedConversation || 0, limit: 50 },
-    { enabled: !!selectedConversation }
+    {
+      enabled: !!selectedConversation,
+      refetchInterval: isOpen && view === "conversation" ? 5_000 : false,
+    }
   );
 
   // User search
@@ -92,6 +104,7 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
       setMessageText("");
       utils.community.messages.conversation.invalidate();
       utils.community.messages.recent.invalidate();
+      utils.community.messages.unreadCount.invalidate();
       scrollToBottom();
     },
     onError: (error) => {
@@ -102,8 +115,38 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
   const markReadMutation = trpc.community.messages.markRead.useMutation({
     onSuccess: () => {
       utils.community.messages.recent.invalidate();
+      utils.community.messages.unreadCount.invalidate();
     },
   });
+
+  // Supabase Realtime: refresh on new DM
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const channel = supabase
+      .channel(`dm:${currentUserId}`)
+      .on(
+        "postgres_changes" as any,
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "direct_messages",
+          filter: `receiver_id=eq.${currentUserId}`,
+        },
+        () => {
+          utils.community.messages.unreadCount.invalidate();
+          utils.community.messages.recent.invalidate();
+          if (selectedConversation) {
+            utils.community.messages.conversation.invalidate();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId, selectedConversation, utils]);
 
   useEffect(() => {
     if (selectedConversation && conversationQuery.data) {
@@ -165,10 +208,7 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
     });
   };
 
-  const getUnreadCount = () => {
-    if (!conversationsQuery.data) return 0;
-    return conversationsQuery.data.reduce((acc, conv) => acc + (conv.unreadCount || 0), 0);
-  };
+  const unreadCount = unreadDmQuery.data?.count ?? 0;
 
   const renderSearchView = () => (
     <div className="flex flex-col h-full">
@@ -415,12 +455,12 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
       <DialogTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
           <MessageCircle className="h-5 w-5" />
-          {!recipientId && getUnreadCount() > 0 && (
+          {!recipientId && unreadCount > 0 && (
             <Badge
               variant="destructive"
               className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
             >
-              {getUnreadCount() > 9 ? "9+" : getUnreadCount()}
+              {unreadCount > 9 ? "9+" : unreadCount}
             </Badge>
           )}
         </Button>

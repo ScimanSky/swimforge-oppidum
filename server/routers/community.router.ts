@@ -12,6 +12,37 @@ import {
 import type { ClubEventInsert, ClubAnnouncementInsert } from "./_shared";
 import { ENV } from "../_core/env";
 
+const CLUB_STAFF_ROLES = new Set(["owner", "admin", "moderator"]);
+
+async function requireClubMemberRole(userId: number, clubId: number) {
+    const { getClubMemberRole } = await import("../db_clubs");
+    const role = await getClubMemberRole(userId, clubId);
+    if (!role || role.status !== "active") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+    }
+    return role;
+}
+
+async function requireClubStaffRole(userId: number, clubId: number) {
+    const role = await requireClubMemberRole(userId, clubId);
+    if (!CLUB_STAFF_ROLES.has(role.role)) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+    }
+    return role;
+}
+
+async function requireClubReadable(userId: number, clubId: number) {
+    const { getClubById } = await import("../db_clubs");
+    const club = await getClubById(userId, clubId);
+    if (!club) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+    }
+    if (club.is_private && !club.is_member) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+    }
+    return club;
+}
+
 export const communityRouter = router({
     feed: protectedProcedure
         .input(z.object({
@@ -715,6 +746,7 @@ export const communityRouter = router({
                     limit: z.number().min(1).max(100).optional(),
                 }))
                 .query(async ({ ctx, input }) => {
+                    await requireClubReadable(ctx.user.id, input.clubId);
                     const { getClubEvents } = await import("../db_social_enhanced");
                     return getClubEvents({
                         clubId: input.clubId,
@@ -743,6 +775,7 @@ export const communityRouter = router({
                     coverImageUrl: z.string().url().optional(),
                 }))
                 .mutation(async ({ ctx, input }) => {
+                    await requireClubStaffRole(ctx.user.id, input.clubId);
                     const { createClubEvent } = await import("../db_social_enhanced");
                     const event = await createClubEvent({
                         ...input,
@@ -755,9 +788,14 @@ export const communityRouter = router({
 
             get: protectedProcedure
                 .input(z.object({ eventId: z.number() }))
-                .query(async ({ input }) => {
+                .query(async ({ ctx, input }) => {
                     const { getEventById } = await import("../db_social_enhanced");
-                    return getEventById(input.eventId);
+                    const event = await getEventById(input.eventId);
+                    if (!event?.event?.clubId) {
+                        throw new TRPCError({ code: "NOT_FOUND" });
+                    }
+                    await requireClubReadable(ctx.user.id, event.event.clubId);
+                    return event;
                 }),
 
             update: protectedProcedure
@@ -771,9 +809,14 @@ export const communityRouter = router({
                     endTime: z.string().datetime().optional(),
                     status: z.enum(["active", "cancelled", "completed"]).optional(),
                 }))
-                .mutation(async ({ input }) => {
-                    const { updateClubEvent } = await import("../db_social_enhanced");
+                .mutation(async ({ ctx, input }) => {
+                    const { getClubEventById, updateClubEvent } = await import("../db_social_enhanced");
                     const { eventId, startTime, endTime, ...rest } = input;
+                    const existingEvent = await getClubEventById(eventId);
+                    if (!existingEvent) {
+                        throw new TRPCError({ code: "NOT_FOUND" });
+                    }
+                    await requireClubStaffRole(ctx.user.id, existingEvent.clubId);
                     const updates: Partial<ClubEventInsert> = {
                         ...rest,
                         ...(startTime ? { startTime: new Date(startTime) } : {}),
@@ -785,8 +828,13 @@ export const communityRouter = router({
 
             delete: protectedProcedure
                 .input(z.object({ eventId: z.number() }))
-                .mutation(async ({ input }) => {
-                    const { deleteClubEvent } = await import("../db_social_enhanced");
+                .mutation(async ({ ctx, input }) => {
+                    const { getClubEventById, deleteClubEvent } = await import("../db_social_enhanced");
+                    const existingEvent = await getClubEventById(input.eventId);
+                    if (!existingEvent) {
+                        throw new TRPCError({ code: "NOT_FOUND" });
+                    }
+                    await requireClubStaffRole(ctx.user.id, existingEvent.clubId);
                     await deleteClubEvent(input.eventId);
                     return { success: true };
                 }),
@@ -797,7 +845,12 @@ export const communityRouter = router({
                     status: z.enum(["going", "maybe", "not_going"]),
                 }))
                 .mutation(async ({ ctx, input }) => {
-                    const { rsvpToEvent } = await import("../db_social_enhanced");
+                    const { getClubEventById, rsvpToEvent } = await import("../db_social_enhanced");
+                    const event = await getClubEventById(input.eventId);
+                    if (!event) {
+                        throw new TRPCError({ code: "NOT_FOUND" });
+                    }
+                    await requireClubMemberRole(ctx.user.id, event.clubId);
                     const attendee = await rsvpToEvent({
                         eventId: input.eventId,
                         userId: ctx.user.id,
@@ -820,8 +873,13 @@ export const communityRouter = router({
 
             attendees: protectedProcedure
                 .input(z.object({ eventId: z.number() }))
-                .query(async ({ input }) => {
-                    const { getEventAttendees } = await import("../db_social_enhanced");
+                .query(async ({ ctx, input }) => {
+                    const { getClubEventById, getEventAttendees } = await import("../db_social_enhanced");
+                    const event = await getClubEventById(input.eventId);
+                    if (!event) {
+                        throw new TRPCError({ code: "NOT_FOUND" });
+                    }
+                    await requireClubReadable(ctx.user.id, event.clubId);
                     return getEventAttendees(input.eventId);
                 }),
         }),
@@ -833,7 +891,8 @@ export const communityRouter = router({
                     clubId: z.number(),
                     includeExpired: z.boolean().optional(),
                 }))
-                .query(async ({ input }) => {
+                .query(async ({ ctx, input }) => {
+                    await requireClubReadable(ctx.user.id, input.clubId);
                     const { getClubAnnouncements } = await import("../db_social_enhanced");
                     return getClubAnnouncements(input.clubId, input.includeExpired);
                 }),
@@ -847,6 +906,7 @@ export const communityRouter = router({
                     expiresAt: z.string().datetime().optional(),
                 }))
                 .mutation(async ({ ctx, input }) => {
+                    await requireClubStaffRole(ctx.user.id, input.clubId);
                     const { createClubAnnouncement } = await import("../db_social_enhanced");
                     const announcement = await createClubAnnouncement({
                         ...input,
@@ -864,21 +924,31 @@ export const communityRouter = router({
                     isPinned: z.boolean().optional(),
                     expiresAt: z.string().datetime().optional(),
                 }))
-                .mutation(async ({ input }) => {
-                    const { updateClubAnnouncement } = await import("../db_social_enhanced");
+                .mutation(async ({ ctx, input }) => {
+                    const { getClubAnnouncementById, updateClubAnnouncement } = await import("../db_social_enhanced");
                     const { announcementId, expiresAt, ...rest } = input;
+                    const announcement = await getClubAnnouncementById(announcementId);
+                    if (!announcement) {
+                        throw new TRPCError({ code: "NOT_FOUND" });
+                    }
+                    await requireClubStaffRole(ctx.user.id, announcement.clubId);
                     const updates: Partial<ClubAnnouncementInsert> = {
                         ...rest,
                         ...(expiresAt ? { expiresAt: new Date(expiresAt) } : {}),
                     };
-                    const announcement = await updateClubAnnouncement(announcementId, updates);
-                    return { success: true, announcement };
+                    const updated = await updateClubAnnouncement(announcementId, updates);
+                    return { success: true, announcement: updated };
                 }),
 
             delete: protectedProcedure
                 .input(z.object({ announcementId: z.number() }))
-                .mutation(async ({ input }) => {
-                    const { deleteClubAnnouncement } = await import("../db_social_enhanced");
+                .mutation(async ({ ctx, input }) => {
+                    const { getClubAnnouncementById, deleteClubAnnouncement } = await import("../db_social_enhanced");
+                    const announcement = await getClubAnnouncementById(input.announcementId);
+                    if (!announcement) {
+                        throw new TRPCError({ code: "NOT_FOUND" });
+                    }
+                    await requireClubStaffRole(ctx.user.id, announcement.clubId);
                     await deleteClubAnnouncement(input.announcementId);
                     return { success: true };
                 }),
@@ -894,9 +964,38 @@ export const communityRouter = router({
                     limit: z.number().min(1).max(100).optional(),
                     offset: z.number().min(0).optional(),
                 }))
-                .query(async ({ input }) => {
+                .query(async ({ ctx, input }) => {
+                    await requireClubReadable(ctx.user.id, input.clubId);
                     const { getClubMediaGallery } = await import("../db_social_enhanced");
                     return getClubMediaGallery(input);
+                }),
+
+            imageKitAuth: protectedProcedure
+                .input(z.object({ clubId: z.number() }))
+                .mutation(async ({ ctx, input }) => {
+                    await requireClubStaffRole(ctx.user.id, input.clubId);
+                    if (!ENV.imagekitPrivateKey || !ENV.imagekitPublicKey || !ENV.imagekitUrlEndpoint) {
+                        throw new TRPCError({
+                            code: "PRECONDITION_FAILED",
+                            message: "ImageKit non configurato sul server.",
+                        });
+                    }
+
+                    const { createHmac, randomBytes } = await import("crypto");
+                    const token = randomBytes(16).toString("hex");
+                    const expire = Math.floor(Date.now() / 1000) + 60 * 10;
+                    const signature = createHmac("sha1", ENV.imagekitPrivateKey)
+                        .update(token + String(expire))
+                        .digest("hex");
+
+                    return {
+                        token,
+                        expire,
+                        signature,
+                        publicKey: ENV.imagekitPublicKey,
+                        urlEndpoint: ENV.imagekitUrlEndpoint,
+                        folder: `/clubs/${input.clubId}/${ctx.user.id}`,
+                    } as const;
                 }),
 
             upload: protectedProcedure
@@ -909,6 +1008,7 @@ export const communityRouter = router({
                     eventId: z.number().optional(),
                 }))
                 .mutation(async ({ ctx, input }) => {
+                    await requireClubStaffRole(ctx.user.id, input.clubId);
                     const { uploadClubMedia } = await import("../db_social_enhanced");
                     const media = await uploadClubMedia({
                         ...input,
@@ -933,6 +1033,7 @@ export const communityRouter = router({
                     })
                 )
                 .mutation(async ({ ctx, input }) => {
+                    await requireClubStaffRole(ctx.user.id, input.clubId);
                     const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
                     const admin = getSupabaseAdminClient();
 
@@ -1032,8 +1133,13 @@ export const communityRouter = router({
 
             delete: protectedProcedure
                 .input(z.object({ mediaId: z.number() }))
-                .mutation(async ({ input }) => {
-                    const { deleteClubMedia } = await import("../db_social_enhanced");
+                .mutation(async ({ ctx, input }) => {
+                    const { getClubMediaById, deleteClubMedia } = await import("../db_social_enhanced");
+                    const media = await getClubMediaById(input.mediaId);
+                    if (!media) {
+                        throw new TRPCError({ code: "NOT_FOUND" });
+                    }
+                    await requireClubStaffRole(ctx.user.id, media.clubId);
                     await deleteClubMedia(input.mediaId);
                     return { success: true };
                 }),
@@ -1048,32 +1154,12 @@ export const communityRouter = router({
                 content: z.string().min(1).max(5000),
             }))
             .mutation(async ({ ctx, input }) => {
-                const { sendDirectMessage, createNotification } = await import("../db_social_enhanced");
+                const { sendDirectMessage } = await import("../db_social_enhanced");
                 const message = await sendDirectMessage({
                     senderId: ctx.user.id,
                     receiverId: input.receiverId,
                     content: input.content,
                 });
-
-                // Notify recipient (fire-and-forget)
-                try {
-                    const { getDb } = await import("../db");
-                    const { sql } = await import("drizzle-orm");
-                    const db = await getDb();
-                    const actor = await db!.execute(sql`SELECT name FROM users WHERE id = ${ctx.user.id} LIMIT 1`);
-                    const actorName = ((actor.rows[0] as any)?.name as string | undefined) || "Qualcuno";
-                    const preview = input.content.trim().slice(0, 80);
-                    await createNotification({
-                        userId: input.receiverId,
-                        type: "dm",
-                        title: "Nuovo messaggio",
-                        message: `${actorName}: ${preview}${input.content.trim().length > 80 ? "…" : ""}`,
-                        link: `/home`,
-                    });
-                } catch {
-                    // non-critical
-                }
-
                 return { success: true, message };
             }),
 
@@ -1109,6 +1195,13 @@ export const communityRouter = router({
             .query(async ({ ctx, input }) => {
                 const { getRecentConversations } = await import("../db_social_enhanced");
                 return getRecentConversations(ctx.user.id, input?.limit);
+            }),
+
+        unreadCount: protectedProcedure
+            .query(async ({ ctx }) => {
+                const { getUnreadDmCount } = await import("../db_social_enhanced");
+                const count = await getUnreadDmCount(ctx.user.id);
+                return { count };
             }),
     }),
 

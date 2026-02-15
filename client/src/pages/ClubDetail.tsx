@@ -80,6 +80,11 @@ type ClubInvite = {
   created_at: string;
 };
 
+const CLUB_ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
+const CLUB_ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime"] as const;
+const MAX_CLUB_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_CLUB_VIDEO_BYTES = 120 * 1024 * 1024;
+
 export default function ClubDetail() {
   const [match, params] = useRoute("/community/club/:id");
   const clubId = Number(params?.id);
@@ -319,24 +324,9 @@ export default function ClubDetail() {
     },
   });
   
-  const readFileAsBase64 = (file: File) =>
-    new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        const base64 = result.split(",")[1];
-        if (!base64) {
-          reject(new Error("Invalid file encoding"));
-          return;
-        }
-        resolve(base64);
-      };
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
-
+  const mediaImageKitAuth = trpc.community.clubs.media.imageKitAuth.useMutation();
   // Media mutations
-  const uploadMediaFile = trpc.community.clubs.media.uploadFile.useMutation({
+  const uploadMediaFile = trpc.community.clubs.media.upload.useMutation({
     onSuccess: () => {
       setMediaForm({ caption: "" });
       setMediaFile(null);
@@ -350,6 +340,45 @@ export default function ClubDetail() {
       toast.error(`Errore: ${error.message}`);
     },
   });
+
+  const uploadClubMediaToImageKit = async (
+    file: File
+  ): Promise<{ url: string; thumbnailUrl?: string }> => {
+    const auth = await mediaImageKitAuth.mutateAsync({ clubId });
+    const fileNameSafe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const fileName = `club-${clubId}-${Date.now()}-${fileNameSafe}`;
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("fileName", fileName);
+    formData.append("publicKey", auth.publicKey);
+    formData.append("token", auth.token);
+    formData.append("signature", auth.signature);
+    formData.append("expire", String(auth.expire));
+    formData.append("folder", auth.folder);
+    formData.append("useUniqueFileName", "true");
+    formData.append("tags", `club,club-${clubId},swimforge`);
+
+    const uploadResponse = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!uploadResponse.ok) {
+      const detail = await uploadResponse.text().catch(() => "");
+      throw new Error(detail || "Upload su ImageKit fallito");
+    }
+
+    const uploaded = (await uploadResponse.json()) as { url?: string; thumbnailUrl?: string };
+    if (!uploaded.url) {
+      throw new Error("ImageKit non ha restituito un URL valido");
+    }
+
+    return {
+      url: uploaded.url,
+      ...(uploaded.thumbnailUrl ? { thumbnailUrl: uploaded.thumbnailUrl } : {}),
+    };
+  };
   
   const deleteMedia = trpc.community.clubs.media.delete.useMutation({
     onSuccess: () => {
@@ -1239,11 +1268,11 @@ export default function ClubDetail() {
 	                          <h3 className="text-lg font-semibold">Carica Media</h3>
 	                          <div className="space-y-3">
 	                            <div className="space-y-2">
-	                              <label className="text-xs text-muted-foreground">File immagine</label>
+	                              <label className="text-xs text-muted-foreground">File foto o video</label>
                                 <Input
                                   ref={mediaFileInputRef}
                                   type="file"
-                                  accept="image/jpeg,image/png,image/webp"
+                                  accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
                                   onChange={(e) => setMediaFile(e.target.files?.[0] ?? null)}
                                   className="bg-background/60"
                                 />
@@ -1262,33 +1291,32 @@ export default function ClubDetail() {
 		                            variant="neon"
 		                            onClick={async () => {
                                   if (!mediaFile) {
-                                    toast.error("Seleziona un file immagine.");
+                                    toast.error("Seleziona un file.");
                                     return;
                                   }
-                                  if (mediaFile.size > 5 * 1024 * 1024) {
-                                    toast.error("File troppo grande (max 5MB).");
+
+                                  const isImage = (CLUB_ALLOWED_IMAGE_TYPES as readonly string[]).includes(mediaFile.type);
+                                  const isVideo = (CLUB_ALLOWED_VIDEO_TYPES as readonly string[]).includes(mediaFile.type);
+                                  if (!isImage && !isVideo) {
+                                    toast.error("Formato non supportato. Usa JPG/PNG/WEBP o MP4/WEBM/MOV.");
                                     return;
                                   }
-                                  const allowedTypes = ["image/jpeg", "image/png", "image/webp"] as const;
-                                  if (!(allowedTypes as readonly string[]).includes(mediaFile.type)) {
-                                    toast.error("Formato non supportato. Usa JPG, PNG o WEBP.");
+
+                                  const maxBytes = isImage ? MAX_CLUB_IMAGE_BYTES : MAX_CLUB_VIDEO_BYTES;
+                                  if (mediaFile.size > maxBytes) {
+                                    const maxMb = Math.round(maxBytes / (1024 * 1024));
+                                    toast.error(`File troppo grande (max ${maxMb}MB).`);
                                     return;
                                   }
-                                  const rawExtension = mediaFile.name.split(".").pop()?.toLowerCase();
-                                  const extension =
-                                    rawExtension === "jpg" ||
-                                    rawExtension === "jpeg" ||
-                                    rawExtension === "png" ||
-                                    rawExtension === "webp"
-                                      ? rawExtension
-                                      : undefined;
+
+                                  const mediaType = isVideo ? "video" : "image";
                                   try {
-                                    const fileBase64 = await readFileAsBase64(mediaFile);
+                                    const uploaded = await uploadClubMediaToImageKit(mediaFile);
                                     uploadMediaFile.mutate({
                                       clubId,
-                                      fileBase64,
-                                      mimeType: mediaFile.type as "image/jpeg" | "image/png" | "image/webp",
-                                      ...(extension ? { extension: extension as "jpg" | "jpeg" | "png" | "webp" } : {}),
+                                      mediaType,
+                                      mediaUrl: uploaded.url,
+                                      ...(uploaded.thumbnailUrl ? { thumbnailUrl: uploaded.thumbnailUrl } : {}),
                                       caption: mediaForm.caption || undefined,
                                     });
                                   } catch (error: unknown) {
@@ -1297,10 +1325,10 @@ export default function ClubDetail() {
                                     toast.error(message);
                                   }
                                 }}
-		                            disabled={!mediaFile || uploadMediaFile.isPending}
+		                            disabled={!mediaFile || uploadMediaFile.isPending || mediaImageKitAuth.isPending}
 		                          >
 	                            <Upload className="h-4 w-4 mr-2" />
-	                            {uploadMediaFile.isPending ? "Caricamento..." : "Carica"}
+	                            {uploadMediaFile.isPending || mediaImageKitAuth.isPending ? "Caricamento..." : "Carica"}
 		                          </Button>
 	                        </SurfaceContent>
 	                      </Surface>
@@ -1313,7 +1341,7 @@ export default function ClubDetail() {
                     ) : mediaItems.length === 0 ? (
                       <Surface className="border-border/50 bg-card/50 backdrop-blur-sm">
                         <SurfaceContent className="p-6 text-muted-foreground">
-                          Nessun media disponibile. {isStaff && "Carica la prima immagine!"}
+                          Nessun media disponibile. {isStaff && "Carica il primo contenuto!"}
                         </SurfaceContent>
                       </Surface>
                     ) : (
@@ -1327,12 +1355,23 @@ export default function ClubDetail() {
 	                            animate={{ opacity: 1, scale: 1 }}
 	                            transition={{ duration: 0.3 }}
 	                          >
-	                            <Surface className="border-border/50 bg-card/60 backdrop-blur-sm overflow-hidden">
-	                              <img
-	                                src={media.mediaUrl ?? media.media_url}
-	                                alt={media.caption || "Gallery"}
-	                                className="w-full h-48 object-cover"
-	                              />
+		                            <Surface className="border-border/50 bg-card/60 backdrop-blur-sm overflow-hidden">
+                                {(media.mediaType ?? media.media_type) === "video" ? (
+                                  <video
+                                    src={media.mediaUrl ?? media.media_url}
+                                    poster={media.thumbnailUrl ?? media.thumbnail_url ?? undefined}
+                                    className="w-full h-48 object-cover bg-black"
+                                    controls
+                                    preload="metadata"
+                                    playsInline
+                                  />
+                                ) : (
+		                                <img
+		                                  src={media.mediaUrl ?? media.media_url}
+		                                  alt={media.caption || "Gallery"}
+		                                  className="w-full h-48 object-cover"
+		                                />
+                                )}
 	                              <SurfaceContent className="p-4">
 	                                {media.caption && (
 	                                  <p className="text-sm text-muted-foreground mb-2">{media.caption}</p>
