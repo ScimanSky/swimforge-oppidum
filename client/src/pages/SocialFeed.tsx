@@ -12,9 +12,8 @@ import FeedSubTabs from "@/components/social/FeedSubTabs"
 import FeedPost from "@/components/social/FeedPost"
 import FeedSkeleton from "@/components/social/FeedSkeleton"
 import FeedSidebar from "@/components/social/FeedSidebar"
-import InfiniteScrollSentinel from "@/components/social/InfiniteScrollSentinel"
 import { Button } from "@/components/ui/button"
-import { Waves, Users, RefreshCw } from "lucide-react"
+import { Waves, Users, RefreshCw, Loader2 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 
 function EmptyFeedPerTe({ onCreatePost }: { onCreatePost: () => void }) {
@@ -63,6 +62,7 @@ export default function SocialFeed() {
   const [cursor, setCursor] = useState<string | undefined>(undefined)
   const [extraPosts, setExtraPosts] = useState<any[]>([])
   const [hasMore, setHasMore] = useState(true)
+  const [visibleCount, setVisibleCount] = useState(5)
   const [storyViewerOpen, setStoryViewerOpen] = useState(false)
   const [storyViewerGroupIdx, setStoryViewerGroupIdx] = useState(0)
   const [storyCreatorOpen, setStoryCreatorOpen] = useState(false)
@@ -120,6 +120,7 @@ export default function SocialFeed() {
     setCursor(undefined)
     setExtraPosts([])
     setHasMore(true)
+    setVisibleCount(5)
     lastCursorRef.current = undefined
   }, [tab])
 
@@ -150,8 +151,8 @@ export default function SocialFeed() {
         <div className="xl:flex xl:gap-6 xl:justify-center">
           {/* Feed column */}
           <div className="w-full max-w-[580px] mx-auto xl:mx-0 space-y-3 lg:space-y-4">
-            {/* Story Bar - transparent bg with bottom border */}
-            <div className="border-b border-border/30 pb-3">
+            {/* Story Bar - hidden on xl+ (shown in sidebar instead) */}
+            <div className="border-b border-border/30 pb-3 xl:hidden">
               <StoryBar
                 currentUserId={currentUserId}
                 onViewStory={handleViewStory}
@@ -180,7 +181,7 @@ export default function SocialFeed() {
               )
             ) : (
               <div className="space-y-3 lg:space-y-4">
-                {posts.map((post: any, index: number) => (
+                {posts.slice(0, visibleCount).map((post: any, index: number) => (
                   <FeedPost
                     key={post.id}
                     post={post}
@@ -188,18 +189,49 @@ export default function SocialFeed() {
                     index={index}
                   />
                 ))}
-                <InfiniteScrollSentinel
-                  onIntersect={loadMore}
-                  hasMore={hasMore}
-                  isLoading={nextPageQuery.isFetching}
-                />
+                {/* Load more button */}
+                {(visibleCount < posts.length || hasMore) && (
+                  <div className="flex justify-center py-4">
+                    <Button
+                      variant="outline-neon"
+                      size="lg"
+                      className="gap-2"
+                      disabled={nextPageQuery.isFetching}
+                      onClick={() => {
+                        if (visibleCount < posts.length) {
+                          setVisibleCount((c) => c + 5)
+                        } else if (hasMore) {
+                          loadMore()
+                          setVisibleCount((c) => c + 5)
+                        }
+                      }}
+                    >
+                      {nextPageQuery.isFetching ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin" />
+                          Caricamento…
+                        </>
+                      ) : (
+                        "Carica altri"
+                      )}
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
           {/* Right Sidebar - xl+ only */}
-          <div className="hidden xl:block w-[280px] shrink-0 sticky top-20">
-            <FeedSidebar />
+          <div className="hidden xl:block w-[280px] shrink-0">
+            <FeedSidebar
+              storyBarSlot={
+                <StoryBar
+                  currentUserId={currentUserId}
+                  onViewStory={handleViewStory}
+                  onCreateStory={handleCreateStory}
+                />
+              }
+            />
           </div>
         </div>
       </div>

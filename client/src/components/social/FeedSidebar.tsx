@@ -59,7 +59,7 @@ function SuggestedUserRow({ user }: { user: { userId: number; name: string | nul
   )
 }
 
-export default function FeedSidebar() {
+export default function FeedSidebar({ storyBarSlot }: { storyBarSlot?: React.ReactNode }) {
   const profileQuery = trpc.profile.get.useQuery()
   const profile = profileQuery.data
 
@@ -72,7 +72,12 @@ export default function FeedSidebar() {
   const displayName = profile?.username || profile?.userId?.toString() || "Nuotatore"
 
   return (
-    <div className="space-y-4">
+    <div className="sticky top-20 max-h-[calc(100dvh-6rem)] overflow-y-auto space-y-4">
+      {/* Story bar slot (xl+ only) */}
+      {storyBarSlot && (
+        <div className="surface-panel p-3">{storyBarSlot}</div>
+      )}
+
       {/* Your profile mini card */}
       {profile && (
         <Link href="/profile" className="block">

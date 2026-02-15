@@ -15,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import StatisticsAccordion from "@/components/statistics/StatisticsAccordion"
 import {
   Search,
   Filter,
@@ -26,6 +27,7 @@ import {
   Waves,
   MapPin,
   Orbit,
+  BarChart3,
 } from "lucide-react"
 import { Link } from "wouter"
 import { trpc } from "@/lib/trpc"
@@ -228,6 +230,12 @@ export default function Activities() {
                           <ChevronRight className="ml-2 h-4 w-4" />
                         </Link>
                       </Button>
+                      <Button variant="outline-neon" size="sm" asChild>
+                        <Link href="/profile/performance">
+                          <BarChart3 className="mr-1 h-3.5 w-3.5" />
+                          Statistiche
+                        </Link>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -245,6 +253,9 @@ export default function Activities() {
                     />
                   ))}
                 </div>
+
+                {/* Statistics accordion */}
+                <StatisticsAccordion />
               </section>
             </div>
 
