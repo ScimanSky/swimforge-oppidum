@@ -115,7 +115,7 @@ function RailLink({ item, location }: { item: NavItem; location: string }) {
   )
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children, headerSlot }: { children: React.ReactNode; headerSlot?: React.ReactNode }) {
   const [location] = useLocation()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -223,6 +223,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="fixed left-0 right-0 top-0 z-50 h-16 border-b border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_54%,transparent),color-mix(in_oklch,var(--background)_62%,transparent))] backdrop-blur-xl shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_12%,transparent)] lg:pl-[88px]">
         <div className="flex h-full items-center justify-between gap-3 px-4">
           <div className="flex min-w-0 items-center gap-3">
+            {headerSlot}
             <div className="min-w-0">
               <div className="text-xs text-muted-foreground">Neon Soft Dark</div>
               <div className="truncate text-lg font-display font-semibold tracking-wide">

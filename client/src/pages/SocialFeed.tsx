@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Link } from "wouter"
-import { motion } from "framer-motion"
 import AppLayout from "@/components/AppLayout"
+import { StoryAvatar } from "@/components/social/StoryAvatar"
 import { StoryViewer } from "@/components/social/StoryViewer"
 import { StoryCreator } from "@/components/social/StoryCreator"
 import { CreatePostSheet } from "@/components/social/CreatePostSheet"
@@ -69,10 +69,18 @@ export default function SocialFeed() {
 
   const profileQuery = trpc.profile.get.useQuery()
   const currentUserId = profileQuery.data?.userId
+  const profile = profileQuery.data
 
   const { data: storyGroups } = trpc.community.stories.active.useQuery(undefined, {
     staleTime: 30_000,
   })
+
+  const allGroups = storyGroups ?? []
+  const currentUserGroup = currentUserId
+    ? allGroups.find((g: any) => Number(g.userId) === Number(currentUserId))
+    : undefined
+  const hasOwnStories = (currentUserGroup?.stories?.length ?? 0) > 0
+  const displayName = profile?.username || profile?.userId?.toString() || "Nuotatore"
 
   const handleViewStory = useCallback((userId: number) => {
     const groups = storyGroups ?? []
@@ -143,81 +151,98 @@ export default function SocialFeed() {
 
   const isInitialLoading = firstPageQuery.isLoading && posts.length === 0
 
+  // Header slot: current user's story avatar
+  const headerStoryAvatar = currentUserId ? (
+    <StoryAvatar
+      userId={currentUserId}
+      userName={currentUserGroup?.userName ?? displayName}
+      avatarUrl={currentUserGroup?.userAvatar ?? profile?.avatarUrl}
+      hasUnviewed={hasOwnStories}
+      isCurrentUser
+      size="sm"
+      onClick={hasOwnStories ? () => handleViewStory(currentUserId) : handleCreateStory}
+    />
+  ) : undefined
+
   return (
-    <AppLayout>
+    <AppLayout headerSlot={headerStoryAvatar}>
       <div className="compact-shell">
-        {/* Sticky top strip: story bar + profile + stats + suggested */}
-        <div className="sticky top-16 z-20 pb-3 bg-background/80 backdrop-blur-md -mx-4 px-4 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
-          <FeedSidebar
-            currentUserId={currentUserId}
-            onViewStory={handleViewStory}
-            onCreateStory={handleCreateStory}
-          />
-        </div>
+        {/* Two-column layout: feed + sidebar on xl+ */}
+        <div className="flex gap-6 justify-center">
+          {/* Feed column */}
+          <div className="w-full max-w-2xl min-w-0">
+            {/* Sticky FeedSubTabs */}
+            <div className="sticky top-16 z-20 pb-3 bg-background/80 backdrop-blur-md -mx-4 px-4 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+              {/* Pull-to-refresh indicator */}
+              {firstPageQuery.isFetching && !isInitialLoading && (
+                <div className="flex justify-center py-2">
+                  <RefreshCw className="size-4 text-muted-foreground animate-spin" />
+                </div>
+              )}
+              <FeedSubTabs tab={tab} onChange={setTab} />
+            </div>
 
-        {/* Feed content */}
-        <div className="w-full max-w-[580px] mx-auto">
-          <div className="space-y-3 lg:space-y-4">
-            {/* Pull-to-refresh indicator */}
-            {firstPageQuery.isFetching && !isInitialLoading && (
-              <div className="flex justify-center py-2">
-                <RefreshCw className="size-4 text-muted-foreground animate-spin" />
-              </div>
-            )}
-
-            {/* Feed Sub-Tabs */}
-            <FeedSubTabs tab={tab} onChange={setTab} />
-
-            {/* Feed List */}
-            {isInitialLoading ? (
-              <FeedSkeleton />
-            ) : posts.length === 0 ? (
-              tab === "seguiti" ? (
-                <EmptyFeedSeguiti />
+            <div className="space-y-3 lg:space-y-4">
+              {/* Feed List */}
+              {isInitialLoading ? (
+                <FeedSkeleton />
+              ) : posts.length === 0 ? (
+                tab === "seguiti" ? (
+                  <EmptyFeedSeguiti />
+                ) : (
+                  <EmptyFeedPerTe onCreatePost={() => setCreatePostOpen(true)} />
+                )
               ) : (
-                <EmptyFeedPerTe onCreatePost={() => setCreatePostOpen(true)} />
-              )
-            ) : (
-              <div className="space-y-3 lg:space-y-4">
-                {posts.slice(0, visibleCount).map((post: any, index: number) => (
-                  <FeedPost
-                    key={post.id}
-                    post={post}
-                    currentUserId={currentUserId}
-                    index={index}
-                  />
-                ))}
-                {/* Load more button */}
-                {(visibleCount < posts.length || hasMore) && (
-                  <div className="flex justify-center py-4">
-                    <Button
-                      variant="outline-neon"
-                      size="lg"
-                      className="gap-2"
-                      disabled={nextPageQuery.isFetching}
-                      onClick={() => {
-                        if (visibleCount < posts.length) {
-                          setVisibleCount((c) => c + 5)
-                        } else if (hasMore) {
-                          loadMore()
-                          setVisibleCount((c) => c + 5)
-                        }
-                      }}
-                    >
-                      {nextPageQuery.isFetching ? (
-                        <>
-                          <Loader2 className="size-4 animate-spin" />
-                          Caricamento…
-                        </>
-                      ) : (
-                        "Carica altri"
-                      )}
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
+                <div className="space-y-3 lg:space-y-4">
+                  {posts.slice(0, visibleCount).map((post: any, index: number) => (
+                    <FeedPost
+                      key={post.id}
+                      post={post}
+                      currentUserId={currentUserId}
+                      index={index}
+                    />
+                  ))}
+                  {/* Load more button */}
+                  {(visibleCount < posts.length || hasMore) && (
+                    <div className="flex justify-center py-4">
+                      <Button
+                        variant="outline-neon"
+                        size="lg"
+                        className="gap-2"
+                        disabled={nextPageQuery.isFetching}
+                        onClick={() => {
+                          if (visibleCount < posts.length) {
+                            setVisibleCount((c) => c + 5)
+                          } else if (hasMore) {
+                            loadMore()
+                            setVisibleCount((c) => c + 5)
+                          }
+                        }}
+                      >
+                        {nextPageQuery.isFetching ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" />
+                            Caricamento…
+                          </>
+                        ) : (
+                          "Carica altri"
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
+
+          {/* Right sidebar — xl+ only */}
+          <aside className="hidden xl:block w-64 shrink-0 sticky top-20 self-start">
+            <FeedSidebar
+              currentUserId={currentUserId}
+              onViewStory={handleViewStory}
+              onCreateStory={handleCreateStory}
+            />
+          </aside>
         </div>
       </div>
 

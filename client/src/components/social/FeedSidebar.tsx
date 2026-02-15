@@ -2,11 +2,10 @@ import { Link } from "wouter"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Flame, Ruler, UserPlus, Waves } from "lucide-react"
+import { UserPlus } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
-import { getInitials, formatDistance } from "@/lib/format"
-import { StoryAvatar } from "./StoryAvatar"
+import { getInitials } from "@/lib/format"
 
 function SuggestedUserRow({ user }: { user: { userId: number; name: string | null; username: string | null; avatarUrl: string | null; level: number | null } }) {
   const displayName = user.username || user.name || `#${user.userId}`
@@ -92,12 +91,9 @@ interface FeedSidebarProps {
   onCreateStory?: () => void
 }
 
-export default function FeedSidebar({ currentUserId, onViewStory, onCreateStory }: FeedSidebarProps) {
-  const profileQuery = trpc.profile.get.useQuery()
-  const profile = profileQuery.data
-
+export default function FeedSidebar({ currentUserId, onViewStory }: FeedSidebarProps) {
   const suggestedQuery = trpc.community.users.suggested.useQuery(
-    { limit: 3 },
+    { limit: 5 },
     { staleTime: 60_000 }
   )
   const suggestedUsers = suggestedQuery.data ?? []
@@ -106,10 +102,6 @@ export default function FeedSidebar({ currentUserId, onViewStory, onCreateStory 
     staleTime: 30_000,
   })
   const allGroups = storyGroups ?? []
-  const currentUserGroup = currentUserId
-    ? allGroups.find((g: any) => Number(g.userId) === Number(currentUserId))
-    : undefined
-  const hasOwnStories = (currentUserGroup?.stories?.length ?? 0) > 0
   const otherGroups = allGroups
     .filter((g: any) => Number(g.userId) !== Number(currentUserId))
     .sort((a, b) => {
@@ -118,78 +110,15 @@ export default function FeedSidebar({ currentUserId, onViewStory, onCreateStory 
       return aU === bU ? 0 : aU ? -1 : 1
     })
 
-  const displayName = profile?.username || profile?.userId?.toString() || "Nuotatore"
   const hasStories = otherGroups.length > 0
 
   return (
-    <div className={cn(
-      "grid gap-2.5",
-      hasStories
-        ? "grid-cols-2 sm:grid-cols-4"
-        : "grid-cols-2 sm:grid-cols-3",
-    )}>
-      {/* Profile card with integrated story avatar */}
-      {profile && currentUserId && (
-        <div className="surface-panel p-3.5 flex items-center gap-3 h-full">
-          <div className="shrink-0">
-            <StoryAvatar
-              userId={currentUserId}
-              userName={currentUserGroup?.userName ?? displayName}
-              avatarUrl={currentUserGroup?.userAvatar ?? profile.avatarUrl}
-              hasUnviewed={hasOwnStories}
-              isCurrentUser
-              onClick={hasOwnStories ? () => onViewStory?.(currentUserId) : onCreateStory}
-            />
-          </div>
-          <Link href="/profile" className="min-w-0 flex-1">
-            <p className="font-bold text-sm text-foreground truncate hover:underline">{displayName}</p>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_20%,transparent),color-mix(in_oklch,var(--electric-lime)_16%,transparent))] text-foreground/80">
-                Lv.{profile.xpLevel}
-              </span>
-              {profile.xpToNextLevel != null && profile.xpToNextLevel > 0 && (
-                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-[linear-gradient(90deg,var(--electric-cyan),var(--electric-lime))]"
-                    style={{
-                      width: `${Math.min(100, ((profile.totalXp) / (profile.totalXp + profile.xpToNextLevel)) * 100)}%`,
-                    }}
-                  />
-                </div>
-              )}
-            </div>
-          </Link>
-        </div>
-      )}
-
-      {/* Stats card */}
-      {profile && (
-        <div className="surface-panel p-3.5 h-full">
-          <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Riepilogo</h3>
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <Ruler className="size-4 text-[var(--electric-cyan)] shrink-0" />
-              <span className="text-sm font-display font-bold text-foreground">
-                {formatDistance(profile.totalDistanceMeters) || "—"}
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Waves className="size-4 text-[var(--electric-lime)] shrink-0" />
-              <span className="text-sm font-display font-bold text-foreground">{profile.totalXp ?? 0} XP</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Flame className="size-4 text-[var(--electric-coral)] shrink-0" />
-              <span className="text-sm font-display font-bold text-foreground truncate">{profile.levelTitle}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Suggested users card */}
-      <div className="surface-panel p-3.5 h-full">
-        <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Suggeriti per te</h3>
+    <div className="space-y-4">
+      {/* Suggested users */}
+      <div className="surface-panel p-4">
+        <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Suggeriti per te</h3>
         {suggestedUsers.length > 0 ? (
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {suggestedUsers.map((user) => (
               <SuggestedUserRow key={user.userId} user={user} />
             ))}
@@ -201,11 +130,11 @@ export default function FeedSidebar({ currentUserId, onViewStory, onCreateStory 
         )}
       </div>
 
-      {/* Stories column — compact vertical list */}
+      {/* Stories */}
       {hasStories && (
-        <div className="surface-panel p-3.5 h-full col-span-2 sm:col-span-1">
-          <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Storie</h3>
-          <div className="space-y-1.5 max-h-[120px] overflow-y-auto scrollbar-hide">
+        <div className="surface-panel p-4">
+          <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Storie</h3>
+          <div className="space-y-2">
             {otherGroups.map((group) => {
               const hasUnviewed = group.stories.some((s: any) => !s.hasViewed)
               return (

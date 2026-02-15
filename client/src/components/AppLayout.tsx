@@ -8,6 +8,7 @@ interface AppLayoutProps {
   withShell?: boolean;
   showBubbles?: boolean;
   bubbleIntensity?: string;
+  headerSlot?: ReactNode;
 }
 
 /**
@@ -19,6 +20,7 @@ export function AppLayout({
   children,
   className = "",
   withShell = true,
+  headerSlot,
 }: AppLayoutProps) {
   const wrappedChildren = withShell ? <div className="sf-page-root">{children}</div> : children;
 
@@ -28,7 +30,7 @@ export function AppLayout({
     >
       <PageBackground />
       <div className="relative z-10">
-        {withShell ? <AppShell>{wrappedChildren}</AppShell> : wrappedChildren}
+        {withShell ? <AppShell headerSlot={headerSlot}>{wrappedChildren}</AppShell> : wrappedChildren}
       </div>
     </div>
   );
