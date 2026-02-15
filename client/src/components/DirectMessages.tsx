@@ -211,8 +211,8 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
   const unreadCount = unreadDmQuery.data?.count ?? 0;
 
   const renderSearchView = () => (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 p-4 border-b">
+    <div className="flex flex-col h-full min-h-0">
+      <div className="flex items-center gap-2 p-4 border-b shrink-0">
         <Button variant="ghost" size="sm" onClick={() => { setView("list"); setSearchQuery(""); }}>
           ← Indietro
         </Button>
@@ -279,8 +279,8 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
 
   const renderConversationsList = () => {
     return (
-      <div className="flex flex-col h-full">
-        <div className="flex items-center justify-between px-4 py-2 border-b">
+      <div className="flex flex-col h-full min-h-0">
+        <div className="flex items-center justify-between px-4 py-2 border-b shrink-0">
           <span className="text-xs text-muted-foreground">Conversazioni recenti</span>
           <Button
             variant="ghost-neon"
@@ -367,8 +367,8 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
       "Utente";
 
     return (
-      <div className="flex flex-col h-full">
-        <div className="flex items-center gap-3 p-4 border-b">
+      <div className="flex flex-col h-full min-h-0">
+        <div className="flex items-center gap-3 p-4 border-b shrink-0">
           <Button
             variant="ghost"
             size="sm"
@@ -385,40 +385,42 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
           </div>
         </div>
 
-        <ScrollArea className="flex-1 p-4">
-          <div className="space-y-4">
-            {conversationQuery.data.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
-                <p className="text-sm">Inizia la conversazione!</p>
-              </div>
-            )}
-            {conversationQuery.data.map((msg) => {
-              const isOwn = msg.message.senderId !== selectedConversation;
-              return (
-                <div
-                  key={msg.message.id}
-                  className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                      isOwn
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    }`}
-                  >
-                    <p className="text-sm whitespace-pre-wrap">{msg.message.content}</p>
-                    <p className={`text-xs mt-1 ${isOwn ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                      {formatTime(msg.message.createdAt)}
-                    </p>
-                  </div>
+        <div className="flex-1 min-h-0">
+          <ScrollArea className="h-full">
+            <div className="space-y-4 p-4">
+              {conversationQuery.data.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+                  <p className="text-sm">Inizia la conversazione!</p>
                 </div>
-              );
-            })}
-            <div ref={messagesEndRef} />
-          </div>
-        </ScrollArea>
+              )}
+              {conversationQuery.data.map((msg) => {
+                const isOwn = msg.message.senderId !== selectedConversation;
+                return (
+                  <div
+                    key={msg.message.id}
+                    className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                        isOwn
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted"
+                      }`}
+                    >
+                      <p className="text-sm whitespace-pre-wrap">{msg.message.content}</p>
+                      <p className={`text-xs mt-1 ${isOwn ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
+                        {formatTime(msg.message.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+              <div ref={messagesEndRef} />
+            </div>
+          </ScrollArea>
+        </div>
 
-        <div className="p-4 border-t">
+        <div className="p-4 border-t shrink-0">
           <div className="flex gap-2">
             <Input
               value={messageText}
@@ -465,7 +467,7 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
           )}
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl h-[600px] flex flex-col p-0">
+      <DialogContent className="max-w-2xl h-[600px] max-h-[80dvh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="p-4 border-b">
           <DialogTitle>Messaggi</DialogTitle>
         </DialogHeader>
