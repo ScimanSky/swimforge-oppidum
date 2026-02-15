@@ -1,8 +1,13 @@
 import { Link } from "wouter"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { UserPlus } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { MoreHorizontal, UserPlus, Flag, EyeOff } from "lucide-react"
 import { formatTimeAgo, getInitials } from "@/lib/format"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
@@ -16,6 +21,7 @@ interface FeedPostHeaderProps {
     activity_source?: string | null
     activity_is_open_water?: boolean | null
     created_at: string
+    user_level?: number | null
   }
   isOwner: boolean
   isFollowing?: boolean
@@ -31,54 +37,68 @@ export default function FeedPostHeader({ post, isOwner, isFollowing }: FeedPostH
     onError: (err) => toast.error(err.message),
   })
 
+  // Build source line: "Strava · Pool · 2h fa"
+  const sourceParts: string[] = []
+  if (post.activity_source) sourceParts.push(post.activity_source)
+  if (post.activity_is_open_water != null) sourceParts.push(activityType)
+  sourceParts.push(formatTimeAgo(post.created_at))
+
   return (
-    <div className="flex items-start gap-3">
+    <div className="flex items-center gap-3 px-4 pt-3">
       <Link href={`/u/${post.user_id}`}>
-        <Avatar className="h-10 w-10 border border-border cursor-pointer">
+        <Avatar className="size-11 border-2 border-border/60 cursor-pointer ring-2 ring-transparent hover:ring-[var(--electric-cyan)]/30 transition-all">
           <AvatarImage src={post.user_avatar || ""} alt={name} />
-          <AvatarFallback>{initials}</AvatarFallback>
+          <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
         </Avatar>
       </Link>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <Link
             href={`/u/${post.user_id}`}
-            className="font-semibold text-foreground truncate hover:underline"
+            className="font-bold text-sm text-foreground truncate hover:underline"
           >
             {name}
           </Link>
-          {post.activity_source ? (
-            <Badge variant="neon" className="text-[10px]">
-              {post.activity_source}
-            </Badge>
-          ) : null}
-          {post.activity_is_open_water != null && (
-            <Badge
-              variant="outline"
-              className={
-                activityType === "Pool"
-                  ? "border-primary/40 text-primary text-[10px]"
-                  : "border-accent/40 text-accent text-[10px]"
-              }
-            >
-              {activityType}
-            </Badge>
+          {post.user_level != null && post.user_level > 0 && (
+            <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_20%,transparent),color-mix(in_oklch,var(--electric-lime)_16%,transparent))] text-foreground/80">
+              Lv.{post.user_level}
+            </span>
           )}
         </div>
-        <p className="text-xs text-muted-foreground">{formatTimeAgo(post.created_at)}</p>
+        <p className="text-xs text-muted-foreground truncate">{sourceParts.join(" · ")}</p>
       </div>
-      {!isOwner && !isFollowing && (
-        <Button
-          variant="outline-neon"
-          size="sm"
-          className="gap-1 shrink-0"
-          onClick={() => toggleFollow.mutate({ userId: post.user_id })}
-          disabled={toggleFollow.isPending}
-        >
-          <UserPlus className="h-3.5 w-3.5" />
-          Segui
-        </Button>
-      )}
+
+      <div className="flex items-center gap-1 shrink-0">
+        {!isOwner && !isFollowing && (
+          <Button
+            variant="outline-neon"
+            size="sm"
+            className="gap-1 h-8 text-xs"
+            onClick={() => toggleFollow.mutate({ userId: post.user_id })}
+            disabled={toggleFollow.isPending}
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            Segui
+          </Button>
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon-sm" className="size-8 rounded-full text-muted-foreground hover:text-foreground">
+              <MoreHorizontal className="size-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem className="gap-2 text-xs">
+              <Flag className="size-3.5" />
+              Segnala
+            </DropdownMenuItem>
+            <DropdownMenuItem className="gap-2 text-xs">
+              <EyeOff className="size-3.5" />
+              Nascondi
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   )
 }

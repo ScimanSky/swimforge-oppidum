@@ -41,11 +41,17 @@ export default function FeedPost({ post, currentUserId, index = 0 }: FeedPostPro
   return (
     <motion.div
       className="stream-node"
-      initial={{ opacity: 0, y: 14, filter: "blur(6px)" }}
-      animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-      transition={{ duration: 0.35, ease: "easeOut", delay: Math.min(index * 0.035, 0.25) }}
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: 0.45,
+        type: "spring",
+        stiffness: 260,
+        damping: 24,
+        delay: Math.min(index * 0.04, 0.2),
+      }}
     >
-      <div className="surface-panel p-3.5">
+      <div className="surface-panel overflow-hidden p-0">
         <FeedPostHeader post={post} isOwner={isOwner} />
 
         <FeedPostMetrics
@@ -54,15 +60,15 @@ export default function FeedPost({ post, currentUserId, index = 0 }: FeedPostPro
         />
 
         {post.content && (
-          <p className="mt-4 text-sm text-foreground whitespace-pre-wrap">{post.content}</p>
+          <p className="px-4 mt-3 text-sm text-foreground whitespace-pre-wrap">{post.content}</p>
         )}
 
         {post.media_url && (
-          <div className="mt-3 rounded-2xl overflow-hidden">
+          <div className="mt-3 overflow-hidden">
             <img
               src={post.media_url}
               alt="Post media"
-              className="w-full object-cover max-h-96"
+              className="w-full object-cover max-h-[480px]"
               loading="lazy"
             />
           </div>

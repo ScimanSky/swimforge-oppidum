@@ -26,7 +26,7 @@ export {
     invalidateLeaderboardCache,
 } from "../lib/cache";
 export { addComment, getComments, getSocialFeed, setActivityShare, toggleSplash, upsertActivityPost } from "../db_social";
-export { getUserPublicProfile, toggleFollow } from "../db_public_profiles";
+export { getUserPublicProfile, toggleFollow, getSuggestedUsers } from "../db_public_profiles";
 export { getPendingActivityInsights, listActivityInsights, markActivityInsightSeen } from "../ai_activity_insights";
 export { logger } from "../middleware/logger";
 export { sanitizeActivityNotes } from "../lib/sanitize";

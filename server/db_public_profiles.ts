@@ -107,6 +107,36 @@ export async function getUserPublicProfile(params: {
   };
 }
 
+export async function getSuggestedUsers(viewerUserId: number, limit = 5) {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Users the viewer is NOT already following, excluding self, ordered by activity (level desc)
+  const rows = await db
+    .select({
+      userId: users.id,
+      name: users.name,
+      username: swimmerProfiles.username,
+      avatarUrl: swimmerProfiles.avatarUrl,
+      level: swimmerProfiles.level,
+    })
+    .from(users)
+    .innerJoin(swimmerProfiles, eq(swimmerProfiles.userId, users.id))
+    .where(
+      and(
+        sql`${users.id} != ${viewerUserId}`,
+        sql`${users.id} NOT IN (
+          SELECT ${socialFollows.followingId} FROM ${socialFollows}
+          WHERE ${socialFollows.followerId} = ${viewerUserId}
+        )`,
+      )
+    )
+    .orderBy(sql`${swimmerProfiles.level} DESC`)
+    .limit(limit);
+
+  return rows;
+}
+
 export async function toggleFollow(params: { followerId: number; followingId: number }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

@@ -291,9 +291,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Mobile Bottom Nav (new skeleton) */}
+      {/* Mobile Bottom Nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_58%,transparent),color-mix(in_oklch,var(--background)_70%,transparent))] backdrop-blur-xl lg:hidden pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto flex h-[calc(4rem+env(safe-area-inset-bottom))] max-w-3xl items-start justify-between px-2 pt-1">
+        <div className="mx-auto flex h-[calc(3.5rem+env(safe-area-inset-bottom))] max-w-3xl items-center justify-between px-2">
           {[navPrimary[0], navPrimary[1]].map((item) => {
             const isActive = isNavItemActive(item.path, location)
             return (
@@ -301,7 +301,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.path}
                 href={item.path}
                 className={cn(
-                  "flex h-14 w-full flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold transition-[transform,box-shadow,background-color,color] active:scale-[0.98]",
+                  "flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-2xl text-[10px] font-semibold transition-[transform,box-shadow,background-color,color] active:scale-[0.96]",
                   isActive
                     ? "text-foreground bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_14%,transparent))] shadow-[0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_22%,transparent),0_10px_26px_var(--neon-soft)]"
                     : "text-muted-foreground hover:bg-card/45 hover:text-foreground",
@@ -315,15 +315,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             )
           })}
 
-          {/* Create button */}
+          {/* Create button - prominent */}
           <button
             type="button"
             onClick={() => setIsCreateOpen(true)}
-            className="flex h-14 w-full flex-col items-center justify-center gap-1 text-xs font-semibold active:scale-[0.98]"
+            className="flex w-full flex-col items-center justify-center active:scale-[0.92] transition-transform"
             aria-label="Crea post"
           >
-            <span className="flex size-10 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime))] text-background shadow-[0_0_18px_var(--neon-soft)]">
-              <Plus className="size-5" />
+            <span className="flex size-12 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime))] text-background shadow-[0_0_22px_var(--neon-soft)] -mt-3">
+              <Plus className="size-6" />
             </span>
           </button>
 
@@ -334,7 +334,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.path}
                 href={item.path}
                 className={cn(
-                  "flex h-14 w-full flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold transition-[transform,box-shadow,background-color,color] active:scale-[0.98]",
+                  "flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-2xl text-[10px] font-semibold transition-[transform,box-shadow,background-color,color] active:scale-[0.96]",
                   isActive
                     ? "text-foreground bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_14%,transparent))] shadow-[0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_22%,transparent),0_10px_26px_var(--neon-soft)]"
                     : "text-muted-foreground hover:bg-card/45 hover:text-foreground",
@@ -351,7 +351,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Main Content */}
-      <main className="min-h-[calc(100dvh-4rem)] min-w-0 pt-16 pb-[calc(6.2rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-[88px]">
+      <main className="min-h-[calc(100dvh-4rem)] min-w-0 pt-16 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-[88px]">
         <div className="mx-auto max-w-[1520px] min-w-0 p-4 md:p-5 lg:p-6">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div

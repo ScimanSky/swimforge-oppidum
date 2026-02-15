@@ -1,15 +1,62 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { Link } from "wouter"
+import { motion } from "framer-motion"
 import AppLayout from "@/components/AppLayout"
 import { StoryBar } from "@/components/social/StoryBar"
 import { StoryViewer } from "@/components/social/StoryViewer"
 import { StoryCreator } from "@/components/social/StoryCreator"
+import { CreatePostSheet } from "@/components/social/CreatePostSheet"
 import FeedSubTabs from "@/components/social/FeedSubTabs"
 import FeedPost from "@/components/social/FeedPost"
 import FeedSkeleton from "@/components/social/FeedSkeleton"
+import FeedSidebar from "@/components/social/FeedSidebar"
 import InfiniteScrollSentinel from "@/components/social/InfiniteScrollSentinel"
+import { Button } from "@/components/ui/button"
+import { Waves, Users, RefreshCw } from "lucide-react"
 import { trpc } from "@/lib/trpc"
+
+function EmptyFeedPerTe({ onCreatePost }: { onCreatePost: () => void }) {
+  return (
+    <div className="surface-panel p-8 flex flex-col items-center text-center gap-4">
+      {/* Inline swimmer SVG illustration */}
+      <div className="relative w-32 h-32 flex items-center justify-center">
+        <div className="absolute inset-0 rounded-full bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_12%,transparent),color-mix(in_oklch,var(--electric-lime)_8%,transparent))]" />
+        <Waves className="size-14 text-[var(--electric-cyan)] relative z-10" />
+      </div>
+      <div>
+        <h3 className="text-lg font-display font-bold text-foreground">Il feed è vuoto</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          Condividi la tua prima sessione e inizia a nuotare insieme alla community!
+        </p>
+      </div>
+      <Button variant="neon" size="lg" className="gap-2 mt-2" onClick={onCreatePost}>
+        Condividi la tua prima sessione
+      </Button>
+    </div>
+  )
+}
+
+function EmptyFeedSeguiti() {
+  return (
+    <div className="surface-panel p-8 flex flex-col items-center text-center gap-4">
+      <div className="relative w-32 h-32 flex items-center justify-center">
+        <div className="absolute inset-0 rounded-full bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-lime)_12%,transparent),color-mix(in_oklch,var(--electric-violet)_8%,transparent))]" />
+        <Users className="size-14 text-[var(--electric-lime)] relative z-10" />
+      </div>
+      <div>
+        <h3 className="text-lg font-display font-bold text-foreground">Segui altri nuotatori</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          Inizia a seguire altri nuotatori per vedere i loro allenamenti qui.
+        </p>
+      </div>
+      <Button variant="neon" size="lg" className="gap-2 mt-2" asChild>
+        <Link href="/home/community">Esplora la community</Link>
+      </Button>
+    </div>
+  )
+}
 
 export default function SocialFeed() {
   const [tab, setTab] = useState<"perte" | "seguiti">("perte")
@@ -19,6 +66,7 @@ export default function SocialFeed() {
   const [storyViewerOpen, setStoryViewerOpen] = useState(false)
   const [storyViewerGroupIdx, setStoryViewerGroupIdx] = useState(0)
   const [storyCreatorOpen, setStoryCreatorOpen] = useState(false)
+  const [createPostOpen, setCreatePostOpen] = useState(false)
 
   const profileQuery = trpc.profile.get.useQuery()
   const currentUserId = profileQuery.data?.userId
@@ -42,19 +90,16 @@ export default function SocialFeed() {
 
   const scope = tab === "seguiti" ? "following" : "global"
 
-  // First page query (no cursor)
   const firstPageQuery = trpc.community.feed.useQuery(
     { limit: 20, scope },
     { staleTime: 30_000 }
   )
 
-  // Pagination query (only when cursor is set)
   const nextPageQuery = trpc.community.feed.useQuery(
     { limit: 20, scope, before: cursor },
     { enabled: !!cursor, staleTime: 30_000 }
   )
 
-  // Accumulate extra pages
   const lastCursorRef = useRef<string | undefined>(undefined)
   useEffect(() => {
     if (!cursor || cursor === lastCursorRef.current) return
@@ -71,7 +116,6 @@ export default function SocialFeed() {
     })
   }, [cursor, nextPageQuery.data])
 
-  // Reset on tab change
   useEffect(() => {
     setCursor(undefined)
     setExtraPosts([])
@@ -79,11 +123,9 @@ export default function SocialFeed() {
     lastCursorRef.current = undefined
   }, [tab])
 
-  // Combine first page + extra pages
   const firstPagePosts = (firstPageQuery.data as any[]) ?? []
   const allPosts = cursor ? [...firstPagePosts, ...extraPosts] : firstPagePosts
 
-  // Deduplicate (safety)
   const seen = new Set<number>()
   const posts = allPosts.filter((p: any) => {
     if (seen.has(p.id)) return false
@@ -103,45 +145,63 @@ export default function SocialFeed() {
 
   return (
     <AppLayout>
-      <div className="compact-shell space-y-4">
-        {/* Story Bar */}
-        <div className="surface-panel p-3">
-          <StoryBar
-            currentUserId={currentUserId}
-            onViewStory={handleViewStory}
-            onCreateStory={handleCreateStory}
-          />
-        </div>
-
-        {/* Feed Sub-Tabs */}
-        <FeedSubTabs tab={tab} onChange={setTab} />
-
-        {/* Feed List */}
-        {isInitialLoading ? (
-          <FeedSkeleton />
-        ) : posts.length === 0 ? (
-          <div className="surface-panel p-8 text-center text-muted-foreground">
-            {tab === "seguiti"
-              ? "Nessun post dai tuoi seguiti. Inizia a seguire altri nuotatori!"
-              : "Nessun contenuto nel feed. Condividi la tua prossima sessione!"}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {posts.map((post: any, index: number) => (
-              <FeedPost
-                key={post.id}
-                post={post}
+      <div className="compact-shell">
+        {/* Desktop: centered feed + sidebar */}
+        <div className="xl:flex xl:gap-6 xl:justify-center">
+          {/* Feed column */}
+          <div className="w-full max-w-[580px] mx-auto xl:mx-0 space-y-3 lg:space-y-4">
+            {/* Story Bar - transparent bg with bottom border */}
+            <div className="border-b border-border/30 pb-3">
+              <StoryBar
                 currentUserId={currentUserId}
-                index={index}
+                onViewStory={handleViewStory}
+                onCreateStory={handleCreateStory}
               />
-            ))}
-            <InfiniteScrollSentinel
-              onIntersect={loadMore}
-              hasMore={hasMore}
-              isLoading={nextPageQuery.isFetching}
-            />
+            </div>
+
+            {/* Pull-to-refresh indicator */}
+            {firstPageQuery.isFetching && !isInitialLoading && (
+              <div className="flex justify-center py-2">
+                <RefreshCw className="size-4 text-muted-foreground animate-spin" />
+              </div>
+            )}
+
+            {/* Feed Sub-Tabs */}
+            <FeedSubTabs tab={tab} onChange={setTab} />
+
+            {/* Feed List */}
+            {isInitialLoading ? (
+              <FeedSkeleton />
+            ) : posts.length === 0 ? (
+              tab === "seguiti" ? (
+                <EmptyFeedSeguiti />
+              ) : (
+                <EmptyFeedPerTe onCreatePost={() => setCreatePostOpen(true)} />
+              )
+            ) : (
+              <div className="space-y-3 lg:space-y-4">
+                {posts.map((post: any, index: number) => (
+                  <FeedPost
+                    key={post.id}
+                    post={post}
+                    currentUserId={currentUserId}
+                    index={index}
+                  />
+                ))}
+                <InfiniteScrollSentinel
+                  onIntersect={loadMore}
+                  hasMore={hasMore}
+                  isLoading={nextPageQuery.isFetching}
+                />
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Right Sidebar - xl+ only */}
+          <div className="hidden xl:block w-[280px] shrink-0 sticky top-20">
+            <FeedSidebar />
+          </div>
+        </div>
       </div>
 
       {/* Story Viewer */}
@@ -155,6 +215,9 @@ export default function SocialFeed() {
 
       {/* Story Creator */}
       <StoryCreator open={storyCreatorOpen} onOpenChange={setStoryCreatorOpen} />
+
+      {/* Create Post Sheet (from empty state CTA) */}
+      <CreatePostSheet open={createPostOpen} onOpenChange={setCreatePostOpen} />
     </AppLayout>
   )
 }

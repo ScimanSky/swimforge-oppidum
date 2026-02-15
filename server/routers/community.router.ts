@@ -4,7 +4,7 @@ import {
     invalidateUserCache, invalidateLeaderboardCache,
     getSocialFeed, upsertActivityPost, setActivityShare,
     toggleSplash, addComment, getComments,
-    getUserPublicProfile, toggleFollow,
+    getUserPublicProfile, toggleFollow, getSuggestedUsers,
     awardActionXp,
     detectImageType, logger,
 } from "./_shared";
@@ -303,6 +303,12 @@ export const communityRouter = router({
                     throw new TRPCError({ code: "BAD_REQUEST", message: "Non puoi seguire te stesso" });
                 }
                 return toggleFollow({ followerId: ctx.user.id, followingId: input.userId });
+            }),
+
+        suggested: protectedProcedure
+            .input(z.object({ limit: z.number().min(1).max(10).optional() }).optional())
+            .query(async ({ ctx, input }) => {
+                return getSuggestedUsers(ctx.user.id, input?.limit ?? 5);
             }),
     }),
 

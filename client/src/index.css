@@ -449,6 +449,28 @@ body,
     min-width: 0;
   }
 
+  .story-ring-animated {
+    background: conic-gradient(
+      from var(--ring-angle),
+      var(--electric-cyan),
+      var(--electric-lime),
+      var(--electric-cyan)
+    );
+    animation: story-ring-rotate 3s linear infinite;
+  }
+
+  .shimmer-bg {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in oklch, var(--foreground) 6%, transparent) 40%,
+      color-mix(in oklch, var(--foreground) 6%, transparent) 60%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+  }
+
   .stream-shell {
     display: grid;
     gap: 1.5rem;
@@ -526,6 +548,41 @@ body,
     .orb-lane {
       grid-template-columns: repeat(auto-fit, minmax(142px, 1fr));
     }
+  }
+}
+
+@keyframes story-ring-rotate {
+  from {
+    --ring-angle: 0deg;
+  }
+  to {
+    --ring-angle: 360deg;
+  }
+}
+
+@property --ring-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes splash-particle {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--tx), var(--ty)) scale(0.3);
   }
 }
 
