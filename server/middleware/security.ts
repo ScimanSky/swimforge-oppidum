@@ -177,6 +177,7 @@ export const helmetConfig = {
       styleSrc: ["'self'", "'unsafe-inline'", 'fonts.googleapis.com'],
       fontSrc: ["'self'", 'fonts.gstatic.com'],
       imgSrc: ["'self'", 'data:', 'https:'],
+      mediaSrc: ["'self'", 'blob:', 'data:', 'https:'],
       connectSrc: [
         "'self'",
         'api.garmin.com',
@@ -184,6 +185,9 @@ export const helmetConfig = {
         'https://sentry.io',
         process.env.SUPABASE_URL || '',
         'https://*.supabase.co',
+        'wss://*.supabase.co',
+        'https://upload.imagekit.io',
+        process.env.IMAGEKIT_URL_ENDPOINT || '',
       ].filter(Boolean),
       frameSrc: ["'none'"],
       frameAncestors: ["'none'"],
