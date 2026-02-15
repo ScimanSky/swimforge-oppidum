@@ -3,6 +3,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,7 @@ const coerceBoolean = (value: unknown): boolean | undefined => {
 
 export default function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
+  const [, navigate] = useLocation();
   const utils = trpc.useUtils();
 
   const profileQuery = trpc.profile.get.useQuery(undefined, {
@@ -100,12 +102,20 @@ export default function NotificationBell() {
 
   const handleNotificationClick = (notification: any) => {
     if (!notification.isRead) {
+      // Optimistically decrement unread count
+      utils.community.notifications.unreadCount.setData(undefined, (old) =>
+        old ? { count: Math.max(0, old.count - 1) } : old
+      );
+      // Mark the item read in the cached list
+      utils.community.notifications.list.setData({ limit: 20, onlyUnread: false }, (old) =>
+        old?.map((n: any) => n.id === notification.id ? { ...n, isRead: true } : n)
+      );
       markReadMutation.mutate({ notificationIds: [notification.id] });
     }
-    if (notification.link) {
-      window.location.href = notification.link;
-    }
     setIsOpen(false);
+    if (notification.link) {
+      navigate(notification.link);
+    }
   };
 
   const getNotificationIcon = (type: string) => {
