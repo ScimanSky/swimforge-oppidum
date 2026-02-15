@@ -321,7 +321,11 @@ export async function leaveClub(userId: number, clubId: number) {
   if (!db) throw new Error("Database not available");
 
   const existing = await db
-    .select({ id: communityClubMembers.id, status: communityClubMembers.status })
+    .select({
+      id: communityClubMembers.id,
+      status: communityClubMembers.status,
+      role: communityClubMembers.role,
+    })
     .from(communityClubMembers)
     .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)))
     .limit(1);
@@ -337,6 +341,41 @@ export async function leaveClub(userId: number, clubId: number) {
     .update(communityClubMembers)
     .set({ status: "left" })
     .where(eq(communityClubMembers.id, existing[0].id));
+
+  const wasStaff = ["owner", "admin", "moderator"].includes(existing[0].role);
+  if (wasStaff) {
+    const stillHasActiveStaff = await db
+      .select({ id: communityClubMembers.id })
+      .from(communityClubMembers)
+      .where(and(
+        eq(communityClubMembers.clubId, clubId),
+        eq(communityClubMembers.status, "active"),
+        sql`${communityClubMembers.role} IN ('owner', 'admin', 'moderator')`
+      ))
+      .limit(1);
+
+    if (!stillHasActiveStaff.length) {
+      const oldestActiveMember = await db
+        .select({
+          id: communityClubMembers.id,
+          role: communityClubMembers.role,
+        })
+        .from(communityClubMembers)
+        .where(and(
+          eq(communityClubMembers.clubId, clubId),
+          eq(communityClubMembers.status, "active"),
+        ))
+        .orderBy(communityClubMembers.joinedAt, communityClubMembers.id)
+        .limit(1);
+
+      if (oldestActiveMember.length && oldestActiveMember[0].role === "member") {
+        await db
+          .update(communityClubMembers)
+          .set({ role: "moderator" })
+          .where(eq(communityClubMembers.id, oldestActiveMember[0].id));
+      }
+    }
+  }
 
   return { left: true };
 }
