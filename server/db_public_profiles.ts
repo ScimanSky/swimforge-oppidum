@@ -167,6 +167,22 @@ export async function toggleFollow(params: { followerId: number; followingId: nu
     })
     .onConflictDoNothing();
 
+  // Notify the followed user (fire-and-forget)
+  try {
+    const actor = await db.execute(sql`SELECT name FROM users WHERE id = ${params.followerId} LIMIT 1`);
+    const actorName = ((actor.rows[0] as any)?.name as string | undefined) || "Qualcuno";
+    const { createNotification } = await import("./db_social_enhanced");
+    await createNotification({
+      userId: params.followingId,
+      type: "follow",
+      title: "Nuovo follower",
+      message: `${actorName} ha iniziato a seguirti.`,
+      link: `/u/${params.followerId}`,
+    });
+  } catch {
+    // non-critical, don't block the follow
+  }
+
   return { following: true };
 }
 
