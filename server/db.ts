@@ -834,3 +834,170 @@ export async function updateUserLastSignedIn(userId: number): Promise<void> {
     });
   }
 }
+
+export async function verifyUserPassword(userId: number, password: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+
+  const rows = await db
+    .select({ passwordHash: users.passwordHash })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  const passwordHash = rows[0]?.passwordHash;
+  if (!passwordHash) return false;
+  return bcrypt.compare(password, passwordHash);
+}
+
+export async function incrementSessionTokenVersion(userId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+
+  await db.execute(sql`
+    UPDATE users
+    SET session_token_version = COALESCE(session_token_version, 1) + 1,
+        updated_at = NOW()
+    WHERE id = ${userId}
+  `);
+}
+
+export async function exportUserData(userId: number) {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const [
+    userResult,
+    profileResult,
+    activitiesResult,
+    socialPostsResult,
+    socialCommentsResult,
+    socialSplashesResult,
+    socialFollowsResult,
+    badgesResult,
+    xpResult,
+    recordsResult,
+    weeklyStatsResult,
+    storiesResult,
+    storyViewsResult,
+    notificationsResult,
+    directMessagesResult,
+    clubsMembershipResult,
+    reportsResult,
+    hiddenPostsResult,
+  ] = await Promise.all([
+    db.execute(sql`
+      SELECT id, open_id, name, email, login_method, role, created_at, updated_at, last_signed_in
+      FROM users
+      WHERE id = ${userId}
+      LIMIT 1
+    `),
+    db.execute(sql`SELECT * FROM swimmer_profiles WHERE user_id = ${userId} LIMIT 1`),
+    db.execute(sql`SELECT * FROM swimming_activities WHERE user_id = ${userId} ORDER BY activity_date DESC`),
+    db.execute(sql`SELECT * FROM social_posts WHERE user_id = ${userId} ORDER BY created_at DESC`),
+    db.execute(sql`SELECT * FROM social_comments WHERE user_id = ${userId} ORDER BY created_at DESC`),
+    db.execute(sql`SELECT * FROM social_splashes WHERE user_id = ${userId} ORDER BY created_at DESC`),
+    db.execute(sql`
+      SELECT *
+      FROM social_follows
+      WHERE follower_id = ${userId} OR following_id = ${userId}
+      ORDER BY created_at DESC
+    `),
+    db.execute(sql`
+      SELECT ub.*, bd.code AS badge_code, bd.name AS badge_name
+      FROM user_badges ub
+      JOIN badge_definitions bd ON bd.id = ub.badge_id
+      WHERE ub.user_id = ${userId}
+      ORDER BY ub.earned_at DESC
+    `),
+    db.execute(sql`SELECT * FROM xp_transactions WHERE user_id = ${userId} ORDER BY created_at DESC`),
+    db.execute(sql`SELECT * FROM personal_records WHERE user_id = ${userId} ORDER BY achieved_at DESC`),
+    db.execute(sql`SELECT * FROM weekly_stats WHERE user_id = ${userId} ORDER BY week_start DESC`),
+    db.execute(sql`SELECT * FROM stories WHERE user_id = ${userId} ORDER BY created_at DESC`),
+    db.execute(sql`SELECT * FROM story_views WHERE viewer_id = ${userId} ORDER BY viewed_at DESC`),
+    db.execute(sql`SELECT * FROM user_notifications WHERE user_id = ${userId} ORDER BY created_at DESC`),
+    db.execute(sql`
+      SELECT *
+      FROM direct_messages
+      WHERE sender_id = ${userId} OR receiver_id = ${userId}
+      ORDER BY created_at DESC
+    `),
+    db.execute(sql`SELECT * FROM community_club_members WHERE user_id = ${userId} ORDER BY joined_at DESC`),
+    db.execute(sql`
+      SELECT *
+      FROM social_post_reports
+      WHERE reporter_user_id = ${userId} OR handled_by = ${userId}
+      ORDER BY created_at DESC
+    `),
+    db.execute(sql`SELECT * FROM social_hidden_posts WHERE user_id = ${userId} ORDER BY created_at DESC`),
+  ]);
+
+  return {
+    exportedAt: new Date().toISOString(),
+    user: userResult.rows[0] ?? null,
+    profile: profileResult.rows[0] ?? null,
+    data: {
+      activities: activitiesResult.rows,
+      socialPosts: socialPostsResult.rows,
+      socialComments: socialCommentsResult.rows,
+      socialSplashes: socialSplashesResult.rows,
+      socialFollows: socialFollowsResult.rows,
+      badges: badgesResult.rows,
+      xpTransactions: xpResult.rows,
+      personalRecords: recordsResult.rows,
+      weeklyStats: weeklyStatsResult.rows,
+      stories: storiesResult.rows,
+      storyViews: storyViewsResult.rows,
+      notifications: notificationsResult.rows,
+      directMessages: directMessagesResult.rows,
+      clubMemberships: clubsMembershipResult.rows,
+      reports: reportsResult.rows,
+      hiddenPosts: hiddenPostsResult.rows,
+    },
+  };
+}
+
+export async function deleteUserAccount(userId: number): Promise<{ id: number; email: string; name: string | null; openId: string | null } | null> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const userResult = await db.execute(sql`
+    SELECT id, email, name, open_id
+    FROM users
+    WHERE id = ${userId}
+    LIMIT 1
+  `);
+  const user = userResult.rows[0] as
+    | { id: number; email: string; name: string | null; open_id: string | null }
+    | undefined;
+
+  if (!user) return null;
+
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`
+      DELETE FROM social_hidden_posts
+      WHERE user_id = ${userId}
+         OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
+    `);
+
+    await tx.execute(sql`
+      DELETE FROM social_post_reports
+      WHERE reporter_user_id = ${userId}
+         OR handled_by = ${userId}
+         OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
+    `);
+
+    await tx.execute(sql`DELETE FROM users WHERE id = ${userId}`);
+  });
+
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    openId: user.open_id,
+  };
+}

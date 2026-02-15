@@ -5,6 +5,8 @@ import {
     COOKIE_NAME, getSessionCookieOptions,
     ONE_YEAR_MS, applyRateLimit,
 } from "./_shared";
+import { getSupabaseAdminClient } from "../_core/supabase_admin";
+import { isEmailServiceConfigured, sendAccountDeletionConfirmationEmail } from "../_core/email";
 
 export const authRouter = router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -31,6 +33,7 @@ export const authRouter = router({
             const sessionToken = await sdk.createSessionToken(result.user.id.toString(), {
                 name: result.user.name || "",
                 expiresInMs: ONE_YEAR_MS,
+                tokenVersion: result.user.sessionTokenVersion ?? 1,
             });
 
             const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -60,6 +63,7 @@ export const authRouter = router({
             const sessionToken = await sdk.createSessionToken(result.user.id.toString(), {
                 name: result.user.name || "",
                 expiresInMs: ONE_YEAR_MS,
+                tokenVersion: result.user.sessionTokenVersion ?? 1,
             });
 
             const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -153,10 +157,85 @@ export const authRouter = router({
             const sessionToken = await sdk.createSessionToken(user.id.toString(), {
                 name: user.name || "",
                 expiresInMs: ONE_YEAR_MS,
+                tokenVersion: user.sessionTokenVersion ?? 1,
             });
 
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
             return { success: true, isNewUser, user: { id: user.id, email: user.email, name: user.name } };
+        }),
+
+    exportMyData: protectedProcedure.query(async ({ ctx }) => {
+        const payload = await db.exportUserData(ctx.user.id);
+        return payload;
+    }),
+
+    logoutAllDevices: protectedProcedure.mutation(async ({ ctx }) => {
+        await db.incrementSessionTokenVersion(ctx.user.id);
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.clearCookie(COOKIE_NAME, cookieOptions);
+        return { success: true } as const;
+    }),
+
+    deleteAccount: protectedProcedure
+        .input(
+            z.object({
+                password: z.string().min(1, "Password obbligatoria"),
+            })
+        )
+        .mutation(async ({ ctx, input }) => {
+            const user = await db.getUserById(ctx.user.id);
+            if (!user) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "Utente non trovato" });
+            }
+
+            if (!user.passwordHash) {
+                throw new TRPCError({
+                    code: "BAD_REQUEST",
+                    message: "Questo account non usa password locale. Contatta il supporto per l'eliminazione.",
+                });
+            }
+
+            const passwordValid = await db.verifyUserPassword(ctx.user.id, input.password);
+            if (!passwordValid) {
+                throw new TRPCError({ code: "UNAUTHORIZED", message: "Password non corretta" });
+            }
+
+            if (!isEmailServiceConfigured()) {
+                throw new TRPCError({
+                    code: "PRECONDITION_FAILED",
+                    message: "Servizio email non configurato. Imposta RESEND_API_KEY e RESEND_FROM_EMAIL.",
+                });
+            }
+
+            const deletedAt = new Date();
+            const deletedUser = await db.deleteUserAccount(ctx.user.id);
+            if (!deletedUser) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "Impossibile eliminare l'account",
+                });
+            }
+
+            // Best effort: delete Supabase Auth user when open_id is a UUID.
+            if (deletedUser.openId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(deletedUser.openId)) {
+                try {
+                    const supabaseAdmin = getSupabaseAdminClient();
+                    await supabaseAdmin.auth.admin.deleteUser(deletedUser.openId);
+                } catch {
+                    // ignore: local deletion already completed
+                }
+            }
+
+            const emailSent = await sendAccountDeletionConfirmationEmail({
+                to: deletedUser.email,
+                displayName: deletedUser.name,
+                deletedAt,
+            });
+
+            const cookieOptions = getSessionCookieOptions(ctx.req);
+            ctx.res.clearCookie(COOKIE_NAME, cookieOptions);
+
+            return { success: true, emailSent } as const;
         }),
 });

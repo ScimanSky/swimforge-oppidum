@@ -25,6 +25,7 @@ export type SessionPayload = {
   openId: string;
   appId: string;
   name: string;
+  tokenVersion: number;
 };
 
 const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
@@ -173,13 +174,14 @@ class SDKServer {
    */
   async createSessionToken(
     openId: string,
-    options: { expiresInMs?: number; name?: string } = {}
+    options: { expiresInMs?: number; name?: string; tokenVersion?: number } = {}
   ): Promise<string> {
     return this.signSession(
       {
         openId,
         appId: ENV.appId,
         name: options.name || "User",
+        tokenVersion: options.tokenVersion ?? 1,
       },
       options
     );
@@ -198,6 +200,7 @@ class SDKServer {
       openId: payload.openId,
       appId: payload.appId,
       name: payload.name,
+      tokenVersion: payload.tokenVersion,
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
       .setExpirationTime(expirationSeconds)
@@ -206,7 +209,7 @@ class SDKServer {
 
   async verifySession(
     cookieValue: string | undefined | null
-  ): Promise<{ openId: string; appId: string; name: string } | null> {
+  ): Promise<{ openId: string; appId: string; name: string; tokenVersion: number } | null> {
     if (!cookieValue) {
       // Missing cookie is expected for anonymous/public requests. Keep it out of warn-level noise.
       log.debug("[Auth] Missing session cookie", {
@@ -220,7 +223,7 @@ class SDKServer {
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
       });
-      const { openId, appId, name } = payload as Record<string, unknown>;
+      const { openId, appId, name, tokenVersion } = payload as Record<string, unknown>;
 
       if (
         !isNonEmptyString(openId) ||
@@ -237,6 +240,7 @@ class SDKServer {
         openId,
         appId,
         name,
+        tokenVersion: typeof tokenVersion === "number" ? tokenVersion : 1,
       };
     } catch (error) {
       log.warn("[Auth] Session verification failed", {
@@ -321,6 +325,11 @@ class SDKServer {
 
     if (!user) {
       throw ForbiddenError("User not found");
+    }
+
+    const userTokenVersion = user.sessionTokenVersion ?? 1;
+    if (session.tokenVersion !== userTokenVersion) {
+      throw ForbiddenError("Session revoked");
     }
 
     return user;

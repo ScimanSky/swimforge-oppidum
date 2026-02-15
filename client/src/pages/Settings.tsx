@@ -8,6 +8,14 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Select,
@@ -358,13 +366,51 @@ export default function Settings() {
     if (stored === "nickname") setDisplayNamePreference("nickname")
   }, [])
 
-	const updateProfileMutation = trpc.profile.update.useMutation({
+  const updateProfileMutation = trpc.profile.update.useMutation({
 		onSuccess: () => {
 			void utils.profile.get.invalidate()
 			void utils.auth.me.invalidate()
 		},
 	})
   const uploadMediaMutation = trpc.profile.uploadMedia.useMutation()
+  const logoutAllDevicesMutation = trpc.auth.logoutAllDevices.useMutation({
+    onSuccess: async () => {
+      try {
+        await supabase.auth.signOut()
+      } catch {
+        // no-op
+      }
+      localStorage.removeItem("swimforge:autoSync:dashboardReady")
+      localStorage.removeItem("swimforge:autoSync:last")
+      toast.success("Sei stato disconnesso da tutti i dispositivi.")
+      window.location.href = "/login"
+    },
+    onError: (error) => {
+      toast.error(error.message || "Impossibile disconnettere tutte le sessioni.")
+    },
+  })
+  const deleteAccountMutation = trpc.auth.deleteAccount.useMutation({
+    onSuccess: async (data) => {
+      try {
+        await supabase.auth.signOut()
+      } catch {
+        // no-op
+      }
+      localStorage.removeItem("swimforge:autoSync:dashboardReady")
+      localStorage.removeItem("swimforge:autoSync:last")
+      if (data.emailSent) {
+        toast.success("Account eliminato. Ti abbiamo inviato un'email di conferma.")
+      } else {
+        toast.warning("Account eliminato. Email di conferma non inviata.")
+      }
+      window.location.href = "/"
+    },
+    onError: (error) => {
+      toast.error(error.message || "Impossibile eliminare l'account.")
+    },
+  })
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deletePassword, setDeletePassword] = useState("")
 
   const readFileAsBase64 = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -591,6 +637,41 @@ export default function Settings() {
     const next = { ...normalizeNotificationSettings(notifications), [id]: !notifications[id] }
     setNotifications(next)
     await persistSettings({ notificationSettings: next })
+  }
+
+  const handleExportData = async () => {
+    try {
+      const payload = await utils.auth.exportMyData.fetch()
+      const now = new Date()
+      const fileName = `swimforge-data-export-${now.toISOString().slice(0, 10)}.json`
+      const blob = new Blob([JSON.stringify(payload, null, 2)], {
+        type: "application/json;charset=utf-8",
+      })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = url
+      anchor.download = fileName
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+      toast.success("Esportazione completata.")
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : undefined
+      toast.error(message || "Impossibile esportare i dati.")
+    }
+  }
+
+  const handleLogoutAllDevices = () => {
+    logoutAllDevicesMutation.mutate()
+  }
+
+  const handleDeleteAccount = () => {
+    if (!deletePassword.trim()) {
+      toast.error("Inserisci la password per confermare l'eliminazione.")
+      return
+    }
+    deleteAccountMutation.mutate({ password: deletePassword })
   }
 
   return (
@@ -1225,7 +1306,11 @@ export default function Settings() {
                     Scarica tutti i tuoi dati in formato JSON
                   </p>
                 </div>
-                <Button variant="outline-neon" className="gap-2 bg-transparent" disabled>
+                <Button
+                  variant="outline-neon"
+                  className="gap-2 bg-transparent"
+                  onClick={handleExportData}
+                >
                   <ExternalLink className="w-4 h-4" />
                   Esporta
                 </Button>
@@ -1237,9 +1322,14 @@ export default function Settings() {
                     Disconnetti tutte le sessioni attive
                   </p>
                 </div>
-                <Button variant="outline-neon" className="gap-2 text-destructive bg-transparent" disabled>
+                <Button
+                  variant="outline-neon"
+                  className="gap-2 text-destructive bg-transparent"
+                  onClick={handleLogoutAllDevices}
+                  disabled={logoutAllDevicesMutation.isPending}
+                >
                   <LogOut className="w-4 h-4" />
-                  Logout
+                  {logoutAllDevicesMutation.isPending ? "Logout..." : "Logout"}
                 </Button>
               </div>
               <div className="flex items-center justify-between p-4 rounded-lg bg-destructive/10">
@@ -1249,7 +1339,11 @@ export default function Settings() {
                     Elimina permanentemente il tuo account e tutti i dati
                   </p>
                 </div>
-                <Button variant="destructive" className="gap-2" disabled>
+                <Button
+                  variant="destructive"
+                  className="gap-2"
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
                   <Trash2 className="w-4 h-4" />
                   Elimina
                 </Button>
@@ -1260,6 +1354,55 @@ export default function Settings() {
           </div>
         </div>
       </Tabs>
+
+      <Dialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open)
+          if (!open) {
+            setDeletePassword("")
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Conferma eliminazione account</DialogTitle>
+            <DialogDescription>
+              Questa azione è irreversibile. Inserisci la password per confermare.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-account-password">Password</Label>
+            <Input
+              id="delete-account-password"
+              type="password"
+              value={deletePassword}
+              onChange={(event) => setDeletePassword(event.target.value)}
+              placeholder="Inserisci la tua password"
+              autoComplete="current-password"
+            />
+            <p className="text-xs text-muted-foreground">
+              Dopo l&apos;eliminazione riceverai un&apos;email di conferma.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline-neon"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={deleteAccountMutation.isPending}
+            >
+              Annulla
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteAccount}
+              disabled={deleteAccountMutation.isPending || deletePassword.trim().length === 0}
+            >
+              {deleteAccountMutation.isPending ? "Eliminazione..." : "Conferma eliminazione"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
     </AppLayout>
   )

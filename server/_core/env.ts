@@ -24,6 +24,8 @@ export const ENV = {
   supabaseUrl: requireEnv("SUPABASE_URL", "VITE_SUPABASE_URL"),
   supabaseAnonKey: requireEnv("SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY"),
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  resendApiKey: process.env.RESEND_API_KEY ?? "",
+  resendFromEmail: process.env.RESEND_FROM_EMAIL ?? "",
 };
 
 export function assertAuthEnv() {
