@@ -198,8 +198,8 @@ export default function SocialFeed() {
               </div>
             )}
 
-            {/* Feed scope tabs: static on mobile, sticky only on wide desktop */}
-            <div className="mb-3 xl:sticky xl:top-20 xl:z-10 xl:py-2 xl:bg-background">
+            {/* Feed scope tabs: static on all breakpoints (never overlays feed) */}
+            <div className="mb-3">
               {/* Pull-to-refresh indicator */}
               {firstPageQuery.isFetching && !isInitialLoading && (
                 <div className="flex justify-center py-1">
