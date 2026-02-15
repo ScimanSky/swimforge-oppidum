@@ -178,17 +178,6 @@ export default function SocialFeed() {
         <div className="flex gap-6 justify-center">
           {/* Feed column */}
           <div className="w-full max-w-2xl min-w-0">
-            {/* Sticky FeedSubTabs */}
-            <div className="sticky top-16 z-20 pt-2 pb-3 -mt-2 bg-background/80 backdrop-blur-md -mx-4 px-4 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
-              {/* Pull-to-refresh indicator */}
-              {firstPageQuery.isFetching && !isInitialLoading && (
-                <div className="flex justify-center py-1">
-                  <RefreshCw className="size-4 text-muted-foreground animate-spin" />
-                </div>
-              )}
-              <FeedSubTabs tab={tab} onChange={setTab} />
-            </div>
-
             {/* Stories strip — visible below xl where sidebar is hidden */}
             {otherStoryGroups.length > 0 && (
               <div className="xl:hidden mb-3 flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
@@ -208,6 +197,17 @@ export default function SocialFeed() {
                 })}
               </div>
             )}
+
+            {/* Feed scope tabs: static on mobile, sticky only on wide desktop */}
+            <div className="mb-3 xl:sticky xl:top-20 xl:z-10 xl:py-2 xl:bg-background">
+              {/* Pull-to-refresh indicator */}
+              {firstPageQuery.isFetching && !isInitialLoading && (
+                <div className="flex justify-center py-1">
+                  <RefreshCw className="size-4 text-muted-foreground animate-spin" />
+                </div>
+              )}
+              <FeedSubTabs tab={tab} onChange={setTab} />
+            </div>
 
             <div className="space-y-3 lg:space-y-4">
               {/* Feed List */}
