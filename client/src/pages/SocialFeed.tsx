@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Link } from "wouter"
 import { motion } from "framer-motion"
 import AppLayout from "@/components/AppLayout"
-import { StoryBar } from "@/components/social/StoryBar"
 import { StoryViewer } from "@/components/social/StoryViewer"
 import { StoryCreator } from "@/components/social/StoryCreator"
 import { CreatePostSheet } from "@/components/social/CreatePostSheet"
@@ -150,13 +149,9 @@ export default function SocialFeed() {
         {/* Sticky top strip: story bar + profile + stats + suggested */}
         <div className="sticky top-16 z-20 pb-3 bg-background/80 backdrop-blur-md -mx-4 px-4 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
           <FeedSidebar
-            storyBarSlot={
-              <StoryBar
-                currentUserId={currentUserId}
-                onViewStory={handleViewStory}
-                onCreateStory={handleCreateStory}
-              />
-            }
+            currentUserId={currentUserId}
+            onViewStory={handleViewStory}
+            onCreateStory={handleCreateStory}
           />
         </div>
 
