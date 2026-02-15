@@ -224,31 +224,30 @@ export default function SeasonPage() {
     <AppLayout>
       <div className="compact-shell space-y-4 lg:space-y-2">
         <Surface className="relative overflow-hidden">
-          <SurfaceContent className="relative p-6 md:p-7">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-              <div className="space-y-3">
-                <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/65 px-3 py-1 text-xs text-muted-foreground">
-                  <Sparkles className="size-3.5 text-primary" />
-                  Battle Pass Stagionale
+          <SurfaceContent className="relative p-4 md:p-5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background/65 px-2.5 py-0.5 text-[10px] text-muted-foreground">
+                    <Sparkles className="size-3 text-primary" />
+                    Battle Pass
+                  </div>
+                  <SeasonRecapDialog triggerLabel="Recap video" />
                 </div>
-                <h1 className="font-display text-2xl md:text-3xl font-bold neon-gradient-text">
+                <h1 className="font-display text-xl md:text-2xl font-bold neon-gradient-text">
                   {seasonData?.season?.name ?? "Season Electric Ice"}
                 </h1>
-                <p className="text-sm text-muted-foreground">
-                  Missioni dinamiche, reward esclusivi e classifica dedicata.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline">Level {currentLevel}</Badge>
-                  <Badge variant="outline">
+                <div className="flex flex-wrap gap-1.5">
+                  <Badge variant="outline" className="text-[10px]">Level {currentLevel}</Badge>
+                  <Badge variant="outline" className="text-[10px]">
                     <CalendarDays className="mr-1 size-3" />
-                    {formatRemaining(Number(seasonData?.season?.remainingMs ?? 0))} rimanenti
+                    {formatRemaining(Number(seasonData?.season?.remainingMs ?? 0))}
                   </Badge>
-                  <Badge variant="outline">{seasonData?.missionMode === "solo-fallback" ? "Modalità Solo" : "Modalità Club"}</Badge>
-                  <SeasonRecapDialog triggerLabel="Recap video" />
+                  <Badge variant="outline" className="text-[10px]">{seasonData?.missionMode === "solo-fallback" ? "Solo" : "Club"}</Badge>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2">
                 <MetricOrb
                   label="Level Season"
                   value={String(currentLevel)}
@@ -270,12 +269,12 @@ export default function SeasonPage() {
               </div>
             </div>
 
-            <div className="mt-5 space-y-2">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Progressione livello corrente</span>
-                <span>{seasonData?.progress?.xpToNextLevel ?? 0} XP al prossimo livello</span>
+            <div className="mt-3 space-y-1">
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span>Progressione livello</span>
+                <span>{seasonData?.progress?.xpToNextLevel ?? 0} XP al prossimo</span>
               </div>
-              <Progress value={levelProgress} className="h-2" />
+              <Progress value={levelProgress} className="h-1.5" />
             </div>
           </SurfaceContent>
         </Surface>
