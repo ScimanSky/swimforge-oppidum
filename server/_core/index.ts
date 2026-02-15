@@ -11,6 +11,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { completeChallenges } from "../cron_challenges";
 import { evaluateAllUsersWeekly } from "../ai_skill_level";
+import { cleanupExpiredStories } from "../db_stories";
 import { setupSwagger } from "../swagger-setup";
 import { connectRedis } from "../lib/cache";
 import { assertAuthEnv } from "./env";
@@ -142,6 +143,39 @@ async function startServer() {
     } catch (error: unknown) {
       log.error("[Cron] Failed to evaluate skill level", {
         event: "cron:evaluate_skill_level_failed",
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      return res.status(500).json({ success: false, error: "Cron execution failed" });
+    }
+  });
+
+  // Cleanup expired stories and corresponding ImageKit files
+  app.post("/api/cron/cleanup-expired-stories", async (req, res) => {
+    const cronSecret = process.env.CRON_SECRET;
+    if (process.env.NODE_ENV === "production" && !cronSecret) {
+      return res.status(503).json({ success: false, error: "CRON_SECRET not configured" });
+    }
+
+    const authHeader = req.headers["authorization"];
+    const token = authHeader?.toString().replace(/^Bearer\s+/i, "") ?? "";
+    if (process.env.NODE_ENV === "production") {
+      const tokenBuf = Buffer.from(token);
+      const secretBuf = Buffer.from(cronSecret as string);
+      if (tokenBuf.length !== secretBuf.length || !timingSafeEqual(tokenBuf, secretBuf)) {
+        return res.status(401).json({ success: false, error: "Unauthorized" });
+      }
+    }
+
+    const requestedLimit = Number(req.body?.limit ?? req.query?.limit ?? 300);
+    const limit = Number.isFinite(requestedLimit) ? requestedLimit : 300;
+
+    try {
+      const result = await cleanupExpiredStories(limit);
+      return res.json({ success: true, ...result });
+    } catch (error: unknown) {
+      log.error("[Cron] Failed to cleanup expired stories", {
+        event: "cron:cleanup_expired_stories_failed",
         message: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       });

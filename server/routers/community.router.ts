@@ -246,6 +246,7 @@ export const communityRouter = router({
         create: protectedProcedure
             .input(z.object({
                 mediaUrl: z.string().url().optional(),
+                imageKitFileId: z.string().min(6).max(200).optional(),
                 caption: z.string().max(500).optional(),
                 type: z.enum(["image", "video", "text"]),
             }))
@@ -253,6 +254,7 @@ export const communityRouter = router({
                 const { createStory } = await import("../db_stories");
                 const story = await createStory(ctx.user.id, {
                     mediaUrl: input.mediaUrl ?? null,
+                    imageKitFileId: input.imageKitFileId ?? null,
                     caption: input.caption ?? null,
                     type: input.type,
                 });
@@ -357,11 +359,86 @@ export const communityRouter = router({
                 return markStoryViewed(input.storyId, ctx.user.id);
             }),
 
+        react: protectedProcedure
+            .input(z.object({
+                storyId: z.number(),
+                reactionType: z.enum(["splash", "fire", "strong", "clap", "wave"]),
+            }))
+            .mutation(async ({ ctx, input }) => {
+                try {
+                    const { toggleStoryReaction, getStoryReactionSummary } = await import("../db_stories");
+                    const toggled = await toggleStoryReaction({
+                        storyId: input.storyId,
+                        userId: ctx.user.id,
+                        reactionType: input.reactionType,
+                    });
+                    const summary = await getStoryReactionSummary(input.storyId, ctx.user.id);
+
+                    if (toggled.reaction && toggled.storyOwnerId !== ctx.user.id) {
+                        try {
+                            const { getDb } = await import("../db");
+                            const { sql } = await import("drizzle-orm");
+                            const db = await getDb();
+                            if (!db) throw new Error("db not available");
+                            const actorResult = await db.execute(sql`SELECT name FROM users WHERE id = ${ctx.user.id} LIMIT 1`);
+                            const actorName = ((actorResult.rows[0] as any)?.name as string | undefined) || "Qualcuno";
+                            const emojiMap: Record<string, string> = {
+                                splash: "💧",
+                                fire: "🔥",
+                                strong: "💪",
+                                clap: "👏",
+                                wave: "🌊",
+                            };
+                            const emoji = emojiMap[input.reactionType] || "✨";
+                            const { createNotification } = await import("../db_social_enhanced");
+                            await createNotification({
+                                userId: toggled.storyOwnerId,
+                                type: "story_reaction",
+                                title: "Nuova reazione alla story",
+                                message: `${actorName} ha reagito ${emoji} alla tua story.`,
+                                link: "/home/community",
+                                referenceId: input.storyId,
+                            });
+                        } catch {
+                            // Notifications are best-effort
+                        }
+                    }
+
+                    return { success: true, reaction: toggled.reaction, removed: toggled.removed, summary };
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : String(error);
+                    if (message.includes("Story not found")) {
+                        throw new TRPCError({ code: "NOT_FOUND", message: "Story non trovata." });
+                    }
+                    if (message.includes("Story expired")) {
+                        throw new TRPCError({ code: "BAD_REQUEST", message: "Questa story è scaduta." });
+                    }
+                    throw error;
+                }
+            }),
+
         delete: protectedProcedure
             .input(z.object({ storyId: z.number() }))
             .mutation(async ({ ctx, input }) => {
                 const { deleteStory } = await import("../db_stories");
-                return deleteStory(input.storyId, ctx.user.id);
+                const deleted = await deleteStory(input.storyId, ctx.user.id);
+
+                if (deleted.imageKitFileId) {
+                    try {
+                        const { deleteImageKitFileById } = await import("../lib/imagekit");
+                        await deleteImageKitFileById(deleted.imageKitFileId);
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : String(error);
+                        logger.warn(`story delete: ImageKit cleanup failed: ${message}`, {
+                            event: "story:delete_imagekit_cleanup_failed",
+                            userId: ctx.user.id,
+                            storyId: input.storyId,
+                            message,
+                        });
+                    }
+                }
+
+                return deleted;
             }),
 
         viewers: protectedProcedure

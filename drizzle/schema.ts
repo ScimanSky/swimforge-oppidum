@@ -331,6 +331,7 @@ export const stories = pgTable("stories", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull(),
   mediaUrl: text("media_url"),
+  imagekitFileId: text("imagekit_file_id"),
   caption: text("caption"),
   type: varchar("type", { length: 10 }).notNull(), // image, video, text
   expiresAt: timestamp("expires_at").notNull(),
@@ -344,6 +345,16 @@ export const storyViews = pgTable("story_views", {
   viewedAt: timestamp("viewed_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueView: unique().on(table.storyId, table.viewerId),
+}));
+
+export const storyReactions = pgTable("story_reactions", {
+  id: serial("id").primaryKey(),
+  storyId: integer("story_id").notNull(),
+  userId: integer("user_id").notNull(),
+  reactionType: varchar("reaction_type", { length: 20 }).notNull(), // splash, fire, strong, clap, wave
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueStoryReaction: unique().on(table.storyId, table.userId),
 }));
 
 // ============================================
@@ -658,6 +669,8 @@ export type Story = typeof stories.$inferSelect;
 export type InsertStory = typeof stories.$inferInsert;
 export type StoryView = typeof storyViews.$inferSelect;
 export type InsertStoryView = typeof storyViews.$inferInsert;
+export type StoryReaction = typeof storyReactions.$inferSelect;
+export type InsertStoryReaction = typeof storyReactions.$inferInsert;
 export type SocialHiddenPost = typeof socialHiddenPosts.$inferSelect;
 export type InsertSocialHiddenPost = typeof socialHiddenPosts.$inferInsert;
 export type SocialPostReport = typeof socialPostReports.$inferSelect;

@@ -16,6 +16,9 @@ interface Story {
   expiresAt: string
   createdAt: string
   hasViewed: boolean
+  reactionCounts?: Record<string, number>
+  userReaction?: string | null
+  reactionsTotal?: number
 }
 
 interface StoryGroup {
@@ -32,6 +35,13 @@ interface StoryViewerProps {
 }
 
 const STORY_IMAGE_DURATION = 5000
+const STORY_REACTION_CHOICES = [
+  { type: "splash", emoji: "💧" },
+  { type: "fire", emoji: "🔥" },
+  { type: "strong", emoji: "💪" },
+  { type: "clap", emoji: "👏" },
+  { type: "wave", emoji: "🌊" },
+] as const
 
 type VideoClipRange = {
   start: number
@@ -58,6 +68,9 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
   const [groupIdx, setGroupIdx] = useState(initialGroupIndex)
   const [storyIdx, setStoryIdx] = useState(0)
   const [progress, setProgress] = useState(0)
+  const [reactionStateByStory, setReactionStateByStory] = useState<
+    Record<number, { counts: Record<string, number>; userReaction: string | null; total: number }>
+  >({})
   const startRef = useRef(0)
   const rafRef = useRef(0)
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -66,8 +79,20 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
 
   const group = groups[groupIdx]
   const story = group?.stories[storyIdx]
+  const utils = trpc.useUtils()
+  const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 5 * 60_000 })
+  const currentUserId = profileQuery.data?.userId
 
   const markViewed = trpc.community.stories.markViewed.useMutation()
+  const reactToStory = trpc.community.stories.react.useMutation({
+    onSuccess: (data, variables) => {
+      setReactionStateByStory((prev) => ({
+        ...prev,
+        [variables.storyId]: data.summary,
+      }))
+      void utils.community.stories.active.invalidate()
+    },
+  })
 
   const goNext = useCallback(() => {
     if (!group) return
@@ -164,6 +189,13 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
   }
 
   if (!group || !story) return null
+
+  const reactionSummary = reactionStateByStory[story.id] ?? {
+    counts: story.reactionCounts ?? {},
+    userReaction: story.userReaction ?? null,
+    total: story.reactionsTotal ?? 0,
+  }
+  const canReact = !!currentUserId && currentUserId !== group.userId
 
   const handleVideoLoadedMetadata = () => {
     const video = videoRef.current
@@ -300,6 +332,41 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
         {story.type !== "text" && story.caption && (
           <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/70 to-transparent px-4 pb-6 pt-12">
             <p className="text-sm text-white">{story.caption}</p>
+          </div>
+        )}
+
+        {/* Reactions */}
+        {canReact && (
+          <div
+            className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 backdrop-blur-sm">
+              {STORY_REACTION_CHOICES.map((choice) => {
+                const isActive = reactionSummary.userReaction === choice.type
+                const count = reactionSummary.counts[choice.type] ?? 0
+                return (
+                  <button
+                    key={choice.type}
+                    type="button"
+                    className={`flex items-center gap-1 rounded-full px-2 py-1 text-sm transition ${
+                      isActive ? "bg-white/25" : "hover:bg-white/15"
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (reactToStory.isPending) return
+                      reactToStory.mutate({ storyId: story.id, reactionType: choice.type })
+                    }}
+                  >
+                    <span>{choice.emoji}</span>
+                    {count > 0 && <span className="text-xs text-white">{count}</span>}
+                  </button>
+                )
+              })}
+              {reactionSummary.total > 0 && (
+                <span className="ml-1 text-xs text-white/80">{reactionSummary.total}</span>
+              )}
+            </div>
           </div>
         )}
       </motion.div>

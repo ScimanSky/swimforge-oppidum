@@ -186,11 +186,14 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
       throw new Error(detail || "Upload su ImageKit fallito")
     }
 
-    const uploaded = (await uploadResponse.json()) as { url?: string }
+    const uploaded = (await uploadResponse.json()) as { url?: string; fileId?: string }
     if (!uploaded.url) {
       throw new Error("ImageKit non ha restituito un URL valido")
     }
-    return uploaded.url
+    return {
+      url: uploaded.url,
+      fileId: uploaded.fileId ?? null,
+    }
   }
 
   const buildVideoStoryUrls = (mediaUrl: string, durationSeconds: number) => {
@@ -216,9 +219,10 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     if (!file) return
 
     try {
-      const mediaUrl = await uploadMediaToImageKit(file)
+      const uploaded = await uploadMediaToImageKit(file)
       await createStory.mutateAsync({
-        mediaUrl,
+        mediaUrl: uploaded.url,
+        imageKitFileId: uploaded.fileId ?? undefined,
         caption: caption.trim() || undefined,
         type: "image",
       })
@@ -236,15 +240,16 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     if (!file) return
 
     try {
-      const mediaUrl = await uploadMediaToImageKit(file)
+      const uploaded = await uploadMediaToImageKit(file)
       const duration = videoDurationRef.current || STORY_VIDEO_CLIP_SECONDS
-      const clipUrls = buildVideoStoryUrls(mediaUrl, duration)
+      const clipUrls = buildVideoStoryUrls(uploaded.url, duration)
       const baseCaption = caption.trim()
       for (let i = 0; i < clipUrls.length; i += 1) {
         const clipCaption = i === 0 ? (baseCaption || undefined) : undefined
 
         await createStory.mutateAsync({
           mediaUrl: clipUrls[i],
+          imageKitFileId: uploaded.fileId ?? undefined,
           caption: clipCaption,
           type: "video",
         })
