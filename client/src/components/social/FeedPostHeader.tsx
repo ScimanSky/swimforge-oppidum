@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { Link } from "wouter"
+import { Link, useLocation } from "wouter"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -15,6 +15,7 @@ import { toast } from "sonner"
 
 interface FeedPostHeaderProps {
   post: {
+    id: number
     user_id: number
     user_name?: string | null
     user_email?: string | null
@@ -33,6 +34,7 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
   const initials = getInitials(name)
   const activityType = post.activity_is_open_water ? "Open Water" : "Pool"
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing ?? false)
+  const [location, setLocation] = useLocation()
 
   useEffect(() => {
     setIsFollowing(initialIsFollowing ?? false)
@@ -45,6 +47,15 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
       toast.success(result.following ? `Segui ${name}` : `Non segui più ${name}`)
       utils.community.feed.invalidate()
       utils.community.users.suggested.invalidate()
+    },
+    onError: (err) => toast.error(err.message),
+  })
+
+  const hidePost = trpc.community.hidePost.useMutation({
+    onSuccess: () => {
+      toast.success("Post nascosto dal tuo feed")
+      utils.community.feed.invalidate()
+      utils.community.clubs.feed.invalidate()
     },
     onError: (err) => toast.error(err.message),
   })
@@ -109,13 +120,25 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem className="gap-2 text-xs">
+            <DropdownMenuItem
+              className="gap-2 text-xs"
+              onSelect={() => {
+                const from = encodeURIComponent(location || "/home")
+                setLocation(`/home/report/post/${post.id}?from=${from}`)
+              }}
+            >
               <Flag className="size-3.5" />
               Segnala
             </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2 text-xs">
+            <DropdownMenuItem
+              className="gap-2 text-xs"
+              disabled={hidePost.isPending}
+              onSelect={() => {
+                hidePost.mutate({ postId: post.id })
+              }}
+            >
               <EyeOff className="size-3.5" />
-              Nascondi
+              {hidePost.isPending ? "Nascondo..." : "Nascondi"}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

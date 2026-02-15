@@ -1,13 +1,17 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   socialPosts,
   socialSplashes,
   socialComments,
+  socialHiddenPosts,
+  socialPostReports,
   swimmingActivities,
 } from "../drizzle/schema";
 
 export type FeedScope = "global" | "self" | "following";
+export type PostReportReason = "spam" | "offensive" | "harassment" | "misinformation" | "other";
+export type PostReportStatus = "open" | "in_review" | "resolved" | "rejected";
 
 export async function getSocialFeed(userId: number, options: { limit?: number; scope?: FeedScope; before?: Date } = {}) {
   const db = await getDb();
@@ -16,6 +20,9 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
   const limit = options.limit ?? 20;
   const scope = options.scope ?? "global";
   const filters = [sql`p.is_deleted = false`, sql`p.club_id IS NULL`];
+  filters.push(
+    sql`NOT EXISTS (SELECT 1 FROM social_hidden_posts hp WHERE hp.post_id = p.id AND hp.user_id = ${userId})`
+  );
 
   if (scope === "self") {
     filters.push(sql`p.user_id = ${userId}`);
@@ -68,6 +75,184 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
   `);
 
   return result.rows;
+}
+
+export async function hidePostForUser(userId: number, postId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const post = await db
+    .select({ id: socialPosts.id })
+    .from(socialPosts)
+    .where(and(eq(socialPosts.id, postId), eq(socialPosts.isDeleted, false)))
+    .limit(1);
+  if (!post.length) {
+    throw new Error("Post not found");
+  }
+
+  await db
+    .insert(socialHiddenPosts)
+    .values({
+      userId,
+      postId,
+      createdAt: new Date(),
+    })
+    .onConflictDoNothing({
+      target: [socialHiddenPosts.userId, socialHiddenPosts.postId],
+    });
+
+  return { hidden: true };
+}
+
+export async function unhidePostForUser(userId: number, postId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db
+    .delete(socialHiddenPosts)
+    .where(and(eq(socialHiddenPosts.userId, userId), eq(socialHiddenPosts.postId, postId)));
+
+  return { hidden: false };
+}
+
+export async function reportPost(userId: number, input: { postId: number; reason: PostReportReason; details?: string | null }) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const post = await db
+    .select({
+      id: socialPosts.id,
+      userId: socialPosts.userId,
+      isDeleted: socialPosts.isDeleted,
+    })
+    .from(socialPosts)
+    .where(eq(socialPosts.id, input.postId))
+    .limit(1);
+
+  const postRow = post[0];
+  if (!postRow || postRow.isDeleted) {
+    throw new Error("Post not found");
+  }
+  if (postRow.userId === userId) {
+    throw new Error("Cannot report your own post");
+  }
+
+  const now = new Date();
+  const inserted = await db
+    .insert(socialPostReports)
+    .values({
+      postId: input.postId,
+      reporterUserId: userId,
+      reason: input.reason,
+      details: input.details?.trim() || null,
+      status: "open",
+      adminNote: null,
+      handledBy: null,
+      handledAt: null,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: [socialPostReports.postId, socialPostReports.reporterUserId],
+      set: {
+        reason: input.reason,
+        details: input.details?.trim() || null,
+        status: "open",
+        adminNote: null,
+        handledBy: null,
+        handledAt: null,
+        updatedAt: now,
+      },
+    })
+    .returning({ id: socialPostReports.id });
+
+  return { success: true, reportId: inserted[0]?.id ?? null };
+}
+
+export async function listPostReports(options: {
+  status?: PostReportStatus | "all";
+  limit?: number;
+  offset?: number;
+} = {}) {
+  const db = await getDb();
+  if (!db) return { items: [], total: 0 };
+
+  const limit = Math.min(100, Math.max(1, options.limit ?? 50));
+  const offset = Math.max(0, options.offset ?? 0);
+  const status = options.status ?? "open";
+  const where = status === "all" ? sql`TRUE` : sql`r.status = ${status}`;
+
+  const itemsResult = await db.execute(sql`
+    SELECT
+      r.id,
+      r.post_id,
+      r.reporter_user_id,
+      r.reason,
+      r.details,
+      r.status,
+      r.admin_note,
+      r.handled_by,
+      r.handled_at,
+      r.created_at,
+      r.updated_at,
+      p.content AS post_content,
+      p.media_url AS post_media_url,
+      p.user_id AS post_author_id,
+      author.name AS post_author_name,
+      reporter.name AS reporter_name,
+      handler.name AS handled_by_name
+    FROM social_post_reports r
+    JOIN social_posts p ON p.id = r.post_id
+    JOIN users author ON author.id = p.user_id
+    JOIN users reporter ON reporter.id = r.reporter_user_id
+    LEFT JOIN users handler ON handler.id = r.handled_by
+    WHERE ${where}
+    ORDER BY r.created_at DESC
+    LIMIT ${limit}
+    OFFSET ${offset}
+  `);
+
+  const totalResult = await db.execute(sql`
+    SELECT COUNT(*)::int AS total
+    FROM social_post_reports r
+    WHERE ${where}
+  `);
+
+  return {
+    items: itemsResult.rows,
+    total: Number((totalResult.rows[0] as { total?: number } | undefined)?.total ?? 0),
+  };
+}
+
+export async function updatePostReportStatus(input: {
+  reportId: number;
+  status: PostReportStatus;
+  adminUserId: number;
+  adminNote?: string | null;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const now = new Date();
+  const handledAt = input.status === "resolved" || input.status === "rejected" ? now : null;
+
+  const updated = await db
+    .update(socialPostReports)
+    .set({
+      status: input.status,
+      adminNote: input.adminNote?.trim() || null,
+      handledBy: input.adminUserId,
+      handledAt,
+      updatedAt: now,
+    })
+    .where(eq(socialPostReports.id, input.reportId))
+    .returning({ id: socialPostReports.id });
+
+  if (!updated.length) {
+    throw new Error("Report not found");
+  }
+
+  return { success: true };
 }
 
 export async function upsertActivityPost(userId: number, activityId: number, data: { content?: string | null; mediaUrl?: string | null; visibility?: string | null }) {

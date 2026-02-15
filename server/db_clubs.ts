@@ -177,7 +177,13 @@ export async function getClubFeed(userId: number, clubId: number, limit = 20) {
     JOIN users u ON u.id = p.user_id
     LEFT JOIN swimmer_profiles sp ON sp.user_id = u.id
     LEFT JOIN swimming_activities a ON a.id = p.activity_id
-    WHERE p.is_deleted = false AND p.club_id = ${clubId}
+    WHERE p.is_deleted = false
+      AND p.club_id = ${clubId}
+      AND NOT EXISTS (
+        SELECT 1
+        FROM social_hidden_posts hp
+        WHERE hp.post_id = p.id AND hp.user_id = ${userId}
+      )
     ORDER BY p.created_at DESC
     LIMIT ${limit}
   `);

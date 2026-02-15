@@ -13,6 +13,7 @@ import {
   MoreHorizontal,
   Plus,
   Settings,
+  Shield,
   Sun,
   User,
   Users,
@@ -121,7 +122,9 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const { theme, toggleTheme, switchable } = useTheme()
   const logoutMutation = trpc.auth.logout.useMutation()
+  const meQuery = trpc.auth.me.useQuery()
   const reduceMotion = useReducedMotion()
+  const isAdmin = meQuery.data?.role === "admin"
 
   const pageTitle = useMemo(() => titleForPath(location), [location])
 
@@ -275,6 +278,14 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
                     Impostazioni
                   </Link>
                 </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/reports" className="flex items-center gap-2">
+                      <Shield className="size-4" />
+                      Moderazione
+                    </Link>
+                  </DropdownMenuItem>
+                )}
                 {switchable && toggleTheme && (
                   <DropdownMenuItem onClick={() => toggleTheme()}>
                     {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}

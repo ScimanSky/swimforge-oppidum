@@ -298,6 +298,31 @@ export const socialFollows = pgTable("social_follows", {
   uniqueFollow: unique().on(table.followerId, table.followingId),
 }));
 
+export const socialHiddenPosts = pgTable("social_hidden_posts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  postId: integer("post_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueHiddenPost: unique().on(table.userId, table.postId),
+}));
+
+export const socialPostReports = pgTable("social_post_reports", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").notNull(),
+  reporterUserId: integer("reporter_user_id").notNull(),
+  reason: varchar("reason", { length: 30 }).notNull(),
+  details: text("details"),
+  status: varchar("status", { length: 20 }).default("open").notNull(),
+  adminNote: text("admin_note"),
+  handledBy: integer("handled_by"),
+  handledAt: timestamp("handled_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  uniquePostReporter: unique().on(table.postId, table.reporterUserId),
+}));
+
 // ============================================
 // STORIES (Ephemeral 24h content)
 // ============================================
@@ -632,3 +657,7 @@ export type Story = typeof stories.$inferSelect;
 export type InsertStory = typeof stories.$inferInsert;
 export type StoryView = typeof storyViews.$inferSelect;
 export type InsertStoryView = typeof storyViews.$inferInsert;
+export type SocialHiddenPost = typeof socialHiddenPosts.$inferSelect;
+export type InsertSocialHiddenPost = typeof socialHiddenPosts.$inferInsert;
+export type SocialPostReport = typeof socialPostReports.$inferSelect;
+export type InsertSocialPostReport = typeof socialPostReports.$inferInsert;

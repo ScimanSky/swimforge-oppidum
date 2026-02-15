@@ -1,6 +1,7 @@
 import {
     publicProcedure, protectedProcedure, router, z, db,
     TRPCError,
+    listPostReports, updatePostReportStatus,
     getPendingActivityInsights, listActivityInsights, markActivityInsightSeen,
 } from "./_shared";
 
@@ -129,6 +130,41 @@ export const adminRouter = router({
         const { fixBadgeUrls } = await import("../fix_badge_urls");
         return await fixBadgeUrls();
     }),
+
+    listPostReports: protectedProcedure
+        .input(z.object({
+            status: z.enum(["all", "open", "in_review", "resolved", "rejected"]).optional(),
+            limit: z.number().min(1).max(100).optional(),
+            offset: z.number().min(0).optional(),
+        }).optional())
+        .query(async ({ ctx, input }) => {
+            if (ctx.user.role !== "admin") {
+                throw new TRPCError({ code: "FORBIDDEN" });
+            }
+            return listPostReports({
+                status: input?.status ?? "open",
+                limit: input?.limit ?? 50,
+                offset: input?.offset ?? 0,
+            });
+        }),
+
+    updatePostReportStatus: protectedProcedure
+        .input(z.object({
+            reportId: z.number(),
+            status: z.enum(["open", "in_review", "resolved", "rejected"]),
+            adminNote: z.string().max(1000).optional().nullable(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            if (ctx.user.role !== "admin") {
+                throw new TRPCError({ code: "FORBIDDEN" });
+            }
+            return updatePostReportStatus({
+                reportId: input.reportId,
+                status: input.status,
+                adminUserId: ctx.user.id,
+                adminNote: input.adminNote ?? null,
+            });
+        }),
 });
 
 // Statistics

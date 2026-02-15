@@ -4,6 +4,7 @@ import {
     invalidateUserCache, invalidateLeaderboardCache,
     getSocialFeed, upsertActivityPost, setActivityShare,
     toggleSplash, addComment, getComments,
+    hidePostForUser, unhidePostForUser, reportPost,
     getUserPublicProfile, toggleFollow, getSuggestedUsers,
     awardActionXp,
     detectImageType, logger,
@@ -99,6 +100,43 @@ export const communityRouter = router({
         }))
         .query(async ({ input }) => {
             return getComments(input.postId);
+        }),
+
+    hidePost: protectedProcedure
+        .input(z.object({
+            postId: z.number(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            return hidePostForUser(ctx.user.id, input.postId);
+        }),
+
+    unhidePost: protectedProcedure
+        .input(z.object({
+            postId: z.number(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            return unhidePostForUser(ctx.user.id, input.postId);
+        }),
+
+    reportPost: protectedProcedure
+        .input(z.object({
+            postId: z.number(),
+            reason: z.enum(["spam", "offensive", "harassment", "misinformation", "other"]),
+            details: z.string().max(1000).optional().nullable(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            const details = input.details?.trim() ?? "";
+            if (input.reason === "other" && details.length < 10) {
+                throw new TRPCError({
+                    code: "BAD_REQUEST",
+                    message: "Per 'Altro' inserisci almeno 10 caratteri di dettaglio.",
+                });
+            }
+            return reportPost(ctx.user.id, {
+                postId: input.postId,
+                reason: input.reason,
+                details: details || null,
+            });
         }),
 
     createTextPost: protectedProcedure

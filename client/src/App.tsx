@@ -28,10 +28,12 @@ const Statistics = lazy(() => import("./pages/Statistics"));
 const Coach = lazy(() => import("./pages/Coach"));
 const SeasonPage = lazy(() => import("./pages/Season"));
 const SocialFeed = lazy(() => import("./pages/SocialFeed"));
+const ReportPost = lazy(() => import("./pages/ReportPost"));
 const Community = lazy(() => import("./pages/Community"));
 const ClubInvite = lazy(() => import("./pages/ClubInvite"));
 const ClubDetail = lazy(() => import("./pages/ClubDetail"));
 const ClubEventDetail = lazy(() => import("./pages/ClubEventDetail"));
+const AdminReports = lazy(() => import("./pages/AdminReports"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const Login = lazy(() => import("./pages/Login"));
@@ -57,8 +59,14 @@ function Router() {
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/home" component={SocialFeed} />
+      <Route path="/home/report/post/:postId" component={ReportPost} />
       <Route path="/dashboard">
         <Redirect to="/home" />
+      </Route>
+      <Route path="/report/post/:postId">{(params: { postId: string }) => <Redirect to={`/home/report/post/${params.postId}`} />}</Route>
+      <Route path="/admin/reports" component={AdminReports} />
+      <Route path="/home/admin/reports">
+        <Redirect to="/admin/reports" />
       </Route>
       <Route path="/home/dashboard" component={Dashboard} />
       <Route path="/badges" component={Badges} />

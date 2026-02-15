@@ -25,7 +25,19 @@ export {
     invalidateUserCache,
     invalidateLeaderboardCache,
 } from "../lib/cache";
-export { addComment, getComments, getSocialFeed, setActivityShare, toggleSplash, upsertActivityPost } from "../db_social";
+export {
+    addComment,
+    getComments,
+    getSocialFeed,
+    hidePostForUser,
+    listPostReports,
+    reportPost,
+    setActivityShare,
+    toggleSplash,
+    unhidePostForUser,
+    updatePostReportStatus,
+    upsertActivityPost,
+} from "../db_social";
 export { getUserPublicProfile, toggleFollow, getSuggestedUsers } from "../db_public_profiles";
 export { getPendingActivityInsights, listActivityInsights, markActivityInsightSeen } from "../ai_activity_insights";
 export { logger } from "../middleware/logger";
