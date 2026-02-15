@@ -81,6 +81,13 @@ export default function SocialFeed() {
     : undefined
   const hasOwnStories = (currentUserGroup?.stories?.length ?? 0) > 0
   const displayName = profile?.username || profile?.userId?.toString() || "Nuotatore"
+  const otherStoryGroups = allGroups
+    .filter((g: any) => Number(g.userId) !== Number(currentUserId))
+    .sort((a, b) => {
+      const aU = a.stories.some((s: any) => !s.hasViewed)
+      const bU = b.stories.some((s: any) => !s.hasViewed)
+      return aU === bU ? 0 : aU ? -1 : 1
+    })
 
   const handleViewStory = useCallback((userId: number) => {
     const groups = storyGroups ?? []
@@ -172,15 +179,35 @@ export default function SocialFeed() {
           {/* Feed column */}
           <div className="w-full max-w-2xl min-w-0">
             {/* Sticky FeedSubTabs */}
-            <div className="sticky top-16 z-20 pb-3 bg-background/80 backdrop-blur-md -mx-4 px-4 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+            <div className="sticky top-16 z-20 pt-2 pb-3 -mt-2 bg-background/80 backdrop-blur-md -mx-4 px-4 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
               {/* Pull-to-refresh indicator */}
               {firstPageQuery.isFetching && !isInitialLoading && (
-                <div className="flex justify-center py-2">
+                <div className="flex justify-center py-1">
                   <RefreshCw className="size-4 text-muted-foreground animate-spin" />
                 </div>
               )}
               <FeedSubTabs tab={tab} onChange={setTab} />
             </div>
+
+            {/* Stories strip — visible below xl where sidebar is hidden */}
+            {otherStoryGroups.length > 0 && (
+              <div className="xl:hidden mb-3 flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+                {otherStoryGroups.map((group) => {
+                  const hasUnviewed = group.stories.some((s: any) => !s.hasViewed)
+                  return (
+                    <StoryAvatar
+                      key={group.userId}
+                      userId={group.userId}
+                      userName={group.userName ?? "Utente"}
+                      avatarUrl={group.userAvatar}
+                      hasUnviewed={hasUnviewed}
+                      size="sm"
+                      onClick={() => handleViewStory(group.userId)}
+                    />
+                  )
+                })}
+              </div>
+            )}
 
             <div className="space-y-3 lg:space-y-4">
               {/* Feed List */}
