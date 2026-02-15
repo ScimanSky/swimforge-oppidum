@@ -2,6 +2,8 @@ import { cn } from "@/lib/utils";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { Component, ReactNode } from "react";
 
+const CHUNK_RELOAD_SESSION_KEY = "swimforge:chunk-reload-attempted";
+
 interface Props {
   children: ReactNode;
 }
@@ -19,6 +21,27 @@ class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error) {
+    if (typeof window === "undefined") return;
+
+    const message = `${error?.name ?? ""} ${error?.message ?? ""}`.toLowerCase();
+    const isDynamicImportFailure =
+      message.includes("failed to fetch dynamically imported module") ||
+      message.includes("importing a module script failed") ||
+      message.includes("chunkloaderror") ||
+      message.includes("loading chunk");
+
+    if (!isDynamicImportFailure) return;
+
+    const hasReloaded = window.sessionStorage.getItem(CHUNK_RELOAD_SESSION_KEY) === "1";
+    if (hasReloaded) return;
+
+    window.sessionStorage.setItem(CHUNK_RELOAD_SESSION_KEY, "1");
+    const url = new URL(window.location.href);
+    url.searchParams.set("__chunk_reload", String(Date.now()));
+    window.location.replace(url.toString());
   }
 
   render() {
@@ -40,7 +63,12 @@ class ErrorBoundary extends Component<Props, State> {
             </div>
 
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  window.sessionStorage.removeItem(CHUNK_RELOAD_SESSION_KEY);
+                }
+                window.location.reload();
+              }}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 rounded-lg",
                 "bg-primary text-primary-foreground",
