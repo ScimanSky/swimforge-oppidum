@@ -147,21 +147,21 @@ export default function SocialFeed() {
   return (
     <AppLayout>
       <div className="compact-shell">
-        <div className="w-full max-w-[580px] mx-auto">
-          {/* Sticky top strip: story bar + profile + stats + suggested */}
-          <div className="sticky top-14 z-20 pb-2 bg-background/80 backdrop-blur-md -mx-2 px-2">
-            <FeedSidebar
-              storyBarSlot={
-                <StoryBar
-                  currentUserId={currentUserId}
-                  onViewStory={handleViewStory}
-                  onCreateStory={handleCreateStory}
-                />
-              }
-            />
-          </div>
+        {/* Sticky top strip: story bar + profile + stats + suggested */}
+        <div className="sticky top-16 z-20 pb-3 bg-background/80 backdrop-blur-md -mx-4 px-4 md:-mx-5 md:px-5 lg:-mx-6 lg:px-6">
+          <FeedSidebar
+            storyBarSlot={
+              <StoryBar
+                currentUserId={currentUserId}
+                onViewStory={handleViewStory}
+                onCreateStory={handleCreateStory}
+              />
+            }
+          />
+        </div>
 
-          {/* Feed content */}
+        {/* Feed content */}
+        <div className="w-full max-w-[580px] mx-auto">
           <div className="space-y-3 lg:space-y-4">
             {/* Pull-to-refresh indicator */}
             {firstPageQuery.isFetching && !isInitialLoading && (

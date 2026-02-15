@@ -6,7 +6,7 @@ import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
 import { getInitials, formatDistance } from "@/lib/format"
 
-function SuggestedUserChip({ user }: { user: { userId: number; name: string | null; username: string | null; avatarUrl: string | null; level: number | null } }) {
+function SuggestedUserRow({ user }: { user: { userId: number; name: string | null; username: string | null; avatarUrl: string | null; level: number | null } }) {
   const displayName = user.username || user.name || `#${user.userId}`
   const utils = trpc.useUtils()
 
@@ -19,26 +19,31 @@ function SuggestedUserChip({ user }: { user: { userId: number; name: string | nu
   })
 
   return (
-    <div className="flex items-center gap-1.5 min-w-0">
+    <div className="flex items-center gap-2">
       <Link href={`/u/${user.userId}`}>
-        <Avatar className="size-7 border border-border/60 cursor-pointer shrink-0">
+        <Avatar className="size-8 border border-border/60 cursor-pointer shrink-0">
           <AvatarImage src={user.avatarUrl || ""} alt={displayName} />
-          <AvatarFallback className="text-[9px] font-semibold">
+          <AvatarFallback className="text-[10px] font-semibold">
             {getInitials(displayName)}
           </AvatarFallback>
         </Avatar>
       </Link>
-      <Link href={`/u/${user.userId}`} className="text-xs font-semibold text-foreground truncate hover:underline">
-        {displayName}
-      </Link>
+      <div className="flex-1 min-w-0">
+        <Link href={`/u/${user.userId}`} className="text-sm font-semibold text-foreground truncate block hover:underline">
+          {displayName}
+        </Link>
+        {user.level != null && (
+          <p className="text-[10px] text-muted-foreground">Lv.{user.level}</p>
+        )}
+      </div>
       <Button
         variant="outline-neon"
         size="sm"
-        className="h-6 text-[9px] gap-0.5 px-1.5 shrink-0 ml-auto"
+        className="h-7 text-[10px] gap-1 px-2 shrink-0"
         onClick={() => toggleFollow.mutate({ userId: user.userId })}
         disabled={toggleFollow.isPending}
       >
-        <UserPlus className="size-2.5" />
+        <UserPlus className="size-3" />
         Segui
       </Button>
     </div>
@@ -58,66 +63,82 @@ export default function FeedSidebar({ storyBarSlot }: { storyBarSlot?: React.Rea
   const displayName = profile?.username || profile?.userId?.toString() || "Nuotatore"
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {/* Story bar */}
       {storyBarSlot && (
-        <div className="surface-panel p-2.5">{storyBarSlot}</div>
+        <div className="surface-panel p-3">{storyBarSlot}</div>
       )}
 
-      {/* Compact horizontal strip: profile + stats + suggested */}
-      <div className="surface-panel p-3">
-        <div className="flex flex-col sm:flex-row gap-3">
-          {/* Profile mini + stats */}
-          {profile && (
-            <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-              {/* Avatar + name + level */}
-              <Link href="/profile" className="flex items-center gap-2 min-w-0 shrink-0">
-                <Avatar className="size-9 border-2 border-border/60">
-                  <AvatarImage src={profile.avatarUrl || ""} alt={displayName} />
-                  <AvatarFallback className="text-[10px] font-semibold">
-                    {getInitials(displayName)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0">
-                  <p className="font-bold text-xs text-foreground truncate">{displayName}</p>
-                  <span className="text-[9px] font-semibold px-1 py-0.5 rounded bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_20%,transparent),color-mix(in_oklch,var(--electric-lime)_16%,transparent))] text-foreground/80">
+      {/* Cards row: profile | stats | suggested */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+        {/* Profile card */}
+        {profile && (
+          <Link href="/profile" className="block">
+            <div className="surface-panel p-3.5 flex items-center gap-3 hover:border-[var(--electric-cyan)]/30 transition-colors cursor-pointer h-full">
+              <Avatar className="size-10 border-2 border-border/60 shrink-0">
+                <AvatarImage src={profile.avatarUrl || ""} alt={displayName} />
+                <AvatarFallback className="text-xs font-semibold">
+                  {getInitials(displayName)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-sm text-foreground truncate">{displayName}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_20%,transparent),color-mix(in_oklch,var(--electric-lime)_16%,transparent))] text-foreground/80">
                     Lv.{profile.xpLevel}
                   </span>
-                </div>
-              </Link>
-
-              {/* Inline stats */}
-              <div className="flex items-center gap-3 text-xs">
-                <div className="flex items-center gap-1.5" title="Distanza totale">
-                  <Ruler className="size-3.5 text-[var(--electric-cyan)]" />
-                  <span className="font-display font-bold text-foreground">
-                    {formatDistance(profile.totalDistanceMeters) || "—"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5" title="Esperienza">
-                  <Waves className="size-3.5 text-[var(--electric-lime)]" />
-                  <span className="font-display font-bold text-foreground">{profile.totalXp ?? 0} XP</span>
-                </div>
-                <div className="hidden sm:flex items-center gap-1.5" title="Titolo">
-                  <Flame className="size-3.5 text-[var(--electric-coral)]" />
-                  <span className="font-display font-bold text-foreground">{profile.levelTitle}</span>
+                  {profile.xpToNextLevel != null && profile.xpToNextLevel > 0 && (
+                    <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-[linear-gradient(90deg,var(--electric-cyan),var(--electric-lime))]"
+                        style={{
+                          width: `${Math.min(100, ((profile.totalXp) / (profile.totalXp + profile.xpToNextLevel)) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          )}
+          </Link>
+        )}
 
-          {/* Suggested users - compact */}
-          {suggestedUsers.length > 0 && (
-            <div className="flex items-center gap-2 sm:border-l sm:border-border/40 sm:pl-3 min-w-0 shrink-0">
-              <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider shrink-0 hidden sm:block">
-                Suggeriti
-              </span>
-              <div className="flex items-center gap-2 overflow-x-auto">
-                {suggestedUsers.map((user) => (
-                  <SuggestedUserChip key={user.userId} user={user} />
-                ))}
+        {/* Stats card */}
+        {profile && (
+          <div className="surface-panel p-3.5 h-full">
+            <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Riepilogo</h3>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <Ruler className="size-4 text-[var(--electric-cyan)] shrink-0" />
+                <span className="text-sm font-display font-bold text-foreground">
+                  {formatDistance(profile.totalDistanceMeters) || "—"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Waves className="size-4 text-[var(--electric-lime)] shrink-0" />
+                <span className="text-sm font-display font-bold text-foreground">{profile.totalXp ?? 0} XP</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Flame className="size-4 text-[var(--electric-coral)] shrink-0" />
+                <span className="text-sm font-display font-bold text-foreground truncate">{profile.levelTitle}</span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Suggested users card */}
+        <div className="surface-panel p-3.5 h-full">
+          <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Suggeriti per te</h3>
+          {suggestedUsers.length > 0 ? (
+            <div className="space-y-2">
+              {suggestedUsers.map((user) => (
+                <SuggestedUserRow key={user.userId} user={user} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Nessun suggerimento al momento.
+            </p>
           )}
         </div>
       </div>
