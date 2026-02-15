@@ -1,3 +1,4 @@
+import { useState } from "react"
 import { Link } from "wouter"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -7,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, UserPlus, Flag, EyeOff } from "lucide-react"
+import { MoreHorizontal, UserCheck, UserPlus, Flag, EyeOff } from "lucide-react"
 import { formatTimeAgo, getInitials } from "@/lib/format"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
@@ -27,13 +28,20 @@ interface FeedPostHeaderProps {
   isFollowing?: boolean
 }
 
-export default function FeedPostHeader({ post, isOwner, isFollowing }: FeedPostHeaderProps) {
+export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFollowing }: FeedPostHeaderProps) {
   const name = post.user_name || post.user_email?.split("@")[0] || "Nuotatore"
   const initials = getInitials(name)
   const activityType = post.activity_is_open_water ? "Open Water" : "Pool"
+  const [isFollowing, setIsFollowing] = useState(initialIsFollowing ?? false)
 
+  const utils = trpc.useUtils()
   const toggleFollow = trpc.community.users.toggleFollow.useMutation({
-    onSuccess: () => toast.success("Fatto!"),
+    onSuccess: (result) => {
+      setIsFollowing(result.following)
+      toast.success(result.following ? `Segui ${name}` : `Non segui più ${name}`)
+      utils.community.feed.invalidate()
+      utils.community.users.suggested.invalidate()
+    },
     onError: (err) => toast.error(err.message),
   })
 
@@ -69,16 +77,25 @@ export default function FeedPostHeader({ post, isOwner, isFollowing }: FeedPostH
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
-        {!isOwner && !isFollowing && (
+        {!isOwner && (
           <Button
-            variant="outline-neon"
+            variant={isFollowing ? "ghost-neon" : "outline-neon"}
             size="sm"
             className="gap-1 h-8 text-xs"
             onClick={() => toggleFollow.mutate({ userId: post.user_id })}
             disabled={toggleFollow.isPending}
           >
-            <UserPlus className="h-3.5 w-3.5" />
-            Segui
+            {isFollowing ? (
+              <>
+                <UserCheck className="h-3.5 w-3.5" />
+                Seguendo
+              </>
+            ) : (
+              <>
+                <UserPlus className="h-3.5 w-3.5" />
+                Segui
+              </>
+            )}
           </Button>
         )}
         <DropdownMenu>
