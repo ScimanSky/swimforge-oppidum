@@ -24,7 +24,7 @@ import {
   communityClubs,
   communityClubMembers
 } from "../drizzle/schema"
-import { and, eq, desc, sql, gte, lte, or, isNull } from "drizzle-orm"
+import { and, eq, desc, sql, gte, lte, or, isNull, inArray } from "drizzle-orm"
 
 type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>
 
@@ -428,16 +428,22 @@ export async function getUserNotifications(params: {
  */
 export async function markNotificationsAsRead(userId: number, notificationIds?: number[]) {
   const db = await requireDb()
-  
-  const conditions = [eq(userNotifications.userId, userId)]
-  if (notificationIds && notificationIds.length > 0) {
-    conditions.push(sql`${userNotifications.id} = ANY(${notificationIds})`)
-  }
-  
+
+  const normalizedIds = Array.isArray(notificationIds)
+    ? Array.from(new Set(notificationIds.filter((id): id is number => Number.isInteger(id) && id > 0)))
+    : []
+
+  const whereClause = normalizedIds.length > 0
+    ? and(
+        eq(userNotifications.userId, userId),
+        inArray(userNotifications.id, normalizedIds),
+      )
+    : eq(userNotifications.userId, userId)
+
   await db
     .update(userNotifications)
     .set({ isRead: true, readAt: new Date() })
-    .where(and(...conditions))
+    .where(whereClause)
   
   return true
 }

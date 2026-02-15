@@ -60,6 +60,11 @@ export default function NotificationBell() {
       utils.community.notifications.unreadCount.invalidate();
       utils.community.notifications.list.invalidate();
     },
+    onError: () => {
+      toast.error("Impossibile segnare la notifica come letta");
+      utils.community.notifications.unreadCount.invalidate();
+      utils.community.notifications.list.invalidate();
+    },
   });
 
   // Supabase Realtime: invalidate on new notification INSERT
@@ -101,6 +106,9 @@ export default function NotificationBell() {
   };
 
   const handleNotificationClick = (notification: any) => {
+    const notificationId = Number(notification.id);
+    const hasValidNotificationId = Number.isInteger(notificationId) && notificationId > 0;
+
     if (!notification.isRead) {
       // Optimistically decrement unread count
       utils.community.notifications.unreadCount.setData(undefined, (old) =>
@@ -108,9 +116,14 @@ export default function NotificationBell() {
       );
       // Mark the item read in the cached list
       utils.community.notifications.list.setData({ limit: 20, onlyUnread: false }, (old) =>
-        old?.map((n: any) => n.id === notification.id ? { ...n, isRead: true } : n)
+        old?.map((n: any) => Number(n.id) === notificationId ? { ...n, isRead: true } : n)
       );
-      markReadMutation.mutate({ notificationIds: [notification.id] });
+      if (hasValidNotificationId) {
+        markReadMutation.mutate({ notificationIds: [notificationId] });
+      } else {
+        utils.community.notifications.unreadCount.invalidate();
+        utils.community.notifications.list.invalidate();
+      }
     }
     setIsOpen(false);
     if (notification.link) {
