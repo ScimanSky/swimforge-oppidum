@@ -163,7 +163,6 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
       setSelectedConversation(recipientId);
       setSelectedName(recipientName || null);
       setView("conversation");
-      setIsOpen(true);
     }
   }, [recipientId]);
 
