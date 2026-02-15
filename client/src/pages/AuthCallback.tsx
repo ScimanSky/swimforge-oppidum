@@ -34,24 +34,40 @@ export default function AuthCallback() {
     const handleAuthCallback = async () => {
       try {
         console.log('[AuthCallback] Starting auth callback...');
-        
-        // Parse hash fragment and exchange for session
+
+        let session = null;
+        let error = null;
+
+        // 1. Check for PKCE flow (code in query params)
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+
+        // 2. Check for implicit flow (tokens in hash fragment)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
-        
-        console.log('[AuthCallback] Hash params:', { hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken });
-        
-        if (!accessToken) {
-          throw new Error("Nessun access token trovato nell'URL");
+
+        console.log('[AuthCallback] Params:', { hasCode: !!code, hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken });
+
+        if (code) {
+          // PKCE flow: exchange code for session
+          console.log('[AuthCallback] Using PKCE flow (code exchange)');
+          const result = await supabase.auth.exchangeCodeForSession(code);
+          session = result.data.session;
+          error = result.error;
+        } else if (accessToken) {
+          // Implicit flow: set session from hash tokens
+          console.log('[AuthCallback] Using implicit flow (hash tokens)');
+          const result = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || '',
+          });
+          session = result.data.session;
+          error = result.error;
+        } else {
+          throw new Error("Nessun access token o codice di autorizzazione trovato nell'URL");
         }
-        
-        // Set the session with the tokens from the hash
-        const { data: { session }, error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken || '',
-        });
-        
+
         console.log('[AuthCallback] Session result:', { session: !!session, error });
 
         if (error) {
