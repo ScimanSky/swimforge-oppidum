@@ -38,7 +38,7 @@ export {
     updatePostReportStatus,
     upsertActivityPost,
 } from "../db_social";
-export { getUserPublicProfile, toggleFollow, getSuggestedUsers } from "../db_public_profiles";
+export { getUserPublicProfile, toggleFollow, getSuggestedUsers, searchUsers } from "../db_public_profiles";
 export { getPendingActivityInsights, listActivityInsights, markActivityInsightSeen } from "../ai_activity_insights";
 export { logger } from "../middleware/logger";
 export { sanitizeActivityNotes } from "../lib/sanitize";

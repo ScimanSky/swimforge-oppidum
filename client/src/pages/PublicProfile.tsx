@@ -9,7 +9,8 @@ import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { trpc } from "@/lib/trpc"
 import { useMemo } from "react"
 import { useParams, Link } from "wouter"
-import { UserPlus, UserCheck, ArrowLeft, MapPin, Zap } from "lucide-react"
+import { UserPlus, UserCheck, ArrowLeft, MapPin, Zap, MessageCircle } from "lucide-react"
+import DirectMessages from "@/components/DirectMessages"
 
 const getInitials = (name: string) =>
   name
@@ -127,15 +128,18 @@ export default function PublicProfile() {
                 </div>
 
                 {!isSelf ? (
-                  <Button
-                    variant={isFollowing ? "outline-neon" : "neon"}
-                    className="gap-2"
-                    onClick={() => toggleFollowMutation.mutate({ userId })}
-                    disabled={toggleFollowMutation.isPending}
-                  >
-                    {isFollowing ? <UserCheck className="size-4" /> : <UserPlus className="size-4" />}
-                    {isFollowing ? "Seguito" : "Segui"}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={isFollowing ? "outline-neon" : "neon"}
+                      className="gap-2"
+                      onClick={() => toggleFollowMutation.mutate({ userId })}
+                      disabled={toggleFollowMutation.isPending}
+                    >
+                      {isFollowing ? <UserCheck className="size-4" /> : <UserPlus className="size-4" />}
+                      {isFollowing ? "Seguito" : "Segui"}
+                    </Button>
+                    <DirectMessages recipientId={userId} recipientName={displayName} />
+                  </div>
                 ) : null}
               </div>
 

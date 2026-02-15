@@ -5,7 +5,7 @@ import {
     getSocialFeed, upsertActivityPost, setActivityShare,
     toggleSplash, addComment, getComments,
     hidePostForUser, unhidePostForUser, reportPost,
-    getUserPublicProfile, toggleFollow, getSuggestedUsers,
+    getUserPublicProfile, toggleFollow, getSuggestedUsers, searchUsers,
     awardActionXp,
     detectImageType, logger,
 } from "./_shared";
@@ -197,7 +197,7 @@ export const communityRouter = router({
 
                 const { createHmac, randomBytes } = await import("crypto");
                 const token = randomBytes(16).toString("hex");
-                const expire = Math.floor(Date.now() / 1000) + 60 * 10;
+                const expire = Math.floor(Date.now() / 1000) + 60 * 10; // 10 minutes
                 const signature = createHmac("sha1", ENV.imagekitPrivateKey)
                     .update(token + String(expire))
                     .digest("hex");
@@ -208,7 +208,7 @@ export const communityRouter = router({
                     signature,
                     publicKey: ENV.imagekitPublicKey,
                     urlEndpoint: ENV.imagekitUrlEndpoint,
-                    folder: `/stories/`,
+                    folder: `/stories/${ctx.user.id}`,
                 } as const;
             }),
 
@@ -235,7 +235,7 @@ export const communityRouter = router({
                 fileBase64: z
                     .string()
                     .min(1)
-                    .max(28 * 1024 * 1024, "File troppo grande (max 20MB)")
+                    .max(7 * 1024 * 1024, "File troppo grande (max 5MB)")
                     .regex(/^[A-Za-z0-9+/=]+$/, "Invalid base64"),
                 mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
             }))
@@ -243,7 +243,7 @@ export const communityRouter = router({
                 const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
                 const admin = getSupabaseAdminClient();
 
-                const MAX_BYTES = 20 * 1024 * 1024;
+                const MAX_BYTES = 5 * 1024 * 1024;
                 let buffer: Buffer;
                 try {
                     buffer = Buffer.from(input.fileBase64, "base64");
@@ -251,7 +251,7 @@ export const communityRouter = router({
                     throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid base64 payload" });
                 }
                 if (buffer.length > MAX_BYTES) {
-                    throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "File troppo grande (max 20MB)" });
+                    throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "File troppo grande (max 5MB)" });
                 }
 
                 const detected = detectImageType(buffer);
@@ -374,6 +374,12 @@ export const communityRouter = router({
             .input(z.object({ limit: z.number().min(1).max(10).optional() }).optional())
             .query(async ({ ctx, input }) => {
                 return getSuggestedUsers(ctx.user.id, input?.limit ?? 5);
+            }),
+
+        search: protectedProcedure
+            .input(z.object({ query: z.string().min(1).max(100), limit: z.number().min(1).max(20).optional() }))
+            .query(async ({ ctx, input }) => {
+                return searchUsers(ctx.user.id, input.query, input.limit ?? 10);
             }),
     }),
 
@@ -920,7 +926,7 @@ export const communityRouter = router({
                         fileBase64: z
                             .string()
                             .min(1)
-                            .max(28 * 1024 * 1024, "File troppo grande (max 20MB)")
+                            .max(7 * 1024 * 1024, "File troppo grande (max 5MB)")
                             .regex(/^[A-Za-z0-9+/=]+$/, "Invalid base64"),
                         mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
                         extension: z.enum(["jpg", "jpeg", "png", "webp"]).optional(),
@@ -930,7 +936,7 @@ export const communityRouter = router({
                     const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
                     const admin = getSupabaseAdminClient();
 
-                    const MAX_BYTES = 20 * 1024 * 1024;
+                    const MAX_BYTES = 5 * 1024 * 1024;
                     let buffer: Buffer;
                     try {
                         buffer = Buffer.from(input.fileBase64, "base64");
@@ -940,7 +946,7 @@ export const communityRouter = router({
                     if (buffer.length > MAX_BYTES) {
                         throw new TRPCError({
                             code: "PAYLOAD_TOO_LARGE",
-                            message: "File troppo grande (max 20MB)",
+                            message: "File troppo grande (max 5MB)",
                         });
                     }
 

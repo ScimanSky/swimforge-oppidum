@@ -186,3 +186,29 @@ export async function toggleFollow(params: { followerId: number; followingId: nu
   return { following: true };
 }
 
+export async function searchUsers(viewerUserId: number, query: string, limit = 10) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const pattern = `%${query}%`;
+  const rows = await db
+    .select({
+      userId: users.id,
+      name: users.name,
+      username: swimmerProfiles.username,
+      avatarUrl: swimmerProfiles.avatarUrl,
+      level: swimmerProfiles.level,
+    })
+    .from(users)
+    .innerJoin(swimmerProfiles, eq(swimmerProfiles.userId, users.id))
+    .where(
+      and(
+        sql`${users.id} != ${viewerUserId}`,
+        sql`(${users.name} ILIKE ${pattern} OR ${swimmerProfiles.username} ILIKE ${pattern})`,
+      )
+    )
+    .orderBy(sql`${swimmerProfiles.level} DESC`)
+    .limit(limit);
+
+  return rows;
+}
