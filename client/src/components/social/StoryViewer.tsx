@@ -33,6 +33,27 @@ interface StoryViewerProps {
 
 const STORY_IMAGE_DURATION = 5000
 
+type VideoClipRange = {
+  start: number
+  end: number | null
+}
+
+const DEFAULT_VIDEO_CLIP_RANGE: VideoClipRange = { start: 0, end: null }
+
+function parseVideoClipRange(mediaUrl: string | null): VideoClipRange {
+  if (!mediaUrl) return DEFAULT_VIDEO_CLIP_RANGE
+  const match = mediaUrl.match(/#t=(\d+(?:\.\d+)?)(?:,(\d+(?:\.\d+)?))?$/)
+  if (!match) return DEFAULT_VIDEO_CLIP_RANGE
+
+  const start = Number(match[1])
+  const parsedEnd = match[2] ? Number(match[2]) : null
+  if (!Number.isFinite(start) || start < 0) return DEFAULT_VIDEO_CLIP_RANGE
+  if (parsedEnd !== null && (!Number.isFinite(parsedEnd) || parsedEnd <= start)) {
+    return { start, end: null }
+  }
+  return { start, end: parsedEnd }
+}
+
 export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerProps) {
   const [groupIdx, setGroupIdx] = useState(initialGroupIndex)
   const [storyIdx, setStoryIdx] = useState(0)
@@ -40,6 +61,8 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
   const startRef = useRef(0)
   const rafRef = useRef(0)
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const clipRangeRef = useRef<VideoClipRange>(DEFAULT_VIDEO_CLIP_RANGE)
+  const advancedFromClipRef = useRef(false)
 
   const group = groups[groupIdx]
   const story = group?.stories[storyIdx]
@@ -102,6 +125,11 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
     }
   }, [story?.id])
 
+  useEffect(() => {
+    clipRangeRef.current = parseVideoClipRange(story?.mediaUrl ?? null)
+    advancedFromClipRef.current = false
+  }, [story?.id, story?.mediaUrl])
+
   // Keyboard
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -140,8 +168,12 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
   const handleVideoLoadedMetadata = () => {
     const video = videoRef.current
     if (!video) return
+    const clipRange = clipRangeRef.current
     const duration = video.duration
     if (!Number.isFinite(duration) || duration <= 0) return
+    if (clipRange.start > 0 && video.currentTime < clipRange.start) {
+      video.currentTime = Math.min(clipRange.start, Math.max(0, duration - 0.05))
+    }
     if (video.paused) {
       void video.play().catch(() => {
         // autoplay can fail on some browsers; user can tap to continue
@@ -153,7 +185,19 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
     const video = videoRef.current
     if (!video) return
     if (!Number.isFinite(video.duration) || video.duration <= 0) return
-    setProgress(Math.min(video.currentTime / video.duration, 1))
+    const clipRange = clipRangeRef.current
+    const clipStart = Math.max(0, clipRange.start)
+    const clipEnd = clipRange.end ? Math.min(clipRange.end, video.duration) : video.duration
+    const clipDuration = Math.max(0.001, clipEnd - clipStart)
+    const elapsed = Math.max(0, Math.min(video.currentTime - clipStart, clipDuration))
+    setProgress(Math.min(elapsed / clipDuration, 1))
+
+    if (clipRange.end !== null && video.currentTime >= clipEnd - 0.05) {
+      if (!advancedFromClipRef.current) {
+        advancedFromClipRef.current = true
+        goNext()
+      }
+    }
   }
 
   return createPortal(
@@ -234,7 +278,12 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
               preload="metadata"
               onLoadedMetadata={handleVideoLoadedMetadata}
               onTimeUpdate={handleVideoTimeUpdate}
-              onEnded={goNext}
+              onEnded={() => {
+                if (!advancedFromClipRef.current) {
+                  advancedFromClipRef.current = true
+                  goNext()
+                }
+              }}
               onClick={(e) => e.stopPropagation()}
               controls
             />

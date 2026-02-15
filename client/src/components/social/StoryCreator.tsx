@@ -23,7 +23,9 @@ const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const
 const ACCEPTED_VIDEO_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/x-m4v"] as const
 const MAX_IMAGE_BYTES = 20 * 1024 * 1024
 const MAX_VIDEO_BYTES = 25 * 1024 * 1024
-const MAX_VIDEO_DURATION_SECONDS = 20
+const MAX_VIDEO_DURATION_SECONDS = 60
+const STORY_VIDEO_CLIP_SECONDS = 20
+const MAX_VIDEO_SEGMENTS = 3
 
 type ModeWithVideo = "pick" | "image" | "video" | "text"
 type PreviewKind = "image" | "video" | null
@@ -35,6 +37,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
   const [previewKind, setPreviewKind] = useState<PreviewKind>(null)
   const imageFileRef = useRef<File | null>(null)
   const videoFileRef = useRef<File | null>(null)
+  const videoDurationRef = useRef<number>(0)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
 
@@ -42,16 +45,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
 
   const imageKitAuth = trpc.community.stories.imageKitAuth.useMutation()
 
-  const createStory = trpc.community.stories.create.useMutation({
-    onSuccess: () => {
-      utils.community.stories.active.invalidate()
-      toast.success("Storia pubblicata!")
-      resetAndClose()
-    },
-    onError: (err) => {
-      toast.error(err.message || "Errore nella pubblicazione")
-    },
-  })
+  const createStory = trpc.community.stories.create.useMutation()
 
   const clearPreviewUrl = () => {
     if (preview && preview.startsWith("blob:")) {
@@ -67,6 +61,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     setPreviewKind(null)
     imageFileRef.current = null
     videoFileRef.current = null
+    videoDurationRef.current = 0
     if (imageInputRef.current) {
       imageInputRef.current.value = ""
     }
@@ -135,6 +130,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
       setPreview(objectUrl)
       setPreviewKind("video")
       videoFileRef.current = file
+      videoDurationRef.current = duration
       imageFileRef.current = null
       setMode("video")
     }
@@ -177,6 +173,24 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     return uploaded.url
   }
 
+  const buildVideoStoryUrls = (mediaUrl: string, durationSeconds: number) => {
+    const normalizedDuration = Math.min(durationSeconds, MAX_VIDEO_DURATION_SECONDS)
+    const segments = Math.min(MAX_VIDEO_SEGMENTS, Math.max(1, Math.ceil(normalizedDuration / STORY_VIDEO_CLIP_SECONDS)))
+    if (segments <= 1) {
+      return [mediaUrl]
+    }
+
+    const baseUrl = mediaUrl.split("#")[0]
+    const urls: string[] = []
+    for (let i = 0; i < segments; i += 1) {
+      const start = i * STORY_VIDEO_CLIP_SECONDS
+      const end = Math.min(normalizedDuration, (i + 1) * STORY_VIDEO_CLIP_SECONDS)
+      if (end - start < 0.25) continue
+      urls.push(`${baseUrl}#t=${start},${end}`)
+    }
+    return urls.length > 0 ? urls : [mediaUrl]
+  }
+
   const handleSubmitImage = async () => {
     const file = imageFileRef.current
     if (!file) return
@@ -188,6 +202,9 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
         caption: caption.trim() || undefined,
         type: "image",
       })
+      await utils.community.stories.active.invalidate()
+      toast.success("Storia pubblicata!")
+      resetAndClose()
     } catch (error) {
       const message = error instanceof Error ? error.message : "Errore nella pubblicazione della foto"
       toast.error(message)
@@ -200,23 +217,45 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
 
     try {
       const mediaUrl = await uploadMediaToImageKit(file)
-      await createStory.mutateAsync({
-        mediaUrl,
-        caption: caption.trim() || undefined,
-        type: "video",
-      })
+      const duration = videoDurationRef.current || STORY_VIDEO_CLIP_SECONDS
+      const clipUrls = buildVideoStoryUrls(mediaUrl, duration)
+      const baseCaption = caption.trim()
+      for (let i = 0; i < clipUrls.length; i += 1) {
+        const clipCaption = i === 0 ? (baseCaption || undefined) : undefined
+
+        await createStory.mutateAsync({
+          mediaUrl: clipUrls[i],
+          caption: clipCaption,
+          type: "video",
+        })
+      }
+      await utils.community.stories.active.invalidate()
+      if (clipUrls.length > 1) {
+        toast.success(`Video pubblicato in ${clipUrls.length} storie da ${STORY_VIDEO_CLIP_SECONDS}s`)
+      } else {
+        toast.success("Video pubblicato!")
+      }
+      resetAndClose()
     } catch (error) {
       const message = error instanceof Error ? error.message : "Errore nella pubblicazione del video"
       toast.error(message)
     }
   }
 
-  const handleSubmitText = () => {
+  const handleSubmitText = async () => {
     if (!caption.trim()) return
-    createStory.mutate({
-      caption: caption.trim(),
-      type: "text",
-    })
+    try {
+      await createStory.mutateAsync({
+        caption: caption.trim(),
+        type: "text",
+      })
+      await utils.community.stories.active.invalidate()
+      toast.success("Storia pubblicata!")
+      resetAndClose()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Errore nella pubblicazione"
+      toast.error(message)
+    }
   }
 
   const isPending = createStory.isPending || imageKitAuth.isPending
@@ -255,7 +294,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
               </div>
               <div>
                 <div className="font-semibold">Video</div>
-                <div className="text-sm text-muted-foreground">Carica un video breve (max 20s)</div>
+                <div className="text-sm text-muted-foreground">Max 60s, split automatico in clip da 20s</div>
               </div>
             </button>
 
@@ -363,7 +402,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
               <span className="text-xs text-muted-foreground">{caption.length}/500</span>
               <Button
                 variant="neon"
-                onClick={handleSubmitText}
+                onClick={() => void handleSubmitText()}
                 disabled={!caption.trim() || isPending}
               >
                 {isPending ? "Pubblicazione..." : "Pubblica storia"}

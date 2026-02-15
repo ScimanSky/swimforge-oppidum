@@ -442,10 +442,10 @@ export default function Settings() {
 	      toast.error("Formato non supportato. Usa JPG, PNG o WEBP.")
 	      return null
 	    }
-	    if (file.size > 200 * 1024) {
-	      toast.error("File troppo grande. Massimo 200KB.")
-	      return null
-	    }
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("File troppo grande. Massimo 20MB.")
+      return null
+    }
 
 	    try {
         const allowedExtensions = ["jpg", "jpeg", "png", "webp"] as const
@@ -785,7 +785,7 @@ export default function Settings() {
                   <div>
                     <p className="font-medium text-foreground">Cover profilo</p>
                     <p className="text-sm text-muted-foreground">
-                      JPG/PNG/WEBP · max 200KB
+                    JPG/PNG/WEBP · max 20MB
                     </p>
                   </div>
                   <Button
@@ -846,7 +846,7 @@ export default function Settings() {
                 </div>
                 <div>
                   <p className="font-medium text-foreground">Foto Profilo</p>
-                  <p className="text-sm text-muted-foreground">JPG/PNG/WEBP · max 200KB</p>
+                  <p className="text-sm text-muted-foreground">JPG/PNG/WEBP · max 20MB</p>
                 </div>
               </div>
 

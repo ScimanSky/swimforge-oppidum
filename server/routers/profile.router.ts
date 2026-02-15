@@ -126,7 +126,7 @@ export const profileRouter = router({
                 fileBase64: z
                     .string()
                     .min(1)
-                    .max(7 * 1024 * 1024, "File troppo grande (max 5MB)")
+                    .max(28 * 1024 * 1024, "File troppo grande (max 20MB)")
                     .regex(/^[A-Za-z0-9+/=]+$/, "Invalid base64"),
                 mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
                 extension: z.enum(["jpg", "jpeg", "png", "webp"]).optional(),
@@ -136,7 +136,7 @@ export const profileRouter = router({
             const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
             const admin = getSupabaseAdminClient();
 
-            const MAX_BYTES = 5 * 1024 * 1024;
+            const MAX_BYTES = 20 * 1024 * 1024;
             let buffer: Buffer;
             try {
                 buffer = Buffer.from(input.fileBase64, "base64");
@@ -146,7 +146,7 @@ export const profileRouter = router({
             if (buffer.length > MAX_BYTES) {
                 throw new TRPCError({
                     code: "PAYLOAD_TOO_LARGE",
-                    message: "File troppo grande (max 5MB)",
+                    message: "File troppo grande (max 20MB)",
                 });
             }
 
