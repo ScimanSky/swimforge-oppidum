@@ -82,6 +82,10 @@ export const challengesRouter = router({
 
     // Recalculate progress for all active challenges (admin only)
     recalculateAllProgress: protectedProcedure.mutation(async ({ ctx }) => {
+        if (ctx.user.role !== "admin") {
+            throw new TRPCError({ code: "FORBIDDEN" });
+        }
+
         const db = await getDb();
         if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 

@@ -101,6 +101,7 @@ export default function Badges() {
     trpc.badges.getAchievementBadgeDefinitions.useQuery(undefined, { enabled: isAuthenticated });
   const { data: userAchievementBadges } =
     trpc.badges.getUserAchievementBadges.useQuery(undefined, { enabled: isAuthenticated });
+  const meQuery = trpc.auth.me.useQuery(undefined, { enabled: isAuthenticated });
 
   const fixBadgeUrls = trpc.admin.fixBadgeUrls.useMutation({
     onSuccess: () => {
@@ -341,15 +342,17 @@ export default function Badges() {
                 <span className="text-primary">{earnedCount}</span> / {totalCount} sbloccati
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => fixBadgeUrls.mutate()}
-              disabled={fixBadgeUrls.isPending}
-              className="text-xs"
-            >
-              {fixBadgeUrls.isPending ? "Aggiornamento..." : "Fix Badge Profilo"}
-            </Button>
+            {meQuery.data?.role === "admin" ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fixBadgeUrls.mutate()}
+                disabled={fixBadgeUrls.isPending}
+                className="text-xs"
+              >
+                {fixBadgeUrls.isPending ? "Aggiornamento..." : "Fix Badge Profilo"}
+              </Button>
+            ) : null}
           </div>
         </div>
       </header>

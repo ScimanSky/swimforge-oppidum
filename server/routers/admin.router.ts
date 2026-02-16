@@ -1,5 +1,5 @@
 import {
-    publicProcedure, protectedProcedure, router, z, db,
+    protectedProcedure, router, z, db,
     TRPCError,
     listPostReports, updatePostReportStatus,
     getPendingActivityInsights, listActivityInsights, markActivityInsightSeen,
@@ -126,7 +126,10 @@ export const adminRouter = router({
     }),
 
     // Fix badge URLs (temporary endpoint)
-    fixBadgeUrls: publicProcedure.mutation(async () => {
+    fixBadgeUrls: protectedProcedure.mutation(async ({ ctx }) => {
+        if (ctx.user.role !== "admin") {
+            throw new TRPCError({ code: "FORBIDDEN" });
+        }
         const { fixBadgeUrls } = await import("../fix_badge_urls");
         return await fixBadgeUrls();
     }),

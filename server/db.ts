@@ -752,24 +752,27 @@ export async function getWeeklyStats(userId: number, weekStart: Date) {
 export async function updateWeeklyStats(userId: number, weekStart: Date, sessions: number, distance: number, time: number) {
   const db = await getDb();
   if (!db) return;
-  
-  const existing = await getWeeklyStats(userId, weekStart);
-  
-  if (existing) {
-    await db.update(weeklyStats).set({
-      sessionsCount: existing.sessionsCount + sessions,
-      totalDistanceMeters: existing.totalDistanceMeters + distance,
-      totalTimeSeconds: existing.totalTimeSeconds + time,
-    }).where(eq(weeklyStats.id, existing.id));
-  } else {
-    await db.insert(weeklyStats).values({
+
+  // Atomic upsert to avoid race conditions on concurrent updates.
+  await db
+    .insert(weeklyStats)
+    .values({
       userId,
       weekStart,
       sessionsCount: sessions,
       totalDistanceMeters: distance,
       totalTimeSeconds: time,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [weeklyStats.userId, weeklyStats.weekStart],
+      set: {
+        sessionsCount: sql`${weeklyStats.sessionsCount} + ${sessions}`,
+        totalDistanceMeters: sql`${weeklyStats.totalDistanceMeters} + ${distance}`,
+        totalTimeSeconds: sql`${weeklyStats.totalTimeSeconds} + ${time}`,
+        updatedAt: new Date(),
+      },
     });
-  }
 }
 
 // Create OAuth user (Google, etc.)
@@ -977,7 +980,70 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
 
   if (!user) return null;
 
+  const shouldIgnoreMissingRelation = (error: unknown) => {
+    if (!error || typeof error !== "object") return false;
+    const pgError = error as { code?: string };
+    return pgError.code === "42P01"; // undefined_table
+  };
+
+  // Collect Story ImageKit file IDs before account deletion.
+  let storyImageKitFileIds: string[] = [];
+  try {
+    const storyAssetsResult = await db.execute(sql`
+      SELECT imagekit_file_id
+      FROM stories
+      WHERE user_id = ${userId}
+        AND imagekit_file_id IS NOT NULL
+        AND imagekit_file_id <> ''
+    `);
+    storyImageKitFileIds = Array.from(
+      new Set(
+        storyAssetsResult.rows
+          .map((row) => ((row as { imagekit_file_id?: string | null }).imagekit_file_id ?? "").trim())
+          .filter((id) => id.length > 0)
+      )
+    );
+  } catch (error) {
+    if (!shouldIgnoreMissingRelation(error)) {
+      throw error;
+    }
+  }
+
   await db.transaction(async (tx) => {
+    // Stories tables were introduced after initial schema rollout.
+    // Cleanup explicitly for databases where these relations don't have full FK coverage.
+    try {
+      await tx.execute(sql`
+        DELETE FROM story_views
+        WHERE viewer_id = ${userId}
+           OR story_id IN (SELECT id FROM stories WHERE user_id = ${userId})
+      `);
+    } catch (error) {
+      if (!shouldIgnoreMissingRelation(error)) {
+        throw error;
+      }
+    }
+
+    try {
+      await tx.execute(sql`
+        DELETE FROM story_reactions
+        WHERE user_id = ${userId}
+           OR story_id IN (SELECT id FROM stories WHERE user_id = ${userId})
+      `);
+    } catch (error) {
+      if (!shouldIgnoreMissingRelation(error)) {
+        throw error;
+      }
+    }
+
+    try {
+      await tx.execute(sql`DELETE FROM stories WHERE user_id = ${userId}`);
+    } catch (error) {
+      if (!shouldIgnoreMissingRelation(error)) {
+        throw error;
+      }
+    }
+
     await tx.execute(sql`
       DELETE FROM social_hidden_posts
       WHERE user_id = ${userId}
@@ -993,6 +1059,28 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
 
     await tx.execute(sql`DELETE FROM users WHERE id = ${userId}`);
   });
+
+  if (storyImageKitFileIds.length > 0) {
+    try {
+      const { deleteImageKitFileById } = await import("./lib/imagekit");
+      const results = await Promise.allSettled(storyImageKitFileIds.map((fileId) => deleteImageKitFileById(fileId)));
+      const failed = results.filter((result) => result.status === "rejected");
+      if (failed.length > 0) {
+        logger.warn(`[Database] Failed to cleanup ${failed.length}/${storyImageKitFileIds.length} ImageKit files during account deletion`, {
+          event: "account:imagekit_cleanup_partial_failure",
+          userId,
+          failedCount: failed.length,
+        });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn(`[Database] ImageKit cleanup after account deletion failed: ${message}`, {
+        event: "account:imagekit_cleanup_failed",
+        userId,
+        message,
+      });
+    }
+  }
 
   return {
     id: user.id,
