@@ -28,9 +28,6 @@ interface ClubHeroProps {
   isLeaving?: boolean;
   variant?: "full" | "compactSticky";
   eventsPageHref?: string | null;
-  onPost?: () => void;
-  onCreateEvent?: () => void;
-  onInvite?: () => void;
 }
 
 const themeColorMap: Record<string, string> = {
@@ -50,9 +47,6 @@ export default function ClubHero({
   isLeaving,
   variant = "full",
   eventsPageHref,
-  onPost,
-  onCreateEvent,
-  onInvite,
 }: ClubHeroProps) {
   const color = themeColorMap[club.theme_color ?? "cyan"] ?? themeColorMap.cyan;
   const isStaff = ["owner", "admin", "moderator"].includes(club.member_role ?? "");
@@ -157,23 +151,6 @@ export default function ClubHero({
           ) : null}
         </div>
 
-        {club.is_member && onPost ? (
-          <div className="relative z-10 mt-2 flex flex-wrap items-center gap-1.5">
-            <Button className="h-7 text-[11px]" variant="neon" size="sm" onClick={onPost}>
-              Post
-            </Button>
-            {isStaff && onCreateEvent ? (
-              <Button className="h-7 text-[11px]" variant="outline-neon" size="sm" onClick={onCreateEvent}>
-                Nuovo evento
-              </Button>
-            ) : null}
-            {isStaff && onInvite ? (
-              <Button className="h-7 text-[11px]" variant="outline-neon" size="sm" onClick={onInvite}>
-                Invita
-              </Button>
-            ) : null}
-          </div>
-        ) : null}
       </motion.div>
     );
   }

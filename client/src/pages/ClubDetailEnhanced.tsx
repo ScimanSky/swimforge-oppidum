@@ -236,12 +236,16 @@ export default function ClubDetailEnhanced() {
 
   const memberRole = club.member_role ?? "";
   const isStaff = ["owner", "admin", "moderator"].includes(memberRole);
-  const eventsPageHref = `/community/club/${clubId}/events`;
 
   const pinnedAnnouncements = (announcementsQuery.data as any[])?.filter(
     (a: any) => a.announcement?.isPinned
   ) ?? [];
   const upcomingEvents = (eventsQuery.data as any[]) ?? [];
+  const firstUpcomingEvent = upcomingEvents[0];
+  const firstUpcomingEventId = Number(firstUpcomingEvent?.event?.id ?? firstUpcomingEvent?.id);
+  const eventsPageHref = Number.isFinite(firstUpcomingEventId)
+    ? `/community/club/${clubId}/event/${firstUpcomingEventId}`
+    : null;
 
   const handleFindLocationOnMap = async () => {
     if (!newEvent.location.trim()) {
@@ -329,13 +333,6 @@ export default function ClubDetailEnhanced() {
                     isLeaving={leaveMutation.isPending}
                     variant="compactSticky"
                     eventsPageHref={isMobile ? eventsPageHref : null}
-                    onPost={
-                      isMobile
-                        ? () => window.scrollTo({ top: contentOffset + 24, behavior: "smooth" })
-                        : undefined
-                    }
-                    onCreateEvent={isMobile && isStaff ? () => setCreateEventOpen(true) : undefined}
-                    onInvite={isMobile && isStaff ? () => setInviteOpen(true) : undefined}
                   />
                 </div>
               )}
@@ -388,15 +385,13 @@ export default function ClubDetailEnhanced() {
         )}
 
         {/* Quick Actions FAB */}
-        {!isMobile ? (
-          <QuickActionsFAB
-            isMember={isMember}
-            isStaff={isStaff}
-            onPost={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-            onCreateEvent={() => setCreateEventOpen(true)}
-            onInvite={() => setInviteOpen(true)}
-          />
-        ) : null}
+        <QuickActionsFAB
+          isMember={isMember}
+          isStaff={isStaff}
+          onPost={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          onCreateEvent={() => setCreateEventOpen(true)}
+          onInvite={() => setInviteOpen(true)}
+        />
 
         {/* Members Sheet */}
         <Sheet open={membersOpen} onOpenChange={setMembersOpen}>
