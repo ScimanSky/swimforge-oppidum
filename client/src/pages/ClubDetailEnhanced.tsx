@@ -1,77 +1,68 @@
 /**
- * Enhanced Club Detail Page con Tab System
- * Tabs: Feed, Eventi, Membri, Galleria, Annunci
+ * Club Dashboard — Unified scrollable page replacing the old tab system
  */
 
 import { useState } from "react";
 import { Link, useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { 
-  ArrowLeft, Calendar, Users, Images, Megaphone, 
-  Settings, MessageCircle, Bell, TrendingUp
-} from "lucide-react";
+import { Calendar, MapPin, Pin, Clock, ArrowLeft } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
-import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
-// Sub-components
+import ClubHero from "@/components/club/ClubHero";
+import PulseBar from "@/components/club/PulseBar";
+import QuickActionsFAB from "@/components/club/QuickActionsFAB";
 import ClubFeedTab from "@/components/club/ClubFeedTab";
-import ClubEventsTab from "@/components/club/ClubEventsTab";
 import ClubMembersTab from "@/components/club/ClubMembersTab";
-import ClubGalleryTab from "@/components/club/ClubGalleryTab";
-import ClubAnnouncementsTab from "@/components/club/ClubAnnouncementsTab";
-import ClubStatsTab from "@/components/club/ClubStatsTab";
 
 export default function ClubDetailEnhanced() {
   const [match, params] = useRoute("/community/club/:id");
   const clubId = Number(params?.id);
-  const [activeTab, setActiveTab] = useState("feed");
+
+  const [membersOpen, setMembersOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const utils = trpc.useUtils();
 
+  // Queries
   const clubQuery = trpc.community.clubs.get.useQuery(
     { clubId },
     { enabled: match && Number.isFinite(clubId) }
   );
-
-  const membersQuery = trpc.community.clubs.members.useQuery(
+  const statsQuery = trpc.community.clubs.weeklyStats.useQuery(
     { clubId },
-    { enabled: !!clubQuery.data }
+    { enabled: match && Number.isFinite(clubId) }
+  );
+  const announcementsQuery = trpc.community.clubs.announcements.list.useQuery(
+    { clubId },
+    { enabled: match && Number.isFinite(clubId) }
+  );
+  const eventsQuery = trpc.community.clubs.events.list.useQuery(
+    { clubId, status: "active", limit: 1 },
+    { enabled: match && Number.isFinite(clubId) }
   );
 
-  type ClubLike = {
-    name: string
-    description?: string | null
-    cover_image_url?: string | null
-    visibility?: string | null
-    member_count?: number
-    member_role?: string | null
-    is_member?: boolean
-  } & Record<string, unknown>
-
-  const club = clubQuery.data as unknown as ClubLike | undefined
-  const memberRole = club?.member_role ?? null
-  const isStaff = memberRole ? ["owner", "admin", "moderator"].includes(memberRole) : false
-  const isOwner = memberRole === "owner"
-  const isMember = Boolean(club?.is_member)
-
+  // Mutations
   const joinMutation = trpc.community.clubs.join.useMutation({
     onSuccess: () => {
       toast.success("Richiesta di iscrizione inviata!");
       utils.community.clubs.get.invalidate({ clubId });
     },
   });
-
   const leaveMutation = trpc.community.clubs.leave.useMutation({
     onSuccess: () => {
       toast.success("Hai lasciato il club");
       utils.community.clubs.get.invalidate({ clubId });
     },
+  });
+  const rsvpMutation = trpc.community.clubs.events.rsvp.useMutation({
+    onSuccess: () => { eventsQuery.refetch(); },
   });
 
   if (!match || !Number.isFinite(clubId)) {
@@ -94,6 +85,7 @@ export default function ClubDetailEnhanced() {
     );
   }
 
+  const club = clubQuery.data as any;
   if (!club) {
     return (
       <AppLayout>
@@ -112,164 +104,213 @@ export default function ClubDetailEnhanced() {
     );
   }
 
+  const memberRole = club.member_role ?? "";
+  const isStaff = ["owner", "admin", "moderator"].includes(memberRole);
+  const isMember = Boolean(club.is_member);
+
+  const pinnedAnnouncements = (announcementsQuery.data as any[])?.filter(
+    (a: any) => a.announcement?.isPinned
+  ) ?? [];
+  const nextEvent = (eventsQuery.data as any[])?.[0] ?? null;
+
   return (
     <AppLayout>
-      <div className="pb-12 lg:pb-2">
-        {/* Header with Cover Image */}
-        <div className="relative">
-          {club.cover_image_url ? (
-            <div 
-              className="w-full h-64 bg-cover bg-center"
-              style={{ backgroundImage: `url(${club.cover_image_url})` }}
-            >
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/30 to-background" />
-            </div>
-          ) : (
-            <div className="w-full h-64 bg-gradient-to-br from-blue-500 via-cyan-500 to-teal-500">
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/30 to-background" />
-            </div>
-          )}
-          
-          {/* Back Button */}
-          <Link href="/home/community">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute top-4 left-4 bg-background/80 backdrop-blur-sm hover:bg-background/90"
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Indietro
-            </Button>
-          </Link>
+      <div className="max-w-2xl mx-auto space-y-4 pb-24 px-4">
+        {/* Hero */}
+        <ClubHero
+          club={club}
+          onOpenMembers={() => setMembersOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
+          onJoin={() => joinMutation.mutate({ clubId })}
+          onLeave={() => leaveMutation.mutate({ clubId })}
+          isJoining={joinMutation.isPending}
+          isLeaving={leaveMutation.isPending}
+        />
 
-          {/* Settings Button (for staff) */}
-          {isStaff && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute top-4 right-4 bg-background/80 backdrop-blur-sm hover:bg-background/90"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-          )}
-        </div>
+        {/* Pulse Bar */}
+        {isMember && (
+          <PulseBar stats={statsQuery.data as any} themeColor={club.theme_color ?? "cyan"} />
+        )}
 
-        {/* Club Info Bar */}
-        <div className="container max-w-6xl mx-auto px-4 -mt-16 relative z-10">
-          <Surface className="border-2">
-            <SurfaceContent className="p-6">
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h1 className="text-3xl font-bold">{club.name}</h1>
-                    {club.visibility === "private" && (
-                      <Badge variant="secondary">Privato</Badge>
-                    )}
-                    {club.visibility === "invite" && (
-                      <Badge variant="secondary">Solo Invito</Badge>
-                    )}
-                  </div>
-                  {club.description && (
-                    <p className="text-muted-foreground mb-3">{club.description}</p>
-                  )}
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Users className="h-4 w-4" />
-                      <span>{club.member_count} membri</span>
-                    </div>
-                    {club.member_role && (
-                      <Badge variant="outline" className="capitalize">
-                        {club.member_role}
-                      </Badge>
-                    )}
-                  </div>
+        {/* Pinned Announcements */}
+        {pinnedAnnouncements.length > 0 && (
+          <div className="space-y-2">
+            {pinnedAnnouncements.slice(0, 2).map((item: any) => (
+              <motion.div
+                key={item.announcement.id}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="surface-panel p-3 flex items-start gap-2"
+              >
+                <Pin className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                <div>
+                  <p className="font-semibold text-sm">{item.announcement.title}</p>
+                  <p className="text-xs text-muted-foreground line-clamp-2">{item.announcement.content}</p>
                 </div>
-                
-                <div className="flex gap-2">
-                  {!isMember ? (
-                    <Button
-                      onClick={() => joinMutation.mutate({ clubId })}
-                      disabled={joinMutation.isPending}
-                      size="lg"
-                    >
-                      {joinMutation.isPending ? "..." : "Unisciti al Club"}
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        if (confirm("Sicuro di voler lasciare il club?")) {
-                          leaveMutation.mutate({ clubId });
-                        }
-                      }}
-                      disabled={leaveMutation.isPending}
-                    >
-                      Lascia Club
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </SurfaceContent>
-          </Surface>
-        </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
 
-        {/* Tabs Navigation */}
-        <div className="container max-w-6xl mx-auto px-4 mt-4 lg:mt-2">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-flex mb-6">
-              <TabsTrigger value="feed" className="gap-2">
-                <MessageCircle className="h-4 w-4" />
-                <span className="hidden sm:inline">Feed</span>
-              </TabsTrigger>
-              <TabsTrigger value="events" className="gap-2">
-                <Calendar className="h-4 w-4" />
-                <span className="hidden sm:inline">Eventi</span>
-              </TabsTrigger>
-              <TabsTrigger value="members" className="gap-2">
-                <Users className="h-4 w-4" />
-                <span className="hidden sm:inline">Membri</span>
-              </TabsTrigger>
-              <TabsTrigger value="gallery" className="gap-2">
-                <Images className="h-4 w-4" />
-                <span className="hidden sm:inline">Galleria</span>
-              </TabsTrigger>
-              <TabsTrigger value="announcements" className="gap-2">
-                <Megaphone className="h-4 w-4" />
-                <span className="hidden sm:inline">Annunci</span>
-              </TabsTrigger>
-              <TabsTrigger value="stats" className="gap-2">
-                <TrendingUp className="h-4 w-4" />
-                <span className="hidden sm:inline">Stats</span>
-              </TabsTrigger>
-            </TabsList>
+        {/* Next Event */}
+        {nextEvent && isMember && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="surface-panel p-4"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Calendar className="h-4 w-4 text-primary" />
+              <span className="text-xs text-muted-foreground uppercase tracking-wide font-display">Prossimo evento</span>
+            </div>
+            <h3 className="font-bold">{nextEvent.event?.title ?? nextEvent.title}</h3>
+            <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
+              {(nextEvent.event?.startTime ?? nextEvent.startTime) && (
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {new Date(nextEvent.event?.startTime ?? nextEvent.startTime).toLocaleDateString("it-IT", {
+                    weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+                  })}
+                </span>
+              )}
+              {(nextEvent.event?.location ?? nextEvent.location) && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  {nextEvent.event?.location ?? nextEvent.location}
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2 mt-3">
+              <Button
+                size="sm"
+                variant={nextEvent.userRsvp === "going" ? "neon" : "outline-neon"}
+                onClick={() => rsvpMutation.mutate({ eventId: nextEvent.event?.id ?? nextEvent.id, status: "going" })}
+              >
+                Partecipo {nextEvent.attendeeCount ? `(${nextEvent.attendeeCount})` : ""}
+              </Button>
+              <Button
+                size="sm"
+                variant={nextEvent.userRsvp === "maybe" ? "neon" : "ghost-neon"}
+                onClick={() => rsvpMutation.mutate({ eventId: nextEvent.event?.id ?? nextEvent.id, status: "maybe" })}
+              >
+                Forse
+              </Button>
+            </div>
+          </motion.div>
+        )}
 
-            {/* Tab Content */}
-            <TabsContent value="feed" className="mt-0">
-              <ClubFeedTab clubId={clubId} isMember={isMember} />
-            </TabsContent>
+        {/* Feed */}
+        {isMember && <ClubFeedTab clubId={clubId} isMember={isMember} />}
 
-            <TabsContent value="events" className="mt-0">
-              <ClubEventsTab clubId={clubId} isMember={isMember} isStaff={isStaff} />
-            </TabsContent>
+        {/* Quick Actions FAB */}
+        <QuickActionsFAB
+          isMember={isMember}
+          isStaff={isStaff}
+          onPost={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          onCreateEvent={() => toast.info("Vai alla sezione eventi per creare un evento")}
+          onInvite={() => toast.info("Funzione inviti in arrivo")}
+        />
 
-            <TabsContent value="members" className="mt-0">
-              <ClubMembersTab clubId={clubId} isStaff={isStaff} isOwner={isOwner} />
-            </TabsContent>
+        {/* Members Sheet */}
+        <Sheet open={membersOpen} onOpenChange={setMembersOpen}>
+          <SheetContent side="right" className="overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Membri</SheetTitle>
+            </SheetHeader>
+            <div className="mt-4">
+              <ClubMembersTab clubId={clubId} isStaff={isStaff} isOwner={memberRole === "owner"} />
+            </div>
+          </SheetContent>
+        </Sheet>
 
-            <TabsContent value="gallery" className="mt-0">
-              <ClubGalleryTab clubId={clubId} isMember={isMember} />
-            </TabsContent>
-
-            <TabsContent value="announcements" className="mt-0">
-              <ClubAnnouncementsTab clubId={clubId} isStaff={isStaff} />
-            </TabsContent>
-
-            <TabsContent value="stats" className="mt-0">
-              <ClubStatsTab clubId={clubId} />
-            </TabsContent>
-          </Tabs>
-        </div>
+        {/* Settings Sheet */}
+        <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <SheetContent side="right" className="overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle>Impostazioni Club</SheetTitle>
+            </SheetHeader>
+            <ClubSettingsForm
+              club={club}
+              clubId={clubId}
+              onSaved={() => {
+                setSettingsOpen(false);
+                utils.community.clubs.get.invalidate({ clubId });
+              }}
+            />
+          </SheetContent>
+        </Sheet>
       </div>
     </AppLayout>
+  );
+}
+
+/* ---- Settings Form ---- */
+
+function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number; onSaved: () => void }) {
+  const [name, setName] = useState(club.name);
+  const [description, setDescription] = useState(club.description ?? "");
+  const [tagline, setTagline] = useState(club.tagline ?? "");
+  const [themeColor, setThemeColor] = useState(club.theme_color ?? "cyan");
+  const [visibility, setVisibility] = useState(club.visibility ?? "public");
+
+  const updateMutation = trpc.community.clubs.update.useMutation({
+    onSuccess: () => { toast.success("Club aggiornato!"); onSaved(); },
+    onError: (e) => toast.error(e.message),
+  });
+
+  return (
+    <div className="mt-4 space-y-4">
+      <div>
+        <label className="text-sm font-medium">Nome</label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+      <div>
+        <label className="text-sm font-medium">Tagline</label>
+        <Input value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={200} placeholder="Motto del club..." />
+      </div>
+      <div>
+        <label className="text-sm font-medium">Descrizione</label>
+        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+      </div>
+      <div>
+        <label className="text-sm font-medium">Colore tema</label>
+        <div className="flex gap-2 mt-1">
+          {(["cyan", "lime", "coral", "violet"] as const).map((c) => (
+            <button
+              key={c}
+              className={`h-8 w-8 rounded-full border-2 transition-transform ${themeColor === c ? "scale-125 border-white" : "border-transparent"}`}
+              style={{ backgroundColor: `var(--electric-${c})` }}
+              onClick={() => setThemeColor(c)}
+            />
+          ))}
+        </div>
+      </div>
+      <div>
+        <label className="text-sm font-medium">Visibilità</label>
+        <Select value={visibility} onValueChange={setVisibility}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="public">Pubblico</SelectItem>
+            <SelectItem value="private">Privato</SelectItem>
+            <SelectItem value="invite">Solo invito</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <Button
+        variant="neon"
+        className="w-full"
+        disabled={updateMutation.isPending}
+        onClick={() => updateMutation.mutate({
+          clubId,
+          name,
+          description,
+          tagline,
+          themeColor: themeColor as any,
+          visibility: visibility as any,
+        })}
+      >
+        {updateMutation.isPending ? "Salvataggio..." : "Salva modifiche"}
+      </Button>
+    </div>
   );
 }
