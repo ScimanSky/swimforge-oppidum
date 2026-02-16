@@ -79,7 +79,7 @@ export default function PageBackground({ className }: { className?: string }) {
   return (
     <div
       aria-hidden="true"
-      className={cn("pointer-events-none absolute inset-0 overflow-hidden", className)}
+      className={cn("pointer-events-none fixed inset-0 overflow-hidden", className)}
     >
       <div className={cn("absolute inset-0 ei-bg-grid", isDark ? "opacity-[0.06]" : "opacity-[0.07]")} />
 
