@@ -5,13 +5,15 @@
 import { useState } from "react";
 import { Link, useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { Calendar, MapPin, Pin, Clock, ArrowLeft } from "lucide-react";
+import { Calendar, MapPin, Pin, Clock, ArrowLeft, Copy, Check } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -27,6 +29,12 @@ export default function ClubDetailEnhanced() {
 
   const [membersOpen, setMembersOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [createEventOpen, setCreateEventOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [newEvent, setNewEvent] = useState({
+    title: "", description: "", eventType: "training" as "training" | "race" | "social" | "meeting",
+    location: "", startTime: "", endTime: "", maxAttendees: "",
+  });
 
   const utils = trpc.useUtils();
 
@@ -64,6 +72,27 @@ export default function ClubDetailEnhanced() {
   const rsvpMutation = trpc.community.clubs.events.rsvp.useMutation({
     onSuccess: () => { eventsQuery.refetch(); },
   });
+  const createEventMutation = trpc.community.clubs.events.create.useMutation({
+    onSuccess: () => {
+      toast.success("Evento creato!");
+      setCreateEventOpen(false);
+      setNewEvent({ title: "", description: "", eventType: "training", location: "", startTime: "", endTime: "", maxAttendees: "" });
+      utils.community.clubs.events.list.invalidate();
+      statsQuery.refetch();
+    },
+    onError: (e) => toast.error(e.message || "Errore nella creazione"),
+  });
+  const createInviteMutation = trpc.community.clubs.createInvite.useMutation({
+    onSuccess: () => {
+      toast.success("Invito creato!");
+      invitesQuery.refetch();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+  const invitesQuery = trpc.community.clubs.invites.useQuery(
+    { clubId },
+    { enabled: inviteOpen }
+  );
 
   if (!match || !Number.isFinite(clubId)) {
     return (
@@ -207,8 +236,8 @@ export default function ClubDetailEnhanced() {
           isMember={isMember}
           isStaff={isStaff}
           onPost={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          onCreateEvent={() => toast.info("Vai alla sezione eventi per creare un evento")}
-          onInvite={() => toast.info("Funzione inviti in arrivo")}
+          onCreateEvent={() => setCreateEventOpen(true)}
+          onInvite={() => setInviteOpen(true)}
         />
 
         {/* Members Sheet */}
@@ -239,6 +268,108 @@ export default function ClubDetailEnhanced() {
             />
           </SheetContent>
         </Sheet>
+        {/* Create Event Dialog */}
+        <Dialog open={createEventOpen} onOpenChange={setCreateEventOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Crea evento</DialogTitle>
+              <DialogDescription>Organizza un evento per il club</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Titolo *</Label>
+                <Input value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} placeholder="Es. Allenamento mattutino" />
+              </div>
+              <div>
+                <Label>Tipo</Label>
+                <Select value={newEvent.eventType} onValueChange={(v) => setNewEvent({ ...newEvent, eventType: v as any })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="training">Allenamento</SelectItem>
+                    <SelectItem value="race">Gara</SelectItem>
+                    <SelectItem value="social">Evento Sociale</SelectItem>
+                    <SelectItem value="meeting">Riunione</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Descrizione</Label>
+                <Textarea value={newEvent.description} onChange={(e) => setNewEvent({ ...newEvent, description: e.target.value })} rows={2} />
+              </div>
+              <div>
+                <Label>Luogo</Label>
+                <Input value={newEvent.location} onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })} placeholder="Es. Piscina comunale" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label>Inizio *</Label>
+                  <Input type="datetime-local" value={newEvent.startTime} onChange={(e) => setNewEvent({ ...newEvent, startTime: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Fine</Label>
+                  <Input type="datetime-local" value={newEvent.endTime} onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })} />
+                </div>
+              </div>
+              <div>
+                <Label>Max partecipanti</Label>
+                <Input type="number" value={newEvent.maxAttendees} onChange={(e) => setNewEvent({ ...newEvent, maxAttendees: e.target.value })} placeholder="Illimitato" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setCreateEventOpen(false)}>Annulla</Button>
+              <Button
+                variant="neon"
+                disabled={createEventMutation.isPending || !newEvent.title || !newEvent.startTime}
+                onClick={() => {
+                  const startTime = new Date(newEvent.startTime);
+                  const endTime = newEvent.endTime ? new Date(newEvent.endTime) : undefined;
+                  if (isNaN(startTime.getTime())) { toast.error("Data inizio non valida"); return; }
+                  if (endTime && endTime <= startTime) { toast.error("La fine deve essere dopo l'inizio"); return; }
+                  createEventMutation.mutate({
+                    clubId,
+                    title: newEvent.title,
+                    description: newEvent.description || undefined,
+                    eventType: newEvent.eventType,
+                    location: newEvent.location || undefined,
+                    startTime: startTime.toISOString(),
+                    endTime: endTime?.toISOString(),
+                    maxAttendees: newEvent.maxAttendees ? Number(newEvent.maxAttendees) : undefined,
+                  });
+                }}
+              >
+                {createEventMutation.isPending ? "Creazione..." : "Crea evento"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Invite Dialog */}
+        <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Invita membri</DialogTitle>
+              <DialogDescription>Genera un link di invito per il club</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Button
+                variant="neon"
+                className="w-full"
+                disabled={createInviteMutation.isPending}
+                onClick={() => createInviteMutation.mutate({ clubId, maxUses: 10 })}
+              >
+                {createInviteMutation.isPending ? "Generazione..." : "Genera nuovo invito"}
+              </Button>
+              {(invitesQuery.data as any[])?.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">Inviti attivi</p>
+                  {(invitesQuery.data as any[]).map((inv: any) => (
+                    <InviteRow key={inv.id} invite={inv} />
+                  ))}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );
@@ -310,6 +441,32 @@ function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number
         })}
       >
         {updateMutation.isPending ? "Salvataggio..." : "Salva modifiche"}
+      </Button>
+    </div>
+  );
+}
+
+/* ---- Invite Row ---- */
+
+function InviteRow({ invite }: { invite: any }) {
+  const [copied, setCopied] = useState(false);
+  const link = `${window.location.origin}/community/invite/${invite.code}`;
+
+  return (
+    <div className="flex items-center gap-2 surface-panel p-2 text-sm">
+      <code className="flex-1 truncate text-xs text-muted-foreground">{link}</code>
+      <span className="text-xs text-muted-foreground">{invite.usedCount}/{invite.maxUses}</span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 shrink-0"
+        onClick={() => {
+          navigator.clipboard.writeText(link);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }}
+      >
+        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
       </Button>
     </div>
   );
