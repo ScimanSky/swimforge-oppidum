@@ -5,7 +5,7 @@
 import { useState } from "react";
 import { Link, useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { Calendar, MapPin, Pin, Clock, ArrowLeft, Copy, Check } from "lucide-react";
+import { Calendar, MapPin, Pin, Clock, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -377,45 +377,163 @@ export default function ClubDetailEnhanced() {
 
 /* ---- Settings Form ---- */
 
+function fileToBase64DataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number; onSaved: () => void }) {
   const [name, setName] = useState(club.name);
   const [description, setDescription] = useState(club.description ?? "");
+  const [rules, setRules] = useState(club.rules ?? "");
   const [tagline, setTagline] = useState(club.tagline ?? "");
   const [themeColor, setThemeColor] = useState(club.theme_color ?? "cyan");
   const [visibility, setVisibility] = useState(club.visibility ?? "public");
+  const [logoPreview, setLogoPreview] = useState<string | null>(club.logo_url ?? null);
+  const [coverPreview, setCoverPreview] = useState<string | null>(club.cover_image_url ?? null);
+  const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
+  const [coverDataUrl, setCoverDataUrl] = useState<string | null>(null);
 
   const updateMutation = trpc.community.clubs.update.useMutation({
     onSuccess: () => { toast.success("Club aggiornato!"); onSaved(); },
     onError: (e) => toast.error(e.message),
   });
 
+  const handleImagePick = async (file: File, target: "logo" | "cover") => {
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Formato non supportato. Usa JPG, PNG o WebP.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Immagine troppo grande (max 5MB)");
+      return;
+    }
+    const dataUrl = await fileToBase64DataUrl(file);
+    if (target === "logo") {
+      setLogoPreview(dataUrl);
+      setLogoDataUrl(dataUrl);
+    } else {
+      setCoverPreview(dataUrl);
+      setCoverDataUrl(dataUrl);
+    }
+  };
+
+  const themeColorMap: Record<string, string> = {
+    cyan: "var(--electric-cyan)", lime: "var(--electric-lime)",
+    coral: "var(--electric-coral)", violet: "var(--electric-violet)",
+  };
+  const accentColor = themeColorMap[themeColor] ?? themeColorMap.cyan;
+
   return (
-    <div className="mt-4 space-y-4">
+    <div className="mt-4 space-y-5">
+      {/* Logo */}
+      <div>
+        <label className="text-sm font-medium">Logo del club</label>
+        <div className="flex items-center gap-3 mt-2">
+          <div
+            className="h-16 w-16 rounded-full border-2 overflow-hidden flex items-center justify-center bg-muted shrink-0"
+            style={{ borderColor: accentColor }}
+          >
+            {logoPreview ? (
+              <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-lg font-bold font-display" style={{ color: accentColor }}>
+                {club.name.slice(0, 2).toUpperCase()}
+              </span>
+            )}
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => { if (e.target.files?.[0]) handleImagePick(e.target.files[0], "logo"); }}
+              />
+              <span className="text-sm underline" style={{ color: accentColor }}>Carica logo</span>
+            </label>
+            {logoPreview && (
+              <button className="text-xs text-muted-foreground underline text-left" onClick={() => { setLogoPreview(null); setLogoDataUrl(""); }}>
+                Rimuovi
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Cover Image */}
+      <div>
+        <label className="text-sm font-medium">Immagine di copertina</label>
+        <div className="mt-2 relative rounded-lg overflow-hidden border border-border">
+          {coverPreview ? (
+            <div className="relative">
+              <img src={coverPreview} alt="Cover" className="w-full h-28 object-cover" />
+              <button
+                className="absolute top-1 right-1 bg-black/60 rounded-full p-1"
+                onClick={() => { setCoverPreview(null); setCoverDataUrl(""); }}
+              >
+                <XIcon className="h-3 w-3 text-white" />
+              </button>
+            </div>
+          ) : (
+            <label className="cursor-pointer flex flex-col items-center justify-center h-28 bg-muted/50 hover:bg-muted transition-colors">
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(e) => { if (e.target.files?.[0]) handleImagePick(e.target.files[0], "cover"); }}
+              />
+              <Upload className="h-5 w-5 text-muted-foreground mb-1" />
+              <span className="text-xs text-muted-foreground">Carica copertina</span>
+            </label>
+          )}
+        </div>
+      </div>
+
+      {/* Name */}
       <div>
         <label className="text-sm font-medium">Nome</label>
         <Input value={name} onChange={(e) => setName(e.target.value)} />
       </div>
+
+      {/* Tagline */}
       <div>
         <label className="text-sm font-medium">Tagline</label>
         <Input value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={200} placeholder="Motto del club..." />
       </div>
+
+      {/* Description */}
       <div>
         <label className="text-sm font-medium">Descrizione</label>
         <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
       </div>
+
+      {/* Rules */}
+      <div>
+        <label className="text-sm font-medium">Regolamento</label>
+        <Textarea value={rules} onChange={(e) => setRules(e.target.value)} rows={2} placeholder="Regole del club..." />
+      </div>
+
+      {/* Theme Color */}
       <div>
         <label className="text-sm font-medium">Colore tema</label>
-        <div className="flex gap-2 mt-1">
+        <div className="flex gap-3 mt-2">
           {(["cyan", "lime", "coral", "violet"] as const).map((c) => (
             <button
               key={c}
-              className={`h-8 w-8 rounded-full border-2 transition-transform ${themeColor === c ? "scale-125 border-white" : "border-transparent"}`}
+              className={`h-10 w-10 rounded-full border-2 transition-all ${themeColor === c ? "scale-110 ring-2 ring-white ring-offset-2 ring-offset-background" : "border-transparent opacity-60 hover:opacity-100"}`}
               style={{ backgroundColor: `var(--electric-${c})` }}
               onClick={() => setThemeColor(c)}
             />
           ))}
         </div>
       </div>
+
+      {/* Visibility */}
       <div>
         <label className="text-sm font-medium">Visibilità</label>
         <Select value={visibility} onValueChange={setVisibility}>
@@ -427,6 +545,8 @@ function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number
           </SelectContent>
         </Select>
       </div>
+
+      {/* Save */}
       <Button
         variant="neon"
         className="w-full"
@@ -435,9 +555,12 @@ function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number
           clubId,
           name,
           description,
+          rules,
           tagline,
           themeColor: themeColor as any,
           visibility: visibility as any,
+          ...(logoDataUrl !== null ? { logoUrl: logoDataUrl || null } : {}),
+          ...(coverDataUrl !== null ? { coverImageUrl: coverDataUrl || null } : {}),
         })}
       >
         {updateMutation.isPending ? "Salvataggio..." : "Salva modifiche"}
