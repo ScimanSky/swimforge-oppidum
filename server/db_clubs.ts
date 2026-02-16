@@ -160,6 +160,9 @@ export async function getClubFeed(userId: number, clubId: number, limit = 20) {
       p.club_id,
       p.content,
       p.media_url,
+      p.media_urls,
+      p.tagged_user_ids,
+      p.hashtags,
       p.visibility,
       p.created_at,
       u.name AS user_name,
@@ -175,7 +178,23 @@ export async function getClubFeed(userId: number, clubId: number, limit = 20) {
       EXISTS(
         SELECT 1 FROM social_splashes s
         WHERE s.post_id = p.id AND s.user_id = ${userId}
-      ) AS has_splashed
+      ) AS has_splashed,
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'user_id', tu.id,
+              'name', tu.name,
+              'username', tsp.username,
+              'avatar_url', tsp.avatar_url
+            )
+          )
+          FROM users tu
+          LEFT JOIN swimmer_profiles tsp ON tsp.user_id = tu.id
+          WHERE tu.id = ANY(COALESCE(p.tagged_user_ids, '{}'::integer[]))
+        ),
+        '[]'::json
+      ) AS tagged_users
     FROM social_posts p
     JOIN users u ON u.id = p.user_id
     LEFT JOIN swimmer_profiles sp ON sp.user_id = u.id
@@ -194,7 +213,17 @@ export async function getClubFeed(userId: number, clubId: number, limit = 20) {
   return result.rows;
 }
 
-export async function createClubPost(userId: number, clubId: number, input: { content?: string | null; mediaUrl?: string | null }) {
+export async function createClubPost(
+  userId: number,
+  clubId: number,
+  input: {
+    content?: string | null;
+    mediaUrl?: string | null;
+    mediaUrls?: string[] | null;
+    taggedUserIds?: number[] | null;
+    hashtags?: string[] | null;
+  }
+) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -219,6 +248,9 @@ export async function createClubPost(userId: number, clubId: number, input: { co
       clubId,
       content: input.content ?? null,
       mediaUrl: input.mediaUrl ?? null,
+      mediaUrls: input.mediaUrls ?? [],
+      taggedUserIds: input.taggedUserIds ?? [],
+      hashtags: input.hashtags ?? [],
       visibility: "public",
       isDeleted: false,
       createdAt: new Date(),

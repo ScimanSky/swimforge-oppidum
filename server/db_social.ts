@@ -44,6 +44,9 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
       p.club_id,
       p.content,
       p.media_url,
+      p.media_urls,
+      p.tagged_user_ids,
+      p.hashtags,
       p.visibility,
       p.created_at,
       p.updated_at,
@@ -65,7 +68,23 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
       EXISTS(
         SELECT 1 FROM social_follows f
         WHERE f.follower_id = ${userId} AND f.following_id = p.user_id AND f.status = 'accepted'
-      ) AS is_following
+      ) AS is_following,
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'user_id', tu.id,
+              'name', tu.name,
+              'username', tsp.username,
+              'avatar_url', tsp.avatar_url
+            )
+          )
+          FROM users tu
+          LEFT JOIN swimmer_profiles tsp ON tsp.user_id = tu.id
+          WHERE tu.id = ANY(COALESCE(p.tagged_user_ids, '{}'::integer[]))
+        ),
+        '[]'::json
+      ) AS tagged_users
     FROM social_posts p
     JOIN users u ON u.id = p.user_id
     LEFT JOIN swimmer_profiles sp ON sp.user_id = u.id
@@ -287,7 +306,18 @@ export async function updatePostReportStatus(input: {
   return { success: true };
 }
 
-export async function upsertActivityPost(userId: number, activityId: number, data: { content?: string | null; mediaUrl?: string | null; visibility?: string | null }) {
+export async function upsertActivityPost(
+  userId: number,
+  activityId: number,
+  data: {
+    content?: string | null;
+    mediaUrl?: string | null;
+    mediaUrls?: string[] | null;
+    taggedUserIds?: number[] | null;
+    hashtags?: string[] | null;
+    visibility?: string | null;
+  }
+) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -315,6 +345,9 @@ export async function upsertActivityPost(userId: number, activityId: number, dat
   const basePayload = {
     content: data.content ?? null,
     mediaUrl: data.mediaUrl ?? null,
+    mediaUrls: data.mediaUrls ?? [],
+    taggedUserIds: data.taggedUserIds ?? [],
+    hashtags: data.hashtags ?? [],
     visibility: data.visibility ?? "public",
     isDeleted: false,
     updatedAt: new Date(),
@@ -355,7 +388,14 @@ export async function setActivityShare(userId: number, activityId: number, share
   await db.update(swimmingActivities).set({ shareToFeed: share }).where(eq(swimmingActivities.id, activityId));
 
   if (share) {
-    await upsertActivityPost(userId, activityId, { content: null, mediaUrl: null, visibility: "public" });
+    await upsertActivityPost(userId, activityId, {
+      content: null,
+      mediaUrl: null,
+      mediaUrls: [],
+      taggedUserIds: [],
+      hashtags: [],
+      visibility: "public",
+    });
   } else {
     await db.update(socialPosts).set({ isDeleted: true, updatedAt: new Date() }).where(eq(socialPosts.activityId, activityId));
   }

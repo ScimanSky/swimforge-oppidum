@@ -14,6 +14,74 @@ import { ENV } from "../_core/env";
 
 const CLUB_STAFF_ROLES = new Set(["owner", "admin", "moderator"]);
 const REACTION_TYPES = ["splash", "fire", "strong", "clap", "wave", "love", "rocket", "wow", "laugh", "cry"] as const;
+const HASHTAG_REGEX = /(^|\s)#([A-Za-z0-9_]{2,40})/g;
+
+function normalizeMediaUrls(mediaUrls?: string[] | null, mediaUrl?: string | null) {
+    const values = [...(mediaUrls ?? []), mediaUrl ?? ""]
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0)
+        .slice(0, 6);
+    return Array.from(new Set(values));
+}
+
+function normalizeTaggedUserIds(authorUserId: number, taggedUserIds?: number[] | null) {
+    if (!taggedUserIds?.length) return [];
+    const unique = Array.from(new Set(taggedUserIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)));
+    return unique.filter((id) => id !== authorUserId).slice(0, 10);
+}
+
+function extractHashtagsFromContent(content?: string | null) {
+    if (!content) return [] as string[];
+    const matches = content.matchAll(HASHTAG_REGEX);
+    const tags = Array.from(matches)
+        .map((entry) => (entry?.[2] ?? "").trim().toLowerCase())
+        .filter((tag) => tag.length >= 2 && tag.length <= 40);
+    return Array.from(new Set(tags));
+}
+
+function normalizeHashtags(content?: string | null, hashtags?: string[] | null) {
+    const explicit = (hashtags ?? [])
+        .map((raw) => raw.replace(/^#+/, "").trim().toLowerCase())
+        .filter((tag) => tag.length >= 2 && tag.length <= 40);
+    const all = [...extractHashtagsFromContent(content), ...explicit];
+    return Array.from(new Set(all)).slice(0, 20);
+}
+
+async function notifyTaggedUsers(input: {
+    authorUserId: number;
+    taggedUserIds: number[];
+    postId: number;
+    clubId?: number | null;
+}) {
+    if (!input.taggedUserIds.length) return;
+
+    try {
+        const { getDb } = await import("../db");
+        const { sql } = await import("drizzle-orm");
+        const { createNotification } = await import("../db_social_enhanced");
+        const db = await getDb();
+        if (!db) return;
+
+        const actorResult = await db.execute(sql`SELECT name FROM users WHERE id = ${input.authorUserId} LIMIT 1`);
+        const actorName = ((actorResult.rows[0] as any)?.name as string | undefined) || "Qualcuno";
+        const link = input.clubId ? `/community/club/${input.clubId}` : "/home";
+
+        await Promise.all(
+            input.taggedUserIds.map((taggedUserId) =>
+                createNotification({
+                    userId: taggedUserId,
+                    type: "mention",
+                    title: "Sei stato taggato",
+                    message: `${actorName} ti ha taggato in un post.`,
+                    link,
+                    referenceId: input.postId,
+                })
+            )
+        );
+    } catch {
+        // Best-effort: tagging notification should not block post creation
+    }
+}
 
 async function requireClubMemberRole(userId: number, clubId: number) {
     const { getClubMemberRole } = await import("../db_clubs");
@@ -105,14 +173,32 @@ export const communityRouter = router({
             activityId: z.number(),
             content: z.string().max(2000).optional().nullable(),
             mediaUrl: z.string().url().optional().nullable(),
+            mediaUrls: z.array(z.string().url()).max(6).optional(),
+            taggedUserIds: z.array(z.number().int().positive()).max(10).optional(),
+            hashtags: z.array(z.string().min(1).max(64)).max(20).optional(),
             visibility: z.enum(["public", "private"]).optional(),
         }))
         .mutation(async ({ ctx, input }) => {
+            const content = input.content?.trim() ?? null;
+            const mediaUrls = normalizeMediaUrls(input.mediaUrls, input.mediaUrl ?? null);
+            const taggedUserIds = normalizeTaggedUserIds(ctx.user.id, input.taggedUserIds);
+            const hashtags = normalizeHashtags(content, input.hashtags);
             const postId = await upsertActivityPost(ctx.user.id, input.activityId, {
-                content: input.content ?? null,
-                mediaUrl: input.mediaUrl ?? null,
+                content,
+                mediaUrl: mediaUrls[0] ?? null,
+                mediaUrls,
+                taggedUserIds,
+                hashtags,
                 visibility: input.visibility ?? "public",
             });
+            if (postId) {
+                await notifyTaggedUsers({
+                    authorUserId: ctx.user.id,
+                    taggedUserIds,
+                    postId,
+                    clubId: null,
+                });
+            }
             return { success: true, postId };
         }),
 
@@ -214,8 +300,11 @@ export const communityRouter = router({
 
     createTextPost: protectedProcedure
         .input(z.object({
-            content: z.string().min(1).max(2000),
-            mediaUrl: z.string().url().optional(),
+            content: z.string().max(2000).optional().nullable(),
+            mediaUrl: z.string().url().optional().nullable(),
+            mediaUrls: z.array(z.string().url()).max(6).optional(),
+            taggedUserIds: z.array(z.number().int().positive()).max(10).optional(),
+            hashtags: z.array(z.string().min(1).max(64)).max(20).optional(),
         }))
         .mutation(async ({ ctx, input }) => {
             const { getDb } = await import("../db");
@@ -223,13 +312,60 @@ export const communityRouter = router({
             const db = await getDb();
             if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
+            const content = input.content?.trim() ?? null;
+            const mediaUrls = normalizeMediaUrls(input.mediaUrls, input.mediaUrl ?? null);
+            const taggedUserIds = normalizeTaggedUserIds(ctx.user.id, input.taggedUserIds);
+            const hashtags = normalizeHashtags(content, input.hashtags);
+            if (!content && mediaUrls.length === 0) {
+                throw new TRPCError({ code: "BAD_REQUEST", message: "Inserisci un testo o almeno un media." });
+            }
+
             const result = await db.execute(sql`
-                INSERT INTO social_posts (user_id, activity_id, club_id, content, media_url, visibility, is_deleted, created_at, updated_at)
-                VALUES (${ctx.user.id}, NULL, NULL, ${input.content}, ${input.mediaUrl ?? null}, 'public', false, NOW(), NOW())
+                INSERT INTO social_posts (
+                  user_id, activity_id, club_id, content, media_url, media_urls, tagged_user_ids, hashtags, visibility, is_deleted, created_at, updated_at
+                )
+                VALUES (
+                  ${ctx.user.id}, NULL, NULL, ${content}, ${mediaUrls[0] ?? null}, ${mediaUrls},
+                  ${taggedUserIds}, ${hashtags}, 'public', false, NOW(), NOW()
+                )
                 RETURNING id
             `);
             const postId = (result.rows[0] as any)?.id ?? null;
+            if (postId) {
+                await notifyTaggedUsers({
+                    authorUserId: ctx.user.id,
+                    taggedUserIds,
+                    postId,
+                    clubId: null,
+                });
+            }
             return { success: true, postId };
+        }),
+
+    postImageKitAuth: protectedProcedure
+        .mutation(async ({ ctx }) => {
+            if (!ENV.imagekitPrivateKey || !ENV.imagekitPublicKey || !ENV.imagekitUrlEndpoint) {
+                throw new TRPCError({
+                    code: "PRECONDITION_FAILED",
+                    message: "ImageKit non configurato sul server.",
+                });
+            }
+
+            const { createHmac, randomBytes } = await import("crypto");
+            const token = randomBytes(16).toString("hex");
+            const expire = Math.floor(Date.now() / 1000) + 60 * 10;
+            const signature = createHmac("sha1", ENV.imagekitPrivateKey)
+                .update(token + String(expire))
+                .digest("hex");
+
+            return {
+                token,
+                expire,
+                signature,
+                publicKey: ENV.imagekitPublicKey,
+                urlEndpoint: ENV.imagekitUrlEndpoint,
+                folder: `/posts/${ctx.user.id}`,
+            } as const;
         }),
 
     unsharedActivities: protectedProcedure
@@ -768,8 +904,11 @@ export const communityRouter = router({
         createPost: protectedProcedure
             .input(z.object({
                 clubId: z.number(),
-                content: z.string().min(1).max(1000).optional(),
+                content: z.string().max(1000).optional().nullable(),
                 mediaUrl: z.string().url().optional().nullable(),
+                mediaUrls: z.array(z.string().url()).max(6).optional(),
+                taggedUserIds: z.array(z.number().int().positive()).max(10).optional(),
+                hashtags: z.array(z.string().min(1).max(64)).max(20).optional(),
             }))
             .mutation(async ({ ctx, input }) => {
                 const { getClubById, createClubPost } = await import("../db_clubs");
@@ -780,10 +919,28 @@ export const communityRouter = router({
                 if (club.is_private && !club.is_member) {
                     throw new TRPCError({ code: "FORBIDDEN" });
                 }
+                const content = input.content?.trim() ?? null;
+                const mediaUrls = normalizeMediaUrls(input.mediaUrls, input.mediaUrl ?? null);
+                const taggedUserIds = normalizeTaggedUserIds(ctx.user.id, input.taggedUserIds);
+                const hashtags = normalizeHashtags(content, input.hashtags);
+                if (!content && mediaUrls.length === 0) {
+                    throw new TRPCError({ code: "BAD_REQUEST", message: "Inserisci un testo o almeno un media." });
+                }
                 const postId = await createClubPost(ctx.user.id, input.clubId, {
-                    content: input.content ?? null,
-                    mediaUrl: input.mediaUrl ?? null,
+                    content,
+                    mediaUrl: mediaUrls[0] ?? null,
+                    mediaUrls,
+                    taggedUserIds,
+                    hashtags,
                 });
+                if (postId) {
+                    await notifyTaggedUsers({
+                        authorUserId: ctx.user.id,
+                        taggedUserIds,
+                        postId,
+                        clubId: input.clubId,
+                    });
+                }
                 const actionXp = await awardActionXp({
                     userId: ctx.user.id,
                     actionType: "club_post",
