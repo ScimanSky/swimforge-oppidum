@@ -375,16 +375,43 @@ export default function ClubDetailEnhanced() {
   );
 }
 
-/* ---- Settings Form ---- */
+/* ---- ImageKit Upload Helper ---- */
 
-function fileToBase64DataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+async function uploadToImageKit(
+  file: File,
+  auth: { publicKey: string; token: string; signature: string; expire: number; folder: string },
+  prefix: string
+): Promise<string> {
+  const fileNameSafe = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const fileName = `${prefix}-${Date.now()}-${fileNameSafe}`;
+
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("fileName", fileName);
+  formData.append("publicKey", auth.publicKey);
+  formData.append("token", auth.token);
+  formData.append("signature", auth.signature);
+  formData.append("expire", String(auth.expire));
+  formData.append("folder", auth.folder);
+  formData.append("useUniqueFileName", "true");
+  formData.append("tags", "club,swimforge");
+
+  const res = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
+    method: "POST",
+    body: formData,
   });
+
+  if (!res.ok) {
+    const detail = await res.text().catch(() => "");
+    throw new Error(detail || "Upload su ImageKit fallito");
+  }
+
+  const uploaded = (await res.json()) as { url?: string };
+  if (!uploaded.url) throw new Error("ImageKit non ha restituito un URL valido");
+  return uploaded.url;
 }
+
+/* ---- Settings Form ---- */
 
 function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number; onSaved: () => void }) {
   const [name, setName] = useState(club.name);
@@ -395,15 +422,19 @@ function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number
   const [visibility, setVisibility] = useState(club.visibility ?? "public");
   const [logoPreview, setLogoPreview] = useState<string | null>(club.logo_url ?? null);
   const [coverPreview, setCoverPreview] = useState<string | null>(club.cover_image_url ?? null);
-  const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
-  const [coverDataUrl, setCoverDataUrl] = useState<string | null>(null);
+  const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
+  const [pendingCoverFile, setPendingCoverFile] = useState<File | null>(null);
+  const [logoRemoved, setLogoRemoved] = useState(false);
+  const [coverRemoved, setCoverRemoved] = useState(false);
+  const [saving, setSaving] = useState(false);
 
+  const imageKitAuth = trpc.community.clubs.media.imageKitAuth.useMutation();
   const updateMutation = trpc.community.clubs.update.useMutation({
     onSuccess: () => { toast.success("Club aggiornato!"); onSaved(); },
     onError: (e) => toast.error(e.message),
   });
 
-  const handleImagePick = async (file: File, target: "logo" | "cover") => {
+  const handleFilePick = (file: File, target: "logo" | "cover") => {
     if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
       toast.error("Formato non supportato. Usa JPG, PNG o WebP.");
       return;
@@ -412,13 +443,56 @@ function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number
       toast.error("Immagine troppo grande (max 5MB)");
       return;
     }
-    const dataUrl = await fileToBase64DataUrl(file);
+    const preview = URL.createObjectURL(file);
     if (target === "logo") {
-      setLogoPreview(dataUrl);
-      setLogoDataUrl(dataUrl);
+      setPendingLogoFile(file);
+      setLogoPreview(preview);
+      setLogoRemoved(false);
     } else {
-      setCoverPreview(dataUrl);
-      setCoverDataUrl(dataUrl);
+      setPendingCoverFile(file);
+      setCoverPreview(preview);
+      setCoverRemoved(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      let logoUrl: string | null | undefined = undefined;
+      let coverImageUrl: string | null | undefined = undefined;
+
+      // Upload new images to ImageKit if selected
+      if (pendingLogoFile || pendingCoverFile) {
+        const auth = await imageKitAuth.mutateAsync({ clubId });
+
+        if (pendingLogoFile) {
+          logoUrl = await uploadToImageKit(pendingLogoFile, auth, `club-${clubId}-logo`);
+        }
+        if (pendingCoverFile) {
+          coverImageUrl = await uploadToImageKit(pendingCoverFile, auth, `club-${clubId}-cover`);
+        }
+      }
+
+      // Handle removals
+      if (logoRemoved && !pendingLogoFile) logoUrl = null;
+      if (coverRemoved && !pendingCoverFile) coverImageUrl = null;
+
+      await updateMutation.mutateAsync({
+        clubId,
+        name,
+        description,
+        rules,
+        tagline,
+        themeColor: themeColor as any,
+        visibility: visibility as any,
+        ...(logoUrl !== undefined ? { logoUrl } : {}),
+        ...(coverImageUrl !== undefined ? { coverImageUrl } : {}),
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Errore nel salvataggio";
+      toast.error(msg);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -452,12 +526,16 @@ function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 className="hidden"
-                onChange={(e) => { if (e.target.files?.[0]) handleImagePick(e.target.files[0], "logo"); }}
+                onChange={(e) => { if (e.target.files?.[0]) handleFilePick(e.target.files[0], "logo"); }}
               />
               <span className="text-sm underline" style={{ color: accentColor }}>Carica logo</span>
             </label>
             {logoPreview && (
-              <button className="text-xs text-muted-foreground underline text-left" onClick={() => { setLogoPreview(null); setLogoDataUrl(""); }}>
+              <button className="text-xs text-muted-foreground underline text-left" onClick={() => {
+                setLogoPreview(null);
+                setPendingLogoFile(null);
+                setLogoRemoved(true);
+              }}>
                 Rimuovi
               </button>
             )}
@@ -474,7 +552,11 @@ function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number
               <img src={coverPreview} alt="Cover" className="w-full h-28 object-cover" />
               <button
                 className="absolute top-1 right-1 bg-black/60 rounded-full p-1"
-                onClick={() => { setCoverPreview(null); setCoverDataUrl(""); }}
+                onClick={() => {
+                  setCoverPreview(null);
+                  setPendingCoverFile(null);
+                  setCoverRemoved(true);
+                }}
               >
                 <XIcon className="h-3 w-3 text-white" />
               </button>
@@ -485,7 +567,7 @@ function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 className="hidden"
-                onChange={(e) => { if (e.target.files?.[0]) handleImagePick(e.target.files[0], "cover"); }}
+                onChange={(e) => { if (e.target.files?.[0]) handleFilePick(e.target.files[0], "cover"); }}
               />
               <Upload className="h-5 w-5 text-muted-foreground mb-1" />
               <span className="text-xs text-muted-foreground">Carica copertina</span>
@@ -550,20 +632,10 @@ function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number
       <Button
         variant="neon"
         className="w-full"
-        disabled={updateMutation.isPending}
-        onClick={() => updateMutation.mutate({
-          clubId,
-          name,
-          description,
-          rules,
-          tagline,
-          themeColor: themeColor as any,
-          visibility: visibility as any,
-          ...(logoDataUrl !== null ? { logoUrl: logoDataUrl || null } : {}),
-          ...(coverDataUrl !== null ? { coverImageUrl: coverDataUrl || null } : {}),
-        })}
+        disabled={saving}
+        onClick={handleSave}
       >
-        {updateMutation.isPending ? "Salvataggio..." : "Salva modifiche"}
+        {saving ? "Caricamento..." : "Salva modifiche"}
       </Button>
     </div>
   );
