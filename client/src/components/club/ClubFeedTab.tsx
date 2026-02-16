@@ -143,17 +143,18 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
                 <Surface className={isActivityPost ? "overflow-hidden" : undefined}>
                   {isActivityPost && (
                     <>
-                      <picture className="pointer-events-none absolute inset-0 z-0">
+                      <picture className="pointer-events-none !absolute inset-0 !z-0">
                         <source media="(max-width: 767px)" srcSet="/images/activity-card-overlay-mobile.png" />
                         <img
                           src="/images/activity-card-overlay-desktop.png"
                           alt=""
                           aria-hidden="true"
-                          className="h-full w-full object-cover opacity-[0.2]"
+                          className="h-full w-full object-cover object-center opacity-[0.36] saturate-[1.06] contrast-[1.02]"
                           loading="lazy"
                         />
                       </picture>
-                      <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-background/76 via-background/64 to-background/86" />
+                      <div className="pointer-events-none !absolute inset-0 !z-0 bg-gradient-to-b from-background/36 via-background/22 to-background/46" />
+                      <div className="pointer-events-none !absolute inset-0 !z-0 bg-[radial-gradient(circle_at_14%_20%,color-mix(in_oklch,var(--electric-cyan)_14%,transparent),transparent_40%),radial-gradient(circle_at_86%_18%,color-mix(in_oklch,var(--electric-lime)_12%,transparent),transparent_44%)]" />
                     </>
                   )}
                 <SurfaceContent className="p-6">

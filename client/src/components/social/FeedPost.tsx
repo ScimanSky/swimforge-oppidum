@@ -35,21 +35,22 @@ export default function FeedPost({ post, currentUserId, index = 0 }: FeedPostPro
       <div className={`surface-panel overflow-hidden p-0 ${isActivityPost ? "relative isolate" : ""}`}>
         {isActivityPost && (
           <>
-            <picture className="pointer-events-none absolute inset-0 z-0">
+            <picture className="pointer-events-none !absolute inset-0 !z-0">
               <source media="(max-width: 767px)" srcSet="/images/activity-card-overlay-mobile.png" />
               <img
                 src="/images/activity-card-overlay-desktop.png"
                 alt=""
                 aria-hidden="true"
-                className="h-full w-full object-cover opacity-[0.24]"
+                className="h-full w-full object-cover object-center opacity-[0.42] saturate-[1.08] contrast-[1.03]"
                 loading="lazy"
               />
             </picture>
-            <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-background/72 via-background/60 to-background/84" />
+            <div className="pointer-events-none !absolute inset-0 !z-0 bg-gradient-to-b from-background/34 via-background/18 to-background/42" />
+            <div className="pointer-events-none !absolute inset-0 !z-0 bg-[radial-gradient(circle_at_12%_22%,color-mix(in_oklch,var(--electric-cyan)_16%,transparent),transparent_42%),radial-gradient(circle_at_88%_16%,color-mix(in_oklch,var(--electric-lime)_14%,transparent),transparent_45%)]" />
           </>
         )}
 
-        <div className={isActivityPost ? "relative z-10" : undefined}>
+        <div className={isActivityPost ? "relative !z-10" : undefined}>
           <FeedPostHeader post={post} isOwner={isOwner} isFollowing={post.is_following} />
 
           <FeedPostMetrics
