@@ -176,7 +176,7 @@ export const helmetConfig = {
       scriptSrc: ["'self'", 'cdn.jsdelivr.net'],
       styleSrc: ["'self'", "'unsafe-inline'", 'fonts.googleapis.com'],
       fontSrc: ["'self'", 'fonts.gstatic.com'],
-      imgSrc: ["'self'", 'data:', 'https:'],
+      imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
       mediaSrc: ["'self'", 'blob:', 'data:', 'https:'],
       connectSrc: [
         "'self'",
