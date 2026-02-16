@@ -67,6 +67,9 @@ export async function getClubById(userId: number, clubId: number) {
       c.is_private,
       c.visibility,
       c.owner_id,
+      c.theme_color,
+      c.logo_url,
+      c.tagline,
       c.created_at,
       COALESCE((SELECT COUNT(*) FROM community_club_members m WHERE m.club_id = c.id AND m.status = 'active'), 0) AS member_count,
       EXISTS(
@@ -622,7 +625,7 @@ export async function acceptClubInvite(userId: number, code: string) {
   return { joined: true, clubId: invite.clubId };
 }
 
-export async function updateClub(userId: number, clubId: number, input: { name?: string; description?: string | null; coverImageUrl?: string | null; visibility?: "public" | "private" | "invite"; rules?: string | null }) {
+export async function updateClub(userId: number, clubId: number, input: { name?: string; description?: string | null; coverImageUrl?: string | null; visibility?: "public" | "private" | "invite"; rules?: string | null; themeColor?: string; logoUrl?: string | null; tagline?: string | null }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -644,6 +647,9 @@ export async function updateClub(userId: number, clubId: number, input: { name?:
       ...(input.coverImageUrl !== undefined ? { coverImageUrl: input.coverImageUrl } : {}),
       ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
       ...(input.visibility !== undefined ? { isPrivate: input.visibility !== "public" } : {}),
+      ...(input.themeColor !== undefined ? { themeColor: input.themeColor } : {}),
+      ...(input.logoUrl !== undefined ? { logoUrl: input.logoUrl } : {}),
+      ...(input.tagline !== undefined ? { tagline: input.tagline } : {}),
       updatedAt: new Date(),
     })
     .where(eq(communityClubs.id, clubId));

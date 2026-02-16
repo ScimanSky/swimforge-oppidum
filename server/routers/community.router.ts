@@ -751,6 +751,9 @@ export const communityRouter = router({
                 coverImageUrl: z.string().max(5000).optional().nullable(),
                 rules: z.string().max(2000).optional().nullable(),
                 visibility: z.enum(["public", "private", "invite"]).optional(),
+                themeColor: z.enum(["cyan", "lime", "coral", "violet"]).optional(),
+                logoUrl: z.string().max(5000).optional().nullable(),
+                tagline: z.string().max(200).optional().nullable(),
             }))
             .mutation(async ({ ctx, input }) => {
                 const { updateClub } = await import("../db_clubs");
@@ -767,6 +770,9 @@ export const communityRouter = router({
                     coverImageUrl: input.coverImageUrl ?? undefined,
                     rules: input.rules ?? undefined,
                     visibility: input.visibility,
+                    themeColor: input.themeColor,
+                    logoUrl: input.logoUrl,
+                    tagline: input.tagline,
                 });
             }),
 
