@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Users, Settings, ArrowLeft } from "lucide-react";
+import { Users, Settings, ArrowLeft, Calendar } from "lucide-react";
 import { Link } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +27,10 @@ interface ClubHeroProps {
   isJoining?: boolean;
   isLeaving?: boolean;
   variant?: "full" | "compactSticky";
+  eventsPageHref?: string | null;
+  onPost?: () => void;
+  onCreateEvent?: () => void;
+  onInvite?: () => void;
 }
 
 const themeColorMap: Record<string, string> = {
@@ -45,6 +49,10 @@ export default function ClubHero({
   isJoining,
   isLeaving,
   variant = "full",
+  eventsPageHref,
+  onPost,
+  onCreateEvent,
+  onInvite,
 }: ClubHeroProps) {
   const color = themeColorMap[club.theme_color ?? "cyan"] ?? themeColorMap.cyan;
   const isStaff = ["owner", "admin", "moderator"].includes(club.member_role ?? "");
@@ -57,7 +65,16 @@ export default function ClubHero({
         className="surface-panel w-full overflow-hidden rounded-xl px-2.5 py-2"
         style={{ borderColor: color, borderWidth: "1px" }}
       >
-        <div className="flex items-start gap-2">
+        {club.cover_image_url ? (
+          <img
+            src={club.cover_image_url}
+            alt=""
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-35"
+          />
+        ) : null}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-background/44 via-background/72 to-background/88" />
+
+        <div className="relative z-10 flex items-start gap-2">
           <Link href="/home/community">
             <Button
               variant="ghost"
@@ -106,7 +123,7 @@ export default function ClubHero({
             >
               <Users className="h-3.5 w-3.5" />
             </Button>
-            {isStaff ? (
+            {club.is_member ? (
               <Button
                 variant="ghost"
                 size="icon"
@@ -119,14 +136,43 @@ export default function ClubHero({
           </div>
         </div>
 
-        {!club.is_member ? (
-          <Button className="mt-2 h-7 w-full text-[11px]" variant="neon" onClick={onJoin} disabled={isJoining}>
-            {isJoining ? "Richiesta..." : club.visibility === "public" ? "Unisciti al club" : "Richiedi accesso"}
-          </Button>
-        ) : club.member_role !== "owner" ? (
-          <Button className="mt-2 h-7 text-[11px]" variant="ghost" size="sm" onClick={onLeave} disabled={isLeaving}>
-            {isLeaving ? "Uscita..." : "Lascia club"}
-          </Button>
+        <div className="relative z-10 mt-2 flex flex-wrap items-center gap-2">
+          {eventsPageHref ? (
+            <Link href={eventsPageHref}>
+              <Button className="h-7 text-[11px]" variant="outline-neon" size="sm">
+                <Calendar className="mr-1.5 h-3.5 w-3.5" />
+                Eventi
+              </Button>
+            </Link>
+          ) : null}
+
+          {!club.is_member ? (
+            <Button className="h-7 text-[11px]" variant="neon" onClick={onJoin} disabled={isJoining}>
+              {isJoining ? "Richiesta..." : club.visibility === "public" ? "Unisciti al club" : "Richiedi accesso"}
+            </Button>
+          ) : club.member_role !== "owner" ? (
+            <Button className="h-7 text-[11px]" variant="ghost" size="sm" onClick={onLeave} disabled={isLeaving}>
+              {isLeaving ? "Uscita..." : "Lascia club"}
+            </Button>
+          ) : null}
+        </div>
+
+        {club.is_member && onPost ? (
+          <div className="relative z-10 mt-2 flex flex-wrap items-center gap-1.5">
+            <Button className="h-7 text-[11px]" variant="neon" size="sm" onClick={onPost}>
+              Post
+            </Button>
+            {isStaff && onCreateEvent ? (
+              <Button className="h-7 text-[11px]" variant="outline-neon" size="sm" onClick={onCreateEvent}>
+                Nuovo evento
+              </Button>
+            ) : null}
+            {isStaff && onInvite ? (
+              <Button className="h-7 text-[11px]" variant="outline-neon" size="sm" onClick={onInvite}>
+                Invita
+              </Button>
+            ) : null}
+          </div>
         ) : null}
       </motion.div>
     );

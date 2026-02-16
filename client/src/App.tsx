@@ -32,6 +32,7 @@ const ReportPost = lazy(() => import("./pages/ReportPost"));
 const Community = lazy(() => import("./pages/Community"));
 const ClubInvite = lazy(() => import("./pages/ClubInvite"));
 const ClubDetail = lazy(() => import("./pages/ClubDetailEnhanced"));
+const ClubEvents = lazy(() => import("./pages/ClubEvents"));
 const ClubEventDetail = lazy(() => import("./pages/ClubEventDetail"));
 const AdminReports = lazy(() => import("./pages/AdminReports"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -103,6 +104,7 @@ function Router() {
       </Route>
       <Route path="/season" component={SeasonPage} />
       <Route path="/community/invite/:code" component={ClubInvite} />
+      <Route path="/community/club/:id/events" component={ClubEvents} />
       <Route path="/community/club/:clubId/event/:eventId" component={ClubEventDetail} />
       <Route path="/community/club/:id" component={ClubDetail} />
       <Route path="/home/community" component={Community} />

@@ -83,6 +83,10 @@ export default function ClubDetailEnhanced() {
     if (typeof window === "undefined") return false;
     return window.matchMedia("(min-width: 1024px)").matches;
   });
+  const [isMobile, setIsMobile] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(max-width: 767px)").matches;
+  });
 
   const utils = trpc.useUtils();
 
@@ -157,11 +161,19 @@ export default function ClubDetailEnhanced() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const mediaQuery = window.matchMedia("(min-width: 1024px)");
-    const handleMediaQuery = () => setIsDesktop(mediaQuery.matches);
-    handleMediaQuery();
-    mediaQuery.addEventListener("change", handleMediaQuery);
-    return () => mediaQuery.removeEventListener("change", handleMediaQuery);
+    const desktopQuery = window.matchMedia("(min-width: 1024px)");
+    const mobileQuery = window.matchMedia("(max-width: 767px)");
+    const handleQueries = () => {
+      setIsDesktop(desktopQuery.matches);
+      setIsMobile(mobileQuery.matches);
+    };
+    handleQueries();
+    desktopQuery.addEventListener("change", handleQueries);
+    mobileQuery.addEventListener("change", handleQueries);
+    return () => {
+      desktopQuery.removeEventListener("change", handleQueries);
+      mobileQuery.removeEventListener("change", handleQueries);
+    };
   }, []);
 
   useEffect(() => {
@@ -224,6 +236,7 @@ export default function ClubDetailEnhanced() {
 
   const memberRole = club.member_role ?? "";
   const isStaff = ["owner", "admin", "moderator"].includes(memberRole);
+  const eventsPageHref = `/community/club/${clubId}/events`;
 
   const pinnedAnnouncements = (announcementsQuery.data as any[])?.filter(
     (a: any) => a.announcement?.isPinned
@@ -315,6 +328,14 @@ export default function ClubDetailEnhanced() {
                     isJoining={joinMutation.isPending}
                     isLeaving={leaveMutation.isPending}
                     variant="compactSticky"
+                    eventsPageHref={isMobile ? eventsPageHref : null}
+                    onPost={
+                      isMobile
+                        ? () => window.scrollTo({ top: contentOffset + 24, behavior: "smooth" })
+                        : undefined
+                    }
+                    onCreateEvent={isMobile && isStaff ? () => setCreateEventOpen(true) : undefined}
+                    onInvite={isMobile && isStaff ? () => setInviteOpen(true) : undefined}
                   />
                 </div>
               )}
@@ -347,7 +368,7 @@ export default function ClubDetailEnhanced() {
           </div>
         )}
 
-        {!isDesktop && isMember ? (
+        {!isDesktop && !isMobile && isMember ? (
           <PulseBar
             stats={statsQuery.data as any}
             themeColor={club.theme_color ?? "cyan"}
@@ -360,20 +381,22 @@ export default function ClubDetailEnhanced() {
           <ClubFeedTab
             clubId={clubId}
             isMember={isMember}
-            afterComposerSlot={!isDesktop ? (
+            afterComposerSlot={!isDesktop && !isMobile ? (
               <ClubEventsPanel clubId={clubId} events={upcomingEvents} variant="inlineFeed" />
             ) : undefined}
           />
         )}
 
         {/* Quick Actions FAB */}
-        <QuickActionsFAB
-          isMember={isMember}
-          isStaff={isStaff}
-          onPost={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          onCreateEvent={() => setCreateEventOpen(true)}
-          onInvite={() => setInviteOpen(true)}
-        />
+        {!isMobile ? (
+          <QuickActionsFAB
+            isMember={isMember}
+            isStaff={isStaff}
+            onPost={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            onCreateEvent={() => setCreateEventOpen(true)}
+            onInvite={() => setInviteOpen(true)}
+          />
+        ) : null}
 
         {/* Members Sheet */}
         <Sheet open={membersOpen} onOpenChange={setMembersOpen}>
