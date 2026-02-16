@@ -2,7 +2,7 @@
  * Club Dashboard — Unified scrollable page replacing the old tab system
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useRoute } from "wouter";
 import { motion } from "framer-motion";
 import { Calendar, MapPin, Pin, Clock, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon } from "lucide-react";
@@ -35,6 +35,8 @@ export default function ClubDetailEnhanced() {
     title: "", description: "", eventType: "training" as "training" | "race" | "social" | "meeting",
     location: "", startTime: "", endTime: "", maxAttendees: "",
   });
+  const clubHeaderRef = useRef<HTMLDivElement | null>(null);
+  const [clubHeaderHeight, setClubHeaderHeight] = useState(0);
 
   const utils = trpc.useUtils();
 
@@ -141,25 +143,56 @@ export default function ClubDetailEnhanced() {
     (a: any) => a.announcement?.isPinned
   ) ?? [];
   const nextEvent = (eventsQuery.data as any[])?.[0] ?? null;
+  const contentOffset = clubHeaderHeight > 0 ? clubHeaderHeight + 12 : (isMember ? 360 : 300);
+
+  useEffect(() => {
+    const node = clubHeaderRef.current;
+    if (!node) return;
+
+    const update = () => {
+      const next = Math.ceil(node.getBoundingClientRect().height);
+      setClubHeaderHeight((prev) => (prev === next ? prev : next));
+    };
+
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(node);
+    window.addEventListener("resize", update);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", update);
+    };
+  }, [isMember, club.cover_image_url, club.logo_url, club.tagline]);
 
   return (
     <AppLayout>
-      <div className="mx-auto max-w-5xl space-y-4 pb-24 px-4">
-        {/* Sticky Club Header */}
-        <div className="sticky top-[4.35rem] z-30 space-y-3 rounded-[28px] bg-background/75 p-1 backdrop-blur-md">
-          <ClubHero
-            club={club}
-            onOpenMembers={() => setMembersOpen(true)}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onJoin={() => joinMutation.mutate({ clubId })}
-            onLeave={() => leaveMutation.mutate({ clubId })}
-            isJoining={joinMutation.isPending}
-            isLeaving={leaveMutation.isPending}
-          />
-          {isMember && (
-            <PulseBar stats={statsQuery.data as any} themeColor={club.theme_color ?? "cyan"} />
-          )}
+      {/* Fixed Club Header */}
+      <div className="pointer-events-none fixed left-0 right-0 top-16 z-30 lg:pl-[88px]">
+        <div className="mx-auto max-w-[1520px] p-4 md:p-5 lg:p-6">
+          <div
+            ref={clubHeaderRef}
+            className="pointer-events-auto mx-auto max-w-5xl space-y-3 rounded-[28px] bg-background/90 p-1 backdrop-blur-md"
+          >
+            <ClubHero
+              club={club}
+              onOpenMembers={() => setMembersOpen(true)}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onJoin={() => joinMutation.mutate({ clubId })}
+              onLeave={() => leaveMutation.mutate({ clubId })}
+              isJoining={joinMutation.isPending}
+              isLeaving={leaveMutation.isPending}
+            />
+            {isMember && (
+              <PulseBar stats={statsQuery.data as any} themeColor={club.theme_color ?? "cyan"} />
+            )}
+          </div>
         </div>
+      </div>
+
+      <div className="mx-auto max-w-5xl space-y-4 pb-24 px-4" style={{ paddingTop: contentOffset }}>
+        {/* Spacer managed by contentOffset (fixed header above) */}
+        <div className="h-px" />
 
         {/* Pinned Announcements */}
         {pinnedAnnouncements.length > 0 && (
