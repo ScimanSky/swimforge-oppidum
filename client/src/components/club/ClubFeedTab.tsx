@@ -143,91 +143,92 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
                 <Surface className={isActivityPost ? "overflow-hidden" : undefined}>
                   {isActivityPost && (
                     <>
-                      <picture className="pointer-events-none !absolute inset-0 !z-0">
+                      <picture className="pointer-events-none !absolute inset-y-0 right-0 w-[66%] !z-0">
                         <source media="(max-width: 767px)" srcSet="/images/activity-card-overlay-mobile.png" />
                         <img
                           src="/images/activity-card-overlay-desktop.png"
                           alt=""
                           aria-hidden="true"
-                          className="h-full w-full object-cover object-center opacity-[0.36] saturate-[1.06] contrast-[1.02]"
+                          className="h-full w-full object-cover object-center opacity-[0.5] saturate-[1.08] contrast-[1.04]"
                           loading="lazy"
                         />
                       </picture>
-                      <div className="pointer-events-none !absolute inset-0 !z-0 bg-gradient-to-b from-background/36 via-background/22 to-background/46" />
-                      <div className="pointer-events-none !absolute inset-0 !z-0 bg-[radial-gradient(circle_at_14%_20%,color-mix(in_oklch,var(--electric-cyan)_14%,transparent),transparent_40%),radial-gradient(circle_at_86%_18%,color-mix(in_oklch,var(--electric-lime)_12%,transparent),transparent_44%)]" />
+                      <div className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(104deg,color-mix(in_oklch,var(--background)_86%,transparent)_0%,color-mix(in_oklch,var(--background)_72%,transparent)_46%,color-mix(in_oklch,var(--background)_50%,transparent)_100%)]" />
+                      <div className="pointer-events-none !absolute inset-0 !z-0 bg-[radial-gradient(circle_at_18%_14%,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),transparent_40%),radial-gradient(circle_at_86%_12%,color-mix(in_oklch,var(--electric-lime)_14%,transparent),transparent_44%)]" />
+                      <div className="pointer-events-none !absolute inset-[1px] rounded-[25px] !z-0 border border-white/10" />
                     </>
                   )}
-                <SurfaceContent className="p-6">
-                  <div className="flex items-start gap-3 mb-4">
-                    <Avatar>
-                      <AvatarImage src={post.user_avatar || undefined} />
-                      <AvatarFallback>
-                        {post.user_name?.[0]?.toUpperCase() || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <p className="font-semibold">{post.user_name || "Utente"}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(post.created_at).toLocaleDateString("it-IT")}
-                      </p>
-                    </div>
-                  </div>
-                  {post.content && (
-                    <p className="text-sm mb-4 whitespace-pre-wrap">{post.content}</p>
-                  )}
-                  <div className="flex items-center gap-4">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setOpenCommentsId(openCommentsId === post.id ? null : post.id)}
-                    >
-                      <MessageCircle className="mr-1 h-4 w-4" />
-                      {post.comment_count || 0}
-                    </Button>
-                    <PostReactions
-                      postId={post.id}
-                      onReactionChange={() => {
-                        utils.community.clubs.feed.invalidate({ clubId });
-                      }}
-                    />
-                  </div>
-                  
-                  {/* Comments Section */}
-                  {openCommentsId === post.id && (
-                    <div className="mt-4 pt-4 border-t space-y-3">
-                      {commentsQuery.data?.map((comment: any) => (
-                        <div key={comment.id} className="flex gap-2">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={comment.user_avatar || undefined} />
-                            <AvatarFallback>
-                              {comment.user_name?.[0]?.toUpperCase() || "U"}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold">{comment.user_name}</p>
-                            <p className="text-sm">{comment.content}</p>
-                          </div>
-                        </div>
-                      ))}
-                      <div className="flex gap-2">
-                        <Textarea
-                          placeholder="Aggiungi un commento..."
-                          value={commentTextByPost[post.id] || ""}
-                          onChange={(e) =>
-                            setCommentTextByPost({ ...commentTextByPost, [post.id]: e.target.value })
-                          }
-                          className="min-h-[60px]"
-                        />
-                        <Button
-                          onClick={() => handleAddComment(post.id)}
-                          disabled={!commentTextByPost[post.id]?.trim()}
-                        >
-                          Invia
-                        </Button>
+                  <SurfaceContent className="p-6">
+                    <div className="flex items-start gap-3 mb-4">
+                      <Avatar>
+                        <AvatarImage src={post.user_avatar || undefined} />
+                        <AvatarFallback>
+                          {post.user_name?.[0]?.toUpperCase() || "U"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="font-semibold">{post.user_name || "Utente"}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(post.created_at).toLocaleDateString("it-IT")}
+                        </p>
                       </div>
                     </div>
-                  )}
-                </SurfaceContent>
+                    {post.content && (
+                      <p className="text-sm mb-4 whitespace-pre-wrap">{post.content}</p>
+                    )}
+                    <div className="flex items-center gap-4">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setOpenCommentsId(openCommentsId === post.id ? null : post.id)}
+                      >
+                        <MessageCircle className="mr-1 h-4 w-4" />
+                        {post.comment_count || 0}
+                      </Button>
+                      <PostReactions
+                        postId={post.id}
+                        onReactionChange={() => {
+                          utils.community.clubs.feed.invalidate({ clubId });
+                        }}
+                      />
+                    </div>
+                    
+                    {/* Comments Section */}
+                    {openCommentsId === post.id && (
+                      <div className="mt-4 pt-4 border-t space-y-3">
+                        {commentsQuery.data?.map((comment: any) => (
+                          <div key={comment.id} className="flex gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarImage src={comment.user_avatar || undefined} />
+                              <AvatarFallback>
+                                {comment.user_name?.[0]?.toUpperCase() || "U"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold">{comment.user_name}</p>
+                              <p className="text-sm">{comment.content}</p>
+                            </div>
+                          </div>
+                        ))}
+                        <div className="flex gap-2">
+                          <Textarea
+                            placeholder="Aggiungi un commento..."
+                            value={commentTextByPost[post.id] || ""}
+                            onChange={(e) =>
+                              setCommentTextByPost({ ...commentTextByPost, [post.id]: e.target.value })
+                            }
+                            className="min-h-[60px]"
+                          />
+                          <Button
+                            onClick={() => handleAddComment(post.id)}
+                            disabled={!commentTextByPost[post.id]?.trim()}
+                          >
+                            Invia
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </SurfaceContent>
                 </Surface>
               </motion.div>
             );

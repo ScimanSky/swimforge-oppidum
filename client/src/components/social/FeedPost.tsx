@@ -35,18 +35,19 @@ export default function FeedPost({ post, currentUserId, index = 0 }: FeedPostPro
       <div className={`surface-panel overflow-hidden p-0 ${isActivityPost ? "relative isolate" : ""}`}>
         {isActivityPost && (
           <>
-            <picture className="pointer-events-none !absolute inset-0 !z-0">
+            <picture className="pointer-events-none !absolute inset-y-0 right-0 w-[68%] !z-0">
               <source media="(max-width: 767px)" srcSet="/images/activity-card-overlay-mobile.png" />
               <img
                 src="/images/activity-card-overlay-desktop.png"
                 alt=""
                 aria-hidden="true"
-                className="h-full w-full object-cover object-center opacity-[0.42] saturate-[1.08] contrast-[1.03]"
+                className="h-full w-full object-cover object-center opacity-[0.55] saturate-[1.1] contrast-[1.04]"
                 loading="lazy"
               />
             </picture>
-            <div className="pointer-events-none !absolute inset-0 !z-0 bg-gradient-to-b from-background/34 via-background/18 to-background/42" />
-            <div className="pointer-events-none !absolute inset-0 !z-0 bg-[radial-gradient(circle_at_12%_22%,color-mix(in_oklch,var(--electric-cyan)_16%,transparent),transparent_42%),radial-gradient(circle_at_88%_16%,color-mix(in_oklch,var(--electric-lime)_14%,transparent),transparent_45%)]" />
+            <div className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(102deg,color-mix(in_oklch,var(--background)_84%,transparent)_0%,color-mix(in_oklch,var(--background)_72%,transparent)_42%,color-mix(in_oklch,var(--background)_46%,transparent)_100%)]" />
+            <div className="pointer-events-none !absolute inset-0 !z-0 bg-[radial-gradient(circle_at_16%_14%,color-mix(in_oklch,var(--electric-cyan)_22%,transparent),transparent_38%),radial-gradient(circle_at_84%_14%,color-mix(in_oklch,var(--electric-lime)_16%,transparent),transparent_42%)]" />
+            <div className="pointer-events-none !absolute inset-[1px] rounded-[25px] !z-0 border border-white/10" />
           </>
         )}
 
