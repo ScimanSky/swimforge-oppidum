@@ -2,15 +2,16 @@
  * Club Feed Tab - Il feed dei post del club (riutilizza logica esistente)
  */
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Droplet, MessageCircle, Plus } from "lucide-react";
+import { MessageCircle, Plus } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
+import PostReactions from "@/components/PostReactions";
 
 interface ClubFeedTabProps {
   clubId: number;
@@ -33,15 +34,6 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
     onSuccess: (data: any) => {
       toast.success("Post pubblicato!");
       setPostText("");
-      utils.community.clubs.feed.invalidate({ clubId });
-      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
-        toast.success(`+${data.actionXp.awardedXp} XP Action`);
-      }
-    },
-  });
-
-  const toggleSplashMutation = trpc.community.toggleSplash.useMutation({
-    onSuccess: (data: any) => {
       utils.community.clubs.feed.invalidate({ clubId });
       if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
         toast.success(`+${data.actionXp.awardedXp} XP Action`);
@@ -165,20 +157,17 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => toggleSplashMutation.mutate({ postId: post.id })}
-                      className={post.has_splashed ? "text-blue-500" : ""}
-                    >
-                      <Droplet className="mr-1 h-4 w-4" />
-                      {post.splash_count || 0}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
                       onClick={() => setOpenCommentsId(openCommentsId === post.id ? null : post.id)}
                     >
                       <MessageCircle className="mr-1 h-4 w-4" />
                       {post.comment_count || 0}
                     </Button>
+                    <PostReactions
+                      postId={post.id}
+                      onReactionChange={() => {
+                        utils.community.clubs.feed.invalidate({ clubId });
+                      }}
+                    />
                   </div>
                   
                   {/* Comments Section */}

@@ -43,6 +43,46 @@ async function requireClubReadable(userId: number, clubId: number) {
     return club;
 }
 
+async function requirePostReadable(userId: number, postId: number) {
+    const { getDb } = await import("../db");
+    const { sql } = await import("drizzle-orm");
+    const db = await getDb();
+    if (!db) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+    }
+
+    const postResult = await db.execute(sql`
+        SELECT id, user_id, club_id, visibility, is_deleted
+        FROM social_posts
+        WHERE id = ${postId}
+        LIMIT 1
+    `);
+
+    const row = postResult.rows[0] as {
+        id: number;
+        user_id: number;
+        club_id: number | null;
+        visibility: string | null;
+        is_deleted: boolean;
+    } | undefined;
+
+    if (!row || row.is_deleted) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+    }
+
+    if (row.club_id) {
+        await requireClubReadable(userId, row.club_id);
+    } else if (row.visibility === "private" && row.user_id !== userId) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+    }
+
+    return {
+        postId: row.id,
+        ownerId: row.user_id,
+        clubId: row.club_id,
+    };
+}
+
 export const communityRouter = router({
     feed: protectedProcedure
         .input(z.object({
@@ -1335,6 +1375,7 @@ export const communityRouter = router({
                 reactionType: z.enum(["splash", "fire", "strong", "clap", "wave"]),
             }))
             .mutation(async ({ ctx, input }) => {
+                const postMeta = await requirePostReadable(ctx.user.id, input.postId);
                 const { togglePostReaction } = await import("../db_social_enhanced");
                 const reaction = await togglePostReaction({
                     postId: input.postId,
@@ -1355,24 +1396,23 @@ export const communityRouter = router({
 
                     // Notify post owner about the reaction
                     try {
-                        const { getDb } = await import("../db");
-                        const { sql } = await import("drizzle-orm");
-                        const db = await getDb();
-                        if (!db) throw new Error("db not available");
-                        const postResult = await db.execute(sql`SELECT user_id FROM social_posts WHERE id = ${input.postId} LIMIT 1`);
-                        const postOwnerId = (postResult.rows[0] as any)?.user_id as number | undefined;
-                        if (postOwnerId && postOwnerId !== ctx.user.id) {
+                        if (postMeta.ownerId !== ctx.user.id) {
+                            const { getDb } = await import("../db");
+                            const { sql } = await import("drizzle-orm");
+                            const db = await getDb();
+                            if (!db) throw new Error("db not available");
                             const actorResult = await db.execute(sql`SELECT name FROM users WHERE id = ${ctx.user.id} LIMIT 1`);
                             const actorName = ((actorResult.rows[0] as any)?.name as string | undefined) || "Qualcuno";
                             const emojiMap: Record<string, string> = { splash: "💧", fire: "🔥", strong: "💪", clap: "👏", wave: "🌊" };
                             const emoji = emojiMap[input.reactionType] || "✨";
                             const { createNotification } = await import("../db_social_enhanced");
+                            const link = postMeta.clubId ? `/community/club/${postMeta.clubId}` : "/home/community";
                             await createNotification({
-                                userId: postOwnerId,
+                                userId: postMeta.ownerId,
                                 type: "reaction",
                                 title: "Nuova reazione",
                                 message: `${actorName} ha reagito ${emoji} al tuo post.`,
-                                link: "/home/community",
+                                link,
                                 referenceId: input.postId,
                             });
                         }
@@ -1385,7 +1425,8 @@ export const communityRouter = router({
 
         list: protectedProcedure
             .input(z.object({ postId: z.number() }))
-            .query(async ({ input }) => {
+            .query(async ({ ctx, input }) => {
+                await requirePostReadable(ctx.user.id, input.postId);
                 const { getPostReactions } = await import("../db_social_enhanced");
                 return getPostReactions(input.postId);
             }),
@@ -1393,6 +1434,7 @@ export const communityRouter = router({
         userReaction: protectedProcedure
             .input(z.object({ postId: z.number() }))
             .query(async ({ ctx, input }) => {
+                await requirePostReadable(ctx.user.id, input.postId);
                 const { getUserPostReaction } = await import("../db_social_enhanced");
                 return getUserPostReaction(input.postId, ctx.user.id);
             }),
