@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react"
 import { Link } from "wouter"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
@@ -74,29 +73,6 @@ export default function Community() {
   useEffect(() => {
     setClubsPage(1)
   }, [clubScope, clubSearch, clubs.length])
-
-  const communityOrbs = useMemo(() => {
-    const totalMembers = clubs.reduce((sum: number, club: any) => sum + Number(club.member_count || 0), 0)
-
-    return [
-      {
-        label: "Club visibili",
-        value: clubs.length,
-        progress: Math.min(100, Math.round((clubs.length / 12) * 100)),
-        helper: clubScope === "mine" ? "Solo i tuoi club" : "Tutti i club",
-        icon: <Users className="size-4" />,
-        tone: "lime" as const,
-      },
-      {
-        label: "Membri attivi",
-        value: totalMembers.toLocaleString(),
-        progress: Math.min(100, Math.round((totalMembers / 500) * 100)),
-        helper: "Somma club in vista",
-        icon: <Sparkles className="size-4" />,
-        tone: "amber" as const,
-      },
-    ]
-  }, [clubs, clubScope])
 
   const createClubDialog = (
     <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -188,21 +164,21 @@ export default function Community() {
   return (
     <AppLayout>
       <div className="compact-shell space-y-4 lg:space-y-2">
-        <section className="surface-panel relative overflow-hidden">
+        <section className="surface-panel relative mx-auto max-w-5xl overflow-hidden">
           <div className="absolute inset-0">
             <div className="absolute inset-0 bg-[radial-gradient(70%_80%_at_18%_0%,color-mix(in_oklch,var(--electric-cyan)_34%,transparent)_0%,transparent_70%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_85%_10%,color-mix(in_oklch,var(--electric-lime)_24%,transparent)_0%,transparent_66%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_60%_90%,color-mix(in_oklch,var(--electric-cyan)_16%,transparent)_0%,transparent_72%)]" />
           </div>
-          <div className="relative p-4 sm:p-5">
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="relative p-3 sm:p-4">
+            <div className="flex flex-col gap-2.5">
+              <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-background/60 px-3 py-1 text-xs text-muted-foreground">
                     <Sparkles className="size-4 text-primary" />
                     Club Hub
                   </div>
-                  <h1 className="mt-2 text-3xl font-display font-bold neon-gradient-text">Club</h1>
+                  <h1 className="mt-1.5 text-2xl font-display font-bold neon-gradient-text">Club</h1>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {createClubDialog}
@@ -210,22 +186,6 @@ export default function Community() {
                     <Link href="/home">Torna al Feed</Link>
                   </Button>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                {communityOrbs.map((item) => (
-                  <MetricOrb
-                    key={item.label}
-                    label={item.label}
-                    value={item.value}
-                    progress={item.progress}
-                    helper={item.helper}
-                    icon={item.icon}
-                    tone={item.tone}
-                    size="sm"
-                    className="scale-[0.9] sm:scale-100 origin-top"
-                  />
-                ))}
               </div>
 
               <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
