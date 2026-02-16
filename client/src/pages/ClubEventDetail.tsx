@@ -5,7 +5,7 @@ import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/componen
 import { Badge } from "@/components/ui/badge";
 import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { trpc } from "@/lib/trpc";
-import { Calendar, CheckCircle2, HelpCircle, MapPin, Users, XCircle } from "lucide-react";
+import { Calendar, CheckCircle2, HelpCircle, MapPin, Users, XCircle, ExternalLink } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useRoute } from "wouter";
 import { toast } from "sonner";
@@ -24,6 +24,19 @@ const formatDateTime = (value: unknown): string => {
     hour: "2-digit",
     minute: "2-digit",
   });
+};
+
+const buildOsmMapLink = (lat: number, lng: number, zoom = 15) =>
+  `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=${zoom}/${lat}/${lng}`;
+
+const buildOsmEmbedUrl = (lat: number, lng: number) => {
+  const delta = 0.01;
+  const left = lng - delta;
+  const right = lng + delta;
+  const top = lat + delta;
+  const bottom = lat - delta;
+  const bbox = `${left},${bottom},${right},${top}`;
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${lat},${lng}`;
 };
 
 export default function ClubEventDetail() {
@@ -81,6 +94,9 @@ export default function ClubEventDetail() {
 
   const event = (eventQuery.data as any)?.event ?? (eventQuery.data as any)?.event ?? eventQuery.data;
   const title = event?.title ?? "Evento";
+  const eventLat = Number(event?.locationLat);
+  const eventLng = Number(event?.locationLng);
+  const hasEventMap = Number.isFinite(eventLat) && Number.isFinite(eventLng);
 
   if (!match || !Number.isFinite(clubId) || !Number.isFinite(eventId)) {
     return null;
@@ -134,6 +150,27 @@ export default function ClubEventDetail() {
               <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                 {event.description}
               </p>
+            ) : null}
+            {hasEventMap ? (
+              <div className="space-y-2 pt-2">
+                <div className="overflow-hidden rounded-md border border-border">
+                  <iframe
+                    title="Mappa evento"
+                    src={buildOsmEmbedUrl(eventLat, eventLng)}
+                    className="h-64 w-full"
+                    loading="lazy"
+                  />
+                </div>
+                <a
+                  href={buildOsmMapLink(eventLat, eventLng)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Apri mappa completa
+                </a>
+              </div>
             ) : null}
 
             <div className="grid grid-cols-2 gap-2 pt-2 sm:grid-cols-3 lg:grid-cols-4">

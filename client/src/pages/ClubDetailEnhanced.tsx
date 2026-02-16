@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { Calendar, MapPin, Pin, Clock, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon } from "lucide-react";
+import { Calendar, MapPin, Pin, Clock, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon, ExternalLink } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,46 @@ import QuickActionsFAB from "@/components/club/QuickActionsFAB";
 import ClubFeedTab from "@/components/club/ClubFeedTab";
 import ClubMembersTab from "@/components/club/ClubMembersTab";
 
+function buildOsmMapLink(lat: number, lng: number, zoom = 15) {
+  return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=${zoom}/${lat}/${lng}`;
+}
+
+function buildOsmEmbedUrl(lat: number, lng: number) {
+  const delta = 0.01;
+  const left = lng - delta;
+  const right = lng + delta;
+  const top = lat + delta;
+  const bottom = lat - delta;
+  const bbox = `${left},${bottom},${right},${top}`;
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${lat},${lng}`;
+}
+
+async function geocodeLocation(query: string): Promise<{ lat: number; lng: number; displayName: string } | null> {
+  const q = query.trim();
+  if (!q) return null;
+
+  const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(q)}`;
+  const res = await fetch(url, {
+    headers: {
+      Accept: "application/json",
+    },
+  });
+  if (!res.ok) {
+    throw new Error("Servizio mappa temporaneamente non disponibile");
+  }
+  const data = (await res.json()) as Array<{ lat?: string; lon?: string; display_name?: string }>;
+  const first = data[0];
+  if (!first?.lat || !first?.lon) return null;
+  const lat = Number(first.lat);
+  const lng = Number(first.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return {
+    lat,
+    lng,
+    displayName: first.display_name ?? q,
+  };
+}
+
 export default function ClubDetailEnhanced() {
   const [match, params] = useRoute("/community/club/:id");
   const clubId = Number(params?.id);
@@ -33,8 +73,10 @@ export default function ClubDetailEnhanced() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [newEvent, setNewEvent] = useState({
     title: "", description: "", eventType: "training" as "training" | "race" | "social" | "meeting",
-    location: "", startTime: "", endTime: "", maxAttendees: "",
+    location: "", locationLat: null as number | null, locationLng: null as number | null,
+    startTime: "", endTime: "", maxAttendees: "",
   });
+  const [isGeocodingLocation, setIsGeocodingLocation] = useState(false);
   const clubHeaderRef = useRef<HTMLDivElement | null>(null);
   const [clubHeaderHeight, setClubHeaderHeight] = useState(0);
 
@@ -78,7 +120,17 @@ export default function ClubDetailEnhanced() {
     onSuccess: () => {
       toast.success("Evento creato!");
       setCreateEventOpen(false);
-      setNewEvent({ title: "", description: "", eventType: "training", location: "", startTime: "", endTime: "", maxAttendees: "" });
+      setNewEvent({
+        title: "",
+        description: "",
+        eventType: "training",
+        location: "",
+        locationLat: null,
+        locationLng: null,
+        startTime: "",
+        endTime: "",
+        maxAttendees: "",
+      });
       utils.community.clubs.events.list.invalidate();
       statsQuery.refetch();
     },
@@ -165,6 +217,37 @@ export default function ClubDetailEnhanced() {
     (a: any) => a.announcement?.isPinned
   ) ?? [];
   const nextEvent = (eventsQuery.data as any[])?.[0] ?? null;
+  const nextEventLat = Number(nextEvent?.event?.locationLat ?? nextEvent?.locationLat);
+  const nextEventLng = Number(nextEvent?.event?.locationLng ?? nextEvent?.locationLng);
+  const hasNextEventMap = Number.isFinite(nextEventLat) && Number.isFinite(nextEventLng);
+
+  const handleFindLocationOnMap = async () => {
+    if (!newEvent.location.trim()) {
+      toast.error("Inserisci prima un luogo da cercare");
+      return;
+    }
+    setIsGeocodingLocation(true);
+    try {
+      const hit = await geocodeLocation(newEvent.location);
+      if (!hit) {
+        toast.error("Luogo non trovato sulla mappa");
+        setNewEvent((prev) => ({ ...prev, locationLat: null, locationLng: null }));
+        return;
+      }
+      setNewEvent((prev) => ({
+        ...prev,
+        location: prev.location.trim().length > 0 ? prev.location : hit.displayName,
+        locationLat: hit.lat,
+        locationLng: hit.lng,
+      }));
+      toast.success("Posizione trovata sulla mappa");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Errore durante la ricerca del luogo";
+      toast.error(message);
+    } finally {
+      setIsGeocodingLocation(false);
+    }
+  };
 
   return (
     <AppLayout>
@@ -241,6 +324,17 @@ export default function ClubDetailEnhanced() {
                   <MapPin className="h-3 w-3" />
                   {nextEvent.event?.location ?? nextEvent.location}
                 </span>
+              )}
+              {hasNextEventMap && (
+                <a
+                  href={buildOsmMapLink(nextEventLat, nextEventLng)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Vedi mappa
+                </a>
               )}
             </div>
             <div className="flex gap-2 mt-3">
@@ -333,6 +427,32 @@ export default function ClubDetailEnhanced() {
               <div>
                 <Label>Luogo</Label>
                 <Input value={newEvent.location} onChange={(e) => setNewEvent({ ...newEvent, location: e.target.value })} placeholder="Es. Piscina comunale" />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline-neon"
+                    onClick={handleFindLocationOnMap}
+                    disabled={isGeocodingLocation || !newEvent.location.trim()}
+                  >
+                    {isGeocodingLocation ? "Cerco..." : "Trova su mappa"}
+                  </Button>
+                  {newEvent.locationLat !== null && newEvent.locationLng !== null && (
+                    <span className="text-xs text-muted-foreground">
+                      {newEvent.locationLat.toFixed(5)}, {newEvent.locationLng.toFixed(5)}
+                    </span>
+                  )}
+                </div>
+                {newEvent.locationLat !== null && newEvent.locationLng !== null && (
+                  <div className="mt-2 overflow-hidden rounded-md border border-border">
+                    <iframe
+                      title="Anteprima mappa evento"
+                      src={buildOsmEmbedUrl(newEvent.locationLat, newEvent.locationLng)}
+                      className="h-44 w-full"
+                      loading="lazy"
+                    />
+                  </div>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -367,6 +487,8 @@ export default function ClubDetailEnhanced() {
                     description: newEvent.description || undefined,
                     eventType: newEvent.eventType,
                     location: newEvent.location || undefined,
+                    locationLat: newEvent.locationLat ?? undefined,
+                    locationLng: newEvent.locationLng ?? undefined,
                     startTime: startTime.toISOString(),
                     endTime: endTime?.toISOString(),
                     maxAttendees: newEvent.maxAttendees ? Number(newEvent.maxAttendees) : undefined,
