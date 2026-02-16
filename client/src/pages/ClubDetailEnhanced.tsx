@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { Pin, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon, ExternalLink, CalendarClock, MapPin } from "lucide-react";
+import { Pin, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 import ClubHero from "@/components/club/ClubHero";
+import ClubEventsPanel from "@/components/club/ClubEventsPanel";
 import PulseBar from "@/components/club/PulseBar";
 import QuickActionsFAB from "@/components/club/QuickActionsFAB";
 import ClubFeedTab from "@/components/club/ClubFeedTab";
@@ -75,8 +76,13 @@ export default function ClubDetailEnhanced() {
     startTime: "", endTime: "", maxAttendees: "",
   });
   const [isGeocodingLocation, setIsGeocodingLocation] = useState(false);
-  const clubHeaderRef = useRef<HTMLDivElement | null>(null);
-  const [clubHeaderHeight, setClubHeaderHeight] = useState(0);
+  const mobileStickyRef = useRef<HTMLDivElement | null>(null);
+  const desktopStickyRef = useRef<HTMLDivElement | null>(null);
+  const [stickyHeaderHeight, setStickyHeaderHeight] = useState(0);
+  const [isDesktop, setIsDesktop] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(min-width: 1024px)").matches;
+  });
 
   const utils = trpc.useUtils();
 
@@ -145,15 +151,26 @@ export default function ClubDetailEnhanced() {
 
   const club = clubQuery.data as any | undefined;
   const isMember = Boolean(club?.is_member);
-  const contentOffset = clubHeaderHeight > 0 ? clubHeaderHeight + 10 : (isMember ? 390 : 330);
+  const contentOffset = stickyHeaderHeight > 0
+    ? stickyHeaderHeight + (isDesktop ? 14 : 10)
+    : (isDesktop ? 430 : 176);
 
   useEffect(() => {
-    const node = clubHeaderRef.current;
+    if (typeof window === "undefined") return;
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    const handleMediaQuery = () => setIsDesktop(mediaQuery.matches);
+    handleMediaQuery();
+    mediaQuery.addEventListener("change", handleMediaQuery);
+    return () => mediaQuery.removeEventListener("change", handleMediaQuery);
+  }, []);
+
+  useEffect(() => {
+    const node = isDesktop ? desktopStickyRef.current : mobileStickyRef.current;
     if (!node) return;
 
     const update = () => {
       const next = Math.ceil(node.getBoundingClientRect().height);
-      setClubHeaderHeight((prev) => (prev === next ? prev : next));
+      setStickyHeaderHeight((prev) => (prev === next ? prev : next));
     };
 
     update();
@@ -165,7 +182,7 @@ export default function ClubDetailEnhanced() {
       observer.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, [isMember, club?.cover_image_url, club?.logo_url, club?.tagline]);
+  }, [isDesktop, isMember, club?.cover_image_url, club?.logo_url, club?.tagline]);
 
   if (!match || !Number.isFinite(clubId)) {
     return (
@@ -246,70 +263,61 @@ export default function ClubDetailEnhanced() {
       {typeof document !== "undefined" &&
         createPortal(
           <div className="pointer-events-none fixed left-0 right-0 top-16 z-30 lg:pl-[88px]">
-            <div ref={clubHeaderRef} className="mx-auto max-w-[1520px] p-4 md:p-5 lg:p-6">
-              <div className="pointer-events-auto mx-auto max-w-5xl space-y-3 rounded-[28px] bg-background/90 p-1 backdrop-blur-md">
-                <ClubHero
-                  club={club}
-                  onOpenMembers={() => setMembersOpen(true)}
-                  onOpenSettings={() => setSettingsOpen(true)}
-                  onJoin={() => joinMutation.mutate({ clubId })}
-                  onLeave={() => leaveMutation.mutate({ clubId })}
-                  isJoining={joinMutation.isPending}
-                  isLeaving={leaveMutation.isPending}
-                />
-                {isMember && (
-                  <PulseBar stats={statsQuery.data as any} themeColor={club.theme_color ?? "cyan"} />
-                )}
-                {isMember && upcomingEvents.length > 0 && (
-                  <div className="surface-panel p-3">
-                    <div className="mb-2 flex items-center justify-between">
-                      <p className="inline-flex items-center gap-2 text-xs font-display uppercase tracking-wide text-muted-foreground">
-                        <CalendarClock className="h-4 w-4 text-primary" />
-                        Eventi in programma
+            <div className="mx-auto max-w-[1520px] p-4 md:p-5 lg:p-6">
+              {isDesktop ? (
+                <div
+                  ref={desktopStickyRef}
+                  className="pointer-events-auto grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.55fr)_minmax(0,0.95fr)] items-start gap-3"
+                >
+                  {isMember ? (
+                    <ClubEventsPanel
+                      clubId={clubId}
+                      events={upcomingEvents}
+                      variant="stickyDesktop"
+                      className="min-h-[186px]"
+                    />
+                  ) : (
+                    <section className="surface-panel p-3">
+                      <p className="text-xs font-display uppercase tracking-wide text-muted-foreground">
+                        Eventi
                       </p>
-                      <span className="text-xs text-muted-foreground">
-                        {upcomingEvents.length}
-                      </span>
-                    </div>
-                    <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
-                      {upcomingEvents.map((eventItem: any) => {
-                        const event = eventItem.event ?? eventItem;
-                        const eventDate = new Date(event.startTime);
-                        const eventLabel = Number.isNaN(eventDate.getTime())
-                          ? "Data non valida"
-                          : eventDate.toLocaleDateString("it-IT", {
-                              weekday: "short",
-                              day: "numeric",
-                              month: "short",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            });
-                        return (
-                          <Link
-                            key={event.id}
-                            href={`/community/club/${clubId}/event/${event.id}`}
-                            className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2 transition-colors hover:bg-card/60"
-                          >
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold">{event.title}</p>
-                              <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                                <span>{eventLabel}</span>
-                                {event.location ? (
-                                  <span className="inline-flex items-center gap-1 truncate">
-                                    <MapPin className="h-3 w-3" />
-                                    {event.location}
-                                  </span>
-                                ) : null}
-                              </div>
-                            </div>
-                            <ExternalLink className="ml-3 h-4 w-4 shrink-0 text-muted-foreground" />
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        Unisciti al club per vedere il calendario eventi.
+                      </p>
+                    </section>
+                  )}
+
+                  <ClubHero
+                    club={club}
+                    onOpenMembers={() => setMembersOpen(true)}
+                    onOpenSettings={() => setSettingsOpen(true)}
+                    onJoin={() => joinMutation.mutate({ clubId })}
+                    onLeave={() => leaveMutation.mutate({ clubId })}
+                    isJoining={joinMutation.isPending}
+                    isLeaving={leaveMutation.isPending}
+                    variant="full"
+                  />
+
+                  <PulseBar
+                    stats={statsQuery.data as any}
+                    themeColor={club.theme_color ?? "cyan"}
+                    layout="stackedCompact"
+                  />
+                </div>
+              ) : (
+                <div ref={mobileStickyRef} className="pointer-events-auto mx-auto max-w-5xl">
+                  <ClubHero
+                    club={club}
+                    onOpenMembers={() => setMembersOpen(true)}
+                    onOpenSettings={() => setSettingsOpen(true)}
+                    onJoin={() => joinMutation.mutate({ clubId })}
+                    onLeave={() => leaveMutation.mutate({ clubId })}
+                    isJoining={joinMutation.isPending}
+                    isLeaving={leaveMutation.isPending}
+                    variant="compactSticky"
+                  />
+                </div>
+              )}
             </div>
           </div>,
           document.body
@@ -339,8 +347,24 @@ export default function ClubDetailEnhanced() {
           </div>
         )}
 
+        {!isDesktop && isMember ? (
+          <PulseBar
+            stats={statsQuery.data as any}
+            themeColor={club.theme_color ?? "cyan"}
+            layout="grid"
+          />
+        ) : null}
+
         {/* Feed */}
-        {isMember && <ClubFeedTab clubId={clubId} isMember={isMember} />}
+        {isMember && (
+          <ClubFeedTab
+            clubId={clubId}
+            isMember={isMember}
+            afterComposerSlot={!isDesktop ? (
+              <ClubEventsPanel clubId={clubId} events={upcomingEvents} variant="inlineFeed" />
+            ) : undefined}
+          />
+        )}
 
         {/* Quick Actions FAB */}
         <QuickActionsFAB

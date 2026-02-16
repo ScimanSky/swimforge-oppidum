@@ -9,6 +9,7 @@ interface PulseBarProps {
     next_event: { id: number; title: string; startTime: string; eventType: string } | null;
   } | null;
   themeColor: string;
+  layout?: "grid" | "stackedCompact";
 }
 
 const themeColorMap: Record<string, string> = {
@@ -28,10 +29,53 @@ function formatCountdown(dateStr: string): string {
   return `tra ${hours}h ${minutes}m`;
 }
 
-export default function PulseBar({ stats, themeColor }: PulseBarProps) {
+export default function PulseBar({ stats, themeColor, layout = "grid" }: PulseBarProps) {
   const color = themeColorMap[themeColor] ?? themeColorMap.cyan;
 
   if (!stats) return null;
+
+  const metricItems = [
+    { key: "posts", icon: MessageCircle, value: String(stats.posts_this_week), label: "post / settimana" },
+    { key: "active", icon: Activity, value: String(stats.active_members), label: "attivi" },
+    { key: "members", icon: Users, value: String(stats.total_members), label: "membri" },
+    {
+      key: "event",
+      icon: Calendar,
+      value: stats.next_event ? formatCountdown(stats.next_event.startTime) : "—",
+      label: stats.next_event ? stats.next_event.title : "nessun evento",
+    },
+  ] as const;
+
+  if (layout === "stackedCompact") {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="surface-panel p-3 text-sm"
+        style={{ borderColor: color, borderWidth: "1px" }}
+      >
+        <div className="mb-2 text-xs font-display uppercase tracking-wide text-muted-foreground">
+          Pulse del club
+        </div>
+        <div className="space-y-2">
+          {metricItems.map((item) => (
+            <div
+              key={item.key}
+              className="flex items-center justify-between rounded-lg border border-border/55 bg-background/40 px-2.5 py-2"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <item.icon className="h-4 w-4 shrink-0" style={{ color }} />
+                <span className="truncate text-xs text-muted-foreground">{item.label}</span>
+              </div>
+              <span className="shrink-0 text-sm font-bold font-display" style={{ color }}>
+                {item.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -40,37 +84,15 @@ export default function PulseBar({ stats, themeColor }: PulseBarProps) {
       className="surface-panel p-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center text-sm"
       style={{ borderColor: color, borderWidth: "1px" }}
     >
-      <div className="flex flex-col items-center gap-1">
-        <MessageCircle className="h-4 w-4" style={{ color }} />
-        <span className="font-bold font-display" style={{ color }}>{stats.posts_this_week}</span>
-        <span className="text-xs text-muted-foreground">post / settimana</span>
-      </div>
-      <div className="flex flex-col items-center gap-1">
-        <Activity className="h-4 w-4" style={{ color }} />
-        <span className="font-bold font-display" style={{ color }}>{stats.active_members}</span>
-        <span className="text-xs text-muted-foreground">attivi</span>
-      </div>
-      <div className="flex flex-col items-center gap-1">
-        <Users className="h-4 w-4" style={{ color }} />
-        <span className="font-bold font-display" style={{ color }}>{stats.total_members}</span>
-        <span className="text-xs text-muted-foreground">membri</span>
-      </div>
-      <div className="flex flex-col items-center gap-1">
-        <Calendar className="h-4 w-4" style={{ color }} />
-        {stats.next_event ? (
-          <>
-            <span className="font-bold font-display truncate max-w-full" style={{ color }}>
-              {formatCountdown(stats.next_event.startTime)}
-            </span>
-            <span className="text-xs text-muted-foreground truncate max-w-full">{stats.next_event.title}</span>
-          </>
-        ) : (
-          <>
-            <span className="font-bold font-display text-muted-foreground">—</span>
-            <span className="text-xs text-muted-foreground">nessun evento</span>
-          </>
-        )}
-      </div>
+      {metricItems.map((item) => (
+        <div key={item.key} className="flex flex-col items-center gap-1">
+          <item.icon className="h-4 w-4" style={{ color }} />
+          <span className="font-bold font-display truncate max-w-full" style={{ color }}>
+            {item.value}
+          </span>
+          <span className="text-xs text-muted-foreground truncate max-w-full">{item.label}</span>
+        </div>
+      ))}
     </motion.div>
   );
 }

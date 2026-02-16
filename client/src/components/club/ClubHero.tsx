@@ -26,6 +26,7 @@ interface ClubHeroProps {
   onLeave: () => void;
   isJoining?: boolean;
   isLeaving?: boolean;
+  variant?: "full" | "compactSticky";
 }
 
 const themeColorMap: Record<string, string> = {
@@ -35,9 +36,101 @@ const themeColorMap: Record<string, string> = {
   violet: "var(--electric-violet)",
 };
 
-export default function ClubHero({ club, onOpenMembers, onOpenSettings, onJoin, onLeave, isJoining, isLeaving }: ClubHeroProps) {
+export default function ClubHero({
+  club,
+  onOpenMembers,
+  onOpenSettings,
+  onJoin,
+  onLeave,
+  isJoining,
+  isLeaving,
+  variant = "full",
+}: ClubHeroProps) {
   const color = themeColorMap[club.theme_color ?? "cyan"] ?? themeColorMap.cyan;
   const isStaff = ["owner", "admin", "moderator"].includes(club.member_role ?? "");
+
+  if (variant === "compactSticky") {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="surface-panel w-full overflow-hidden rounded-2xl px-3 py-3"
+        style={{ borderColor: color, borderWidth: "1px" }}
+      >
+        <div className="flex items-start gap-2">
+          <Link href="/home/community">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          </Link>
+
+          <Avatar className="h-11 w-11 border-2 shrink-0" style={{ borderColor: color }}>
+            <AvatarImage src={club.logo_url ?? undefined} />
+            <AvatarFallback style={{ color }} className="text-sm font-bold font-display">
+              {club.name.slice(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-base font-bold font-display" style={{ color }}>
+              {club.name}
+            </h1>
+            {club.tagline ? (
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">{club.tagline}</p>
+            ) : null}
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <Badge variant="outline" className="text-[10px] h-5 px-1.5" style={{ borderColor: color, color }}>
+                {club.member_count} membri
+              </Badge>
+              <Badge variant="outline" className="text-[10px] h-5 px-1.5 capitalize">
+                {club.visibility}
+              </Badge>
+              {club.member_role ? (
+                <Badge variant="outline" className="text-[10px] h-5 px-1.5" style={{ borderColor: color, color }}>
+                  {club.member_role}
+                </Badge>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              onClick={onOpenMembers}
+            >
+              <Users className="h-4 w-4" />
+            </Button>
+            {isStaff ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                onClick={onOpenSettings}
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            ) : null}
+          </div>
+        </div>
+
+        {!club.is_member ? (
+          <Button className="mt-3 h-8 w-full text-xs" variant="neon" onClick={onJoin} disabled={isJoining}>
+            {isJoining ? "Richiesta..." : club.visibility === "public" ? "Unisciti al club" : "Richiedi accesso"}
+          </Button>
+        ) : club.member_role !== "owner" ? (
+          <Button className="mt-3 h-8 text-xs" variant="ghost" size="sm" onClick={onLeave} disabled={isLeaving}>
+            {isLeaving ? "Uscita..." : "Lascia club"}
+          </Button>
+        ) : null}
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div

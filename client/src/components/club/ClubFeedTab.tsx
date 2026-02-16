@@ -2,7 +2,7 @@
  * Club Feed Tab - Il feed dei post del club (riutilizza logica esistente)
  */
 
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,9 +16,10 @@ import PostReactions from "@/components/PostReactions";
 interface ClubFeedTabProps {
   clubId: number;
   isMember?: boolean;
+  afterComposerSlot?: ReactNode;
 }
 
-export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
+export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: ClubFeedTabProps) {
   const [postText, setPostText] = useState("");
   const [openCommentsId, setOpenCommentsId] = useState<number | null>(null);
   const [commentTextByPost, setCommentTextByPost] = useState<Record<number, string>>({});
@@ -107,6 +108,8 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
           </div>
         </SurfaceContent>
       </Surface>
+
+      {afterComposerSlot ? <div className="space-y-3">{afterComposerSlot}</div> : null}
 
       {/* Feed */}
       {feedQuery.isLoading ? (
