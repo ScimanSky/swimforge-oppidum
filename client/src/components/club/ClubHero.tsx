@@ -43,11 +43,11 @@ export default function ClubHero({ club, onOpenMembers, onOpenSettings, onJoin, 
     <motion.div
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-[26px]"
+      className="relative w-full overflow-hidden rounded-[26px]"
       style={{ borderColor: color, borderWidth: "1px" }}
     >
       {/* Cover image */}
-      <div className="h-32 sm:h-44 bg-gradient-to-br from-surface-panel to-black/60 relative">
+      <div className="relative h-36 bg-gradient-to-br from-surface-panel to-black/60 sm:h-48">
         {club.cover_image_url && (
           <img src={club.cover_image_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-60" />
         )}
@@ -72,7 +72,7 @@ export default function ClubHero({ club, onOpenMembers, onOpenSettings, onJoin, 
       </div>
 
       {/* Club info overlay */}
-      <div className="relative px-4 pb-4 -mt-10">
+      <div className="relative -mt-10 px-5 pb-5">
         <div className="flex items-end gap-3">
           {/* Logo */}
           <Avatar className="h-16 w-16 border-2" style={{ borderColor: color }}>

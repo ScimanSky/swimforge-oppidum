@@ -144,22 +144,22 @@ export default function ClubDetailEnhanced() {
 
   return (
     <AppLayout>
-      <div className="max-w-2xl mx-auto space-y-4 pb-24 px-4">
-        {/* Hero */}
-        <ClubHero
-          club={club}
-          onOpenMembers={() => setMembersOpen(true)}
-          onOpenSettings={() => setSettingsOpen(true)}
-          onJoin={() => joinMutation.mutate({ clubId })}
-          onLeave={() => leaveMutation.mutate({ clubId })}
-          isJoining={joinMutation.isPending}
-          isLeaving={leaveMutation.isPending}
-        />
-
-        {/* Pulse Bar */}
-        {isMember && (
-          <PulseBar stats={statsQuery.data as any} themeColor={club.theme_color ?? "cyan"} />
-        )}
+      <div className="mx-auto max-w-5xl space-y-4 pb-24 px-4">
+        {/* Sticky Club Header */}
+        <div className="sticky top-[4.35rem] z-30 space-y-3 rounded-[28px] bg-background/75 p-1 backdrop-blur-md">
+          <ClubHero
+            club={club}
+            onOpenMembers={() => setMembersOpen(true)}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onJoin={() => joinMutation.mutate({ clubId })}
+            onLeave={() => leaveMutation.mutate({ clubId })}
+            isJoining={joinMutation.isPending}
+            isLeaving={leaveMutation.isPending}
+          />
+          {isMember && (
+            <PulseBar stats={statsQuery.data as any} themeColor={club.theme_color ?? "cyan"} />
+          )}
+        </div>
 
         {/* Pinned Announcements */}
         {pinnedAnnouncements.length > 0 && (
