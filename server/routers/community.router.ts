@@ -13,6 +13,7 @@ import type { ClubEventInsert, ClubAnnouncementInsert } from "./_shared";
 import { ENV } from "../_core/env";
 
 const CLUB_STAFF_ROLES = new Set(["owner", "admin", "moderator"]);
+const REACTION_TYPES = ["splash", "fire", "strong", "clap", "wave", "love", "rocket", "wow", "laugh", "cry"] as const;
 
 async function requireClubMemberRole(userId: number, clubId: number) {
     const { getClubMemberRole } = await import("../db_clubs");
@@ -402,7 +403,7 @@ export const communityRouter = router({
         react: protectedProcedure
             .input(z.object({
                 storyId: z.number(),
-                reactionType: z.enum(["splash", "fire", "strong", "clap", "wave"]),
+                reactionType: z.enum(REACTION_TYPES),
             }))
             .mutation(async ({ ctx, input }) => {
                 try {
@@ -428,6 +429,11 @@ export const communityRouter = router({
                                 strong: "💪",
                                 clap: "👏",
                                 wave: "🌊",
+                                love: "❤️",
+                                rocket: "🚀",
+                                wow: "🤯",
+                                laugh: "😂",
+                                cry: "😢",
                             };
                             const emoji = emojiMap[input.reactionType] || "✨";
                             const { createNotification } = await import("../db_social_enhanced");
@@ -1372,7 +1378,7 @@ export const communityRouter = router({
         toggle: protectedProcedure
             .input(z.object({
                 postId: z.number(),
-                reactionType: z.enum(["splash", "fire", "strong", "clap", "wave"]),
+                reactionType: z.enum(REACTION_TYPES),
             }))
             .mutation(async ({ ctx, input }) => {
                 const postMeta = await requirePostReadable(ctx.user.id, input.postId);
@@ -1403,7 +1409,18 @@ export const communityRouter = router({
                             if (!db) throw new Error("db not available");
                             const actorResult = await db.execute(sql`SELECT name FROM users WHERE id = ${ctx.user.id} LIMIT 1`);
                             const actorName = ((actorResult.rows[0] as any)?.name as string | undefined) || "Qualcuno";
-                            const emojiMap: Record<string, string> = { splash: "💧", fire: "🔥", strong: "💪", clap: "👏", wave: "🌊" };
+                            const emojiMap: Record<string, string> = {
+                                splash: "💧",
+                                fire: "🔥",
+                                strong: "💪",
+                                clap: "👏",
+                                wave: "🌊",
+                                love: "❤️",
+                                rocket: "🚀",
+                                wow: "🤯",
+                                laugh: "😂",
+                                cry: "😢",
+                            };
                             const emoji = emojiMap[input.reactionType] || "✨";
                             const { createNotification } = await import("../db_social_enhanced");
                             const link = postMeta.clubId ? `/community/club/${postMeta.clubId}` : "/home/community";

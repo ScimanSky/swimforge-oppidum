@@ -2,7 +2,18 @@ import { sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { deleteImageKitFileById } from "./lib/imagekit";
 
-export const STORY_REACTION_TYPES = ["splash", "fire", "strong", "clap", "wave"] as const;
+export const STORY_REACTION_TYPES = [
+  "splash",
+  "fire",
+  "strong",
+  "clap",
+  "wave",
+  "love",
+  "rocket",
+  "wow",
+  "laugh",
+  "cry",
+] as const;
 export type StoryReactionType = (typeof STORY_REACTION_TYPES)[number];
 
 function normalizeReactionCounts(raw: unknown): Record<string, number> {

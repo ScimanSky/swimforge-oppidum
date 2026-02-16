@@ -1,6 +1,6 @@
 /**
  * Post Reactions Component - Reazioni emotive avanzate
- * Supporta: splash (💧), fire (🔥), strong (💪), clap (👏), wave (🌊)
+ * Supporta: splash (💧), fire (🔥), strong (💪), clap (👏), wave (🌊), love (❤️), rocket (🚀), wow (🤯), laugh (😂), cry (😢)
  */
 
 import { useState } from "react";
@@ -28,6 +28,11 @@ const reactionEmojis = {
   strong: { emoji: "💪", label: "Forza", color: "text-purple-500" },
   clap: { emoji: "👏", label: "Applauso", color: "text-yellow-500" },
   wave: { emoji: "🌊", label: "Onda", color: "text-cyan-500" },
+  love: { emoji: "❤️", label: "Love", color: "text-rose-500" },
+  rocket: { emoji: "🚀", label: "Razzo", color: "text-emerald-500" },
+  wow: { emoji: "🤯", label: "Wow", color: "text-fuchsia-500" },
+  laugh: { emoji: "😂", label: "Risata", color: "text-amber-500" },
+  cry: { emoji: "😢", label: "Pianto", color: "text-sky-500" },
 };
 
 export default function PostReactions({

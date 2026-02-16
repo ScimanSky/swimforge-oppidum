@@ -41,6 +41,11 @@ const STORY_REACTION_CHOICES = [
   { type: "strong", emoji: "💪" },
   { type: "clap", emoji: "👏" },
   { type: "wave", emoji: "🌊" },
+  { type: "love", emoji: "❤️" },
+  { type: "rocket", emoji: "🚀" },
+  { type: "wow", emoji: "🤯" },
+  { type: "laugh", emoji: "😂" },
+  { type: "cry", emoji: "😢" },
 ] as const
 
 type VideoClipRange = {

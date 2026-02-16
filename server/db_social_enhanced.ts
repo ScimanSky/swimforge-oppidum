@@ -674,7 +674,7 @@ export async function getClubMediaById(mediaId: number) {
 export async function togglePostReaction(params: {
   postId: number
   userId: number
-  reactionType: 'splash' | 'fire' | 'strong' | 'clap' | 'wave'
+  reactionType: 'splash' | 'fire' | 'strong' | 'clap' | 'wave' | 'love' | 'rocket' | 'wow' | 'laugh' | 'cry'
 }) {
   const db = await requireDb()
   
