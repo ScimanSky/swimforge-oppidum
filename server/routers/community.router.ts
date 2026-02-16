@@ -617,6 +617,13 @@ export const communityRouter = router({
                 return club;
             }),
 
+        weeklyStats: protectedProcedure
+            .input(z.object({ clubId: z.number() }))
+            .query(async ({ input }) => {
+                const { getClubWeeklyStats } = await import("../db_clubs");
+                return getClubWeeklyStats(input.clubId);
+            }),
+
         members: protectedProcedure
             .input(z.object({ clubId: z.number() }))
             .query(async ({ ctx, input }) => {

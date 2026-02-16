@@ -673,3 +673,48 @@ export async function deleteClub(userId: number, clubId: number) {
   await db.delete(communityClubs).where(eq(communityClubs.id, clubId));
   return { success: true };
 }
+
+export async function getClubWeeklyStats(clubId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const oneWeekAgo = new Date();
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+  const result = await db.execute(sql`
+    SELECT
+      COALESCE((
+        SELECT COUNT(*)::int
+        FROM social_posts p
+        WHERE p.club_id = ${clubId}
+          AND p.created_at >= ${oneWeekAgo.toISOString()}
+      ), 0) AS posts_this_week,
+      COALESCE((
+        SELECT COUNT(DISTINCT p.user_id)::int
+        FROM social_posts p
+        WHERE p.club_id = ${clubId}
+          AND p.created_at >= ${oneWeekAgo.toISOString()}
+      ), 0) AS active_members,
+      COALESCE((
+        SELECT COUNT(*)::int
+        FROM community_club_members m
+        WHERE m.club_id = ${clubId} AND m.status = 'active'
+      ), 0) AS total_members,
+      (
+        SELECT JSON_BUILD_OBJECT(
+          'id', e.id,
+          'title', e.title,
+          'startTime', e.start_time,
+          'eventType', e.event_type
+        )
+        FROM club_events e
+        WHERE e.club_id = ${clubId}
+          AND e.status = 'active'
+          AND e.start_time > NOW()
+        ORDER BY e.start_time ASC
+        LIMIT 1
+      ) AS next_event
+  `);
+
+  return result.rows[0] ?? null;
+}
