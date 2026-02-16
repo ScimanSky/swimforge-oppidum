@@ -127,14 +127,35 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
         </Surface>
       ) : (
         <div className="space-y-4">
-          {feedQuery.data.map((post: any, index: number) => (
-            <motion.div
-              key={post.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
-              <Surface>
+          {feedQuery.data.map((post: any, index: number) => {
+            const isActivityPost =
+              Boolean(post.activity_id) ||
+              Number(post.activity_distance_meters ?? 0) > 0 ||
+              Number(post.activity_duration_seconds ?? 0) > 0;
+
+            return (
+              <motion.div
+                key={post.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <Surface className={isActivityPost ? "overflow-hidden" : undefined}>
+                  {isActivityPost && (
+                    <>
+                      <picture className="pointer-events-none absolute inset-0 z-0">
+                        <source media="(max-width: 767px)" srcSet="/images/activity-card-overlay-mobile.png" />
+                        <img
+                          src="/images/activity-card-overlay-desktop.png"
+                          alt=""
+                          aria-hidden="true"
+                          className="h-full w-full object-cover opacity-[0.2]"
+                          loading="lazy"
+                        />
+                      </picture>
+                      <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-b from-background/76 via-background/64 to-background/86" />
+                    </>
+                  )}
                 <SurfaceContent className="p-6">
                   <div className="flex items-start gap-3 mb-4">
                     <Avatar>
@@ -206,9 +227,10 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
                     </div>
                   )}
                 </SurfaceContent>
-              </Surface>
-            </motion.div>
-          ))}
+                </Surface>
+              </motion.div>
+            );
+          })}
         </div>
       )}
     </div>

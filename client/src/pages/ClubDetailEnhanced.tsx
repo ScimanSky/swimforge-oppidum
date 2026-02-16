@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { Calendar, MapPin, Pin, Clock, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon, ExternalLink } from "lucide-react";
+import { Pin, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon, ExternalLink, CalendarClock, MapPin } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,10 +23,6 @@ import PulseBar from "@/components/club/PulseBar";
 import QuickActionsFAB from "@/components/club/QuickActionsFAB";
 import ClubFeedTab from "@/components/club/ClubFeedTab";
 import ClubMembersTab from "@/components/club/ClubMembersTab";
-
-function buildOsmMapLink(lat: number, lng: number, zoom = 15) {
-  return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=${zoom}/${lat}/${lng}`;
-}
 
 function buildOsmEmbedUrl(lat: number, lng: number) {
   const delta = 0.01;
@@ -67,6 +63,7 @@ async function geocodeLocation(query: string): Promise<{ lat: number; lng: numbe
 export default function ClubDetailEnhanced() {
   const [match, params] = useRoute("/community/club/:id");
   const clubId = Number(params?.id);
+  const [eventsFromDateIso] = useState(() => new Date().toISOString());
 
   const [membersOpen, setMembersOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -97,7 +94,7 @@ export default function ClubDetailEnhanced() {
     { enabled: match && Number.isFinite(clubId) }
   );
   const eventsQuery = trpc.community.clubs.events.list.useQuery(
-    { clubId, status: "active", limit: 1 },
+    { clubId, status: "active", fromDate: eventsFromDateIso, limit: 8 },
     { enabled: match && Number.isFinite(clubId) }
   );
 
@@ -113,9 +110,6 @@ export default function ClubDetailEnhanced() {
       toast.success("Hai lasciato il club");
       utils.community.clubs.get.invalidate({ clubId });
     },
-  });
-  const rsvpMutation = trpc.community.clubs.events.rsvp.useMutation({
-    onSuccess: () => { eventsQuery.refetch(); },
   });
   const createEventMutation = trpc.community.clubs.events.create.useMutation({
     onSuccess: () => {
@@ -217,10 +211,7 @@ export default function ClubDetailEnhanced() {
   const pinnedAnnouncements = (announcementsQuery.data as any[])?.filter(
     (a: any) => a.announcement?.isPinned
   ) ?? [];
-  const nextEvent = (eventsQuery.data as any[])?.[0] ?? null;
-  const nextEventLat = Number(nextEvent?.event?.locationLat ?? nextEvent?.locationLat);
-  const nextEventLng = Number(nextEvent?.event?.locationLng ?? nextEvent?.locationLng);
-  const hasNextEventMap = Number.isFinite(nextEventLat) && Number.isFinite(nextEventLng);
+  const upcomingEvents = (eventsQuery.data as any[]) ?? [];
 
   const handleFindLocationOnMap = async () => {
     if (!newEvent.location.trim()) {
@@ -269,6 +260,55 @@ export default function ClubDetailEnhanced() {
                 {isMember && (
                   <PulseBar stats={statsQuery.data as any} themeColor={club.theme_color ?? "cyan"} />
                 )}
+                {isMember && upcomingEvents.length > 0 && (
+                  <div className="surface-panel p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="inline-flex items-center gap-2 text-xs font-display uppercase tracking-wide text-muted-foreground">
+                        <CalendarClock className="h-4 w-4 text-primary" />
+                        Eventi in programma
+                      </p>
+                      <span className="text-xs text-muted-foreground">
+                        {upcomingEvents.length}
+                      </span>
+                    </div>
+                    <div className="max-h-44 space-y-2 overflow-y-auto pr-1">
+                      {upcomingEvents.map((eventItem: any) => {
+                        const event = eventItem.event ?? eventItem;
+                        const eventDate = new Date(event.startTime);
+                        const eventLabel = Number.isNaN(eventDate.getTime())
+                          ? "Data non valida"
+                          : eventDate.toLocaleDateString("it-IT", {
+                              weekday: "short",
+                              day: "numeric",
+                              month: "short",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            });
+                        return (
+                          <Link
+                            key={event.id}
+                            href={`/community/club/${clubId}/event/${event.id}`}
+                            className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2 transition-colors hover:bg-card/60"
+                          >
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold">{event.title}</p>
+                              <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                                <span>{eventLabel}</span>
+                                {event.location ? (
+                                  <span className="inline-flex items-center gap-1 truncate">
+                                    <MapPin className="h-3 w-3" />
+                                    {event.location}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </div>
+                            <ExternalLink className="ml-3 h-4 w-4 shrink-0 text-muted-foreground" />
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>,
@@ -297,64 +337,6 @@ export default function ClubDetailEnhanced() {
               </motion.div>
             ))}
           </div>
-        )}
-
-        {/* Next Event */}
-        {nextEvent && isMember && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="surface-panel p-4"
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <Calendar className="h-4 w-4 text-primary" />
-              <span className="text-xs text-muted-foreground uppercase tracking-wide font-display">Prossimo evento</span>
-            </div>
-            <h3 className="font-bold">{nextEvent.event?.title ?? nextEvent.title}</h3>
-            <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
-              {(nextEvent.event?.startTime ?? nextEvent.startTime) && (
-                <span className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  {new Date(nextEvent.event?.startTime ?? nextEvent.startTime).toLocaleDateString("it-IT", {
-                    weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
-                  })}
-                </span>
-              )}
-              {(nextEvent.event?.location ?? nextEvent.location) && (
-                <span className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  {nextEvent.event?.location ?? nextEvent.location}
-                </span>
-              )}
-              {hasNextEventMap && (
-                <a
-                  href={buildOsmMapLink(nextEventLat, nextEventLng)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-primary hover:underline"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  Vedi mappa
-                </a>
-              )}
-            </div>
-            <div className="flex gap-2 mt-3">
-              <Button
-                size="sm"
-                variant={nextEvent.userRsvp === "going" ? "neon" : "outline-neon"}
-                onClick={() => rsvpMutation.mutate({ eventId: nextEvent.event?.id ?? nextEvent.id, status: "going" })}
-              >
-                Partecipo {nextEvent.attendeeCount ? `(${nextEvent.attendeeCount})` : ""}
-              </Button>
-              <Button
-                size="sm"
-                variant={nextEvent.userRsvp === "maybe" ? "neon" : "ghost-neon"}
-                onClick={() => rsvpMutation.mutate({ eventId: nextEvent.event?.id ?? nextEvent.id, status: "maybe" })}
-              >
-                Forse
-              </Button>
-            </div>
-          </motion.div>
         )}
 
         {/* Feed */}
