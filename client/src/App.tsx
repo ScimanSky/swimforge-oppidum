@@ -31,7 +31,7 @@ const SocialFeed = lazy(() => import("./pages/SocialFeed"));
 const ReportPost = lazy(() => import("./pages/ReportPost"));
 const Community = lazy(() => import("./pages/Community"));
 const ClubInvite = lazy(() => import("./pages/ClubInvite"));
-const ClubDetail = lazy(() => import("./pages/ClubDetail"));
+const ClubDetail = lazy(() => import("./pages/ClubDetailEnhanced"));
 const ClubEventDetail = lazy(() => import("./pages/ClubEventDetail"));
 const AdminReports = lazy(() => import("./pages/AdminReports"));
 const Auth = lazy(() => import("./pages/Auth"));
