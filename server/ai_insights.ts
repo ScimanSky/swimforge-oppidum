@@ -7,12 +7,75 @@ import { logger } from "./middleware/logger";
 // Initialize Gemini AI
 let genAI: GoogleGenerativeAI | null = null;
 const log = logger.child({ component: "ai_insights" });
+const INSIGHT_EMOJI_REGEX = /^[🔥⚡💪🎯📈🏊🔄🌟🚀💯🏆❤️📊🎉👍💬🤯😂😢🌊]/;
 
 function getGeminiClient() {
   if (!genAI && process.env.GEMINI_API_KEY) {
     genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
   }
   return genAI;
+}
+
+function cleanupInsightLine(line: string): string {
+  return line
+    .replace(/^[-*•]\s*/, "")
+    .replace(/^\d+[\).\-\s]+/, "")
+    .replace(/^#+\s*/, "")
+    .replace(/\*\*/g, "")
+    .replace(/^["'`]+|["'`]+$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function parseInsightsFromAiText(text: string): string[] {
+  const lines = text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => cleanupInsightLine(line))
+    .filter(Boolean);
+
+  const picked: string[] = [];
+  const seen = new Set<string>();
+  const pushUnique = (line: string) => {
+    const normalized = line.toLowerCase();
+    if (line.length < 24 || seen.has(normalized)) return;
+    seen.add(normalized);
+    picked.push(line);
+  };
+
+  // Pass 1: prefer emoji-prefixed insights (supports markdown bullets too).
+  for (const line of lines) {
+    if (INSIGHT_EMOJI_REGEX.test(line)) {
+      pushUnique(line);
+    }
+  }
+
+  // Pass 2: fallback to meaningful bullet/numbered lines if model skipped emojis.
+  if (picked.length === 0) {
+    for (const rawLine of text.replace(/\r\n/g, "\n").split("\n")) {
+      const trimmed = rawLine.trim();
+      if (!trimmed) continue;
+      if (!/^([-*•]|\d+[\).\-\s]+)/.test(trimmed)) continue;
+      const cleaned = cleanupInsightLine(trimmed);
+      if (!cleaned || cleaned.startsWith("---")) continue;
+      pushUnique(cleaned);
+    }
+  }
+
+  // Pass 3: as last resort, split long paragraphs and extract first statements.
+  if (picked.length === 0) {
+    const paragraphCandidates = text
+      .replace(/\r\n/g, "\n")
+      .split(/\n{2,}/)
+      .map((p) => cleanupInsightLine(p))
+      .filter((p) => p.length >= 40 && !p.startsWith("---") && !p.startsWith("###"));
+    for (const paragraph of paragraphCandidates) {
+      const sentence = paragraph.split(/(?<=[.!?])\s+/)[0]?.trim() ?? "";
+      if (sentence) pushUnique(sentence);
+    }
+  }
+
+  return picked.slice(0, 8);
 }
 
 export interface UserStatsData {
@@ -285,23 +348,7 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
       preview: text.substring(0, 500),
     });
 
-    // Parse insights (split by newlines, filter empty)
-    // Accept lines that start with emoji OR number + emoji (e.g., "1. 🎯")
-    const insights = text
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => {
-        if (line.length === 0) return false;
-        // Match lines starting with emoji
-        if (line.match(/^[🔥⚡💪🎯📈🏊🔄🌟🚀💯🏆❤️📊🎉👍🚀🏊‍♂️🏊‍♀️💬]/)) return true;
-        // Match lines starting with number + dot + space + emoji (e.g., "1. 🎯")
-        if (line.match(/^\d+\.\s*[🔥⚡💪🎯📈🏊🔄🌟🚀💯🏆❤️📊🎉👍🚀🏊‍♂️🏊‍♀️💬]/)) return true;
-        return false;
-      })
-      .map((line) => {
-        // Remove leading numbers (e.g., "1. 🎯" -> "🎯")
-        return line.replace(/^\d+\.\s*/, '');
-      });
+    const insights = parseInsightsFromAiText(text);
 
     log.debug("[AI Insights] Parsed insights from response", {
       event: "ai_insights:parsed",
