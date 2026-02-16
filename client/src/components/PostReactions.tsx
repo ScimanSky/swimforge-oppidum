@@ -3,7 +3,7 @@
  * Supporta: splash (💧), fire (🔥), strong (💪), clap (👏), wave (🌊), love (❤️), rocket (🚀), wow (🤯), laugh (😂), cry (😢)
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { Droplet } from "lucide-react";
 import { toast } from "sonner";
+import { AnimatePresence, motion } from "framer-motion";
 
 interface PostReactionsProps {
   postId: number;
@@ -35,6 +36,15 @@ const reactionEmojis = {
   cry: { emoji: "😢", label: "Pianto", color: "text-sky-500" },
 };
 
+type FloatingReaction = {
+  id: number;
+  emoji: string;
+  x: number;
+  drift: number;
+  rotate: number;
+  delay: number;
+};
+
 export default function PostReactions({
   postId,
   initialReactions = [],
@@ -42,6 +52,7 @@ export default function PostReactions({
   onReactionChange,
 }: PostReactionsProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [burstReactions, setBurstReactions] = useState<FloatingReaction[]>([]);
   const utils = trpc.useUtils();
 
   const reactionsQuery = trpc.community.reactions.list.useQuery(
@@ -73,6 +84,20 @@ export default function PostReactions({
   });
 
   const handleReaction = (reactionType: keyof typeof reactionEmojis) => {
+    const selected = reactionEmojis[reactionType];
+    const now = Date.now();
+    const particles: FloatingReaction[] = Array.from({ length: 6 }, (_, idx) => ({
+      id: now + idx,
+      emoji: selected.emoji,
+      x: (Math.random() - 0.5) * 58,
+      drift: (Math.random() - 0.5) * 20,
+      rotate: (Math.random() - 0.5) * 34,
+      delay: idx * 0.02,
+    }));
+    setBurstReactions((prev) => [...prev, ...particles]);
+    window.setTimeout(() => {
+      setBurstReactions((prev) => prev.filter((item) => !particles.some((p) => p.id === item.id)));
+    }, 780);
     toggleReactionMutation.mutate({ postId, reactionType });
     setIsOpen(false);
   };
@@ -91,9 +116,16 @@ export default function PostReactions({
     acc[r.reactionType] = r.count;
     return acc;
   }, {}) || {};
+  const currentReactionConfig = currentUserReaction
+    ? reactionEmojis[currentUserReaction as keyof typeof reactionEmojis]
+    : null;
+  const triggerAnimationKey = useMemo(
+    () => `${currentUserReaction ?? "none"}-${totalReactions}`,
+    [currentUserReaction, totalReactions]
+  );
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="relative flex items-center gap-2">
       {/* Picker delle reazioni */}
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
@@ -102,13 +134,19 @@ export default function PostReactions({
             size="sm"
             className={cn(
               "gap-1 hover:scale-110 transition-transform",
-              currentUserReaction && reactionEmojis[currentUserReaction as keyof typeof reactionEmojis]?.color
+              currentUserReaction && currentReactionConfig?.color
             )}
           >
-            {currentUserReaction && reactionEmojis[currentUserReaction as keyof typeof reactionEmojis] ? (
-              <span className="text-lg">
-                {reactionEmojis[currentUserReaction as keyof typeof reactionEmojis].emoji}
-              </span>
+            {currentUserReaction && currentReactionConfig ? (
+              <motion.span
+                key={triggerAnimationKey}
+                className="text-lg"
+                initial={{ scale: 0.75, rotate: -14, y: 3 }}
+                animate={{ scale: 1, rotate: 0, y: 0 }}
+                transition={{ type: "spring", stiffness: 420, damping: 22 }}
+              >
+                {currentReactionConfig.emoji}
+              </motion.span>
             ) : (
               <Droplet className="h-4 w-4" />
             )}
@@ -118,7 +156,7 @@ export default function PostReactions({
         <PopoverContent className="w-auto p-2" align="start">
           <div className="flex gap-1">
             {Object.entries(reactionEmojis).map(([type, { emoji, label }]) => (
-              <button
+              <motion.button
                 key={type}
                 onClick={() => handleReaction(type as keyof typeof reactionEmojis)}
                 className={cn(
@@ -126,14 +164,22 @@ export default function PostReactions({
                   currentUserReaction === type && "bg-accent"
                 )}
                 title={label}
+                whileHover={{ scale: 1.12, y: -2 }}
+                whileTap={{ scale: 0.92 }}
               >
-                <span className="text-2xl">{emoji}</span>
+                <motion.span
+                  className="text-2xl"
+                  animate={currentUserReaction === type ? { y: [0, -2, 0] } : { y: 0 }}
+                  transition={{ duration: 0.35 }}
+                >
+                  {emoji}
+                </motion.span>
                 {reactionCounts[type] > 0 && (
                   <span className="text-xs text-muted-foreground">
                     {reactionCounts[type]}
                   </span>
                 )}
-              </button>
+              </motion.button>
             ))}
           </div>
         </PopoverContent>
@@ -143,14 +189,17 @@ export default function PostReactions({
       {reactionsQuery.data && reactionsQuery.data.length > 0 && (
         <div className="flex gap-1">
           {reactionsQuery.data.slice(0, 3).map((reaction: any) => (
-            <div
+            <motion.div
               key={reaction.reactionType}
               className="flex items-center gap-1 text-xs bg-accent/50 rounded-full px-2 py-1"
               title={`${reaction.count} ${reactionEmojis[reaction.reactionType as keyof typeof reactionEmojis]?.label || ""}`}
+              initial={{ opacity: 0.75, y: 3 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2 }}
             >
               <span>{reactionEmojis[reaction.reactionType as keyof typeof reactionEmojis]?.emoji}</span>
               <span className="text-muted-foreground">{reaction.count}</span>
-            </div>
+            </motion.div>
           ))}
           {reactionsQuery.data.length > 3 && (
             <Popover>
@@ -181,6 +230,30 @@ export default function PostReactions({
           )}
         </div>
       )}
+
+      <div className="pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2">
+        <AnimatePresence>
+          {burstReactions.map((item) => (
+            <motion.span
+              key={item.id}
+              className="absolute text-lg"
+              style={{ left: item.x, bottom: 0 }}
+              initial={{ opacity: 0, y: 0, x: 0, scale: 0.75, rotate: 0 }}
+              animate={{
+                opacity: [0, 1, 1, 0],
+                y: [-2, -22, -42],
+                x: [0, item.drift],
+                scale: [0.75, 1.08, 0.9],
+                rotate: [0, item.rotate],
+              }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.72, ease: "easeOut", delay: item.delay }}
+            >
+              {item.emoji}
+            </motion.span>
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

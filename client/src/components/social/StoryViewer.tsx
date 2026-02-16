@@ -53,6 +53,15 @@ type VideoClipRange = {
   end: number | null
 }
 
+type StoryFloatingReaction = {
+  id: number
+  emoji: string
+  x: number
+  drift: number
+  rotate: number
+  delay: number
+}
+
 const DEFAULT_VIDEO_CLIP_RANGE: VideoClipRange = { start: 0, end: null }
 
 function parseVideoClipRange(mediaUrl: string | null): VideoClipRange {
@@ -76,6 +85,7 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
   const [reactionStateByStory, setReactionStateByStory] = useState<
     Record<number, { counts: Record<string, number>; userReaction: string | null; total: number }>
   >({})
+  const [floatingReactions, setFloatingReactions] = useState<StoryFloatingReaction[]>([])
   const startRef = useRef(0)
   const rafRef = useRef(0)
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -98,6 +108,22 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
       void utils.community.stories.active.invalidate()
     },
   })
+
+  const spawnFloatingReactions = useCallback((emoji: string) => {
+    const now = Date.now()
+    const particles: StoryFloatingReaction[] = Array.from({ length: 7 }, (_, idx) => ({
+      id: now + idx,
+      emoji,
+      x: (Math.random() - 0.5) * 80,
+      drift: (Math.random() - 0.5) * 28,
+      rotate: (Math.random() - 0.5) * 42,
+      delay: idx * 0.02,
+    }))
+    setFloatingReactions((prev) => [...prev, ...particles])
+    window.setTimeout(() => {
+      setFloatingReactions((prev) => prev.filter((item) => !particles.some((particle) => particle.id === item.id)))
+    }, 820)
+  }, [])
 
   const goNext = useCallback(() => {
     if (!group) return
@@ -356,23 +382,31 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
                 const isActive = reactionSummary.userReaction === choice.type
                 const count = reactionSummary.counts[choice.type] ?? 0
                 return (
-                  <button
+                  <motion.button
                     key={choice.type}
                     type="button"
                     className={`flex items-center gap-1 rounded-full px-2 py-1 text-sm transition ${
                       isActive ? "bg-white/25" : "hover:bg-white/15"
                     }`}
+                    whileHover={{ scale: 1.08, y: -1 }}
+                    whileTap={{ scale: 0.92 }}
                     onClick={(e) => {
                       e.stopPropagation()
                       if (!canReact) return
                       if (reactToStory.isPending) return
+                      spawnFloatingReactions(choice.emoji)
                       reactToStory.mutate({ storyId: story.id, reactionType: choice.type })
                     }}
                     disabled={!canReact}
                   >
-                    <span>{choice.emoji}</span>
+                    <motion.span
+                      animate={isActive ? { y: [0, -2, 0] } : { y: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      {choice.emoji}
+                    </motion.span>
                     {count > 0 && <span className="text-xs text-white">{count}</span>}
-                  </button>
+                  </motion.button>
                 )
               })}
               {reactionSummary.total > 0 && (
@@ -381,6 +415,30 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
             </div>
           </div>
         )}
+
+        <div className="pointer-events-none absolute bottom-14 left-1/2 z-30 -translate-x-1/2">
+          <AnimatePresence>
+            {floatingReactions.map((item) => (
+              <motion.span
+                key={item.id}
+                className="absolute text-xl"
+                style={{ left: item.x, bottom: 0 }}
+                initial={{ opacity: 0, y: 0, x: 0, scale: 0.7, rotate: 0 }}
+                animate={{
+                  opacity: [0, 1, 1, 0],
+                  y: [-2, -26, -56],
+                  x: [0, item.drift],
+                  scale: [0.7, 1.08, 0.92],
+                  rotate: [0, item.rotate],
+                }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.76, ease: "easeOut", delay: item.delay }}
+              >
+                {item.emoji}
+              </motion.span>
+            ))}
+          </AnimatePresence>
+        </div>
       </motion.div>
     </AnimatePresence>,
     document.body,
