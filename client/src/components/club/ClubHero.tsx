@@ -54,7 +54,7 @@ export default function ClubHero({
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="surface-panel w-full overflow-hidden rounded-2xl px-3 py-3"
+        className="surface-panel w-full overflow-hidden rounded-xl px-2.5 py-2"
         style={{ borderColor: color, borderWidth: "1px" }}
       >
         <div className="flex items-start gap-2">
@@ -62,13 +62,13 @@ export default function ClubHero({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-3.5 w-3.5" />
             </Button>
           </Link>
 
-          <Avatar className="h-11 w-11 border-2 shrink-0" style={{ borderColor: color }}>
+          <Avatar className="h-10 w-10 border-2 shrink-0" style={{ borderColor: color }}>
             <AvatarImage src={club.logo_url ?? undefined} />
             <AvatarFallback style={{ color }} className="text-sm font-bold font-display">
               {club.name.slice(0, 2).toUpperCase()}
@@ -76,21 +76,21 @@ export default function ClubHero({
           </Avatar>
 
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base font-bold font-display" style={{ color }}>
+            <h1 className="truncate text-[15px] font-bold font-display leading-tight" style={{ color }}>
               {club.name}
             </h1>
             {club.tagline ? (
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">{club.tagline}</p>
+              <p className="mt-0.5 hidden truncate text-[11px] text-muted-foreground sm:block">{club.tagline}</p>
             ) : null}
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <Badge variant="outline" className="text-[10px] h-5 px-1.5" style={{ borderColor: color, color }}>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+              <Badge variant="outline" className="h-4 px-1 text-[9px]" style={{ borderColor: color, color }}>
                 {club.member_count} membri
               </Badge>
-              <Badge variant="outline" className="text-[10px] h-5 px-1.5 capitalize">
+              <Badge variant="outline" className="h-4 px-1 text-[9px] capitalize">
                 {club.visibility}
               </Badge>
               {club.member_role ? (
-                <Badge variant="outline" className="text-[10px] h-5 px-1.5" style={{ borderColor: color, color }}>
+                <Badge variant="outline" className="h-4 px-1 text-[9px]" style={{ borderColor: color, color }}>
                   {club.member_role}
                 </Badge>
               ) : null}
@@ -101,30 +101,30 @@ export default function ClubHero({
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
               onClick={onOpenMembers}
             >
-              <Users className="h-4 w-4" />
+              <Users className="h-3.5 w-3.5" />
             </Button>
             {isStaff ? (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
                 onClick={onOpenSettings}
               >
-                <Settings className="h-4 w-4" />
+                <Settings className="h-3.5 w-3.5" />
               </Button>
             ) : null}
           </div>
         </div>
 
         {!club.is_member ? (
-          <Button className="mt-3 h-8 w-full text-xs" variant="neon" onClick={onJoin} disabled={isJoining}>
+          <Button className="mt-2 h-7 w-full text-[11px]" variant="neon" onClick={onJoin} disabled={isJoining}>
             {isJoining ? "Richiesta..." : club.visibility === "public" ? "Unisciti al club" : "Richiedi accesso"}
           </Button>
         ) : club.member_role !== "owner" ? (
-          <Button className="mt-3 h-8 text-xs" variant="ghost" size="sm" onClick={onLeave} disabled={isLeaving}>
+          <Button className="mt-2 h-7 text-[11px]" variant="ghost" size="sm" onClick={onLeave} disabled={isLeaving}>
             {isLeaving ? "Uscita..." : "Lascia club"}
           </Button>
         ) : null}

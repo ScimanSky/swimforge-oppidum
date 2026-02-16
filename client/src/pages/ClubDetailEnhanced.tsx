@@ -152,8 +152,8 @@ export default function ClubDetailEnhanced() {
   const club = clubQuery.data as any | undefined;
   const isMember = Boolean(club?.is_member);
   const contentOffset = stickyHeaderHeight > 0
-    ? stickyHeaderHeight + (isDesktop ? 14 : 10)
-    : (isDesktop ? 430 : 176);
+    ? stickyHeaderHeight + (isDesktop ? 14 : 6)
+    : (isDesktop ? 430 : 144);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -263,7 +263,7 @@ export default function ClubDetailEnhanced() {
       {typeof document !== "undefined" &&
         createPortal(
           <div className="pointer-events-none fixed left-0 right-0 top-16 z-30 lg:pl-[88px]">
-            <div className="mx-auto max-w-[1520px] p-4 md:p-5 lg:p-6">
+            <div className="mx-auto max-w-[1520px] px-2.5 py-2.5 sm:p-3 md:p-5 lg:p-6">
               {isDesktop ? (
                 <div
                   ref={desktopStickyRef}
@@ -323,9 +323,9 @@ export default function ClubDetailEnhanced() {
           document.body
         )}
 
-      <div className="mx-auto max-w-5xl space-y-4 pb-24 px-4" style={{ paddingTop: contentOffset }}>
+      <div className="mx-auto max-w-5xl space-y-3 pb-24 px-3 sm:space-y-4 sm:px-4" style={{ paddingTop: contentOffset }}>
         {/* Spacer managed by contentOffset (fixed header above) */}
-        <div className="h-px" />
+        <div className="h-0" />
 
         {/* Pinned Announcements */}
         {pinnedAnnouncements.length > 0 && (
