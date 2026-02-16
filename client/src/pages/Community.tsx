@@ -194,19 +194,25 @@ export default function Community() {
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_85%_10%,color-mix(in_oklch,var(--electric-lime)_24%,transparent)_0%,transparent_66%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_60%_90%,color-mix(in_oklch,var(--electric-cyan)_16%,transparent)_0%,transparent_72%)]" />
           </div>
-          <div className="relative p-6">
-            <div className="flex flex-col gap-5">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-background/60 px-3 py-1 text-xs text-muted-foreground">
-                  <Sparkles className="size-4 text-primary" />
-                  Club Hub
+          <div className="relative p-4 sm:p-5">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-background/60 px-3 py-1 text-xs text-muted-foreground">
+                    <Sparkles className="size-4 text-primary" />
+                    Club Hub
+                  </div>
+                  <h1 className="mt-2 text-3xl font-display font-bold neon-gradient-text">Club</h1>
                 </div>
-                <h1 className="mt-3 text-3xl font-display font-bold neon-gradient-text">Club</h1>
-                <p className="mt-1 text-muted-foreground">
-                  Trova squadre, crea il tuo club e allenati insieme.
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {createClubDialog}
+                  <Button variant="outline-neon" asChild>
+                    <Link href="/home">Torna al Feed</Link>
+                  </Button>
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-2">
+
+              <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
                 {communityOrbs.map((item) => (
                   <MetricOrb
                     key={item.label}
@@ -217,54 +223,41 @@ export default function Community() {
                     icon={item.icon}
                     tone={item.tone}
                     size="sm"
+                    className="scale-[0.9] sm:scale-100 origin-top"
                   />
                 ))}
               </div>
-              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                {createClubDialog}
-                <Button variant="outline-neon" asChild>
-                  <Link href="/home">Torna al Feed</Link>
-                </Button>
+
+              <div className="grid gap-2 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center">
+                <div className="flex gap-2">
+                  <Button
+                    variant={clubScope === "all" ? "neon" : "outline-neon"}
+                    size="sm"
+                    onClick={() => setClubScope("all")}
+                  >
+                    Esplora
+                  </Button>
+                  <Button
+                    variant={clubScope === "mine" ? "neon" : "outline-neon"}
+                    size="sm"
+                    onClick={() => setClubScope("mine")}
+                  >
+                    I miei
+                  </Button>
+                </div>
+                <Input
+                  placeholder="Cerca club..."
+                  value={clubSearch}
+                  onChange={(e) => setClubSearch(e.target.value)}
+                  className="h-9 bg-background/60"
+                />
               </div>
             </div>
           </div>
         </section>
 
         {/* Clubs Section */}
-        <div className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <h2 className="text-lg font-display font-bold text-foreground truncate">Esplora Club</h2>
-              <p className="text-muted-foreground text-sm">Trova squadre o crea il tuo club</p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant={clubScope === "all" ? "neon" : "outline-neon"}
-                size="sm"
-                onClick={() => setClubScope("all")}
-              >
-                Esplora
-              </Button>
-              <Button
-                variant={clubScope === "mine" ? "neon" : "outline-neon"}
-                size="sm"
-                onClick={() => setClubScope("mine")}
-              >
-                I miei
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Input
-              placeholder="Cerca club..."
-              value={clubSearch}
-              onChange={(e) => setClubSearch(e.target.value)}
-              className="bg-background/60"
-            />
-            <div className="shrink-0">{createClubDialog}</div>
-          </div>
-
+        <div className="space-y-3">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {clubsQuery.isLoading ? (
               <div className="surface-panel p-6 text-muted-foreground">Caricamento club...</div>
