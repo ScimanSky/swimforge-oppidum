@@ -319,15 +319,17 @@ export default function ClubDetailEnhanced() {
               <Button variant="ghost" onClick={() => setCreateEventOpen(false)}>Annulla</Button>
               <Button
                 variant="neon"
-                disabled={createEventMutation.isPending || !newEvent.title || !newEvent.startTime}
+                disabled={createEventMutation.isPending}
                 onClick={() => {
+                  if (!newEvent.title.trim()) { toast.error("Inserisci un titolo"); return; }
+                  if (!newEvent.startTime) { toast.error("Inserisci la data di inizio"); return; }
                   const startTime = new Date(newEvent.startTime);
                   const endTime = newEvent.endTime ? new Date(newEvent.endTime) : undefined;
                   if (isNaN(startTime.getTime())) { toast.error("Data inizio non valida"); return; }
                   if (endTime && endTime <= startTime) { toast.error("La fine deve essere dopo l'inizio"); return; }
                   createEventMutation.mutate({
                     clubId,
-                    title: newEvent.title,
+                    title: newEvent.title.trim(),
                     description: newEvent.description || undefined,
                     eventType: newEvent.eventType,
                     location: newEvent.location || undefined,
