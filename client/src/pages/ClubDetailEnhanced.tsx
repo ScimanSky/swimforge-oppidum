@@ -96,53 +96,8 @@ export default function ClubDetailEnhanced() {
     { enabled: inviteOpen }
   );
 
-  if (!match || !Number.isFinite(clubId)) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center py-12 lg:py-4">
-          <p className="text-muted-foreground">Club non trovato</p>
-        </div>
-      </AppLayout>
-    );
-  }
-
-  if (clubQuery.isLoading) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center py-12 lg:py-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
-        </div>
-      </AppLayout>
-    );
-  }
-
-  const club = clubQuery.data as any;
-  if (!club) {
-    return (
-      <AppLayout>
-        <div className="flex items-center justify-center py-12 lg:py-4">
-          <div className="text-center">
-            <p className="text-muted-foreground mb-4">Club non trovato</p>
-            <Link href="/home/community">
-              <Button variant="outline">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Torna alla Community
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
-
-  const memberRole = club.member_role ?? "";
-  const isStaff = ["owner", "admin", "moderator"].includes(memberRole);
-  const isMember = Boolean(club.is_member);
-
-  const pinnedAnnouncements = (announcementsQuery.data as any[])?.filter(
-    (a: any) => a.announcement?.isPinned
-  ) ?? [];
-  const nextEvent = (eventsQuery.data as any[])?.[0] ?? null;
+  const club = clubQuery.data as any | undefined;
+  const isMember = Boolean(club?.is_member);
   const contentOffset = clubHeaderHeight > 0 ? clubHeaderHeight + 12 : (isMember ? 360 : 300);
 
   useEffect(() => {
@@ -163,7 +118,53 @@ export default function ClubDetailEnhanced() {
       observer.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, [isMember, club.cover_image_url, club.logo_url, club.tagline]);
+  }, [isMember, club?.cover_image_url, club?.logo_url, club?.tagline]);
+
+  if (!match || !Number.isFinite(clubId)) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center py-12 lg:py-4">
+          <p className="text-muted-foreground">Club non trovato</p>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (clubQuery.isLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center py-12 lg:py-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!club) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center py-12 lg:py-4">
+          <div className="text-center">
+            <p className="text-muted-foreground mb-4">Club non trovato</p>
+            <Link href="/home/community">
+              <Button variant="outline">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Torna alla Community
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  const memberRole = club.member_role ?? "";
+  const isStaff = ["owner", "admin", "moderator"].includes(memberRole);
+
+  const pinnedAnnouncements = (announcementsQuery.data as any[])?.filter(
+    (a: any) => a.announcement?.isPinned
+  ) ?? [];
+  const nextEvent = (eventsQuery.data as any[])?.[0] ?? null;
 
   return (
     <AppLayout>
