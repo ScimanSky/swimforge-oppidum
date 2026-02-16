@@ -404,7 +404,13 @@ async function uploadToImageKit(
   });
 
   if (!res.ok) {
-    const detail = await res.text().catch(() => "");
+    let detail = "";
+    try {
+      const payload = (await res.json()) as { message?: string; help?: string };
+      detail = payload.message || payload.help || "";
+    } catch {
+      detail = await res.text().catch(() => "");
+    }
     throw new Error(detail || "Upload su ImageKit fallito");
   }
 
@@ -464,15 +470,13 @@ function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number
       let coverImageUrl: string | null | undefined = undefined;
 
       // Upload new images to ImageKit if selected
-      if (pendingLogoFile || pendingCoverFile) {
-        const auth = await imageKitAuth.mutateAsync({ clubId });
-
-        if (pendingLogoFile) {
-          logoUrl = await uploadToImageKit(pendingLogoFile, auth, `club-${clubId}-logo`);
-        }
-        if (pendingCoverFile) {
-          coverImageUrl = await uploadToImageKit(pendingCoverFile, auth, `club-${clubId}-cover`);
-        }
+      if (pendingLogoFile) {
+        const logoAuth = await imageKitAuth.mutateAsync({ clubId });
+        logoUrl = await uploadToImageKit(pendingLogoFile, logoAuth, `club-${clubId}-logo`);
+      }
+      if (pendingCoverFile) {
+        const coverAuth = await imageKitAuth.mutateAsync({ clubId });
+        coverImageUrl = await uploadToImageKit(pendingCoverFile, coverAuth, `club-${clubId}-cover`);
       }
 
       // Handle removals

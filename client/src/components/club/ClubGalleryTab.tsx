@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Images, Upload, Image as ImageIcon, Video } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -85,6 +85,9 @@ export default function ClubGalleryTab({ clubId, isMember }: ClubGalleryTabProps
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Carica Foto o Video</DialogTitle>
+              <DialogDescription>
+                Inserisci URL e descrizione per aggiungere media alla galleria del club.
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>

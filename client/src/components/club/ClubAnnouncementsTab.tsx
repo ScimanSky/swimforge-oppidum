@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Megaphone, Pin, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
@@ -73,6 +73,9 @@ export default function ClubAnnouncementsTab({ clubId, isStaff }: ClubAnnounceme
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Crea Annuncio</DialogTitle>
+                <DialogDescription>
+                  Pubblica un aggiornamento importante per i membri del club.
+                </DialogDescription>
               </DialogHeader>
               <div className="space-y-4">
                 <div>
