@@ -5,10 +5,10 @@ import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/componen
 import { Badge } from "@/components/ui/badge";
 import { MetricOrb } from "@/components/metrics/MetricOrb";
 import EventMapEditor from "@/components/club/EventMapEditor";
-import { parseRouteGeojson, routeGeojsonToPoints } from "@/lib/club-event-map";
+import { parseRouteGeojson, pointsToRouteGeojson, routeDistanceMeters, routeGeojsonToPoints, type RoutePoint } from "@/lib/club-event-map";
 import { trpc } from "@/lib/trpc";
-import { Calendar, CheckCircle2, HelpCircle, MapPin, RefreshCw, Users, XCircle, ExternalLink, Wind, Waves } from "lucide-react";
-import { useMemo } from "react";
+import { Calendar, CheckCircle2, HelpCircle, MapPin, Pencil, RefreshCw, Save, Users, X, XCircle, ExternalLink, Wind, Waves } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useRoute } from "wouter";
 import { toast } from "sonner";
 
@@ -107,6 +107,17 @@ export default function ClubEventDetail() {
     },
     onError: (error) => toast.error(error.message || "Aggiornamento meteo non riuscito"),
   });
+  const updateEventMutation = trpc.community.clubs.events.update.useMutation({
+    onSuccess: async () => {
+      toast.success("Percorso evento aggiornato");
+      await Promise.all([
+        utils.community.clubs.events.get.invalidate({ eventId }),
+        utils.community.clubs.events.list.invalidate(),
+      ]);
+      setIsEditingRoute(false);
+    },
+    onError: (error) => toast.error(error.message || "Aggiornamento percorso non riuscito"),
+  });
 
   const attendees = useMemo(() => (attendeesQuery.data as any[]) || [], [attendeesQuery.data]);
   const going = attendees.filter((a) => a.status === "going");
@@ -131,6 +142,15 @@ export default function ClubEventDetail() {
   const routePoints = routeGeojsonToPoints(routeGeojson);
   const weatherSnapshot = parseWeatherSnapshot(event?.weatherSnapshot);
   const weatherTime = weatherSnapshot?.resolvedTime || weatherSnapshot?.targetTime || weatherSnapshot?.fetchedAt || null;
+  const [isEditingRoute, setIsEditingRoute] = useState(false);
+  const [draftPin, setDraftPin] = useState<RoutePoint | null>(null);
+  const [draftRoutePoints, setDraftRoutePoints] = useState<RoutePoint[]>([]);
+
+  useEffect(() => {
+    if (isEditingRoute) return;
+    setDraftPin(hasEventMap ? { lat: eventLat, lng: eventLng } : null);
+    setDraftRoutePoints(routePoints);
+  }, [isEditingRoute, hasEventMap, eventLat, eventLng, event?.id, routePoints]);
 
   if (!match || !Number.isFinite(clubId) || !Number.isFinite(eventId)) {
     return null;
@@ -185,25 +205,101 @@ export default function ClubEventDetail() {
                 {event.description}
               </p>
             ) : null}
-            {hasEventMap ? (
+            {hasEventMap || (isStaff && isEditingRoute) ? (
               <div className="space-y-2 pt-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-medium">Mappa e percorso</p>
+                  {isStaff ? (
+                    isEditingRoute ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline-neon"
+                          className="h-8"
+                          onClick={() => {
+                            setDraftPin(hasEventMap ? { lat: eventLat, lng: eventLng } : null);
+                            setDraftRoutePoints(routePoints);
+                            setIsEditingRoute(false);
+                          }}
+                        >
+                          <X className="mr-1 h-3.5 w-3.5" />
+                          Annulla
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="neon"
+                          className="h-8"
+                          onClick={() =>
+                            updateEventMutation.mutate({
+                              eventId,
+                              locationLat: draftPin?.lat,
+                              locationLng: draftPin?.lng,
+                              routeGeojson: pointsToRouteGeojson(draftRoutePoints),
+                            })
+                          }
+                          disabled={updateEventMutation.isPending}
+                        >
+                          <Save className="mr-1 h-3.5 w-3.5" />
+                          {updateEventMutation.isPending ? "Salvataggio..." : "Salva percorso"}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline-neon"
+                        className="h-8"
+                        onClick={() => setIsEditingRoute(true)}
+                      >
+                        <Pencil className="mr-1 h-3.5 w-3.5" />
+                        Modifica percorso
+                      </Button>
+                    )
+                  ) : null}
+                </div>
                 <EventMapEditor
-                  pin={{ lat: eventLat, lng: eventLng }}
-                  routePoints={routePoints}
-                  onPinChange={() => {}}
-                  onRouteChange={() => {}}
-                  readOnly
+                  pin={isEditingRoute ? draftPin : { lat: eventLat, lng: eventLng }}
+                  routePoints={isEditingRoute ? draftRoutePoints : routePoints}
+                  onPinChange={isEditingRoute ? setDraftPin : () => {}}
+                  onRouteChange={isEditingRoute ? setDraftRoutePoints : () => {}}
+                  readOnly={!isEditingRoute}
                   className="h-72 w-full rounded-xl border border-border/70"
                 />
-                <a
-                  href={buildOsmMapLink(eventLat, eventLng)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Apri mappa completa
-                </a>
+                {isEditingRoute ? (
+                  <p className="text-xs text-muted-foreground">
+                    Percorso corrente: {(routeDistanceMeters(draftRoutePoints) / 1000).toFixed(2)} km
+                  </p>
+                ) : null}
+                {hasEventMap ? (
+                  <a
+                    href={buildOsmMapLink(eventLat, eventLng)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Apri mappa completa
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
+            {!hasEventMap && isStaff && !isEditingRoute ? (
+              <div className="rounded-lg border border-border/70 bg-card/40 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm text-muted-foreground">Nessuna mappa/pin impostata per questo evento.</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline-neon"
+                    className="h-8"
+                    onClick={() => setIsEditingRoute(true)}
+                  >
+                    <Pencil className="mr-1 h-3.5 w-3.5" />
+                    Aggiungi mappa
+                  </Button>
+                </div>
               </div>
             ) : null}
             {weatherSnapshot ? (
