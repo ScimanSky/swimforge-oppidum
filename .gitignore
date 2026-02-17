@@ -134,3 +134,6 @@ package-lock.json
 
 # Generated API docs
 docs/api/
+
+# Local analysis reports (do not commit)
+docs/reports/

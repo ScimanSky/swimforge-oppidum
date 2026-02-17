@@ -13,6 +13,7 @@ import { useBadgeNotifications } from "./hooks/useBadgeNotifications";
 import AutoSync from "./components/AutoSync";
 import ActivityInsightNotification from "./components/ActivityInsightNotification";
 import CookieBanner from "./components/CookieBanner";
+import OnboardingFlow from "./components/onboarding/OnboardingFlow";
 
 const Home = lazy(() => import("./pages/Home"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -152,6 +153,7 @@ function App() {
           <Router />
           <ActivityInsightNotification />
           <CookieBanner />
+          <OnboardingFlow />
           {isShowing && pendingBadges.length > 0 && (
             <BadgeUnlockNotification
               badges={pendingBadges}

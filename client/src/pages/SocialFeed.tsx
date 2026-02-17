@@ -187,7 +187,7 @@ export default function SocialFeed() {
           <div className="w-full max-w-2xl min-w-0">
             {/* Stories strip — visible below xl where sidebar is hidden */}
             {otherStoryGroups.length > 0 && (
-              <div className="xl:hidden mb-3 flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+              <div data-tour="feed-stories" className="xl:hidden mb-3 flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
                 {otherStoryGroups.map((group) => {
                   const hasUnviewed = group.stories.some((s: any) => !s.hasViewed)
                   return (
@@ -206,7 +206,7 @@ export default function SocialFeed() {
             )}
 
             {/* Feed scope tabs: static on all breakpoints (never overlays feed) */}
-            <div className="mb-3">
+            <div data-tour="feed-tabs" className="mb-3">
               {/* Pull-to-refresh indicator */}
               {firstPageQuery.isFetching && !isInitialLoading && (
                 <div className="flex justify-center py-1">
@@ -229,13 +229,14 @@ export default function SocialFeed() {
               ) : (
                 <div className="space-y-3 lg:space-y-4">
                   {posts.slice(0, visibleCount).map((post: any, index: number) => (
-                    <FeedPost
-                      key={post.id}
-                      post={post}
-                      currentUserId={currentUserId}
-                      index={index}
-                      autoplayVideos={autoplayVideos}
-                    />
+                    <div key={post.id} data-tour={index === 0 ? "feed-first-post" : undefined}>
+                      <FeedPost
+                        post={post}
+                        currentUserId={currentUserId}
+                        index={index}
+                        autoplayVideos={autoplayVideos}
+                      />
+                    </div>
                   ))}
                   {/* Load more button */}
                   {(visibleCount < posts.length || hasMore) && (
@@ -271,7 +272,7 @@ export default function SocialFeed() {
           </div>
 
           {/* Right sidebar — xl+ only */}
-          <aside className="hidden xl:block w-64 shrink-0 sticky top-20 self-start">
+          <aside data-tour="feed-stories" className="hidden xl:block w-64 shrink-0 sticky top-20 self-start">
             <FeedSidebar
               currentUserId={currentUserId}
               onViewStory={handleViewStory}

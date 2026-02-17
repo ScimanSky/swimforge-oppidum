@@ -11,6 +11,7 @@ export const CONSENT_TYPES = [
   "strava_sync",
   "marketing_communications",
   "cookie_analytics",
+  "product_onboarding_tour",
 ] as const;
 
 export type ConsentType = (typeof CONSENT_TYPES)[number];
@@ -23,6 +24,7 @@ export const CONSENT_VERSION: Record<ConsentType, string> = {
   strava_sync: "v1.0",
   marketing_communications: "v1.0",
   cookie_analytics: "v1.0",
+  product_onboarding_tour: "v1.0",
 };
 
 export type ConsentState = {

@@ -149,7 +149,10 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   return (
     <div className="min-h-[100dvh] bg-transparent overflow-x-hidden">
       {/* Desktop Rail */}
-      <aside className="fixed left-0 top-0 z-40 hidden h-screen w-[88px] border-r border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_50%,transparent),color-mix(in_oklch,var(--background)_65%,transparent))] backdrop-blur-xl shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_14%,transparent)] lg:flex">
+      <aside
+        data-tour="main-navigation"
+        className="fixed left-0 top-0 z-40 hidden h-screen w-[88px] border-r border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_50%,transparent),color-mix(in_oklch,var(--background)_65%,transparent))] backdrop-blur-xl shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_14%,transparent)] lg:flex"
+      >
         <div className="flex h-full w-full flex-col items-center">
           <div className="flex h-16 items-center justify-center">
             <Link
@@ -174,6 +177,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
                 <button
                   type="button"
                   onClick={() => setIsCreateOpen(true)}
+                  data-tour="create-post"
                   className="group relative my-1 flex size-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime))] text-background shadow-[0_0_22px_var(--neon-soft)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
                   aria-label="Crea post"
                 >
@@ -234,7 +238,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div data-tour="top-actions" className="flex items-center gap-2">
             <NotificationBell />
             <DirectMessages />
 
@@ -303,7 +307,10 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
       </header>
 
       {/* Mobile Bottom Nav */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_58%,transparent),color-mix(in_oklch,var(--background)_70%,transparent))] backdrop-blur-xl lg:hidden pb-[env(safe-area-inset-bottom)]">
+      <nav
+        data-tour="main-navigation"
+        className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_58%,transparent),color-mix(in_oklch,var(--background)_70%,transparent))] backdrop-blur-xl lg:hidden pb-[env(safe-area-inset-bottom)]"
+      >
         <div className="mx-auto flex h-[calc(3.5rem+env(safe-area-inset-bottom))] max-w-3xl items-center justify-between px-2">
           {[navPrimary[0], navPrimary[1]].map((item) => {
             const isActive = isNavItemActive(item.path, location)
@@ -330,6 +337,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
           <button
             type="button"
             onClick={() => setIsCreateOpen(true)}
+            data-tour="create-post"
             className="flex w-full flex-col items-center justify-center active:scale-[0.92] transition-transform"
             aria-label="Crea post"
           >

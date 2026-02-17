@@ -40,6 +40,7 @@ import {
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { supabase } from "@/lib/supabase"
+import { ONBOARDING_FORCE_QUERY_PARAM } from "@/lib/onboarding"
 import { formatDistanceToNow } from "date-fns"
 import { it } from "date-fns/locale"
 import { toast } from "sonner"
@@ -1266,6 +1267,23 @@ export default function Settings() {
                     void persistSettings({ preferences: next })
                   }}
                 />
+              </div>
+              <div className="flex items-center justify-between py-3 border-t border-border/60">
+                <div>
+                  <p className="font-medium text-foreground">Tour guidato app</p>
+                  <p className="text-sm text-muted-foreground">
+                    Rivedi il tour interattivo dei punti principali.
+                  </p>
+                </div>
+                <Button
+                  variant="outline-neon"
+                  size="sm"
+                  onClick={() => {
+                    setLocation(`/home?${ONBOARDING_FORCE_QUERY_PARAM}=1`)
+                  }}
+                >
+                  Rivedi tour
+                </Button>
               </div>
             </div>
           </section>
