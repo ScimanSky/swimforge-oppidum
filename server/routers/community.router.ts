@@ -1238,7 +1238,31 @@ export const communityRouter = router({
                     coverImageUrl: z.string().url().optional(),
                 }))
                 .mutation(async ({ ctx, input }) => {
-                    await requireClubStaffRole(ctx.user.id, input.clubId);
+                    const memberRole = await requireClubMemberRole(ctx.user.id, input.clubId);
+                    const isStaff = CLUB_STAFF_ROLES.has(memberRole.role);
+                    if (!isStaff) {
+                        const { countUserCreatedClubEventsSince } = await import("../db_social_enhanced");
+                        const now = new Date();
+                        const startOfUtcDay = new Date(Date.UTC(
+                            now.getUTCFullYear(),
+                            now.getUTCMonth(),
+                            now.getUTCDate(),
+                            0,
+                            0,
+                            0,
+                            0,
+                        ));
+                        const createdToday = await countUserCreatedClubEventsSince({
+                            userId: ctx.user.id,
+                            since: startOfUtcDay,
+                        });
+                        if (createdToday >= 1) {
+                            throw new TRPCError({
+                                code: "PRECONDITION_FAILED",
+                                message: "Hai già creato un evento oggi. Limite: 1 evento al giorno per membri non staff.",
+                            });
+                        }
+                    }
                     const { createClubEvent } = await import("../db_social_enhanced");
                     const startTime = new Date(input.startTime);
                     const endTime = input.endTime ? new Date(input.endTime) : undefined;

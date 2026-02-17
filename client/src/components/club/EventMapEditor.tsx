@@ -161,20 +161,6 @@ export default function EventMapEditor({
     }
   }, [pin, routePoints]);
 
-  const setPinFromMapCenter = () => {
-    const map = mapRef.current;
-    if (!map || readOnly) return;
-    const center = map.getCenter();
-    onPinChange({ lat: Number(center.lat), lng: Number(center.lng) });
-  };
-
-  const addRoutePointFromMapCenter = () => {
-    const map = mapRef.current;
-    if (!map || readOnly) return;
-    const center = map.getCenter();
-    onRouteChange([...routePoints, { lat: Number(center.lat), lng: Number(center.lng) }]);
-  };
-
   return (
     <div className="space-y-2">
       {!readOnly ? (
@@ -194,22 +180,6 @@ export default function EventMapEditor({
             onClick={() => setMode("route")}
           >
             Disegna percorso
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline-neon"
-            onClick={setPinFromMapCenter}
-          >
-            Pin al centro
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline-neon"
-            onClick={addRoutePointFromMapCenter}
-          >
-            Punto percorso al centro
           </Button>
           <Button
             type="button"

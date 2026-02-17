@@ -482,12 +482,23 @@ export default function ClubDetailEnhanced() {
         </Dialog>
         {/* Create Event Dialog */}
         <Dialog open={createEventOpen} onOpenChange={setCreateEventOpen}>
-          <DialogContent>
+          <DialogContent
+            className={
+              isMobile
+                ? "w-[calc(100vw-0.75rem)] max-w-none max-h-[92dvh] overflow-y-auto p-4 pb-24"
+                : "sm:max-w-2xl max-h-[90vh] overflow-y-auto"
+            }
+          >
             <DialogHeader>
               <DialogTitle>Crea evento</DialogTitle>
               <DialogDescription>Organizza un evento per il club</DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
+              {!isStaff ? (
+                <div className="rounded-lg border border-border/60 bg-background/50 p-2 text-xs text-muted-foreground">
+                  Limite membri: massimo 1 evento al giorno.
+                </div>
+              ) : null}
               <div>
                 <Label>Titolo *</Label>
                 <Input value={newEvent.title} onChange={(e) => setNewEvent({ ...newEvent, title: e.target.value })} placeholder="Es. Allenamento mattutino" />
@@ -543,7 +554,7 @@ export default function ClubDetailEnhanced() {
                       }))
                     }
                     onRouteChange={setEventRoutePoints}
-                    className="h-56 w-full rounded-xl border border-border/70"
+                    className="h-72 w-full rounded-xl border border-border/70 sm:h-80"
                   />
                   <p className="text-xs text-muted-foreground">
                     Clicca sulla mappa per impostare il pin (modalita pin) o disegnare il percorso in acqua (modalita percorso).

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
 import {
   Activity,
@@ -23,7 +24,7 @@ import {
 } from "lucide-react"
 import { Link } from "wouter"
 import { toast } from "sonner"
-import { getSeasonAssignmentImageUrl, getSeasonRewardImageUrl } from "@/lib/seasonBadgeImages"
+import { getSeasonAssignmentImageUrl } from "@/lib/seasonBadgeImages"
 import { SeasonRecapDialog } from "@/components/video/SeasonRecapDialog"
 
 type PredictionPreset = {
@@ -117,26 +118,6 @@ export default function SeasonPage() {
     targetDurationMinutes: "",
     targetRpe: "",
     note: "",
-  })
-
-  const claimRewardMutation = trpc.season.claimReward.useMutation({
-    onSuccess: async (result) => {
-      if (result.alreadyClaimed) {
-        toast.info("Ricompensa già riscattata")
-      } else {
-        toast.success(`Ricompensa riscattata: +${result.xpAwarded} XP`)
-      }
-      await Promise.all([
-        utils.season.getCurrent.invalidate(),
-        utils.season.getLeaderboard.invalidate(),
-        utils.season.getMyRank.invalidate(),
-        utils.profile.get.invalidate(),
-        utils.leaderboard.get.invalidate(),
-      ])
-    },
-    onError: (error) => {
-      toast.error(error.message || "Riscatto ricompensa non riuscito")
-    },
   })
 
   const createPredictionMutation = trpc.season.predictions.create.useMutation({
@@ -236,7 +217,6 @@ export default function SeasonPage() {
 
   const dailyMissions = seasonData?.missions?.daily ?? []
   const weeklyMissions = seasonData?.missions?.weekly ?? []
-  const rewards = seasonData?.rewards ?? []
   const badgeAssignments = seasonData?.badgeAssignments ?? []
 
   const firstIncompleteDaily = dailyMissions.find((mission) => !mission.completed)
@@ -524,9 +504,8 @@ export default function SeasonPage() {
 
         <section className="surface-panel p-4 lg:p-5">
           <Tabs defaultValue="week" className="space-y-3">
-            <TabsList className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4">
+            <TabsList className="grid w-full grid-cols-2 gap-2 sm:grid-cols-3">
               <TabsTrigger value="week">Settimana</TabsTrigger>
-              <TabsTrigger value="rewards">Ricompense</TabsTrigger>
               <TabsTrigger value="leaderboard">Classifica</TabsTrigger>
               <TabsTrigger value="badges">Badge</TabsTrigger>
             </TabsList>
@@ -619,50 +598,6 @@ export default function SeasonPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="rewards" className="space-y-2">
-              <p className="text-sm font-semibold text-foreground">Reward Track</p>
-              <div className="grid gap-2">
-                {rewards.map((reward) => (
-                  <div key={reward.rewardCode} className="stream-card">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex items-center gap-3">
-                        <div className="size-10 rounded-xl overflow-hidden border border-border/70 bg-background/65 shrink-0">
-                          <img
-                            src={getSeasonRewardImageUrl(String(reward.rewardCode))}
-                            alt={reward.rewardName}
-                            className="h-full w-full object-cover"
-                            loading="lazy"
-                          />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-foreground truncate">
-                            Lv {reward.level} · {reward.rewardName}
-                          </p>
-                          <p className="text-xs text-muted-foreground capitalize">{reward.rewardType}</p>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1.5">
-                        <Badge variant={reward.unlocked ? "neon" : "outline"} className="text-xs capitalize">
-                          {reward.claimed ? "Riscattata" : reward.unlocked ? "Sbloccata" : "Bloccata"}
-                        </Badge>
-                        {reward.unlocked && !reward.claimed ? (
-                          <Button
-                            size="sm"
-                            variant="neon"
-                            className="h-7 px-3 text-[11px]"
-                            disabled={claimRewardMutation.isPending}
-                            onClick={() => claimRewardMutation.mutate({ rewardCode: reward.rewardCode })}
-                          >
-                            Riscatta
-                          </Button>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </TabsContent>
-
             <TabsContent value="leaderboard" className="space-y-3">
               <div className="stream-card border-primary/35 bg-primary/8">
                 <p className="text-xs text-muted-foreground">La tua posizione</p>
@@ -672,12 +607,17 @@ export default function SeasonPage() {
                 {myRank?.around?.length ? (
                   <div className="mt-2 grid gap-1">
                     {myRank.around.map((entry) => (
-                      <div
+                      <Link
                         key={`me-around-${entry.userId}`}
-                        className={`rounded-md border px-2 py-1 text-xs ${entry.isMe ? "border-primary/50 bg-primary/15" : "border-border/60 bg-background/40"}`}
+                        href={`/u/${entry.userId}`}
+                        className={`flex items-center gap-2 rounded-md border px-2 py-1 text-xs transition-colors hover:bg-background/60 ${entry.isMe ? "border-primary/50 bg-primary/15" : "border-border/60 bg-background/40"}`}
                       >
+                        <Avatar className="size-6 border border-border/60">
+                          <AvatarImage src={entry.avatarUrl ?? undefined} alt={entry.name} />
+                          <AvatarFallback>{String(entry.name ?? "U").slice(0, 1).toUpperCase()}</AvatarFallback>
+                        </Avatar>
                         <span className="font-semibold">#{entry.rank}</span> {entry.name} · {entry.seasonXp.toLocaleString()} XP
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 ) : null}
@@ -685,11 +625,15 @@ export default function SeasonPage() {
 
               <div className="grid gap-2">
                 {leaderboard.map((entry) => (
-                  <div key={entry.userId} className="stream-card">
+                  <Link key={entry.userId} href={`/u/${entry.userId}`} className="stream-card block transition-colors hover:bg-background/55">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="size-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
                         {entry.rank}
                       </div>
+                      <Avatar className="size-9 border border-border/70 shrink-0">
+                        <AvatarImage src={entry.avatarUrl ?? undefined} alt={entry.name} />
+                        <AvatarFallback>{String(entry.name ?? "U").slice(0, 1).toUpperCase()}</AvatarFallback>
+                      </Avatar>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-semibold text-foreground truncate">{entry.name}</p>
                         <p className="text-xs text-muted-foreground">
@@ -697,7 +641,7 @@ export default function SeasonPage() {
                         </p>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </TabsContent>

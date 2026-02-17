@@ -36,7 +36,7 @@ export default function QuickActionsFAB({
   const actions = [
     { icon: PenSquare, label: "Posta", onClick: onPost, show: true },
     { icon: Calendar, label: "Eventi", onClick: onOpenEvents ?? (() => {}), show: Boolean(onOpenEvents) },
-    { icon: Calendar, label: "Evento", onClick: onCreateEvent, show: isStaff },
+    { icon: Calendar, label: isStaff ? "Nuovo evento" : "Nuovo evento (1/g)", onClick: onCreateEvent, show: true },
     { icon: UserPlus, label: "Invita", onClick: onInvite, show: isStaff },
   ].filter((a) => a.show);
 

@@ -67,6 +67,30 @@ export async function createClubEvent(params: {
 }
 
 /**
+ * Conta quanti eventi ha creato un utente da una certa data in poi.
+ * Usato per limitare la creazione eventi degli utenti non staff.
+ */
+export async function countUserCreatedClubEventsSince(params: {
+  userId: number
+  since: Date
+}) {
+  const db = await requireDb()
+  const [row] = await db
+    .select({
+      count: sql<number>`count(*)::int`,
+    })
+    .from(clubEvents)
+    .where(
+      and(
+        eq(clubEvents.creatorId, params.userId),
+        gte(clubEvents.createdAt, params.since),
+      )
+    )
+
+  return Number(row?.count ?? 0)
+}
+
+/**
  * Ottiene eventi di un club con filtri opzionali
  */
 export async function getClubEvents(params: {
