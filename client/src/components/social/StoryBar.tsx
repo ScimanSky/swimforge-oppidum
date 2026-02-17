@@ -68,7 +68,7 @@ export function StoryBar({ currentUserId, onViewStory, onCreateStory }: StoryBar
     <div className="relative group/story-bar">
       <div
         ref={scrollRef}
-        className="flex gap-3 overflow-x-auto pb-2 pt-1 px-1 scrollbar-hide snap-x snap-mandatory"
+        className="flex gap-3 overflow-x-auto overflow-y-hidden pb-2 pt-1 px-1 scrollbar-hide snap-x snap-mandatory"
       >
         {/* Current user - always first */}
         {currentUserId && (

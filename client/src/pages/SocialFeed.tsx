@@ -175,7 +175,7 @@ export default function SocialFeed() {
   const isInitialLoading = firstPageQuery.isLoading && posts.length === 0
 
   const headerStoriesSlot = (
-    <div className="hidden lg:flex min-w-0 max-w-[min(62vw,860px)] items-center gap-2 overflow-x-auto scrollbar-hide pr-1">
+    <div className="hidden lg:flex h-12 min-w-0 max-w-[min(62vw,860px)] items-center gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide pr-1">
       {topbarStoryGroups.length > 0 ? (
         topbarStoryGroups.map((group: any) => {
           const isCurrent = Number(group.userId) === Number(currentUserId)
@@ -218,7 +218,7 @@ export default function SocialFeed() {
           <div className="w-full max-w-2xl min-w-0">
             {/* Stories strip — visible below xl where sidebar is hidden */}
             {otherStoryGroups.length > 0 && (
-              <div data-tour="feed-stories" className="xl:hidden mb-3 flex gap-3 overflow-x-auto pb-1 scrollbar-hide">
+              <div data-tour="feed-stories" className="xl:hidden mb-3 flex gap-3 overflow-x-auto overflow-y-hidden pb-1 scrollbar-hide">
                 {otherStoryGroups.map((group) => {
                   const hasUnviewed = group.stories.some((s: any) => !s.hasViewed)
                   return (

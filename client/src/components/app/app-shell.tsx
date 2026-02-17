@@ -128,6 +128,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   const isAdmin = meQuery.data?.role === "admin"
 
   const pageTitle = useMemo(() => titleForPath(location), [location])
+  const showPageTitle = !(headerSlot && pageTitle === "Feed")
 
   const handleLogout = async () => {
     if (isLoggingOut) return
@@ -232,11 +233,13 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
         <div className="flex h-full items-center justify-between gap-3 px-4">
           <div className="flex min-w-0 items-center gap-3">
             {headerSlot}
-            <div className="min-w-0">
-              <div className="truncate text-lg font-display font-semibold tracking-wide">
-                {pageTitle}
+            {showPageTitle ? (
+              <div className="min-w-0">
+                <div className="truncate text-lg font-display font-semibold tracking-wide">
+                  {pageTitle}
+                </div>
               </div>
-            </div>
+            ) : null}
           </div>
 
           <div data-tour="top-actions" className="flex items-center gap-2">
