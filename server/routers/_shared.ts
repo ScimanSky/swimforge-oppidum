@@ -27,6 +27,7 @@ export {
 } from "../lib/cache";
 export {
     addComment,
+    deleteOwnPost,
     getComments,
     getSocialFeed,
     hidePostForUser,

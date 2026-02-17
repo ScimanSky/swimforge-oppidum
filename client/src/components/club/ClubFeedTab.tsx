@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { MessageCircle, Plus, ImagePlus, X, AtSign, Hash } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { MessageCircle, Plus, ImagePlus, X, AtSign, Hash, Trash2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
@@ -95,6 +96,7 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
   const [openCommentsId, setOpenCommentsId] = useState<number | null>(null);
   const [commentTextByPost, setCommentTextByPost] = useState<Record<number, string>>({});
   const [mediaItems, setMediaItems] = useState<SelectedMedia[]>([]);
+  const [openMediaUrl, setOpenMediaUrl] = useState<string | null>(null);
   const [tagQuery, setTagQuery] = useState("");
   const [taggedUsers, setTaggedUsers] = useState<TaggedUser[]>([]);
   const mediaInputRef = useRef<HTMLInputElement | null>(null);
@@ -107,6 +109,7 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
     { clubId, limit: 20 },
     { enabled: !!clubId }
   );
+  const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 5 * 60_000 });
 
   const imageKitAuth = trpc.community.postImageKitAuth.useMutation();
   const tagSearchEnabled = isMember && tagQuery.trim().length >= 2;
@@ -138,6 +141,20 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
       if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
         toast.success(`+${data.actionXp.awardedXp} XP Action`);
       }
+    },
+  });
+
+  const [deletingPostId, setDeletingPostId] = useState<number | null>(null);
+  const deletePostMutation = trpc.community.deletePost.useMutation({
+    onSuccess: () => {
+      toast.success("Post eliminato");
+      setDeletingPostId(null);
+      utils.community.clubs.feed.invalidate({ clubId });
+      utils.community.feed.invalidate();
+    },
+    onError: (error) => {
+      setDeletingPostId(null);
+      toast.error(error.message || "Impossibile eliminare il post");
     },
   });
 
@@ -451,6 +468,7 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
       ) : (
         <div className="space-y-4">
           {feedQuery.data.map((post: any, index: number) => {
+            const isOwnPost = Number(profileQuery.data?.userId ?? 0) === Number(post.user_id);
             const isActivityPost =
               Boolean(post.activity_id) ||
               Number(post.activity_distance_meters ?? 0) > 0 ||
@@ -501,6 +519,22 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
                           {new Date(post.created_at).toLocaleDateString("it-IT")}
                         </p>
                       </div>
+                      {isOwnPost ? (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="text-muted-foreground hover:text-destructive"
+                          disabled={deletePostMutation.isPending && deletingPostId === post.id}
+                          onClick={() => {
+                            const confirmed = window.confirm("Eliminare questo post?");
+                            if (!confirmed) return;
+                            setDeletingPostId(post.id);
+                            deletePostMutation.mutate({ postId: post.id });
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      ) : null}
                     </div>
                     {post.content && (
                       <p className="text-sm mb-3 whitespace-pre-wrap">{renderPostContent(post.content)}</p>
@@ -533,12 +567,18 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
                                 preload="metadata"
                               />
                             ) : (
-                              <img
-                                src={url}
-                                alt="Media del post"
-                                className="max-h-[360px] w-full object-cover"
-                                loading="lazy"
-                              />
+                              <button
+                                type="button"
+                                className="block w-full cursor-zoom-in"
+                                onClick={() => setOpenMediaUrl(url)}
+                              >
+                                <img
+                                  src={url}
+                                  alt="Media del post"
+                                  className="max-h-[360px] w-full object-cover"
+                                  loading="lazy"
+                                />
+                              </button>
                             )}
                           </div>
                         ))}
@@ -613,6 +653,20 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
           })}
         </div>
       )}
+
+      <Dialog open={Boolean(openMediaUrl)} onOpenChange={(open) => !open && setOpenMediaUrl(null)}>
+        <DialogContent className="max-w-5xl border-border/80 bg-background/95 p-2">
+          <DialogTitle className="sr-only">Anteprima immagine</DialogTitle>
+          <DialogDescription className="sr-only">Visualizzazione dell'immagine del post.</DialogDescription>
+          {openMediaUrl ? (
+            <img
+              src={openMediaUrl}
+              alt="Anteprima immagine del post club"
+              className="max-h-[82vh] w-full rounded-lg object-contain"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import FeedPostMetrics from "./FeedPostMetrics"
 import FeedPostActions from "./FeedPostActions"
 import FeedPostComments from "./FeedPostComments"
 import { isVideoUrl } from "@/lib/post-media"
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 
 interface FeedPostProps {
   post: any
@@ -63,6 +64,7 @@ function renderPostContent(content: string) {
 
 export default function FeedPost({ post, currentUserId, index = 0 }: FeedPostProps) {
   const [commentsOpen, setCommentsOpen] = useState(false)
+  const [openMediaUrl, setOpenMediaUrl] = useState<string | null>(null)
   const isOwner = !!(currentUserId && post.user_id === currentUserId)
   const isActivityPost =
     Boolean(post.activity_id) ||
@@ -148,12 +150,18 @@ export default function FeedPost({ post, currentUserId, index = 0 }: FeedPostPro
                       preload="metadata"
                     />
                   ) : (
-                    <img
-                      src={url}
-                      alt="Post media"
-                      className="max-h-[420px] w-full object-cover"
-                      loading="lazy"
-                    />
+                    <button
+                      type="button"
+                      className="block w-full cursor-zoom-in"
+                      onClick={() => setOpenMediaUrl(url)}
+                    >
+                      <img
+                        src={url}
+                        alt="Post media"
+                        className="max-h-[420px] w-full object-cover"
+                        loading="lazy"
+                      />
+                    </button>
                   )}
                 </div>
               ))}
@@ -179,6 +187,20 @@ export default function FeedPost({ post, currentUserId, index = 0 }: FeedPostPro
           <FeedPostComments postId={post.id} isOpen={commentsOpen} />
         </div>
       </div>
+
+      <Dialog open={Boolean(openMediaUrl)} onOpenChange={(open) => !open && setOpenMediaUrl(null)}>
+        <DialogContent className="max-w-5xl border-border/80 bg-background/95 p-2">
+          <DialogTitle className="sr-only">Anteprima immagine</DialogTitle>
+          <DialogDescription className="sr-only">Visualizzazione dell'immagine del post.</DialogDescription>
+          {openMediaUrl ? (
+            <img
+              src={openMediaUrl}
+              alt="Anteprima immagine del post"
+              className="max-h-[82vh] w-full rounded-lg object-contain"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </motion.div>
   )
 }

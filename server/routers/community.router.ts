@@ -3,7 +3,7 @@ import {
     TRPCError,
     invalidateUserCache, invalidateLeaderboardCache,
     getSocialFeed, upsertActivityPost, setActivityShare,
-    toggleSplash, addComment, getComments,
+    toggleSplash, addComment, getComments, deleteOwnPost,
     hidePostForUser, unhidePostForUser, reportPost,
     getUserPublicProfile, toggleFollow, getSuggestedUsers, searchUsers,
     awardActionXp,
@@ -11,6 +11,7 @@ import {
 } from "./_shared";
 import type { ClubEventInsert, ClubAnnouncementInsert } from "./_shared";
 import { ENV } from "../_core/env";
+import { socialPosts } from "../../drizzle/schema";
 
 const CLUB_STAFF_ROLES = new Set(["owner", "admin", "moderator"]);
 const REACTION_TYPES = ["splash", "fire", "strong", "clap", "wave", "love", "rocket", "wow", "laugh", "cry"] as const;
@@ -277,6 +278,31 @@ export const communityRouter = router({
             return unhidePostForUser(ctx.user.id, input.postId);
         }),
 
+    deletePost: protectedProcedure
+        .input(z.object({
+            postId: z.number(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            try {
+                return await deleteOwnPost(ctx.user.id, input.postId);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : "Impossibile eliminare il post";
+                if (message === "Post not found") {
+                    throw new TRPCError({ code: "NOT_FOUND", message: "Post non trovato" });
+                }
+                if (message === "Cannot delete other users posts") {
+                    throw new TRPCError({ code: "FORBIDDEN", message: "Puoi eliminare solo i tuoi post" });
+                }
+                if (message.startsWith("Delete window expired")) {
+                    throw new TRPCError({
+                        code: "FORBIDDEN",
+                        message: "Tempo massimo per eliminare il post superato",
+                    });
+                }
+                throw new TRPCError({ code: "BAD_REQUEST", message });
+            }
+        }),
+
     reportPost: protectedProcedure
         .input(z.object({
             postId: z.number(),
@@ -308,7 +334,6 @@ export const communityRouter = router({
         }))
         .mutation(async ({ ctx, input }) => {
             const { getDb } = await import("../db");
-            const { sql } = await import("drizzle-orm");
             const db = await getDb();
             if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
 
@@ -320,17 +345,24 @@ export const communityRouter = router({
                 throw new TRPCError({ code: "BAD_REQUEST", message: "Inserisci un testo o almeno un media." });
             }
 
-            const result = await db.execute(sql`
-                INSERT INTO social_posts (
-                  user_id, activity_id, club_id, content, media_url, media_urls, tagged_user_ids, hashtags, visibility, is_deleted, created_at, updated_at
-                )
-                VALUES (
-                  ${ctx.user.id}, NULL, NULL, ${content}, ${mediaUrls[0] ?? null}, ${mediaUrls},
-                  ${taggedUserIds}, ${hashtags}, 'public', false, NOW(), NOW()
-                )
-                RETURNING id
-            `);
-            const postId = (result.rows[0] as any)?.id ?? null;
+            const inserted = await db
+                .insert(socialPosts)
+                .values({
+                    userId: ctx.user.id,
+                    activityId: null,
+                    clubId: null,
+                    content,
+                    mediaUrl: mediaUrls[0] ?? null,
+                    mediaUrls,
+                    taggedUserIds,
+                    hashtags,
+                    visibility: "public",
+                    isDeleted: false,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                })
+                .returning({ id: socialPosts.id });
+            const postId = inserted[0]?.id ?? null;
             if (postId) {
                 await notifyTaggedUsers({
                     authorUserId: ctx.user.id,

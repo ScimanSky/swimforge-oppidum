@@ -13,6 +13,7 @@ import {
 export type FeedScope = "global" | "self" | "following";
 export type PostReportReason = "spam" | "offensive" | "harassment" | "misinformation" | "other";
 export type PostReportStatus = "open" | "in_review" | "resolved" | "rejected";
+const POST_DELETE_WINDOW_HOURS = Math.max(1, Number.parseInt(process.env.POST_DELETE_WINDOW_HOURS ?? "24", 10) || 24);
 
 export async function getSocialFeed(userId: number, options: { limit?: number; scope?: FeedScope; before?: Date } = {}) {
   const db = await getDb();
@@ -133,6 +134,54 @@ export async function unhidePostForUser(userId: number, postId: number) {
     .where(and(eq(socialHiddenPosts.userId, userId), eq(socialHiddenPosts.postId, postId)));
 
   return { hidden: false };
+}
+
+export async function deleteOwnPost(userId: number, postId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const post = await db
+    .select({
+      id: socialPosts.id,
+      userId: socialPosts.userId,
+      activityId: socialPosts.activityId,
+      isDeleted: socialPosts.isDeleted,
+      createdAt: socialPosts.createdAt,
+    })
+    .from(socialPosts)
+    .where(eq(socialPosts.id, postId))
+    .limit(1);
+
+  const row = post[0];
+  if (!row || row.isDeleted) {
+    throw new Error("Post not found");
+  }
+  if (row.userId !== userId) {
+    throw new Error("Cannot delete other users posts");
+  }
+
+  const ageMs = Date.now() - row.createdAt.getTime();
+  const maxAgeMs = POST_DELETE_WINDOW_HOURS * 60 * 60 * 1000;
+  if (ageMs > maxAgeMs) {
+    throw new Error(`Delete window expired (${POST_DELETE_WINDOW_HOURS}h)`);
+  }
+
+  await db
+    .update(socialPosts)
+    .set({
+      isDeleted: true,
+      updatedAt: new Date(),
+    })
+    .where(eq(socialPosts.id, postId));
+
+  if (row.activityId) {
+    await db
+      .update(swimmingActivities)
+      .set({ shareToFeed: false })
+      .where(and(eq(swimmingActivities.id, row.activityId), eq(swimmingActivities.userId, userId)));
+  }
+
+  return { deleted: true, windowHours: POST_DELETE_WINDOW_HOURS };
 }
 
 export async function reportPost(userId: number, input: { postId: number; reason: PostReportReason; details?: string | null }) {

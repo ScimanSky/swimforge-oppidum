@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, UserCheck, UserPlus, Flag, EyeOff } from "lucide-react"
+import { MoreHorizontal, UserCheck, UserPlus, Flag, EyeOff, Trash2 } from "lucide-react"
 import { formatTimeAgo, getInitials } from "@/lib/format"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
@@ -54,6 +54,15 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
   const hidePost = trpc.community.hidePost.useMutation({
     onSuccess: () => {
       toast.success("Post nascosto dal tuo feed")
+      utils.community.feed.invalidate()
+      utils.community.clubs.feed.invalidate()
+    },
+    onError: (err) => toast.error(err.message),
+  })
+
+  const deletePost = trpc.community.deletePost.useMutation({
+    onSuccess: () => {
+      toast.success("Post eliminato")
       utils.community.feed.invalidate()
       utils.community.clubs.feed.invalidate()
     },
@@ -120,26 +129,43 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
-            <DropdownMenuItem
-              className="gap-2 text-xs"
-              onSelect={() => {
-                const from = encodeURIComponent(location || "/home")
-                setLocation(`/home/report/post/${post.id}?from=${from}`)
-              }}
-            >
-              <Flag className="size-3.5" />
-              Segnala
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="gap-2 text-xs"
-              disabled={hidePost.isPending}
-              onSelect={() => {
-                hidePost.mutate({ postId: post.id })
-              }}
-            >
-              <EyeOff className="size-3.5" />
-              {hidePost.isPending ? "Nascondo..." : "Nascondi"}
-            </DropdownMenuItem>
+            {isOwner ? (
+              <DropdownMenuItem
+                className="gap-2 text-xs text-destructive focus:text-destructive"
+                disabled={deletePost.isPending}
+                onSelect={() => {
+                  const confirmed = window.confirm("Eliminare questo post?")
+                  if (!confirmed) return
+                  deletePost.mutate({ postId: post.id })
+                }}
+              >
+                <Trash2 className="size-3.5" />
+                {deletePost.isPending ? "Elimino..." : "Elimina"}
+              </DropdownMenuItem>
+            ) : (
+              <>
+                <DropdownMenuItem
+                  className="gap-2 text-xs"
+                  onSelect={() => {
+                    const from = encodeURIComponent(location || "/home")
+                    setLocation(`/home/report/post/${post.id}?from=${from}`)
+                  }}
+                >
+                  <Flag className="size-3.5" />
+                  Segnala
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="gap-2 text-xs"
+                  disabled={hidePost.isPending}
+                  onSelect={() => {
+                    hidePost.mutate({ postId: post.id })
+                  }}
+                >
+                  <EyeOff className="size-3.5" />
+                  {hidePost.isPending ? "Nascondo..." : "Nascondi"}
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
