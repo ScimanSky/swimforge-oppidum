@@ -8,6 +8,7 @@ import {
   Bot,
   Home,
   LogOut,
+  Trophy,
   Orbit,
   Moon,
   MoreHorizontal,
@@ -252,27 +253,15 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
                 <DropdownMenuLabel>Menu</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/season" className="flex items-center gap-2">
-                    <Orbit className="size-4" />
-                    Season
+                  <Link href="/season/challenges" className="flex items-center gap-2">
+                    <Trophy className="size-4" />
+                    Sfide
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/profile/performance" className="flex items-center gap-2">
                     <BarChart3 className="size-4" />
                     Progressi
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/coach" className="flex items-center gap-2">
-                    <Bot className="size-4" />
-                    Coach
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/profile" className="flex items-center gap-2">
-                    <User className="size-4" />
-                    Profilo
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>

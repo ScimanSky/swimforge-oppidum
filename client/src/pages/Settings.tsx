@@ -1274,19 +1274,22 @@ export default function Settings() {
               </div>
               <div className="flex items-center justify-between py-3 border-t border-border/60">
                 <div>
-                  <p className="font-medium text-foreground">Tour guidato app</p>
+                  <p className="font-medium text-foreground">Onboarding guidato app</p>
                   <p className="text-sm text-muted-foreground">
-                    Rivedi il tour interattivo dei punti principali.
+                    Rivedi intro video + tour interattivo dei punti principali.
                   </p>
                 </div>
                 <Button
                   variant="outline-neon"
                   size="sm"
                   onClick={() => {
+                    if (typeof window !== "undefined") {
+                      window.dispatchEvent(new CustomEvent("swimforge:onboarding:start"))
+                    }
                     setLocation(`/home?${ONBOARDING_FORCE_QUERY_PARAM}=1`)
                   }}
                 >
-                  Rivedi tour
+                  Rivedi onboarding
                 </Button>
               </div>
             </div>

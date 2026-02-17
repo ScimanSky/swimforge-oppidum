@@ -121,6 +121,7 @@ export default function OnboardingFlow() {
   const [manualRunNonce, setManualRunNonce] = useState(0);
   const [pendingTourLaunch, setPendingTourLaunch] = useState(false);
   const [welcomeCompleted, setWelcomeCompleted] = useState(false);
+  const [resumePathAfterTour, setResumePathAfterTour] = useState<string | null>(null);
   const [seasonPopupOpen, setSeasonPopupOpen] = useState(false);
   const onboardingUserId = meQuery.data?.id ? String(meQuery.data.id) : null;
 
@@ -303,15 +304,21 @@ export default function OnboardingFlow() {
   }, [currentStep, stage]);
 
   const completeOnboarding = async () => {
+    const targetAfterCompletion = resumePathAfterTour;
     setOnboardingCompletedLocally(true, onboardingUserId);
     setStage("hidden");
     setCurrentStep(0);
     setHighlightRect(null);
     setManualRunNonce(0);
     setPendingTourLaunch(false);
+    setResumePathAfterTour(null);
 
     const cleanLocation = stripOnboardingParams(location);
-    if (cleanLocation !== location) setLocation(cleanLocation);
+    const nextLocation =
+      targetAfterCompletion && cleanLocation.startsWith("/home")
+        ? targetAfterCompletion
+        : cleanLocation;
+    if (nextLocation !== location) setLocation(nextLocation);
 
     if (!meQuery.data?.id || serverDone) return;
 
@@ -330,6 +337,7 @@ export default function OnboardingFlow() {
   const startTour = () => {
     setManualRunNonce(0);
     if (pathname !== "/home") {
+      setResumePathAfterTour(stripOnboardingParams(location));
       setPendingTourLaunch(true);
       setStage("hidden");
       setHighlightRect(null);

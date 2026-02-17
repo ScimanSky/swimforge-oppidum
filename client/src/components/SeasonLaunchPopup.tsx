@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Sparkles, Trophy, Target, Zap, X } from "lucide-react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { ONBOARDING_CONSENT_TYPE, isOnboardingCompletedLocally } from "@/lib/onboarding";
 
 const POPUP_VERSION = "season-launch-s1-v1";
 const PRIMARY_LAUNCH_IMAGE = "/images/season-launch-electric-ice-main.png";
@@ -18,26 +20,36 @@ function getStorageKey(userId: string) {
 
 export default function SeasonLaunchPopup() {
   const { isAuthenticated, user } = useAuth();
+  const [location] = useLocation();
   const userId = user?.id ? String(user.id) : "";
   const [open, setOpen] = useState(false);
   const [bootChecked, setBootChecked] = useState(false);
   const [launchImageSrc, setLaunchImageSrc] = useState(PRIMARY_LAUNCH_IMAGE);
+  const pathname = useMemo(() => location.split("?")[0] || "/", [location]);
+  const isProfileSetupPath = pathname === "/settings";
 
   const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
     enabled: isAuthenticated,
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
+  const consentsQuery = trpc.consent.list.useQuery(undefined, {
+    enabled: isAuthenticated && Boolean(userId),
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+  });
+  const onboardingServerDone = Boolean((consentsQuery.data as any)?.byType?.[ONBOARDING_CONSENT_TYPE]?.granted);
+  const onboardingLocalDone = isOnboardingCompletedLocally(userId);
+  const onboardingDone = onboardingServerDone || onboardingLocalDone;
 
   useEffect(() => {
     if (!isAuthenticated || !userId) return;
     const storageKey = getStorageKey(userId);
     const alreadySeen = localStorage.getItem(storageKey) === "1";
-    if (!alreadySeen) {
-      setOpen(true);
-    }
+    const canOpen = !alreadySeen && onboardingDone && !isProfileSetupPath;
+    setOpen(canOpen);
     setBootChecked(true);
-  }, [isAuthenticated, userId]);
+  }, [isAuthenticated, userId, onboardingDone, isProfileSetupPath]);
 
   useEffect(() => {
     if (!open) return;
