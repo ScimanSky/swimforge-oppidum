@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { trpc } from "@/lib/trpc"
 import { useMemo } from "react"
-import { useParams, Link } from "wouter"
+import { useLocation, useParams } from "wouter"
 import { UserPlus, UserCheck, ArrowLeft, MapPin, Zap, MessageCircle } from "lucide-react"
 import DirectMessages from "@/components/DirectMessages"
 
@@ -22,8 +22,12 @@ const getInitials = (name: string) =>
     .toUpperCase() || "SF"
 
 export default function PublicProfile() {
+  const [, setLocation] = useLocation()
   const params = useParams<{ id: string }>()
   const userId = Number.parseInt(params.id || "0", 10)
+  const fromParam =
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("from") : null
+  const safeFromPath = fromParam && fromParam.startsWith("/") ? fromParam : null
 
   const meQuery = trpc.auth.me.useQuery()
   const profileQuery = trpc.community.users.getPublicProfile.useQuery(
@@ -60,14 +64,26 @@ export default function PublicProfile() {
   const followingCount = Number((profileQuery.data as any)?.followingCount ?? 0)
   const isFollowing = Boolean((profileQuery.data as any)?.isFollowing)
 
+  const handleBack = () => {
+    if (safeFromPath) {
+      setLocation(safeFromPath)
+      return
+    }
+
+    if (window.history.length > 1) {
+      window.history.back()
+      return
+    }
+
+    setLocation("/home")
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6 lg:space-y-3">
         <div className="flex items-center gap-3">
-          <Button variant="ghost-neon" size="icon" asChild>
-            <Link href="/season/challenges">
-              <ArrowLeft className="size-5" />
-            </Link>
+          <Button variant="ghost-neon" size="icon" onClick={handleBack}>
+            <ArrowLeft className="size-5" />
           </Button>
           <div>
             <h1 className="text-2xl font-display font-bold neon-gradient-text">Profilo pubblico</h1>
