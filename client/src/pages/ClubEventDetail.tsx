@@ -174,19 +174,31 @@ export default function ClubEventDetail() {
   const isStaff =
     club?.member_role && ["owner", "admin", "moderator"].includes(club.member_role);
 
-  const event = (eventQuery.data as any)?.event ?? (eventQuery.data as any)?.event ?? eventQuery.data;
-  const title = event?.title ?? "Evento";
-  const eventLat = Number(event?.locationLat);
-  const eventLng = Number(event?.locationLng);
-  const hasEventMap = Number.isFinite(eventLat) && Number.isFinite(eventLng);
+  const rawEvent = (eventQuery.data as any)?.event ?? eventQuery.data;
+  const event = useMemo(() => {
+    if (!rawEvent || typeof rawEvent !== "object") return rawEvent;
+    const normalized = rawEvent as Record<string, unknown>;
+    return {
+      ...normalized,
+      locationLat: normalized.locationLat ?? normalized.location_lat ?? null,
+      locationLng: normalized.locationLng ?? normalized.location_lng ?? null,
+      routeGeojson: normalized.routeGeojson ?? normalized.route_geojson ?? null,
+      weatherSnapshot: normalized.weatherSnapshot ?? normalized.weather_snapshot ?? null,
+    };
+  }, [rawEvent]);
+  const title = (event as any)?.title ?? "Evento";
+  const eventLat = Number((event as any)?.locationLat);
+  const eventLng = Number((event as any)?.locationLng);
+  const hasPin = Number.isFinite(eventLat) && Number.isFinite(eventLng);
   const routeGeojson = useMemo(
-    () => parseRouteGeojson(event?.routeGeojson),
-    [event?.routeGeojson]
+    () => parseRouteGeojson((event as any)?.routeGeojson),
+    [(event as any)?.routeGeojson]
   );
   const routePoints = useMemo(() => routeGeojsonToPoints(routeGeojson), [routeGeojson]);
+  const hasMapData = hasPin || routePoints.length > 0;
   const weatherSnapshot = useMemo(
-    () => parseWeatherSnapshot(event?.weatherSnapshot),
-    [event?.weatherSnapshot]
+    () => parseWeatherSnapshot((event as any)?.weatherSnapshot),
+    [(event as any)?.weatherSnapshot]
   );
   const weatherCondition = describeWeatherCode(weatherSnapshot?.general?.weatherCode);
   const weatherTime = weatherSnapshot?.resolvedTime || weatherSnapshot?.targetTime || weatherSnapshot?.fetchedAt || null;
@@ -196,14 +208,14 @@ export default function ClubEventDetail() {
 
   useEffect(() => {
     if (isEditingRoute) return;
-    const nextPin = hasEventMap ? { lat: eventLat, lng: eventLng } : null;
+    const nextPin = hasPin ? { lat: eventLat, lng: eventLng } : null;
     setDraftPin((prev) => {
       if (!prev && !nextPin) return prev;
       if (prev && nextPin && prev.lat === nextPin.lat && prev.lng === nextPin.lng) return prev;
       return nextPin;
     });
     setDraftRoutePoints((prev) => (pointsEqual(prev, routePoints) ? prev : routePoints));
-  }, [isEditingRoute, hasEventMap, eventLat, eventLng, event?.id, routePoints]);
+  }, [isEditingRoute, hasPin, eventLat, eventLng, (event as any)?.id, routePoints]);
 
   if (!match || !Number.isFinite(clubId) || !Number.isFinite(eventId)) {
     return null;
@@ -258,7 +270,7 @@ export default function ClubEventDetail() {
                 {event.description}
               </p>
             ) : null}
-            {hasEventMap || (isStaff && isEditingRoute) ? (
+            {hasMapData || (isStaff && isEditingRoute) ? (
               <div className="space-y-2 pt-2">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm font-medium">Mappa e percorso</p>
@@ -271,7 +283,7 @@ export default function ClubEventDetail() {
                           variant="outline-neon"
                           className="h-8"
                           onClick={() => {
-                            setDraftPin(hasEventMap ? { lat: eventLat, lng: eventLng } : null);
+                            setDraftPin(hasPin ? { lat: eventLat, lng: eventLng } : null);
                             setDraftRoutePoints(routePoints);
                             setIsEditingRoute(false);
                           }}
@@ -313,7 +325,7 @@ export default function ClubEventDetail() {
                   ) : null}
                 </div>
                 <EventMapEditor
-                  pin={isEditingRoute ? draftPin : { lat: eventLat, lng: eventLng }}
+                  pin={isEditingRoute ? draftPin : hasPin ? { lat: eventLat, lng: eventLng } : null}
                   routePoints={isEditingRoute ? draftRoutePoints : routePoints}
                   onPinChange={isEditingRoute ? setDraftPin : () => {}}
                   onRouteChange={isEditingRoute ? setDraftRoutePoints : () => {}}
@@ -328,7 +340,7 @@ export default function ClubEventDetail() {
                       : ""}
                   </p>
                 ) : null}
-                {hasEventMap ? (
+                {hasPin ? (
                   <a
                     href={buildOsmMapLink(eventLat, eventLng)}
                     target="_blank"
@@ -341,7 +353,7 @@ export default function ClubEventDetail() {
                 ) : null}
               </div>
             ) : null}
-            {!hasEventMap && isStaff && !isEditingRoute ? (
+            {!hasMapData && isStaff && !isEditingRoute ? (
               <div className="rounded-lg border border-border/70 bg-card/40 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm text-muted-foreground">Nessuna mappa/pin impostata per questo evento.</p>
@@ -420,7 +432,7 @@ export default function ClubEventDetail() {
                   </p>
                 ) : null}
               </div>
-            ) : hasEventMap ? (
+            ) : hasPin ? (
               <div className="rounded-lg border border-border/70 bg-card/40 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm text-muted-foreground">Meteo non ancora disponibile.</p>
