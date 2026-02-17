@@ -61,6 +61,17 @@ const parseWeatherSnapshot = (raw: unknown): EventWeatherSnapshot | null => {
   return null;
 };
 
+const pointsEqual = (a: RoutePoint[], b: RoutePoint[]) => {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    if (a[i].lat !== b[i].lat || a[i].lng !== b[i].lng) {
+      return false;
+    }
+  }
+  return true;
+};
+
 export default function ClubEventDetail() {
   const [match, params] = useRoute("/community/club/:clubId/event/:eventId");
   const clubId = Number(params?.clubId);
@@ -138,9 +149,15 @@ export default function ClubEventDetail() {
   const eventLat = Number(event?.locationLat);
   const eventLng = Number(event?.locationLng);
   const hasEventMap = Number.isFinite(eventLat) && Number.isFinite(eventLng);
-  const routeGeojson = parseRouteGeojson(event?.routeGeojson);
-  const routePoints = routeGeojsonToPoints(routeGeojson);
-  const weatherSnapshot = parseWeatherSnapshot(event?.weatherSnapshot);
+  const routeGeojson = useMemo(
+    () => parseRouteGeojson(event?.routeGeojson),
+    [event?.routeGeojson]
+  );
+  const routePoints = useMemo(() => routeGeojsonToPoints(routeGeojson), [routeGeojson]);
+  const weatherSnapshot = useMemo(
+    () => parseWeatherSnapshot(event?.weatherSnapshot),
+    [event?.weatherSnapshot]
+  );
   const weatherTime = weatherSnapshot?.resolvedTime || weatherSnapshot?.targetTime || weatherSnapshot?.fetchedAt || null;
   const [isEditingRoute, setIsEditingRoute] = useState(false);
   const [draftPin, setDraftPin] = useState<RoutePoint | null>(null);
@@ -148,8 +165,13 @@ export default function ClubEventDetail() {
 
   useEffect(() => {
     if (isEditingRoute) return;
-    setDraftPin(hasEventMap ? { lat: eventLat, lng: eventLng } : null);
-    setDraftRoutePoints(routePoints);
+    const nextPin = hasEventMap ? { lat: eventLat, lng: eventLng } : null;
+    setDraftPin((prev) => {
+      if (!prev && !nextPin) return prev;
+      if (prev && nextPin && prev.lat === nextPin.lat && prev.lng === nextPin.lng) return prev;
+      return nextPin;
+    });
+    setDraftRoutePoints((prev) => (pointsEqual(prev, routePoints) ? prev : routePoints));
   }, [isEditingRoute, hasEventMap, eventLat, eventLng, event?.id, routePoints]);
 
   if (!match || !Number.isFinite(clubId) || !Number.isFinite(eventId)) {
