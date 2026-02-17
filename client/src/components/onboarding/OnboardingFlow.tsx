@@ -167,8 +167,11 @@ export default function OnboardingFlow() {
     }
 
     if (!serverDone && !localDone) {
-      setStage("welcome");
-      setWelcomeCompleted(false);
+      // Open welcome only when idle; do not interrupt an already-started interactive tour.
+      if (stage === "hidden") {
+        setStage("welcome");
+        setWelcomeCompleted(false);
+      }
       return;
     }
 
