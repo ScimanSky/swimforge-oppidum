@@ -12,6 +12,7 @@ import { serveStatic, setupVite } from "./vite";
 import { completeChallenges } from "../cron_challenges";
 import { evaluateAllUsersWeekly } from "../ai_skill_level";
 import { cleanupExpiredStories } from "../db_stories";
+import { cleanupSocialRetention } from "../db_social_enhanced";
 import { setupSwagger } from "../swagger-setup";
 import { connectRedis } from "../lib/cache";
 import { assertAuthEnv } from "./env";
@@ -176,6 +177,54 @@ async function startServer() {
     } catch (error: unknown) {
       log.error("[Cron] Failed to cleanup expired stories", {
         event: "cron:cleanup_expired_stories_failed",
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      return res.status(500).json({ success: false, error: "Cron execution failed" });
+    }
+  });
+
+  // Cleanup old notifications and direct messages
+  app.post("/api/cron/cleanup-social-retention", async (req, res) => {
+    const cronSecret = process.env.CRON_SECRET;
+    if (process.env.NODE_ENV === "production" && !cronSecret) {
+      return res.status(503).json({ success: false, error: "CRON_SECRET not configured" });
+    }
+
+    const authHeader = req.headers["authorization"];
+    const token = authHeader?.toString().replace(/^Bearer\s+/i, "") ?? "";
+    if (process.env.NODE_ENV === "production") {
+      const tokenBuf = Buffer.from(token);
+      const secretBuf = Buffer.from(cronSecret as string);
+      if (tokenBuf.length !== secretBuf.length || !timingSafeEqual(tokenBuf, secretBuf)) {
+        return res.status(401).json({ success: false, error: "Unauthorized" });
+      }
+    }
+
+    const notificationRetentionDaysRaw = Number(
+      req.body?.notificationRetentionDays ?? req.query?.notificationRetentionDays ?? process.env.NOTIFICATION_RETENTION_DAYS ?? 90
+    );
+    const dmRetentionDaysRaw = Number(
+      req.body?.dmRetentionDays ?? req.query?.dmRetentionDays ?? process.env.DM_RETENTION_DAYS ?? 60
+    );
+    const limitRaw = Number(
+      req.body?.limit ?? req.query?.limit ?? process.env.SOCIAL_RETENTION_BATCH_LIMIT ?? 1000
+    );
+
+    const notificationRetentionDays = Number.isFinite(notificationRetentionDaysRaw) ? notificationRetentionDaysRaw : 90;
+    const dmRetentionDays = Number.isFinite(dmRetentionDaysRaw) ? dmRetentionDaysRaw : 60;
+    const limit = Number.isFinite(limitRaw) ? limitRaw : 1000;
+
+    try {
+      const result = await cleanupSocialRetention({
+        notificationRetentionDays,
+        dmRetentionDays,
+        limit,
+      });
+      return res.json({ success: true, ...result });
+    } catch (error: unknown) {
+      log.error("[Cron] Failed to cleanup social retention", {
+        event: "cron:cleanup_social_retention_failed",
         message: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       });

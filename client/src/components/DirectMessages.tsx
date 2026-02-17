@@ -72,6 +72,7 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
 
   const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 5 * 60_000 });
   const currentUserId = profileQuery.data?.userId;
+  const dmRetentionDays = Number(import.meta.env.VITE_DM_RETENTION_DAYS ?? 60);
 
   // Unread DM count — always active (shows badge on icon)
   const unreadDmQuery = trpc.community.messages.unreadCount.useQuery(undefined, {
@@ -469,6 +470,9 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
       <DialogContent className="max-w-2xl h-[600px] max-h-[80dvh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="p-4 border-b">
           <DialogTitle>Messaggi</DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            I messaggi vengono eliminati automaticamente dal server dopo {Number.isFinite(dmRetentionDays) ? dmRetentionDays : 60} giorni.
+          </p>
         </DialogHeader>
         {view === "search"
           ? renderSearchView()

@@ -113,6 +113,7 @@ const defaultPreferencesState = {
   paceFormat: "100m" as "100m" | "100y",
   language: "it" as "it" | "en" | "es" | "fr",
   timezone: "Europe/Rome",
+  autoplayVideos: true,
 }
 
 const defaultPrivacyState = {
@@ -595,6 +596,7 @@ export default function Settings() {
           ? profile.preferences.language
           : undefined
       const timezone = typeof profile.preferences.timezone === "string" ? profile.preferences.timezone : undefined
+      const autoplayVideos = coerceBoolean(profile.preferences.autoplayVideos)
 
       setPreferences({
         ...defaultPreferencesState,
@@ -602,6 +604,7 @@ export default function Settings() {
         ...(paceFormat ? { paceFormat } : {}),
         ...(language ? { language } : {}),
         ...(timezone ? { timezone } : {}),
+        ...(autoplayVideos !== undefined ? { autoplayVideos } : {}),
       })
     } else {
       setPreferences(defaultPreferencesState)
@@ -1178,6 +1181,22 @@ export default function Settings() {
                     <SelectItem value="100y">min/100yd</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="flex items-center justify-between py-3 border-t border-border/60">
+                <div>
+                  <p className="font-medium text-foreground">Riproduzione automatica video</p>
+                  <p className="text-sm text-muted-foreground">
+                    Avvia automaticamente i video nei feed quando visibili.
+                  </p>
+                </div>
+                <Switch
+                  checked={preferences.autoplayVideos}
+                  onCheckedChange={(value) => {
+                    const next = { ...preferences, autoplayVideos: value }
+                    setPreferences(next)
+                    void persistSettings({ preferences: next })
+                  }}
+                />
               </div>
             </div>
           </section>

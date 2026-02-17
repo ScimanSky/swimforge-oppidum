@@ -70,6 +70,13 @@ export default function SocialFeed() {
   const profileQuery = trpc.profile.get.useQuery()
   const currentUserId = profileQuery.data?.userId
   const profile = profileQuery.data
+  const autoplayVideos = (() => {
+    const value = (profile?.preferences as Record<string, unknown> | null | undefined)?.autoplayVideos
+    if (typeof value === "boolean") return value
+    if (typeof value === "string") return value.toLowerCase() !== "false"
+    if (typeof value === "number") return value !== 0
+    return true
+  })()
 
   const { data: storyGroups } = trpc.community.stories.active.useQuery(undefined, {
     staleTime: 30_000,
@@ -227,6 +234,7 @@ export default function SocialFeed() {
                       post={post}
                       currentUserId={currentUserId}
                       index={index}
+                      autoplayVideos={autoplayVideos}
                     />
                   ))}
                   {/* Load more button */}

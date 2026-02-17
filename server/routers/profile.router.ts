@@ -72,6 +72,7 @@ export const profileRouter = router({
                 paceFormat: z.enum(["100m", "100y"]).optional(),
                 language: z.enum(["it", "en", "es", "fr"]).optional(),
                 timezone: z.string().optional(),
+                autoplayVideos: z.boolean().optional(),
             }).optional(),
             privacySettings: z.object({
                 profilePublic: z.boolean().optional(),

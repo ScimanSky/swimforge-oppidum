@@ -65,7 +65,7 @@ async function notifyTaggedUsers(input: {
 
         const actorResult = await db.execute(sql`SELECT name FROM users WHERE id = ${input.authorUserId} LIMIT 1`);
         const actorName = ((actorResult.rows[0] as any)?.name as string | undefined) || "Qualcuno";
-        const link = input.clubId ? `/community/club/${input.clubId}` : "/home";
+        const link = input.clubId ? `/community/club/${input.clubId}` : `/post/${input.postId}`;
 
         await Promise.all(
             input.taggedUserIds.map((taggedUserId) =>
@@ -107,8 +107,11 @@ async function requireClubReadable(userId: number, clubId: number) {
     if (!club) {
         throw new TRPCError({ code: "NOT_FOUND" });
     }
-    if (club.is_private && !club.is_member) {
-        throw new TRPCError({ code: "FORBIDDEN" });
+    if (!club.is_member) {
+        throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Devi iscriverti al club per visualizzare i contenuti.",
+        });
     }
     return club;
 }
@@ -154,6 +157,85 @@ async function requirePostReadable(userId: number, postId: number) {
 }
 
 export const communityRouter = router({
+    postById: protectedProcedure
+        .input(z.object({ postId: z.number() }))
+        .query(async ({ ctx, input }) => {
+            await requirePostReadable(ctx.user.id, input.postId);
+
+            const { getDb } = await import("../db");
+            const { sql } = await import("drizzle-orm");
+            const db = await getDb();
+            if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+
+            const result = await db.execute(sql`
+                SELECT
+                  p.id,
+                  p.user_id,
+                  p.activity_id,
+                  p.club_id,
+                  p.content,
+                  p.media_url,
+                  p.media_urls,
+                  p.tagged_user_ids,
+                  p.hashtags,
+                  p.visibility,
+                  p.created_at,
+                  p.updated_at,
+                  u.name AS user_name,
+                  u.email AS user_email,
+                  sp.avatar_url AS user_avatar,
+                  a.distance_meters AS activity_distance_meters,
+                  a.duration_seconds AS activity_duration_seconds,
+                  a.activity_date AS activity_date,
+                  a.activity_source AS activity_source,
+                  a.stroke_type AS activity_stroke_type,
+                  a.is_open_water AS activity_is_open_water,
+                  COALESCE((SELECT COUNT(*) FROM social_splashes s WHERE s.post_id = p.id), 0) AS splash_count,
+                  COALESCE((SELECT COUNT(*) FROM social_comments c WHERE c.post_id = p.id), 0) AS comment_count,
+                  EXISTS(
+                    SELECT 1 FROM social_splashes s
+                    WHERE s.post_id = p.id AND s.user_id = ${ctx.user.id}
+                  ) AS has_splashed,
+                  EXISTS(
+                    SELECT 1 FROM social_follows f
+                    WHERE f.follower_id = ${ctx.user.id} AND f.following_id = p.user_id AND f.status = 'accepted'
+                  ) AS is_following,
+                  COALESCE(
+                    (
+                      SELECT json_agg(
+                        json_build_object(
+                          'user_id', tu.id,
+                          'name', tu.name,
+                          'username', tsp.username,
+                          'avatar_url', tsp.avatar_url
+                        )
+                      )
+                      FROM users tu
+                      LEFT JOIN swimmer_profiles tsp ON tsp.user_id = tu.id
+                      WHERE tu.id = ANY(COALESCE(p.tagged_user_ids, '{}'::integer[]))
+                    ),
+                    '[]'::json
+                  ) AS tagged_users
+                FROM social_posts p
+                JOIN users u ON u.id = p.user_id
+                LEFT JOIN swimmer_profiles sp ON sp.user_id = u.id
+                LEFT JOIN swimming_activities a ON a.id = p.activity_id
+                WHERE p.id = ${input.postId}
+                  AND p.is_deleted = false
+                  AND NOT EXISTS (
+                    SELECT 1 FROM social_hidden_posts hp
+                    WHERE hp.post_id = p.id AND hp.user_id = ${ctx.user.id}
+                  )
+                LIMIT 1
+            `);
+
+            const row = result.rows[0];
+            if (!row) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "Post non trovato" });
+            }
+            return row;
+        }),
+
     feed: protectedProcedure
         .input(z.object({
             limit: z.number().min(1).max(50).optional(),
@@ -610,7 +692,7 @@ export const communityRouter = router({
                                 type: "story_reaction",
                                 title: "Nuova reazione alla story",
                                 message: `${actorName} ha reagito ${emoji} alla tua story.`,
-                                link: "/home/community",
+                                link: "/home",
                                 referenceId: input.storyId,
                             });
                         } catch {
@@ -804,10 +886,21 @@ export const communityRouter = router({
             }),
 
         join: protectedProcedure
-            .input(z.object({ clubId: z.number() }))
+            .input(z.object({ clubId: z.number(), acceptRules: z.boolean().optional() }))
             .mutation(async ({ ctx, input }) => {
                 const { joinClub } = await import("../db_clubs");
-                return joinClub(ctx.user.id, input.clubId);
+                try {
+                    return await joinClub(ctx.user.id, input.clubId, { acceptRules: input.acceptRules });
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : "Impossibile iscriversi al club";
+                    if (message === "Rules not accepted") {
+                        throw new TRPCError({
+                            code: "BAD_REQUEST",
+                            message: "Devi accettare esplicitamente il regolamento del club.",
+                        });
+                    }
+                    throw new TRPCError({ code: "BAD_REQUEST", message });
+                }
             }),
 
         leave: protectedProcedure
@@ -846,8 +939,11 @@ export const communityRouter = router({
                 if (!club) {
                     throw new TRPCError({ code: "NOT_FOUND" });
                 }
-                if (club.is_private && !club.is_member) {
-                    throw new TRPCError({ code: "FORBIDDEN" });
+                if (!club.is_member) {
+                    throw new TRPCError({
+                        code: "FORBIDDEN",
+                        message: "Devi iscriverti al club per vedere i membri.",
+                    });
                 }
                 return listClubMembers(input.clubId);
             }),
@@ -927,8 +1023,11 @@ export const communityRouter = router({
                 if (!club) {
                     throw new TRPCError({ code: "NOT_FOUND" });
                 }
-                if (club.is_private && !club.is_member) {
-                    throw new TRPCError({ code: "FORBIDDEN" });
+                if (!club.is_member) {
+                    throw new TRPCError({
+                        code: "FORBIDDEN",
+                        message: "Devi iscriverti al club per visualizzare il feed.",
+                    });
                 }
                 return getClubFeed(ctx.user.id, input.clubId, input.limit ?? 20);
             }),
@@ -948,8 +1047,11 @@ export const communityRouter = router({
                 if (!club) {
                     throw new TRPCError({ code: "NOT_FOUND" });
                 }
-                if (club.is_private && !club.is_member) {
-                    throw new TRPCError({ code: "FORBIDDEN" });
+                if (!club.is_member) {
+                    throw new TRPCError({
+                        code: "FORBIDDEN",
+                        message: "Devi iscriverti al club per pubblicare.",
+                    });
                 }
                 const content = input.content?.trim() ?? null;
                 const mediaUrls = normalizeMediaUrls(input.mediaUrls, input.mediaUrl ?? null);
@@ -1612,7 +1714,7 @@ export const communityRouter = router({
                             };
                             const emoji = emojiMap[input.reactionType] || "✨";
                             const { createNotification } = await import("../db_social_enhanced");
-                            const link = postMeta.clubId ? `/community/club/${postMeta.clubId}` : "/home/community";
+                            const link = `/post/${input.postId}`;
                             await createNotification({
                                 userId: postMeta.ownerId,
                                 type: "reaction",

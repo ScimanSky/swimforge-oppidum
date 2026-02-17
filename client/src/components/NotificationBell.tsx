@@ -126,9 +126,23 @@ export default function NotificationBell() {
       }
     }
     setIsOpen(false);
-    if (notification.link) {
-      navigate(notification.link);
-    }
+    const referenceId = Number(notification.referenceId ?? notification.reference_id);
+    const fallbackLink = (() => {
+      switch (notification.type) {
+        case "mention":
+        case "reaction":
+        case "splash":
+        case "comment":
+          return Number.isFinite(referenceId) && referenceId > 0 ? `/post/${referenceId}` : "/home";
+        case "follow":
+          return "/home/community";
+        case "report_update":
+          return "/home";
+        default:
+          return "/home";
+      }
+    })();
+    navigate(notification.link || fallbackLink);
   };
 
   const getNotificationIcon = (type: string) => {

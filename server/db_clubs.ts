@@ -304,17 +304,26 @@ export async function createClub(userId: number, input: { name: string; descript
   return clubId;
 }
 
-export async function joinClub(userId: number, clubId: number) {
+export async function joinClub(userId: number, clubId: number, options: { acceptRules?: boolean } = {}) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
   const club = await db
-    .select({ id: communityClubs.id, isPrivate: communityClubs.isPrivate, visibility: communityClubs.visibility })
+    .select({
+      id: communityClubs.id,
+      isPrivate: communityClubs.isPrivate,
+      visibility: communityClubs.visibility,
+      rules: communityClubs.rules,
+    })
     .from(communityClubs)
     .where(eq(communityClubs.id, clubId))
     .limit(1);
 
   if (!club.length) throw new Error("Club not found");
+  const hasRules = Boolean(club[0].rules && club[0].rules.trim().length > 0);
+  if (hasRules && !options.acceptRules) {
+    throw new Error("Rules not accepted");
+  }
 
   const existing = await db
     .select({

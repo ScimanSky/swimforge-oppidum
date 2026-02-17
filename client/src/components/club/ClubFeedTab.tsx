@@ -110,6 +110,13 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
     { enabled: !!clubId }
   );
   const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 5 * 60_000 });
+  const autoplayVideos = (() => {
+    const value = (profileQuery.data?.preferences as Record<string, unknown> | null | undefined)?.autoplayVideos;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value.toLowerCase() !== "false";
+    if (typeof value === "number") return value !== 0;
+    return true;
+  })();
 
   const imageKitAuth = trpc.community.postImageKitAuth.useMutation();
   const tagSearchEnabled = isMember && tagQuery.trim().length >= 2;
@@ -565,6 +572,9 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
                                 controls
                                 playsInline
                                 preload="metadata"
+                                autoPlay={autoplayVideos}
+                                muted={autoplayVideos}
+                                loop={autoplayVideos}
                               />
                             ) : (
                               <button

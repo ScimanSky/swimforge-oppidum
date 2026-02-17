@@ -492,6 +492,56 @@ export async function getUnreadNotificationCount(userId: number) {
   return result?.count || 0
 }
 
+/**
+ * Cleanup retention per notifiche e messaggi diretti
+ */
+export async function cleanupSocialRetention(params: {
+  notificationRetentionDays: number
+  dmRetentionDays: number
+  limit?: number
+}) {
+  const db = await requireDb()
+  const limit = Math.max(1, Math.min(params.limit ?? 1000, 10_000))
+  const notificationRetentionDays = Math.max(1, params.notificationRetentionDays)
+  const dmRetentionDays = Math.max(1, params.dmRetentionDays)
+
+  const deletedNotifications = await db.execute(sql`
+    WITH doomed AS (
+      SELECT id
+      FROM user_notifications
+      WHERE created_at < NOW() - (${notificationRetentionDays} * INTERVAL '1 day')
+      ORDER BY created_at ASC
+      LIMIT ${limit}
+    )
+    DELETE FROM user_notifications n
+    USING doomed d
+    WHERE n.id = d.id
+    RETURNING n.id
+  `)
+
+  const deletedMessages = await db.execute(sql`
+    WITH doomed AS (
+      SELECT id
+      FROM direct_messages
+      WHERE created_at < NOW() - (${dmRetentionDays} * INTERVAL '1 day')
+      ORDER BY created_at ASC
+      LIMIT ${limit}
+    )
+    DELETE FROM direct_messages m
+    USING doomed d
+    WHERE m.id = d.id
+    RETURNING m.id
+  `)
+
+  return {
+    notificationsDeleted: deletedNotifications.rows.length,
+    messagesDeleted: deletedMessages.rows.length,
+    notificationRetentionDays,
+    dmRetentionDays,
+    limit,
+  }
+}
+
 // ============================================
 // CLUB ANNOUNCEMENTS
 // ============================================

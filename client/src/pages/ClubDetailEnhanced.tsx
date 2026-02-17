@@ -70,6 +70,8 @@ export default function ClubDetailEnhanced() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [createEventOpen, setCreateEventOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [joinRulesOpen, setJoinRulesOpen] = useState(false);
+  const [joinRulesAccepted, setJoinRulesAccepted] = useState(false);
   const [newEvent, setNewEvent] = useState({
     title: "", description: "", eventType: "training" as "training" | "race" | "social" | "meeting",
     location: "", locationLat: null as number | null, locationLng: null as number | null,
@@ -99,20 +101,32 @@ export default function ClubDetailEnhanced() {
     { clubId },
     { enabled: match && Number.isFinite(clubId) }
   );
+  const isMemberFromClubQuery = Boolean((clubQuery.data as any | undefined)?.is_member);
   const announcementsQuery = trpc.community.clubs.announcements.list.useQuery(
     { clubId },
-    { enabled: match && Number.isFinite(clubId) }
+    { enabled: match && Number.isFinite(clubId) && isMemberFromClubQuery }
   );
   const eventsQuery = trpc.community.clubs.events.list.useQuery(
     { clubId, status: "active", fromDate: eventsFromDateIso, limit: 8 },
-    { enabled: match && Number.isFinite(clubId) }
+    { enabled: match && Number.isFinite(clubId) && isMemberFromClubQuery }
   );
 
   // Mutations
   const joinMutation = trpc.community.clubs.join.useMutation({
-    onSuccess: () => {
-      toast.success("Richiesta di iscrizione inviata!");
+    onSuccess: (result: any) => {
+      if (result?.joined) {
+        toast.success("Iscrizione al club completata.");
+      } else if (result?.requested) {
+        toast.success("Richiesta di iscrizione inviata.");
+      } else {
+        toast.success("Operazione completata.");
+      }
+      setJoinRulesOpen(false);
+      setJoinRulesAccepted(false);
       utils.community.clubs.get.invalidate({ clubId });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Impossibile iscriversi al club.");
     },
   });
   const leaveMutation = trpc.community.clubs.leave.useMutation({
@@ -246,6 +260,16 @@ export default function ClubDetailEnhanced() {
   const eventsPageHref = Number.isFinite(firstUpcomingEventId)
     ? `/community/club/${clubId}/event/${firstUpcomingEventId}`
     : null;
+  const hasClubRules = Boolean(club?.rules && String(club.rules).trim().length > 0);
+
+  const handleJoinClub = () => {
+    if (!hasClubRules) {
+      joinMutation.mutate({ clubId });
+      return;
+    }
+    setJoinRulesAccepted(false);
+    setJoinRulesOpen(true);
+  };
 
   const handleFindLocationOnMap = async () => {
     if (!newEvent.location.trim()) {
@@ -308,7 +332,7 @@ export default function ClubDetailEnhanced() {
                     club={club}
                     onOpenMembers={() => setMembersOpen(true)}
                     onOpenSettings={() => setSettingsOpen(true)}
-                    onJoin={() => joinMutation.mutate({ clubId })}
+                    onJoin={handleJoinClub}
                     onLeave={() => leaveMutation.mutate({ clubId })}
                     isJoining={joinMutation.isPending}
                     isLeaving={leaveMutation.isPending}
@@ -327,7 +351,7 @@ export default function ClubDetailEnhanced() {
                     club={club}
                     onOpenMembers={() => setMembersOpen(true)}
                     onOpenSettings={() => setSettingsOpen(true)}
-                    onJoin={() => joinMutation.mutate({ clubId })}
+                    onJoin={handleJoinClub}
                     onLeave={() => leaveMutation.mutate({ clubId })}
                     isJoining={joinMutation.isPending}
                     isLeaving={leaveMutation.isPending}
@@ -421,6 +445,44 @@ export default function ClubDetailEnhanced() {
             />
           </SheetContent>
         </Sheet>
+
+        {/* Join Rules Confirmation */}
+        <Dialog open={joinRulesOpen} onOpenChange={setJoinRulesOpen}>
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Accetta regolamento club</DialogTitle>
+              <DialogDescription>
+                Per iscriverti al club devi accettare il regolamento.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="max-h-64 overflow-y-auto rounded-lg border border-border/60 bg-background/40 p-3 text-sm text-foreground whitespace-pre-wrap">
+                {club?.rules}
+              </div>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={joinRulesAccepted}
+                  onChange={(e) => setJoinRulesAccepted(e.target.checked)}
+                />
+                <span>Confermo di aver letto e accettato il regolamento del club.</span>
+              </label>
+            </div>
+            <DialogFooter>
+              <Button variant="outline-neon" onClick={() => setJoinRulesOpen(false)}>
+                Annulla
+              </Button>
+              <Button
+                variant="neon"
+                disabled={!joinRulesAccepted || joinMutation.isPending}
+                onClick={() => joinMutation.mutate({ clubId, acceptRules: true })}
+              >
+                {joinMutation.isPending ? "Iscrizione..." : "Accetta e iscriviti"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         {/* Create Event Dialog */}
         <Dialog open={createEventOpen} onOpenChange={setCreateEventOpen}>
           <DialogContent>

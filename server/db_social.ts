@@ -482,7 +482,7 @@ export async function toggleSplash(userId: number, postId: number) {
       const actor = await db.execute(sql`SELECT name FROM users WHERE id = ${userId} LIMIT 1`);
       const actorName = ((actor.rows[0] as any)?.name as string | undefined) || "Qualcuno";
       const { createNotification } = await import("./db_social_enhanced");
-      const link = clubId ? `/community/club/${clubId}` : "/community";
+      const link = `/post/${postId}`;
       await createNotification({
         userId: ownerId,
         type: "splash",
@@ -521,7 +521,7 @@ export async function addComment(userId: number, postId: number, content: string
       const actorName = ((actor.rows[0] as any)?.name as string | undefined) || "Qualcuno";
       const preview = content.trim().slice(0, 120);
       const { createNotification } = await import("./db_social_enhanced");
-      const link = clubId ? `/community/club/${clubId}` : "/community";
+      const link = `/post/${postId}`;
       await createNotification({
         userId: ownerId,
         type: "comment",

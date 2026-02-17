@@ -12,6 +12,7 @@ interface FeedPostProps {
   post: any
   currentUserId?: number
   index?: number
+  autoplayVideos?: boolean
 }
 
 function normalizeArrayField(raw: unknown): string[] {
@@ -62,7 +63,7 @@ function renderPostContent(content: string) {
   })
 }
 
-export default function FeedPost({ post, currentUserId, index = 0 }: FeedPostProps) {
+export default function FeedPost({ post, currentUserId, index = 0, autoplayVideos = true }: FeedPostProps) {
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [openMediaUrl, setOpenMediaUrl] = useState<string | null>(null)
   const isOwner = !!(currentUserId && post.user_id === currentUserId)
@@ -148,6 +149,9 @@ export default function FeedPost({ post, currentUserId, index = 0 }: FeedPostPro
                       controls
                       playsInline
                       preload="metadata"
+                      autoPlay={autoplayVideos}
+                      muted={autoplayVideos}
+                      loop={autoplayVideos}
                     />
                   ) : (
                     <button
