@@ -33,6 +33,9 @@ export default function EventMapEditor({
   const markerRef = useRef<any>(null);
   const polylineRef = useRef<any>(null);
   const [mode, setMode] = useState<Mode>("pin");
+  const onPinChangeRef = useRef(onPinChange);
+  const onRouteChangeRef = useRef(onRouteChange);
+  const readOnlyRef = useRef(readOnly);
 
   const modeRef = useRef<Mode>(mode);
   const routeRef = useRef<RoutePoint[]>(routePoints);
@@ -44,6 +47,18 @@ export default function EventMapEditor({
   useEffect(() => {
     routeRef.current = routePoints;
   }, [routePoints]);
+
+  useEffect(() => {
+    onPinChangeRef.current = onPinChange;
+  }, [onPinChange]);
+
+  useEffect(() => {
+    onRouteChangeRef.current = onRouteChange;
+  }, [onRouteChange]);
+
+  useEffect(() => {
+    readOnlyRef.current = readOnly;
+  }, [readOnly]);
 
   const mapHeightClass = useMemo(() => className ?? "h-64 w-full rounded-xl border border-border/70", [className]);
 
@@ -77,13 +92,13 @@ export default function EventMapEditor({
       map.setView([initial.lat, initial.lng], pin || routePoints.length > 0 ? 13 : 7);
 
       map.on("click", (event: any) => {
-        if (readOnly) return;
+        if (readOnlyRef.current) return;
         const nextPoint = { lat: event.latlng.lat, lng: event.latlng.lng };
         if (modeRef.current === "pin") {
-          onPinChange(nextPoint);
+          onPinChangeRef.current(nextPoint);
           return;
         }
-        onRouteChange([...routeRef.current, nextPoint]);
+        onRouteChangeRef.current([...routeRef.current, nextPoint]);
       });
 
       setTimeout(() => {
@@ -103,7 +118,7 @@ export default function EventMapEditor({
       polylineRef.current = null;
       LRef.current = null;
     };
-  }, [onPinChange, onRouteChange, pin, readOnly, routePoints]);
+  }, []);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -146,6 +161,20 @@ export default function EventMapEditor({
     }
   }, [pin, routePoints]);
 
+  const setPinFromMapCenter = () => {
+    const map = mapRef.current;
+    if (!map || readOnly) return;
+    const center = map.getCenter();
+    onPinChange({ lat: Number(center.lat), lng: Number(center.lng) });
+  };
+
+  const addRoutePointFromMapCenter = () => {
+    const map = mapRef.current;
+    if (!map || readOnly) return;
+    const center = map.getCenter();
+    onRouteChange([...routePoints, { lat: Number(center.lat), lng: Number(center.lng) }]);
+  };
+
   return (
     <div className="space-y-2">
       {!readOnly ? (
@@ -165,6 +194,22 @@ export default function EventMapEditor({
             onClick={() => setMode("route")}
           >
             Disegna percorso
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline-neon"
+            onClick={setPinFromMapCenter}
+          >
+            Pin al centro
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline-neon"
+            onClick={addRoutePointFromMapCenter}
+          >
+            Punto percorso al centro
           </Button>
           <Button
             type="button"
