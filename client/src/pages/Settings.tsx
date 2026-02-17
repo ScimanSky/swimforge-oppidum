@@ -37,6 +37,7 @@ import {
   Trash2,
   LogOut,
   Smartphone,
+  AlertTriangle,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { supabase } from "@/lib/supabase"
@@ -445,9 +446,27 @@ export default function Settings() {
   const setConsentMutation = trpc.consent.set.useMutation({
     onError: (error) => toast.error(error.message || "Impossibile aggiornare il consenso."),
   })
+  const resetAppForLaunchMutation = trpc.auth.resetAppForLaunch.useMutation({
+    onSuccess: async () => {
+      try {
+        await supabase.auth.signOut()
+      } catch {
+        // no-op
+      }
+      localStorage.clear()
+      toast.success("Reset completato. App pronta al lancio.")
+      window.location.href = "/"
+    },
+    onError: (error) => {
+      toast.error(error.message || "Reset non riuscito.")
+    },
+  })
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletePassword, setDeletePassword] = useState("")
+  const [resetDialogOpen, setResetDialogOpen] = useState(false)
+  const [resetConfirmationText, setResetConfirmationText] = useState("")
   const [consentState, setConsentState] = useState<Record<string, boolean>>({})
+  const isDevResetAccount = (me?.email ?? "").toLowerCase() === "shardanu@gmail.com"
 
   useEffect(() => {
     const next: Record<string, boolean> = {}
@@ -1516,6 +1535,24 @@ export default function Settings() {
                   Elimina
                 </Button>
               </div>
+              {isDevResetAccount ? (
+                <div className="flex items-center justify-between p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                  <div>
+                    <p className="font-medium text-amber-300">Reset App per Lancio (solo dev)</p>
+                    <p className="text-sm text-muted-foreground">
+                      Cancella tutti i dati di test (attivita, club, post, notifiche, chat, sfide). L&apos;account dev resta attivo.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline-neon"
+                    className="gap-2 text-amber-300 border-amber-400/40"
+                    onClick={() => setResetDialogOpen(true)}
+                  >
+                    <AlertTriangle className="w-4 h-4" />
+                    Reset app
+                  </Button>
+                </div>
+              ) : null}
             </div>
           </section>
         </TabsContent>
@@ -1579,6 +1616,47 @@ export default function Settings() {
               }
             >
               {deleteAccountMutation.isPending ? "Eliminazione..." : "Conferma eliminazione"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={resetDialogOpen}
+        onOpenChange={(open) => {
+          setResetDialogOpen(open)
+          if (!open) setResetConfirmationText("")
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-amber-300">Conferma reset completo app (dev only)</DialogTitle>
+            <DialogDescription>
+              Operazione irreversibile: verranno eliminati tutti i dati di test. L&apos;account dev rimane attivo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="reset-app-confirmation">Scrivi esattamente: <span className="font-mono">RESET APP</span></Label>
+            <Input
+              id="reset-app-confirmation"
+              value={resetConfirmationText}
+              onChange={(event) => setResetConfirmationText(event.target.value)}
+              placeholder="RESET APP"
+              autoComplete="off"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setResetDialogOpen(false)}>
+              Annulla
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={resetConfirmationText.trim() !== "RESET APP" || resetAppForLaunchMutation.isPending}
+              onClick={() => {
+                resetAppForLaunchMutation.mutate({ confirmation: resetConfirmationText.trim() })
+              }}
+            >
+              {resetAppForLaunchMutation.isPending ? "Reset in corso..." : "Conferma reset"}
             </Button>
           </DialogFooter>
         </DialogContent>

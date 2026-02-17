@@ -3,12 +3,20 @@ import {
     TRPCError, sdk, verifySupabaseAccessToken,
     loginLimiter, registrationLimiter,
     COOKIE_NAME, getSessionCookieOptions,
-    applyRateLimit,
+    applyRateLimit, sql,
 } from "./_shared";
 import { getSupabaseAdminClient } from "../_core/supabase_admin";
 import { sendAccountDeletionConfirmationEmail } from "../_core/email";
 import { ENV } from "../_core/env";
 import { ensureRequiredLegalConsents } from "../consent";
+
+const DEV_RESET_EMAIL = "shardanu@gmail.com";
+const RESET_CONFIRMATION_PHRASE = "RESET APP";
+
+const isUndefinedTableError = (error: unknown) => {
+    if (!error || typeof error !== "object") return false;
+    return (error as { code?: string }).code === "42P01";
+};
 
 export const authRouter = router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -194,6 +202,132 @@ export const authRouter = router({
         ctx.res.clearCookie(COOKIE_NAME, cookieOptions);
         return { success: true } as const;
     }),
+
+    resetAppForLaunch: protectedProcedure
+        .input(
+            z.object({
+                confirmation: z.string().min(1),
+            })
+        )
+        .mutation(async ({ ctx, input }) => {
+            const currentEmail = (ctx.user.email ?? "").trim().toLowerCase();
+            if (currentEmail !== DEV_RESET_EMAIL) {
+                throw new TRPCError({ code: "FORBIDDEN", message: "Operazione consentita solo all'account dev." });
+            }
+
+            if (input.confirmation.trim() !== RESET_CONFIRMATION_PHRASE) {
+                throw new TRPCError({
+                    code: "PRECONDITION_FAILED",
+                    message: `Conferma non valida. Inserisci esattamente: ${RESET_CONFIRMATION_PHRASE}`,
+                });
+            }
+
+            const preservedUser = await db.getUserByEmail(DEV_RESET_EMAIL);
+            if (!preservedUser) {
+                throw new TRPCError({
+                    code: "INTERNAL_SERVER_ERROR",
+                    message: "Account dev non trovato. Reset annullato.",
+                });
+            }
+
+            const dbConn = await db.getDb();
+            if (!dbConn) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database non disponibile" });
+            }
+
+            const otherUsersResult = await dbConn.execute(sql`
+                SELECT id
+                FROM users
+                WHERE id <> ${preservedUser.id}
+            `);
+            const otherUserIds = (otherUsersResult.rows as Array<{ id: number }>).map((row) => Number(row.id)).filter((id) => Number.isFinite(id));
+
+            for (const userId of otherUserIds) {
+                await db.deleteUserAccount(userId);
+            }
+
+            await dbConn.transaction(async (tx) => {
+                const deleteIfExists = async (query: ReturnType<typeof sql>) => {
+                    try {
+                        await tx.execute(query);
+                    } catch (error) {
+                        if (!isUndefinedTableError(error)) {
+                            throw error;
+                        }
+                    }
+                };
+
+                // Global cleanup for launch reset (dynamic/test data only).
+                await deleteIfExists(sql`DELETE FROM story_views`);
+                await deleteIfExists(sql`DELETE FROM story_reactions`);
+                await deleteIfExists(sql`DELETE FROM stories`);
+
+                await deleteIfExists(sql`DELETE FROM post_reactions`);
+                await deleteIfExists(sql`DELETE FROM social_comments`);
+                await deleteIfExists(sql`DELETE FROM social_splashes`);
+                await deleteIfExists(sql`DELETE FROM social_hidden_posts`);
+                await deleteIfExists(sql`DELETE FROM social_post_reports`);
+                await deleteIfExists(sql`DELETE FROM social_follows`);
+                await deleteIfExists(sql`DELETE FROM social_posts`);
+
+                await deleteIfExists(sql`DELETE FROM direct_messages`);
+                await deleteIfExists(sql`DELETE FROM user_notifications`);
+
+                await deleteIfExists(sql`DELETE FROM event_attendees`);
+                await deleteIfExists(sql`DELETE FROM club_announcements`);
+                await deleteIfExists(sql`DELETE FROM club_media`);
+                await deleteIfExists(sql`DELETE FROM club_events`);
+                await deleteIfExists(sql`DELETE FROM community_club_invites`);
+                await deleteIfExists(sql`DELETE FROM community_club_members`);
+                await deleteIfExists(sql`DELETE FROM community_clubs`);
+
+                await deleteIfExists(sql`DELETE FROM challenge_participants`);
+                await deleteIfExists(sql`DELETE FROM challenge_badges`);
+                await deleteIfExists(sql`DELETE FROM challenge_activity_log`);
+                await deleteIfExists(sql`DELETE FROM challenges`);
+
+                await deleteIfExists(sql`DELETE FROM season_activity_predictions`);
+                await deleteIfExists(sql`DELETE FROM season_club_quest_claims`);
+
+                await deleteIfExists(sql`DELETE FROM ghost_challenges`);
+                await deleteIfExists(sql`DELETE FROM garmin_activity_lengths`);
+                await deleteIfExists(sql`DELETE FROM garmin_activity_laps`);
+                await deleteIfExists(sql`DELETE FROM swimming_activities`);
+
+                await deleteIfExists(sql`DELETE FROM user_badges`);
+                await deleteIfExists(sql`DELETE FROM user_achievement_badges`);
+                await deleteIfExists(sql`DELETE FROM xp_transactions`);
+                await deleteIfExists(sql`DELETE FROM personal_records`);
+                await deleteIfExists(sql`DELETE FROM weekly_stats`);
+
+                await deleteIfExists(sql`DELETE FROM ai_insights_cache`);
+                await deleteIfExists(sql`DELETE FROM activity_ai_insights`);
+                await deleteIfExists(sql`DELETE FROM ai_coach_workouts`);
+
+                await deleteIfExists(sql`DELETE FROM garmin_tokens`);
+                await deleteIfExists(sql`DELETE FROM strava_tokens`);
+                await deleteIfExists(sql`DELETE FROM user_consents`);
+
+                // Reset and preserve the dev identity only.
+                await deleteIfExists(sql`DELETE FROM swimmer_profiles`);
+                await tx.execute(sql`DELETE FROM users WHERE id <> ${preservedUser.id}`);
+                await tx.execute(sql`
+                    UPDATE users
+                    SET
+                        role = 'admin',
+                        updated_at = now(),
+                        last_signed_in = now(),
+                        session_token_version = COALESCE(session_token_version, 1) + 1
+                    WHERE id = ${preservedUser.id}
+                `);
+                await tx.execute(sql`INSERT INTO swimmer_profiles (user_id) VALUES (${preservedUser.id})`);
+            });
+
+            const cookieOptions = getSessionCookieOptions(ctx.req);
+            ctx.res.clearCookie(COOKIE_NAME, cookieOptions);
+
+            return { success: true, preservedEmail: DEV_RESET_EMAIL, deletedUsers: otherUserIds.length } as const;
+        }),
 
     deleteAccount: protectedProcedure
         .input(
