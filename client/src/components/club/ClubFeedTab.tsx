@@ -107,7 +107,7 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
 
   const feedQuery = trpc.community.clubs.feed.useQuery(
     { clubId, limit: 20 },
-    { enabled: !!clubId }
+    { enabled: !!clubId && isMember }
   );
   const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 5 * 60_000 });
   const autoplayVideos = (() => {
