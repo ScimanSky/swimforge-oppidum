@@ -5,17 +5,27 @@ export const ONBOARDING_STORAGE_KEY = "swimforge:onboarding:completed:v1";
 
 export const ONBOARDING_FORCE_QUERY_PARAM = "onboarding";
 
-export function isOnboardingCompletedLocally(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(ONBOARDING_STORAGE_KEY) === "1";
+function getScopedOnboardingStorageKey(userId?: string | number | null): string {
+  if (userId === undefined || userId === null || userId === "") return ONBOARDING_STORAGE_KEY;
+  return `${ONBOARDING_STORAGE_KEY}:${String(userId)}`;
 }
 
-export function setOnboardingCompletedLocally(value: boolean): void {
+export function isOnboardingCompletedLocally(userId?: string | number | null): boolean {
+  if (typeof window === "undefined") return false;
+  const scopedKey = getScopedOnboardingStorageKey(userId);
+  return window.localStorage.getItem(scopedKey) === "1";
+}
+
+export function setOnboardingCompletedLocally(
+  value: boolean,
+  userId?: string | number | null
+): void {
   if (typeof window === "undefined") return;
+  const scopedKey = getScopedOnboardingStorageKey(userId);
   if (value) {
-    window.localStorage.setItem(ONBOARDING_STORAGE_KEY, "1");
+    window.localStorage.setItem(scopedKey, "1");
   } else {
-    window.localStorage.removeItem(ONBOARDING_STORAGE_KEY);
+    window.localStorage.removeItem(scopedKey);
   }
 }
 

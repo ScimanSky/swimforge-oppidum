@@ -119,6 +119,7 @@ export default function OnboardingFlow() {
   const [manualRunNonce, setManualRunNonce] = useState(0);
   const [pendingTourLaunch, setPendingTourLaunch] = useState(false);
   const [welcomeCompleted, setWelcomeCompleted] = useState(false);
+  const onboardingUserId = meQuery.data?.id ? String(meQuery.data.id) : null;
 
   const syncAttemptedRef = useRef(false);
 
@@ -152,10 +153,10 @@ export default function OnboardingFlow() {
     if (isPublicPath(pathname)) return;
     if (!canEvaluate) return;
 
-    const localDone = isOnboardingCompletedLocally();
+    const localDone = isOnboardingCompletedLocally(onboardingUserId);
 
     if (serverDone && !localDone) {
-      setOnboardingCompletedLocally(true);
+      setOnboardingCompletedLocally(true, onboardingUserId);
     }
 
     if (shouldForce) {
@@ -179,12 +180,12 @@ export default function OnboardingFlow() {
       setStage("hidden");
       setHighlightRect(null);
     }
-  }, [canEvaluate, meQuery.data?.id, pathname, pendingTourLaunch, serverDone, shouldForce, stage]);
+  }, [canEvaluate, meQuery.data?.id, onboardingUserId, pathname, pendingTourLaunch, serverDone, shouldForce, stage]);
 
   useEffect(() => {
     if (!canEvaluate || !meQuery.data?.id) return;
 
-    const localDone = isOnboardingCompletedLocally();
+    const localDone = isOnboardingCompletedLocally(onboardingUserId);
     if (!localDone || serverDone || syncAttemptedRef.current) return;
 
     syncAttemptedRef.current = true;
@@ -198,7 +199,7 @@ export default function OnboardingFlow() {
       .catch(() => {
         syncAttemptedRef.current = false;
       });
-  }, [canEvaluate, meQuery.data?.id, serverDone, setConsentMutation, utils.consent.list]);
+  }, [canEvaluate, meQuery.data?.id, onboardingUserId, serverDone, setConsentMutation, utils.consent.list]);
 
   useEffect(() => {
     if (!pendingTourLaunch || pathname !== "/home") return;
@@ -272,7 +273,7 @@ export default function OnboardingFlow() {
   }, [currentStep, stage]);
 
   const completeOnboarding = async () => {
-    setOnboardingCompletedLocally(true);
+    setOnboardingCompletedLocally(true, onboardingUserId);
     setStage("hidden");
     setCurrentStep(0);
     setHighlightRect(null);
