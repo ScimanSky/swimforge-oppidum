@@ -681,11 +681,14 @@ export default function ClubDetailEnhanced() {
                     className="h-72 w-full rounded-xl border border-border/70 sm:h-80"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Clicca sulla mappa per impostare il pin (modalita pin) o disegnare il percorso in acqua (modalita percorso).
+                    Clicca sulla mappa per impostare il pin (modalita pin) o aggiungere waypoint numerati del percorso (modalita percorso).
                   </p>
-                  {eventRoutePoints.length >= 2 ? (
+                  {eventRoutePoints.length > 0 ? (
                     <p className="text-xs text-muted-foreground">
-                      Percorso: {(routeDistanceMeters(eventRoutePoints) / 1000).toFixed(2)} km
+                      Waypoint: {eventRoutePoints.length}
+                      {eventRoutePoints.length >= 2
+                        ? ` · Percorso: ${(routeDistanceMeters(eventRoutePoints) / 1000).toFixed(2)} km`
+                        : ""}
                     </p>
                   ) : null}
                 </div>

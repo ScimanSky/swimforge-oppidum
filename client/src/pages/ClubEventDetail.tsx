@@ -7,7 +7,7 @@ import { MetricOrb } from "@/components/metrics/MetricOrb";
 import EventMapEditor from "@/components/club/EventMapEditor";
 import { parseRouteGeojson, pointsToRouteGeojson, routeDistanceMeters, routeGeojsonToPoints, type RoutePoint } from "@/lib/club-event-map";
 import { trpc } from "@/lib/trpc";
-import { Calendar, CheckCircle2, HelpCircle, MapPin, Pencil, RefreshCw, Save, Users, X, XCircle, ExternalLink, Wind, Waves } from "lucide-react";
+import { Calendar, CheckCircle2, Cloud, CloudFog, CloudLightning, CloudRain, CloudSnow, CloudSun, ExternalLink, HelpCircle, MapPin, Pencil, RefreshCw, Save, Sun, Users, Wind, Waves, X, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useRoute } from "wouter";
 import { toast } from "sonner";
@@ -37,6 +37,10 @@ type EventWeatherSnapshot = {
   targetTime?: string;
   resolvedTime?: string | null;
   timezone?: string | null;
+  general?: {
+    temperatureC?: number | null;
+    weatherCode?: number | null;
+  };
   wind?: {
     speedMps?: number | null;
     directionDeg?: number | null;
@@ -60,6 +64,32 @@ const parseWeatherSnapshot = (raw: unknown): EventWeatherSnapshot | null => {
   if (typeof raw === "object") return raw as EventWeatherSnapshot;
   return null;
 };
+
+function degreesToCardinal(degrees: number | null | undefined) {
+  if (!Number.isFinite(degrees)) return "n/d";
+  const labels = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"];
+  const index = Math.round((((degrees as number) % 360) / 22.5)) % 16;
+  return labels[index];
+}
+
+function describeWeatherCode(code: number | null | undefined): {
+  label: string;
+  Icon: typeof Sun;
+} {
+  if (!Number.isFinite(code)) return { label: "Condizioni non disponibili", Icon: Cloud };
+  const value = Math.round(code as number);
+  if (value === 0) return { label: "Sereno", Icon: Sun };
+  if (value === 1) return { label: "Prevalentemente sereno", Icon: CloudSun };
+  if (value === 2) return { label: "Parzialmente nuvoloso", Icon: CloudSun };
+  if (value === 3) return { label: "Coperto", Icon: Cloud };
+  if (value === 45 || value === 48) return { label: "Nebbia", Icon: CloudFog };
+  if ((value >= 51 && value <= 57) || (value >= 61 && value <= 67) || (value >= 80 && value <= 82)) {
+    return { label: "Pioggia", Icon: CloudRain };
+  }
+  if ((value >= 71 && value <= 77) || value === 85 || value === 86) return { label: "Neve", Icon: CloudSnow };
+  if (value >= 95) return { label: "Temporale", Icon: CloudLightning };
+  return { label: "Variabile", Icon: Cloud };
+}
 
 const pointsEqual = (a: RoutePoint[], b: RoutePoint[]) => {
   if (a === b) return true;
@@ -158,6 +188,7 @@ export default function ClubEventDetail() {
     () => parseWeatherSnapshot(event?.weatherSnapshot),
     [event?.weatherSnapshot]
   );
+  const weatherCondition = describeWeatherCode(weatherSnapshot?.general?.weatherCode);
   const weatherTime = weatherSnapshot?.resolvedTime || weatherSnapshot?.targetTime || weatherSnapshot?.fetchedAt || null;
   const [isEditingRoute, setIsEditingRoute] = useState(false);
   const [draftPin, setDraftPin] = useState<RoutePoint | null>(null);
@@ -289,9 +320,12 @@ export default function ClubEventDetail() {
                   readOnly={!isEditingRoute}
                   className="h-72 w-full rounded-xl border border-border/70"
                 />
-                {isEditingRoute ? (
+                {(isEditingRoute ? draftRoutePoints : routePoints).length > 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    Percorso corrente: {(routeDistanceMeters(draftRoutePoints) / 1000).toFixed(2)} km
+                    Waypoint: {(isEditingRoute ? draftRoutePoints : routePoints).length}
+                    {(isEditingRoute ? draftRoutePoints : routePoints).length >= 2
+                      ? ` · Percorso: ${(routeDistanceMeters(isEditingRoute ? draftRoutePoints : routePoints) / 1000).toFixed(2)} km`
+                      : ""}
                   </p>
                 ) : null}
                 {hasEventMap ? (
@@ -343,6 +377,16 @@ export default function ClubEventDetail() {
                 <div className="grid gap-2 sm:grid-cols-2">
                   <div className="rounded-md border border-border/60 bg-background/40 p-2 text-sm">
                     <p className="flex items-center gap-1 text-muted-foreground">
+                      <weatherCondition.Icon className="h-3.5 w-3.5" />
+                      Meteo generale
+                    </p>
+                    <p className="font-semibold">
+                      {weatherCondition.label}
+                      {weatherSnapshot.general?.temperatureC != null ? ` · ${weatherSnapshot.general.temperatureC.toFixed(1)} °C` : ""}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-border/60 bg-background/40 p-2 text-sm">
+                    <p className="flex items-center gap-1 text-muted-foreground">
                       <Wind className="h-3.5 w-3.5" />
                       Vento
                     </p>
@@ -350,7 +394,8 @@ export default function ClubEventDetail() {
                       {weatherSnapshot.wind?.speedMps != null ? `${weatherSnapshot.wind.speedMps.toFixed(1)} m/s` : "n/d"}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Direzione: {weatherSnapshot.wind?.directionDeg != null ? `${Math.round(weatherSnapshot.wind.directionDeg)}°` : "n/d"}
+                      Direzione: {degreesToCardinal(weatherSnapshot.wind?.directionDeg)}{" "}
+                      {weatherSnapshot.wind?.directionDeg != null ? `(${Math.round(weatherSnapshot.wind.directionDeg)}°)` : ""}
                     </p>
                   </div>
                   <div className="rounded-md border border-border/60 bg-background/40 p-2 text-sm">
@@ -362,7 +407,8 @@ export default function ClubEventDetail() {
                       {weatherSnapshot.waves?.heightM != null ? `${weatherSnapshot.waves.heightM.toFixed(2)} m` : "n/d"}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Direzione: {weatherSnapshot.waves?.directionDeg != null ? `${Math.round(weatherSnapshot.waves.directionDeg)}°` : "n/d"}
+                      Direzione: {degreesToCardinal(weatherSnapshot.waves?.directionDeg)}
+                      {weatherSnapshot.waves?.directionDeg != null ? ` (${Math.round(weatherSnapshot.waves.directionDeg)}°)` : ""}
                       {" · "}
                       Periodo: {weatherSnapshot.waves?.periodSeconds != null ? `${weatherSnapshot.waves.periodSeconds.toFixed(1)} s` : "n/d"}
                     </p>

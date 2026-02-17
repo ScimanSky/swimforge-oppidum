@@ -4,6 +4,10 @@ export type EventWeatherSnapshot = {
   targetTime: string;
   resolvedTime: string | null;
   timezone: string | null;
+  general: {
+    temperatureC: number | null;
+    weatherCode: number | null;
+  };
   wind: {
     speedMps: number | null;
     directionDeg: number | null;
@@ -19,6 +23,8 @@ type ForecastResponse = {
   timezone?: string;
   hourly?: {
     time?: string[];
+    temperature_2m?: Array<number | null>;
+    weather_code?: Array<number | null>;
     wind_speed_10m?: Array<number | null>;
     wind_direction_10m?: Array<number | null>;
   };
@@ -89,7 +95,7 @@ export async function fetchEventWeatherSnapshot(params: {
     forecast_days: "3",
   });
 
-  const forecastUrl = `https://api.open-meteo.com/v1/forecast?${shared.toString()}&hourly=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms`;
+  const forecastUrl = `https://api.open-meteo.com/v1/forecast?${shared.toString()}&hourly=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m&wind_speed_unit=ms`;
   const marineUrl = `https://marine-api.open-meteo.com/v1/marine?${shared.toString()}&hourly=wave_height,wave_direction,wave_period`;
 
   const [forecast, marine] = await Promise.all([
@@ -110,6 +116,10 @@ export async function fetchEventWeatherSnapshot(params: {
     targetTime: new Date(targetMs).toISOString(),
     resolvedTime,
     timezone: forecast.timezone ?? marine.timezone ?? null,
+    general: {
+      temperatureC: forecastIdx >= 0 ? toFiniteNumber(forecast.hourly?.temperature_2m?.[forecastIdx]) : null,
+      weatherCode: forecastIdx >= 0 ? toFiniteNumber(forecast.hourly?.weather_code?.[forecastIdx]) : null,
+    },
     wind: {
       speedMps: forecastIdx >= 0 ? toFiniteNumber(forecast.hourly?.wind_speed_10m?.[forecastIdx]) : null,
       directionDeg: forecastIdx >= 0 ? toFiniteNumber(forecast.hourly?.wind_direction_10m?.[forecastIdx]) : null,

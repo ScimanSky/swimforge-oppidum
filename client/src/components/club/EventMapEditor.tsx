@@ -31,6 +31,7 @@ export default function EventMapEditor({
   const mapRef = useRef<any>(null);
   const LRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
+  const waypointMarkersRef = useRef<any[]>([]);
   const polylineRef = useRef<any>(null);
   const [mode, setMode] = useState<Mode>("pin");
   const onPinChangeRef = useRef(onPinChange);
@@ -115,6 +116,10 @@ export default function EventMapEditor({
         mapRef.current = null;
       }
       markerRef.current = null;
+      for (const marker of waypointMarkersRef.current) {
+        marker.remove();
+      }
+      waypointMarkersRef.current = [];
       polylineRef.current = null;
       LRef.current = null;
     };
@@ -133,17 +138,38 @@ export default function EventMapEditor({
       markerRef.current = L.marker([pin.lat, pin.lng]).addTo(map);
     }
 
+    for (const marker of waypointMarkersRef.current) {
+      marker.remove();
+    }
+    waypointMarkersRef.current = [];
+
     if (polylineRef.current) {
       polylineRef.current.remove();
       polylineRef.current = null;
     }
+    if (routePoints.length > 0) {
+      waypointMarkersRef.current = routePoints.map((point, index) =>
+        L.marker([point.lat, point.lng], {
+          icon: L.divIcon({
+            className: "club-waypoint-marker",
+            html: `<div style="width:26px;height:26px;border-radius:9999px;background:rgba(0,229,255,0.92);color:#00111a;border:2px solid rgba(255,255,255,0.9);font-size:12px;font-weight:700;line-height:22px;text-align:center;box-shadow:0 0 12px rgba(0,229,255,0.45);">${index + 1}</div>`,
+            iconSize: [26, 26],
+            iconAnchor: [13, 13],
+          }),
+          interactive: false,
+          keyboard: false,
+        }).addTo(map)
+      );
+    }
+
     if (routePoints.length >= 2) {
       polylineRef.current = L.polyline(
         routePoints.map((point) => [point.lat, point.lng]),
         {
           color: "#00e5ff",
-          weight: 4,
-          opacity: 0.9,
+          weight: 2,
+          opacity: 0.55,
+          dashArray: "8,8",
         }
       ).addTo(map);
     }
@@ -179,7 +205,7 @@ export default function EventMapEditor({
             variant={mode === "route" ? "neon" : "outline-neon"}
             onClick={() => setMode("route")}
           >
-            Disegna percorso
+            Aggiungi waypoint
           </Button>
           <Button
             type="button"
