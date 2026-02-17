@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link, useRoute } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import { motion } from "framer-motion";
 import { Pin, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
@@ -438,6 +438,8 @@ export default function ClubDetailEnhanced() {
             <ClubSettingsForm
               club={club}
               clubId={clubId}
+              isStaff={isStaff}
+              isOwner={memberRole === "owner"}
               onSaved={() => {
                 setSettingsOpen(false);
                 utils.community.clubs.get.invalidate({ clubId });
@@ -664,7 +666,20 @@ async function uploadToImageKit(
 
 /* ---- Settings Form ---- */
 
-function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number; onSaved: () => void }) {
+function ClubSettingsForm({
+  club,
+  clubId,
+  isStaff,
+  isOwner,
+  onSaved,
+}: {
+  club: any;
+  clubId: number;
+  isStaff: boolean;
+  isOwner: boolean;
+  onSaved: () => void;
+}) {
+  const [, setLocation] = useLocation();
   const [name, setName] = useState(club.name);
   const [description, setDescription] = useState(club.description ?? "");
   const [rules, setRules] = useState(club.rules ?? "");
@@ -683,6 +698,13 @@ function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number
   const updateMutation = trpc.community.clubs.update.useMutation({
     onSuccess: () => { toast.success("Club aggiornato!"); onSaved(); },
     onError: (e) => toast.error(e.message),
+  });
+  const deleteMutation = trpc.community.clubs.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Club eliminato");
+      setLocation("/home/community");
+    },
+    onError: (e) => toast.error(e.message || "Impossibile eliminare il club"),
   });
 
   const handleFilePick = (file: File, target: "logo" | "cover") => {
@@ -886,6 +908,36 @@ function ClubSettingsForm({ club, clubId, onSaved }: { club: any; clubId: number
       >
         {saving ? "Caricamento..." : "Salva modifiche"}
       </Button>
+
+      {isStaff ? (
+        <div className="rounded-lg border border-border/60 bg-card/40 p-3">
+          <p className="text-sm font-semibold">Moderazione</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            La gestione ruoli, ban/sblocchi e richieste ingresso è disponibile nella sezione membri del club.
+          </p>
+        </div>
+      ) : null}
+
+      {isOwner ? (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 space-y-2">
+          <p className="text-sm font-semibold text-destructive">Zona pericolosa</p>
+          <p className="text-xs text-muted-foreground">
+            Questa azione elimina definitivamente club, eventi e contenuti associati.
+          </p>
+          <Button
+            variant="destructive"
+            className="w-full"
+            disabled={deleteMutation.isPending}
+            onClick={() => {
+              const ok = window.confirm("Confermi l'eliminazione definitiva del club?");
+              if (!ok) return;
+              deleteMutation.mutate({ clubId });
+            }}
+          >
+            {deleteMutation.isPending ? "Eliminazione..." : "Elimina club"}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -228,7 +228,6 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
           <div className="flex min-w-0 items-center gap-3">
             {headerSlot}
             <div className="min-w-0">
-              <div className="text-xs text-muted-foreground">Neon Soft Dark</div>
               <div className="truncate text-lg font-display font-semibold tracking-wide">
                 {pageTitle}
               </div>

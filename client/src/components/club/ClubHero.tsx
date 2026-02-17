@@ -117,7 +117,7 @@ export default function ClubHero({
             >
               <Users className="h-3.5 w-3.5" />
             </Button>
-            {club.is_member ? (
+            {isStaff ? (
               <Button
                 variant="ghost"
                 size="icon"
