@@ -34,7 +34,7 @@ SwimForge è fornito "così com'è" e ci riserviamo il diritto di modificare, so
 
 Per utilizzare SwimForge, devi:
 
-- Avere almeno **13 anni** (o l'età minima prevista dalla legge nel tuo paese)
+- Avere almeno **14 anni** se risiedi in Italia (art. 2-quinquies Codice Privacy) o l'età minima prevista dalla legge locale
 - Fornire informazioni accurate e complete durante la registrazione
 - Mantenere la sicurezza del tuo account e password
 - Essere responsabile di tutte le attività che si verificano tramite il tuo account
@@ -318,9 +318,9 @@ Se la negoziazione fallisce, la controversia sarà risolta tramite:
 - **Mediazione** (facoltativa)
 - **Tribunale competente** del luogo di residenza del provider o dell'utente (per utenti UE)
 
-### 15.3 Rinuncia ad azioni collettive
+### 15.3 ADR / ODR per consumatori UE
 
-Nella misura consentita dalla legge, accetti di risolvere le controversie su base individuale e rinunci al diritto di partecipare ad azioni collettive.
+Per gli utenti consumatori residenti nell'UE, resta salvo il diritto di usare strumenti ADR/ODR previsti dalla normativa applicabile.
 
 ---
 

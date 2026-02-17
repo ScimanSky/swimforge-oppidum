@@ -22,6 +22,7 @@ import {
 } from "./gameplay.router";
 import { challengesRouter } from "./challenges.router";
 import { communityRouter } from "./community.router";
+import { consentRouter } from "./consent.router";
 import {
     adminRouter,
     statisticsRouter,
@@ -50,6 +51,7 @@ export const appRouter = router({
     strava: stravaRouter,
     challenges: challengesRouter,
     community: communityRouter,
+    consent: consentRouter,
     admin: adminRouter,
     statistics: statisticsRouter,
     aiCoach: aiCoachRouter,

@@ -219,13 +219,13 @@ I tuoi dati potrebbero essere trasferiti e conservati su server situati al di fu
 
 Garantiamo che tali trasferimenti rispettino le normative applicabili sulla protezione dei dati (es. GDPR) tramite:
 - Clausole contrattuali standard
-- Certificazioni di adeguatezza (es. Privacy Shield, dove applicabile)
+- Certificazioni di adeguatezza (es. EU-US Data Privacy Framework, dove applicabile)
 
 ---
 
 ## 10. Minori
 
-SwimForge non è destinato a utenti di età inferiore a **13 anni** (o età minima prevista dalla legge locale). Non raccogliamo consapevolmente informazioni personali da minori.
+In Italia, SwimForge non è destinato a utenti di età inferiore a **14 anni** (art. 2-quinquies Codice Privacy). Non raccogliamo consapevolmente informazioni personali da minori di 14 anni.
 
 Se vieni a conoscenza che un minore ha fornito informazioni personali, contattaci immediatamente per la cancellazione.
 

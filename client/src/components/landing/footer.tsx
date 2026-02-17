@@ -23,6 +23,7 @@ const footerLinks = {
     links: [
       { label: "Privacy", href: "/privacy" },
       { label: "Termini", href: "/terms" },
+      { label: "Cookie", href: "/cookies" },
     ],
   },
 }

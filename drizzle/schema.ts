@@ -27,6 +27,29 @@ export const users = pgTable("users", {
 });
 
 // ============================================
+// USER CONSENTS (GDPR audit trail)
+// ============================================
+export const userConsents = pgTable("user_consents", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  consentType: varchar("consent_type", { length: 64 }).notNull(),
+  consentVersion: varchar("consent_version", { length: 32 }).notNull(),
+  granted: boolean("granted").notNull().default(false),
+  grantedAt: timestamp("granted_at"),
+  withdrawnAt: timestamp("withdrawn_at"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userConsentUnique: unique("user_consents_user_type_version_unique").on(
+    table.userId,
+    table.consentType,
+    table.consentVersion,
+  ),
+}));
+
+// ============================================
 // SWIMMER PROFILES (Extended user data)
 // ============================================
 export const swimmerProfiles = pgTable("swimmer_profiles", {
@@ -675,6 +698,8 @@ export type ActivityAiInsight = typeof activityAiInsights.$inferSelect;
 export type InsertActivityAiInsight = typeof activityAiInsights.$inferInsert;
 export type AiCoachWorkout = typeof aiCoachWorkouts.$inferSelect;
 export type InsertAiCoachWorkout = typeof aiCoachWorkouts.$inferInsert;
+export type UserConsent = typeof userConsents.$inferSelect;
+export type InsertUserConsent = typeof userConsents.$inferInsert;
 export type Story = typeof stories.$inferSelect;
 export type InsertStory = typeof stories.$inferInsert;
 export type StoryView = typeof storyViews.$inferSelect;

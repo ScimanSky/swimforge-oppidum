@@ -8,6 +8,7 @@ import {
 import { getSupabaseAdminClient } from "../_core/supabase_admin";
 import { sendAccountDeletionConfirmationEmail } from "../_core/email";
 import { ENV } from "../_core/env";
+import { ensureRequiredLegalConsents } from "../consent";
 
 export const authRouter = router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -40,6 +41,8 @@ export const authRouter = router({
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
 
+            await ensureRequiredLegalConsents(result.user.id, ctx.req);
+
             return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
         }),
 
@@ -69,6 +72,7 @@ export const authRouter = router({
 
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
+            await ensureRequiredLegalConsents(result.user.id, ctx.req);
 
             return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
         }),
@@ -163,6 +167,7 @@ export const authRouter = router({
 
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
+            await ensureRequiredLegalConsents(user.id, ctx.req);
             return { success: true, isNewUser, user: { id: user.id, email: user.email, name: user.name } };
         }),
 

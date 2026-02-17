@@ -1,37 +1,55 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X, PenSquare, Calendar, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface QuickActionsFABProps {
   isMember: boolean;
   isStaff: boolean;
   onPost: () => void;
+  onOpenEvents?: () => void;
   onCreateEvent: () => void;
   onInvite: () => void;
 }
 
-export default function QuickActionsFAB({ isMember, isStaff, onPost, onCreateEvent, onInvite }: QuickActionsFABProps) {
+export default function QuickActionsFAB({
+  isMember,
+  isStaff,
+  onPost,
+  onOpenEvents,
+  onCreateEvent,
+  onInvite,
+}: QuickActionsFABProps) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const isMobile = useIsMobile();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   if (!isMember) return null;
+  if (!mounted || typeof document === "undefined") return null;
 
   const actions = [
     { icon: PenSquare, label: "Posta", onClick: onPost, show: true },
+    { icon: Calendar, label: "Eventi", onClick: onOpenEvents ?? (() => {}), show: Boolean(onOpenEvents) },
     { icon: Calendar, label: "Evento", onClick: onCreateEvent, show: isStaff },
     { icon: UserPlus, label: "Invita", onClick: onInvite, show: isStaff },
   ].filter((a) => a.show);
 
-  return (
-    <div className="fixed bottom-20 right-4 z-50 flex flex-col-reverse items-end gap-2">
+  const fab = (
+    <div className="flex flex-col-reverse items-end gap-2">
       <Button
         variant="neon"
         size="icon"
-        className="h-14 w-14 rounded-full shadow-lg"
+        className={`rounded-full shadow-lg ${isMobile ? "h-12 w-12" : "h-14 w-14"}`}
         onClick={() => setOpen(!open)}
       >
         <motion.div animate={{ rotate: open ? 45 : 0 }}>
-          {open ? <X className="h-6 w-6" /> : <Plus className="h-6 w-6" />}
+          {open ? <X className={isMobile ? "h-5 w-5" : "h-6 w-6"} /> : <Plus className={isMobile ? "h-5 w-5" : "h-6 w-6"} />}
         </motion.div>
       </Button>
       <AnimatePresence>
@@ -48,7 +66,7 @@ export default function QuickActionsFAB({ isMember, isStaff, onPost, onCreateEve
             <Button
               variant="outline-neon"
               size="icon"
-              className="h-10 w-10 rounded-full"
+              className={`rounded-full ${isMobile ? "h-9 w-9" : "h-10 w-10"}`}
               onClick={() => { action.onClick(); setOpen(false); }}
             >
               <action.icon className="h-4 w-4" />
@@ -57,5 +75,12 @@ export default function QuickActionsFAB({ isMember, isStaff, onPost, onCreateEve
         ))}
       </AnimatePresence>
     </div>
+  );
+
+  return createPortal(
+    <div className={`fixed right-4 z-[75] ${isMobile ? "bottom-[calc(env(safe-area-inset-bottom)+5rem)]" : "bottom-6"}`}>
+      {fab}
+    </div>,
+    document.body,
   );
 }

@@ -14,6 +14,27 @@ import {
     runAutoSync,
     garmin, strava,
 } from "./_shared";
+import { hasGrantedConsent } from "../consent";
+
+async function assertHealthAndProviderConsent(userId: number, provider: "garmin_sync" | "strava_sync") {
+    const [healthAllowed, providerAllowed] = await Promise.all([
+        hasGrantedConsent(userId, "health_data_processing"),
+        hasGrantedConsent(userId, provider),
+    ]);
+
+    if (!healthAllowed) {
+        throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "Per usare la sincronizzazione devi accettare il consenso per il trattamento dati salute in Impostazioni > Privacy.",
+        });
+    }
+    if (!providerAllowed) {
+        throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `Devi autorizzare il consenso ${provider === "garmin_sync" ? "Garmin" : "Strava"} in Impostazioni > Privacy.`,
+        });
+    }
+}
 
 // Auto sync Garmin + Strava (login/app open)
 export const syncRouter = router({
@@ -314,6 +335,7 @@ export const garminRouter = router({
             password: z.string().min(1),
         }))
         .mutation(async ({ ctx, input }) => {
+            await assertHealthAndProviderConsent(ctx.user.id, "garmin_sync");
             return await garmin.connectGarmin(ctx.user.id, input.email, input.password);
         }),
 
@@ -340,6 +362,7 @@ export const garminRouter = router({
     sync: protectedProcedure
         .input(z.object({ daysBack: z.number().min(1).max(365).default(30) }))
         .mutation(async ({ ctx, input }) => {
+            await assertHealthAndProviderConsent(ctx.user.id, "garmin_sync");
             return await garmin.syncGarminActivities(ctx.user.id, input.daysBack);
         }),
 
@@ -362,6 +385,7 @@ export const stravaRouter = router({
     exchangeToken: protectedProcedure
         .input(z.object({ code: z.string() }))
         .mutation(async ({ ctx, input }) => {
+            await assertHealthAndProviderConsent(ctx.user.id, "strava_sync");
             return await strava.exchangeStravaToken(ctx.user.id, input.code);
         }),
 
@@ -372,6 +396,7 @@ export const stravaRouter = router({
     sync: protectedProcedure
         .input(z.object({ daysBack: z.number().min(1).max(365).default(7) }))
         .mutation(async ({ ctx, input }) => {
+            await assertHealthAndProviderConsent(ctx.user.id, "strava_sync");
             return await strava.syncStravaActivities(ctx.user.id, input.daysBack);
         }),
 });

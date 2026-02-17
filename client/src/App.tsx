@@ -12,6 +12,7 @@ import SeasonLaunchPopup from "./components/SeasonLaunchPopup";
 import { useBadgeNotifications } from "./hooks/useBadgeNotifications";
 import AutoSync from "./components/AutoSync";
 import ActivityInsightNotification from "./components/ActivityInsightNotification";
+import CookieBanner from "./components/CookieBanner";
 
 const Home = lazy(() => import("./pages/Home"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -45,6 +46,7 @@ const StravaConnect = lazy(() => import("./pages/StravaConnect"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
+const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 
 function Router() {
   return (
@@ -117,6 +119,7 @@ function Router() {
       <Route path="/settings" component={Settings} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
+      <Route path="/cookies" component={CookiePolicy} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
@@ -148,6 +151,7 @@ function App() {
           <ScrollToTop />
           <Router />
           <ActivityInsightNotification />
+          <CookieBanner />
           {isShowing && pendingBadges.length > 0 && (
             <BadgeUnlockNotification
               badges={pendingBadges}

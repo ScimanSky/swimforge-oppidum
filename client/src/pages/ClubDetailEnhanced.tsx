@@ -407,6 +407,7 @@ export default function ClubDetailEnhanced() {
           isMember={isMember}
           isStaff={isStaff}
           onPost={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          onOpenEvents={eventsPageHref ? () => { window.location.href = eventsPageHref; } : undefined}
           onCreateEvent={() => setCreateEventOpen(true)}
           onInvite={() => setInviteOpen(true)}
         />

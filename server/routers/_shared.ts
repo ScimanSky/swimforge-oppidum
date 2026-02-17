@@ -131,9 +131,20 @@ export function detectImageType(buffer: Buffer): { mimeType: "image/jpeg" | "ima
 export async function runAutoSync(userId: number, options: { force?: boolean } = {}) {
     const _garmin = await import("../garmin");
     const _strava = await import("../strava");
+    const { hasGrantedConsent } = await import("../consent");
+    const [healthAllowed, garminAllowed, stravaAllowed] = await Promise.all([
+        hasGrantedConsent(userId, "health_data_processing"),
+        hasGrantedConsent(userId, "garmin_sync"),
+        hasGrantedConsent(userId, "strava_sync"),
+    ]);
+
+    if (!healthAllowed) {
+        return;
+    }
+
     await Promise.allSettled([
-        _garmin.autoSyncGarmin(userId, options),
-        _strava.autoSyncStrava(userId, options),
+        garminAllowed ? _garmin.autoSyncGarmin(userId, options) : Promise.resolve(),
+        stravaAllowed ? _strava.autoSyncStrava(userId, options) : Promise.resolve(),
     ]);
     const { invalidateLeaderboardCache: _inv } = await import("../lib/cache");
     await _inv();

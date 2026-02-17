@@ -890,6 +890,7 @@ export async function exportUserData(userId: number) {
     clubsMembershipResult,
     reportsResult,
     hiddenPostsResult,
+    consentsResult,
   ] = await Promise.all([
     db.execute(sql`
       SELECT id, open_id, name, email, login_method, role, created_at, updated_at, last_signed_in
@@ -935,6 +936,7 @@ export async function exportUserData(userId: number) {
       ORDER BY created_at DESC
     `),
     db.execute(sql`SELECT * FROM social_hidden_posts WHERE user_id = ${userId} ORDER BY created_at DESC`),
+    db.execute(sql`SELECT * FROM user_consents WHERE user_id = ${userId} ORDER BY created_at DESC`),
   ]);
 
   return {
@@ -958,6 +960,7 @@ export async function exportUserData(userId: number) {
       clubMemberships: clubsMembershipResult.rows,
       reports: reportsResult.rows,
       hiddenPosts: hiddenPostsResult.rows,
+      consents: consentsResult.rows,
     },
   };
 }
@@ -1010,53 +1013,95 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
   }
 
   await db.transaction(async (tx) => {
-    // Stories tables were introduced after initial schema rollout.
-    // Cleanup explicitly for databases where these relations don't have full FK coverage.
-    try {
-      await tx.execute(sql`
-        DELETE FROM story_views
-        WHERE viewer_id = ${userId}
-           OR story_id IN (SELECT id FROM stories WHERE user_id = ${userId})
-      `);
-    } catch (error) {
-      if (!shouldIgnoreMissingRelation(error)) {
-        throw error;
+    const deleteIfExists = async (query: ReturnType<typeof sql>) => {
+      try {
+        await tx.execute(query);
+      } catch (error) {
+        if (!shouldIgnoreMissingRelation(error)) {
+          throw error;
+        }
       }
-    }
+    };
 
-    try {
-      await tx.execute(sql`
-        DELETE FROM story_reactions
-        WHERE user_id = ${userId}
-           OR story_id IN (SELECT id FROM stories WHERE user_id = ${userId})
-      `);
-    } catch (error) {
-      if (!shouldIgnoreMissingRelation(error)) {
-        throw error;
-      }
-    }
+    // Season engagement
+    await deleteIfExists(sql`DELETE FROM season_activity_predictions WHERE user_id = ${userId}`);
+    await deleteIfExists(sql`DELETE FROM season_club_quest_claims WHERE user_id = ${userId}`);
 
-    try {
-      await tx.execute(sql`DELETE FROM stories WHERE user_id = ${userId}`);
-    } catch (error) {
-      if (!shouldIgnoreMissingRelation(error)) {
-        throw error;
-      }
-    }
+    // Stories
+    await deleteIfExists(sql`
+      DELETE FROM story_views
+      WHERE viewer_id = ${userId}
+         OR story_id IN (SELECT id FROM stories WHERE user_id = ${userId})
+    `);
+    await deleteIfExists(sql`
+      DELETE FROM story_reactions
+      WHERE user_id = ${userId}
+         OR story_id IN (SELECT id FROM stories WHERE user_id = ${userId})
+    `);
+    await deleteIfExists(sql`DELETE FROM stories WHERE user_id = ${userId}`);
 
-    await tx.execute(sql`
+    // Social graph and feed
+    await deleteIfExists(sql`
+      DELETE FROM post_reactions
+      WHERE user_id = ${userId}
+         OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
+    `);
+    await deleteIfExists(sql`
+      DELETE FROM social_comments
+      WHERE user_id = ${userId}
+         OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
+    `);
+    await deleteIfExists(sql`
+      DELETE FROM social_splashes
+      WHERE user_id = ${userId}
+         OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
+    `);
+    await deleteIfExists(sql`
       DELETE FROM social_hidden_posts
       WHERE user_id = ${userId}
          OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
     `);
-
-    await tx.execute(sql`
+    await deleteIfExists(sql`
       DELETE FROM social_post_reports
       WHERE reporter_user_id = ${userId}
          OR handled_by = ${userId}
          OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
     `);
+    await deleteIfExists(sql`
+      DELETE FROM social_follows
+      WHERE follower_id = ${userId} OR following_id = ${userId}
+    `);
+    await deleteIfExists(sql`DELETE FROM social_posts WHERE user_id = ${userId}`);
 
+    // Community and messaging
+    await deleteIfExists(sql`DELETE FROM direct_messages WHERE sender_id = ${userId} OR receiver_id = ${userId}`);
+    await deleteIfExists(sql`DELETE FROM user_notifications WHERE user_id = ${userId}`);
+    await deleteIfExists(sql`DELETE FROM event_attendees WHERE user_id = ${userId}`);
+    await deleteIfExists(sql`DELETE FROM club_announcements WHERE author_id = ${userId}`);
+    await deleteIfExists(sql`DELETE FROM community_club_members WHERE user_id = ${userId}`);
+    await deleteIfExists(sql`DELETE FROM club_media WHERE uploader_id = ${userId}`);
+
+    // Progression and stats
+    await deleteIfExists(sql`DELETE FROM user_badges WHERE user_id = ${userId}`);
+    await deleteIfExists(sql`DELETE FROM user_achievement_badges WHERE user_id = ${userId}`);
+    await deleteIfExists(sql`DELETE FROM personal_records WHERE user_id = ${userId}`);
+    await deleteIfExists(sql`DELETE FROM weekly_stats WHERE user_id = ${userId}`);
+    await deleteIfExists(sql`DELETE FROM xp_transactions WHERE user_id = ${userId}`);
+
+    // AI artifacts
+    await deleteIfExists(sql`DELETE FROM ai_insights_cache WHERE user_id = ${userId}`);
+    await deleteIfExists(sql`DELETE FROM activity_ai_insights WHERE user_id = ${userId}`);
+    await deleteIfExists(sql`DELETE FROM ai_coach_workouts WHERE user_id = ${userId}`);
+
+    // External sync tokens
+    await deleteIfExists(sql`DELETE FROM garmin_tokens WHERE user_id = ${userId}`);
+    await deleteIfExists(sql`DELETE FROM strava_tokens WHERE user_id = ${userId}`);
+
+    // Consent audit
+    await deleteIfExists(sql`DELETE FROM user_consents WHERE user_id = ${userId}`);
+
+    // Final identity rows
+    await deleteIfExists(sql`DELETE FROM swimmer_profiles WHERE user_id = ${userId}`);
     await tx.execute(sql`DELETE FROM users WHERE id = ${userId}`);
   });
 

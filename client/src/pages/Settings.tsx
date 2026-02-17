@@ -44,7 +44,7 @@ import { formatDistanceToNow } from "date-fns"
 import { it } from "date-fns/locale"
 import { toast } from "sonner"
 import GarminSection from "@/components/GarminSection"
-import { useLocation } from "wouter"
+import { Link as RouterLink, useLocation } from "wouter"
 
 const notificationSettings = [
   {
@@ -122,6 +122,34 @@ const defaultPrivacyState = {
   showLeaderboards: true,
 }
 
+const consentItems = [
+  {
+    type: "health_data_processing",
+    title: "Trattamento dati salute",
+    description: "Necessario per frequenza cardiaca, VO2max, stress, calorie e sync completo Garmin/Strava.",
+  },
+  {
+    type: "garmin_sync",
+    title: "Consenso Garmin Sync",
+    description: "Autorizza l'importazione e il trattamento dei dati da Garmin Connect.",
+  },
+  {
+    type: "strava_sync",
+    title: "Consenso Strava Sync",
+    description: "Autorizza l'importazione e il trattamento dei dati da Strava.",
+  },
+  {
+    type: "marketing_communications",
+    title: "Comunicazioni marketing",
+    description: "Novità prodotto e comunicazioni promozionali.",
+  },
+  {
+    type: "cookie_analytics",
+    title: "Cookie analytics",
+    description: "Consenso ai cookie analitici opzionali.",
+  },
+] as const
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null
 
@@ -197,6 +225,7 @@ export default function Settings() {
   const { data: activities } = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
   const { data: garminStatus } = trpc.garmin.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 })
   const { data: stravaStatus } = trpc.strava.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 })
+  const consentsQuery = trpc.consent.list.useQuery(undefined, { staleTime: 30_000 })
 
   type GarminSyncResult = { synced?: number; error?: string }
 
@@ -410,8 +439,20 @@ export default function Settings() {
       toast.error(error.message || "Impossibile eliminare l'account.")
     },
   })
+  const setConsentMutation = trpc.consent.set.useMutation({
+    onError: (error) => toast.error(error.message || "Impossibile aggiornare il consenso."),
+  })
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletePassword, setDeletePassword] = useState("")
+  const [consentState, setConsentState] = useState<Record<string, boolean>>({})
+
+  useEffect(() => {
+    const next: Record<string, boolean> = {}
+    for (const item of consentItems) {
+      next[item.type] = Boolean((consentsQuery.data as any)?.byType?.[item.type]?.granted)
+    }
+    setConsentState(next)
+  }, [consentsQuery.data])
 
   const readFileAsBase64 = (file: File) =>
     new Promise<string>((resolve, reject) => {
@@ -640,6 +681,34 @@ export default function Settings() {
     const next = { ...normalizeNotificationSettings(notifications), [id]: !notifications[id] }
     setNotifications(next)
     await persistSettings({ notificationSettings: next })
+    if (id === "marketing") {
+      const marketingEnabled = Boolean(next.marketing)
+      setConsentState((prev) => ({ ...prev, marketing_communications: marketingEnabled }))
+      try {
+        await setConsentMutation.mutateAsync({
+          consentType: "marketing_communications",
+          granted: marketingEnabled,
+        })
+        await consentsQuery.refetch()
+      } catch {
+        // mutation already handled by onError
+      }
+    }
+  }
+
+  const toggleConsent = async (consentType: typeof consentItems[number]["type"], granted: boolean) => {
+    setConsentState((prev) => ({ ...prev, [consentType]: granted }))
+    try {
+      await setConsentMutation.mutateAsync({ consentType, granted })
+      await consentsQuery.refetch()
+      if (consentType === "marketing_communications") {
+        const next = { ...normalizeNotificationSettings(notifications), marketing: granted }
+        setNotifications(next)
+        await persistSettings({ notificationSettings: next })
+      }
+    } catch {
+      setConsentState((prev) => ({ ...prev, [consentType]: !granted }))
+    }
   }
 
   const handleExportData = async () => {
@@ -1310,6 +1379,61 @@ export default function Settings() {
                   }}
                 />
               </div>
+            </div>
+          </section>
+
+          <section className="surface-panel p-6">
+            <div className="space-y-1">
+              <h3 className="font-display">Consensi GDPR</h3>
+              <p className="text-sm text-muted-foreground">
+                Gestisci i consensi opzionali. Termini e Privacy sono obbligatori per usare il servizio.
+              </p>
+            </div>
+            <div className="mt-4 space-y-3">
+              <div className="rounded-lg border border-border/60 bg-background/40 p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-foreground">Termini di Servizio</p>
+                  <span className="text-xs text-accent">Obbligatorio · accettato</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Versione: {(consentsQuery.data as any)?.versions?.terms_acceptance ?? "v1.1"}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border/60 bg-background/40 p-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <p className="font-medium text-foreground">Privacy Policy</p>
+                  <span className="text-xs text-accent">Obbligatorio · accettata</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Versione: {(consentsQuery.data as any)?.versions?.privacy_policy ?? "v1.1"}
+                </p>
+              </div>
+
+              {consentItems.map((item) => (
+                <div key={item.type} className="flex items-center justify-between gap-4 py-3 border-b border-border/40 last:border-0">
+                  <div>
+                    <p className="font-medium text-foreground">{item.title}</p>
+                    <p className="text-sm text-muted-foreground">{item.description}</p>
+                  </div>
+                  <Switch
+                    checked={Boolean(consentState[item.type])}
+                    disabled={setConsentMutation.isPending}
+                    onCheckedChange={(value) => void toggleConsent(item.type, value)}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <Button variant="outline-neon" size="sm" asChild>
+                <RouterLink href="/privacy">Apri Privacy Policy</RouterLink>
+              </Button>
+              <Button variant="outline-neon" size="sm" asChild>
+                <RouterLink href="/terms">Apri Termini</RouterLink>
+              </Button>
+              <Button variant="outline-neon" size="sm" asChild>
+                <RouterLink href="/cookies">Cookie Policy</RouterLink>
+              </Button>
             </div>
           </section>
 
