@@ -3,7 +3,7 @@ import {
     TRPCError,
     getOrSetCached, cacheKeys, CACHE_TTL,
     invalidateUserCache, invalidateLeaderboardCache,
-    getCurrentSeasonState, getSeasonLeaderboard,
+    getCurrentSeasonState, getSeasonLeaderboard, getMySeasonRank,
     getSeasonEngagementSnapshot, getActionXpStatus,
     claimSeasonReward,
     listSeasonActivityPredictions,
@@ -64,6 +64,9 @@ export const seasonRouter = router({
         .query(async ({ input }) => {
             return getSeasonLeaderboard(input?.limit ?? 20);
         }),
+    getMyRank: protectedProcedure.query(async ({ ctx }) => {
+        return getMySeasonRank(ctx.user.id);
+    }),
     claimReward: protectedProcedure
         .input(
             z.object({

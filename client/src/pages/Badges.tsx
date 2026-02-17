@@ -92,10 +92,9 @@ export default function Badges() {
   );
   const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
     enabled: isAuthenticated,
-    staleTime: 15_000,
-    refetchInterval: 30_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
     refetchOnWindowFocus: true,
-    refetchOnMount: "always",
   });
   const { data: achievementDefinitions, isLoading: achievementsLoading } =
     trpc.badges.getAchievementBadgeDefinitions.useQuery(undefined, { enabled: isAuthenticated });

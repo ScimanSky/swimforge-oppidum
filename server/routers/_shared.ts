@@ -43,7 +43,7 @@ export { getUserPublicProfile, toggleFollow, getSuggestedUsers, searchUsers } fr
 export { getPendingActivityInsights, listActivityInsights, markActivityInsightSeen } from "../ai_activity_insights";
 export { logger } from "../middleware/logger";
 export { sanitizeActivityNotes } from "../lib/sanitize";
-export { claimSeasonReward, getCurrentSeasonState, getSeasonLeaderboard } from "../season";
+export { claimSeasonReward, getCurrentSeasonState, getSeasonLeaderboard, getMySeasonRank } from "../season";
 export {
     awardActionXp,
     claimCurrentClubQuestReward,

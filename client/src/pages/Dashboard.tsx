@@ -152,18 +152,16 @@ export default function Dashboard() {
   const advancedQuery = trpc.statistics.getAdvanced.useQuery({ days: 30 })
   const challengesQuery = trpc.challenges.list.useQuery()
   const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
-    staleTime: 15_000,
-    refetchInterval: 30_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
     refetchOnWindowFocus: true,
-    refetchOnMount: "always",
   })
   const seasonLeaderboardQuery = trpc.season.getLeaderboard.useQuery(
     { limit: 5 },
     {
-      staleTime: 15_000,
-      refetchInterval: 30_000,
+      staleTime: 30_000,
+      refetchInterval: 60_000,
       refetchOnWindowFocus: true,
-      refetchOnMount: "always",
     }
   )
 

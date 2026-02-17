@@ -227,6 +227,39 @@ async function getActionXpTotalForDay(db: DbClient, userId: number, dayKey: stri
   return Number(rows[0]?.total ?? 0);
 }
 
+async function getActionXpBreakdownForDay(db: DbClient, userId: number, dayKey: string) {
+  const rows = await db
+    .select({
+      actionType: sql<string>`split_part(${xpTransactions.description}, ':', 3)`,
+      total: sql<number>`coalesce(sum(${xpTransactions.amount}), 0)`,
+    })
+    .from(xpTransactions)
+    .where(
+      and(
+        eq(xpTransactions.userId, userId),
+        sql`${xpTransactions.description} LIKE ${`action_xp:${dayKey}:%`}`,
+      ),
+    )
+    .groupBy(sql`split_part(${xpTransactions.description}, ':', 3)`);
+
+  const byType: Record<ActionXpType, number> = {
+    comment: 0,
+    splash: 0,
+    reaction: 0,
+    rsvp: 0,
+    club_post: 0,
+  };
+
+  for (const row of rows) {
+    const actionType = String(row.actionType ?? "") as ActionXpType;
+    if (actionType in byType) {
+      byType[actionType] = Number(row.total ?? 0);
+    }
+  }
+
+  return byType;
+}
+
 export async function getActionXpStatus(userId: number, now = new Date()) {
   await ensureSeasonEngagementSchema();
   const db = await getDb();
@@ -236,16 +269,27 @@ export async function getActionXpStatus(userId: number, now = new Date()) {
       earnedToday: 0,
       cap: ACTION_XP_DAILY_CAP,
       remaining: ACTION_XP_DAILY_CAP,
+      byType: {
+        comment: 0,
+        splash: 0,
+        reaction: 0,
+        rsvp: 0,
+        club_post: 0,
+      },
     };
   }
 
   const dayKey = toUtcDateKey(now);
-  const earnedToday = await getActionXpTotalForDay(db, userId, dayKey);
+  const [earnedToday, byType] = await Promise.all([
+    getActionXpTotalForDay(db, userId, dayKey),
+    getActionXpBreakdownForDay(db, userId, dayKey),
+  ]);
   return {
     dayKey,
     earnedToday,
     cap: ACTION_XP_DAILY_CAP,
     remaining: Math.max(0, ACTION_XP_DAILY_CAP - earnedToday),
+    byType,
   };
 }
 
@@ -868,4 +912,3 @@ export async function getSeasonEngagementSnapshot(userId: number) {
     clubQuests,
   };
 }
-

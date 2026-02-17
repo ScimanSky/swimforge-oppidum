@@ -26,6 +26,12 @@ const persistSeenSet = (storageKey: string, keys: Set<string>) => {
 };
 
 const getUnlockedSeasonValue = (metric: string, seasonData: any): number => {
+  const assignment = (seasonData?.badgeAssignments ?? []).find(
+    (entry: any) => String(entry?.metric ?? "") === metric,
+  );
+  if (assignment && Number.isFinite(Number(assignment?.current))) {
+    return Number(assignment.current);
+  }
   if (metric === "seasonLevel") {
     return Number(seasonData?.progress?.currentLevel ?? 1);
   }
@@ -43,19 +49,21 @@ export default function BadgeUnlockWatcher() {
   });
   const classicBadgesQuery = trpc.badges.userBadges.useQuery(undefined, {
     enabled: isAuthenticated,
+    staleTime: 60_000,
     refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
+    refetchInterval: 120_000,
   });
   const achievementBadgesQuery = trpc.badges.getUserAchievementBadges.useQuery(undefined, {
     enabled: isAuthenticated,
+    staleTime: 60_000,
     refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
+    refetchInterval: 120_000,
   });
   const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
     enabled: isAuthenticated,
-    staleTime: 15_000,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+    refetchOnWindowFocus: false,
   });
 
   const isDataReady =
@@ -172,4 +180,3 @@ export default function BadgeUnlockWatcher() {
 
   return null;
 }
-

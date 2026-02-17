@@ -8,13 +8,14 @@ import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import {
   Activity,
   CalendarDays,
   CheckCircle2,
   ChevronRight,
+  Flame,
   Sparkles,
   Target,
   Trophy,
@@ -25,10 +26,47 @@ import { toast } from "sonner"
 import { getSeasonAssignmentImageUrl, getSeasonRewardImageUrl } from "@/lib/seasonBadgeImages"
 import { SeasonRecapDialog } from "@/components/video/SeasonRecapDialog"
 
+type PredictionPreset = {
+  id: string
+  label: string
+  distance: number
+  pace: number
+  durationMin: number
+  rpe: number
+}
+
+const PREDICTION_PRESETS: PredictionPreset[] = [
+  { id: "light", label: "Leggero", distance: 1200, pace: 130, durationMin: 30, rpe: 4 },
+  { id: "tempo", label: "Tempo", distance: 2000, pace: 112, durationMin: 42, rpe: 6 },
+  { id: "intense", label: "Intenso", distance: 2800, pace: 98, durationMin: 55, rpe: 8 },
+]
+
 function formatRemaining(remainingMs: number) {
   const totalSeconds = Math.max(0, Math.floor(remainingMs / 1000))
   const days = Math.floor(totalSeconds / 86400)
   const hours = Math.floor((totalSeconds % 86400) / 3600)
+  return `${days}g ${hours}h`
+}
+
+function formatUtcCountdownToNextDay() {
+  const now = new Date()
+  const nextUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0)
+  const remainingMs = Math.max(0, nextUtc - now.getTime())
+  const hours = Math.floor(remainingMs / (1000 * 60 * 60))
+  const minutes = Math.floor((remainingMs % (1000 * 60 * 60)) / (1000 * 60))
+  return `${hours}h ${minutes}m`
+}
+
+function formatUtcCountdownToNextWeek() {
+  const now = new Date()
+  const currentStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0))
+  const utcWeekday = currentStart.getUTCDay() // 0 Sunday
+  const diffFromMonday = (utcWeekday + 6) % 7
+  currentStart.setUTCDate(currentStart.getUTCDate() - diffFromMonday)
+  const nextWeekStart = new Date(currentStart.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const remainingMs = Math.max(0, nextWeekStart.getTime() - now.getTime())
+  const days = Math.floor(remainingMs / (1000 * 60 * 60 * 24))
+  const hours = Math.floor((remainingMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
   return `${days}g ${hours}h`
 }
 
@@ -50,26 +88,29 @@ function formatPaceSeconds(pacePer100m: number | null | undefined) {
 export default function SeasonPage() {
   const utils = trpc.useUtils()
   const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
-    staleTime: 15_000,
-    refetchInterval: 30_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
     refetchOnWindowFocus: true,
-    refetchOnMount: "always",
   })
   const leaderboardQuery = trpc.season.getLeaderboard.useQuery(
-    { limit: 12 },
+    { limit: 20 },
     {
-      staleTime: 15_000,
-      refetchInterval: 30_000,
+      staleTime: 30_000,
+      refetchInterval: 60_000,
       refetchOnWindowFocus: true,
-      refetchOnMount: "always",
     }
   )
-  const engagementQuery = trpc.season.getEngagement.useQuery(undefined, {
-    staleTime: 10_000,
-    refetchInterval: 20_000,
+  const myRankQuery = trpc.season.getMyRank.useQuery(undefined, {
+    staleTime: 30_000,
+    refetchInterval: 60_000,
     refetchOnWindowFocus: true,
-    refetchOnMount: "always",
   })
+  const engagementQuery = trpc.season.getEngagement.useQuery(undefined, {
+    staleTime: 20_000,
+    refetchInterval: 45_000,
+    refetchOnWindowFocus: true,
+  })
+
   const [predictionForm, setPredictionForm] = useState({
     targetDistanceMeters: "",
     targetPacePer100m: "",
@@ -77,6 +118,7 @@ export default function SeasonPage() {
     targetRpe: "",
     note: "",
   })
+
   const claimRewardMutation = trpc.season.claimReward.useMutation({
     onSuccess: async (result) => {
       if (result.alreadyClaimed) {
@@ -87,6 +129,7 @@ export default function SeasonPage() {
       await Promise.all([
         utils.season.getCurrent.invalidate(),
         utils.season.getLeaderboard.invalidate(),
+        utils.season.getMyRank.invalidate(),
         utils.profile.get.invalidate(),
         utils.leaderboard.get.invalidate(),
       ])
@@ -95,6 +138,7 @@ export default function SeasonPage() {
       toast.error(error.message || "Riscatto ricompensa non riuscito")
     },
   })
+
   const createPredictionMutation = trpc.season.predictions.create.useMutation({
     onSuccess: async () => {
       toast.success("Previsione registrata. Dopo la prossima attività puoi valutarla.")
@@ -114,6 +158,7 @@ export default function SeasonPage() {
       toast.error(error.message || "Impossibile creare la previsione")
     },
   })
+
   const evaluatePredictionMutation = trpc.season.predictions.evaluateLatest.useMutation({
     onSuccess: async (result) => {
       if (result.status === "no_pending") {
@@ -129,6 +174,7 @@ export default function SeasonPage() {
         utils.season.getEngagement.invalidate(),
         utils.season.getCurrent.invalidate(),
         utils.season.getLeaderboard.invalidate(),
+        utils.season.getMyRank.invalidate(),
         utils.profile.get.invalidate(),
       ])
     },
@@ -136,6 +182,7 @@ export default function SeasonPage() {
       toast.error(error.message || "Valutazione previsione non riuscita")
     },
   })
+
   const claimClubQuestMutation = trpc.season.clubQuest.claim.useMutation({
     onSuccess: async (result) => {
       if (!result.success) {
@@ -158,6 +205,7 @@ export default function SeasonPage() {
       await Promise.all([
         utils.season.getEngagement.invalidate(),
         utils.season.getCurrent.invalidate(),
+        utils.season.getMyRank.invalidate(),
         utils.profile.get.invalidate(),
         utils.leaderboard.get.invalidate(),
       ])
@@ -169,6 +217,7 @@ export default function SeasonPage() {
 
   const seasonData = seasonQuery.data
   const leaderboard = leaderboardQuery.data ?? []
+  const myRank = myRankQuery.data
   const engagement = engagementQuery.data
   const actionXp = engagement?.actionXp
   const predictions = engagement?.predictions ?? []
@@ -189,12 +238,49 @@ export default function SeasonPage() {
   const weeklyMissions = seasonData?.missions?.weekly ?? []
   const rewards = seasonData?.rewards ?? []
   const badgeAssignments = seasonData?.badgeAssignments ?? []
-  const dailyPreview = dailyMissions.slice(0, 3)
-  const weeklyPreview = weeklyMissions.slice(0, 3)
-  const rewardsPreview = rewards.slice(0, 4)
-  const questsPreview = clubQuests.slice(0, 2)
-  const leaderboardPreview = leaderboard.slice(0, 5)
-  const badgeAssignmentsPreview = badgeAssignments.slice(0, 6)
+
+  const firstIncompleteDaily = dailyMissions.find((mission) => !mission.completed)
+  const firstIncompleteWeekly = weeklyMissions.find((mission) => !mission.completed)
+
+  const nextAction = useMemo(() => {
+    if (firstIncompleteDaily) {
+      return {
+        title: "Priorità oggi",
+        body: `${firstIncompleteDaily.title} · +${firstIncompleteDaily.xpReward} XP`,
+        helper: "Completa una missione daily prima del reset.",
+      }
+    }
+
+    if ((actionXp?.remaining ?? 0) > 0) {
+      return {
+        title: "Spingi Action XP",
+        body: `Hai ancora ${actionXp?.remaining ?? 0} XP disponibili oggi`,
+        helper: "Commento, reaction, RSVP e club post aumentano il cap giornaliero.",
+      }
+    }
+
+    if (pendingPredictions.length > 0) {
+      return {
+        title: "Valuta la previsione",
+        body: `${pendingPredictions.length} previsione in attesa`,
+        helper: "Chiudi il loop pre-sessione e sblocca XP precisione.",
+      }
+    }
+
+    if (firstIncompleteWeekly) {
+      return {
+        title: "Focus settimanale",
+        body: `${firstIncompleteWeekly.title} · +${firstIncompleteWeekly.xpReward} XP`,
+        helper: "Consolida i progressi weekly per aumentare il completamento globale.",
+      }
+    }
+
+    return {
+      title: "Ottimo ritmo",
+      body: "Tutte le priorità completate",
+      helper: "Mantieni continuità con attività, community e club quest.",
+    }
+  }, [actionXp?.remaining, firstIncompleteDaily, firstIncompleteWeekly, pendingPredictions.length])
 
   const handleCreatePrediction = () => {
     const targetDistanceMeters = toOptionalNumber(predictionForm.targetDistanceMeters)
@@ -220,6 +306,16 @@ export default function SeasonPage() {
     })
   }
 
+  const applyPredictionPreset = (preset: PredictionPreset) => {
+    setPredictionForm((prev) => ({
+      ...prev,
+      targetDistanceMeters: String(preset.distance),
+      targetPacePer100m: String(preset.pace),
+      targetDurationMinutes: String(preset.durationMin),
+      targetRpe: String(preset.rpe),
+    }))
+  }
+
   return (
     <AppLayout>
       <div className="compact-shell space-y-4 lg:space-y-2">
@@ -230,7 +326,7 @@ export default function SeasonPage() {
                 <div className="flex items-center gap-3">
                   <div className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background/65 px-2.5 py-0.5 text-[10px] text-muted-foreground">
                     <Sparkles className="size-3 text-primary" />
-                    Battle Pass
+                    Season Hub
                   </div>
                   <SeasonRecapDialog triggerLabel="Recap video" />
                 </div>
@@ -244,12 +340,18 @@ export default function SeasonPage() {
                     {formatRemaining(Number(seasonData?.season?.remainingMs ?? 0))}
                   </Badge>
                   <Badge variant="outline" className="text-[10px]">{seasonData?.missionMode === "solo-fallback" ? "Solo" : "Club"}</Badge>
+                  {myRank?.me?.rank ? (
+                    <Badge variant="outline" className="text-[10px]">
+                      <Trophy className="mr-1 size-3" />
+                      Rank #{myRank.me.rank}
+                    </Badge>
+                  ) : null}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <MetricOrb
-                  label="Level Season"
+                  label="Level"
                   value={String(currentLevel)}
                   progress={levelProgress}
                   helper={`${seasonXp.toLocaleString()} XP`}
@@ -279,427 +381,359 @@ export default function SeasonPage() {
           </SurfaceContent>
         </Surface>
 
-        <div className="stream-shell lg:gap-2">
-          <section className="stream-main lg:gap-2">
-            <div className="stream-node">
-              <section className="surface-panel p-4 lg:p-5">
-                <Accordion type="single" collapsible defaultValue="daily" className="space-y-2">
-                  <AccordionItem value="daily" className="rounded-xl border border-border/70 bg-background/50 px-3">
-                    <AccordionTrigger className="py-3 text-left hover:no-underline">
-                      <div>
-                        <p className="font-display text-base font-semibold text-foreground">Missioni Daily</p>
-                        <p className="text-xs text-muted-foreground">Obiettivi rapidi giornalieri</p>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pb-3">
-                      <div className="space-y-2">
-                        {dailyPreview.map((mission) => (
-                          <div key={mission.id} className="stream-card">
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-semibold text-foreground">{mission.title}</p>
-                                <p className="text-xs text-muted-foreground">{mission.description}</p>
-                              </div>
-                              <Badge variant={mission.completed ? "neon" : "outline"} className="text-xs">
-                                +{mission.xpReward} XP
-                              </Badge>
-                            </div>
-                            <Progress value={Number(mission.progress ?? 0)} className="mt-2 h-1.5" />
-                          </div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
+        <section className="surface-panel p-4 lg:p-5 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-display text-base font-semibold text-foreground">Oggi</p>
+            <Badge variant="outline" className="text-xs">
+              Reset daily tra {formatUtcCountdownToNextDay()}
+            </Badge>
+          </div>
 
-                  <AccordionItem value="action" className="rounded-xl border border-border/70 bg-background/50 px-3">
-                    <AccordionTrigger className="py-3 text-left hover:no-underline">
-                      <div>
-                        <p className="font-display text-base font-semibold text-foreground">Action XP Giornaliero</p>
-                        <p className="text-xs text-muted-foreground">XP da community, RSVP e club</p>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pb-3">
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="stream-card text-center">
-                          <p className="text-xs text-muted-foreground">Oggi</p>
-                          <p className="text-lg font-display font-semibold text-foreground">{actionXp?.earnedToday ?? 0}</p>
-                        </div>
-                        <div className="stream-card text-center">
-                          <p className="text-xs text-muted-foreground">Rimanenti</p>
-                          <p className="text-lg font-display font-semibold text-foreground">{actionXp?.remaining ?? 90}</p>
-                        </div>
-                        <div className="stream-card text-center">
-                          <p className="text-xs text-muted-foreground">In attesa</p>
-                          <p className="text-lg font-display font-semibold text-foreground">{pendingPredictions.length}</p>
-                        </div>
-                      </div>
-                      <div className="mt-2 space-y-1.5">
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>Progress cap</span>
-                          <span>{actionXp?.earnedToday ?? 0}/{actionXp?.cap ?? 90}</span>
-                        </div>
-                        <Progress
-                          value={Math.min(
-                            100,
-                            ((actionXp?.earnedToday ?? 0) / Math.max(actionXp?.cap ?? 90, 1)) * 100,
-                          )}
-                          className="h-1.5"
-                        />
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="prediction" className="rounded-xl border border-border/70 bg-background/50 px-3">
-                    <AccordionTrigger className="py-3 text-left hover:no-underline">
-                      <div>
-                        <p className="font-display text-base font-semibold text-foreground">Previsione Allenamento</p>
-                        <p className="text-xs text-muted-foreground">Target pre-sessione e XP precisione</p>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pb-3">
-                      <div className="mb-2 flex justify-end">
-                        <Button
-                          variant="outline-neon"
-                          size="sm"
-                          disabled={evaluatePredictionMutation.isPending}
-                          onClick={() => evaluatePredictionMutation.mutate({})}
-                        >
-                          Valuta ultima
-                        </Button>
-                      </div>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <Input
-                          type="number"
-                          min={100}
-                          max={50000}
-                          placeholder="Target distanza (m)"
-                          value={predictionForm.targetDistanceMeters}
-                          onChange={(e) =>
-                            setPredictionForm((prev) => ({
-                              ...prev,
-                              targetDistanceMeters: e.target.value,
-                            }))
-                          }
-                          className="bg-background/60"
-                        />
-                        <Input
-                          type="number"
-                          min={50}
-                          max={600}
-                          placeholder="Target pace (sec/100m)"
-                          value={predictionForm.targetPacePer100m}
-                          onChange={(e) =>
-                            setPredictionForm((prev) => ({
-                              ...prev,
-                              targetPacePer100m: e.target.value,
-                            }))
-                          }
-                          className="bg-background/60"
-                        />
-                        <Input
-                          type="number"
-                          min={5}
-                          max={360}
-                          placeholder="Target durata (min)"
-                          value={predictionForm.targetDurationMinutes}
-                          onChange={(e) =>
-                            setPredictionForm((prev) => ({
-                              ...prev,
-                              targetDurationMinutes: e.target.value,
-                            }))
-                          }
-                          className="bg-background/60"
-                        />
-                        <Input
-                          type="number"
-                          min={1}
-                          max={10}
-                          placeholder="Target RPE (1-10)"
-                          value={predictionForm.targetRpe}
-                          onChange={(e) =>
-                            setPredictionForm((prev) => ({
-                              ...prev,
-                              targetRpe: e.target.value,
-                            }))
-                          }
-                          className="bg-background/60"
-                        />
-                      </div>
-                      <Input
-                        className="mt-2 bg-background/60"
-                        placeholder="Nota opzionale"
-                        value={predictionForm.note}
-                        onChange={(e) =>
-                          setPredictionForm((prev) => ({
-                            ...prev,
-                            note: e.target.value,
-                          }))
-                        }
-                      />
-                      <div className="mt-2 flex justify-end">
-                        <Button
-                          variant="neon"
-                          size="sm"
-                          disabled={createPredictionMutation.isPending}
-                          onClick={handleCreatePrediction}
-                        >
-                          Crea previsione
-                        </Button>
-                      </div>
-                      <div className="mt-2 space-y-2">
-                        {predictions.length ? (
-                          predictions.slice(0, 2).map((prediction) => (
-                            <div key={prediction.id} className="stream-card">
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="min-w-0">
-                                  <p className="text-sm font-semibold text-foreground">Previsione #{prediction.id}</p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {prediction.targetDistanceMeters ? `${prediction.targetDistanceMeters}m · ` : ""}
-                                    {prediction.targetPacePer100m ? `${formatPaceSeconds(prediction.targetPacePer100m)} · ` : ""}
-                                    {prediction.targetDurationSeconds ? `${Math.round(prediction.targetDurationSeconds / 60)} min · ` : ""}
-                                    {prediction.targetRpe ? `RPE ${prediction.targetRpe}` : ""}
-                                  </p>
-                                </div>
-                                <Badge
-                                  variant={prediction.status === "evaluated" ? "neon" : "outline"}
-                                  className="text-xs capitalize"
-                                >
-                                  {prediction.status === "evaluated" ? "Valutata" : "In attesa"}
-                                </Badge>
-                              </div>
-                            </div>
-                          ))
-                        ) : (
-                          <p className="text-sm text-muted-foreground">Nessuna previsione registrata.</p>
-                        )}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="weekly" className="rounded-xl border border-border/70 bg-background/50 px-3">
-                    <AccordionTrigger className="py-3 text-left hover:no-underline">
-                      <div>
-                        <p className="font-display text-base font-semibold text-foreground">Missioni Weekly</p>
-                        <p className="text-xs text-muted-foreground">Obiettivi progressivi settimanali</p>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pb-3">
-                      <div className="space-y-2">
-                        {weeklyPreview.map((mission) => (
-                          <div key={mission.id} className="stream-card">
-                            <div className="flex items-center justify-between gap-3">
-                              <div>
-                                <p className="text-sm font-semibold text-foreground">{mission.title}</p>
-                                <p className="text-xs text-muted-foreground">{mission.description}</p>
-                              </div>
-                              <Badge variant={mission.completed ? "neon" : "outline"} className="text-xs">
-                                +{mission.xpReward} XP
-                              </Badge>
-                            </div>
-                            <Progress value={Number(mission.progress ?? 0)} className="mt-2 h-1.5" />
-                          </div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="rewards" className="rounded-xl border border-border/70 bg-background/50 px-3">
-                    <AccordionTrigger className="py-3 text-left hover:no-underline">
-                      <div>
-                        <p className="font-display text-base font-semibold text-foreground">Reward Track</p>
-                        <p className="text-xs text-muted-foreground">Sblocchi del battle pass</p>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pb-3">
-                      <div className="space-y-2">
-                        {rewardsPreview.map((reward) => (
-                          <div key={reward.rewardCode} className="stream-card">
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="min-w-0 flex items-center gap-3">
-                                <div className="size-10 rounded-xl overflow-hidden border border-border/70 bg-background/65 shrink-0">
-                                  <img
-                                    src={getSeasonRewardImageUrl(String(reward.rewardCode))}
-                                    alt={reward.rewardName}
-                                    className="h-full w-full object-cover"
-                                    loading="lazy"
-                                  />
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-sm font-semibold text-foreground truncate">
-                                    Lv {reward.level} · {reward.rewardName}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground capitalize">{reward.rewardType}</p>
-                                </div>
-                              </div>
-                              <div className="flex flex-col items-end gap-1.5">
-                                <Badge variant={reward.unlocked ? "neon" : "outline"} className="text-xs capitalize">
-                                  {reward.claimed ? "Riscattata" : reward.unlocked ? "Sbloccata" : "Bloccata"}
-                                </Badge>
-                                {reward.unlocked && !reward.claimed ? (
-                                  <Button
-                                    size="sm"
-                                    variant="neon"
-                                    className="h-7 px-3 text-[11px]"
-                                    disabled={claimRewardMutation.isPending}
-                                    onClick={() => claimRewardMutation.mutate({ rewardCode: reward.rewardCode })}
-                                  >
-                                    Riscatta
-                                  </Button>
-                                ) : null}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </section>
+          <div className="stream-card border-primary/35 bg-primary/8">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">{nextAction.title}</p>
+                <p className="text-sm text-foreground/90">{nextAction.body}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{nextAction.helper}</p>
+              </div>
+              <Flame className="size-4 text-primary shrink-0" />
             </div>
-          </section>
+          </div>
 
-          <aside className="xl:sticky xl:top-20">
-            <section className="surface-panel p-4 lg:p-5">
-              <Accordion type="single" collapsible defaultValue="club-quest" className="space-y-2">
-                <AccordionItem value="club-quest" className="rounded-xl border border-border/70 bg-background/50 px-3">
-                  <AccordionTrigger className="py-3 text-left hover:no-underline">
-                    <div>
-                      <p className="font-display text-base font-semibold text-foreground">Club Quest Settimanale</p>
-                      <p className="text-xs text-muted-foreground">Obiettivo collaborativo con reward condivisa</p>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="stream-card md:col-span-2">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-foreground">Missioni daily</p>
+                <Badge variant="outline" className="text-[10px]">Scadenza {formatUtcCountdownToNextDay()}</Badge>
+              </div>
+              <div className="space-y-2">
+                {dailyMissions.map((mission) => (
+                  <div key={mission.id} className="rounded-xl border border-border/60 bg-background/40 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{mission.title}</p>
+                        <p className="text-xs text-muted-foreground">{mission.description}</p>
+                      </div>
+                      <Badge variant={mission.completed ? "neon" : "outline"} className="text-xs shrink-0">
+                        +{mission.xpReward} XP
+                      </Badge>
                     </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-3">
-                    <div className="space-y-2">
-                      {clubQuests.length ? (
-                        questsPreview.map((quest) => (
-                          <div key={quest.clubId} className="stream-card">
-                            <div className="flex items-center justify-between gap-2">
-                              <p className="text-sm font-semibold text-foreground truncate">{quest.clubName}</p>
-                              <Badge variant={quest.completion.completed ? "neon" : "outline"} className="text-[10px]">
-                                {quest.completion.progressPercent}%
-                              </Badge>
-                            </div>
-                            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                              <div className="flex items-center justify-between">
-                                <span className="inline-flex items-center gap-1">
-                                  <Users className="size-3.5" />
-                                  Membri attivi
-                                </span>
-                                <span>{quest.progress.engagedMembers}/{quest.targets.engagedMembers}</span>
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="inline-flex items-center gap-1">
-                                  <CalendarDays className="size-3.5" />
-                                  RSVP team
-                                </span>
-                                <span>{quest.progress.teamRsvps}/{quest.targets.rsvps}</span>
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="inline-flex items-center gap-1">
-                                  <Activity className="size-3.5" />
-                                  Interazioni
-                                </span>
-                                <span>{quest.progress.teamInteractions}/{quest.targets.interactions}</span>
-                              </div>
-                            </div>
-                            <Progress value={quest.completion.progressPercent} className="mt-2 h-1.5" />
-                            <div className="mt-2 flex items-center justify-between">
-                              <p className="text-xs text-muted-foreground">Reward: +{quest.xpReward} XP</p>
-                              {quest.claimed ? (
-                                <Badge variant="neon" className="text-[10px]">
-                                  <CheckCircle2 className="mr-1 size-3" />
-                                  Riscattata
-                                </Badge>
-                              ) : (
-                                <Button
-                                  size="sm"
-                                  variant="outline-neon"
-                                  className="h-7 px-3 text-[11px]"
-                                  disabled={!quest.eligibleToClaim || claimClubQuestMutation.isPending}
-                                  onClick={() => claimClubQuestMutation.mutate({ clubId: quest.clubId })}
-                                >
-                                  Riscatta
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground">
-                          Nessun club attivo. Entra in un club per sbloccare la quest settimanale.
-                        </p>
-                      )}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
+                    <Progress value={Number(mission.progress ?? 0)} className="mt-2 h-1.5" />
+                  </div>
+                ))}
+              </div>
+            </div>
 
-                <AccordionItem value="leaderboard" className="rounded-xl border border-border/70 bg-background/50 px-3">
-                  <AccordionTrigger className="py-3 text-left hover:no-underline">
-                    <div>
-                      <p className="font-display text-base font-semibold text-foreground">Classifica Season</p>
-                      <p className="text-xs text-muted-foreground">Top progressione attuale</p>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-3">
-                    <div className="space-y-2">
-                      {leaderboard.length ? (
-                        leaderboardPreview.map((entry) => (
-                          <div key={entry.userId} className="stream-card">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="size-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold">
-                                {entry.rank}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-sm font-semibold text-foreground truncate">{entry.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {Number(entry.seasonXp ?? 0).toLocaleString()} XP season
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground">Classifica non disponibile.</p>
-                      )}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
+            <div className="space-y-2">
+              <div className="stream-card">
+                <p className="text-xs text-muted-foreground">Action XP</p>
+                <p className="text-lg font-display font-semibold text-foreground">
+                  {actionXp?.earnedToday ?? 0}/{actionXp?.cap ?? 90}
+                </p>
+                <Progress
+                  value={Math.min(100, ((actionXp?.earnedToday ?? 0) / Math.max(actionXp?.cap ?? 90, 1)) * 100)}
+                  className="mt-2 h-1.5"
+                />
+                <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
+                  <span>Commenti: {actionXp?.byType?.comment ?? 0}</span>
+                  <span>Reaction: {actionXp?.byType?.reaction ?? 0}</span>
+                  <span>Splash: {actionXp?.byType?.splash ?? 0}</span>
+                  <span>RSVP: {actionXp?.byType?.rsvp ?? 0}</span>
+                </div>
+              </div>
 
-                <AccordionItem value="badges" className="rounded-xl border border-border/70 bg-background/50 px-3">
-                  <AccordionTrigger className="py-3 text-left hover:no-underline">
-                    <div>
-                      <p className="font-display text-base font-semibold text-foreground">Badge Assegnazioni S1</p>
-                      <p className="text-xs text-muted-foreground">Obiettivi dedicati alla season</p>
+              <div className="stream-card">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">Previsioni</p>
+                  <Button
+                    variant="outline-neon"
+                    size="sm"
+                    className="h-7 px-2 text-[11px]"
+                    disabled={evaluatePredictionMutation.isPending}
+                    onClick={() => evaluatePredictionMutation.mutate({})}
+                  >
+                    Valuta ultima
+                  </Button>
+                </div>
+
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {PREDICTION_PRESETS.map((preset) => (
+                    <Button
+                      key={preset.id}
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-[11px]"
+                      onClick={() => applyPredictionPreset(preset)}
+                    >
+                      {preset.label}
+                    </Button>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-2 gap-1">
+                  <Input
+                    type="number"
+                    min={100}
+                    max={50000}
+                    placeholder="Distanza (m)"
+                    value={predictionForm.targetDistanceMeters}
+                    onChange={(e) =>
+                      setPredictionForm((prev) => ({ ...prev, targetDistanceMeters: e.target.value }))
+                    }
+                    className="h-8 bg-background/60 text-xs"
+                  />
+                  <Input
+                    type="number"
+                    min={5}
+                    max={360}
+                    placeholder="Durata (min)"
+                    value={predictionForm.targetDurationMinutes}
+                    onChange={(e) =>
+                      setPredictionForm((prev) => ({ ...prev, targetDurationMinutes: e.target.value }))
+                    }
+                    className="h-8 bg-background/60 text-xs"
+                  />
+                </div>
+
+                <Input
+                  className="mt-1 h-8 bg-background/60 text-xs"
+                  placeholder="Nota opzionale"
+                  value={predictionForm.note}
+                  onChange={(e) =>
+                    setPredictionForm((prev) => ({ ...prev, note: e.target.value }))
+                  }
+                />
+
+                <Button
+                  variant="neon"
+                  size="sm"
+                  className="mt-2 h-8 w-full text-xs"
+                  disabled={createPredictionMutation.isPending}
+                  onClick={handleCreatePrediction}
+                >
+                  Crea previsione
+                </Button>
+
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  In attesa: {pendingPredictions.length}
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="surface-panel p-4 lg:p-5">
+          <Tabs defaultValue="week" className="space-y-3">
+            <TabsList className="grid w-full grid-cols-2 gap-2 sm:grid-cols-4">
+              <TabsTrigger value="week">Settimana</TabsTrigger>
+              <TabsTrigger value="rewards">Ricompense</TabsTrigger>
+              <TabsTrigger value="leaderboard">Classifica</TabsTrigger>
+              <TabsTrigger value="badges">Badge</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="week" className="space-y-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-foreground">Missioni weekly</p>
+                <Badge variant="outline" className="text-xs">Reset weekly tra {formatUtcCountdownToNextWeek()}</Badge>
+              </div>
+              <div className="grid gap-2">
+                {weeklyMissions.map((mission) => (
+                  <div key={mission.id} className="stream-card">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">{mission.title}</p>
+                        <p className="text-xs text-muted-foreground">{mission.description}</p>
+                      </div>
+                      <Badge variant={mission.completed ? "neon" : "outline"} className="text-xs">
+                        +{mission.xpReward} XP
+                      </Badge>
                     </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-3">
-                    <div className="space-y-2">
-                      {badgeAssignmentsPreview.map((item) => (
-                        <div key={item.code} className="stream-card">
-                          <div className="flex items-center gap-3">
-                            <div className="size-10 rounded-xl overflow-hidden border border-border/70 bg-background/65 shrink-0">
-                              <img
-                                src={getSeasonAssignmentImageUrl(String(item.code))}
-                                alt={item.name}
-                                className="h-full w-full object-cover"
-                                loading="lazy"
-                              />
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-foreground">{item.name}</p>
-                              <p className="text-xs text-muted-foreground">{item.objective}</p>
-                            </div>
+                    <Progress value={Number(mission.progress ?? 0)} className="mt-2 h-1.5" />
+                  </div>
+                ))}
+              </div>
+
+              <div className="pt-1">
+                <p className="mb-2 text-sm font-semibold text-foreground">Club quest</p>
+                {clubQuests.length ? (
+                  <div className="grid gap-2">
+                    {clubQuests.map((quest) => (
+                      <div key={quest.clubId} className="stream-card">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-foreground truncate">{quest.clubName}</p>
+                          <Badge variant={quest.completion.completed ? "neon" : "outline"} className="text-[10px]">
+                            {quest.completion.progressPercent}%
+                          </Badge>
+                        </div>
+                        <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                          <div className="flex items-center justify-between">
+                            <span className="inline-flex items-center gap-1">
+                              <Users className="size-3.5" />
+                              Membri attivi
+                            </span>
+                            <span>{quest.progress.engagedMembers}/{quest.targets.engagedMembers}</span>
                           </div>
-                          <div className="mt-2 flex items-center justify-between">
-                            <Badge variant="outline" className="text-[10px]">{item.code}</Badge>
-                            <Badge variant="outline" className="text-[10px] capitalize">{item.rarity}</Badge>
+                          <div className="flex items-center justify-between">
+                            <span className="inline-flex items-center gap-1">
+                              <CalendarDays className="size-3.5" />
+                              RSVP team
+                            </span>
+                            <span>{quest.progress.teamRsvps}/{quest.targets.rsvps}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="inline-flex items-center gap-1">
+                              <Activity className="size-3.5" />
+                              Interazioni
+                            </span>
+                            <span>{quest.progress.teamInteractions}/{quest.targets.interactions}</span>
                           </div>
                         </div>
-                      ))}
+                        <Progress value={quest.completion.progressPercent} className="mt-2 h-1.5" />
+                        <div className="mt-2 flex items-center justify-between">
+                          <p className="text-xs text-muted-foreground">Reward: +{quest.xpReward} XP</p>
+                          {quest.claimed ? (
+                            <Badge variant="neon" className="text-[10px]">
+                              <CheckCircle2 className="mr-1 size-3" />
+                              Riscattata
+                            </Badge>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="outline-neon"
+                              className="h-7 px-3 text-[11px]"
+                              disabled={!quest.eligibleToClaim || claimClubQuestMutation.isPending}
+                              onClick={() => claimClubQuestMutation.mutate({ clubId: quest.clubId })}
+                            >
+                              Riscatta
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Nessun club attivo. Entra in un club per sbloccare la quest settimanale.
+                  </p>
+                )}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="rewards" className="space-y-2">
+              <p className="text-sm font-semibold text-foreground">Reward Track</p>
+              <div className="grid gap-2">
+                {rewards.map((reward) => (
+                  <div key={reward.rewardCode} className="stream-card">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex items-center gap-3">
+                        <div className="size-10 rounded-xl overflow-hidden border border-border/70 bg-background/65 shrink-0">
+                          <img
+                            src={getSeasonRewardImageUrl(String(reward.rewardCode))}
+                            alt={reward.rewardName}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">
+                            Lv {reward.level} · {reward.rewardName}
+                          </p>
+                          <p className="text-xs text-muted-foreground capitalize">{reward.rewardType}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1.5">
+                        <Badge variant={reward.unlocked ? "neon" : "outline"} className="text-xs capitalize">
+                          {reward.claimed ? "Riscattata" : reward.unlocked ? "Sbloccata" : "Bloccata"}
+                        </Badge>
+                        {reward.unlocked && !reward.claimed ? (
+                          <Button
+                            size="sm"
+                            variant="neon"
+                            className="h-7 px-3 text-[11px]"
+                            disabled={claimRewardMutation.isPending}
+                            onClick={() => claimRewardMutation.mutate({ rewardCode: reward.rewardCode })}
+                          >
+                            Riscatta
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="leaderboard" className="space-y-3">
+              <div className="stream-card border-primary/35 bg-primary/8">
+                <p className="text-xs text-muted-foreground">La tua posizione</p>
+                <p className="text-lg font-display font-semibold text-foreground">
+                  {myRank?.me ? `#${myRank.me.rank} · ${myRank.me.seasonXp.toLocaleString()} XP` : "n/d"}
+                </p>
+                {myRank?.around?.length ? (
+                  <div className="mt-2 grid gap-1">
+                    {myRank.around.map((entry) => (
+                      <div
+                        key={`me-around-${entry.userId}`}
+                        className={`rounded-md border px-2 py-1 text-xs ${entry.isMe ? "border-primary/50 bg-primary/15" : "border-border/60 bg-background/40"}`}
+                      >
+                        <span className="font-semibold">#{entry.rank}</span> {entry.name} · {entry.seasonXp.toLocaleString()} XP
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="grid gap-2">
+                {leaderboard.map((entry) => (
+                  <div key={entry.userId} className="stream-card">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="size-8 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
+                        {entry.rank}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-foreground truncate">{entry.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {Number(entry.seasonXp ?? 0).toLocaleString()} XP season
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </TabsContent>
+
+            <TabsContent value="badges" className="space-y-2">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {badgeAssignments.map((item) => {
+                  const progress = Number(item.progress ?? 0)
+                  const current = Number(item.current ?? 0)
+                  const target = Math.max(1, Number(item.target ?? 1))
+                  const earned = Boolean(item.earned)
+                  return (
+                    <div key={item.code} className="stream-card">
+                      <div className="flex items-center gap-3">
+                        <div className="size-10 rounded-xl overflow-hidden border border-border/70 bg-background/65 shrink-0">
+                          <img
+                            src={getSeasonAssignmentImageUrl(String(item.code))}
+                            alt={item.name}
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">{item.name}</p>
+                          <p className="text-xs text-muted-foreground">{item.objective}</p>
+                        </div>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{current}/{target}</span>
+                        <Badge variant={earned ? "neon" : "outline"} className="text-[10px] capitalize">{item.rarity}</Badge>
+                      </div>
+                      <Progress value={progress} className="mt-1.5 h-1.5" />
+                    </div>
+                  )
+                })}
+              </div>
 
               <Button variant="outline-neon" className="mt-3 w-full" asChild>
                 <Link href="/badges">
@@ -707,11 +741,9 @@ export default function SeasonPage() {
                   <ChevronRight className="ml-2 size-4" />
                 </Link>
               </Button>
-            </section>
-          </aside>
-        </div>
-
-
+            </TabsContent>
+          </Tabs>
+        </section>
       </div>
     </AppLayout>
   )

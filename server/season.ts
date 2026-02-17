@@ -1,4 +1,4 @@
-import { and, eq, gte, lte, sql, desc } from "drizzle-orm";
+import { and, eq, gte, lte, sql, desc, asc } from "drizzle-orm";
 import { getDb } from "./db";
 import {
   xpReasonEnum,
@@ -746,6 +746,21 @@ export async function getCurrentSeasonState(userId: number) {
 
   const remainingMs = Math.max(0, season.endAt.getTime() - Date.now());
 
+  const badgeAssignments = SEASON_BADGE_ASSIGNMENTS.map((assignment) => {
+    const current = assignment.metric === "seasonLevel"
+      ? level.currentLevel
+      : Number((seasonStats as Record<string, unknown>)[assignment.metric] ?? 0);
+    const target = Math.max(1, Number(assignment.target ?? 1));
+    const progress = Math.min(100, Math.round((current / target) * 100));
+    return {
+      ...assignment,
+      current,
+      target,
+      progress,
+      earned: current >= target,
+    };
+  });
+
   return {
     season: {
       id: season.id,
@@ -779,7 +794,7 @@ export async function getCurrentSeasonState(userId: number) {
       claimed: claimedRewardCodes.has(reward.rewardCode),
       claimXpBonus: REWARD_CLAIM_BONUS_XP[reward.rarity] ?? 0,
     })),
-    badgeAssignments: SEASON_BADGE_ASSIGNMENTS,
+    badgeAssignments,
   };
 }
 
@@ -844,6 +859,86 @@ export async function getSeasonLeaderboard(limit = 20) {
     seasonXp: Number(row.seasonXp ?? 0),
     totalXp: Number(row.totalXp ?? 0),
   }));
+}
+
+export async function getMySeasonRank(userId: number) {
+  const season = getSeasonWindow();
+  const database = await getDb();
+  if (!database) return null;
+
+  const seasonTxXpExpr = sql<number>`
+    coalesce(
+      (
+        select sum(${xpTransactions.amount})
+        from ${xpTransactions}
+        where ${xpTransactions.userId} = ${swimmerProfiles.userId}
+          and ${xpTransactions.createdAt} >= ${season.startAt}
+          and ${xpTransactions.createdAt} <= ${season.endAt}
+      ),
+      0
+    )
+  `;
+
+  const seasonActivityXpExpr = sql<number>`
+    coalesce(
+      (
+        select sum(${swimmingActivities.xpEarned})
+        from ${swimmingActivities}
+        where ${swimmingActivities.userId} = ${swimmerProfiles.userId}
+          and ${swimmingActivities.activityDate} >= ${season.startAt}
+          and ${swimmingActivities.activityDate} <= ${season.endAt}
+      ),
+      0
+    )
+  `;
+
+  const seasonXpExpr = sql<number>`
+    case
+      when ${seasonTxXpExpr} > 0 then ${seasonTxXpExpr}
+      else ${seasonActivityXpExpr}
+    end
+  `;
+
+  const rankedRows = await database
+    .select({
+      userId: swimmerProfiles.userId,
+      name: users.name,
+      username: swimmerProfiles.username,
+      avatarUrl: swimmerProfiles.avatarUrl,
+      totalXp: swimmerProfiles.totalXp,
+      seasonXp: seasonXpExpr,
+      rank: sql<number>`row_number() over (order by ${seasonXpExpr} desc, ${swimmerProfiles.totalXp} desc, ${swimmerProfiles.userId} asc)`,
+    })
+    .from(swimmerProfiles)
+    .innerJoin(users, eq(users.id, swimmerProfiles.userId))
+    .orderBy(desc(seasonXpExpr), desc(swimmerProfiles.totalXp), asc(swimmerProfiles.userId));
+
+  const me = rankedRows.find((row) => Number(row.userId) === Number(userId));
+  if (!me) return null;
+
+  const around = rankedRows
+    .filter((row) => Math.abs(Number(row.rank) - Number(me.rank)) <= 1)
+    .map((row) => ({
+      rank: Number(row.rank),
+      userId: row.userId,
+      name: row.username || row.name || `Utente ${row.userId}`,
+      avatarUrl: row.avatarUrl,
+      seasonXp: Number(row.seasonXp ?? 0),
+      totalXp: Number(row.totalXp ?? 0),
+      isMe: Number(row.userId) === Number(userId),
+    }));
+
+  return {
+    me: {
+      rank: Number(me.rank),
+      userId: me.userId,
+      name: me.username || me.name || `Utente ${me.userId}`,
+      avatarUrl: me.avatarUrl,
+      seasonXp: Number(me.seasonXp ?? 0),
+      totalXp: Number(me.totalXp ?? 0),
+    },
+    around,
+  };
 }
 
 export async function claimSeasonReward(userId: number, rewardCode: string) {
