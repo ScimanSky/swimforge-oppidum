@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { Pin, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon } from "lucide-react";
+import { Pin, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon, Calendar as CalendarIcon } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -51,6 +53,119 @@ async function geocodeLocation(query: string): Promise<{ lat: number; lng: numbe
     lng,
     displayName: first.display_name ?? q,
   };
+}
+
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function toDateTimeLocalString(date: Date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+function parseDateTimeLocal(value: string) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function DateTimePickerField({
+  label,
+  value,
+  onChange,
+  required = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  required?: boolean;
+}) {
+  const selected = parseDateTimeLocal(value);
+  const [open, setOpen] = useState(false);
+
+  const applyDate = (nextDate: Date | undefined) => {
+    if (!nextDate) return;
+    const base = selected ?? new Date();
+    const merged = new Date(nextDate);
+    merged.setHours(base.getHours(), base.getMinutes(), 0, 0);
+    onChange(toDateTimeLocalString(merged));
+  };
+
+  const applyTime = (time: string) => {
+    const [hh, mm] = time.split(":").map((part) => Number(part));
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return;
+    const base = selected ?? new Date();
+    const next = new Date(base);
+    next.setHours(hh, mm, 0, 0);
+    onChange(toDateTimeLocalString(next));
+  };
+
+  const formattedLabel = selected
+    ? selected.toLocaleString("it-IT", {
+        weekday: "short",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "Seleziona data e ora";
+
+  return (
+    <div className="space-y-1">
+      <Label>
+        {label}
+        {required ? " *" : ""}
+      </Label>
+      <div className="flex items-center gap-2">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button type="button" variant="outline-neon" className="w-full justify-start font-normal">
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              <span className="truncate">{formattedLabel}</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-3" align="start">
+            <div className="space-y-3">
+              <Calendar
+                mode="single"
+                selected={selected ?? undefined}
+                onSelect={applyDate}
+                initialFocus
+              />
+              <div className="space-y-1">
+                <Label htmlFor={`${label}-time`}>Ora</Label>
+                <Input
+                  id={`${label}-time`}
+                  type="time"
+                  value={selected ? `${pad2(selected.getHours())}:${pad2(selected.getMinutes())}` : "09:00"}
+                  onChange={(e) => applyTime(e.target.value)}
+                />
+              </div>
+              <div className="flex justify-between gap-2">
+                {!required ? (
+                  <Button
+                    type="button"
+                    variant="outline-neon"
+                    size="sm"
+                    onClick={() => onChange("")}
+                  >
+                    Rimuovi
+                  </Button>
+                ) : (
+                  <span />
+                )}
+                <Button type="button" variant="neon" size="sm" onClick={() => setOpen(false)}>
+                  Conferma
+                </Button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+    </div>
+  );
 }
 
 export default function ClubDetailEnhanced() {
@@ -568,12 +683,41 @@ export default function ClubDetailEnhanced() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label>Inizio *</Label>
-                  <Input type="datetime-local" value={newEvent.startTime} onChange={(e) => setNewEvent({ ...newEvent, startTime: e.target.value })} />
+                  {isMobile ? (
+                    <>
+                      <Label>Inizio *</Label>
+                      <Input
+                        type="datetime-local"
+                        value={newEvent.startTime}
+                        onChange={(e) => setNewEvent({ ...newEvent, startTime: e.target.value })}
+                      />
+                    </>
+                  ) : (
+                    <DateTimePickerField
+                      label="Inizio"
+                      required
+                      value={newEvent.startTime}
+                      onChange={(next) => setNewEvent({ ...newEvent, startTime: next })}
+                    />
+                  )}
                 </div>
                 <div>
-                  <Label>Fine</Label>
-                  <Input type="datetime-local" value={newEvent.endTime} onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })} />
+                  {isMobile ? (
+                    <>
+                      <Label>Fine</Label>
+                      <Input
+                        type="datetime-local"
+                        value={newEvent.endTime}
+                        onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })}
+                      />
+                    </>
+                  ) : (
+                    <DateTimePickerField
+                      label="Fine"
+                      value={newEvent.endTime}
+                      onChange={(next) => setNewEvent({ ...newEvent, endTime: next })}
+                    />
+                  )}
                 </div>
               </div>
               <div>

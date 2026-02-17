@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Link } from "wouter"
 import AppLayout from "@/components/AppLayout"
 import { StoryAvatar } from "@/components/social/StoryAvatar"
@@ -96,6 +96,10 @@ export default function SocialFeed() {
       const bU = b.stories.some((s: any) => !s.hasViewed)
       return aU === bU ? 0 : aU ? -1 : 1
     })
+  const topbarStoryGroups = useMemo(() => {
+    if (!currentUserId) return otherStoryGroups
+    return currentUserGroup ? [currentUserGroup, ...otherStoryGroups] : otherStoryGroups
+  }, [currentUserGroup, currentUserId, otherStoryGroups])
 
   const handleViewStory = useCallback((userId: number) => {
     const groups = storyGroups ?? []
@@ -170,21 +174,43 @@ export default function SocialFeed() {
 
   const isInitialLoading = firstPageQuery.isLoading && posts.length === 0
 
-  // Header slot: current user's story avatar
-  const headerStoryAvatar = currentUserId ? (
-    <StoryAvatar
-      userId={currentUserId}
-      userName={currentUserGroup?.userName ?? displayName}
-      avatarUrl={currentUserGroup?.userAvatar ?? profile?.avatarUrl}
-      hasUnviewed={hasOwnStories}
-      isCurrentUser
-      size="sm"
-      onClick={hasOwnStories ? () => handleViewStory(currentUserId) : handleCreateStory}
-    />
-  ) : undefined
+  const headerStoriesSlot = (
+    <div className="hidden lg:flex min-w-0 max-w-[min(62vw,860px)] items-center gap-2 overflow-x-auto scrollbar-hide pr-1">
+      {topbarStoryGroups.length > 0 ? (
+        topbarStoryGroups.map((group: any) => {
+          const isCurrent = Number(group.userId) === Number(currentUserId)
+          const hasUnviewed = group.stories.some((s: any) => !s.hasViewed)
+          return (
+            <StoryAvatar
+              key={group.userId}
+              userId={group.userId}
+              userName={group.userName ?? "Utente"}
+              avatarUrl={group.userAvatar}
+              hasUnviewed={hasUnviewed}
+              isCurrentUser={isCurrent}
+              size="sm"
+              onClick={() =>
+                isCurrent && !hasOwnStories ? handleCreateStory() : handleViewStory(group.userId)
+              }
+            />
+          )
+        })
+      ) : currentUserId ? (
+        <StoryAvatar
+          userId={currentUserId}
+          userName={currentUserGroup?.userName ?? displayName}
+          avatarUrl={currentUserGroup?.userAvatar ?? profile?.avatarUrl}
+          hasUnviewed={hasOwnStories}
+          isCurrentUser
+          size="sm"
+          onClick={hasOwnStories ? () => handleViewStory(currentUserId) : handleCreateStory}
+        />
+      ) : null}
+    </div>
+  )
 
   return (
-    <AppLayout headerSlot={headerStoryAvatar}>
+    <AppLayout headerSlot={headerStoriesSlot}>
       <div className="compact-shell">
         {/* Two-column layout: feed + sidebar on xl+ */}
         <div className="flex gap-6 justify-center">
@@ -281,12 +307,8 @@ export default function SocialFeed() {
           </div>
 
           {/* Right sidebar — xl+ only */}
-          <aside data-tour="feed-stories" className="hidden xl:block w-64 shrink-0 sticky top-20 self-start">
-            <FeedSidebar
-              currentUserId={currentUserId}
-              onViewStory={handleViewStory}
-              onCreateStory={handleCreateStory}
-            />
+          <aside className="hidden xl:block w-64 shrink-0 sticky top-20 self-start">
+            <FeedSidebar />
           </aside>
         </div>
       </div>

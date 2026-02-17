@@ -37,7 +37,6 @@ const ClubInvite = lazy(() => import("./pages/ClubInvite"));
 const ClubDetail = lazy(() => import("./pages/ClubDetailEnhanced"));
 const ClubEventDetail = lazy(() => import("./pages/ClubEventDetail"));
 const AdminReports = lazy(() => import("./pages/AdminReports"));
-const Auth = lazy(() => import("./pages/Auth"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
@@ -54,7 +53,9 @@ function Router() {
     <Suspense fallback={<div className="flex items-center justify-center h-screen"><Spinner /></div>}>
     <Switch>
       <Route path="/" component={Home} />
-      <Route path="/auth" component={Auth} />
+      <Route path="/auth">
+        <Redirect to="/login" />
+      </Route>
       <Route path="/auth/callback" component={AuthCallback} />
       <Route path="/strava/callback" component={StravaConnect} />
       <Route path="/login" component={Login} />

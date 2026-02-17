@@ -113,7 +113,7 @@ export default function AuthCallback() {
         
         // Redirect alla pagina di login dopo 3 secondi
         setTimeout(() => {
-          navigate("/auth");
+          navigate("/login");
         }, 3000);
       }
     };

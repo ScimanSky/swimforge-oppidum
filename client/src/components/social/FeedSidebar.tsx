@@ -1,6 +1,5 @@
 import { useState } from "react"
 import { Link } from "wouter"
-import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { UserCheck, UserPlus } from "lucide-react"
@@ -64,66 +63,12 @@ function SuggestedUserRow({ user }: { user: { userId: number; name: string | nul
   )
 }
 
-/** Compact mini-avatar for story in sidebar column */
-function StoryMiniAvatar({
-  userName,
-  avatarUrl,
-  hasUnviewed,
-  onClick,
-}: {
-  userName: string
-  avatarUrl?: string | null
-  hasUnviewed: boolean
-  onClick?: () => void
-}) {
-  return (
-    <button type="button" onClick={onClick} className="flex items-center gap-2 group outline-none w-full">
-      <div
-        className={cn(
-          "shrink-0 rounded-full p-[2px] transition-transform group-hover:scale-105 group-active:scale-95",
-          hasUnviewed ? "story-ring-animated" : "bg-border/40",
-        )}
-      >
-        <Avatar className="size-8 border-2 border-background">
-          {avatarUrl && <AvatarImage src={avatarUrl} alt={userName} />}
-          <AvatarFallback className="text-[9px] font-semibold">
-            {getInitials(userName)}
-          </AvatarFallback>
-        </Avatar>
-      </div>
-      <span className="text-xs text-muted-foreground truncate group-hover:text-foreground transition-colors">
-        {userName.split(" ")[0]}
-      </span>
-    </button>
-  )
-}
-
-interface FeedSidebarProps {
-  currentUserId?: number | null
-  onViewStory?: (userId: number) => void
-  onCreateStory?: () => void
-}
-
-export default function FeedSidebar({ currentUserId, onViewStory }: FeedSidebarProps) {
+export default function FeedSidebar() {
   const suggestedQuery = trpc.community.users.suggested.useQuery(
     { limit: 5 },
     { staleTime: 60_000 }
   )
   const suggestedUsers = suggestedQuery.data ?? []
-
-  const { data: storyGroups } = trpc.community.stories.active.useQuery(undefined, {
-    staleTime: 30_000,
-  })
-  const allGroups = storyGroups ?? []
-  const otherGroups = allGroups
-    .filter((g: any) => Number(g.userId) !== Number(currentUserId))
-    .sort((a, b) => {
-      const aU = a.stories.some((s: any) => !s.hasViewed)
-      const bU = b.stories.some((s: any) => !s.hasViewed)
-      return aU === bU ? 0 : aU ? -1 : 1
-    })
-
-  const hasStories = otherGroups.length > 0
 
   return (
     <div className="space-y-4">
@@ -142,27 +87,6 @@ export default function FeedSidebar({ currentUserId, onViewStory }: FeedSidebarP
           </p>
         )}
       </div>
-
-      {/* Stories */}
-      {hasStories && (
-        <div className="surface-panel p-4">
-          <h3 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">Storie</h3>
-          <div className="space-y-2">
-            {otherGroups.map((group) => {
-              const hasUnviewed = group.stories.some((s: any) => !s.hasViewed)
-              return (
-                <StoryMiniAvatar
-                  key={group.userId}
-                  userName={group.userName ?? "Utente"}
-                  avatarUrl={group.userAvatar}
-                  hasUnviewed={hasUnviewed}
-                  onClick={() => onViewStory?.(group.userId)}
-                />
-              )
-            })}
-          </div>
-        </div>
-      )}
     </div>
   )
 }
