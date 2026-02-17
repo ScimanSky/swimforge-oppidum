@@ -137,6 +137,42 @@ export async function getSuggestedUsers(viewerUserId: number, limit = 5) {
   return rows;
 }
 
+export async function getFollowStarterState(viewerUserId: number, limit = 5, target = 3) {
+  const db = await getDb();
+  if (!db) {
+    return {
+      followingCount: 0,
+      target,
+      remaining: target,
+      suggestedUsers: [],
+    };
+  }
+
+  const [countRow] = await db
+    .select({
+      count: sql<number>`count(*)`,
+    })
+    .from(socialFollows)
+    .where(
+      and(
+        eq(socialFollows.followerId, viewerUserId),
+        eq(socialFollows.status, "accepted")
+      )
+    )
+    .limit(1);
+
+  const followingCount = Number(countRow?.count ?? 0);
+  const normalizedTarget = Math.max(1, target);
+  const remaining = Math.max(0, normalizedTarget - followingCount);
+
+  return {
+    followingCount,
+    target: normalizedTarget,
+    remaining,
+    suggestedUsers: await getSuggestedUsers(viewerUserId, limit),
+  };
+}
+
 export async function toggleFollow(params: { followerId: number; followingId: number }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

@@ -5,7 +5,7 @@ import {
     getSocialFeed, upsertActivityPost, setActivityShare,
     toggleSplash, addComment, getComments, deleteOwnPost,
     hidePostForUser, unhidePostForUser, reportPost,
-    getUserPublicProfile, toggleFollow, getSuggestedUsers, searchUsers,
+    getUserPublicProfile, toggleFollow, getSuggestedUsers, getFollowStarterState, searchUsers,
     awardActionXp,
     detectImageType, logger,
 } from "./_shared";
@@ -813,6 +813,23 @@ export const communityRouter = router({
             .input(z.object({ limit: z.number().min(1).max(10).optional() }).optional())
             .query(async ({ ctx, input }) => {
                 return getSuggestedUsers(ctx.user.id, input?.limit ?? 5);
+            }),
+
+        followStarter: protectedProcedure
+            .input(
+                z
+                    .object({
+                        limit: z.number().min(1).max(10).optional(),
+                        target: z.number().min(1).max(10).optional(),
+                    })
+                    .optional()
+            )
+            .query(async ({ ctx, input }) => {
+                return getFollowStarterState(
+                    ctx.user.id,
+                    input?.limit ?? 5,
+                    input?.target ?? 3
+                );
             }),
 
         search: protectedProcedure

@@ -176,6 +176,18 @@ export const authRouter = router({
         return payload;
     }),
 
+    deleteAccountStatus: protectedProcedure.query(async ({ ctx }) => {
+        const user = await db.getUserById(ctx.user.id);
+        if (!user) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Utente non trovato" });
+        }
+
+        return {
+            requiresPassword: Boolean(user.passwordHash),
+            loginMethod: user.loginMethod ?? "email",
+        } as const;
+    }),
+
     logoutAllDevices: protectedProcedure.mutation(async ({ ctx }) => {
         await db.incrementSessionTokenVersion(ctx.user.id);
         const cookieOptions = getSessionCookieOptions(ctx.req);
@@ -186,7 +198,7 @@ export const authRouter = router({
     deleteAccount: protectedProcedure
         .input(
             z.object({
-                password: z.string().min(1, "Password obbligatoria"),
+                password: z.string().min(1, "Password obbligatoria").optional(),
             })
         )
         .mutation(async ({ ctx, input }) => {
@@ -195,16 +207,17 @@ export const authRouter = router({
                 throw new TRPCError({ code: "NOT_FOUND", message: "Utente non trovato" });
             }
 
-            if (!user.passwordHash) {
-                throw new TRPCError({
-                    code: "BAD_REQUEST",
-                    message: "Questo account non usa password locale. Contatta il supporto per l'eliminazione.",
-                });
-            }
-
-            const passwordValid = await db.verifyUserPassword(ctx.user.id, input.password);
-            if (!passwordValid) {
-                throw new TRPCError({ code: "UNAUTHORIZED", message: "Password non corretta" });
+            // Local accounts require password confirmation.
+            // OAuth/social accounts can be deleted directly from an authenticated session.
+            if (user.passwordHash) {
+                const password = input.password?.trim() ?? "";
+                if (!password) {
+                    throw new TRPCError({ code: "BAD_REQUEST", message: "Password obbligatoria" });
+                }
+                const passwordValid = await db.verifyUserPassword(ctx.user.id, password);
+                if (!passwordValid) {
+                    throw new TRPCError({ code: "UNAUTHORIZED", message: "Password non corretta" });
+                }
             }
 
             const deletedAt = new Date();

@@ -11,6 +11,7 @@ import FeedSubTabs from "@/components/social/FeedSubTabs"
 import FeedPost from "@/components/social/FeedPost"
 import FeedSkeleton from "@/components/social/FeedSkeleton"
 import FeedSidebar from "@/components/social/FeedSidebar"
+import FollowStarterCard from "@/components/social/FollowStarterCard"
 import { Button } from "@/components/ui/button"
 import { Waves, Users, RefreshCw, Loader2 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
@@ -110,6 +111,10 @@ export default function SocialFeed() {
   }, [])
 
   const scope = tab === "seguiti" ? "following" : "global"
+  const followStarterQuery = trpc.community.users.followStarter.useQuery(
+    { limit: 5, target: 3 },
+    { staleTime: 60_000 }
+  )
 
   const firstPageQuery = trpc.community.feed.useQuery(
     { limit: 20, scope },
@@ -217,6 +222,10 @@ export default function SocialFeed() {
             </div>
 
             <div className="space-y-3 lg:space-y-4">
+              <FollowStarterCard
+                state={followStarterQuery.data}
+                isLoading={followStarterQuery.isLoading}
+              />
               {/* Feed List */}
               {isInitialLoading ? (
                 <FeedSkeleton />

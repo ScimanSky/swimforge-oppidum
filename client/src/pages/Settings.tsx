@@ -222,6 +222,7 @@ export default function Settings() {
 
   const utils = trpc.useUtils()
   const { data: me } = trpc.auth.me.useQuery()
+  const deleteAccountStatusQuery = trpc.auth.deleteAccountStatus.useQuery()
   const { data: profile } = trpc.profile.get.useQuery()
   const { data: activities } = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
   const { data: garminStatus } = trpc.garmin.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 })
@@ -246,6 +247,7 @@ export default function Settings() {
   })
 
   const displayName = me?.name || me?.email || "Utente"
+  const deleteRequiresPassword = deleteAccountStatusQuery.data?.requiresPassword ?? true
   const initials = displayName
     .split(" ")
     .map((part) => part[0])
@@ -740,11 +742,13 @@ export default function Settings() {
   }
 
   const handleDeleteAccount = () => {
-    if (!deletePassword.trim()) {
+    if (deleteRequiresPassword && !deletePassword.trim()) {
       toast.error("Inserisci la password per confermare l'eliminazione.")
       return
     }
-    deleteAccountMutation.mutate({ password: deletePassword })
+    deleteAccountMutation.mutate(
+      deleteRequiresPassword ? { password: deletePassword.trim() } : {}
+    )
   }
 
   return (
@@ -1529,23 +1533,32 @@ export default function Settings() {
           <DialogHeader>
             <DialogTitle className="text-destructive">Conferma eliminazione account</DialogTitle>
             <DialogDescription>
-              Questa azione è irreversibile. Inserisci la password per confermare.
+              {deleteRequiresPassword
+                ? "Questa azione è irreversibile. Inserisci la password per confermare."
+                : "Questa azione è irreversibile. Conferma per eliminare definitivamente l'account."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="delete-account-password">Password</Label>
-            <Input
-              id="delete-account-password"
-              type="password"
-              value={deletePassword}
-              onChange={(event) => setDeletePassword(event.target.value)}
-              placeholder="Inserisci la tua password"
-              autoComplete="current-password"
-            />
+          {deleteRequiresPassword ? (
+            <div className="space-y-2">
+              <Label htmlFor="delete-account-password">Password</Label>
+              <Input
+                id="delete-account-password"
+                type="password"
+                value={deletePassword}
+                onChange={(event) => setDeletePassword(event.target.value)}
+                placeholder="Inserisci la tua password"
+                autoComplete="current-password"
+              />
+              <p className="text-xs text-muted-foreground">
+                Dopo l&apos;eliminazione riceverai un&apos;email di conferma.
+              </p>
+            </div>
+          ) : (
             <p className="text-xs text-muted-foreground">
+              Questo account usa accesso esterno (Google/Apple o simile): non serve password locale.
               Dopo l&apos;eliminazione riceverai un&apos;email di conferma.
             </p>
-          </div>
+          )}
           <DialogFooter>
             <Button
               variant="outline-neon"
@@ -1557,7 +1570,10 @@ export default function Settings() {
             <Button
               variant="destructive"
               onClick={handleDeleteAccount}
-              disabled={deleteAccountMutation.isPending || deletePassword.trim().length === 0}
+              disabled={
+                deleteAccountMutation.isPending ||
+                (deleteRequiresPassword && deletePassword.trim().length === 0)
+              }
             >
               {deleteAccountMutation.isPending ? "Eliminazione..." : "Conferma eliminazione"}
             </Button>
