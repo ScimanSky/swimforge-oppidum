@@ -83,6 +83,7 @@ function DateTimePickerField({
 }) {
   const selected = parseDateTimeLocal(value);
   const [open, setOpen] = useState(false);
+  const timeInputId = `event-time-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
   const applyDate = (nextDate: Date | undefined) => {
     if (!nextDate) return;
@@ -135,9 +136,9 @@ function DateTimePickerField({
                 initialFocus
               />
               <div className="space-y-1">
-                <Label htmlFor={`${label}-time`}>Ora</Label>
+                <Label htmlFor={timeInputId}>Ora</Label>
                 <Input
-                  id={`${label}-time`}
+                  id={timeInputId}
                   type="time"
                   value={selected ? `${pad2(selected.getHours())}:${pad2(selected.getMinutes())}` : "09:00"}
                   onChange={(e) => applyTime(e.target.value)}
@@ -196,6 +197,10 @@ export default function ClubDetailEnhanced() {
   const [isMobile, setIsMobile] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.matchMedia("(max-width: 767px)").matches;
+  });
+  const [isCoarsePointer, setIsCoarsePointer] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.matchMedia("(pointer: coarse)").matches;
   });
 
   const utils = trpc.useUtils();
@@ -286,16 +291,20 @@ export default function ClubDetailEnhanced() {
     if (typeof window === "undefined") return;
     const desktopQuery = window.matchMedia("(min-width: 1024px)");
     const mobileQuery = window.matchMedia("(max-width: 767px)");
+    const coarsePointerQuery = window.matchMedia("(pointer: coarse)");
     const handleQueries = () => {
       setIsDesktop(desktopQuery.matches);
       setIsMobile(mobileQuery.matches);
+      setIsCoarsePointer(coarsePointerQuery.matches);
     };
     handleQueries();
     desktopQuery.addEventListener("change", handleQueries);
     mobileQuery.addEventListener("change", handleQueries);
+    coarsePointerQuery.addEventListener("change", handleQueries);
     return () => {
       desktopQuery.removeEventListener("change", handleQueries);
       mobileQuery.removeEventListener("change", handleQueries);
+      coarsePointerQuery.removeEventListener("change", handleQueries);
     };
   }, []);
 
@@ -683,7 +692,7 @@ export default function ClubDetailEnhanced() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  {isMobile ? (
+                  {isCoarsePointer ? (
                     <>
                       <Label>Inizio *</Label>
                       <Input
@@ -702,7 +711,7 @@ export default function ClubDetailEnhanced() {
                   )}
                 </div>
                 <div>
-                  {isMobile ? (
+                  {isCoarsePointer ? (
                     <>
                       <Label>Fine</Label>
                       <Input
