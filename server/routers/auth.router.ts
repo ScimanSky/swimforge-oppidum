@@ -3,10 +3,11 @@ import {
     TRPCError, sdk, verifySupabaseAccessToken,
     loginLimiter, registrationLimiter,
     COOKIE_NAME, getSessionCookieOptions,
-    ONE_YEAR_MS, applyRateLimit,
+    applyRateLimit,
 } from "./_shared";
 import { getSupabaseAdminClient } from "../_core/supabase_admin";
 import { sendAccountDeletionConfirmationEmail } from "../_core/email";
+import { ENV } from "../_core/env";
 
 export const authRouter = router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -32,12 +33,12 @@ export const authRouter = router({
             // Create session token
             const sessionToken = await sdk.createSessionToken(result.user.id.toString(), {
                 name: result.user.name || "",
-                expiresInMs: ONE_YEAR_MS,
+                expiresInMs: ENV.sessionMaxAgeMs,
                 tokenVersion: result.user.sessionTokenVersion ?? 1,
             });
 
             const cookieOptions = getSessionCookieOptions(ctx.req);
-            ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+            ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
 
             return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
         }),
@@ -46,7 +47,7 @@ export const authRouter = router({
     login: publicProcedure
         .input(z.object({
             email: z.string().email(),
-            password: z.string().min(1),
+            password: z.string().min(6, "Password must be at least 6 characters"),
         }))
         .mutation(async ({ ctx, input }) => {
             await applyRateLimit(loginLimiter, ctx.req, ctx.res);
@@ -62,12 +63,12 @@ export const authRouter = router({
             // Create session token
             const sessionToken = await sdk.createSessionToken(result.user.id.toString(), {
                 name: result.user.name || "",
-                expiresInMs: ONE_YEAR_MS,
+                expiresInMs: ENV.sessionMaxAgeMs,
                 tokenVersion: result.user.sessionTokenVersion ?? 1,
             });
 
             const cookieOptions = getSessionCookieOptions(ctx.req);
-            ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+            ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
 
             return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
         }),
@@ -156,12 +157,12 @@ export const authRouter = router({
             // Crea session token
             const sessionToken = await sdk.createSessionToken(user.id.toString(), {
                 name: user.name || "",
-                expiresInMs: ONE_YEAR_MS,
+                expiresInMs: ENV.sessionMaxAgeMs,
                 tokenVersion: user.sessionTokenVersion ?? 1,
             });
 
             const cookieOptions = getSessionCookieOptions(ctx.req);
-            ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+            ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
             return { success: true, isNewUser, user: { id: user.id, email: user.email, name: user.name } };
         }),
 

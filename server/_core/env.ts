@@ -12,6 +12,27 @@ function requireEnv(name: string, fallbackName?: string): string {
   return value;
 }
 
+function parseIntEnv(name: string, fallback: number, options: { min?: number; max?: number } = {}): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) {
+    logger.warn(`[env] WARNING: ${name} is not a valid integer, using fallback ${fallback}`);
+    return fallback;
+  }
+  if (options.min !== undefined && parsed < options.min) {
+    logger.warn(`[env] WARNING: ${name} below minimum (${options.min}), using fallback ${fallback}`);
+    return fallback;
+  }
+  if (options.max !== undefined && parsed > options.max) {
+    logger.warn(`[env] WARNING: ${name} above maximum (${options.max}), using fallback ${fallback}`);
+    return fallback;
+  }
+  return parsed;
+}
+
+const sessionMaxAgeDays = parseIntEnv("SESSION_MAX_AGE_DAYS", 30, { min: 1, max: 365 });
+
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? "",
   cookieSecret: requireEnv("JWT_SECRET"),
@@ -29,6 +50,8 @@ export const ENV = {
   imagekitPublicKey: process.env.IMAGEKIT_PUBLIC_KEY ?? "",
   imagekitPrivateKey: process.env.IMAGEKIT_PRIVATE_KEY ?? "",
   imagekitUrlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT ?? "",
+  sessionMaxAgeDays,
+  sessionMaxAgeMs: sessionMaxAgeDays * 24 * 60 * 60 * 1000,
 };
 
 export function assertAuthEnv() {

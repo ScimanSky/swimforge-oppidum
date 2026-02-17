@@ -54,9 +54,6 @@ export {
     listSeasonActivityPredictions,
 } from "../season_engagement";
 
-// ─── Constants ──────────────────────────────────────────────────────
-export const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
-
 // ─── Type aliases ───────────────────────────────────────────────────
 import type * as _db from "../db";
 import type { clubEvents as _clubEvents, clubAnnouncements as _clubAnnouncements, swimmingActivities as _swimmingActivities } from "../../drizzle/schema";

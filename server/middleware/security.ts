@@ -16,6 +16,35 @@ import { logger } from "./logger";
 
 const log = logger.child({ component: "security" });
 
+function parseCspList(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function toOrigin(value: string | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed;
+  }
+}
+
+function uniq(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+}
+
+const supabaseOrigin = toOrigin(process.env.SUPABASE_URL);
+const imagekitEndpointOrigin = toOrigin(process.env.IMAGEKIT_URL_ENDPOINT);
+const extraConnectSrc = parseCspList(process.env.CSP_CONNECT_SRC_EXTRA);
+const extraImgSrc = parseCspList(process.env.CSP_IMG_SRC_EXTRA);
+const extraMediaSrc = parseCspList(process.env.CSP_MEDIA_SRC_EXTRA);
+
 // ============================================================================
 // RATE LIMITING - SEMPLIFICATO
 // ============================================================================
@@ -173,23 +202,47 @@ export const helmetConfig = {
     directives: {
       defaultSrc: ["'self'"],
       baseUri: ["'self'"],
-      scriptSrc: ["'self'", 'cdn.jsdelivr.net'],
-      styleSrc: ["'self'", "'unsafe-inline'", 'fonts.googleapis.com'],
-      fontSrc: ["'self'", 'fonts.gstatic.com'],
-      imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
-      mediaSrc: ["'self'", 'blob:', 'data:', 'https:'],
-      connectSrc: [
+      scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+      imgSrc: uniq([
         "'self'",
-        'api.garmin.com',
-        'api.strava.com',
+        'data:',
+        'blob:',
+        supabaseOrigin,
+        'https://*.supabase.co',
+        imagekitEndpointOrigin,
+        'https://ik.imagekit.io',
+        'https://avatars.githubusercontent.com',
+        'https://lh3.googleusercontent.com',
+        'https://*.googleusercontent.com',
+        'https://secure.gravatar.com',
+        'https://*.gravatar.com',
+        ...extraImgSrc,
+      ]),
+      mediaSrc: uniq([
+        "'self'",
+        'blob:',
+        'data:',
+        supabaseOrigin,
+        'https://*.supabase.co',
+        imagekitEndpointOrigin,
+        'https://ik.imagekit.io',
+        ...extraMediaSrc,
+      ]),
+      connectSrc: uniq([
+        "'self'",
+        'https://api.garmin.com',
+        'https://api.strava.com',
         'https://sentry.io',
         'https://nominatim.openstreetmap.org',
-        process.env.SUPABASE_URL || '',
+        supabaseOrigin,
         'https://*.supabase.co',
         'wss://*.supabase.co',
         'https://upload.imagekit.io',
-        process.env.IMAGEKIT_URL_ENDPOINT || '',
-      ].filter(Boolean),
+        imagekitEndpointOrigin,
+        ...extraConnectSrc,
+      ]),
       frameSrc: ["'self'", 'https://www.openstreetmap.org'],
       frameAncestors: ["'none'"],
       formAction: ["'self'"],
