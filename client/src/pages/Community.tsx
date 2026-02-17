@@ -45,7 +45,7 @@ export default function Community() {
   const clubsQuery = trpc.community.clubs.list.useQuery({
     scope: clubScope,
     search: clubSearch.trim() || undefined,
-    limit: 12,
+    limit: 100,
   })
 
   const createClub = trpc.community.clubs.create.useMutation({
