@@ -75,6 +75,8 @@ const PUBLIC_PATHS = [
   "/terms",
   "/cookies",
 ] as const;
+const SEASON_POPUP_DATASET_KEY = "seasonLaunchOpen";
+const SEASON_POPUP_EVENT = "swimforge:season-popup:state";
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((base) => pathname === base || pathname.startsWith(`${base}/`));
@@ -119,6 +121,7 @@ export default function OnboardingFlow() {
   const [manualRunNonce, setManualRunNonce] = useState(0);
   const [pendingTourLaunch, setPendingTourLaunch] = useState(false);
   const [welcomeCompleted, setWelcomeCompleted] = useState(false);
+  const [seasonPopupOpen, setSeasonPopupOpen] = useState(false);
   const onboardingUserId = meQuery.data?.id ? String(meQuery.data.id) : null;
 
   const syncAttemptedRef = useRef(false);
@@ -143,9 +146,36 @@ export default function OnboardingFlow() {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+
+    const readCurrent = () => document.documentElement.dataset[SEASON_POPUP_DATASET_KEY] === "1";
+    setSeasonPopupOpen(readCurrent());
+
+    const handler = (event: Event) => {
+      const customEvent = event as CustomEvent<{ open?: boolean }>;
+      if (typeof customEvent.detail?.open === "boolean") {
+        setSeasonPopupOpen(customEvent.detail.open);
+        return;
+      }
+      setSeasonPopupOpen(readCurrent());
+    };
+
+    window.addEventListener(SEASON_POPUP_EVENT, handler as EventListener);
+    return () => window.removeEventListener(SEASON_POPUP_EVENT, handler as EventListener);
+  }, []);
+
+  useEffect(() => {
     if (!meQuery.data?.id) {
       setStage("hidden");
       setHighlightRect(null);
+      return;
+    }
+
+    if (seasonPopupOpen) {
+      if (stage !== "hidden") {
+        setStage("hidden");
+        setHighlightRect(null);
+      }
       return;
     }
 
@@ -180,7 +210,7 @@ export default function OnboardingFlow() {
       setStage("hidden");
       setHighlightRect(null);
     }
-  }, [canEvaluate, meQuery.data?.id, onboardingUserId, pathname, pendingTourLaunch, serverDone, shouldForce, stage]);
+  }, [canEvaluate, meQuery.data?.id, onboardingUserId, pathname, pendingTourLaunch, seasonPopupOpen, serverDone, shouldForce, stage]);
 
   useEffect(() => {
     if (!canEvaluate || !meQuery.data?.id) return;

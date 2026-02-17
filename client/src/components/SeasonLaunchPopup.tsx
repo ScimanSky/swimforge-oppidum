@@ -9,6 +9,8 @@ import { useAuth } from "@/_core/hooks/useAuth";
 const POPUP_VERSION = "season-launch-s1-v1";
 const PRIMARY_LAUNCH_IMAGE = "/images/season-launch-electric-ice-main.png";
 const FALLBACK_LAUNCH_IMAGE = "/images/season-launch-electric-ice.svg";
+const SEASON_POPUP_DATASET_KEY = "seasonLaunchOpen";
+const SEASON_POPUP_EVENT = "swimforge:season-popup:state";
 
 function getStorageKey(userId: string) {
   return `swimforge:feature-popup:${POPUP_VERSION}:${userId}`;
@@ -47,6 +49,17 @@ export default function SeasonLaunchPopup() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
+    document.documentElement.dataset[SEASON_POPUP_DATASET_KEY] = open ? "1" : "0";
+    window.dispatchEvent(new CustomEvent(SEASON_POPUP_EVENT, { detail: { open } }));
+
+    return () => {
+      document.documentElement.dataset[SEASON_POPUP_DATASET_KEY] = "0";
+      window.dispatchEvent(new CustomEvent(SEASON_POPUP_EVENT, { detail: { open: false } }));
+    };
   }, [open]);
 
   const handleClose = () => {
