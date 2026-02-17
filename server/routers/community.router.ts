@@ -16,6 +16,18 @@ import { socialPosts } from "../../drizzle/schema";
 const CLUB_STAFF_ROLES = new Set(["owner", "admin", "moderator"]);
 const REACTION_TYPES = ["splash", "fire", "strong", "clap", "wave", "love", "rocket", "wow", "laugh", "cry"] as const;
 const HASHTAG_REGEX = /(^|\s)#([A-Za-z0-9_]{2,40})/g;
+const ROUTE_GEOJSON_SCHEMA = z.object({
+    type: z.literal("LineString"),
+    coordinates: z
+        .array(
+            z.tuple([
+                z.number().min(-180).max(180),
+                z.number().min(-90).max(90),
+            ])
+        )
+        .min(2)
+        .max(500),
+});
 
 function normalizeMediaUrls(mediaUrls?: string[] | null, mediaUrl?: string | null) {
     const values = [...(mediaUrls ?? []), mediaUrl ?? ""]
@@ -46,6 +58,29 @@ function normalizeHashtags(content?: string | null, hashtags?: string[] | null) 
         .filter((tag) => tag.length >= 2 && tag.length <= 40);
     const all = [...extractHashtagsFromContent(content), ...explicit];
     return Array.from(new Set(all)).slice(0, 20);
+}
+
+function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number) {
+    const R = 6371000;
+    const toRad = (deg: number) => (deg * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+function routeDistanceMeters(routeGeoJson?: { coordinates: Array<[number, number]> } | null) {
+    if (!routeGeoJson?.coordinates?.length || routeGeoJson.coordinates.length < 2) return null;
+    let total = 0;
+    for (let i = 1; i < routeGeoJson.coordinates.length; i += 1) {
+        const [prevLng, prevLat] = routeGeoJson.coordinates[i - 1];
+        const [currLng, currLat] = routeGeoJson.coordinates[i];
+        total += haversineMeters(prevLat, prevLng, currLat, currLng);
+    }
+    return Math.round(total);
 }
 
 async function notifyTaggedUsers(input: {
@@ -1194,6 +1229,7 @@ export const communityRouter = router({
                     location: z.string().max(500).optional(),
                     locationLat: z.number().min(-90).max(90).optional(),
                     locationLng: z.number().min(-180).max(180).optional(),
+                    routeGeojson: ROUTE_GEOJSON_SCHEMA.optional(),
                     startTime: z.string().datetime(),
                     endTime: z.string().datetime().optional(),
                     maxAttendees: z.number().min(1).optional(),
@@ -1204,11 +1240,39 @@ export const communityRouter = router({
                 .mutation(async ({ ctx, input }) => {
                     await requireClubStaffRole(ctx.user.id, input.clubId);
                     const { createClubEvent } = await import("../db_social_enhanced");
+                    const startTime = new Date(input.startTime);
+                    const endTime = input.endTime ? new Date(input.endTime) : undefined;
+                    const distanceMeters = routeDistanceMeters(input.routeGeojson);
+
+                    let weatherSnapshot: unknown = undefined;
+                    let weatherFetchedAt: Date | undefined = undefined;
+                    if (input.locationLat !== undefined && input.locationLng !== undefined) {
+                        try {
+                            const { fetchEventWeatherSnapshot } = await import("../lib/open_meteo");
+                            weatherSnapshot = await fetchEventWeatherSnapshot({
+                                lat: input.locationLat,
+                                lng: input.locationLng,
+                                targetTime: startTime,
+                            });
+                            weatherFetchedAt = new Date();
+                        } catch (error) {
+                            logger.warn("[Club Event] Weather snapshot fetch failed on create", {
+                                event: "club_event:weather_snapshot_create_failed",
+                                clubId: input.clubId,
+                                message: error instanceof Error ? error.message : String(error),
+                            });
+                        }
+                    }
+
                     const event = await createClubEvent({
                         ...input,
                         creatorId: ctx.user.id,
-                        startTime: new Date(input.startTime),
-                        endTime: input.endTime ? new Date(input.endTime) : undefined,
+                        startTime,
+                        endTime,
+                        routeGeojson: input.routeGeojson,
+                        routeDistanceMeters: distanceMeters ?? undefined,
+                        weatherSnapshot,
+                        weatherFetchedAt,
                     });
                     return { success: true, event };
                 }),
@@ -1232,6 +1296,9 @@ export const communityRouter = router({
                     description: z.string().max(5000).optional(),
                     eventType: z.enum(["training", "race", "social", "meeting"]).optional(),
                     location: z.string().max(500).optional(),
+                    locationLat: z.number().min(-90).max(90).optional(),
+                    locationLng: z.number().min(-180).max(180).optional(),
+                    routeGeojson: ROUTE_GEOJSON_SCHEMA.nullable().optional(),
                     startTime: z.string().datetime().optional(),
                     endTime: z.string().datetime().optional(),
                     status: z.enum(["active", "cancelled", "completed"]).optional(),
@@ -1249,8 +1316,57 @@ export const communityRouter = router({
                         ...(startTime ? { startTime: new Date(startTime) } : {}),
                         ...(endTime ? { endTime: new Date(endTime) } : {}),
                     };
+                    if (input.routeGeojson !== undefined) {
+                        updates.routeGeojson = input.routeGeojson;
+                        updates.routeDistanceMeters = input.routeGeojson ? routeDistanceMeters(input.routeGeojson) : null;
+                    }
+
+                    const nextLat = input.locationLat ?? existingEvent.locationLat ?? undefined;
+                    const nextLng = input.locationLng ?? existingEvent.locationLng ?? undefined;
+                    const nextStart = startTime ? new Date(startTime) : existingEvent.startTime;
+                    if (nextLat !== undefined && nextLng !== undefined && Number.isFinite(nextLat) && Number.isFinite(nextLng)) {
+                        try {
+                            const { fetchEventWeatherSnapshot } = await import("../lib/open_meteo");
+                            updates.weatherSnapshot = await fetchEventWeatherSnapshot({
+                                lat: Number(nextLat),
+                                lng: Number(nextLng),
+                                targetTime: nextStart instanceof Date ? nextStart : new Date(nextStart),
+                            });
+                            updates.weatherFetchedAt = new Date();
+                        } catch (error) {
+                            logger.warn("[Club Event] Weather snapshot fetch failed on update", {
+                                event: "club_event:weather_snapshot_update_failed",
+                                eventId,
+                                message: error instanceof Error ? error.message : String(error),
+                            });
+                        }
+                    }
                     const event = await updateClubEvent(eventId, updates);
                     return { success: true, event };
+                }),
+
+            refreshWeather: protectedProcedure
+                .input(z.object({ eventId: z.number() }))
+                .mutation(async ({ ctx, input }) => {
+                    const { getClubEventById, updateClubEvent } = await import("../db_social_enhanced");
+                    const existingEvent = await getClubEventById(input.eventId);
+                    if (!existingEvent) {
+                        throw new TRPCError({ code: "NOT_FOUND" });
+                    }
+                    await requireClubReadable(ctx.user.id, existingEvent.clubId);
+                    if (!Number.isFinite(existingEvent.locationLat) || !Number.isFinite(existingEvent.locationLng)) {
+                        throw new TRPCError({ code: "BAD_REQUEST", message: "Evento senza coordinate mappa" });
+                    }
+
+                    const { fetchEventWeatherSnapshot } = await import("../lib/open_meteo");
+                    const weatherSnapshot = await fetchEventWeatherSnapshot({
+                        lat: Number(existingEvent.locationLat),
+                        lng: Number(existingEvent.locationLng),
+                        targetTime: existingEvent.startTime ? new Date(existingEvent.startTime) : undefined,
+                    });
+                    const weatherFetchedAt = new Date();
+                    await updateClubEvent(input.eventId, { weatherSnapshot, weatherFetchedAt });
+                    return { success: true, weatherSnapshot, weatherFetchedAt };
                 }),
 
             delete: protectedProcedure

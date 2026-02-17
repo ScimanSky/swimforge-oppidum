@@ -218,6 +218,7 @@ export const helmetConfig = {
         'https://*.googleusercontent.com',
         'https://secure.gravatar.com',
         'https://*.gravatar.com',
+        'https://*.tile.openstreetmap.org',
         ...extraImgSrc,
       ]),
       mediaSrc: uniq([

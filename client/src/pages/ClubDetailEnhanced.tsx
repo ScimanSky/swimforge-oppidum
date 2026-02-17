@@ -24,16 +24,8 @@ import PulseBar from "@/components/club/PulseBar";
 import QuickActionsFAB from "@/components/club/QuickActionsFAB";
 import ClubFeedTab from "@/components/club/ClubFeedTab";
 import ClubMembersTab from "@/components/club/ClubMembersTab";
-
-function buildOsmEmbedUrl(lat: number, lng: number) {
-  const delta = 0.01;
-  const left = lng - delta;
-  const right = lng + delta;
-  const top = lat + delta;
-  const bottom = lat - delta;
-  const bbox = `${left},${bottom},${right},${top}`;
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${lat},${lng}`;
-}
+import EventMapEditor from "@/components/club/EventMapEditor";
+import { pointsToRouteGeojson, routeDistanceMeters, type RoutePoint } from "@/lib/club-event-map";
 
 async function geocodeLocation(query: string): Promise<{ lat: number; lng: number; displayName: string } | null> {
   const q = query.trim();
@@ -78,6 +70,7 @@ export default function ClubDetailEnhanced() {
     startTime: "", endTime: "", maxAttendees: "",
   });
   const [isGeocodingLocation, setIsGeocodingLocation] = useState(false);
+  const [eventRoutePoints, setEventRoutePoints] = useState<RoutePoint[]>([]);
   const mobileStickyRef = useRef<HTMLDivElement | null>(null);
   const desktopStickyRef = useRef<HTMLDivElement | null>(null);
   const [stickyHeaderHeight, setStickyHeaderHeight] = useState(0);
@@ -150,6 +143,7 @@ export default function ClubDetailEnhanced() {
         endTime: "",
         maxAttendees: "",
       });
+      setEventRoutePoints([]);
       utils.community.clubs.events.list.invalidate();
       statsQuery.refetch();
     },
@@ -532,16 +526,33 @@ export default function ClubDetailEnhanced() {
                     </span>
                   )}
                 </div>
-                {newEvent.locationLat !== null && newEvent.locationLng !== null && (
-                  <div className="mt-2 overflow-hidden rounded-md border border-border">
-                    <iframe
-                      title="Anteprima mappa evento"
-                      src={buildOsmEmbedUrl(newEvent.locationLat, newEvent.locationLng)}
-                      className="h-44 w-full"
-                      loading="lazy"
-                    />
-                  </div>
-                )}
+                <div className="mt-2 space-y-2">
+                  <EventMapEditor
+                    pin={
+                      newEvent.locationLat !== null && newEvent.locationLng !== null
+                        ? { lat: newEvent.locationLat, lng: newEvent.locationLng }
+                        : null
+                    }
+                    routePoints={eventRoutePoints}
+                    onPinChange={(pin) =>
+                      setNewEvent((prev) => ({
+                        ...prev,
+                        locationLat: pin?.lat ?? null,
+                        locationLng: pin?.lng ?? null,
+                      }))
+                    }
+                    onRouteChange={setEventRoutePoints}
+                    className="h-56 w-full rounded-xl border border-border/70"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Clicca sulla mappa per impostare il pin (modalita pin) o disegnare il percorso in acqua (modalita percorso).
+                  </p>
+                  {eventRoutePoints.length >= 2 ? (
+                    <p className="text-xs text-muted-foreground">
+                      Percorso: {(routeDistanceMeters(eventRoutePoints) / 1000).toFixed(2)} km
+                    </p>
+                  ) : null}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -581,6 +592,7 @@ export default function ClubDetailEnhanced() {
                     startTime: startTime.toISOString(),
                     endTime: endTime?.toISOString(),
                     maxAttendees: newEvent.maxAttendees ? Number(newEvent.maxAttendees) : undefined,
+                    routeGeojson: pointsToRouteGeojson(eventRoutePoints) ?? undefined,
                   });
                 }}
               >

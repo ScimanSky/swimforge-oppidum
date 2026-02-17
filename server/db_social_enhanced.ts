@@ -50,12 +50,16 @@ export async function createClubEvent(params: {
   location?: string
   locationLat?: number
   locationLng?: number
+  routeGeojson?: unknown
+  routeDistanceMeters?: number
   startTime: Date
   endTime?: Date
   maxAttendees?: number
   isRecurring?: boolean
   recurringRule?: string
   coverImageUrl?: string
+  weatherSnapshot?: unknown
+  weatherFetchedAt?: Date
 }) {
   const db = await requireDb()
   const [event] = await db.insert(clubEvents).values(params).returning()

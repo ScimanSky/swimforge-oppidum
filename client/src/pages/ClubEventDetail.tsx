@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface";
 import { Badge } from "@/components/ui/badge";
 import { MetricOrb } from "@/components/metrics/MetricOrb";
+import EventMapEditor from "@/components/club/EventMapEditor";
+import { parseRouteGeojson, routeGeojsonToPoints } from "@/lib/club-event-map";
 import { trpc } from "@/lib/trpc";
-import { Calendar, CheckCircle2, HelpCircle, MapPin, Users, XCircle, ExternalLink } from "lucide-react";
+import { Calendar, CheckCircle2, HelpCircle, MapPin, RefreshCw, Users, XCircle, ExternalLink, Wind, Waves } from "lucide-react";
 import { useMemo } from "react";
 import { Link, useRoute } from "wouter";
 import { toast } from "sonner";
@@ -29,14 +31,34 @@ const formatDateTime = (value: unknown): string => {
 const buildOsmMapLink = (lat: number, lng: number, zoom = 15) =>
   `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=${zoom}/${lat}/${lng}`;
 
-const buildOsmEmbedUrl = (lat: number, lng: number) => {
-  const delta = 0.01;
-  const left = lng - delta;
-  const right = lng + delta;
-  const top = lat + delta;
-  const bottom = lat - delta;
-  const bbox = `${left},${bottom},${right},${top}`;
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${lat},${lng}`;
+type EventWeatherSnapshot = {
+  source?: string;
+  fetchedAt?: string;
+  targetTime?: string;
+  resolvedTime?: string | null;
+  timezone?: string | null;
+  wind?: {
+    speedMps?: number | null;
+    directionDeg?: number | null;
+  };
+  waves?: {
+    heightM?: number | null;
+    directionDeg?: number | null;
+    periodSeconds?: number | null;
+  };
+};
+
+const parseWeatherSnapshot = (raw: unknown): EventWeatherSnapshot | null => {
+  if (!raw) return null;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as EventWeatherSnapshot;
+    } catch {
+      return null;
+    }
+  }
+  if (typeof raw === "object") return raw as EventWeatherSnapshot;
+  return null;
 };
 
 export default function ClubEventDetail() {
@@ -77,6 +99,14 @@ export default function ClubEventDetail() {
       window.location.href = `/community/club/${clubId}`;
     },
   });
+  const refreshWeather = trpc.community.clubs.events.refreshWeather.useMutation({
+    onSuccess: () => {
+      toast.success("Meteo aggiornato");
+      utils.community.clubs.events.get.invalidate({ eventId });
+      utils.community.clubs.events.list.invalidate();
+    },
+    onError: (error) => toast.error(error.message || "Aggiornamento meteo non riuscito"),
+  });
 
   const attendees = useMemo(() => (attendeesQuery.data as any[]) || [], [attendeesQuery.data]);
   const going = attendees.filter((a) => a.status === "going");
@@ -97,6 +127,10 @@ export default function ClubEventDetail() {
   const eventLat = Number(event?.locationLat);
   const eventLng = Number(event?.locationLng);
   const hasEventMap = Number.isFinite(eventLat) && Number.isFinite(eventLng);
+  const routeGeojson = parseRouteGeojson(event?.routeGeojson);
+  const routePoints = routeGeojsonToPoints(routeGeojson);
+  const weatherSnapshot = parseWeatherSnapshot(event?.weatherSnapshot);
+  const weatherTime = weatherSnapshot?.resolvedTime || weatherSnapshot?.targetTime || weatherSnapshot?.fetchedAt || null;
 
   if (!match || !Number.isFinite(clubId) || !Number.isFinite(eventId)) {
     return null;
@@ -153,14 +187,14 @@ export default function ClubEventDetail() {
             ) : null}
             {hasEventMap ? (
               <div className="space-y-2 pt-2">
-                <div className="overflow-hidden rounded-md border border-border">
-                  <iframe
-                    title="Mappa evento"
-                    src={buildOsmEmbedUrl(eventLat, eventLng)}
-                    className="h-64 w-full"
-                    loading="lazy"
-                  />
-                </div>
+                <EventMapEditor
+                  pin={{ lat: eventLat, lng: eventLng }}
+                  routePoints={routePoints}
+                  onPinChange={() => {}}
+                  onRouteChange={() => {}}
+                  readOnly
+                  className="h-72 w-full rounded-xl border border-border/70"
+                />
                 <a
                   href={buildOsmMapLink(eventLat, eventLng)}
                   target="_blank"
@@ -170,6 +204,74 @@ export default function ClubEventDetail() {
                   <ExternalLink className="h-4 w-4" />
                   Apri mappa completa
                 </a>
+              </div>
+            ) : null}
+            {weatherSnapshot ? (
+              <div className="space-y-2 rounded-lg border border-border/70 bg-card/40 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium">Meteo mare</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline-neon"
+                    className="h-8"
+                    onClick={() => refreshWeather.mutate({ eventId })}
+                    disabled={refreshWeather.isPending}
+                  >
+                    <RefreshCw className={`mr-1 h-3.5 w-3.5 ${refreshWeather.isPending ? "animate-spin" : ""}`} />
+                    Aggiorna
+                  </Button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-md border border-border/60 bg-background/40 p-2 text-sm">
+                    <p className="flex items-center gap-1 text-muted-foreground">
+                      <Wind className="h-3.5 w-3.5" />
+                      Vento
+                    </p>
+                    <p className="font-semibold">
+                      {weatherSnapshot.wind?.speedMps != null ? `${weatherSnapshot.wind.speedMps.toFixed(1)} m/s` : "n/d"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Direzione: {weatherSnapshot.wind?.directionDeg != null ? `${Math.round(weatherSnapshot.wind.directionDeg)}°` : "n/d"}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-border/60 bg-background/40 p-2 text-sm">
+                    <p className="flex items-center gap-1 text-muted-foreground">
+                      <Waves className="h-3.5 w-3.5" />
+                      Onde
+                    </p>
+                    <p className="font-semibold">
+                      {weatherSnapshot.waves?.heightM != null ? `${weatherSnapshot.waves.heightM.toFixed(2)} m` : "n/d"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Direzione: {weatherSnapshot.waves?.directionDeg != null ? `${Math.round(weatherSnapshot.waves.directionDeg)}°` : "n/d"}
+                      {" · "}
+                      Periodo: {weatherSnapshot.waves?.periodSeconds != null ? `${weatherSnapshot.waves.periodSeconds.toFixed(1)} s` : "n/d"}
+                    </p>
+                  </div>
+                </div>
+                {weatherTime ? (
+                  <p className="text-xs text-muted-foreground">
+                    Riferimento meteo: {formatDateTime(weatherTime)}
+                  </p>
+                ) : null}
+              </div>
+            ) : hasEventMap ? (
+              <div className="rounded-lg border border-border/70 bg-card/40 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm text-muted-foreground">Meteo non ancora disponibile.</p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline-neon"
+                    className="h-8"
+                    onClick={() => refreshWeather.mutate({ eventId })}
+                    disabled={refreshWeather.isPending}
+                  >
+                    <RefreshCw className={`mr-1 h-3.5 w-3.5 ${refreshWeather.isPending ? "animate-spin" : ""}`} />
+                    Carica meteo
+                  </Button>
+                </div>
               </div>
             ) : null}
 

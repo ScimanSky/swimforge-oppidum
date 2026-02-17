@@ -418,12 +418,16 @@ export const clubEvents = pgTable("club_events", {
   location: text("location"),
   locationLat: real("location_lat"),
   locationLng: real("location_lng"),
+  routeGeojson: json("route_geojson"),
+  routeDistanceMeters: integer("route_distance_meters"),
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time"),
   maxAttendees: integer("max_attendees"),
   isRecurring: boolean("is_recurring").default(false).notNull(),
   recurringRule: text("recurring_rule"), // RRULE format per eventi ricorrenti
   coverImageUrl: text("cover_image_url"),
+  weatherSnapshot: json("weather_snapshot"),
+  weatherFetchedAt: timestamp("weather_fetched_at"),
   status: varchar("status", { length: 20 }).default("active").notNull(), // active, cancelled, completed
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
