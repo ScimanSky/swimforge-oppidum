@@ -2,7 +2,7 @@ import {
     protectedProcedure, router, z, db,
     TRPCError,
     normalizeBooleanRecord, coerceBoolean, detectImageType,
-    logger,
+    logger, getUserPublicProfile,
 } from "./_shared";
 import type { SwimmingActivityInsert } from "./_shared";
 
@@ -30,6 +30,11 @@ export const profileRouter = router({
             profileBadge = await getUserProfileBadge(ctx.user.id);
         }
 
+        const socialSnapshot = await getUserPublicProfile({
+            viewerUserId: ctx.user.id,
+            targetUserId: ctx.user.id,
+        });
+
         return {
             ...profile,
             notificationSettings: normalizeBooleanRecord(profile.notificationSettings),
@@ -41,6 +46,8 @@ export const profileRouter = router({
             nextLevelXp: nextLevel?.xpRequired || null,
             xpToNextLevel: nextLevel ? nextLevel.xpRequired - profile.totalXp : 0,
             profileBadge,
+            followerCount: socialSnapshot?.followerCount ?? 0,
+            followingCount: socialSnapshot?.followingCount ?? 0,
         };
     }),
 

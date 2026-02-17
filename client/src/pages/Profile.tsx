@@ -2,7 +2,6 @@ import AppLayout from "@/components/AppLayout";
 import { useMemo } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { getBadgeImageUrl } from "@/lib/badgeImages";
 import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -287,6 +286,13 @@ export default function Profile() {
     source: "all",
   });
   const { data: badgesData } = trpc.badges.progress.useQuery();
+  const { data: achievementDefinitions } = trpc.badges.getAchievementBadgeDefinitions.useQuery();
+  const { data: userAchievementBadges } = trpc.badges.getUserAchievementBadges.useQuery();
+  const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
 
   const displayName =
     [me?.name, profile?.lastName].filter(Boolean).join(" ") ||
@@ -433,7 +439,48 @@ export default function Profile() {
     ];
   }, [activities]);
 
-  const unlockedBadges = badgeProgress.filter((badge) => badge.earned).length;
+  const achievementBadgeSummary = useMemo(() => {
+    const total = achievementDefinitions?.length ?? 0;
+    const earned = userAchievementBadges?.length ?? 0;
+    return { total, earned };
+  }, [achievementDefinitions, userAchievementBadges]);
+
+  const seasonBadgeSummary = useMemo(() => {
+    const season = seasonQuery.data;
+    if (!season?.badgeAssignments?.length) {
+      return { total: 0, earned: 0 };
+    }
+
+    const seasonStats = season.seasonStats as Record<string, unknown> | undefined;
+    const currentLevel = Number(season.progress?.currentLevel ?? 1);
+    const metricValue = (metric: string): number => {
+      if (metric === "seasonLevel") return currentLevel;
+      return Number(seasonStats?.[metric] ?? 0);
+    };
+
+    let earned = 0;
+    for (const assignment of season.badgeAssignments as Array<{ metric?: string; target?: number }>) {
+      const target = Math.max(1, Number(assignment.target ?? 1));
+      const current = metricValue(String(assignment.metric ?? ""));
+      if (current >= target) earned += 1;
+    }
+
+    return {
+      total: season.badgeAssignments.length,
+      earned,
+    };
+  }, [seasonQuery.data]);
+
+  const unlockedBadges =
+    badgeProgress.filter((badge) => badge.earned).length +
+    achievementBadgeSummary.earned +
+    seasonBadgeSummary.earned;
+  const totalBadges =
+    badgeProgress.length + achievementBadgeSummary.total + seasonBadgeSummary.total;
+
+  const followerCount = Number((profile as { followerCount?: number } | undefined)?.followerCount ?? 0);
+  const followingCount = Number((profile as { followingCount?: number } | undefined)?.followingCount ?? 0);
+
   const levelProgress = profile?.nextLevelXp
     ? Math.min(100, ((profile.totalXp ?? 0) / profile.nextLevelXp) * 100)
     : 0;
@@ -570,18 +617,16 @@ export default function Profile() {
                 </div>
                 <div className="mt-4 flex flex-wrap justify-center gap-6 text-sm text-muted-foreground sm:justify-start">
                   <div className="text-center">
-                    <p className="text-lg font-bold text-foreground">—</p>
+                    <p className="text-lg font-bold text-foreground">{followingCount}</p>
                     <p>Following</p>
-                    <p className="text-xs text-muted-foreground">In arrivo</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-lg font-bold text-foreground">—</p>
+                    <p className="text-lg font-bold text-foreground">{followerCount}</p>
                     <p>Follower</p>
-                    <p className="text-xs text-muted-foreground">In arrivo</p>
                   </div>
                   <div className="text-center">
                     <p className="text-lg font-bold text-foreground">
-                      {unlockedBadges}/{badgeProgress.length || 0}
+                      {unlockedBadges}/{totalBadges || 0}
                     </p>
                     <p>Badge</p>
                   </div>
