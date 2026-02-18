@@ -183,7 +183,7 @@ export default function SocialFeed() {
   const isInitialLoading = firstPageQuery.isLoading && posts.length === 0
 
   const headerStoriesSlot = (
-    <div className="hidden lg:flex h-12 min-w-0 max-w-[min(62vw,860px)] items-center gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide pr-1">
+    <div className="flex h-12 min-w-0 max-w-[min(68vw,860px)] items-center gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide pr-1">
       {displayStoryGroups.length > 0 ? (
         displayStoryGroups.map((group: any) => {
           const isCurrent = Number(group.userId) === Number(currentUserId)
@@ -216,32 +216,6 @@ export default function SocialFeed() {
         <div className="flex gap-6 justify-center">
           {/* Feed column */}
           <div className="w-full max-w-2xl min-w-0">
-            {/* Stories strip — visible below xl where sidebar is hidden */}
-            {displayStoryGroups.length > 0 && (
-              <div data-tour="feed-stories" className="xl:hidden mb-3 flex gap-3 overflow-x-auto overflow-y-hidden pb-1 scrollbar-hide">
-                {displayStoryGroups.map((group: any) => {
-                  const isCurrent = Number(group.userId) === Number(currentUserId)
-                  const hasStories = (group.stories?.length ?? 0) > 0
-                  const hasUnviewed = group.stories.some((s: any) => !s.hasViewed)
-                  return (
-                    <StoryAvatar
-                      key={group.userId}
-                      userId={group.userId}
-                      userName={group.userName ?? "Utente"}
-                      avatarUrl={group.userAvatar}
-                      hasUnviewed={hasUnviewed}
-                      hasStories={hasStories}
-                      isCurrentUser={isCurrent}
-                      size="sm"
-                      onClick={() =>
-                        isCurrent && !hasStories ? handleCreateStory() : handleViewStory(group.userId)
-                      }
-                    />
-                  )
-                })}
-              </div>
-            )}
-
             {/* Feed scope tabs: static on all breakpoints (never overlays feed) */}
             <div data-tour="feed-tabs" className="mb-3">
               {/* Pull-to-refresh indicator */}
