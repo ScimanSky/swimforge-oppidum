@@ -62,10 +62,35 @@ export function serveStatic(app: Express) {
     });
   }
 
-  app.use(express.static(distPath, { maxAge: '1d' }));
+  const assetsPath = path.resolve(distPath, "assets");
+  if (fs.existsSync(assetsPath)) {
+    app.use(
+      "/assets",
+      express.static(assetsPath, {
+        maxAge: "365d",
+        immutable: true,
+      })
+    );
+  }
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
+  app.use(
+    express.static(distPath, {
+      maxAge: "1h",
+      setHeaders: (res, filePath) => {
+        if (path.basename(filePath) === "index.html") {
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        }
+      },
+    })
+  );
+
+  // Fall through to index.html only for SPA routes.
+  // Requests for missing static assets should return 404 (not HTML) to avoid MIME errors.
+  app.use("*", (req, res) => {
+    if (path.extname(req.path)) {
+      return res.status(404).end();
+    }
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

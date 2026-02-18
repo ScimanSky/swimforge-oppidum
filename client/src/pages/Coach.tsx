@@ -118,6 +118,23 @@ const getFocusLabel = (
 const CHAT_STORAGE_KEY = "coach_chat_history_v1"
 const CHAT_GOAL_STORAGE_KEY = "coach_chat_goal_v1"
 const CHAT_CONSTRAINTS_STORAGE_KEY = "coach_chat_constraints_v1"
+const CHAT_MAX_MESSAGE_CHARS = 2000
+const CHAT_MAX_HISTORY = 20
+
+const clampChatContent = (value: string) => {
+  const normalized = value.trim()
+  if (normalized.length <= CHAT_MAX_MESSAGE_CHARS) return normalized
+  return `${normalized.slice(0, CHAT_MAX_MESSAGE_CHARS - 1).trimEnd()}…`
+}
+
+const sanitizeChatMessages = (messages: ChatMessage[]): ChatMessage[] =>
+  messages
+    .map((item): ChatMessage => ({
+      role: item.role === "assistant" ? "assistant" : "user",
+      content: clampChatContent(String(item.content ?? "")),
+    }))
+    .filter((item) => item.content.length > 0)
+    .slice(-CHAT_MAX_HISTORY)
 
 export default function Coach() {
   const [location] = useLocation()
@@ -391,14 +408,19 @@ export default function Coach() {
       if (!raw) return
       const parsed = JSON.parse(raw)
       if (!Array.isArray(parsed)) return
-      const safeMessages = parsed
+      const safeMessages: ChatMessage[] = parsed
         .filter((item) =>
           item &&
           typeof item === "object" &&
           (item.role === "user" || item.role === "assistant") &&
           typeof item.content === "string"
         )
-        .slice(-20)
+        .map((item): ChatMessage => ({
+          role: item.role === "assistant" ? "assistant" : "user",
+          content: clampChatContent(item.content as string),
+        }))
+        .filter((item) => item.content.length > 0)
+        .slice(-CHAT_MAX_HISTORY)
       if (safeMessages.length > 0) {
         setChatMessages(safeMessages)
       }
@@ -414,7 +436,7 @@ export default function Coach() {
   useEffect(() => {
     if (typeof window === "undefined") return
     try {
-      window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatMessages.slice(-20)))
+      window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(sanitizeChatMessages(chatMessages)))
     } catch {
       // Best-effort persistence
     }
@@ -433,23 +455,34 @@ export default function Coach() {
   const handleSendChatMessage = async (content: string) => {
     if (chatMutation.isPending) return
 
-    const userMessage: ChatMessage = { role: "user", content }
-    const nextMessages = [...chatMessages, userMessage].slice(-20)
+    const originalTrimmed = content.trim()
+    const normalizedUserContent = clampChatContent(originalTrimmed)
+    if (!normalizedUserContent) return
+    if (originalTrimmed.length > CHAT_MAX_MESSAGE_CHARS) {
+      toast.info("Messaggio troppo lungo: inviati i primi 2000 caratteri.")
+    }
+
+    const userMessage: ChatMessage = { role: "user", content: normalizedUserContent }
+    const nextMessages = sanitizeChatMessages([...chatMessages, userMessage])
     setChatMessages(nextMessages)
 
     try {
       const response = await chatMutation.mutateAsync({
         messages: nextMessages.map((msg) => ({
           role: msg.role === "assistant" ? "assistant" : "user",
-          content: msg.content,
+          content: clampChatContent(msg.content),
         })),
         goal: chatGoal.trim() || null,
         constraints: chatConstraints.trim() || null,
       })
 
+      const assistantContent = clampChatContent(String(response.message ?? ""))
+      if (!assistantContent) {
+        throw new Error("Risposta vuota dal Coach AI.")
+      }
       const assistantMessage: ChatMessage = {
         role: "assistant",
-        content: String(response.message ?? ""),
+        content: assistantContent,
       }
       setChatProvider((response.provider as "forge" | "gemini" | "rule_based" | undefined) ?? null)
       if (response.fallback && !fallbackToastShownRef.current) {
@@ -459,7 +492,7 @@ export default function Coach() {
       if (!response.fallback) {
         fallbackToastShownRef.current = false
       }
-      setChatMessages((prev) => [...prev, assistantMessage].slice(-20))
+      setChatMessages((prev) => sanitizeChatMessages([...prev, assistantMessage]))
     } catch (error) {
       const message = error instanceof Error ? error.message : "Impossibile contattare il Coach AI."
       toast.error(message)
@@ -1001,6 +1034,7 @@ export default function Coach() {
                   placeholder="Scrivi al Coach AI (es. 'Come imposto la seduta di domani?')"
                   emptyStateMessage="Parti da una domanda operativa sul tuo allenamento."
                   suggestedPrompts={suggestedChatPrompts}
+                  maxInputLength={CHAT_MAX_MESSAGE_CHARS}
                   height={520}
                 />
               </div>
