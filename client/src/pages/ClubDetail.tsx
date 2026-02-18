@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
 import { renderMarkdownPreview } from "@/lib/markdownPreview";
 import { toast } from "sonner";
+import { uploadVideoToCloudinary } from "@/lib/cloudinary-upload";
 
 type FeedItem = {
   id: number;
@@ -326,6 +327,7 @@ export default function ClubDetail() {
   });
   
   const mediaImageKitAuth = trpc.community.clubs.media.imageKitAuth.useMutation();
+  const cloudinaryVideoAuth = trpc.community.cloudinaryVideoAuth.useMutation();
   // Media mutations
   const uploadMediaFile = trpc.community.clubs.media.upload.useMutation({
     onSuccess: () => {
@@ -379,6 +381,25 @@ export default function ClubDetail() {
       url: uploaded.url,
       ...(uploaded.thumbnailUrl ? { thumbnailUrl: uploaded.thumbnailUrl } : {}),
     };
+  };
+
+  const uploadClubVideoToCloudinary = async (file: File): Promise<{ url: string }> => {
+    const auth = await cloudinaryVideoAuth.mutateAsync({ scope: "clubs", clubId });
+    const uploaded = await uploadVideoToCloudinary(file, auth, {
+      fileNamePrefix: `club-${clubId}-video`,
+      tags: `club,club-${clubId},swimforge,video`,
+    });
+    return { url: uploaded.url };
+  };
+
+  const uploadClubMedia = async (
+    file: File,
+    isVideo: boolean
+  ): Promise<{ url: string; thumbnailUrl?: string }> => {
+    if (isVideo) {
+      return uploadClubVideoToCloudinary(file);
+    }
+    return uploadClubMediaToImageKit(file);
   };
   
   const deleteMedia = trpc.community.clubs.media.delete.useMutation({
@@ -1317,7 +1338,7 @@ export default function ClubDetail() {
 
                                   const mediaType = isVideo ? "video" : "image";
                                   try {
-                                    const uploaded = await uploadClubMediaToImageKit(mediaFile);
+                                    const uploaded = await uploadClubMedia(mediaFile, isVideo);
                                     uploadMediaFile.mutate({
                                       clubId,
                                       mediaType,
@@ -1331,10 +1352,15 @@ export default function ClubDetail() {
                                     toast.error(message);
                                   }
                                 }}
-		                            disabled={!mediaFile || uploadMediaFile.isPending || mediaImageKitAuth.isPending}
+		                            disabled={
+                                  !mediaFile ||
+                                  uploadMediaFile.isPending ||
+                                  mediaImageKitAuth.isPending ||
+                                  cloudinaryVideoAuth.isPending
+                                }
 		                          >
 	                            <Upload className="h-4 w-4 mr-2" />
-	                            {uploadMediaFile.isPending || mediaImageKitAuth.isPending ? "Caricamento..." : "Carica"}
+	                            {uploadMediaFile.isPending || mediaImageKitAuth.isPending || cloudinaryVideoAuth.isPending ? "Caricamento..." : "Carica"}
 		                          </Button>
 	                        </SurfaceContent>
 	                      </Surface>

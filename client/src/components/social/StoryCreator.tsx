@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/sheet"
 import { Camera, Type, Video } from "lucide-react"
 import { toast } from "sonner"
+import { uploadVideoToCloudinary } from "@/lib/cloudinary-upload"
 
 interface StoryCreatorProps {
   open: boolean
@@ -45,6 +46,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
   const utils = trpc.useUtils()
 
   const imageKitAuth = trpc.community.stories.imageKitAuth.useMutation()
+  const cloudinaryVideoAuth = trpc.community.cloudinaryVideoAuth.useMutation()
 
   const createStory = trpc.community.stories.create.useMutation()
 
@@ -196,6 +198,14 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     }
   }
 
+  const uploadStoryVideoToCloudinary = async (file: File) => {
+    const auth = await cloudinaryVideoAuth.mutateAsync({ scope: "stories" })
+    return uploadVideoToCloudinary(file, auth, {
+      fileNamePrefix: "story-video",
+      tags: "story,swimforge,video",
+    })
+  }
+
   const buildVideoStoryUrls = (mediaUrl: string, durationSeconds: number) => {
     const normalizedDuration = Math.min(durationSeconds, MAX_VIDEO_DURATION_SECONDS)
     const segments = Math.min(MAX_VIDEO_SEGMENTS, Math.max(1, Math.ceil(normalizedDuration / STORY_VIDEO_CLIP_SECONDS)))
@@ -240,26 +250,15 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     if (!file) return
 
     try {
-      const uploaded = await uploadMediaToImageKit(file)
-      const duration = videoDurationRef.current || STORY_VIDEO_CLIP_SECONDS
-      const clipUrls = buildVideoStoryUrls(uploaded.url, duration)
+      const uploaded = await uploadStoryVideoToCloudinary(file)
       const baseCaption = caption.trim()
-      for (let i = 0; i < clipUrls.length; i += 1) {
-        const clipCaption = i === 0 ? (baseCaption || undefined) : undefined
-
-        await createStory.mutateAsync({
-          mediaUrl: clipUrls[i],
-          imageKitFileId: uploaded.fileId ?? undefined,
-          caption: clipCaption,
-          type: "video",
-        })
-      }
+      await createStory.mutateAsync({
+        mediaUrl: uploaded.url,
+        caption: baseCaption || undefined,
+        type: "video",
+      })
       await utils.community.stories.active.invalidate()
-      if (clipUrls.length > 1) {
-        toast.success(`Video pubblicato in ${clipUrls.length} storie da ${STORY_VIDEO_CLIP_SECONDS}s`)
-      } else {
-        toast.success("Video pubblicato!")
-      }
+      toast.success("Video pubblicato!")
       resetAndClose()
     } catch (error) {
       const message = error instanceof Error ? error.message : "Errore nella pubblicazione del video"
@@ -283,7 +282,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     }
   }
 
-  const isPending = createStory.isPending || imageKitAuth.isPending
+  const isPending = createStory.isPending || imageKitAuth.isPending || cloudinaryVideoAuth.isPending
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) resetAndClose(); else onOpenChange(o) }}>

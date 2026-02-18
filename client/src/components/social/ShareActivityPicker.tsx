@@ -23,6 +23,7 @@ import {
   validatePostMediaFile,
   type PostMediaKind,
 } from "@/lib/post-media"
+import { uploadVideoToCloudinary } from "@/lib/cloudinary-upload"
 
 interface ShareActivityPickerProps {
   open: boolean
@@ -64,6 +65,7 @@ export function ShareActivityPicker({
 
   const utils = trpc.useUtils()
   const imageKitAuth = trpc.community.postImageKitAuth.useMutation()
+  const cloudinaryVideoAuth = trpc.community.cloudinaryVideoAuth.useMutation()
   const tagSearchEnabled = open && !!selectedId && tagQuery.trim().length >= 2
   const tagSearchQuery = trpc.community.users.search.useQuery(
     { query: tagQuery.trim(), limit: 8 },
@@ -215,12 +217,24 @@ export function ShareActivityPicker({
     return uploaded.url
   }
 
+  const uploadMedia = async (file: File, kind: PostMediaKind) => {
+    if (kind === "video") {
+      const auth = await cloudinaryVideoAuth.mutateAsync({ scope: "posts" })
+      const uploaded = await uploadVideoToCloudinary(file, auth, {
+        fileNamePrefix: "activity-post-video",
+        tags: "activity,post,swimforge,video",
+      })
+      return uploaded.url
+    }
+    return uploadMediaToImageKit(file)
+  }
+
   const handleShare = async () => {
     if (!selectedId) return
     try {
       const uploadedMediaUrls: string[] = []
       for (const media of mediaItems) {
-        const url = await uploadMediaToImageKit(media.file)
+        const url = await uploadMedia(media.file, media.kind)
         uploadedMediaUrls.push(url)
       }
 
@@ -238,7 +252,7 @@ export function ShareActivityPicker({
     }
   }
 
-  const isPending = createPost.isPending || imageKitAuth.isPending
+  const isPending = createPost.isPending || imageKitAuth.isPending || cloudinaryVideoAuth.isPending
 
   return (
     <Sheet open={open} onOpenChange={handleClose}>

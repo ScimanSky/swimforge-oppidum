@@ -24,6 +24,7 @@ import {
   validatePostMediaFile,
   type PostMediaKind,
 } from "@/lib/post-media"
+import { uploadVideoToCloudinary } from "@/lib/cloudinary-upload"
 
 interface CreatePostSheetProps {
   open: boolean
@@ -59,6 +60,7 @@ export function CreatePostSheet({ open, onOpenChange }: CreatePostSheetProps) {
 
   const utils = trpc.useUtils()
   const imageKitAuth = trpc.community.postImageKitAuth.useMutation()
+  const cloudinaryVideoAuth = trpc.community.cloudinaryVideoAuth.useMutation()
 
   const searchEnabled = mode === "text" && tagQuery.trim().length >= 2
   const tagSearchQuery = trpc.community.users.search.useQuery(
@@ -203,13 +205,25 @@ export function CreatePostSheet({ open, onOpenChange }: CreatePostSheetProps) {
     return uploaded.url
   }
 
+  const uploadMedia = async (file: File, kind: PostMediaKind) => {
+    if (kind === "video") {
+      const auth = await cloudinaryVideoAuth.mutateAsync({ scope: "posts" })
+      const uploaded = await uploadVideoToCloudinary(file, auth, {
+        fileNamePrefix: "post-video",
+        tags: "post,swimforge,video",
+      })
+      return uploaded.url
+    }
+    return uploadMediaToImageKit(file)
+  }
+
   const handleSubmitText = async () => {
     if (!hasContent && !hasMedia) return
 
     try {
       const uploadedMediaUrls: string[] = []
       for (const media of mediaItems) {
-        const uploadedUrl = await uploadMediaToImageKit(media.file)
+        const uploadedUrl = await uploadMedia(media.file, media.kind)
         uploadedMediaUrls.push(uploadedUrl)
       }
 
@@ -226,7 +240,7 @@ export function CreatePostSheet({ open, onOpenChange }: CreatePostSheetProps) {
     }
   }
 
-  const isPending = createTextPost.isPending || imageKitAuth.isPending
+  const isPending = createTextPost.isPending || imageKitAuth.isPending || cloudinaryVideoAuth.isPending
 
   return (
     <>

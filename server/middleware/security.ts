@@ -41,6 +41,7 @@ function uniq(values: Array<string | null | undefined>): string[] {
 
 const supabaseOrigin = toOrigin(process.env.SUPABASE_URL);
 const imagekitEndpointOrigin = toOrigin(process.env.IMAGEKIT_URL_ENDPOINT);
+const cloudinaryResOrigin = toOrigin(process.env.CLOUDINARY_CLOUD_NAME ? `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}` : undefined);
 const extraConnectSrc = parseCspList(process.env.CSP_CONNECT_SRC_EXTRA);
 const extraImgSrc = parseCspList(process.env.CSP_IMG_SRC_EXTRA);
 const extraMediaSrc = parseCspList(process.env.CSP_MEDIA_SRC_EXTRA);
@@ -213,6 +214,8 @@ export const helmetConfig = {
         'https://*.supabase.co',
         imagekitEndpointOrigin,
         'https://ik.imagekit.io',
+        cloudinaryResOrigin,
+        'https://res.cloudinary.com',
         'https://avatars.githubusercontent.com',
         'https://lh3.googleusercontent.com',
         'https://*.googleusercontent.com',
@@ -229,6 +232,8 @@ export const helmetConfig = {
         'https://*.supabase.co',
         imagekitEndpointOrigin,
         'https://ik.imagekit.io',
+        cloudinaryResOrigin,
+        'https://res.cloudinary.com',
         ...extraMediaSrc,
       ]),
       connectSrc: uniq([
@@ -241,6 +246,7 @@ export const helmetConfig = {
         'https://*.supabase.co',
         'wss://*.supabase.co',
         'https://upload.imagekit.io',
+        'https://api.cloudinary.com',
         imagekitEndpointOrigin,
         ...extraConnectSrc,
       ]),

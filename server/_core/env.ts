@@ -50,6 +50,9 @@ export const ENV = {
   imagekitPublicKey: process.env.IMAGEKIT_PUBLIC_KEY ?? "",
   imagekitPrivateKey: process.env.IMAGEKIT_PRIVATE_KEY ?? "",
   imagekitUrlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT ?? "",
+  cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME ?? "",
+  cloudinaryApiKey: process.env.CLOUDINARY_API_KEY ?? "",
+  cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET ?? "",
   sessionMaxAgeDays,
   sessionMaxAgeMs: sessionMaxAgeDays * 24 * 60 * 60 * 1000,
 };

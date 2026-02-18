@@ -22,6 +22,7 @@ import {
   validatePostMediaFile,
   type PostMediaKind,
 } from "@/lib/post-media";
+import { uploadVideoToCloudinary } from "@/lib/cloudinary-upload";
 
 interface ClubFeedTabProps {
   clubId: number;
@@ -119,6 +120,7 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
   })();
 
   const imageKitAuth = trpc.community.postImageKitAuth.useMutation();
+  const cloudinaryVideoAuth = trpc.community.cloudinaryVideoAuth.useMutation();
   const tagSearchEnabled = isMember && tagQuery.trim().length >= 2;
   const tagSearchQuery = trpc.community.users.search.useQuery(
     { query: tagQuery.trim(), limit: 8 },
@@ -280,6 +282,18 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
     return uploaded.url;
   };
 
+  const uploadMedia = async (file: File, kind: PostMediaKind) => {
+    if (kind === "video") {
+      const auth = await cloudinaryVideoAuth.mutateAsync({ scope: "posts" });
+      const uploaded = await uploadVideoToCloudinary(file, auth, {
+        fileNamePrefix: "club-post-video",
+        tags: `club-post,club-${clubId},swimforge,video`,
+      });
+      return uploaded.url;
+    }
+    return uploadMediaToImageKit(file);
+  };
+
   const handlePostSubmit = async () => {
     const hasText = postText.trim().length > 0;
     const hasMedia = mediaItems.length > 0;
@@ -287,7 +301,7 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
     try {
       const uploadedMediaUrls: string[] = [];
       for (const media of mediaItems) {
-        const url = await uploadMediaToImageKit(media.file);
+        const url = await uploadMedia(media.file, media.kind);
         uploadedMediaUrls.push(url);
       }
 
@@ -445,10 +459,17 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
           <div className="flex justify-end">
             <Button
               onClick={() => void handlePostSubmit()}
-              disabled={(!postText.trim() && mediaItems.length === 0) || createPostMutation.isPending || imageKitAuth.isPending}
+              disabled={
+                (!postText.trim() && mediaItems.length === 0) ||
+                createPostMutation.isPending ||
+                imageKitAuth.isPending ||
+                cloudinaryVideoAuth.isPending
+              }
             >
               <Plus className="mr-2 h-4 w-4" />
-              {createPostMutation.isPending || imageKitAuth.isPending ? "Pubblicazione..." : "Pubblica"}
+              {createPostMutation.isPending || imageKitAuth.isPending || cloudinaryVideoAuth.isPending
+                ? "Pubblicazione..."
+                : "Pubblica"}
             </Button>
           </div>
         </SurfaceContent>

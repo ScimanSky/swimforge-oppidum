@@ -10,6 +10,7 @@ import {
     detectImageType, logger,
 } from "./_shared";
 import type { ClubEventInsert, ClubAnnouncementInsert } from "./_shared";
+import { createHash } from "crypto";
 import { ENV } from "../_core/env";
 import { socialPosts } from "../../drizzle/schema";
 
@@ -58,6 +59,19 @@ function normalizeHashtags(content?: string | null, hashtags?: string[] | null) 
         .filter((tag) => tag.length >= 2 && tag.length <= 40);
     const all = [...extractHashtagsFromContent(content), ...explicit];
     return Array.from(new Set(all)).slice(0, 20);
+}
+
+function buildCloudinarySignature(
+    params: Record<string, string | number | undefined>,
+    apiSecret: string
+) {
+    const payload = Object.entries(params)
+        .filter(([, value]) => value !== undefined && value !== null && String(value).length > 0)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => `${key}=${value}`)
+        .join("&");
+
+    return createHash("sha1").update(`${payload}${apiSecret}`).digest("hex");
 }
 
 function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number) {
@@ -514,6 +528,57 @@ export const communityRouter = router({
                 publicKey: ENV.imagekitPublicKey,
                 urlEndpoint: ENV.imagekitUrlEndpoint,
                 folder: `/posts/${ctx.user.id}`,
+            } as const;
+        }),
+
+    cloudinaryVideoAuth: protectedProcedure
+        .input(
+            z
+                .object({
+                    scope: z.enum(["posts", "stories", "clubs"]).optional(),
+                    clubId: z.number().optional(),
+                })
+                .optional()
+        )
+        .mutation(async ({ ctx, input }) => {
+            if (!ENV.cloudinaryCloudName || !ENV.cloudinaryApiKey || !ENV.cloudinaryApiSecret) {
+                throw new TRPCError({
+                    code: "PRECONDITION_FAILED",
+                    message: "Cloudinary non configurato sul server.",
+                });
+            }
+
+            const scope = input?.scope ?? "posts";
+            let folder = `posts/${ctx.user.id}`;
+
+            if (scope === "stories") {
+                folder = `stories/${ctx.user.id}`;
+            } else if (scope === "clubs") {
+                if (!input?.clubId) {
+                    throw new TRPCError({
+                        code: "BAD_REQUEST",
+                        message: "clubId richiesto per upload video del club.",
+                    });
+                }
+                await requireClubStaffRole(ctx.user.id, input.clubId);
+                folder = `clubs/${input.clubId}/${ctx.user.id}`;
+            }
+
+            const timestamp = Math.floor(Date.now() / 1000);
+            const signature = buildCloudinarySignature(
+                {
+                    folder,
+                    timestamp,
+                },
+                ENV.cloudinaryApiSecret
+            );
+
+            return {
+                cloudName: ENV.cloudinaryCloudName,
+                apiKey: ENV.cloudinaryApiKey,
+                timestamp,
+                signature,
+                folder,
             } as const;
         }),
 
