@@ -1,7 +1,7 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
@@ -16,6 +16,7 @@ import {
   Target,
   HeartPulse,
   Activity,
+  AlertTriangle,
 } from "lucide-react"
 import { useLocation } from "wouter"
 
@@ -123,6 +124,8 @@ export default function Coach() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatGoal, setChatGoal] = useState("")
   const [chatConstraints, setChatConstraints] = useState("")
+  const [chatProvider, setChatProvider] = useState<"forge" | "gemini" | "rule_based" | null>(null)
+  const fallbackToastShownRef = useRef(false)
   const [activeTab, setActiveTab] = useState<"insights" | "workouts" | "session-iq" | "chat">("insights")
   const [activeInsightIndex, setActiveInsightIndex] = useState(0)
   const [activePoolSectionIndex, setActivePoolSectionIndex] = useState(0)
@@ -448,6 +451,14 @@ export default function Coach() {
         role: "assistant",
         content: String(response.message ?? ""),
       }
+      setChatProvider((response.provider as "forge" | "gemini" | "rule_based" | undefined) ?? null)
+      if (response.fallback && !fallbackToastShownRef.current) {
+        toast.warning("Coach in modalità base: risposte semplificate (controlla la configurazione AI server).")
+        fallbackToastShownRef.current = true
+      }
+      if (!response.fallback) {
+        fallbackToastShownRef.current = false
+      }
       setChatMessages((prev) => [...prev, assistantMessage].slice(-20))
     } catch (error) {
       const message = error instanceof Error ? error.message : "Impossibile contattare il Coach AI."
@@ -457,6 +468,7 @@ export default function Coach() {
 
   const clearChat = () => {
     setChatMessages([])
+    setChatProvider(null)
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(CHAT_STORAGE_KEY)
     }
@@ -940,6 +952,21 @@ export default function Coach() {
                     <p className="text-xs text-muted-foreground">
                       Risposte generate sui tuoi dati reali (sessioni, metriche e Session IQ).
                     </p>
+                    {chatProvider === "gemini" && (
+                      <div className="mt-1">
+                        <Badge variant="outline" className="text-[11px] border-emerald-500/40 text-emerald-300">
+                          Provider attivo: Gemini
+                        </Badge>
+                      </div>
+                    )}
+                    {chatProvider === "rule_based" && (
+                      <div className="mt-1">
+                        <Badge variant="outline" className="text-[11px] border-amber-500/40 text-amber-300">
+                          <AlertTriangle className="mr-1 h-3 w-3" />
+                          Modalità base (AI cloud non raggiungibile)
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                   <Button
                     type="button"

@@ -4,6 +4,7 @@ import { getAdvancedMetrics } from "./db_statistics";
 import { getExistingWorkouts } from "./ai_coach";
 import { listActivityInsights } from "./ai_activity_insights";
 import { logger } from "./middleware/logger";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export type CoachChatMessage = {
   role: "user" | "assistant";
@@ -14,6 +15,7 @@ export type CoachChatResult = {
   message: string;
   generatedAt: string;
   fallback: boolean;
+  provider: "forge" | "gemini" | "rule_based";
 };
 
 export type CoachChatPreferences = {
@@ -103,11 +105,14 @@ Regole:
 - evita diagnosi mediche e sostituzione di professionisti sanitari;
 - se l'utente riferisce dolore/infortunio, raccomanda stop e valutazione specialistica;
 - niente testo motivazionale generico.
+- se l'utente dice che oggi e' stanco/lento, riduci volume/intensita' e proponi una seduta di qualita' tecnica;
+- se l'obiettivo e' 50/100 stile, inserisci lavoro specifico di velocita' e partenze/virate.
 
 Formato di risposta preferito:
 1) "Lettura dati" (max 3 bullet)
 2) "Cosa fare adesso" (max 4 bullet con target concreti)
 3) "Check prossimo" (1 bullet: cosa monitorare nella prossima sessione)
+4) "Domanda mirata" (1 domanda breve per affinare il piano)
 
 PREFERENZE UTENTE
 - Obiettivo attuale: ${goal && goal.length > 0 ? goal : "n/d"}
@@ -134,11 +139,41 @@ function normalizeAssistantContent(content: unknown): string {
     .trim();
 }
 
-function fallbackMessage(ctx: CoachContext) {
+const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_API_KEY = (process.env.GEMINI_API_KEY ?? "").trim();
+const geminiModel = GEMINI_API_KEY
+  ? new GoogleGenerativeAI(GEMINI_API_KEY).getGenerativeModel({ model: GEMINI_MODEL })
+  : null;
+
+function extractLastUserMessage(history: CoachChatMessage[]): string {
+  for (let i = history.length - 1; i >= 0; i -= 1) {
+    if (history[i].role === "user") {
+      return history[i].content.trim();
+    }
+  }
+  return "";
+}
+
+function fallbackMessage(
+  ctx: CoachContext,
+  history: CoachChatMessage[],
+  preferences?: CoachChatPreferences
+) {
   const performance = ctx.advanced?.performanceIndex;
   const consistency = ctx.advanced?.consistencyScore;
   const recovery = ctx.advanced?.recoveryReadinessScore;
   const latest = ctx.recentActivities[0];
+  const lastUserMessage = extractLastUserMessage(history).toLowerCase();
+  const goal = preferences?.goal?.trim() ?? "";
+  const constraints = preferences?.constraints?.trim() ?? "";
+
+  const mentionsFatigue = /(stanc|lento|fatica|scaric|pesant|affatic)/i.test(lastUserMessage);
+  const mentionsShoulder = /(spall|dolor|infiam|tendin|male)/i.test(
+    `${lastUserMessage} ${constraints}`.toLowerCase()
+  );
+  const speedGoal = /(50\s?(sl|stile|m)|100\s?(sl|stile|m)|sprint|veloc)/i.test(
+    `${lastUserMessage} ${goal}`.toLowerCase()
+  );
 
   const nextFocus =
     recovery !== null && recovery !== undefined && recovery < 45
@@ -151,19 +186,70 @@ function fallbackMessage(ctx: CoachContext) {
     ? `Ultima sessione: ${latest.distanceMeters}m in ${Math.round(latest.durationSeconds / 60)} min, passo ${formatPace(latest.avgPacePer100m ?? null)}.`
     : "Non vedo sessioni recenti, quindi parto da una base conservativa.";
 
+  let sessionBullet = "- Sessione oggi: 300 sciolti + 8x100 ritmo controllato + 6x50 progressivi + 200 defaticamento.";
+  let checkBullet = "- Monitora passo medio/100m e sensazione di fatica (RPE) a fine seduta.";
+  let questionBullet = "- Quante sedute reali puoi fare nei prossimi 7 giorni (2/3/4)?";
+
+  if (mentionsFatigue) {
+    sessionBullet =
+      "- Sessione oggi (scarico): 200 sciolti + 10x50 tecnica con 20\" rec + 6x75 aerobici facili + 150 defaticamento.";
+    checkBullet = "- Se RPE supera 6/10 o il passo peggiora oltre 3\"/100m, chiudi la serie principale.";
+    questionBullet = "- Domani vuoi seduta breve tecnica (35-40') o riposo completo?";
+  } else if (speedGoal) {
+    sessionBullet =
+      "- Sessione oggi (focus 50/100): 300 warm-up + 2x(6x25 veloce con 30\" rec) + 4x50 a ritmo gara + 200 sciolti.";
+    checkBullet = "- Monitora tempo medio sui 25 veloci e mantenimento tecnica nelle ultime ripetute.";
+    questionBullet = "- Hai riferimenti cronometrici attuali su 25m o 50m per calibrare i target?";
+  }
+
+  const shoulderLine = mentionsShoulder
+    ? "- Vincolo spalla: evita palette/farfalla e interrompi se dolore >3/10, valutando un professionista."
+    : "- Vincoli dichiarati: nessuna limitazione critica segnalata.";
+
   return [
     "Lettura dati",
     `- Performance: ${performance ?? "n/d"} · Consistency: ${consistency ?? "n/d"} · Recovery: ${recovery ?? "n/d"}`,
     `- ${latestLine}`,
+    `- Obiettivo: ${goal || "n/d"} · Vincoli: ${constraints || "n/d"}`,
     "",
     "Cosa fare adesso",
     `- Focus prossime 2 sedute: ${nextFocus}.`,
-    "- Sessione 1: 8x100 a ritmo controllato con recupero breve e tecnica prioritaria.",
-    "- Sessione 2: lavoro aerobico continuo + 6x50 progressivi.",
+    sessionBullet,
+    "- Sessione successiva: lavoro aerobico continuo + 6x50 progressivi in controllo tecnico.",
+    shoulderLine,
     "",
     "Check prossimo",
-    "- Monitora passo medio/100m e sensazione di fatica (RPE) a fine seduta.",
+    checkBullet,
+    "",
+    "Domanda mirata",
+    questionBullet,
   ].join("\n");
+}
+
+function toGeminiPrompt(systemPrompt: string, history: CoachChatMessage[]): string {
+  const transcript = history
+    .slice(-16)
+    .map((message) => `${message.role === "assistant" ? "Coach" : "Atleta"}: ${message.content}`)
+    .join("\n");
+
+  return [
+    systemPrompt,
+    "",
+    "CONVERSAZIONE RECENTE",
+    transcript,
+    "",
+    "Rispondi all'ultimo messaggio dell'atleta seguendo esattamente il formato richiesto.",
+  ].join("\n");
+}
+
+async function generateWithGemini(systemPrompt: string, history: CoachChatMessage[]): Promise<string> {
+  if (!geminiModel) {
+    throw new Error("GEMINI_API_KEY is not configured");
+  }
+  const result = await geminiModel.generateContent(toGeminiPrompt(systemPrompt, history));
+  const text = result.response.text().trim();
+  if (!text) throw new Error("Gemini returned empty content");
+  return text;
 }
 
 export async function generateCoachChatReply(
@@ -198,32 +284,56 @@ export async function generateCoachChatReply(
 
   if (safeHistory.length === 0) {
     return {
-      message: fallbackMessage(context),
+      message: fallbackMessage(context, safeHistory, preferences),
       generatedAt: new Date().toISOString(),
       fallback: true,
+      provider: "rule_based",
     };
   }
 
-  try {
-    const result = await invokeLLM({
-      messages: [
-        {
-          role: "system",
-          content: baseSystemPrompt(context, preferences),
-        },
-        ...safeHistory,
-      ],
-    });
+  const systemPrompt = baseSystemPrompt(context, preferences);
+  const hasForgeKey = (process.env.BUILT_IN_FORGE_API_KEY ?? "").trim().length > 0;
 
-    const message = normalizeAssistantContent(result.choices?.[0]?.message?.content);
-    if (!message) {
-      throw new Error("Empty assistant response");
+  if (hasForgeKey) {
+    try {
+      const result = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt,
+          },
+          ...safeHistory,
+        ],
+      });
+
+      const message = normalizeAssistantContent(result.choices?.[0]?.message?.content);
+      if (!message) {
+        throw new Error("Empty assistant response");
+      }
+
+      return {
+        message,
+        generatedAt: new Date().toISOString(),
+        fallback: false,
+        provider: "forge",
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn("[AI Coach Chat] Forge provider failed, trying Gemini fallback", {
+        event: "ai_coach_chat:forge_failed",
+        userId,
+        message,
+      });
     }
+  }
 
+  try {
+    const message = await generateWithGemini(systemPrompt, safeHistory);
     return {
       message,
       generatedAt: new Date().toISOString(),
       fallback: false,
+      provider: "gemini",
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -234,9 +344,10 @@ export async function generateCoachChatReply(
     });
 
     return {
-      message: fallbackMessage(context),
+      message: fallbackMessage(context, safeHistory, preferences),
       generatedAt: new Date().toISOString(),
       fallback: true,
+      provider: "rule_based",
     };
   }
 }
