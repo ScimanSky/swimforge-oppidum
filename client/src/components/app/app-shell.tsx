@@ -268,6 +268,18 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
+                  <Link href="/track" className="flex items-center gap-2">
+                    <Waves className="size-4" />
+                    Attività
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/coach" className="flex items-center gap-2">
+                    <Bot className="size-4" />
+                    Coach
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
                   <Link href="/settings" className="flex items-center gap-2">
                     <Settings className="size-4" />
                     Impostazioni
