@@ -27,6 +27,7 @@ export function StoryBar({ currentUserId, onViewStory, onCreateStory }: StoryBar
     : undefined
 
   const hasOwnStories = (currentUserGroup?.stories?.length ?? 0) > 0
+  const hasOwnUnviewedStories = currentUserGroup?.stories?.some((s: any) => !s.hasViewed) ?? false
 
   const otherGroups = groups.filter((g: any) => Number(g.userId) !== Number(currentUserId))
 
@@ -77,7 +78,8 @@ export function StoryBar({ currentUserId, onViewStory, onCreateStory }: StoryBar
               userId={currentUserId}
               userName={currentUserGroup?.userName ?? "Tu"}
               avatarUrl={currentUserGroup?.userAvatar}
-              hasUnviewed={hasOwnStories}
+              hasUnviewed={hasOwnUnviewedStories}
+              hasStories={hasOwnStories}
               isCurrentUser
               onClick={hasOwnStories ? () => onViewStory?.(currentUserId) : onCreateStory}
             />

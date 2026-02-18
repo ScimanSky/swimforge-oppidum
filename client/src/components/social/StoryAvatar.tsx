@@ -10,6 +10,7 @@ interface StoryAvatarProps {
   userName: string
   avatarUrl?: string | null
   hasUnviewed: boolean
+  hasStories?: boolean
   isCurrentUser?: boolean
   size?: "sm" | "default"
   onClick?: () => void
@@ -19,11 +20,13 @@ export function StoryAvatar({
   userName,
   avatarUrl,
   hasUnviewed,
+  hasStories,
   isCurrentUser,
   size = "default",
   onClick,
 }: StoryAvatarProps) {
-  const showAddOverlay = isCurrentUser && !hasUnviewed
+  const currentUserHasStories = isCurrentUser ? (hasStories ?? hasUnviewed) : hasUnviewed
+  const showAddOverlay = isCurrentUser && !currentUserHasStories
   const isSmall = size === "sm"
 
   return (

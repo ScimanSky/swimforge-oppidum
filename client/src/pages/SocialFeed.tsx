@@ -87,7 +87,6 @@ export default function SocialFeed() {
   const currentUserGroup = currentUserId
     ? allGroups.find((g: any) => Number(g.userId) === Number(currentUserId))
     : undefined
-  const hasOwnStories = (currentUserGroup?.stories?.length ?? 0) > 0
   const displayName = profile?.username || profile?.userId?.toString() || "Nuotatore"
   const otherStoryGroups = allGroups
     .filter((g: any) => Number(g.userId) !== Number(currentUserId))
@@ -96,10 +95,19 @@ export default function SocialFeed() {
       const bU = b.stories.some((s: any) => !s.hasViewed)
       return aU === bU ? 0 : aU ? -1 : 1
     })
-  const topbarStoryGroups = useMemo(() => {
+  const displayStoryGroups = useMemo(() => {
     if (!currentUserId) return otherStoryGroups
-    return currentUserGroup ? [currentUserGroup, ...otherStoryGroups] : otherStoryGroups
-  }, [currentUserGroup, currentUserId, otherStoryGroups])
+    if (currentUserGroup) return [currentUserGroup, ...otherStoryGroups]
+    return [
+      {
+        userId: Number(currentUserId),
+        userName: displayName,
+        userAvatar: profile?.avatarUrl ?? null,
+        stories: [],
+      },
+      ...otherStoryGroups,
+    ]
+  }, [currentUserGroup, currentUserId, displayName, otherStoryGroups, profile?.avatarUrl])
 
   const handleViewStory = useCallback((userId: number) => {
     const groups = storyGroups ?? []
@@ -176,9 +184,10 @@ export default function SocialFeed() {
 
   const headerStoriesSlot = (
     <div className="hidden lg:flex h-12 min-w-0 max-w-[min(62vw,860px)] items-center gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide pr-1">
-      {topbarStoryGroups.length > 0 ? (
-        topbarStoryGroups.map((group: any) => {
+      {displayStoryGroups.length > 0 ? (
+        displayStoryGroups.map((group: any) => {
           const isCurrent = Number(group.userId) === Number(currentUserId)
+          const hasStories = (group.stories?.length ?? 0) > 0
           const hasUnviewed = group.stories.some((s: any) => !s.hasViewed)
           return (
             <StoryAvatar
@@ -187,24 +196,15 @@ export default function SocialFeed() {
               userName={group.userName ?? "Utente"}
               avatarUrl={group.userAvatar}
               hasUnviewed={hasUnviewed}
+              hasStories={hasStories}
               isCurrentUser={isCurrent}
               size="sm"
               onClick={() =>
-                isCurrent && !hasOwnStories ? handleCreateStory() : handleViewStory(group.userId)
+                isCurrent && !hasStories ? handleCreateStory() : handleViewStory(group.userId)
               }
             />
           )
         })
-      ) : currentUserId ? (
-        <StoryAvatar
-          userId={currentUserId}
-          userName={currentUserGroup?.userName ?? displayName}
-          avatarUrl={currentUserGroup?.userAvatar ?? profile?.avatarUrl}
-          hasUnviewed={hasOwnStories}
-          isCurrentUser
-          size="sm"
-          onClick={hasOwnStories ? () => handleViewStory(currentUserId) : handleCreateStory}
-        />
       ) : null}
     </div>
   )
@@ -217,9 +217,11 @@ export default function SocialFeed() {
           {/* Feed column */}
           <div className="w-full max-w-2xl min-w-0">
             {/* Stories strip — visible below xl where sidebar is hidden */}
-            {otherStoryGroups.length > 0 && (
+            {displayStoryGroups.length > 0 && (
               <div data-tour="feed-stories" className="xl:hidden mb-3 flex gap-3 overflow-x-auto overflow-y-hidden pb-1 scrollbar-hide">
-                {otherStoryGroups.map((group) => {
+                {displayStoryGroups.map((group: any) => {
+                  const isCurrent = Number(group.userId) === Number(currentUserId)
+                  const hasStories = (group.stories?.length ?? 0) > 0
                   const hasUnviewed = group.stories.some((s: any) => !s.hasViewed)
                   return (
                     <StoryAvatar
@@ -228,8 +230,12 @@ export default function SocialFeed() {
                       userName={group.userName ?? "Utente"}
                       avatarUrl={group.userAvatar}
                       hasUnviewed={hasUnviewed}
+                      hasStories={hasStories}
+                      isCurrentUser={isCurrent}
                       size="sm"
-                      onClick={() => handleViewStory(group.userId)}
+                      onClick={() =>
+                        isCurrent && !hasStories ? handleCreateStory() : handleViewStory(group.userId)
+                      }
                     />
                   )
                 })}
