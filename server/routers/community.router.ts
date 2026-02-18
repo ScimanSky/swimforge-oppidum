@@ -62,6 +62,23 @@ function normalizeHashtags(content?: string | null, hashtags?: string[] | null) 
     return Array.from(new Set(all)).slice(0, 20);
 }
 
+function normalizeExternalWebsiteUrl(raw?: string | null) {
+    if (!raw) return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    const candidate = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    let parsed: URL;
+    try {
+        parsed = new URL(candidate);
+    } catch {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "URL sito club non valido." });
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "URL sito club non valido." });
+    }
+    return parsed.toString();
+}
+
 function buildCloudinarySignature(
     params: Record<string, string | number | undefined>,
     apiSecret: string
@@ -1097,12 +1114,14 @@ export const communityRouter = router({
                 name: z.string().min(3).max(120),
                 description: z.string().max(500).optional().nullable(),
                 coverImageUrl: z.string().max(5000).optional().nullable(),
+                websiteUrl: z.string().max(500).optional().nullable(),
                 rules: z.string().max(2000).optional().nullable(),
                 visibility: z.enum(["public", "private", "invite"]).optional(),
                 isPrivate: z.boolean().optional(),
             }))
             .mutation(async ({ ctx, input }) => {
                 const { createClub } = await import("../db_clubs");
+                const websiteUrl = normalizeExternalWebsiteUrl(input.websiteUrl ?? null);
                 if (input.coverImageUrl) {
                     const isHttpUrl = /^https?:\/\//i.test(input.coverImageUrl);
                     const isDataImage = input.coverImageUrl.startsWith("data:image/");
@@ -1110,7 +1129,10 @@ export const communityRouter = router({
                         throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid cover image URL" });
                     }
                 }
-                const clubId = await createClub(ctx.user.id, input);
+                const clubId = await createClub(ctx.user.id, {
+                    ...input,
+                    websiteUrl,
+                });
                 return { success: true, clubId };
             }),
 
@@ -1322,6 +1344,7 @@ export const communityRouter = router({
                 name: z.string().min(3).max(120).optional(),
                 description: z.string().max(500).optional().nullable(),
                 coverImageUrl: z.string().max(5000).optional().nullable(),
+                websiteUrl: z.string().max(500).optional().nullable(),
                 rules: z.string().max(2000).optional().nullable(),
                 visibility: z.enum(["public", "private", "invite"]).optional(),
                 themeColor: z.enum(["cyan", "lime", "coral", "violet"]).optional(),
@@ -1330,6 +1353,10 @@ export const communityRouter = router({
             }))
             .mutation(async ({ ctx, input }) => {
                 const { updateClub } = await import("../db_clubs");
+                const normalizedWebsiteUrl =
+                    input.websiteUrl === undefined
+                        ? undefined
+                        : normalizeExternalWebsiteUrl(input.websiteUrl);
                 if (input.coverImageUrl) {
                     const isHttpUrl = /^https?:\/\//i.test(input.coverImageUrl);
                     const isDataImage = input.coverImageUrl.startsWith("data:image/");
@@ -1346,6 +1373,7 @@ export const communityRouter = router({
                     themeColor: input.themeColor,
                     logoUrl: input.logoUrl,
                     tagline: input.tagline,
+                    websiteUrl: normalizedWebsiteUrl,
                 });
             }),
 

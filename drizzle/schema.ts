@@ -392,6 +392,7 @@ export const communityClubs = pgTable("community_clubs", {
   description: text("description"),
   rules: text("rules"),
   coverImageUrl: text("cover_image_url"),
+  websiteUrl: text("website_url"),
   themeColor: varchar("theme_color", { length: 20 }).default("cyan"),
   logoUrl: text("logo_url"),
   tagline: varchar("tagline", { length: 200 }),

@@ -326,7 +326,7 @@ export default function ClubDetailEnhanced() {
       observer.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, [isDesktop, isMember, club?.cover_image_url, club?.logo_url, club?.tagline]);
+  }, [isDesktop, isMember, club?.cover_image_url, club?.logo_url, club?.tagline, club?.website_url]);
 
   if (!match || !Number.isFinite(clubId)) {
     return (
@@ -864,6 +864,7 @@ function ClubSettingsForm({
   const [description, setDescription] = useState(club.description ?? "");
   const [rules, setRules] = useState(club.rules ?? "");
   const [tagline, setTagline] = useState(club.tagline ?? "");
+  const [websiteUrl, setWebsiteUrl] = useState(club.website_url ?? "");
   const [themeColor, setThemeColor] = useState(club.theme_color ?? "cyan");
   const [visibility, setVisibility] = useState(club.visibility ?? "public");
   const [logoPreview, setLogoPreview] = useState<string | null>(club.logo_url ?? null);
@@ -934,6 +935,7 @@ function ClubSettingsForm({
         description,
         rules,
         tagline,
+        websiteUrl: websiteUrl.trim() || null,
         themeColor: themeColor as any,
         visibility: visibility as any,
         ...(logoUrl !== undefined ? { logoUrl } : {}),
@@ -1037,6 +1039,17 @@ function ClubSettingsForm({
       <div>
         <label className="text-sm font-medium">Tagline</label>
         <Input value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={200} placeholder="Motto del club..." />
+      </div>
+
+      {/* Website URL */}
+      <div>
+        <label className="text-sm font-medium">Sito web esterno</label>
+        <Input
+          value={websiteUrl}
+          onChange={(e) => setWebsiteUrl(e.target.value)}
+          maxLength={500}
+          placeholder="https://www.miosito.it"
+        />
       </div>
 
       {/* Description */}

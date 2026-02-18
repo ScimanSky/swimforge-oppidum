@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Users, Settings, ArrowLeft, Calendar } from "lucide-react";
+import { Users, Settings, ArrowLeft, Calendar, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -11,6 +11,7 @@ interface ClubHeroProps {
     name: string;
     description?: string | null;
     cover_image_url?: string | null;
+    website_url?: string | null;
     theme_color?: string | null;
     logo_url?: string | null;
     tagline?: string | null;
@@ -139,6 +140,14 @@ export default function ClubHero({
               </Button>
             </Link>
           ) : null}
+          {club.website_url ? (
+            <a href={club.website_url} target="_blank" rel="noopener noreferrer">
+              <Button className="h-7 text-[11px]" variant="outline-neon" size="sm">
+                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+                Sito
+              </Button>
+            </a>
+          ) : null}
 
           {!club.is_member ? (
             <Button className="h-7 text-[11px]" variant="neon" onClick={onJoin} disabled={isJoining}>
@@ -221,6 +230,17 @@ export default function ClubHero({
             </Badge>
           )}
         </div>
+        {club.website_url ? (
+          <a
+            href={club.website_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[var(--electric-cyan)] underline-offset-2 hover:underline"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            Sito del club
+          </a>
+        ) : null}
 
         {/* Join/Leave */}
         {!club.is_member ? (

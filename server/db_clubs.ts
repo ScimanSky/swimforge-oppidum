@@ -33,6 +33,7 @@ export async function listClubs(userId: number, options: { search?: string; scop
       c.description,
       c.rules,
       c.cover_image_url,
+      c.website_url,
       c.is_private,
       c.visibility,
       c.owner_id,
@@ -64,6 +65,7 @@ export async function getClubById(userId: number, clubId: number) {
       c.description,
       c.rules,
       c.cover_image_url,
+      c.website_url,
       c.is_private,
       c.visibility,
       c.owner_id,
@@ -261,7 +263,7 @@ export async function createClubPost(
   return inserted[0]?.id ?? null;
 }
 
-export async function createClub(userId: number, input: { name: string; description?: string | null; coverImageUrl?: string | null; isPrivate?: boolean; visibility?: "public" | "private" | "invite"; rules?: string | null }) {
+export async function createClub(userId: number, input: { name: string; description?: string | null; coverImageUrl?: string | null; websiteUrl?: string | null; isPrivate?: boolean; visibility?: "public" | "private" | "invite"; rules?: string | null }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -282,6 +284,7 @@ export async function createClub(userId: number, input: { name: string; descript
       description: input.description ?? null,
       rules: input.rules ?? null,
       coverImageUrl: input.coverImageUrl ?? null,
+      websiteUrl: input.websiteUrl ?? null,
       ownerId: userId,
       isPrivate: input.isPrivate ?? false,
       visibility: input.visibility ?? (input.isPrivate ? "private" : "public"),
@@ -666,7 +669,7 @@ export async function acceptClubInvite(userId: number, code: string) {
   return { joined: true, clubId: invite.clubId };
 }
 
-export async function updateClub(userId: number, clubId: number, input: { name?: string; description?: string | null; coverImageUrl?: string | null; visibility?: "public" | "private" | "invite"; rules?: string | null; themeColor?: string; logoUrl?: string | null; tagline?: string | null }) {
+export async function updateClub(userId: number, clubId: number, input: { name?: string; description?: string | null; coverImageUrl?: string | null; websiteUrl?: string | null; visibility?: "public" | "private" | "invite"; rules?: string | null; themeColor?: string; logoUrl?: string | null; tagline?: string | null }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
@@ -686,6 +689,7 @@ export async function updateClub(userId: number, clubId: number, input: { name?:
       ...(input.description !== undefined ? { description: input.description } : {}),
       ...(input.rules !== undefined ? { rules: input.rules } : {}),
       ...(input.coverImageUrl !== undefined ? { coverImageUrl: input.coverImageUrl } : {}),
+      ...(input.websiteUrl !== undefined ? { websiteUrl: input.websiteUrl } : {}),
       ...(input.visibility !== undefined ? { visibility: input.visibility } : {}),
       ...(input.visibility !== undefined ? { isPrivate: input.visibility !== "public" } : {}),
       ...(input.themeColor !== undefined ? { themeColor: input.themeColor } : {}),

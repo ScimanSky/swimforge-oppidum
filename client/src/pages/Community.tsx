@@ -40,6 +40,7 @@ export default function Community() {
     description: "",
     visibility: "public",
     coverImageUrl: "",
+    websiteUrl: "",
   })
 
   const clubsQuery = trpc.community.clubs.list.useQuery({
@@ -52,7 +53,7 @@ export default function Community() {
     onSuccess: (data) => {
       toast.success("Club creato!")
       setIsCreateOpen(false)
-      setCreateDraft({ name: "", description: "", visibility: "public", coverImageUrl: "" })
+      setCreateDraft({ name: "", description: "", visibility: "public", coverImageUrl: "", websiteUrl: "" })
       setClubScope("mine")
       clubsQuery.refetch()
       if (data?.clubId) {
@@ -136,6 +137,16 @@ export default function Community() {
               placeholder="https://..."
             />
           </div>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Sito web (opzionale)</p>
+            <Input
+              value={createDraft.websiteUrl}
+              onChange={(event) =>
+                setCreateDraft((prev) => ({ ...prev, websiteUrl: event.target.value }))
+              }
+              placeholder="https://..."
+            />
+          </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline-neon" onClick={() => setIsCreateOpen(false)}>
               Annulla
@@ -147,6 +158,7 @@ export default function Community() {
                   name: createDraft.name.trim(),
                   description: createDraft.description.trim() || undefined,
                   coverImageUrl: createDraft.coverImageUrl.trim() || undefined,
+                  websiteUrl: createDraft.websiteUrl.trim() || undefined,
                   visibility: createDraft.visibility as "public" | "private" | "invite",
                   isPrivate: createDraft.visibility === "private",
                 })
