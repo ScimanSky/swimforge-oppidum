@@ -223,10 +223,7 @@ export function ShareActivityPicker({
       if (auth.warning) {
         toast.warning(auth.warning)
       }
-      const uploaded = await uploadVideoToCloudinary(file, auth, {
-        fileNamePrefix: "activity-post-video",
-        tags: "activity,post,swimforge,video",
-      })
+      const uploaded = await uploadVideoToCloudinary(file, auth)
       return uploaded.url
     }
     return uploadMediaToImageKit(file)

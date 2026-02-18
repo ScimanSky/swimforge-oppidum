@@ -288,10 +288,7 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
       if (auth.warning) {
         toast.warning(auth.warning);
       }
-      const uploaded = await uploadVideoToCloudinary(file, auth, {
-        fileNamePrefix: "club-post-video",
-        tags: `club-post,club-${clubId},swimforge,video`,
-      });
+      const uploaded = await uploadVideoToCloudinary(file, auth);
       return uploaded.url;
     }
     return uploadMediaToImageKit(file);

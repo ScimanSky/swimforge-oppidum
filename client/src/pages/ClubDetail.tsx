@@ -388,10 +388,7 @@ export default function ClubDetail() {
     if (auth.warning) {
       toast.warning(auth.warning);
     }
-    const uploaded = await uploadVideoToCloudinary(file, auth, {
-      fileNamePrefix: `club-${clubId}-video`,
-      tags: `club,club-${clubId},swimforge,video`,
-    });
+    const uploaded = await uploadVideoToCloudinary(file, auth);
     return { url: uploaded.url };
   };
 

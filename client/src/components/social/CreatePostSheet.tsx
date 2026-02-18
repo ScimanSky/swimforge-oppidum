@@ -211,10 +211,7 @@ export function CreatePostSheet({ open, onOpenChange }: CreatePostSheetProps) {
       if (auth.warning) {
         toast.warning(auth.warning)
       }
-      const uploaded = await uploadVideoToCloudinary(file, auth, {
-        fileNamePrefix: "post-video",
-        tags: "post,swimforge,video",
-      })
+      const uploaded = await uploadVideoToCloudinary(file, auth)
       return uploaded.url
     }
     return uploadMediaToImageKit(file)

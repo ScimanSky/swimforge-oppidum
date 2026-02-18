@@ -203,10 +203,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     if (auth.warning) {
       toast.warning(auth.warning)
     }
-    return uploadVideoToCloudinary(file, auth, {
-      fileNamePrefix: "story-video",
-      tags: "story,swimforge,video",
-    })
+    return uploadVideoToCloudinary(file, auth)
   }
 
   const buildVideoStoryUrls = (mediaUrl: string, durationSeconds: number) => {

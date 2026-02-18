@@ -17,27 +17,14 @@ type CloudinaryUploadResult = {
 
 export async function uploadVideoToCloudinary(
   file: File,
-  auth: CloudinaryVideoAuth,
-  options?: {
-    fileNamePrefix?: string
-    tags?: string
-  }
+  auth: CloudinaryVideoAuth
 ) {
-  const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
-  const publicId = options?.fileNamePrefix ? `${options.fileNamePrefix}-${Date.now()}-${safeFileName}` : undefined
-
   const formData = new FormData()
   formData.append("file", file)
   formData.append("api_key", auth.apiKey)
   formData.append("timestamp", String(auth.timestamp))
   formData.append("signature", auth.signature)
   formData.append("folder", auth.folder)
-  if (options?.tags) {
-    formData.append("tags", options.tags)
-  }
-  if (publicId) {
-    formData.append("public_id", publicId)
-  }
 
   const response = await fetch(`https://api.cloudinary.com/v1_1/${auth.cloudName}/video/upload`, {
     method: "POST",
