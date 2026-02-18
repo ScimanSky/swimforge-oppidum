@@ -14,26 +14,37 @@ export default function FeedPostMetrics({ distanceMeters, durationSeconds }: Fee
   const pace = formatPace(distanceMeters, durationSeconds)
 
   return (
-    <div className="grid grid-cols-[1fr_auto] gap-2.5 mx-4 mt-3">
-      {/* Primary metric: distance - spans left, tall */}
-      <div className="relative row-span-2 rounded-2xl border border-white/14 bg-[linear-gradient(135deg,color-mix(in_oklch,var(--background)_86%,transparent),color-mix(in_oklch,var(--background)_70%,transparent))] p-4 flex flex-col justify-center overflow-hidden backdrop-blur-sm shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_12%,transparent)]">
-        <p className="text-2xl font-display font-bold text-foreground leading-tight">{distance}</p>
-        <p className="text-[10px] text-foreground/70 mt-0.5">Distanza</p>
-        <Ruler className="absolute bottom-2 right-2 size-8 text-foreground/[0.14]" />
-      </div>
+    <div className="mx-4 mt-3">
+      <div className="grid grid-cols-[minmax(0,1fr)_128px] gap-2.5 rounded-2xl border border-white/12 bg-[linear-gradient(120deg,rgba(2,8,23,0.48),rgba(15,23,42,0.22))] p-1.5 backdrop-blur-[2px]">
+        <div className="relative row-span-2 overflow-hidden rounded-[18px] border border-cyan-300/20 bg-[linear-gradient(120deg,rgba(2,6,23,0.9),rgba(6,39,61,0.72))] p-4 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.16)]">
+          <div className="mb-1 inline-flex items-center gap-1 rounded-full border border-cyan-300/25 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100/90">
+            <Ruler className="size-3" />
+            Distanza
+          </div>
+          <p className="text-[34px] leading-[1.05] font-display font-bold text-white drop-shadow-sm">{distance}</p>
+          <div className="pointer-events-none absolute -right-4 -bottom-3 h-16 w-16 rounded-full bg-cyan-300/18 blur-xl" />
+          <Ruler className="absolute bottom-2.5 right-2.5 size-8 text-white/15" />
+        </div>
 
-      {/* Duration - top right */}
-      <div className="relative rounded-2xl border border-white/14 bg-[linear-gradient(135deg,color-mix(in_oklch,var(--background)_84%,transparent),color-mix(in_oklch,var(--background)_68%,transparent))] p-3 min-w-[120px] overflow-hidden backdrop-blur-sm shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_10%,transparent)]">
-        <p className="text-sm font-display font-bold text-foreground">{duration}</p>
-        <p className="text-[10px] text-foreground/70">Durata</p>
-        <Clock className="absolute bottom-1.5 right-1.5 size-5 text-foreground/[0.14]" />
-      </div>
+        <div className="relative overflow-hidden rounded-[18px] border border-white/16 bg-[linear-gradient(130deg,rgba(3,16,35,0.86),rgba(14,37,63,0.66))] p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]">
+          <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-200/75">
+            <Clock className="size-3.5 text-emerald-200/80" />
+            Durata
+          </div>
+          <p className="text-lg font-display font-bold leading-tight text-white">{duration}</p>
+          <Clock className="absolute bottom-1.5 right-1.5 size-5 text-white/14" />
+          <div className="pointer-events-none absolute -right-2 -top-2 h-10 w-10 rounded-full bg-emerald-300/15 blur-lg" />
+        </div>
 
-      {/* Pace - bottom right */}
-      <div className="relative rounded-2xl border border-white/14 bg-[linear-gradient(135deg,color-mix(in_oklch,var(--background)_84%,transparent),color-mix(in_oklch,var(--background)_68%,transparent))] p-3 min-w-[120px] overflow-hidden backdrop-blur-sm shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_10%,transparent)]">
-        <p className="text-sm font-display font-bold text-foreground">{pace}</p>
-        <p className="text-[10px] text-foreground/70">Pace</p>
-        <Gauge className="absolute bottom-1.5 right-1.5 size-5 text-foreground/[0.14]" />
+        <div className="relative overflow-hidden rounded-[18px] border border-white/16 bg-[linear-gradient(130deg,rgba(3,16,35,0.86),rgba(14,37,63,0.66))] p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]">
+          <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-200/75">
+            <Gauge className="size-3.5 text-cyan-200/80" />
+            Pace
+          </div>
+          <p className="text-lg font-display font-bold leading-tight text-white">{pace}</p>
+          <Gauge className="absolute bottom-1.5 right-1.5 size-5 text-white/14" />
+          <div className="pointer-events-none absolute -right-2 -top-2 h-10 w-10 rounded-full bg-cyan-300/15 blur-lg" />
+        </div>
       </div>
     </div>
   )

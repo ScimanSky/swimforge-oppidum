@@ -94,7 +94,7 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
       <div
         className={`surface-panel overflow-hidden p-0 transition-all duration-300 ${
           isActivityPost
-            ? "relative isolate rounded-3xl border border-white/10 shadow-lg hover:shadow-xl"
+            ? "relative isolate rounded-3xl border border-cyan-300/20 bg-[linear-gradient(142deg,rgba(2,6,23,0.7),rgba(15,23,42,0.52))] shadow-[0_12px_34px_rgba(2,6,23,0.45)] hover:shadow-[0_18px_44px_rgba(2,6,23,0.6)]"
             : "rounded-2xl"
         }`}
       >
@@ -104,12 +104,12 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
               src={post.activity_is_open_water ? "/images/open-water.jpg" : "/images/pool-lanes.jpg"}
               alt=""
               aria-hidden="true"
-              className="pointer-events-none !absolute inset-0 h-full w-full object-cover object-center !z-0 opacity-[0.42] saturate-[1.25] contrast-[1.08]"
+              className="pointer-events-none !absolute inset-0 h-full w-full object-cover object-center !z-0 opacity-[0.48] saturate-[1.28] contrast-[1.12]"
               loading="lazy"
             />
-            <div className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(104deg,color-mix(in_oklch,var(--background)_82%,transparent)_0%,color-mix(in_oklch,var(--background)_62%,transparent)_44%,color-mix(in_oklch,var(--background)_34%,transparent)_100%)]" />
+            <div className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(106deg,rgba(2,6,23,0.72)_0%,rgba(3,24,45,0.5)_45%,rgba(2,6,23,0.26)_100%)]" />
             <div className="pointer-events-none !absolute inset-0 !z-0 bg-[radial-gradient(circle_at_14%_14%,color-mix(in_oklch,var(--electric-cyan)_24%,transparent),transparent_40%),radial-gradient(circle_at_88%_10%,color-mix(in_oklch,var(--electric-lime)_19%,transparent),transparent_45%)]" />
-            <div className="pointer-events-none !absolute inset-[1px] rounded-[25px] !z-0 border border-white/10" />
+            <div className="pointer-events-none !absolute inset-[1px] rounded-[25px] !z-0 border border-white/12" />
           </>
         )}
 
