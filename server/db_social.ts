@@ -371,7 +371,10 @@ export async function upsertActivityPost(
   if (!db) throw new Error("Database not available");
 
   const activity = await db
-    .select({ id: swimmingActivities.id })
+    .select({
+      id: swimmingActivities.id,
+      isOpenWater: swimmingActivities.isOpenWater,
+    })
     .from(swimmingActivities)
     .where(and(eq(swimmingActivities.id, activityId), eq(swimmingActivities.userId, userId)))
     .limit(1);
@@ -379,6 +382,13 @@ export async function upsertActivityPost(
   if (!activity.length) {
     throw new Error("Activity not found");
   }
+
+  const activityRow = activity[0];
+  const normalizedMediaUrls = (data.mediaUrls ?? []).map((item) => item.trim()).filter((item) => item.length > 0);
+  const hasMedia = normalizedMediaUrls.length > 0 || Boolean(data.mediaUrl?.trim());
+  const rawContent = data.content?.trim() ?? "";
+  const fallbackContent = activityRow.isOpenWater ? "Allenamento in acque libere" : "Allenamento in piscina";
+  const resolvedContent = rawContent.length > 0 ? rawContent : !hasMedia ? fallbackContent : null;
 
   await db
     .update(swimmingActivities)
@@ -392,9 +402,9 @@ export async function upsertActivityPost(
     .limit(1);
 
   const basePayload = {
-    content: data.content ?? null,
+    content: resolvedContent,
     mediaUrl: data.mediaUrl ?? null,
-    mediaUrls: data.mediaUrls ?? [],
+    mediaUrls: normalizedMediaUrls,
     taggedUserIds: data.taggedUserIds ?? [],
     hashtags: data.hashtags ?? [],
     visibility: data.visibility ?? "public",
@@ -404,6 +414,29 @@ export async function upsertActivityPost(
 
   if (existing.length) {
     await db.update(socialPosts).set(basePayload).where(eq(socialPosts.id, existing[0].id));
+    await db.execute(sql`
+      INSERT INTO user_notifications (user_id, type, title, message, link, reference_id, created_at)
+      SELECT
+        f.follower_id,
+        'activity_shared',
+        'Nuova attività nel feed',
+        COALESCE(u.name, 'Un nuotatore') || ' ha condiviso un nuovo allenamento.',
+        ${`/post/${existing[0].id}`},
+        ${existing[0].id},
+        NOW()
+      FROM social_follows f
+      JOIN users u ON u.id = ${userId}
+      WHERE f.following_id = ${userId}
+        AND f.status = 'accepted'
+        AND f.follower_id <> ${userId}
+        AND NOT EXISTS (
+          SELECT 1
+          FROM user_notifications n
+          WHERE n.user_id = f.follower_id
+            AND n.type = 'activity_shared'
+            AND n.reference_id = ${existing[0].id}
+        )
+    `);
     return existing[0].id;
   }
 
@@ -417,7 +450,28 @@ export async function upsertActivityPost(
       createdAt: new Date(),
     })
     .returning({ id: socialPosts.id });
-  return inserted[0]?.id ?? null;
+  const postId = inserted[0]?.id ?? null;
+
+  if (postId) {
+    await db.execute(sql`
+      INSERT INTO user_notifications (user_id, type, title, message, link, reference_id, created_at)
+      SELECT
+        f.follower_id,
+        'activity_shared',
+        'Nuova attività nel feed',
+        COALESCE(u.name, 'Un nuotatore') || ' ha condiviso un nuovo allenamento.',
+        ${`/post/${postId}`},
+        ${postId},
+        NOW()
+      FROM social_follows f
+      JOIN users u ON u.id = ${userId}
+      WHERE f.following_id = ${userId}
+        AND f.status = 'accepted'
+        AND f.follower_id <> ${userId}
+    `);
+  }
+
+  return postId;
 }
 
 export async function setActivityShare(userId: number, activityId: number, share: boolean) {

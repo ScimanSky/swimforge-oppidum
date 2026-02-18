@@ -241,6 +241,31 @@ export const aiCoachRouter = router({
             const { generateBothWorkouts } = await import("../ai_coach");
             return await generateBothWorkouts(ctx.user.id);
         }),
+
+    // Conversational coach chat
+    chat: protectedProcedure
+        .input(
+            z.object({
+                messages: z
+                    .array(
+                        z.object({
+                            role: z.enum(["user", "assistant"]),
+                            content: z.string().trim().min(1).max(2000),
+                        })
+                    )
+                    .min(1)
+                    .max(20),
+                goal: z.string().trim().max(120).optional().nullable(),
+                constraints: z.string().trim().max(240).optional().nullable(),
+            })
+        )
+        .mutation(async ({ ctx, input }) => {
+            const { generateCoachChatReply } = await import("../ai_coach_chat");
+            return await generateCoachChatReply(ctx.user.id, input.messages, {
+                goal: input.goal ?? null,
+                constraints: input.constraints ?? null,
+            });
+        }),
 });
 
 // Activity Insights

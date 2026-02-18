@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { trpc } from "@/lib/trpc"
 import { formatDistance, formatDuration, formatTimeAgo } from "@/lib/format"
 import { Button } from "@/components/ui/button"
@@ -27,6 +27,8 @@ import {
 interface ShareActivityPickerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialActivityId?: number | null
+  onShared?: (activityId: number) => void
 }
 
 type SelectedMedia = {
@@ -43,7 +45,12 @@ type TaggedUser = {
   avatarUrl: string | null
 }
 
-export function ShareActivityPicker({ open, onOpenChange }: ShareActivityPickerProps) {
+export function ShareActivityPicker({
+  open,
+  onOpenChange,
+  initialActivityId = null,
+  onShared,
+}: ShareActivityPickerProps) {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [caption, setCaption] = useState("")
   const [mediaItems, setMediaItems] = useState<SelectedMedia[]>([])
@@ -65,9 +72,13 @@ export function ShareActivityPicker({ open, onOpenChange }: ShareActivityPickerP
 
   const createPost = trpc.community.createPost.useMutation({
     onSuccess: () => {
+      const sharedActivityId = selectedId
       utils.community.feed.invalidate()
       utils.community.unsharedActivities.invalidate()
       toast.success("Attivita condivisa!")
+      if (sharedActivityId) {
+        onShared?.(sharedActivityId)
+      }
       resetComposer()
       setSelectedId(null)
       onOpenChange(false)
@@ -79,6 +90,14 @@ export function ShareActivityPicker({ open, onOpenChange }: ShareActivityPickerP
 
   const selected = activities?.find((a: any) => a.id === selectedId)
   const hashtags = useMemo(() => extractHashtags(caption), [caption])
+
+  useEffect(() => {
+    if (!open || !initialActivityId || !activities?.length) return
+    const exists = (activities as any[]).some((activity) => Number(activity.id) === Number(initialActivityId))
+    if (exists) {
+      setSelectedId(Number(initialActivityId))
+    }
+  }, [open, initialActivityId, activities])
 
   const clearMediaPreviews = () => {
     mediaItems.forEach((item) => {

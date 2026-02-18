@@ -6,7 +6,15 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Switch } from "@/components/ui/switch"
+import { ShareActivityPicker } from "@/components/social/ShareActivityPicker"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Select,
   SelectContent,
@@ -22,6 +30,7 @@ import {
   MapPin,
   Orbit,
   BarChart3,
+  Sparkles,
 } from "lucide-react"
 import { Link } from "wouter"
 import { trpc } from "@/lib/trpc"
@@ -66,8 +75,10 @@ export default function Activities() {
   const [filter, setFilter] = useState("all")
   const [search, setSearch] = useState("")
   const [sort, setSort] = useState("recent")
-  const [shareOverrides, setShareOverrides] = useState<Record<number, boolean>>({})
-  const [pendingShareId, setPendingShareId] = useState<number | null>(null)
+  const [sharePickerOpen, setSharePickerOpen] = useState(false)
+  const [shareActivityId, setShareActivityId] = useState<number | null>(null)
+  const [syncPromptOpen, setSyncPromptOpen] = useState(false)
+  const [syncPromptActivity, setSyncPromptActivity] = useState<any | null>(null)
   const [isDesktopWide, setIsDesktopWide] = useState(false)
   const [page, setPage] = useState(1)
 
@@ -79,23 +90,6 @@ export default function Activities() {
     refetchOnMount: "always",
   })
   const utils = trpc.useContext()
-
-  const toggleShareMutation = trpc.community.toggleShare.useMutation({
-    onMutate: ({ activityId, share }) => {
-      setPendingShareId(activityId)
-      setShareOverrides((prev) => ({ ...prev, [activityId]: share }))
-    },
-    onError: (_error, variables) => {
-      setShareOverrides((prev) => ({
-        ...prev,
-        [variables.activityId]: !variables.share,
-      }))
-    },
-    onSettled: async () => {
-      setPendingShareId(null)
-      await utils.activities.list.invalidate()
-    },
-  })
 
   const activities = activitiesQuery.data ?? []
 
@@ -140,11 +134,54 @@ export default function Activities() {
   }, [page, totalPages])
 
 
-  const getShareState = (activity: any) =>
-    shareOverrides[activity.id] ?? activity.shareToFeed ?? false
+  const openShareForActivity = (activityId: number) => {
+    setShareActivityId(activityId)
+    setSharePickerOpen(true)
+  }
 
-  const handleShareToggle = (activityId: number, share: boolean) => {
-    toggleShareMutation.mutate({ activityId, share })
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (!activities.length) return
+
+    const SYNC_PROMPT_SEEN_KEY = "swimforge:lastPromptedSyncedActivityId"
+    const syncedActivities = [...activities]
+      .filter(
+        (activity) =>
+          (activity.activitySource === "garmin" || activity.activitySource === "strava") &&
+          Number.isInteger(activity.id)
+      )
+      .sort((a, b) => Number(b.id) - Number(a.id))
+
+    if (!syncedActivities.length) return
+    const newest = syncedActivities[0]
+    const lastSeenRaw = window.localStorage.getItem(SYNC_PROMPT_SEEN_KEY)
+    const lastSeenId = Number(lastSeenRaw ?? "0")
+
+    if (!lastSeenRaw) {
+      window.localStorage.setItem(SYNC_PROMPT_SEEN_KEY, String(newest.id))
+      return
+    }
+
+    if (newest.id > lastSeenId && !newest.shareToFeed) {
+      setSyncPromptActivity(newest)
+      setSyncPromptOpen(true)
+      return
+    }
+
+    if (newest.id > lastSeenId) {
+      window.localStorage.setItem(SYNC_PROMPT_SEEN_KEY, String(newest.id))
+    }
+  }, [activities])
+
+  const markSyncPromptSeen = (activityId: number | null | undefined) => {
+    if (typeof window === "undefined" || !activityId) return
+    window.localStorage.setItem("swimforge:lastPromptedSyncedActivityId", String(activityId))
+  }
+
+  const handleCloseSyncPrompt = () => {
+    markSyncPromptSeen(syncPromptActivity?.id)
+    setSyncPromptOpen(false)
+    setSyncPromptActivity(null)
   }
 
   return (
@@ -209,16 +246,23 @@ export default function Activities() {
                   ) : (
                     pagedActivities.map((activity) => {
                       const isOpenWater = Boolean(activity.isOpenWater)
-                      const shareChecked = getShareState(activity)
-                      const shareDisabled = pendingShareId === activity.id
                       return (
                         <div
                           key={activity.id}
-                          className="stream-card border-l-2 border-l-primary/45 hover:border-l-primary"
+                          className="stream-card relative isolate overflow-hidden border-l-2 border-l-primary/45 hover:border-l-primary"
                         >
+                          <img
+                            src={isOpenWater ? "/images/open-water.jpg" : "/images/pool-lanes.jpg"}
+                            alt=""
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-[0.36] saturate-[1.15]"
+                            loading="lazy"
+                          />
+                          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(112deg,color-mix(in_oklch,var(--background)_80%,transparent)_0%,color-mix(in_oklch,var(--background)_60%,transparent)_42%,color-mix(in_oklch,var(--background)_34%,transparent)_100%)]" />
+                          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,color-mix(in_oklch,var(--electric-cyan)_26%,transparent),transparent_36%),radial-gradient(circle_at_92%_12%,color-mix(in_oklch,var(--electric-lime)_18%,transparent),transparent_44%)]" />
                           <div className="flex items-start gap-4">
                             <div
-                              className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${
+                              className={`relative z-10 flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl ${
                                 isOpenWater ? "bg-accent/10" : "bg-primary/10"
                               }`}
                             >
@@ -229,7 +273,7 @@ export default function Activities() {
                               )}
                             </div>
 
-                            <div className="flex-1 min-w-0">
+                            <div className="relative z-10 flex-1 min-w-0">
                               <div className="mb-1 flex items-center gap-2">
                                 <h3 className="font-semibold text-foreground truncate">
                                   {activity.activityName || "Swim Session"}
@@ -275,19 +319,24 @@ export default function Activities() {
                               </div>
 
                               <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-                                <div className="flex items-center gap-2">
-                                  <Switch
-                                    checked={shareChecked}
-                                    disabled={shareDisabled}
-                                    onCheckedChange={(checked) => handleShareToggle(activity.id, checked)}
-                                  />
-                                  <span>Condividi nel feed</span>
-                                </div>
-                                {shareDisabled && <span>Salvataggio...</span>}
+                                {activity.shareToFeed ? (
+                                  <Badge variant="outline" className="bg-background/60">
+                                    Condivisa nel feed
+                                  </Badge>
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="neon"
+                                    onClick={() => openShareForActivity(activity.id)}
+                                  >
+                                    Condividi nel feed
+                                  </Button>
+                                )}
                               </div>
                             </div>
 
-                            <Button variant="ghost-neon" size="icon" asChild>
+                            <Button variant="ghost-neon" size="icon" asChild className="relative z-10">
                               <Link href={`/track/${activity.id}`}>
                                 <ChevronRight className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
                               </Link>
@@ -362,6 +411,64 @@ export default function Activities() {
           </aside>
         </div>
       </div>
+
+      <Dialog open={syncPromptOpen} onOpenChange={(open) => !open && handleCloseSyncPrompt()}>
+        <DialogContent className="border-border/70 bg-background/95 sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="size-4 text-primary" />
+              Nuova attività sincronizzata
+            </DialogTitle>
+            <DialogDescription>
+              Vuoi condividerla subito nel feed? Puoi aggiungere commento, foto o video.
+            </DialogDescription>
+          </DialogHeader>
+          {syncPromptActivity ? (
+            <div className="rounded-2xl border border-border/70 bg-background/60 p-4">
+              <div className="text-sm font-semibold text-foreground">
+                {syncPromptActivity.activityName || "Nuova sessione"}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
+                <span>{formatDistance(syncPromptActivity.distanceMeters || 0)}</span>
+                <span>{formatDuration(syncPromptActivity.durationSeconds || 0)}</span>
+                <span className="capitalize">{syncPromptActivity.activitySource || "sync"}</span>
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button variant="outline-neon" onClick={handleCloseSyncPrompt}>
+              Più tardi
+            </Button>
+            <Button
+              variant="neon"
+              onClick={() => {
+                if (syncPromptActivity?.id) {
+                  openShareForActivity(syncPromptActivity.id)
+                }
+                setSyncPromptOpen(false)
+              }}
+            >
+              Condividi ora
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <ShareActivityPicker
+        open={sharePickerOpen}
+        onOpenChange={(open) => {
+          setSharePickerOpen(open)
+          if (!open && shareActivityId) {
+            markSyncPromptSeen(shareActivityId)
+            setShareActivityId(null)
+          }
+        }}
+        initialActivityId={shareActivityId}
+        onShared={async (activityId) => {
+          markSyncPromptSeen(activityId)
+          await utils.activities.list.invalidate()
+        }}
+      />
     </AppLayout>
   )
 }

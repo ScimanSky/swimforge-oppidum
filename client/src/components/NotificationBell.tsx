@@ -133,6 +133,7 @@ export default function NotificationBell() {
         case "reaction":
         case "splash":
         case "comment":
+        case "activity_shared":
           return Number.isFinite(referenceId) && referenceId > 0 ? `/post/${referenceId}` : "/home";
         case "follow":
           return "/home/community";
@@ -165,6 +166,8 @@ export default function NotificationBell() {
         return "🏊";
       case "reaction":
         return "✨";
+      case "activity_shared":
+        return "🏊";
       case "report_update":
         return "🛡️";
       default:

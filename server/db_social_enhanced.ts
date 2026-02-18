@@ -34,6 +34,11 @@ async function requireDb(): Promise<DbClient> {
   return db
 }
 
+const ACTIVITY_SHARED_NOTIFICATION_TTL_HOURS = Math.max(
+  1,
+  Number.parseInt(process.env.ACTIVITY_SHARED_NOTIFICATION_TTL_HOURS ?? "24", 10) || 24
+)
+
 // ============================================
 // CLUB EVENTS
 // ============================================
@@ -461,7 +466,13 @@ export async function getUserNotifications(params: {
   onlyUnread?: boolean
 }) {
   const db = await requireDb()
-  const conditions = [eq(userNotifications.userId, params.userId)]
+  const conditions = [
+    eq(userNotifications.userId, params.userId),
+    sql`(
+      ${userNotifications.type} <> 'activity_shared'
+      OR ${userNotifications.createdAt} >= NOW() - (${ACTIVITY_SHARED_NOTIFICATION_TTL_HOURS} * INTERVAL '1 hour')
+    )`,
+  ]
   
   if (params.onlyUnread) {
     conditions.push(eq(userNotifications.isRead, false))
@@ -513,7 +524,11 @@ export async function getUnreadNotificationCount(userId: number) {
     .where(
       and(
         eq(userNotifications.userId, userId),
-        eq(userNotifications.isRead, false)
+        eq(userNotifications.isRead, false),
+        sql`(
+          ${userNotifications.type} <> 'activity_shared'
+          OR ${userNotifications.createdAt} >= NOW() - (${ACTIVITY_SHARED_NOTIFICATION_TTL_HOURS} * INTERVAL '1 hour')
+        )`
       )
     )
   

@@ -7,15 +7,15 @@ import { Badge } from "@/components/ui/badge"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AIChatBox, type Message as ChatMessage } from "@/components/AIChatBox"
 import { trpc } from "@/lib/trpc"
+import { toast } from "sonner"
 import {
   Brain,
   Sparkles,
-  RefreshCw,
   Target,
   HeartPulse,
   Activity,
-  MessageSquare,
 } from "lucide-react"
 import { useLocation } from "wouter"
 
@@ -114,9 +114,15 @@ const getFocusLabel = (
   return candidates[0].label
 }
 
+const CHAT_STORAGE_KEY = "coach_chat_history_v1"
+const CHAT_GOAL_STORAGE_KEY = "coach_chat_goal_v1"
+const CHAT_CONSTRAINTS_STORAGE_KEY = "coach_chat_constraints_v1"
+
 export default function Coach() {
   const [location] = useLocation()
-  const [message, setMessage] = useState("")
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatGoal, setChatGoal] = useState("")
+  const [chatConstraints, setChatConstraints] = useState("")
   const [activeTab, setActiveTab] = useState<"insights" | "workouts" | "session-iq" | "chat">("insights")
   const [activeInsightIndex, setActiveInsightIndex] = useState(0)
   const [activePoolSectionIndex, setActivePoolSectionIndex] = useState(0)
@@ -139,6 +145,7 @@ export default function Coach() {
   const utils = trpc.useUtils()
 
   const generateMutation = trpc.aiCoach.generateWorkouts.useMutation()
+  const chatMutation = trpc.aiCoach.chat.useMutation()
 
   const handleGenerate = async () => {
     setIsGenerating(true)
@@ -176,6 +183,22 @@ export default function Coach() {
     if (!workoutsData?.generatedAt) return null
     return formatDate(workoutsData.generatedAt)
   }, [workoutsData?.generatedAt])
+
+  const suggestedChatPrompts = useMemo(
+    () => [
+      "Come imposto la prossima seduta in base al mio recupero?",
+      "Guardando i miei dati, cosa devo migliorare prima?",
+      "Mi prepari 2 obiettivi concreti per questa settimana?",
+      `Che lavoro faccio per alzare il mio ${getFocusLabel(
+        advanced?.performanceIndex,
+        advanced?.consistencyScore,
+        advanced?.recoveryReadinessScore,
+        advanced?.swimmingEfficiencyIndex
+      )}?`,
+    ],
+    [advanced]
+  )
+
   const sessionInsightsQuery = trpc.activityInsights.list.useQuery(
     { limit: 50, offset: 0 },
     { staleTime: 60 * 1000 }
@@ -357,6 +380,87 @@ export default function Coach() {
       setActiveWorkout(workout)
     }
   }, [location])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      const raw = window.localStorage.getItem(CHAT_STORAGE_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return
+      const safeMessages = parsed
+        .filter((item) =>
+          item &&
+          typeof item === "object" &&
+          (item.role === "user" || item.role === "assistant") &&
+          typeof item.content === "string"
+        )
+        .slice(-20)
+      if (safeMessages.length > 0) {
+        setChatMessages(safeMessages)
+      }
+    } catch {
+      // Ignore corrupted local chat storage
+    }
+    const storedGoal = window.localStorage.getItem(CHAT_GOAL_STORAGE_KEY)
+    const storedConstraints = window.localStorage.getItem(CHAT_CONSTRAINTS_STORAGE_KEY)
+    if (storedGoal) setChatGoal(storedGoal)
+    if (storedConstraints) setChatConstraints(storedConstraints)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(chatMessages.slice(-20)))
+    } catch {
+      // Best-effort persistence
+    }
+  }, [chatMessages])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(CHAT_GOAL_STORAGE_KEY, chatGoal)
+  }, [chatGoal])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(CHAT_CONSTRAINTS_STORAGE_KEY, chatConstraints)
+  }, [chatConstraints])
+
+  const handleSendChatMessage = async (content: string) => {
+    if (chatMutation.isPending) return
+
+    const userMessage: ChatMessage = { role: "user", content }
+    const nextMessages = [...chatMessages, userMessage].slice(-20)
+    setChatMessages(nextMessages)
+
+    try {
+      const response = await chatMutation.mutateAsync({
+        messages: nextMessages.map((msg) => ({
+          role: msg.role === "assistant" ? "assistant" : "user",
+          content: msg.content,
+        })),
+        goal: chatGoal.trim() || null,
+        constraints: chatConstraints.trim() || null,
+      })
+
+      const assistantMessage: ChatMessage = {
+        role: "assistant",
+        content: String(response.message ?? ""),
+      }
+      setChatMessages((prev) => [...prev, assistantMessage].slice(-20))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Impossibile contattare il Coach AI."
+      toast.error(message)
+    }
+  }
+
+  const clearChat = () => {
+    setChatMessages([])
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(CHAT_STORAGE_KEY)
+    }
+  }
 
   return (
     <AppLayout>
@@ -829,30 +933,49 @@ export default function Coach() {
 
           <TabsContent value="chat" className="mt-3">
             <section className="surface-panel p-6">
-              <div className="p-6 space-y-4 text-sm text-muted-foreground">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <MessageSquare className="size-5 text-primary" />
-                  </div>
+              <div className="p-4 space-y-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="font-medium text-foreground">Chat AI</p>
+                    <p className="font-medium text-foreground">Coach Chat</p>
                     <p className="text-xs text-muted-foreground">
-                      Funzione in arrivo. Per ora usa gli insights e i piani generati.
+                      Risposte generate sui tuoi dati reali (sessioni, metriche e Session IQ).
                     </p>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Chat AI in arrivo"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    className="bg-background/60"
-                    disabled
-                  />
-                  <Button size="icon" variant="ghost-neon" disabled>
-                    <MessageSquare className="w-4 h-4" />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline-neon"
+                    disabled={chatMessages.length === 0 || chatMutation.isPending}
+                    onClick={clearChat}
+                  >
+                    Svuota chat
                   </Button>
                 </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <Input
+                    value={chatGoal}
+                    onChange={(e) => setChatGoal(e.target.value)}
+                    placeholder="Obiettivo attuale (es. migliorare il passo sui 100m)"
+                    maxLength={120}
+                    className="bg-background/60"
+                  />
+                  <Input
+                    value={chatConstraints}
+                    onChange={(e) => setChatConstraints(e.target.value)}
+                    placeholder="Vincoli (es. 2 sedute, spalla delicata)"
+                    maxLength={240}
+                    className="bg-background/60"
+                  />
+                </div>
+                <AIChatBox
+                  messages={chatMessages}
+                  onSendMessage={handleSendChatMessage}
+                  isLoading={chatMutation.isPending}
+                  placeholder="Scrivi al Coach AI (es. 'Come imposto la seduta di domani?')"
+                  emptyStateMessage="Parti da una domanda operativa sul tuo allenamento."
+                  suggestedPrompts={suggestedChatPrompts}
+                  height={520}
+                />
               </div>
             </section>
           </TabsContent>

@@ -94,18 +94,15 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
       <div className={`surface-panel overflow-hidden p-0 ${isActivityPost ? "relative isolate" : ""}`}>
         {isActivityPost && (
           <>
-            <picture className="pointer-events-none !absolute inset-y-0 right-0 w-[68%] !z-0">
-              <source media="(max-width: 767px)" srcSet="/images/activity-card-overlay-mobile.png" />
-              <img
-                src="/images/activity-card-overlay-desktop.png"
-                alt=""
-                aria-hidden="true"
-                className="h-full w-full object-cover object-center opacity-[0.55] saturate-[1.1] contrast-[1.04]"
-                loading="lazy"
-              />
-            </picture>
-            <div className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(102deg,color-mix(in_oklch,var(--background)_84%,transparent)_0%,color-mix(in_oklch,var(--background)_72%,transparent)_42%,color-mix(in_oklch,var(--background)_46%,transparent)_100%)]" />
-            <div className="pointer-events-none !absolute inset-0 !z-0 bg-[radial-gradient(circle_at_16%_14%,color-mix(in_oklch,var(--electric-cyan)_22%,transparent),transparent_38%),radial-gradient(circle_at_84%_14%,color-mix(in_oklch,var(--electric-lime)_16%,transparent),transparent_42%)]" />
+            <img
+              src={post.activity_is_open_water ? "/images/open-water.jpg" : "/images/pool-lanes.jpg"}
+              alt=""
+              aria-hidden="true"
+              className="pointer-events-none !absolute inset-0 h-full w-full object-cover object-center !z-0 opacity-[0.44] saturate-[1.2] contrast-[1.05]"
+              loading="lazy"
+            />
+            <div className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(104deg,color-mix(in_oklch,var(--background)_82%,transparent)_0%,color-mix(in_oklch,var(--background)_62%,transparent)_44%,color-mix(in_oklch,var(--background)_34%,transparent)_100%)]" />
+            <div className="pointer-events-none !absolute inset-0 !z-0 bg-[radial-gradient(circle_at_14%_14%,color-mix(in_oklch,var(--electric-cyan)_24%,transparent),transparent_40%),radial-gradient(circle_at_88%_10%,color-mix(in_oklch,var(--electric-lime)_19%,transparent),transparent_45%)]" />
             <div className="pointer-events-none !absolute inset-[1px] rounded-[25px] !z-0 border border-white/10" />
           </>
         )}
