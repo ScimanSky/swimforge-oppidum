@@ -80,25 +80,31 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
 
   return (
     <motion.div
-      className="stream-node"
+      className="stream-node mb-4"
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{
-        duration: 0.45,
+        duration: 0.5,
         type: "spring",
         stiffness: 260,
         damping: 24,
-        delay: Math.min(index * 0.04, 0.2),
+        delay: Math.min(index * 0.05, 0.25),
       }}
     >
-      <div className={`surface-panel overflow-hidden p-0 ${isActivityPost ? "relative isolate" : ""}`}>
+      <div
+        className={`surface-panel overflow-hidden p-0 transition-all duration-300 ${
+          isActivityPost
+            ? "relative isolate rounded-3xl border border-white/10 shadow-lg hover:shadow-xl"
+            : "rounded-2xl"
+        }`}
+      >
         {isActivityPost && (
           <>
             <img
               src={post.activity_is_open_water ? "/images/open-water.jpg" : "/images/pool-lanes.jpg"}
               alt=""
               aria-hidden="true"
-              className="pointer-events-none !absolute inset-0 h-full w-full object-cover object-center !z-0 opacity-[0.44] saturate-[1.2] contrast-[1.05]"
+              className="pointer-events-none !absolute inset-0 h-full w-full object-cover object-center !z-0 opacity-[0.42] saturate-[1.25] contrast-[1.08]"
               loading="lazy"
             />
             <div className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(104deg,color-mix(in_oklch,var(--background)_82%,transparent)_0%,color-mix(in_oklch,var(--background)_62%,transparent)_44%,color-mix(in_oklch,var(--background)_34%,transparent)_100%)]" />
@@ -116,7 +122,11 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
           />
 
           {post.content && (
-            <p className="px-4 mt-3 text-sm text-foreground whitespace-pre-wrap">
+            <p
+              className={`px-4 mt-3 text-sm whitespace-pre-wrap ${
+                isActivityPost ? "text-white/90" : "text-foreground"
+              }`}
+            >
               {renderPostContent(post.content)}
             </p>
           )}
@@ -127,7 +137,11 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
                 <Link
                   key={user.user_id}
                   href={`/u/${user.user_id}`}
-                  className="rounded-full border border-border/70 bg-card/40 px-2 py-1 text-xs text-[var(--electric-lime)] hover:bg-card/70"
+                  className={`rounded-full px-2 py-1 text-xs text-[var(--electric-lime)] ${
+                    isActivityPost
+                      ? "border border-white/15 bg-white/5 backdrop-blur-sm hover:bg-white/10"
+                      : "border border-border/70 bg-card/40 hover:bg-card/70"
+                  }`}
                 >
                   @{user.username || user.name || `u${user.user_id}`}
                 </Link>
@@ -136,9 +150,16 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
           )}
 
           {allMedia.length > 0 && (
-            <div className={`mt-3 grid gap-1 overflow-hidden ${allMedia.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+            <div
+              className={`mt-3 grid gap-1.5 overflow-hidden ${
+                isActivityPost ? "px-2 pb-2" : ""
+              } ${allMedia.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
+            >
               {allMedia.map((url, idx) => (
-                <div key={`${url}-${idx}`} className="bg-black/30">
+                <div
+                  key={`${url}-${idx}`}
+                  className={`${isActivityPost ? "overflow-hidden rounded-2xl border border-white/8 bg-black/35" : "bg-black/30"}`}
+                >
                   {isVideoUrl(url) ? (
                     <video
                       src={url}
