@@ -60,6 +60,7 @@ export function CreatePostSheet({ open, onOpenChange }: CreatePostSheetProps) {
 
   const utils = trpc.useUtils()
   const imageKitAuth = trpc.community.postImageKitAuth.useMutation()
+  const postImageUpload = trpc.community.postUploadImage.useMutation()
   const cloudinaryVideoAuth = trpc.community.cloudinaryVideoAuth.useMutation()
 
   const searchEnabled = mode === "text" && tagQuery.trim().length >= 2
@@ -166,6 +167,22 @@ export function CreatePostSheet({ open, onOpenChange }: CreatePostSheetProps) {
     setTaggedUsers((prev) => prev.filter((item) => item.userId !== userId))
   }
 
+  const fileToBase64 = (file: File) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result
+        if (typeof result !== "string") {
+          reject(new Error("Impossibile leggere il file"))
+          return
+        }
+        const commaIdx = result.indexOf(",")
+        resolve(commaIdx >= 0 ? result.slice(commaIdx + 1) : result)
+      }
+      reader.onerror = () => reject(new Error("Impossibile leggere il file"))
+      reader.readAsDataURL(file)
+    })
+
   const uploadMediaToImageKit = async (file: File) => {
     const auth = await imageKitAuth.mutateAsync()
     const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
@@ -182,27 +199,45 @@ export function CreatePostSheet({ open, onOpenChange }: CreatePostSheetProps) {
     formData.append("useUniqueFileName", "true")
     formData.append("tags", "post,swimforge")
 
-    const response = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
-      method: "POST",
-      body: formData,
-    })
+    try {
+      const response = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
+        method: "POST",
+        body: formData,
+      })
 
-    if (!response.ok) {
-      let detail = ""
-      try {
-        const payload = (await response.json()) as { message?: string; help?: string }
-        detail = payload.message || payload.help || ""
-      } catch {
-        detail = await response.text().catch(() => "")
+      if (!response.ok) {
+        let detail = ""
+        try {
+          const payload = (await response.json()) as { message?: string; help?: string }
+          detail = payload.message || payload.help || ""
+        } catch {
+          detail = await response.text().catch(() => "")
+        }
+        throw new Error(detail || "Upload media fallito")
       }
-      throw new Error(detail || "Upload media fallito")
-    }
 
-    const uploaded = (await response.json()) as { url?: string }
-    if (!uploaded.url) {
-      throw new Error("ImageKit non ha restituito un URL valido")
+      const uploaded = (await response.json()) as { url?: string }
+      if (!uploaded.url) {
+        throw new Error("ImageKit non ha restituito un URL valido")
+      }
+      return uploaded.url
+    } catch (imageKitError) {
+      const fallbackPayload = await fileToBase64(file)
+      try {
+        const uploaded = await postImageUpload.mutateAsync({
+          fileBase64: fallbackPayload,
+          mimeType: file.type as "image/jpeg" | "image/png" | "image/webp",
+        })
+        toast.warning("Upload diretto non riuscito: usato fallback server.")
+        return uploaded.url
+      } catch (fallbackError) {
+        const primaryMessage =
+          imageKitError instanceof Error ? imageKitError.message : "Upload media fallito"
+        const fallbackMessage =
+          fallbackError instanceof Error ? fallbackError.message : "Upload media fallito"
+        throw new Error(fallbackMessage || primaryMessage)
+      }
     }
-    return uploaded.url
   }
 
   const uploadMedia = async (file: File, kind: PostMediaKind) => {
@@ -240,7 +275,11 @@ export function CreatePostSheet({ open, onOpenChange }: CreatePostSheetProps) {
     }
   }
 
-  const isPending = createTextPost.isPending || imageKitAuth.isPending || cloudinaryVideoAuth.isPending
+  const isPending =
+    createTextPost.isPending ||
+    imageKitAuth.isPending ||
+    postImageUpload.isPending ||
+    cloudinaryVideoAuth.isPending
 
   return (
     <>

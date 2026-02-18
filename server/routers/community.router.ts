@@ -532,6 +532,87 @@ export const communityRouter = router({
             } as const;
         }),
 
+    postUploadImage: protectedProcedure
+        .input(z.object({
+            fileBase64: z
+                .string()
+                .min(1)
+                .max(30 * 1024 * 1024, "File troppo grande (max 20MB)")
+                .regex(/^[A-Za-z0-9+/=]+$/, "Invalid base64"),
+            mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
+            const admin = getSupabaseAdminClient();
+
+            const MAX_BYTES = 20 * 1024 * 1024;
+            let buffer: Buffer;
+            try {
+                buffer = Buffer.from(input.fileBase64, "base64");
+            } catch {
+                throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid base64 payload" });
+            }
+            if (buffer.length > MAX_BYTES) {
+                throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "File troppo grande (max 20MB)" });
+            }
+
+            const detected = detectImageType(buffer);
+            if (!detected) {
+                throw new TRPCError({ code: "BAD_REQUEST", message: "Formato immagine non supportato. Usa JPG, PNG o WEBP." });
+            }
+            if (detected.mimeType !== input.mimeType) {
+                throw new TRPCError({ code: "BAD_REQUEST", message: "Il MIME type non corrisponde al contenuto del file." });
+            }
+
+            try {
+                type SharpPipeline = {
+                    rotate: () => SharpPipeline;
+                    resize: (options: { width: number; height: number; fit: "inside"; withoutEnlargement: boolean }) => SharpPipeline;
+                    jpeg: (options: { quality: number }) => SharpPipeline;
+                    png: (options: { compressionLevel: number }) => SharpPipeline;
+                    webp: (options: { quality: number }) => SharpPipeline;
+                    toBuffer: () => Promise<Buffer>;
+                };
+                type SharpFn = (input: Buffer) => SharpPipeline;
+
+                const sharpMod = (await import("sharp")) as unknown as { default?: unknown };
+                const sharpFn = ((sharpMod.default ?? sharpMod) as unknown) as SharpFn;
+                const pipeline = sharpFn(buffer)
+                    .rotate()
+                    .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true });
+
+                if (detected.extension === "jpg") {
+                    buffer = await pipeline.jpeg({ quality: 85 }).toBuffer();
+                } else if (detected.extension === "png") {
+                    buffer = await pipeline.png({ compressionLevel: 9 }).toBuffer();
+                } else {
+                    buffer = await pipeline.webp({ quality: 85 }).toBuffer();
+                }
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                logger.warn(`post upload fallback: image resize failed: ${message}`, {
+                    event: "post:upload_fallback_resize_failed",
+                    userId: ctx.user.id,
+                    message,
+                });
+            }
+
+            const filePath = `posts/${ctx.user.id}/${Date.now()}.${detected.extension}`;
+            const { error } = await admin.storage
+                .from("profile-media")
+                .upload(filePath, buffer, {
+                    contentType: detected.mimeType,
+                    upsert: true,
+                });
+            if (error) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Upload failed: ${error.message}` });
+            }
+
+            const { data } = admin.storage.from("profile-media").getPublicUrl(filePath);
+            const publicUrl = data.publicUrl;
+            return { url: publicUrl };
+        }),
+
     cloudinaryVideoAuth: protectedProcedure
         .input(
             z
