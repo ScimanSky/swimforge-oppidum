@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import { ShareActivityPicker } from "@/components/social/ShareActivityPicker"
 import {
   Dialog,
@@ -35,6 +36,7 @@ import {
 import { Link } from "wouter"
 import { trpc } from "@/lib/trpc"
 import { Skeleton } from "@/components/ui/skeleton"
+import { toast } from "sonner"
 
 const formatDistance = (meters: number) => {
   if (!meters) return "—"
@@ -90,6 +92,21 @@ export default function Activities() {
     refetchOnMount: "always",
   })
   const utils = trpc.useContext()
+  const toggleShareMutation = trpc.community.toggleShare.useMutation({
+    onSuccess: async (_, vars) => {
+      await Promise.all([
+        utils.activities.list.invalidate(),
+        utils.community.feed.invalidate(),
+        utils.community.unsharedActivities.invalidate(),
+      ])
+      toast.success(
+        vars.share ? "Attività condivisa nel feed." : "Condivisione attività disattivata."
+      )
+    },
+    onError: (error) => {
+      toast.error(error.message || "Impossibile aggiornare la condivisione.")
+    },
+  })
 
   const activities = activitiesQuery.data ?? []
 
@@ -319,19 +336,33 @@ export default function Activities() {
                               </div>
 
                               <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-                                {activity.shareToFeed ? (
-                                  <Badge variant="outline" className="bg-background/60">
-                                    Condivisa nel feed
-                                  </Badge>
-                                ) : (
+                                <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/60 px-3 py-1.5">
+                                  <Switch
+                                    checked={Boolean(activity.shareToFeed)}
+                                    disabled={toggleShareMutation.isPending}
+                                    onCheckedChange={(checked) => {
+                                      toggleShareMutation.mutate({
+                                        activityId: activity.id,
+                                        share: checked,
+                                      })
+                                    }}
+                                  />
+                                  <span className="text-xs text-foreground">Condividi nel feed</span>
+                                </div>
+                                {!activity.shareToFeed && (
                                   <Button
                                     type="button"
                                     size="sm"
                                     variant="neon"
                                     onClick={() => openShareForActivity(activity.id)}
                                   >
-                                    Condividi nel feed
+                                    Condividi con commento/media
                                   </Button>
+                                )}
+                                {activity.shareToFeed && (
+                                  <Badge variant="outline" className="bg-background/60">
+                                    Condivisa nel feed
+                                  </Badge>
                                 )}
                               </div>
                             </div>
