@@ -376,8 +376,12 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
           <div
             className="absolute bottom-4 left-1/2 z-20 w-[calc(100vw-1rem)] max-w-[640px] -translate-x-1/2 px-1"
             onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onTouchMove={(e) => e.stopPropagation()}
+            onTouchEnd={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap rounded-full bg-black/55 px-2 py-1 backdrop-blur-sm scrollbar-hide">
+            <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap rounded-full bg-black/55 px-2 py-1 backdrop-blur-sm scrollbar-hide touch-pan-x overscroll-x-contain">
               {visibleReactionChoices.map((choice) => {
                 const isActive = reactionSummary.userReaction === choice.type
                 const count = reactionSummary.counts[choice.type] ?? 0
