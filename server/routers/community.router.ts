@@ -13,6 +13,7 @@ import type { ClubEventInsert, ClubAnnouncementInsert } from "./_shared";
 import { createHash } from "crypto";
 import { ENV } from "../_core/env";
 import { socialPosts } from "../../drizzle/schema";
+import { getCloudinaryCreditUsage } from "../lib/cloudinary";
 
 const CLUB_STAFF_ROLES = new Set(["owner", "admin", "moderator"]);
 const REACTION_TYPES = ["splash", "fire", "strong", "clap", "wave", "love", "rocket", "wow", "laugh", "cry"] as const;
@@ -564,6 +565,21 @@ export const communityRouter = router({
                 folder = `clubs/${input.clubId}/${ctx.user.id}`;
             }
 
+            const usage = await getCloudinaryCreditUsage();
+            if (usage && usage.percentUsed >= ENV.cloudinaryVideoCreditBlockPercent) {
+                throw new TRPCError({
+                    code: "PRECONDITION_FAILED",
+                    message: `Upload video temporaneamente bloccato: quota Cloudinary al ${usage.percentUsed.toFixed(
+                        1
+                    )}% (${usage.used}/${usage.limit} crediti).`,
+                });
+            }
+
+            const warning =
+                usage && usage.percentUsed >= ENV.cloudinaryVideoCreditWarnPercent
+                    ? `Attenzione: quota Cloudinary al ${usage.percentUsed.toFixed(1)}% (${usage.used}/${usage.limit} crediti).`
+                    : null;
+
             const timestamp = Math.floor(Date.now() / 1000);
             const signature = buildCloudinarySignature(
                 {
@@ -579,7 +595,22 @@ export const communityRouter = router({
                 timestamp,
                 signature,
                 folder,
+                warning,
+                creditUsage: usage,
             } as const;
+        }),
+
+    cloudinaryVideoUsage: protectedProcedure
+        .query(async () => {
+            const usage = await getCloudinaryCreditUsage();
+            if (!usage) return null;
+            return {
+                ...usage,
+                warnThreshold: ENV.cloudinaryVideoCreditWarnPercent,
+                blockThreshold: ENV.cloudinaryVideoCreditBlockPercent,
+                isWarning: usage.percentUsed >= ENV.cloudinaryVideoCreditWarnPercent,
+                isBlocked: usage.percentUsed >= ENV.cloudinaryVideoCreditBlockPercent,
+            };
         }),
 
     unsharedActivities: protectedProcedure

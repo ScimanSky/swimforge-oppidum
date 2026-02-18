@@ -53,6 +53,8 @@ export const ENV = {
   cloudinaryCloudName: process.env.CLOUDINARY_CLOUD_NAME ?? "",
   cloudinaryApiKey: process.env.CLOUDINARY_API_KEY ?? "",
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET ?? "",
+  cloudinaryVideoCreditWarnPercent: parseIntEnv("CLOUDINARY_VIDEO_CREDIT_WARN_PERCENT", 80, { min: 1, max: 100 }),
+  cloudinaryVideoCreditBlockPercent: parseIntEnv("CLOUDINARY_VIDEO_CREDIT_BLOCK_PERCENT", 95, { min: 1, max: 100 }),
   sessionMaxAgeDays,
   sessionMaxAgeMs: sessionMaxAgeDays * 24 * 60 * 60 * 1000,
 };

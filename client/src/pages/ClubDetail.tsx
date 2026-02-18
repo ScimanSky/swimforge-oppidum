@@ -385,6 +385,9 @@ export default function ClubDetail() {
 
   const uploadClubVideoToCloudinary = async (file: File): Promise<{ url: string }> => {
     const auth = await cloudinaryVideoAuth.mutateAsync({ scope: "clubs", clubId });
+    if (auth.warning) {
+      toast.warning(auth.warning);
+    }
     const uploaded = await uploadVideoToCloudinary(file, auth, {
       fileNamePrefix: `club-${clubId}-video`,
       tags: `club,club-${clubId},swimforge,video`,

@@ -200,6 +200,9 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
 
   const uploadStoryVideoToCloudinary = async (file: File) => {
     const auth = await cloudinaryVideoAuth.mutateAsync({ scope: "stories" })
+    if (auth.warning) {
+      toast.warning(auth.warning)
+    }
     return uploadVideoToCloudinary(file, auth, {
       fileNamePrefix: "story-video",
       tags: "story,swimforge,video",

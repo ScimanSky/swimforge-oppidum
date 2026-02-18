@@ -285,6 +285,9 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
   const uploadMedia = async (file: File, kind: PostMediaKind) => {
     if (kind === "video") {
       const auth = await cloudinaryVideoAuth.mutateAsync({ scope: "posts" });
+      if (auth.warning) {
+        toast.warning(auth.warning);
+      }
       const uploaded = await uploadVideoToCloudinary(file, auth, {
         fileNamePrefix: "club-post-video",
         tags: `club-post,club-${clubId},swimforge,video`,

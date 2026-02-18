@@ -220,6 +220,9 @@ export function ShareActivityPicker({
   const uploadMedia = async (file: File, kind: PostMediaKind) => {
     if (kind === "video") {
       const auth = await cloudinaryVideoAuth.mutateAsync({ scope: "posts" })
+      if (auth.warning) {
+        toast.warning(auth.warning)
+      }
       const uploaded = await uploadVideoToCloudinary(file, auth, {
         fileNamePrefix: "activity-post-video",
         tags: "activity,post,swimforge,video",
