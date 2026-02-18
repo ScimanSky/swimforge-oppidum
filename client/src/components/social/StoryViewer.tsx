@@ -374,10 +374,10 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
         {/* Reactions */}
         {showReactions && (
           <div
-            className="absolute bottom-4 left-1/2 z-20 -translate-x-1/2"
+            className="absolute bottom-4 left-1/2 z-20 w-[calc(100vw-1rem)] max-w-[640px] -translate-x-1/2 px-1"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 backdrop-blur-sm">
+            <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap rounded-full bg-black/55 px-2 py-1 backdrop-blur-sm scrollbar-hide">
               {visibleReactionChoices.map((choice) => {
                 const isActive = reactionSummary.userReaction === choice.type
                 const count = reactionSummary.counts[choice.type] ?? 0
@@ -385,7 +385,7 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
                   <motion.button
                     key={choice.type}
                     type="button"
-                    className={`flex items-center gap-1 rounded-full px-2 py-1 text-sm transition ${
+                    className={`shrink-0 flex items-center gap-1 rounded-full px-2 py-1 text-sm transition ${
                       isActive ? "bg-white/25" : "hover:bg-white/15"
                     }`}
                     whileHover={{ scale: 1.08, y: -1 }}
@@ -410,7 +410,7 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
                 )
               })}
               {reactionSummary.total > 0 && (
-                <span className="ml-1 text-xs text-white/80">{reactionSummary.total}</span>
+                <span className="ml-1 shrink-0 text-xs text-white/80">{reactionSummary.total}</span>
               )}
             </div>
           </div>
