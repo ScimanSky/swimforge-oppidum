@@ -69,26 +69,49 @@ export default function FeedPostMetrics({
   swolf,
 }: FeedPostMetricsProps) {
   const metrics: Metric[] = []
+  const distanceValue = Number(distanceMeters ?? 0)
+  const durationValue = Number(durationSeconds ?? 0)
+  const caloriesValue = Number(calories ?? 0)
+  const heartRateValue = Number(heartRate ?? 0)
+  const swolfValue = Number(swolf ?? 0)
 
-  const distance = formatDistance(distanceMeters)
-  if (distance) metrics.push({ icon: Ruler, label: "Distanza", value: distance, color: "cyan" })
-
-  const duration = formatDuration(durationSeconds)
-  if (duration) metrics.push({ icon: Clock, label: "Durata", value: duration, color: "emerald" })
-
-  const pace = formatPace(distanceMeters, durationSeconds)
-  if (pace) metrics.push({ icon: Gauge, label: "Pace", value: pace, color: "amber" })
-
-  if (calories && calories > 0) {
-    metrics.push({ icon: Flame, label: "Calorie", value: `${calories} kcal`, color: "rose" })
+  if (distanceValue > 0) {
+    metrics.push({
+      icon: Ruler,
+      label: "Distanza",
+      value: formatDistance(distanceMeters),
+      color: "cyan",
+    })
   }
 
-  if (heartRate && heartRate > 0) {
-    metrics.push({ icon: Heart, label: "HR media", value: `${heartRate} bpm`, color: "sky" })
+  if (durationValue > 0) {
+    metrics.push({
+      icon: Clock,
+      label: "Durata",
+      value: formatDuration(durationSeconds),
+      color: "emerald",
+    })
   }
 
-  if (swolf && swolf > 0) {
-    metrics.push({ icon: Activity, label: "SWOLF", value: `${swolf}`, color: "violet" })
+  if (distanceValue > 0 && durationValue > 0) {
+    metrics.push({
+      icon: Gauge,
+      label: "Pace",
+      value: formatPace(distanceMeters, durationSeconds),
+      color: "amber",
+    })
+  }
+
+  if (caloriesValue > 0) {
+    metrics.push({ icon: Flame, label: "Calorie", value: `${caloriesValue} kcal`, color: "rose" })
+  }
+
+  if (heartRateValue > 0) {
+    metrics.push({ icon: Heart, label: "HR media", value: `${heartRateValue} bpm`, color: "sky" })
+  }
+
+  if (swolfValue > 0) {
+    metrics.push({ icon: Activity, label: "SWOLF", value: `${swolfValue}`, color: "violet" })
   }
 
   if (metrics.length === 0) return null
