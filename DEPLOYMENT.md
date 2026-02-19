@@ -93,6 +93,10 @@ pnpm db:migrate
 
 For production, run migrations against production `DATABASE_URL` from a trusted environment.
 
+Important:
+- Use only the canonical Drizzle migration chain under `drizzle/`.
+- Do not execute scripts from `db/legacy-sql/` unless you are performing a controlled recovery/backfill task.
+
 ## 6. Post-Deploy Smoke Checks
 1. `GET /health` and `GET /ready`
 2. Login and open Dashboard

@@ -42,6 +42,10 @@ pnpm db:generate
 pnpm db:migrate
 ```
 
+Migration policy:
+- Canonical migration chain: `drizzle/0000_*.sql` ... `drizzle/00xx_*.sql`
+- Legacy/manual SQL scripts are archived in `db/legacy-sql/` and are **not** part of the default migrate flow.
+
 Optional demo seed:
 - `docs/sample-data/seed.sql`
 
