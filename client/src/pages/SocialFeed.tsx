@@ -207,7 +207,7 @@ export default function SocialFeed() {
           <div className="w-full min-w-0 max-w-2xl">
             <div
               data-tour="feed-tabs"
-              className="sticky top-[4.35rem] z-20 mb-4 rounded-2xl border border-border/45 bg-background/88 px-2 py-2 backdrop-blur-xl shadow-[0_10px_24px_color-mix(in_oklch,var(--foreground)_12%,transparent)]"
+              className="sticky top-16 z-20 mb-4 rounded-2xl border border-border/45 bg-background/88 px-2 py-2 backdrop-blur-xl shadow-[0_10px_24px_color-mix(in_oklch,var(--foreground)_12%,transparent)]"
             >
               {firstPageQuery.isFetching && !isInitialLoading && (
                 <div className="flex justify-center py-1">
