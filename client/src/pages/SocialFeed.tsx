@@ -15,6 +15,7 @@ import FollowStarterCard from "@/components/social/FollowStarterCard"
 import { Button } from "@/components/ui/button"
 import { Waves, Users, RefreshCw, Loader2 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
+import { buildDisplayStoryGroups, findStoryGroupIndex } from "@/lib/social-feed-stories"
 
 function EmptyFeedPerTe({ onCreatePost }: { onCreatePost: () => void }) {
   return (
@@ -84,39 +85,23 @@ export default function SocialFeed() {
   })
 
   const allGroups = storyGroups ?? []
-  const currentUserGroup = currentUserId
-    ? allGroups.find((g: any) => Number(g.userId) === Number(currentUserId))
-    : undefined
   const displayName = profile?.username || profile?.userId?.toString() || "Nuotatore"
-  const otherStoryGroups = allGroups
-    .filter((g: any) => Number(g.userId) !== Number(currentUserId))
-    .sort((a, b) => {
-      const aU = a.stories.some((s: any) => !s.hasViewed)
-      const bU = b.stories.some((s: any) => !s.hasViewed)
-      return aU === bU ? 0 : aU ? -1 : 1
-    })
   const displayStoryGroups = useMemo(() => {
-    if (!currentUserId) return otherStoryGroups
-    if (currentUserGroup) return [currentUserGroup, ...otherStoryGroups]
-    return [
-      {
-        userId: Number(currentUserId),
-        userName: displayName,
-        userAvatar: profile?.avatarUrl ?? null,
-        stories: [],
-      },
-      ...otherStoryGroups,
-    ]
-  }, [currentUserGroup, currentUserId, displayName, otherStoryGroups, profile?.avatarUrl])
+    return buildDisplayStoryGroups({
+      allGroups: allGroups as any,
+      currentUserId: currentUserId ?? null,
+      displayName,
+      avatarUrl: profile?.avatarUrl ?? null,
+    })
+  }, [allGroups, currentUserId, displayName, profile?.avatarUrl])
 
   const handleViewStory = useCallback((userId: number) => {
-    const groups = storyGroups ?? []
-    const idx = groups.findIndex((g: any) => Number(g.userId) === Number(userId))
+    const idx = findStoryGroupIndex(displayStoryGroups as any, userId)
     if (idx >= 0) {
       setStoryViewerGroupIdx(idx)
       setStoryViewerOpen(true)
     }
-  }, [storyGroups])
+  }, [displayStoryGroups])
 
   const handleCreateStory = useCallback(() => {
     setStoryCreatorOpen(true)
@@ -294,9 +279,9 @@ export default function SocialFeed() {
       </div>
 
       {/* Story Viewer */}
-      {storyViewerOpen && storyGroups && storyGroups.length > 0 && (
+      {storyViewerOpen && displayStoryGroups.length > 0 && (
         <StoryViewer
-          groups={storyGroups as any}
+          groups={displayStoryGroups as any}
           initialGroupIndex={storyViewerGroupIdx}
           onClose={() => setStoryViewerOpen(false)}
         />
