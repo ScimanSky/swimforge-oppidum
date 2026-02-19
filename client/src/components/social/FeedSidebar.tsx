@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Link } from "wouter"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Bot, UserCheck, UserPlus, Users, Waves } from "lucide-react"
+import { UserCheck, UserPlus } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
 import { getInitials } from "@/lib/format"
@@ -72,32 +72,6 @@ export default function FeedSidebar() {
 
   return (
     <div className="space-y-4">
-      <div className="surface-panel p-4">
-        <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          Azioni rapide
-        </h3>
-        <div className="space-y-2">
-          <Button variant="outline-neon" className="h-11 w-full justify-start gap-2 text-xs" asChild>
-            <Link href="/track">
-              <Waves className="size-4" />
-              Traccia attività
-            </Link>
-          </Button>
-          <Button variant="outline-neon" className="h-11 w-full justify-start gap-2 text-xs" asChild>
-            <Link href="/coach">
-              <Bot className="size-4" />
-              Apri Coach AI
-            </Link>
-          </Button>
-          <Button variant="outline-neon" className="h-11 w-full justify-start gap-2 text-xs" asChild>
-            <Link href="/home/community">
-              <Users className="size-4" />
-              Scopri club
-            </Link>
-          </Button>
-        </div>
-      </div>
-
       <div className="surface-panel p-4">
         <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
           Suggeriti per te
