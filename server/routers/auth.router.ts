@@ -2,9 +2,10 @@ import {
     publicProcedure, protectedProcedure, router, z, db,
     TRPCError, sdk, verifySupabaseAccessToken,
     loginLimiter, registrationLimiter,
-    COOKIE_NAME, getSessionCookieOptions,
+    COOKIE_NAME, getSessionCookieOptions, issueCsrfCookie,
     applyRateLimit, sql,
 } from "./_shared";
+import { CSRF_COOKIE_NAME } from "@shared/const";
 import { getSupabaseAdminClient } from "../_core/supabase_admin";
 import { sendAccountDeletionConfirmationEmail } from "../_core/email";
 import { ENV } from "../_core/env";
@@ -57,6 +58,7 @@ export const authRouter = router({
 
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
+            issueCsrfCookie(ctx.req, ctx.res);
 
             await ensureRequiredLegalConsents(result.user.id, ctx.req);
 
@@ -89,6 +91,7 @@ export const authRouter = router({
 
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
+            issueCsrfCookie(ctx.req, ctx.res);
             await ensureRequiredLegalConsents(result.user.id, ctx.req);
 
             return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
@@ -104,6 +107,7 @@ export const authRouter = router({
         }
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.clearCookie(COOKIE_NAME, cookieOptions);
+        ctx.res.clearCookie(CSRF_COOKIE_NAME, { ...cookieOptions, httpOnly: false });
         return { success: true } as const;
     }),
 
@@ -196,6 +200,7 @@ export const authRouter = router({
 
             const cookieOptions = getSessionCookieOptions(ctx.req);
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
+            issueCsrfCookie(ctx.req, ctx.res);
             await ensureRequiredLegalConsents(user.id, ctx.req);
             return { success: true, isNewUser, user: { id: user.id, email: user.email, name: user.name } };
         }),

@@ -620,64 +620,79 @@ export async function acceptClubInvite(userId: number, code: string) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const inviteResult = await db
-    .select()
-    .from(communityClubInvites)
-    .where(eq(communityClubInvites.code, code))
-    .limit(1);
+  return db.transaction(async (tx) => {
+    const inviteResult = await tx.execute(sql`
+      SELECT id, club_id, role, status, max_uses, used_count, expires_at
+      FROM community_club_invites
+      WHERE code = ${code}
+      LIMIT 1
+      FOR UPDATE
+    `);
 
-  const invite = inviteResult[0];
-  if (!invite) throw new Error("Invite not found");
+    const invite = inviteResult.rows[0] as
+      | {
+          id: number;
+          club_id: number;
+          role: "member" | "moderator" | null;
+          status: string;
+          max_uses: number;
+          used_count: number;
+          expires_at: Date | null;
+        }
+      | undefined;
 
-  if (invite.status !== "active") {
-    throw new Error("Invite inactive");
-  }
-  if (invite.expiresAt && invite.expiresAt.getTime() < Date.now()) {
-    throw new Error("Invite expired");
-  }
-  if (invite.usedCount >= invite.maxUses) {
-    throw new Error("Invite exhausted");
-  }
+    if (!invite) throw new Error("Invite not found");
+    if (invite.status !== "active") throw new Error("Invite inactive");
+    if (invite.expires_at && invite.expires_at.getTime() < Date.now()) throw new Error("Invite expired");
+    if (invite.used_count >= invite.max_uses) throw new Error("Invite exhausted");
 
-  const existing = await db
-    .select({
-      id: communityClubMembers.id,
-      status: communityClubMembers.status,
-      role: communityClubMembers.role,
-    })
-    .from(communityClubMembers)
-    .where(and(eq(communityClubMembers.clubId, invite.clubId), eq(communityClubMembers.userId, userId)))
-    .limit(1);
+    const existing = await tx
+      .select({
+        id: communityClubMembers.id,
+        status: communityClubMembers.status,
+        role: communityClubMembers.role,
+      })
+      .from(communityClubMembers)
+      .where(and(eq(communityClubMembers.clubId, invite.club_id), eq(communityClubMembers.userId, userId)))
+      .limit(1);
 
-  if (existing.length && existing[0].status === "banned") {
-    throw new Error("Banned");
-  }
+    if (existing.length && existing[0].status === "banned") {
+      throw new Error("Banned");
+    }
 
-  if (!existing.length) {
-    await db.insert(communityClubMembers).values({
-      clubId: invite.clubId,
-      userId,
-      role: invite.role ?? "member",
-      status: "active",
-      joinedAt: new Date(),
-    });
-  } else {
-    const nextRole =
-      existing[0].role && existing[0].role !== "member"
-        ? existing[0].role
-        : (invite.role ?? existing[0].role ?? "member");
-    await db
-      .update(communityClubMembers)
-      .set({ status: "active", role: nextRole, joinedAt: new Date() })
-      .where(eq(communityClubMembers.id, existing[0].id));
-  }
+    if (!existing.length) {
+      await tx.insert(communityClubMembers).values({
+        clubId: invite.club_id,
+        userId,
+        role: invite.role ?? "member",
+        status: "active",
+        joinedAt: new Date(),
+      });
+    } else {
+      const nextRole =
+        existing[0].role && existing[0].role !== "member"
+          ? existing[0].role
+          : (invite.role ?? existing[0].role ?? "member");
+      await tx
+        .update(communityClubMembers)
+        .set({ status: "active", role: nextRole, joinedAt: new Date() })
+        .where(eq(communityClubMembers.id, existing[0].id));
+    }
 
-  await db
-    .update(communityClubInvites)
-    .set({ usedCount: invite.usedCount + 1 })
-    .where(eq(communityClubInvites.id, invite.id));
+    const consumeInvite = await tx.execute(sql`
+      UPDATE community_club_invites
+      SET used_count = used_count + 1
+      WHERE id = ${invite.id}
+        AND used_count < max_uses
+      RETURNING club_id
+    `);
 
-  return { joined: true, clubId: invite.clubId };
+    if (!consumeInvite.rows.length) {
+      throw new Error("Invite exhausted");
+    }
+
+    return { joined: true, clubId: invite.club_id };
+  });
 }
 
 export async function updateClub(userId: number, clubId: number, input: { name?: string; description?: string | null; coverImageUrl?: string | null; websiteUrl?: string | null; visibility?: "public" | "private" | "invite"; rules?: string | null; themeColor?: string; logoUrl?: string | null; tagline?: string | null }) {

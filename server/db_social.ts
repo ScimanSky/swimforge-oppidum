@@ -527,18 +527,25 @@ export async function toggleSplash(userId: number, postId: number) {
     throw new Error("Cannot splash your own post");
   }
 
-  const existing = await db
-    .select({ id: socialSplashes.id })
-    .from(socialSplashes)
+  const removed = await db
+    .delete(socialSplashes)
     .where(and(eq(socialSplashes.postId, postId), eq(socialSplashes.userId, userId)))
-    .limit(1);
+    .returning({ id: socialSplashes.id });
 
-  if (existing.length) {
-    await db.delete(socialSplashes).where(eq(socialSplashes.id, existing[0].id));
+  if (removed.length) {
     return { splashed: false };
   }
 
-  await db.insert(socialSplashes).values({ postId, userId, createdAt: new Date() });
+  const inserted = await db
+    .insert(socialSplashes)
+    .values({ postId, userId, createdAt: new Date() })
+    .onConflictDoNothing()
+    .returning({ id: socialSplashes.id });
+
+  if (!inserted.length) {
+    // Another concurrent request inserted the splash first.
+    return { splashed: true };
+  }
 
   // Notification for post owner (only on create)
   if (ownerId && ownerId !== userId) {

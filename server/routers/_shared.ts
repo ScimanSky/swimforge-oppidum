@@ -3,6 +3,7 @@
 
 export { COOKIE_NAME } from "@shared/const";
 export { getSessionCookieOptions } from "../_core/cookies";
+export { issueCsrfCookie } from "../_core/cookies";
 export { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 export { sdk } from "../_core/sdk";
 export { z } from "zod";

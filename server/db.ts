@@ -115,38 +115,40 @@ export async function registerUser(email: string, password: string, name?: strin
   }
 
   try {
-    // Check if user already exists
-    const existing = await db.select().from(users).where(eq(users.email, email)).limit(1);
-    if (existing.length > 0) {
-      return { success: false, error: "Email already registered" };
-    }
-
-    // Hash password
+    // Hash password before transaction to keep lock time short.
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Create user
-    const result = await db.insert(users).values({
-      email,
-      passwordHash,
-      name: name || email.split('@')[0],
-      loginMethod: 'email',
-      lastSignedIn: new Date(),
-    }).returning();
+    const user = await db.transaction(async (tx) => {
+      const existing = await tx.select().from(users).where(eq(users.email, email)).limit(1);
+      if (existing.length > 0) {
+        throw new Error("Email already registered");
+      }
 
-    if (result.length === 0) {
-      return { success: false, error: "Failed to create user" };
-    }
+      const result = await tx.insert(users).values({
+        email,
+        passwordHash,
+        name: name || email.split('@')[0],
+        loginMethod: 'email',
+        lastSignedIn: new Date(),
+      }).returning();
 
-    const user = result[0];
+      if (result.length === 0) {
+        throw new Error("Failed to create user");
+      }
 
-    // Create swimmer profile
-    await db.insert(swimmerProfiles).values({ userId: user.id });
+      const createdUser = result[0];
+      await tx.insert(swimmerProfiles).values({ userId: createdUser.id });
+      return createdUser;
+    });
 
-    // Assign initial profile badge (Novizio - level 1)
+    // Best-effort badge assignment after successful transactional user creation.
     await updateUserProfileBadge(user.id, 0);
 
     return { success: true, user };
   } catch (error) {
+    if (error instanceof Error && error.message === "Email already registered") {
+      return { success: false, error: "Email already registered" };
+    }
     const { kind, message } = classifyAsyncError(error);
     logger.error(`[Database] Failed to register user (${kind}): ${message}`, {
       event: "auth:register_failed",
@@ -239,50 +241,50 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
 
   try {
-    const values: InsertUser = { email: user.email || '' };
-    const updateSet: Record<string, unknown> = {};
+    await db.transaction(async (tx) => {
+      const values: InsertUser = { email: user.email || '' };
+      const updateSet: Record<string, unknown> = {};
 
-    if (user.openId) values.openId = user.openId;
-    if (user.name) {
-      values.name = user.name;
-      updateSet.name = user.name;
-    }
-    if (user.loginMethod) {
-      values.loginMethod = user.loginMethod;
-      updateSet.loginMethod = user.loginMethod;
-    }
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    }
-
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
-    }
-
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
-
-    // PostgreSQL upsert using ON CONFLICT on email
-    await db.insert(users).values(values).onConflictDoUpdate({
-      target: users.email,
-      set: updateSet
-    });
-    
-    // Create swimmer profile if not exists
-    const existingUser = await db.select().from(users).where(eq(users.email, user.email || '')).limit(1);
-    if (existingUser.length > 0) {
-      const userId = existingUser[0].id;
-      const existingProfile = await db.select().from(swimmerProfiles).where(eq(swimmerProfiles.userId, userId)).limit(1);
-      if (existingProfile.length === 0) {
-        await db.insert(swimmerProfiles).values({ userId });
+      if (user.openId) values.openId = user.openId;
+      if (user.name) {
+        values.name = user.name;
+        updateSet.name = user.name;
       }
-    }
+      if (user.loginMethod) {
+        values.loginMethod = user.loginMethod;
+        updateSet.loginMethod = user.loginMethod;
+      }
+      if (user.lastSignedIn !== undefined) {
+        values.lastSignedIn = user.lastSignedIn;
+        updateSet.lastSignedIn = user.lastSignedIn;
+      }
+      if (user.role !== undefined) {
+        values.role = user.role;
+        updateSet.role = user.role;
+      }
+
+      if (!values.lastSignedIn) {
+        values.lastSignedIn = new Date();
+      }
+
+      if (Object.keys(updateSet).length === 0) {
+        updateSet.lastSignedIn = new Date();
+      }
+
+      const upserted = await tx.insert(users).values(values).onConflictDoUpdate({
+        target: users.email,
+        set: updateSet,
+      }).returning({ id: users.id });
+
+      const userId = upserted[0]?.id;
+      if (!userId) {
+        throw new Error("Failed to upsert user");
+      }
+
+      await tx.insert(swimmerProfiles).values({ userId }).onConflictDoNothing({
+        target: swimmerProfiles.userId,
+      });
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`[Database] Failed to upsert user: ${message}`, {
@@ -791,26 +793,25 @@ export async function createOAuthUser(data: {
   }
 
   try {
-    // Create user without password
-    const result = await db.insert(users).values({
-      email: data.email,
-      name: data.name || data.email.split('@')[0],
-      openId: data.supabaseId,
-      loginMethod: data.loginMethod,
-      lastSignedIn: new Date(),
-      passwordHash: null, // OAuth users don't have passwords
-    }).returning();
+    const user = await db.transaction(async (tx) => {
+      const result = await tx.insert(users).values({
+        email: data.email,
+        name: data.name || data.email.split('@')[0],
+        openId: data.supabaseId,
+        loginMethod: data.loginMethod,
+        lastSignedIn: new Date(),
+        passwordHash: null, // OAuth users don't have passwords
+      }).returning();
 
-    if (result.length === 0) {
-      return { success: false, error: "Failed to create OAuth user" };
-    }
+      if (result.length === 0) {
+        throw new Error("Failed to create OAuth user");
+      }
 
-    const user = result[0];
+      const createdUser = result[0];
+      await tx.insert(swimmerProfiles).values({ userId: createdUser.id });
+      return createdUser;
+    });
 
-    // Create swimmer profile
-    await db.insert(swimmerProfiles).values({ userId: user.id });
-
-    // Assign initial profile badge (Novizio - level 1)
     await updateUserProfileBadge(user.id, 0);
 
     return { success: true, user };
