@@ -1,5 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ClubHero from "./ClubHero";
 
@@ -9,7 +10,11 @@ vi.mock("framer-motion", () => ({
   },
 }));
 
-const baseClub = {
+type ClubHeroProps = ComponentProps<typeof ClubHero>;
+type ClubHeroClub = ClubHeroProps["club"];
+type ClubHeroOverrideProps = Partial<Omit<ClubHeroProps, "club" | "onOpenMembers" | "onOpenSettings" | "onJoin" | "onLeave">>;
+
+const baseClub: ClubHeroClub = {
   id: 1,
   name: "Swim Masters",
   description: "Club description",
@@ -25,7 +30,7 @@ const baseClub = {
   owner_id: 5,
 };
 
-function renderClubHero(overrideClub: Partial<typeof baseClub> = {}, overrideProps: Record<string, unknown> = {}) {
+function renderClubHero(overrideClub: Partial<ClubHeroClub> = {}, overrideProps: ClubHeroOverrideProps = {}) {
   const onOpenMembers = vi.fn();
   const onOpenSettings = vi.fn();
   const onJoin = vi.fn();
