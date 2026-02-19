@@ -18,7 +18,7 @@ import {
   Moon,
 } from "lucide-react";
 import { Link } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const features = [
   {
@@ -73,6 +73,14 @@ const stats = [
   { value: "∞", label: "XP", description: "da guadagnare" },
 ];
 
+const TOUR_VIDEO_SRC = "/videos/swimforge-tour.mp4";
+const tourFrames = [
+  "/images/community_feed_mockup.png",
+  "/images/ai_insights_data.webp",
+  "/images/community_clubs.png",
+  "/images/detailed_stats_graph.webp",
+];
+
 function FeatureCard({
   icon,
   title,
@@ -88,16 +96,16 @@ function FeatureCard({
 }) {
   const Icon = icon;
   return (
-    <Surface className="relative overflow-hidden border-border/50 bg-card/50 backdrop-blur transition-all hover:border-primary/30 hover:shadow-md">
+    <Surface className="relative overflow-hidden border-border/50 bg-card/65 backdrop-blur transition-all hover:border-primary/30 hover:shadow-md">
       {backgroundImageSrc && (
         <div aria-hidden className="pointer-events-none absolute inset-0">
           <img
             src={backgroundImageSrc}
             alt=""
-            className="h-full w-full object-cover opacity-15"
+            className="h-full w-full object-cover opacity-35"
             loading="lazy"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-background/40 via-background/70 to-background/90" />
+          <div className="absolute inset-0 bg-gradient-to-br from-background/24 via-background/56 to-background/78" />
         </div>
       )}
       <SurfaceContent className="relative pt-6">
@@ -119,6 +127,8 @@ function FeatureCard({
 export default function Home() {
   const { theme, toggleTheme, switchable } = useTheme();
   const { isAuthenticated, loading } = useAuth();
+  const [hasTourVideo, setHasTourVideo] = useState(true);
+  const [tourIndex, setTourIndex] = useState(0);
 
   useEffect(() => {
     if (loading) return;
@@ -126,13 +136,21 @@ export default function Home() {
     window.location.href = "/home";
   }, [isAuthenticated, loading]);
 
+  useEffect(() => {
+    if (hasTourVideo) return;
+    const interval = window.setInterval(() => {
+      setTourIndex((prev) => (prev + 1) % tourFrames.length);
+    }, 2600);
+    return () => window.clearInterval(interval);
+  }, [hasTourVideo]);
+
   if (loading || isAuthenticated) {
     return <div className="min-h-screen bg-background" />;
   }
 
   return (
-    <div className="min-h-screen bg-background dark:bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.16),_rgba(15,23,42,0.9)_45%,_rgba(2,6,23,1)_100%)]">
-      <header className="fixed left-0 right-0 top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-lg">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_12%_8%,color-mix(in_oklch,var(--electric-cyan)_22%,transparent),transparent_44%),radial-gradient(circle_at_88%_14%,color-mix(in_oklch,var(--electric-lime)_18%,transparent),transparent_52%),linear-gradient(to_bottom,var(--background),color-mix(in_oklch,var(--background)_82%,white_18%))]">
+      <header className="fixed left-0 right-0 top-0 z-50 border-b border-border/40 bg-background/62 backdrop-blur-lg">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
           <div className="flex items-center gap-3">
             <img
@@ -179,38 +197,96 @@ export default function Home() {
       </header>
 
       <section className="relative overflow-hidden pt-16">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/15 via-background to-background" />
-        <div className="relative mx-auto max-w-7xl px-4 py-24 md:px-6 md:py-32 lg:py-40">
-          <div className="mx-auto max-w-3xl text-center">
-            <Badge variant="neon" className="mb-6">
-              Analisi AI • Gamification • Community
-            </Badge>
-            <h1 className="mb-6 text-balance text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
-              <span className="neon-gradient-text">SwimForge</span>
-              <span className="block text-primary">Forgia il tuo percorso</span>
-            </h1>
-            <p className="mb-8 text-pretty text-lg text-muted-foreground md:text-xl">
-              La piattaforma esclusiva per nuotatori di tutte le età. Trasforma
-              ogni allenamento in un&apos;avventura epica, con sincronizzazione
-              Garmin e Strava, XP, badge e analisi avanzate.
-            </p>
-            <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Link
-                href="/signup"
-                className={cn(
-                  buttonVariants({ size: "lg", variant: "neon" }),
-                  "min-h-[48px] w-full sm:w-auto"
-                )}
-              >
-                Inizia l&apos;avventura
-                <ArrowRight className="ml-2 size-4" />
-              </Link>
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,color-mix(in_oklch,var(--electric-cyan)_20%,transparent),transparent_58%)]" />
+        <div className="relative mx-auto max-w-7xl px-4 py-20 md:px-6 md:py-24 lg:py-28">
+          <div className="grid items-center gap-8 lg:grid-cols-[1.06fr_0.94fr]">
+            <div className="text-center lg:text-left">
+              <Badge variant="neon" className="mb-5">
+                Analisi AI • Gamification • Community
+              </Badge>
+              <h1 className="mb-5 text-balance text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
+                <span className="neon-gradient-text">SwimForge</span>
+                <span className="block text-primary">Forgia il tuo percorso</span>
+              </h1>
+              <p className="mb-7 text-pretty text-lg text-muted-foreground md:text-xl">
+                La piattaforma esclusiva per nuotatori di tutte le età. Trasforma
+                ogni allenamento in un&apos;avventura epica, con sincronizzazione
+                Garmin e Strava, XP, badge e analisi avanzate.
+              </p>
+              <div className="flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:justify-start">
+                <Link
+                  href="/signup"
+                  className={cn(
+                    buttonVariants({ size: "lg", variant: "neon" }),
+                    "min-h-[48px] w-full sm:w-auto"
+                  )}
+                >
+                  Inizia l&apos;avventura
+                  <ArrowRight className="ml-2 size-4" />
+                </Link>
+                <Link
+                  href="/login"
+                  className={cn(
+                    buttonVariants({ size: "lg", variant: "outline-neon" }),
+                    "min-h-[48px] w-full sm:w-auto"
+                  )}
+                >
+                  Guarda il tour
+                </Link>
+              </div>
             </div>
+
+            <Surface className="relative overflow-hidden border-border/60 bg-card/76 p-3 shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_12%,transparent)] backdrop-blur">
+              <div className="overflow-hidden rounded-2xl border border-border/50 bg-black/20">
+                <div className="relative aspect-[16/10] w-full">
+                  {hasTourVideo ? (
+                    <video
+                      src={TOUR_VIDEO_SRC}
+                      className="h-full w-full object-cover"
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      onError={() => setHasTourVideo(false)}
+                    />
+                  ) : (
+                    <img
+                      src={tourFrames[tourIndex]}
+                      alt="Tour SwimForge"
+                      className="h-full w-full object-cover transition-opacity duration-500"
+                    />
+                  )}
+                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/58 via-transparent to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-4">
+                    <p className="text-sm font-semibold text-foreground">Tour rapido SwimForge</p>
+                    <p className="text-xs text-muted-foreground">
+                      Feed social, coaching AI, progressi e club in un flusso unico.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between px-1">
+                <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                  {hasTourVideo ? "Video interno" : "Anteprima animata"}
+                </span>
+                <div className="flex items-center gap-1.5">
+                  {tourFrames.map((_, index) => (
+                    <span
+                      key={`tour-dot-${index}`}
+                      className={cn(
+                        "h-1.5 w-1.5 rounded-full bg-border",
+                        !hasTourVideo && index === tourIndex && "bg-[var(--electric-cyan)]"
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+            </Surface>
           </div>
         </div>
       </section>
 
-      <section id="progress" className="border-y border-border bg-card/50 py-16">
+      <section id="progress" className="border-y border-border/60 bg-card/62 py-16">
         <div className="mx-auto max-w-7xl px-4 md:px-6">
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
             {[
@@ -262,21 +338,21 @@ export default function Home() {
       </section>
 
       <section id="cta" className="relative overflow-hidden py-24">
-        <div className="absolute inset-0 opacity-20">
-          <div className="absolute left-0 top-0 size-96 rounded-full bg-primary/20 blur-3xl" />
-          <div className="absolute bottom-0 right-0 size-96 rounded-full bg-accent/20 blur-3xl" />
+        <div className="absolute inset-0 opacity-35">
+          <div className="absolute left-0 top-0 size-96 rounded-full bg-primary/24 blur-3xl" />
+          <div className="absolute bottom-0 right-0 size-96 rounded-full bg-accent/24 blur-3xl" />
         </div>
 
         <div className="relative mx-auto max-w-7xl px-4 md:px-6">
-          <div className="relative grid gap-10 overflow-hidden rounded-3xl border border-border bg-card/60 p-10 backdrop-blur lg:grid-cols-[auto_1fr]">
+          <div className="relative grid gap-10 overflow-hidden rounded-3xl border border-border/60 bg-card/72 p-10 backdrop-blur lg:grid-cols-[auto_1fr]">
             <div aria-hidden className="pointer-events-none absolute inset-0">
               <img
                 src="/images/swimmer_action_hero.webp"
                 alt=""
-                className="h-full w-full object-cover opacity-10"
+                className="h-full w-full object-cover opacity-26"
                 loading="lazy"
               />
-              <div className="absolute inset-0 bg-gradient-to-br from-background/30 via-background/75 to-background/95" />
+              <div className="absolute inset-0 bg-gradient-to-br from-background/18 via-background/52 to-background/76" />
             </div>
             <div className="flex size-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
               <Waves className="size-8" />
