@@ -3,6 +3,7 @@
  */
 
 import { useState, useEffect, useRef } from "react";
+import { Link } from "wouter";
 import { MessageCircle, Send, Search, PenSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,8 @@ interface Message {
   senderId: number;
   receiverId: number;
   content: string;
+  messageType?: string | null;
+  metadata?: unknown;
   isRead: boolean;
   readAt: Date | null;
   createdAt: Date;
@@ -56,6 +59,48 @@ interface Conversation {
 }
 
 type View = "list" | "conversation" | "search";
+
+type ForwardMetadata = {
+  targetType?: "post" | "story";
+  targetId?: number;
+  ownerName?: string | null;
+  previewText?: string | null;
+  previewMediaUrl?: string | null;
+};
+
+function parseForwardMetadata(raw: unknown): ForwardMetadata | null {
+  const source =
+    typeof raw === "string"
+      ? (() => {
+          try {
+            return JSON.parse(raw) as unknown
+          } catch {
+            return null
+          }
+        })()
+      : raw
+  if (!source || typeof source !== "object" || Array.isArray(source)) return null;
+  const data = source as Record<string, unknown>;
+  const targetType = data.targetType === "post" || data.targetType === "story" ? data.targetType : undefined;
+  const targetId = typeof data.targetId === "number" ? data.targetId : Number(data.targetId);
+  const ownerName = typeof data.ownerName === "string" ? data.ownerName : null;
+  const previewText = typeof data.previewText === "string" ? data.previewText : null;
+  const previewMediaUrl = typeof data.previewMediaUrl === "string" ? data.previewMediaUrl : null;
+  if (!targetType || !Number.isFinite(targetId) || targetId <= 0) return null;
+  return {
+    targetType,
+    targetId: Math.trunc(targetId),
+    ownerName,
+    previewText,
+    previewMediaUrl,
+  };
+}
+
+function getConversationPreview(message: Message) {
+  if (message.messageType === "forward_post") return "📩 Post inoltrato"
+  if (message.messageType === "forward_story") return "📩 Story inoltrata"
+  return message.content
+}
 
 export default function DirectMessages({ recipientId, recipientName }: DirectMessagesProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -334,7 +379,7 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
                         )}
                       </div>
                       <p className="text-sm text-muted-foreground truncate">
-                        {conv.lastMessage.content}
+                        {getConversationPreview(conv.lastMessage)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {formatTime(conv.lastMessage.createdAt)}
@@ -395,6 +440,10 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
               )}
               {conversationQuery.data.map((msg) => {
                 const isOwn = msg.message.senderId !== selectedConversation;
+                const forwardMeta = parseForwardMetadata(msg.message.metadata);
+                const isForwarded =
+                  (msg.message.messageType === "forward_post" || msg.message.messageType === "forward_story") &&
+                  !!forwardMeta;
                 return (
                   <div
                     key={msg.message.id}
@@ -407,7 +456,54 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
                           : "bg-muted"
                       }`}
                     >
-                      <p className="text-sm whitespace-pre-wrap">{msg.message.content}</p>
+                      {isForwarded && forwardMeta ? (
+                        <div className="space-y-2">
+                          <div className="rounded-md border border-border/60 bg-background/60 p-2">
+                            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                              {forwardMeta.targetType === "post" ? "Post inoltrato" : "Story inoltrata"}
+                            </p>
+                            <p className="text-sm font-medium">
+                              {forwardMeta.ownerName
+                                ? `${forwardMeta.ownerName}`
+                                : "Contenuto condiviso"}
+                            </p>
+                            {forwardMeta.previewMediaUrl ? (
+                              <img
+                                src={forwardMeta.previewMediaUrl}
+                                alt="Anteprima inoltro"
+                                className="mt-2 h-24 w-full rounded-md object-cover"
+                              />
+                            ) : null}
+                            {forwardMeta.previewText ? (
+                              <p className="mt-2 text-xs text-muted-foreground line-clamp-2">
+                                {forwardMeta.previewText}
+                              </p>
+                            ) : null}
+                            <div className="mt-2">
+                              {forwardMeta.targetType === "post" ? (
+                                <Link
+                                  href={`/post/${forwardMeta.targetId}`}
+                                  className="text-xs font-medium text-[var(--electric-cyan)] hover:underline"
+                                >
+                                  Apri post
+                                </Link>
+                              ) : (
+                                <Link
+                                  href="/home"
+                                  className="text-xs font-medium text-[var(--electric-cyan)] hover:underline"
+                                >
+                                  Apri feed
+                                </Link>
+                              )}
+                            </div>
+                          </div>
+                          {msg.message.content ? (
+                            <p className="text-sm whitespace-pre-wrap">{msg.message.content}</p>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <p className="text-sm whitespace-pre-wrap">{msg.message.content}</p>
+                      )}
                       <p className={`text-xs mt-1 ${isOwn ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
                         {formatTime(msg.message.createdAt)}
                       </p>

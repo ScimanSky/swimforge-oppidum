@@ -122,6 +122,8 @@ const defaultPrivacyState = {
   profilePublic: true,
   activitiesPublic: true,
   showLeaderboards: true,
+  allowPrivateForwards: true,
+  forwardsFollowersOnly: false,
 }
 
 const consentItems = [
@@ -677,12 +679,16 @@ export default function Settings() {
       const profilePublic = coerceBoolean(profile.privacySettings.profilePublic)
       const activitiesPublic = coerceBoolean(profile.privacySettings.activitiesPublic)
       const showLeaderboards = coerceBoolean(profile.privacySettings.showLeaderboards)
+      const allowPrivateForwards = coerceBoolean(profile.privacySettings.allowPrivateForwards)
+      const forwardsFollowersOnly = coerceBoolean(profile.privacySettings.forwardsFollowersOnly)
 
       setPrivacySettings({
         ...defaultPrivacyState,
         ...(profilePublic !== undefined ? { profilePublic } : {}),
         ...(activitiesPublic !== undefined ? { activitiesPublic } : {}),
         ...(showLeaderboards !== undefined ? { showLeaderboards } : {}),
+        ...(allowPrivateForwards !== undefined ? { allowPrivateForwards } : {}),
+        ...(forwardsFollowersOnly !== undefined ? { forwardsFollowersOnly } : {}),
       })
     } else {
       setPrivacySettings(defaultPrivacyState)
@@ -1418,6 +1424,42 @@ export default function Settings() {
                   checked={privacySettings.showLeaderboards}
                   onCheckedChange={(value) => {
                     const next = { ...privacySettings, showLeaderboards: value }
+                    setPrivacySettings(next)
+                    void persistSettings({ privacySettings: next })
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between py-3">
+                <div>
+                  <p className="font-medium text-foreground">Consenti inoltri privati</p>
+                  <p className="text-sm text-muted-foreground">
+                    Permetti che post e stories vengano inoltrati in chat privata
+                  </p>
+                </div>
+                <Switch
+                  checked={privacySettings.allowPrivateForwards}
+                  onCheckedChange={(value) => {
+                    const next = {
+                      ...privacySettings,
+                      allowPrivateForwards: value,
+                    }
+                    setPrivacySettings(next)
+                    void persistSettings({ privacySettings: next })
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between py-3">
+                <div>
+                  <p className="font-medium text-foreground">Inoltri solo ai follower</p>
+                  <p className="text-sm text-muted-foreground">
+                    Limita gli inoltri privati ai soli utenti che ti seguono
+                  </p>
+                </div>
+                <Switch
+                  checked={privacySettings.forwardsFollowersOnly}
+                  disabled={!privacySettings.allowPrivateForwards}
+                  onCheckedChange={(value) => {
+                    const next = { ...privacySettings, forwardsFollowersOnly: value }
                     setPrivacySettings(next)
                     void persistSettings({ privacySettings: next })
                   }}

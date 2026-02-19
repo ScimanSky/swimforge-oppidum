@@ -1,6 +1,8 @@
-import { MessageCircle, Share2 } from "lucide-react"
+import { useState } from "react"
+import { MessageCircle, Send, Share2 } from "lucide-react"
 import { toast } from "sonner"
 import PostReactions from "@/components/PostReactions"
+import { ForwardContentDialog } from "@/components/social/ForwardContentDialog"
 
 interface FeedPostActionsProps {
   post: {
@@ -41,6 +43,7 @@ export default function FeedPostActions({
   commentsOpen,
 }: FeedPostActionsProps) {
   const commentCount = Number(post.comment_count) || 0
+  const [forwardOpen, setForwardOpen] = useState(false)
 
   return (
     <div className="px-4 pb-3 pt-1">
@@ -64,6 +67,15 @@ export default function FeedPostActions({
 
         <button
           type="button"
+          onClick={() => setForwardOpen(true)}
+          className="flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-muted/40 hover:text-foreground active:scale-95"
+        >
+          <Send className="size-[18px]" />
+          <span className="hidden sm:inline">Inoltra</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => handleShare(post.id)}
           className="flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-muted/40 hover:text-foreground active:scale-95"
         >
@@ -75,6 +87,14 @@ export default function FeedPostActions({
           <PostReactions postId={post.id} />
         </div>
       </div>
+      {forwardOpen ? (
+        <ForwardContentDialog
+          open={forwardOpen}
+          onOpenChange={setForwardOpen}
+          targetType="post"
+          targetId={post.id}
+        />
+      ) : null}
     </div>
   )
 }

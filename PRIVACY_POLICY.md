@@ -1,7 +1,7 @@
 # Privacy Policy di SwimForge
 
 **Data di entrata in vigore**: 26 Gennaio 2026  
-**Ultimo aggiornamento**: 26 Gennaio 2026
+**Ultimo aggiornamento**: 19 Febbraio 2026
 
 ---
 
@@ -23,6 +23,7 @@ Quando ti registri e utilizzi SwimForge, potresti fornirci:
 - **Informazioni di profilo**: Nome visualizzato, avatar, biografia
 - **Dati di attività**: Attività di nuoto inserite manualmente (distanza, durata, data, tipo di vasca, stile)
 - **Preferenze**: Impostazioni di notifica, preferenze di visualizzazione
+- **Interazioni social**: Commenti, reazioni, messaggi diretti e inoltri privati di post/story (con nota opzionale)
 
 ### 1.2 Informazioni raccolte automaticamente
 
@@ -75,6 +76,7 @@ Utilizziamo le informazioni raccolte per:
 - Inviare notifiche su nuovi badge, challenge completate, progressi
 - Rispondere alle tue richieste di supporto
 - Inviare aggiornamenti importanti sul Servizio
+- Consentire la messaggistica privata tra utenti e l'inoltro privato di contenuti social
 
 ### 2.4 Sicurezza e conformità
 - Prevenire frodi, abusi e attività illegali
@@ -114,6 +116,14 @@ Le classifiche (leaderboard) mostrano pubblicamente:
 
 **Non condividiamo** email, dati di attività dettagliati o altre informazioni sensibili nelle classifiche.
 
+### 3.5 Inoltri privati di post e stories
+
+Quando inoltri un post o una story in chat privata:
+- Registriamo mittente, destinatario, timestamp, tipo messaggio e metadati minimi del contenuto inoltrato (es. id contenuto, anteprima, autore)
+- L'inoltro viene consentito solo se conforme alle regole privacy dell'autore (es. inoltri consentiti/disabilitati, limitazione ai follower)
+- I destinatari bloccati dalle regole privacy non ricevono l'inoltro
+- Puoi gestire queste impostazioni in **Impostazioni > Privacy**
+
 ---
 
 ## 4. Conservazione dei Dati
@@ -122,6 +132,7 @@ Conserviamo le tue informazioni personali per il tempo necessario a fornirti il 
 
 - **Account attivi**: Conserviamo i dati finché il tuo account è attivo
 - **Account cancellati**: Eliminiamo i dati personali entro **30 giorni** dalla cancellazione dell'account, salvo obblighi legali di conservazione
+- **Messaggi diretti e inoltri privati**: Conservazione operativa con retention automatica lato server (attualmente 60 giorni, salvo configurazioni diverse)
 - **Dati aggregati**: Potremmo conservare dati aggregati e anonimizzati per analisi statistiche
 
 ---

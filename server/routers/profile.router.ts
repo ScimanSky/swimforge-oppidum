@@ -85,6 +85,8 @@ export const profileRouter = router({
                 profilePublic: z.boolean().optional(),
                 activitiesPublic: z.boolean().optional(),
                 showLeaderboards: z.boolean().optional(),
+                allowPrivateForwards: z.boolean().optional(),
+                forwardsFollowersOnly: z.boolean().optional(),
             }).optional(),
         }))
         .mutation(async ({ ctx, input }) => {

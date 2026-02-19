@@ -309,9 +309,20 @@ export async function sendDirectMessage(params: {
   senderId: number
   receiverId: number
   content: string
+  messageType?: "text" | "forward_post" | "forward_story"
+  metadata?: Record<string, unknown> | null
 }) {
   const db = await requireDb()
-  const [message] = await db.insert(directMessages).values(params).returning()
+  const [message] = await db
+    .insert(directMessages)
+    .values({
+      senderId: params.senderId,
+      receiverId: params.receiverId,
+      content: params.content,
+      messageType: params.messageType ?? "text",
+      metadata: params.metadata ?? null,
+    })
+    .returning()
   return message
 }
 

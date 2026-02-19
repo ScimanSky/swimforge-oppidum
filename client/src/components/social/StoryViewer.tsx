@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion } from "framer-motion"
-import { X } from "lucide-react"
+import { Send, X } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { getInitials, formatTimeAgo } from "@/lib/format"
+import { ForwardContentDialog } from "./ForwardContentDialog"
 
 interface Story {
   id: number
@@ -82,6 +83,7 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
   const [groupIdx, setGroupIdx] = useState(initialGroupIndex)
   const [storyIdx, setStoryIdx] = useState(0)
   const [progress, setProgress] = useState(0)
+  const [forwardOpen, setForwardOpen] = useState(false)
   const [reactionStateByStory, setReactionStateByStory] = useState<
     Record<number, { counts: Record<string, number>; userReaction: string | null; total: number }>
   >({})
@@ -319,6 +321,17 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
             type="button"
             onClick={(e) => {
               e.stopPropagation()
+              setForwardOpen(true)
+            }}
+            className="flex size-9 items-center justify-center rounded-full text-white/80 hover:text-white"
+            aria-label="Inoltra story"
+          >
+            <Send className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
               onClose()
             }}
             className="flex size-9 items-center justify-center rounded-full text-white/80 hover:text-white"
@@ -438,6 +451,15 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
             ))}
           </AnimatePresence>
         </div>
+
+        {forwardOpen ? (
+          <ForwardContentDialog
+            open={forwardOpen}
+            onOpenChange={setForwardOpen}
+            targetType="story"
+            targetId={story.id}
+          />
+        ) : null}
       </motion.div>
     </AnimatePresence>,
     document.body,

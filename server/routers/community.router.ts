@@ -7,7 +7,7 @@ import {
     hidePostForUser, unhidePostForUser, reportPost,
     getUserPublicProfile, toggleFollow, getSuggestedUsers, getFollowStarterState, searchUsers,
     awardActionXp,
-    detectImageType, logger,
+    detectImageType, logger, coerceBoolean,
 } from "./_shared";
 import type { ClubEventInsert, ClubAnnouncementInsert } from "./_shared";
 import { createHash } from "crypto";
@@ -222,6 +222,130 @@ async function requirePostReadable(userId: number, postId: number) {
         ownerId: row.user_id,
         clubId: row.club_id,
     };
+}
+
+type ForwardTargetType = "post" | "story";
+
+type ForwardPrivacySettings = {
+    profilePublic: boolean;
+    activitiesPublic: boolean;
+    allowPrivateForwards: boolean;
+    forwardsFollowersOnly: boolean;
+};
+
+const DEFAULT_FORWARD_PRIVACY: ForwardPrivacySettings = {
+    profilePublic: true,
+    activitiesPublic: true,
+    allowPrivateForwards: true,
+    forwardsFollowersOnly: false,
+};
+
+function getForwardPrivacyFlag(raw: unknown, key: keyof ForwardPrivacySettings, fallback: boolean) {
+    if (!raw || typeof raw !== "object") return fallback;
+    const record = raw as Record<string, unknown>;
+    const value = coerceBoolean(record[key]);
+    return value === undefined ? fallback : value;
+}
+
+function normalizeForwardPrivacySettings(raw: unknown): ForwardPrivacySettings {
+    return {
+        profilePublic: getForwardPrivacyFlag(raw, "profilePublic", DEFAULT_FORWARD_PRIVACY.profilePublic),
+        activitiesPublic: getForwardPrivacyFlag(raw, "activitiesPublic", DEFAULT_FORWARD_PRIVACY.activitiesPublic),
+        allowPrivateForwards: getForwardPrivacyFlag(raw, "allowPrivateForwards", DEFAULT_FORWARD_PRIVACY.allowPrivateForwards),
+        forwardsFollowersOnly: getForwardPrivacyFlag(raw, "forwardsFollowersOnly", DEFAULT_FORWARD_PRIVACY.forwardsFollowersOnly),
+    };
+}
+
+async function getUserForwardPrivacySettings(userId: number): Promise<ForwardPrivacySettings> {
+    const { getDb } = await import("../db");
+    const { sql } = await import("drizzle-orm");
+    const db = await getDb();
+    if (!db) {
+        return { ...DEFAULT_FORWARD_PRIVACY };
+    }
+
+    const result = await db.execute(sql`
+        SELECT privacy_settings
+        FROM swimmer_profiles
+        WHERE user_id = ${userId}
+        LIMIT 1
+    `);
+    return normalizeForwardPrivacySettings((result.rows[0] as { privacy_settings?: unknown } | undefined)?.privacy_settings);
+}
+
+async function isAcceptedFollower(followerId: number, followingId: number) {
+    if (followerId === followingId) return true;
+    const { getDb } = await import("../db");
+    const { sql } = await import("drizzle-orm");
+    const db = await getDb();
+    if (!db) return false;
+
+    const result = await db.execute(sql`
+        SELECT 1
+        FROM social_follows
+        WHERE follower_id = ${followerId}
+          AND following_id = ${followingId}
+          AND status = 'accepted'
+        LIMIT 1
+    `);
+    return result.rows.length > 0;
+}
+
+async function getUsersById(userIds: number[]) {
+    const { getDb } = await import("../db");
+    const { sql } = await import("drizzle-orm");
+    const db = await getDb();
+    if (!db || userIds.length === 0) return [] as Array<{ id: number; name: string | null }>;
+
+    const idsSql = sql.join(
+        userIds.map((id) => sql`${id}`),
+        sql`, `
+    );
+
+    const result = await db.execute(sql`
+        SELECT id, name
+        FROM users
+        WHERE id IN (${idsSql})
+    `);
+
+    return (result.rows as Array<{ id: number; name: string | null }>).map((row) => ({
+        id: Number(row.id),
+        name: row.name ?? null,
+    }));
+}
+
+async function checkForwardRecipientAllowed(input: {
+    senderId: number;
+    recipientId: number;
+    ownerId: number;
+    ownerPrivacy: ForwardPrivacySettings;
+    targetType: ForwardTargetType;
+    visibility?: string | null;
+    isActivityPost?: boolean;
+}) {
+    if (input.recipientId === input.ownerId) return { allowed: true as const, reason: null };
+
+    if (!input.ownerPrivacy.allowPrivateForwards && input.senderId !== input.ownerId) {
+        return { allowed: false as const, reason: "L'autore non consente inoltri privati dei suoi contenuti." };
+    }
+
+    if (input.targetType === "post" && input.visibility === "private") {
+        return { allowed: false as const, reason: "Il post è privato e non può essere inoltrato." };
+    }
+
+    const mustBeFollower =
+        !input.ownerPrivacy.profilePublic ||
+        input.ownerPrivacy.forwardsFollowersOnly ||
+        (input.targetType === "post" && input.isActivityPost && !input.ownerPrivacy.activitiesPublic);
+
+    if (mustBeFollower) {
+        const follower = await isAcceptedFollower(input.recipientId, input.ownerId);
+        if (!follower) {
+            return { allowed: false as const, reason: "Solo i follower dell'autore possono ricevere questo inoltro." };
+        }
+    }
+
+    return { allowed: true as const, reason: null };
 }
 
 export const communityRouter = router({
@@ -1960,6 +2084,223 @@ export const communityRouter = router({
                     content: input.content,
                 });
                 return { success: true, message };
+            }),
+
+        forward: protectedProcedure
+            .input(
+                z.object({
+                    targetType: z.enum(["post", "story"]),
+                    targetId: z.number().int().positive(),
+                    recipientIds: z.array(z.number().int().positive()).min(1).max(10),
+                    note: z.string().max(500).optional().nullable(),
+                })
+            )
+            .mutation(async ({ ctx, input }) => {
+                const uniqueRecipientIds = Array.from(
+                    new Set(
+                        input.recipientIds
+                            .map((id) => Number(id))
+                            .filter((id) => Number.isInteger(id) && id > 0 && id !== ctx.user.id)
+                    )
+                );
+
+                if (!uniqueRecipientIds.length) {
+                    throw new TRPCError({
+                        code: "BAD_REQUEST",
+                        message: "Seleziona almeno un destinatario valido diverso da te.",
+                    });
+                }
+
+                const recipients = await getUsersById(uniqueRecipientIds);
+                const recipientMap = new Map(recipients.map((row) => [row.id, row]));
+
+                const missingRecipientIds = uniqueRecipientIds.filter((id) => !recipientMap.has(id));
+                if (missingRecipientIds.length) {
+                    throw new TRPCError({
+                        code: "BAD_REQUEST",
+                        message: "Uno o più destinatari non esistono più.",
+                    });
+                }
+
+                const { getDb } = await import("../db");
+                const { sql } = await import("drizzle-orm");
+                const db = await getDb();
+                if (!db) {
+                    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+                }
+
+                let ownerId = 0;
+                let ownerName = "Nuotatore";
+                let previewText: string | null = null;
+                let previewMediaUrl: string | null = null;
+                let visibility: string | null = null;
+                let isActivityPost = false;
+
+                if (input.targetType === "post") {
+                    await requirePostReadable(ctx.user.id, input.targetId);
+                    const postResult = await db.execute(sql`
+                        SELECT
+                          p.id,
+                          p.user_id,
+                          p.content,
+                          p.media_url,
+                          p.visibility,
+                          p.activity_id,
+                          u.name AS owner_name
+                        FROM social_posts p
+                        JOIN users u ON u.id = p.user_id
+                        WHERE p.id = ${input.targetId}
+                          AND p.is_deleted = false
+                        LIMIT 1
+                    `);
+                    const post = postResult.rows[0] as {
+                        id: number;
+                        user_id: number;
+                        content: string | null;
+                        media_url: string | null;
+                        visibility: string | null;
+                        activity_id: number | null;
+                        owner_name: string | null;
+                    } | undefined;
+
+                    if (!post) {
+                        throw new TRPCError({ code: "NOT_FOUND", message: "Post non trovato." });
+                    }
+
+                    ownerId = Number(post.user_id);
+                    ownerName = post.owner_name?.trim() || "Nuotatore";
+                    previewText = post.content?.trim() || null;
+                    previewMediaUrl = post.media_url ?? null;
+                    visibility = post.visibility ?? "public";
+                    isActivityPost = post.activity_id != null;
+                } else {
+                    const storyResult = await db.execute(sql`
+                        SELECT
+                          s.id,
+                          s.user_id,
+                          s.caption,
+                          s.media_url,
+                          s.type,
+                          s.expires_at,
+                          u.name AS owner_name
+                        FROM stories s
+                        JOIN users u ON u.id = s.user_id
+                        WHERE s.id = ${input.targetId}
+                          AND s.expires_at > NOW()
+                        LIMIT 1
+                    `);
+                    const story = storyResult.rows[0] as {
+                        id: number;
+                        user_id: number;
+                        caption: string | null;
+                        media_url: string | null;
+                        type: string;
+                        expires_at: Date;
+                        owner_name: string | null;
+                    } | undefined;
+
+                    if (!story) {
+                        throw new TRPCError({ code: "NOT_FOUND", message: "Story non trovata o scaduta." });
+                    }
+
+                    ownerId = Number(story.user_id);
+                    ownerName = story.owner_name?.trim() || "Nuotatore";
+                    previewText = story.caption?.trim() || (story.type === "video" ? "Story video" : "Story");
+                    previewMediaUrl = story.media_url ?? null;
+                    visibility = "public";
+                    isActivityPost = false;
+                }
+
+                const ownerPrivacy = await getUserForwardPrivacySettings(ownerId);
+                const senderAccess = await checkForwardRecipientAllowed({
+                    senderId: ctx.user.id,
+                    recipientId: ctx.user.id,
+                    ownerId,
+                    ownerPrivacy,
+                    targetType: input.targetType as ForwardTargetType,
+                    visibility,
+                    isActivityPost,
+                });
+
+                if (!senderAccess.allowed && ctx.user.id !== ownerId) {
+                    throw new TRPCError({
+                        code: "FORBIDDEN",
+                        message: senderAccess.reason ?? "Non hai accesso per inoltrare questo contenuto.",
+                    });
+                }
+
+                const blockedRecipients: Array<{ userId: number; reason: string }> = [];
+                const allowedRecipientIds: number[] = [];
+
+                for (const recipientId of uniqueRecipientIds) {
+                    const allowed = await checkForwardRecipientAllowed({
+                        senderId: ctx.user.id,
+                        recipientId,
+                        ownerId,
+                        ownerPrivacy,
+                        targetType: input.targetType as ForwardTargetType,
+                        visibility,
+                        isActivityPost,
+                    });
+                    if (allowed.allowed) {
+                        allowedRecipientIds.push(recipientId);
+                    } else {
+                        blockedRecipients.push({
+                            userId: recipientId,
+                            reason: allowed.reason ?? "Privacy non compatibile con l'inoltro.",
+                        });
+                    }
+                }
+
+                if (!allowedRecipientIds.length) {
+                    throw new TRPCError({
+                        code: "FORBIDDEN",
+                        message:
+                            blockedRecipients[0]?.reason ??
+                            "Nessun destinatario è autorizzato a ricevere questo inoltro.",
+                    });
+                }
+
+                const messageType = input.targetType === "post" ? "forward_post" : "forward_story";
+                const fallbackText =
+                    input.targetType === "post"
+                        ? `Post inoltrato da ${ownerName}`
+                        : `Story inoltrata da ${ownerName}`;
+                const trimmedNote = input.note?.trim() ?? "";
+                const content = trimmedNote.length > 0 ? `${fallbackText}\n\n${trimmedNote}` : fallbackText;
+                const metadata = {
+                    targetType: input.targetType,
+                    targetId: input.targetId,
+                    ownerId,
+                    ownerName,
+                    previewText: previewText?.slice(0, 500) ?? null,
+                    previewMediaUrl,
+                    forwardedBy: ctx.user.id,
+                    forwardedAt: new Date().toISOString(),
+                };
+
+                const { sendDirectMessage } = await import("../db_social_enhanced");
+                const messages = await Promise.all(
+                    allowedRecipientIds.map((receiverId) =>
+                        sendDirectMessage({
+                            senderId: ctx.user.id,
+                            receiverId,
+                            content,
+                            messageType,
+                            metadata,
+                        })
+                    )
+                );
+
+                return {
+                    success: true,
+                    deliveredCount: messages.length,
+                    blockedRecipients: blockedRecipients.map((item) => ({
+                        userId: item.userId,
+                        userName: recipientMap.get(item.userId)?.name ?? `#${item.userId}`,
+                        reason: item.reason,
+                    })),
+                };
             }),
 
         conversation: protectedProcedure

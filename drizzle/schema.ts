@@ -481,6 +481,8 @@ export const directMessages = pgTable("direct_messages", {
   senderId: integer("sender_id").notNull(),
   receiverId: integer("receiver_id").notNull(),
   content: text("content").notNull(),
+  messageType: varchar("message_type", { length: 32 }).default("text").notNull(),
+  metadata: json("metadata"),
   isRead: boolean("is_read").default(false).notNull(),
   readAt: timestamp("read_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
