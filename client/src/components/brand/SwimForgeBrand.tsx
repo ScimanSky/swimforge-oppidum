@@ -6,15 +6,7 @@ interface SwimForgeMarkProps {
 }
 
 export function SwimForgeMark({ className, alt = "SwimForge" }: SwimForgeMarkProps) {
-  return (
-    <img
-      src="/images/theme-v3/logo-cyber.webp"
-      alt={alt}
-      className={cn("h-10 w-10 object-contain drop-shadow-md", className)}
-      loading="eager"
-      decoding="async"
-    />
-  )
+  return null;
 }
 
 interface SwimForgeWordmarkProps {
