@@ -13,6 +13,13 @@ import { markUserOffline, touchUserPresence } from "../user_presence";
 
 const DEV_RESET_EMAIL = "shardanu@gmail.com";
 const RESET_CONFIRMATION_PHRASE = "RESET APP";
+const REGISTRATION_PASSWORD_SCHEMA = z
+    .string()
+    .min(12, "Password must be at least 12 characters")
+    .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+    .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+    .regex(/[0-9]/, "Password must contain at least one number")
+    .regex(/[!@#$%^&*]/, "Password must contain at least one special character");
 
 const isUndefinedTableError = (error: unknown) => {
     if (!error || typeof error !== "object") return false;
@@ -26,7 +33,7 @@ export const authRouter = router({
     register: publicProcedure
         .input(z.object({
             email: z.string().email(),
-            password: z.string().min(6, "Password must be at least 6 characters"),
+            password: REGISTRATION_PASSWORD_SCHEMA,
             name: z.string().optional(),
         }))
         .mutation(async ({ ctx, input }) => {
@@ -59,7 +66,7 @@ export const authRouter = router({
     login: publicProcedure
         .input(z.object({
             email: z.string().email(),
-            password: z.string().min(6, "Password must be at least 6 characters"),
+            password: z.string().min(1, "Password is required"),
         }))
         .mutation(async ({ ctx, input }) => {
             await applyRateLimit(loginLimiter, ctx.req, ctx.res);
@@ -223,6 +230,13 @@ export const authRouter = router({
             })
         )
         .mutation(async ({ ctx, input }) => {
+            if (process.env.NODE_ENV === "production" && process.env.ENABLE_RESET_APP_FOR_LAUNCH !== "true") {
+                throw new TRPCError({
+                    code: "FORBIDDEN",
+                    message: "Reset disabilitato in produzione.",
+                });
+            }
+
             const currentEmail = (ctx.user.email ?? "").trim().toLowerCase();
             if (currentEmail !== DEV_RESET_EMAIL) {
                 throw new TRPCError({ code: "FORBIDDEN", message: "Operazione consentita solo all'account dev." });

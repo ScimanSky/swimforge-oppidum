@@ -20,6 +20,8 @@ import { Request, Response, NextFunction } from 'express';
  * Crea logger Winston
  */
 export function createLogger() {
+  const enableFileLogging =
+    process.env.ENABLE_FILE_LOGGING === 'true' || process.env.NODE_ENV !== 'production';
   const logFormat = winston.format.combine(
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     winston.format.errors({ stack: true }),
@@ -54,6 +56,28 @@ export function createLogger() {
     })
   );
 
+  const fileTransports = enableFileLogging
+    ? [
+        new winston.transports.File({
+          filename: 'logs/error.log',
+          level: 'error',
+          maxsize: 10485760, // 10MB
+          maxFiles: 10,
+        }),
+        new winston.transports.File({
+          filename: 'logs/combined.log',
+          maxsize: 10485760, // 10MB
+          maxFiles: 10,
+        }),
+        new winston.transports.File({
+          filename: 'logs/audit.log',
+          level: 'info',
+          maxsize: 10485760, // 10MB
+          maxFiles: 10,
+        }),
+      ]
+    : [];
+
   const logger = winston.createLogger({
     level: process.env.LOG_LEVEL || 'info',
     format: logFormat,
@@ -84,29 +108,7 @@ export function createLogger() {
           })
         ),
       }),
-
-      // Error log file
-      new winston.transports.File({
-        filename: 'logs/error.log',
-        level: 'error',
-        maxsize: 10485760, // 10MB
-        maxFiles: 10,
-      }),
-
-      // Combined log file
-      new winston.transports.File({
-        filename: 'logs/combined.log',
-        maxsize: 10485760, // 10MB
-        maxFiles: 10,
-      }),
-
-      // Audit log file
-      new winston.transports.File({
-        filename: 'logs/audit.log',
-        level: 'info',
-        maxsize: 10485760, // 10MB
-        maxFiles: 10,
-      }),
+      ...fileTransports,
     ],
   });
 

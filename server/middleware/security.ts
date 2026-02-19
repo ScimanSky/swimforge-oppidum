@@ -307,7 +307,10 @@ export function payloadSizeLimit(
   res: Response,
   next: NextFunction
 ) {
-  const maxSize = 1024 * 1024; // 1 MB
+  const configuredMaxSize = Number.parseInt(process.env.MAX_REQUEST_BYTES ?? '', 10);
+  const maxSize = Number.isFinite(configuredMaxSize) && configuredMaxSize > 0
+    ? configuredMaxSize
+    : 5 * 1024 * 1024; // 5 MB default
   const contentLength = parseInt(req.headers['content-length'] || '0');
 
   if (contentLength > maxSize) {
@@ -332,6 +335,7 @@ export function applySecurityMiddleware() {
     helmet(helmetConfig as any),
     cors(corsOptions),
     userAgentValidation,
+    payloadSizeLimit,
   ];
 }
 
