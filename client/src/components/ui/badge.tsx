@@ -15,6 +15,7 @@ const badgeVariants = cva(
           'border-transparent bg-secondary text-secondary-foreground flex-none',
         destructive:
           'border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90',
+        outline: 'text-foreground border border-border',
         neon:
           'border-[1.5px] border-primary bg-primary/20 text-primary shadow-[0_0_20px_var(--neon-soft)] font-extrabold tracking-widest uppercase text-[0.65rem] px-2.5 py-1',
         'rank-gold':
