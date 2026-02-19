@@ -48,7 +48,7 @@ const STORY_REACTION_CHOICES = [
   { type: "cry", emoji: "😢" },
 ] as const
 
-type VideoClipRange = {
+export type VideoClipRange = {
   start: number
   end: number | null
 }
@@ -62,9 +62,9 @@ type StoryFloatingReaction = {
   delay: number
 }
 
-const DEFAULT_VIDEO_CLIP_RANGE: VideoClipRange = { start: 0, end: null }
+export const DEFAULT_VIDEO_CLIP_RANGE: VideoClipRange = { start: 0, end: null }
 
-function parseVideoClipRange(mediaUrl: string | null): VideoClipRange {
+export function parseVideoClipRange(mediaUrl: string | null): VideoClipRange {
   if (!mediaUrl) return DEFAULT_VIDEO_CLIP_RANGE
   const match = mediaUrl.match(/#t=(\d+(?:\.\d+)?)(?:,(\d+(?:\.\d+)?))?$/)
   if (!match) return DEFAULT_VIDEO_CLIP_RANGE
