@@ -166,7 +166,8 @@ Hai i seguenti diritti riguardo ai tuoi dati personali:
 
 ### 6.4 Revoca consenso
 - Puoi disconnettere Garmin Connect o Strava in qualsiasi momento dalle impostazioni
-- Puoi disabilitare cookie non essenziali tramite le impostazioni del browser
+- Puoi revocare i consensi opzionali da **Impostazioni > Privacy > Consensi GDPR**
+- Puoi gestire i cookie opzionali dalla nostra Cookie Policy: **/cookies**
 
 ### 6.5 Opposizione e limitazione
 - Puoi opporti al trattamento dei tuoi dati per scopi specifici (es. marketing)
@@ -178,16 +179,19 @@ Per esercitare questi diritti, contattaci all'indirizzo indicato nella sezione "
 
 ## 7. Cookie e Tecnologie di Tracciamento
 
+Il dettaglio completo dei cookie e delle preferenze è disponibile nella Cookie Policy dedicata: **/cookies**.
+
 Utilizziamo cookie e tecnologie simili per:
 
 ### 7.1 Cookie essenziali
 - **Cookie di sessione**: Per mantenere il tuo login e garantire il funzionamento dell'app
 - **Cookie di sicurezza**: Per proteggere il tuo account da accessi non autorizzati
 
-### 7.2 Cookie di performance
+### 7.2 Cookie opzionali
 - **Analytics**: Per capire come gli utenti utilizzano SwimForge e migliorare il Servizio
+- **Marketing**: Comunicazioni promozionali solo con consenso esplicito
 
-Puoi gestire le preferenze sui cookie tramite le impostazioni del tuo browser. Nota che disabilitare cookie essenziali potrebbe compromettere il funzionamento del Servizio.
+Puoi gestire le preferenze cookie dal banner iniziale o da **Impostazioni > Privacy > Consensi GDPR**.
 
 ---
 
@@ -221,6 +225,12 @@ Per generare insights AI personalizzati:
 - Gli insights vengono memorizzati in cache per 24 ore per ridurre le chiamate API
 
 **Google AI Privacy**: https://ai.google.dev/gemini-api/terms
+
+### 8.4 Altri responsabili del trattamento (processor)
+
+- **ImageKit** (hosting media foto/video)
+- **Resend** (email transazionali)
+- **Rollbar** (monitoring errori)
 
 ---
 
@@ -270,6 +280,12 @@ Se risiedi nell'Unione Europea, hai diritti aggiuntivi ai sensi del GDPR:
 - **Base giuridica del trattamento**: Consenso, esecuzione del contratto, legittimo interesse
 - **Diritto di reclamo**: Puoi presentare reclamo all'autorità di controllo competente nel tuo paese
 - **Trasferimenti extra-UE**: Garantiamo protezioni adeguate tramite clausole contrattuali standard
+
+Autorità italiana competente:
+
+**Garante per la protezione dei dati personali**  
+Piazza Venezia n. 11, 00187 Roma  
+https://www.garanteprivacy.it
 
 ---
 

@@ -1,161 +1,118 @@
-# SwimForge Oppidum - Guida al Deployment
+# SwimForge Oppidum - Deployment Guide
 
-Questa guida spiega come deployare SwimForge Oppidum su:
-- **Vercel** (Frontend + Backend Node.js)
-- **Supabase** (Database PostgreSQL)
-- **Render** (Microservizio Python per Garmin)
+This guide reflects the current production architecture used by this repository.
 
----
+## Target Architecture
+- Main app (frontend + backend): Render Web Service (Node)
+- Database: Supabase PostgreSQL
+- Garmin microservice: Render Web Service (Python)
 
-## 1. Setup Supabase (Database)
+## 1. Provision Supabase
+1. Create a Supabase project.
+2. Copy the PostgreSQL connection string.
+3. Run base SQL (`supabase-init.sql`) if your environment is empty.
 
-### 1.1 Crea un progetto Supabase
-1. Vai su [supabase.com](https://supabase.com) e accedi
-2. Crea un nuovo progetto
-3. Scegli una regione vicina ai tuoi utenti
-4. Imposta una password sicura per il database (salvala!)
+Required DB env:
+- `DATABASE_URL`
 
-### 1.2 Ottieni la Connection String
-1. Vai in **Project Settings** > **Database**
-2. Scorri fino a **Connection string** > **URI**
-3. Copia la stringa e sostituisci `[YOUR-PASSWORD]` con la password del database
+## 2. Deploy Garmin Service (Render)
+1. Create a Render Web Service from this repo.
+2. Set `Root Directory` to `garmin-service`.
+3. Build command:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Start command:
+   ```bash
+   uvicorn main:app --host 0.0.0.0 --port $PORT
+   ```
+5. Configure env:
+   - `GARMIN_SERVICE_SECRET`
 
-Esempio:
+Save the deployed URL, used later as `GARMIN_SERVICE_URL` in the main app.
+
+## 3. Deploy Main App (Render)
+1. Create a Render Web Service from this repo root.
+2. Build command:
+   ```bash
+   pnpm install --frozen-lockfile && pnpm build
+   ```
+3. Start command:
+   ```bash
+   pnpm start
+   ```
+
+## 4. Main App Environment Variables
+Set at least:
+
+Core:
+- `NODE_ENV=production`
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Integrations:
+- `GARMIN_SERVICE_URL`
+- `GARMIN_SERVICE_SECRET`
+- `STRAVA_CLIENT_ID`
+- `STRAVA_CLIENT_SECRET`
+- `GEMINI_API_KEY`
+
+Media:
+- `IMAGEKIT_PUBLIC_KEY`
+- `IMAGEKIT_PRIVATE_KEY`
+- `IMAGEKIT_URL_ENDPOINT`
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_API_SECRET`
+
+Security and cron:
+- `CRON_SECRET`
+- `TOKEN_ENCRYPTION_KEY` (64-char hex prefixed with `hex:`)
+- `ALLOWED_ORIGINS` (comma-separated allowed origins)
+
+Optional but recommended:
+- `REDIS_URL`
+- `ROLLBAR_ACCESS_TOKEN`
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL`
+- `ENABLE_SWAGGER=false` (or set true with `SWAGGER_USERNAME` and `SWAGGER_PASSWORD`)
+
+Use `.env.example` as the reference checklist.
+
+## 5. Migrations
+Migrations are not auto-applied at runtime.
+
+Before/after deploy (depending on your release flow), run:
+```bash
+pnpm db:generate
+pnpm db:migrate
 ```
-postgresql://postgres:TuaPassword123@db.wpnxaadvyxmhlcgdobla.supabase.co:5432/postgres
-```
 
-### 1.3 Inizializza il Database
-1. Vai in **SQL Editor** nel pannello Supabase
-2. Copia e incolla il contenuto del file `supabase-init.sql`
-3. Clicca **Run** per eseguire lo script
+For production, run migrations against production `DATABASE_URL` from a trusted environment.
 
----
+## 6. Post-Deploy Smoke Checks
+1. `GET /health` and `GET /ready`
+2. Login and open Dashboard
+3. Feed load + create post
+4. Story create/view
+5. AI coach chat request
+6. Garmin status endpoint from UI
 
-## 2. Deploy su Render (Microservizio Garmin)
+## 7. Cron Endpoints
+Cron routes require `Authorization: Bearer <CRON_SECRET>`.
 
-### 2.1 Crea un nuovo Web Service
-1. Vai su [render.com](https://render.com) e accedi
-2. Clicca **New** > **Web Service**
-3. Connetti il repository GitHub: `ScimanSky/swimforge-oppidum`
-4. Configura:
-   - **Name**: `swimforge-garmin-service`
-   - **Root Directory**: `garmin-service`
-   - **Runtime**: Python 3
-   - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+Available cron endpoints:
+- `POST /api/cron/complete-challenges`
+- `POST /api/cron/evaluate-skill-level`
+- `POST /api/cron/cleanup-expired-stories`
+- `POST /api/cron/cleanup-social-retention`
 
-### 2.2 Configura le Environment Variables
-Aggiungi queste variabili in Render:
-- `GARMIN_SERVICE_SECRET`: Una chiave segreta (es. `swimforge-garmin-secret-2024`)
-
-### 2.3 Deploy
-1. Clicca **Create Web Service**
-2. Attendi il completamento del deploy
-3. Copia l'URL del servizio (es. `https://swimforge-garmin-service.onrender.com`)
-
----
-
-## 3. Deploy su Vercel (Frontend + Backend)
-
-### 3.1 Importa il Progetto
-1. Vai su [vercel.com](https://vercel.com) e accedi
-2. Clicca **Add New** > **Project**
-3. Importa da GitHub: `ScimanSky/swimforge-oppidum`
-
-### 3.2 Configura il Build
-- **Framework Preset**: Other
-- **Build Command**: `pnpm build`
-- **Output Directory**: `dist`
-- **Install Command**: `pnpm install`
-
-### 3.3 Configura le Environment Variables
-Aggiungi queste variabili in Vercel:
-
-| Variable | Valore |
-|----------|--------|
-| `DATABASE_URL` | La connection string di Supabase |
-| `JWT_SECRET` | Una stringa casuale sicura (32+ caratteri) |
-| `VITE_APP_ID` | `swimforge-oppidum` |
-| `VITE_APP_TITLE` | `SwimForge Oppidum` |
-| `NODE_ENV` | `production` |
-| `GARMIN_SERVICE_URL` | URL del servizio Render |
-| `GARMIN_SERVICE_SECRET` | La stessa chiave usata in Render |
-| `STRAVA_SERVICE_SECRET` | La stessa chiave usata nel servizio Strava |
-| `TOKEN_ENCRYPTION_KEY` | Chiave 32 byte per cifrare token |
-| `ENABLE_SWAGGER` | Abilita Swagger in produzione | `true` (solo se necessario) |
-| `GARMIN_AUTO_SYNC_INTERVAL_HOURS` | Intervallo auto-sync Garmin (ore) | `0` = sempre |
-| `STRAVA_AUTO_SYNC_INTERVAL_HOURS` | Intervallo auto-sync Strava (ore) | `0` = sempre |
-| `VITE_AUTO_SYNC_INTERVAL_HOURS` | Intervallo auto-sync client (ore) | `6` |
-
-### 3.4 Deploy
-1. Clicca **Deploy**
-2. Attendi il completamento
-3. L'app sarà disponibile all'URL fornito da Vercel
-
----
-
-## 4. Verifica il Deployment
-
-### 4.1 Test Database
-1. Apri l'app su Vercel
-2. Prova a registrarti/accedere
-3. Verifica che il profilo venga creato correttamente
-
-### 4.2 Test Garmin Integration
-1. Vai nel tuo profilo
-2. Prova a collegare Garmin Connect
-3. Verifica che la sincronizzazione funzioni
-
----
-
-## Troubleshooting
-
-### Errore "Database connection failed"
-- Verifica che `DATABASE_URL` sia corretto
-- Assicurati che la password non contenga caratteri speciali non escapati
-- Controlla che SSL sia abilitato (aggiungere `?sslmode=require` se necessario)
-
----
-
-## Migrazioni Database (workflow consigliato)
-
-Le migrazioni **non** vengono più eseguite automaticamente a runtime.
-
-Quando aggiungi nuove migrazioni:
-1. Genera migrazione (se usi Drizzle)
-   ```
-   pnpm db:generate
-   ```
-2. Applica migrazioni al DB (una tantum)
-   ```
-   DATABASE_URL="..." pnpm db:migrate
-   ```
-3. Poi esegui il deploy dell'app.
-
-### Errore "Garmin service unavailable"
-- Verifica che il servizio Render sia attivo
-- Controlla i log in Render per errori
-- Verifica che `GARMIN_SERVICE_URL` e `GARMIN_SERVICE_SECRET` corrispondano
-- Verifica che `STRAVA_SERVICE_SECRET` corrisponda al servizio Strava
-- Verifica che `TOKEN_ENCRYPTION_KEY` sia presente (32 byte)
-
-### Errore "Build failed" su Vercel
-- Verifica che tutte le dipendenze siano nel `package.json`
-- Controlla i log di build per errori specifici
-
----
-
-## Variabili d'Ambiente Richieste
-
-| Variable | Descrizione | Dove Ottenerla |
-|----------|-------------|----------------|
-| `DATABASE_URL` | Connection string PostgreSQL | Supabase > Settings > Database |
-| `JWT_SECRET` | Chiave per firmare i JWT | Genera con `openssl rand -base64 32` |
-| `GARMIN_SERVICE_URL` | URL del microservizio Python | Render dopo il deploy |
-| `GARMIN_SERVICE_SECRET` | Chiave condivisa per auth | Scegli una stringa sicura |
-| `STRAVA_SERVICE_SECRET` | Chiave condivisa per auth | Scegli una stringa sicura |
-| `TOKEN_ENCRYPTION_KEY` | Chiave 32 byte | `openssl rand -base64 32` |
-| `VITE_APP_ID` | ID dell'applicazione | `swimforge-oppidum` |
-| `VITE_APP_TITLE` | Titolo visualizzato | `SwimForge Oppidum` |
-| `NODE_ENV` | Ambiente di esecuzione | `production` |
+## 8. Troubleshooting
+- `401 Unauthorized` on cron: wrong/missing bearer token.
+- `503 CRON_SECRET not configured`: set `CRON_SECRET`.
+- Media upload/signature errors: verify ImageKit/Cloudinary env values exactly.
+- AI fallback responses: verify `GEMINI_API_KEY`.
+- DB connection errors: verify `DATABASE_URL` and network access from Render.

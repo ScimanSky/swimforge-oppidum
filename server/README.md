@@ -1,36 +1,41 @@
 # SwimForge Backend (tRPC + Express)
 
-This folder contains the SwimForge backend, implemented in TypeScript.
+Backend service for SwimForge Oppidum, written in TypeScript.
 
-## Architecture
+## Entry Points
+- `server/_core/index.ts`: HTTP server bootstrap, middleware, cron endpoints
+- `server/routers/index.ts`: root tRPC router composition
+- `server/_core/context.ts`: request context and auth context creation
 
-- `server/_core/index.ts`: main entrypoint. Creates the HTTP server and mounts the API.
-- `server/routers.ts`: tRPC router definition (API surface).
-- `server/db.ts` + `drizzle/`: database access layer (Drizzle ORM).
-- `server/garmin.ts` / `server/strava.ts`: external integrations.
-- `server/lib/`: shared backend utilities (cache, crypto, fetch helpers, etc.).
-- `server/middleware/`: Express middleware (logging, security, validation).
+## Router Organization
+Main routers are split by domain:
+- `server/routers/auth.router.ts`
+- `server/routers/profile.router.ts`
+- `server/routers/activities.router.ts`
+- `server/routers/community.*.router.ts`
+- `server/routers/challenges.router.ts`
+- `server/routers/gameplay.router.ts`
+- `server/routers/admin.router.ts`
 
-## Development
+## Data Layer
+- `server/db*.ts`: business/data access modules
+- `drizzle/schema.ts`: schema definitions
+- `drizzle/*.sql`: migrations
 
+## Integrations
+- Garmin: `server/garmin.ts` + `garmin-service/`
+- Strava: `server/strava.ts`
+- AI: `server/ai_coach*.ts`, `server/ai_insights.ts`
+- Media: `server/lib/imagekit.ts`, `server/lib/cloudinary.ts`
+
+## Development Commands
 - Typecheck: `pnpm check`
 - Build: `pnpm build`
 - Tests: `pnpm test`
 
-## Adding A New Endpoint
-
-1. Define input/output in `server/routers.ts` using `zod` schemas.
-2. Keep business logic in a dedicated module under `server/` or `server/lib/`.
-3. Prefer shared helpers (cache/logger/etc.) instead of duplicating logic.
-4. Add/extend tests under `server/*.test.ts` when behavior is non-trivial.
-
-## API Docs (TypeDoc)
-
-Generate static API docs:
-
+## API Docs
+Generate TypeDoc:
 ```bash
 pnpm docs:generate
 ```
-
-Output is generated into `docs/api/` (not committed by default).
-
+Output goes to `docs/api/`.

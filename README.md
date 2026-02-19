@@ -1,79 +1,62 @@
-# SwimForge — social + analytics platform for swim activities (OSS)
+# SwimForge Oppidum
 
-SwimForge  is a gamified, social swim platform that unifies activity data (Garmin/Strava), computes advanced metrics, and delivers AI-assisted coaching insights. It is designed as a provider-agnostic monorepo with a modern React UI, a Node/Express API, and a PostgreSQL backend.
+SwimForge Oppidum is a social + analytics web app for swimmers.
+It combines training tracking, social feed/stories/clubs, and AI coach features.
 
-## Overview
-SwimForge helps swimmers track pool and open-water sessions, earn XP and badges, and compare progress with friends. A metrics engine calculates performance/consistency indexes, while the AI layer generates coaching insights and training plans. The community hub enables sharing sessions, giving "Splash" kudos, and forming clubs.
+## Stack
+- Frontend: React + Vite + TypeScript
+- Backend: Node.js + Express + tRPC
+- Database: PostgreSQL (Supabase recommended)
+- ORM/Migrations: Drizzle
+- Integrations: Garmin service, Strava, Gemini, ImageKit, Cloudinary
 
-## Key Features
-- Ingestion of raw swim activities (Garmin/Strava)
-- Unified data model + normalization layer
-- Advanced metrics engine (pace, efficiency, load, zones)
-- AI coaching insights (session & global)
-- Gamification: badges, XP, levels
-- Social hub + clubs + async challenges
+## Core Features
+- Activity tracking (pool/open-water) with share-to-feed flow
+- Social feed, stories, reactions, comments, direct messages, clubs
+- XP, badges, records, and seasonal engagement mechanics
+- AI coach chat and AI-generated insights
 
-## Current Status
-- ✅ Garmin integration via third‑party provider
-- ✅ Strava integration works for maintainer (dev mode)
-- ⚠️ Strava multi‑user approval pending
-- ✅ Raw data storage + basic metrics
-- 🔜 Metrics engine v1 + test coverage + docs improvements
+## Local Development
 
-## Provider Constraints & Mitigation
-- Strava: dev mode, multi‑user pending approval
-- Garmin: strict APIs; integration via third‑party provider
-- Mitigation: provider‑agnostic architecture + demo dataset + planned FIT/TCX/GPX import
+Prerequisites:
+- Node.js 20+
+- pnpm
+- PostgreSQL (local or Supabase)
 
-## Quickstart (Dev)
-**Prereqs**
-- Node.js 20+ (Render uses 22.x)
-- pnpm (or npm)
-- PostgreSQL (Supabase recommended)
-
-**Steps**
-1) Install dependencies
+Setup:
 ```bash
 pnpm install
-```
-2) Create env file
-```bash
 cp .env.example .env.local
-```
-3) Start dev server
-```bash
 pnpm dev
 ```
 
-**Demo / Without providers**
-- Use the sample dataset in `docs/sample-data/`.
-- Run `docs/sample-data/seed.sql` in Supabase SQL editor to insert a demo user and 2 activities.
+Quality gates:
+```bash
+pnpm check
+pnpm test
+```
 
-## Architecture (Monorepo)
-- `client/` React + Vite frontend (Tailwind, wouter)
-- `server/` Node/Express + tRPC API
-- `drizzle/` schema + migrations
-- `garmin-service/` Python microservice for Garmin data
-- `shared/` shared types/helpers
+Database migrations:
+```bash
+pnpm db:generate
+pnpm db:migrate
+```
 
-## Development workflow
-AI‑assisted development with human review.
+Optional demo seed:
+- `docs/sample-data/seed.sql`
 
-## Self‑hosting
-See `docs/SELF_HOST.md` for a minimal local Postgres setup.
+## Monorepo Layout
+- `client/`: UI and pages
+- `server/`: API and business logic
+- `drizzle/`: schema and SQL migrations
+- `shared/`: shared constants/types
+- `garmin-service/`: Python microservice for Garmin sync
 
-## Roadmap
-See `docs/ROADMAP.md`.
-
-## Contributing
-See `CONTRIBUTING.md`.
+## Operations
+- Deploy guide: `DEPLOYMENT.md`
+- Self-hosting: `docs/SELF_HOST.md`
+- Security policy: `SECURITY.md`
+- Contribution flow: `CONTRIBUTING.md`
 
 ## License
 Apache-2.0
-
-## Security
-See `SECURITY.md`.
-
-## How grant credits help
-
-Cline credits would be used primarily to accelerate refactors, improve test coverage, expand documentation/examples, and streamline contributor onboarding, while keeping quality gates enforced via CI and manual review.
