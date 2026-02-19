@@ -384,7 +384,6 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
             <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap rounded-full bg-black/55 px-2 py-1 backdrop-blur-sm scrollbar-hide touch-pan-x overscroll-x-contain">
               {visibleReactionChoices.map((choice) => {
                 const isActive = reactionSummary.userReaction === choice.type
-                const count = reactionSummary.counts[choice.type] ?? 0
                 return (
                   <motion.button
                     key={choice.type}
@@ -409,13 +408,9 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
                     >
                       {choice.emoji}
                     </motion.span>
-                    {count > 0 && <span className="text-xs text-white">{count}</span>}
                   </motion.button>
                 )
               })}
-              {reactionSummary.total > 0 && (
-                <span className="ml-1 shrink-0 text-xs text-white/80">{reactionSummary.total}</span>
-              )}
             </div>
           </div>
         )}

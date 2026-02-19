@@ -102,27 +102,12 @@ export default function PostReactions({
     setIsOpen(false);
   };
 
-  // Calcola il totale delle reazioni
-  const totalReactions = reactionsQuery.data?.reduce(
-    (acc: number, r: any) => acc + (r.count || 0),
-    0
-  ) || 0;
-
   // Ottieni la reazione dell'utente corrente
   const currentUserReaction = userReactionQuery.data?.reactionType;
-
-  // Raggruppa le reazioni per tipo
-  const reactionCounts = reactionsQuery.data?.reduce((acc: any, r: any) => {
-    acc[r.reactionType] = r.count;
-    return acc;
-  }, {}) || {};
   const currentReactionConfig = currentUserReaction
     ? reactionEmojis[currentUserReaction as keyof typeof reactionEmojis]
     : null;
-  const triggerAnimationKey = useMemo(
-    () => `${currentUserReaction ?? "none"}-${totalReactions}`,
-    [currentUserReaction, totalReactions]
-  );
+  const triggerAnimationKey = useMemo(() => `${currentUserReaction ?? "none"}`, [currentUserReaction]);
 
   return (
     <div className="relative flex items-center gap-2">
@@ -150,7 +135,6 @@ export default function PostReactions({
             ) : (
               <Droplet className="h-4 w-4" />
             )}
-            {totalReactions > 0 && <span className="text-sm">{totalReactions}</span>}
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-2" align="start">
@@ -174,11 +158,6 @@ export default function PostReactions({
                 >
                   {emoji}
                 </motion.span>
-                {reactionCounts[type] > 0 && (
-                  <span className="text-xs text-muted-foreground">
-                    {reactionCounts[type]}
-                  </span>
-                )}
               </motion.button>
             ))}
           </div>
@@ -198,14 +177,13 @@ export default function PostReactions({
               transition={{ duration: 0.2 }}
             >
               <span>{reactionEmojis[reaction.reactionType as keyof typeof reactionEmojis]?.emoji}</span>
-              <span className="text-muted-foreground">{reaction.count}</span>
             </motion.div>
           ))}
           {reactionsQuery.data.length > 3 && (
             <Popover>
               <PopoverTrigger asChild>
                 <button className="text-xs text-muted-foreground hover:text-foreground">
-                  +{reactionsQuery.data.length - 3}
+                  Altre
                 </button>
               </PopoverTrigger>
               <PopoverContent className="w-64 p-3">
@@ -221,7 +199,6 @@ export default function PostReactions({
                           {reactionEmojis[reaction.reactionType as keyof typeof reactionEmojis]?.label}
                         </span>
                       </div>
-                      <span className="text-sm font-semibold">{reaction.count}</span>
                     </div>
                   ))}
                 </div>
