@@ -58,8 +58,9 @@ export default function PostReactions({
   const reactionsQuery = trpc.community.reactions.list.useQuery(
     { postId },
     {
-      enabled: isOpen,
+      enabled: true,
       initialData: initialReactions,
+      staleTime: 15_000,
     }
   );
 
@@ -167,7 +168,7 @@ export default function PostReactions({
       {/* Mostra le reazioni raggruppate */}
       {reactionsQuery.data && reactionsQuery.data.length > 0 && (
         <div className="flex gap-1">
-          {reactionsQuery.data.slice(0, 3).map((reaction: any) => (
+          {reactionsQuery.data.map((reaction: any) => (
             <motion.div
               key={reaction.reactionType}
               className="flex items-center gap-1 text-xs bg-accent/50 rounded-full px-2 py-1"
@@ -179,32 +180,6 @@ export default function PostReactions({
               <span>{reactionEmojis[reaction.reactionType as keyof typeof reactionEmojis]?.emoji}</span>
             </motion.div>
           ))}
-          {reactionsQuery.data.length > 3 && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className="text-xs text-muted-foreground hover:text-foreground">
-                  Altre
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-3">
-                <div className="space-y-2">
-                  <h4 className="font-semibold text-sm">Tutte le reazioni</h4>
-                  {reactionsQuery.data.map((reaction: any) => (
-                    <div key={reaction.reactionType} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">
-                          {reactionEmojis[reaction.reactionType as keyof typeof reactionEmojis]?.emoji}
-                        </span>
-                        <span className="text-sm">
-                          {reactionEmojis[reaction.reactionType as keyof typeof reactionEmojis]?.label}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
         </div>
       )}
 

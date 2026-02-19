@@ -234,6 +234,9 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
   const visibleReactionChoices = canReact
     ? STORY_REACTION_CHOICES
     : STORY_REACTION_CHOICES.filter((choice) => (reactionSummary.counts[choice.type] ?? 0) > 0)
+  const activeReactionChoices = STORY_REACTION_CHOICES.filter(
+    (choice) => (reactionSummary.counts[choice.type] ?? 0) > 0
+  )
 
   const handleVideoLoadedMetadata = () => {
     const video = videoRef.current
@@ -394,7 +397,20 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
             onTouchEnd={(e) => e.stopPropagation()}
             onPointerDown={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap rounded-full bg-black/55 px-2 py-1 backdrop-blur-sm scrollbar-hide touch-pan-x overscroll-x-contain">
+            <div className="flex flex-col gap-1 rounded-2xl bg-black/55 px-2 py-1.5 backdrop-blur-sm">
+              {activeReactionChoices.length > 0 ? (
+                <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-hide touch-pan-x overscroll-x-contain">
+                  {activeReactionChoices.map((choice) => (
+                    <span
+                      key={`active-${choice.type}`}
+                      className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-xs text-white"
+                    >
+                      {choice.emoji}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+              <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-hide touch-pan-x overscroll-x-contain">
               {visibleReactionChoices.map((choice) => {
                 const isActive = reactionSummary.userReaction === choice.type
                 return (
@@ -424,6 +440,7 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
                   </motion.button>
                 )
               })}
+              </div>
             </div>
           </div>
         )}
