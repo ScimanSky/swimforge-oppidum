@@ -1,5 +1,6 @@
 import { ENV } from "../_core/env";
 import { logger } from "../middleware/logger";
+import { fetchWithTimeout } from "./fetchWithTimeout";
 
 const log = logger.child({ component: "cloudinary" });
 
@@ -36,12 +37,17 @@ export async function getCloudinaryCreditUsage(): Promise<CloudinaryCreditUsage 
   const url = `https://api.cloudinary.com/v1_1/${ENV.cloudinaryCloudName}/usage`;
 
   try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Basic ${auth}`,
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Basic ${auth}`,
+        },
       },
-    });
+      undefined,
+      "cloudinary:usage",
+    );
 
     if (!response.ok) {
       const detail = await response.text().catch(() => "");

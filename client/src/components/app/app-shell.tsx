@@ -400,7 +400,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
       </nav>
 
       {/* Main Content */}
-      <main className="min-h-[calc(100dvh-4rem)] min-w-0 pb-20 pt-16 md:pb-0 lg:pl-[88px]">
+      <main className="min-h-[calc(100dvh-4rem)] min-w-0 pb-20 pt-16 lg:pb-0 lg:pl-[88px]">
         <div className="mx-auto max-w-[1520px] min-w-0 p-4 md:p-5 lg:p-6">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div

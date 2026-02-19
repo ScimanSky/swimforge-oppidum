@@ -28,7 +28,9 @@ import { config } from "./config";
 import { fetchWithTimeout } from "./lib/fetchWithTimeout";
 
 // Strava microservice configuration
-const STRAVA_SERVICE_URL = process.env.STRAVA_SERVICE_URL || "https://swimforge-strava-service.onrender.com";
+const STRAVA_SERVICE_URL =
+  process.env.STRAVA_SERVICE_URL ||
+  (process.env.NODE_ENV === "production" ? "https://swimforge-strava-service.onrender.com" : "");
 const STRAVA_SERVICE_SECRET = process.env.STRAVA_SERVICE_SECRET;
 const log = logger.child({ component: "strava" });
 
@@ -82,6 +84,9 @@ async function callStravaService(
 ): Promise<StravaServiceResponse> {
   if (!STRAVA_SERVICE_SECRET) {
     throw new Error("Strava service not configured (missing STRAVA_SERVICE_SECRET)");
+  }
+  if (!STRAVA_SERVICE_URL) {
+    throw new Error("Strava service not configured (missing STRAVA_SERVICE_URL)");
   }
 
   const url = `${STRAVA_SERVICE_URL}${endpoint}`;

@@ -44,8 +44,33 @@ class OAuthService {
   }
 
   private decodeState(state: string): string {
-    const redirectUri = atob(state);
-    return redirectUri;
+    let decoded: string;
+    try {
+      decoded = Buffer.from(state, "base64").toString("utf-8").trim();
+    } catch {
+      throw new Error("Invalid OAuth state");
+    }
+
+    let parsed: URL;
+    try {
+      parsed = new URL(decoded);
+    } catch {
+      throw new Error("Invalid OAuth redirectUri");
+    }
+
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new Error("Invalid OAuth redirectUri protocol");
+    }
+
+    if (!parsed.pathname.startsWith("/api/oauth/callback")) {
+      throw new Error("Invalid OAuth redirectUri path");
+    }
+
+    if (!ENV.oAuthAllowedRedirectOrigins.includes(parsed.origin)) {
+      throw new Error("OAuth redirectUri origin not allowed");
+    }
+
+    return parsed.toString();
   }
 
   async getTokenByCode(

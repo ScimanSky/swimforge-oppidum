@@ -1,5 +1,6 @@
 import { ENV } from "../_core/env";
 import { logger } from "../middleware/logger";
+import { fetchWithTimeout } from "./fetchWithTimeout";
 
 const log = logger.child({ component: "imagekit" });
 
@@ -16,12 +17,17 @@ export async function deleteImageKitFileById(fileId: string): Promise<{ deleted:
     return { deleted: false, notFound: true };
   }
 
-  const response = await fetch(`https://api.imagekit.io/v1/files/${encodeURIComponent(trimmedFileId)}`, {
-    method: "DELETE",
-    headers: {
-      Authorization: getImageKitBasicAuthHeader(),
+  const response = await fetchWithTimeout(
+    `https://api.imagekit.io/v1/files/${encodeURIComponent(trimmedFileId)}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: getImageKitBasicAuthHeader(),
+      },
     },
-  });
+    undefined,
+    "imagekit:delete_file",
+  );
 
   if (response.ok) {
     return { deleted: true, notFound: false };

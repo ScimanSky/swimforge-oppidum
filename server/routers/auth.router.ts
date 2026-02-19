@@ -11,11 +11,12 @@ import { ENV } from "../_core/env";
 import { ensureRequiredLegalConsents } from "../consent";
 import { markUserOffline, touchUserPresence } from "../user_presence";
 
-const DEV_RESET_EMAIL = "shardanu@gmail.com";
+const DEV_RESET_EMAIL = (process.env.RESET_APP_ALLOWED_EMAIL ?? "shardanu@gmail.com").trim().toLowerCase();
 const RESET_CONFIRMATION_PHRASE = "RESET APP";
 const REGISTRATION_PASSWORD_SCHEMA = z
     .string()
     .min(12, "Password must be at least 12 characters")
+    .refine((value) => new TextEncoder().encode(value).length <= 72, "Password must be at most 72 bytes")
     .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
     .regex(/[a-z]/, "Password must contain at least one lowercase letter")
     .regex(/[0-9]/, "Password must contain at least one number")
@@ -116,7 +117,7 @@ export const authRouter = router({
         .input(z.object({
             accessToken: z.string(),
             user: z.object({
-                id: z.string(),
+                id: z.string().min(1),
                 email: z.string().email(),
                 name: z.string().nullable(),
             }),

@@ -652,15 +652,18 @@ export async function getPersonalRecords(userId: number) {
 export async function getPersonalRecord(userId: number, recordType: string, strokeType?: string) {
   const db = await getDb();
   if (!db) return undefined;
-  
-  let query = db.select().from(personalRecords).where(
-    and(
-      eq(personalRecords.userId, userId),
-      eq(personalRecords.recordType, recordType)
-    )
-  );
-  
-  const result = await query.limit(1);
+
+  const filters = [
+    eq(personalRecords.userId, userId),
+    eq(personalRecords.recordType, recordType),
+    ...(strokeType ? [eq(personalRecords.strokeType, strokeType as any)] : []),
+  ];
+
+  const result = await db
+    .select()
+    .from(personalRecords)
+    .where(and(...filters))
+    .limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 

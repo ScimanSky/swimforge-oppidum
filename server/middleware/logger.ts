@@ -9,7 +9,6 @@
  */
 
 import winston from 'winston';
-import * as Sentry from '@sentry/node';
 import { Request, Response, NextFunction } from 'express';
 
 // ============================================================================
@@ -40,11 +39,6 @@ export function createLogger() {
       // Skip if message is [object Object] or empty string
       if (finalMessage === '[object Object]' || finalMessage === '' || !finalMessage) {
         return ''; // Skip this log entry
-      }
-      
-      // Skip error level logs that don't have meaningful content
-      if (level === 'error' && (!meta || Object.keys(meta).length === 0)) {
-        return ''; // Skip error logs with no metadata
       }
       
       return JSON.stringify({
@@ -217,9 +211,11 @@ export function errorHandler(
     }
   }
 
+  const clientErrorMessage = statusCode >= 500 ? "Internal Server Error" : errorMessage;
+
   // Risposta al client
   res.status(statusCode).json({
-    error: errorMessage || 'Internal Server Error',
+    error: clientErrorMessage,
     statusCode,
     ...(process.env.NODE_ENV === 'development' && { stack: err instanceof Error ? err.stack : errRec?.["stack"] }),
   });

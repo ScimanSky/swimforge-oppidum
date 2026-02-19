@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { timingSafeEqual } from "crypto";
+import { createHash, timingSafeEqual } from "crypto";
 import express from "express";
 import type { NextFunction, Request, Response } from "express";
 import { createServer } from "http";
@@ -44,6 +44,74 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+function hashForCompare(value: string): Buffer {
+  return createHash("sha256").update(value).digest();
+}
+
+function authorizeCronRequest(req: Request, res: Response): boolean {
+  const cronSecret = process.env.CRON_SECRET;
+  const allowInsecureCron =
+    process.env.ALLOW_INSECURE_CRON === "true" && process.env.NODE_ENV !== "production";
+
+  if (!cronSecret) {
+    if (allowInsecureCron) return true;
+    res.status(503).json({ success: false, error: "CRON_SECRET not configured" });
+    return false;
+  }
+
+  const authHeader = req.headers["authorization"];
+  const token = authHeader?.toString().replace(/^Bearer\s+/i, "") ?? "";
+  if (!token) {
+    res.status(401).json({ success: false, error: "Unauthorized" });
+    return false;
+  }
+
+  const tokenHash = hashForCompare(token);
+  const secretHash = hashForCompare(cronSecret);
+  if (!timingSafeEqual(tokenHash, secretHash)) {
+    res.status(401).json({ success: false, error: "Unauthorized" });
+    return false;
+  }
+
+  return true;
+}
+
+function buildSwaggerAuthMiddleware() {
+  const username = process.env.SWAGGER_USERNAME;
+  const password = process.env.SWAGGER_PASSWORD;
+  if (!username || !password) return null;
+
+  return (req: Request, res: Response, next: NextFunction) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Basic ")) {
+      res.setHeader("WWW-Authenticate", 'Basic realm="SwimForge API Docs"');
+      return res.status(401).send("Authentication required");
+    }
+
+    const encodedCredentials = authHeader.slice("Basic ".length);
+    let decoded = "";
+    try {
+      decoded = Buffer.from(encodedCredentials, "base64").toString("utf8");
+    } catch {
+      res.setHeader("WWW-Authenticate", 'Basic realm="SwimForge API Docs"');
+      return res.status(401).send("Invalid authentication header");
+    }
+
+    const separatorIndex = decoded.indexOf(":");
+    const providedUser = separatorIndex >= 0 ? decoded.slice(0, separatorIndex) : decoded;
+    const providedPass = separatorIndex >= 0 ? decoded.slice(separatorIndex + 1) : "";
+    const userOk = timingSafeEqual(hashForCompare(providedUser), hashForCompare(username));
+    const passOk = timingSafeEqual(hashForCompare(providedPass), hashForCompare(password));
+
+    if (!userOk || !passOk) {
+      res.setHeader("WWW-Authenticate", 'Basic realm="SwimForge API Docs"');
+      return res.status(401).send("Invalid credentials");
+    }
+
+    return next();
+  };
+}
+
 async function startServer() {
   if (process.env.NODE_ENV === "production") {
     assertAuthEnv();
@@ -81,7 +149,20 @@ async function startServer() {
   const enableSwagger =
     process.env.NODE_ENV !== "production" || process.env.ENABLE_SWAGGER === "true";
   if (enableSwagger) {
-    setupSwagger(app);
+    if (process.env.NODE_ENV === "production") {
+      const swaggerAuthMiddleware = buildSwaggerAuthMiddleware();
+      if (!swaggerAuthMiddleware) {
+        log.warn("[Swagger] Disabled in production because SWAGGER_USERNAME/SWAGGER_PASSWORD are missing", {
+          event: "swagger:disabled_missing_auth",
+        });
+      } else {
+        app.use("/api/docs", swaggerAuthMiddleware);
+        app.use("/api/docs.json", swaggerAuthMiddleware);
+        setupSwagger(app);
+      }
+    } else {
+      setupSwagger(app);
+    }
   }
 
   // Keep request payloads bounded; media files are uploaded directly to media providers.
@@ -94,20 +175,7 @@ async function startServer() {
 
   // Cron endpoint for external scheduler (Render/cron-job.org)
   app.post("/api/cron/complete-challenges", async (req, res) => {
-    const cronSecret = process.env.CRON_SECRET;
-    if (process.env.NODE_ENV === "production" && !cronSecret) {
-      return res.status(503).json({ success: false, error: "CRON_SECRET not configured" });
-    }
-
-    const authHeader = req.headers["authorization"];
-    const token = authHeader?.toString().replace(/^Bearer\s+/i, "") ?? "";
-    if (process.env.NODE_ENV === "production") {
-      const tokenBuf = Buffer.from(token);
-      const secretBuf = Buffer.from(cronSecret as string);
-      if (tokenBuf.length !== secretBuf.length || !timingSafeEqual(tokenBuf, secretBuf)) {
-        return res.status(401).json({ success: false, error: "Unauthorized" });
-      }
-    }
+    if (!authorizeCronRequest(req, res)) return;
 
     try {
       const result = await completeChallenges();
@@ -124,20 +192,7 @@ async function startServer() {
 
   // Weekly AI skill level evaluation
   app.post("/api/cron/evaluate-skill-level", async (req, res) => {
-    const cronSecret = process.env.CRON_SECRET;
-    if (process.env.NODE_ENV === "production" && !cronSecret) {
-      return res.status(503).json({ success: false, error: "CRON_SECRET not configured" });
-    }
-
-    const authHeader = req.headers["authorization"];
-    const token = authHeader?.toString().replace(/^Bearer\s+/i, "") ?? "";
-    if (process.env.NODE_ENV === "production") {
-      const tokenBuf = Buffer.from(token);
-      const secretBuf = Buffer.from(cronSecret as string);
-      if (tokenBuf.length !== secretBuf.length || !timingSafeEqual(tokenBuf, secretBuf)) {
-        return res.status(401).json({ success: false, error: "Unauthorized" });
-      }
-    }
+    if (!authorizeCronRequest(req, res)) return;
 
     try {
       const result = await evaluateAllUsersWeekly();
@@ -154,20 +209,7 @@ async function startServer() {
 
   // Cleanup expired stories and corresponding ImageKit files
   app.post("/api/cron/cleanup-expired-stories", async (req, res) => {
-    const cronSecret = process.env.CRON_SECRET;
-    if (process.env.NODE_ENV === "production" && !cronSecret) {
-      return res.status(503).json({ success: false, error: "CRON_SECRET not configured" });
-    }
-
-    const authHeader = req.headers["authorization"];
-    const token = authHeader?.toString().replace(/^Bearer\s+/i, "") ?? "";
-    if (process.env.NODE_ENV === "production") {
-      const tokenBuf = Buffer.from(token);
-      const secretBuf = Buffer.from(cronSecret as string);
-      if (tokenBuf.length !== secretBuf.length || !timingSafeEqual(tokenBuf, secretBuf)) {
-        return res.status(401).json({ success: false, error: "Unauthorized" });
-      }
-    }
+    if (!authorizeCronRequest(req, res)) return;
 
     const requestedLimit = Number(req.body?.limit ?? req.query?.limit ?? 300);
     const limit = Number.isFinite(requestedLimit) ? requestedLimit : 300;
@@ -187,20 +229,7 @@ async function startServer() {
 
   // Cleanup old notifications and direct messages
   app.post("/api/cron/cleanup-social-retention", async (req, res) => {
-    const cronSecret = process.env.CRON_SECRET;
-    if (process.env.NODE_ENV === "production" && !cronSecret) {
-      return res.status(503).json({ success: false, error: "CRON_SECRET not configured" });
-    }
-
-    const authHeader = req.headers["authorization"];
-    const token = authHeader?.toString().replace(/^Bearer\s+/i, "") ?? "";
-    if (process.env.NODE_ENV === "production") {
-      const tokenBuf = Buffer.from(token);
-      const secretBuf = Buffer.from(cronSecret as string);
-      if (tokenBuf.length !== secretBuf.length || !timingSafeEqual(tokenBuf, secretBuf)) {
-        return res.status(401).json({ success: false, error: "Unauthorized" });
-      }
-    }
+    if (!authorizeCronRequest(req, res)) return;
 
     const notificationRetentionDaysRaw = Number(
       req.body?.notificationRetentionDays ?? req.query?.notificationRetentionDays ?? process.env.NOTIFICATION_RETENTION_DAYS ?? 90
@@ -258,8 +287,11 @@ async function startServer() {
       method: req.method,
       ip: req.ip,
     });
-    // Don't send error details to client
-    res.status(500).json({ error: "Internal Server Error" });
+    if (res.headersSent) {
+      return next(err);
+    }
+    // Don't send error details to client.
+    return res.status(500).json({ error: "Internal Server Error" });
   });
 
   const preferredPort = parseInt(process.env.PORT || "3000");
