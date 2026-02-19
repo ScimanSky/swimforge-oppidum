@@ -25,7 +25,7 @@ import {
   type PostMediaKind,
 } from "@/lib/post-media"
 import { uploadVideoToCloudinary } from "@/lib/cloudinary-upload"
-import { fileToBase64 } from "@/lib/file-base64"
+import { uploadPostImageWithFallback } from "@/lib/post-image-upload"
 
 interface CreatePostSheetProps {
   open: boolean
@@ -170,59 +170,14 @@ export function CreatePostSheet({ open, onOpenChange }: CreatePostSheetProps) {
 
   const uploadMediaToImageKit = async (file: File) => {
     const auth = await imageKitAuth.mutateAsync()
-    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
-    const fileName = `post-${Date.now()}-${safeFileName}`
-
-    const formData = new FormData()
-    formData.append("file", file)
-    formData.append("fileName", fileName)
-    formData.append("publicKey", auth.publicKey)
-    formData.append("token", auth.token)
-    formData.append("signature", auth.signature)
-    formData.append("expire", String(auth.expire))
-    formData.append("folder", auth.folder)
-    formData.append("useUniqueFileName", "true")
-    formData.append("tags", "post,swimforge")
-
-    try {
-      const response = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
-        method: "POST",
-        body: formData,
-      })
-
-      if (!response.ok) {
-        let detail = ""
-        try {
-          const payload = (await response.json()) as { message?: string; help?: string }
-          detail = payload.message || payload.help || ""
-        } catch {
-          detail = await response.text().catch(() => "")
-        }
-        throw new Error(detail || "Upload media fallito")
-      }
-
-      const uploaded = (await response.json()) as { url?: string }
-      if (!uploaded.url) {
-        throw new Error("ImageKit non ha restituito un URL valido")
-      }
-      return uploaded.url
-    } catch (imageKitError) {
-      const fallbackPayload = await fileToBase64(file)
-      try {
-        const uploaded = await postImageUpload.mutateAsync({
-          fileBase64: fallbackPayload,
-          mimeType: file.type as "image/jpeg" | "image/png" | "image/webp",
-        })
+    return uploadPostImageWithFallback({
+      file,
+      auth,
+      uploadFallback: (payload) => postImageUpload.mutateAsync(payload),
+      onFallbackUsed: () => {
         toast.warning("Upload diretto non riuscito: usato fallback server.")
-        return uploaded.url
-      } catch (fallbackError) {
-        const primaryMessage =
-          imageKitError instanceof Error ? imageKitError.message : "Upload media fallito"
-        const fallbackMessage =
-          fallbackError instanceof Error ? fallbackError.message : "Upload media fallito"
-        throw new Error(fallbackMessage || primaryMessage)
-      }
-    }
+      },
+    })
   }
 
   const uploadMedia = async (file: File, kind: PostMediaKind) => {
