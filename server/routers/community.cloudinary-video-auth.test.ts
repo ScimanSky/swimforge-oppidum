@@ -169,4 +169,32 @@ describe("community.cloudinaryVideoAuth", () => {
       percentUsed: 81,
     });
   });
+
+  it("cloudinaryVideoUsage returns thresholds and flags", async () => {
+    getCloudinaryCreditUsageMock.mockResolvedValue({
+      used: 96,
+      limit: 100,
+      percentUsed: 96,
+    });
+    const caller = communityRouter.createCaller(createAuthContext());
+
+    const result = await caller.cloudinaryVideoUsage();
+
+    expect(result).toEqual({
+      used: 96,
+      limit: 100,
+      percentUsed: 96,
+      warnThreshold: 80,
+      blockThreshold: 95,
+      isWarning: true,
+      isBlocked: true,
+    });
+  });
+
+  it("cloudinaryVideoUsage returns null when usage cannot be fetched", async () => {
+    getCloudinaryCreditUsageMock.mockResolvedValue(null);
+    const caller = communityRouter.createCaller(createAuthContext());
+
+    await expect(caller.cloudinaryVideoUsage()).resolves.toBeNull();
+  });
 });
