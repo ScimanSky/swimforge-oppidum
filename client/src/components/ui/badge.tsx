@@ -15,16 +15,14 @@ const badgeVariants = cva(
           'border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90',
         destructive:
           'border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
-        outline:
-          'text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground',
         neon:
-          'border-primary/50 bg-primary/10 text-primary shadow-[0_0_12px_var(--neon-soft)]',
+          'border-primary/80 bg-primary/20 text-primary shadow-[0_0_16px_var(--neon-soft)] font-bold tracking-tight',
         'rank-gold':
-          'border-[var(--gold)]/50 bg-[var(--gold)]/15 text-[var(--gold)]',
+          'border-[var(--gold)]/80 bg-[var(--gold)]/20 text-[var(--gold)] font-bold tracking-tight shadow-[0_0_12px_color-mix(in_oklch,var(--gold)_30%,transparent)]',
         'rank-silver':
-          'border-slate-300/50 bg-slate-300/15 text-slate-200',
+          'border-slate-300/80 bg-slate-300/20 text-slate-200 font-bold tracking-tight',
         'rank-bronze':
-          'border-orange-500/50 bg-orange-500/15 text-orange-400',
+          'border-orange-500/80 bg-orange-500/20 text-orange-400 font-bold tracking-tight',
       },
     },
     defaultVariants: {

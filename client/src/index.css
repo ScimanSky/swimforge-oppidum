@@ -91,26 +91,26 @@ body,
 }
 
 .dark {
-  /* Neon Soft Dark Balanced: less black, preserves details over photography */
-  --background: oklch(0.18 0.026 255);
-  --foreground: oklch(0.94 0.016 255);
-  --card: oklch(0.22 0.026 255);
+  /* Dark Precision: True deep darks, higher contrast, sharper edges */
+  --background: oklch(0.12 0.015 255);
+  --foreground: oklch(0.96 0.010 255);
+  --card: oklch(0.14 0.015 255);
   --card-foreground: var(--foreground);
-  --popover: oklch(0.215 0.024 255);
+  --popover: oklch(0.14 0.015 255);
   --popover-foreground: var(--foreground);
 
   --primary: var(--electric-cyan);
-  --primary-foreground: oklch(0.13 0.022 255);
-  --secondary: oklch(0.27 0.028 255);
+  --primary-foreground: oklch(0.10 0.010 255);
+  --secondary: oklch(0.18 0.02 255);
   --secondary-foreground: var(--foreground);
-  --muted: oklch(0.255 0.022 255);
-  --muted-foreground: oklch(0.79 0.018 255);
+  --muted: oklch(0.18 0.015 255);
+  --muted-foreground: oklch(0.70 0.010 255);
   --accent: var(--electric-lime);
-  --accent-foreground: oklch(0.13 0.022 255);
+  --accent-foreground: oklch(0.10 0.010 255);
   --destructive: var(--electric-coral);
   --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.38 0.026 255);
-  --input: oklch(0.29 0.024 255);
+  --border: oklch(0.22 0.015 255);
+  --input: oklch(0.18 0.015 255);
   --ring: var(--electric-cyan);
 
   --chart-1: var(--electric-cyan);
@@ -123,27 +123,27 @@ body,
   --warning: oklch(0.84 0.140 85);
   --danger: var(--electric-coral);
 
-  --neon-glow: oklch(0.84 0.190 205 / 0.62);
-  --neon-soft: oklch(0.84 0.190 205 / 0.26);
-  --forge-glow: oklch(0.78 0.21 48 / 0.42);
+  --neon-glow: oklch(0.84 0.190 205 / 0.80);
+  --neon-soft: oklch(0.84 0.190 205 / 0.15);
+  --forge-glow: oklch(0.78 0.21 48 / 0.60);
   --chip-cyan: oklch(0.82 0.14 192);
   --chip-emerald: oklch(0.78 0.15 160);
   --chip-amber: oklch(0.82 0.14 75);
   --chip-rose: oklch(0.72 0.17 15);
   --chip-sky: oklch(0.76 0.11 230);
   --chip-violet: oklch(0.7 0.16 300);
-  --card-elevated: oklch(0.24 0.025 240);
-  --surface-glow: oklch(0.78 0.14 192 / 0.06);
+  --card-elevated: oklch(0.16 0.015 255);
+  --surface-glow: oklch(0.78 0.14 192 / 0.04);
 
-  --sidebar: oklch(0.17 0.024 255);
+  --sidebar: oklch(0.12 0.015 255);
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--electric-cyan);
-  --sidebar-primary-foreground: oklch(0.13 0.022 255);
-  --sidebar-accent: oklch(0.245 0.022 255);
+  --sidebar-primary-foreground: oklch(0.10 0.010 255);
+  --sidebar-accent: oklch(0.16 0.015 255);
   --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: oklch(0.36 0.024 255);
+  --sidebar-border: oklch(0.20 0.015 255);
   --sidebar-ring: var(--electric-cyan);
-  --navy: oklch(0.17 0.024 255);
+  --navy: oklch(0.12 0.015 255);
   --navy-light: oklch(0.245 0.022 255);
   --azure: var(--electric-cyan);
   --gold: oklch(0.84 0.140 85);
@@ -295,16 +295,16 @@ body,
   .surface-panel {
     position: relative;
     isolation: isolate;
-    border-radius: 26px;
-    border: 1px solid color-mix(in oklch, var(--border) 44%, transparent);
+    border-radius: 20px;
+    border: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
     background: linear-gradient(
       150deg,
-      color-mix(in oklch, var(--card) 44%, transparent),
-      color-mix(in oklch, var(--card) 28%, transparent)
+      color-mix(in oklch, var(--card) 85%, transparent),
+      color-mix(in oklch, var(--card) 60%, transparent)
     );
-    box-shadow: 0 14px 40px color-mix(in oklch, var(--foreground) 10%, transparent);
-    backdrop-filter: blur(18px);
-    transition: transform 180ms ease, border-color 180ms ease, box-shadow 220ms ease;
+    box-shadow: 0 14px 40px color-mix(in oklch, black 40%, transparent);
+    backdrop-filter: blur(28px);
+    transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms ease, box-shadow 150ms ease;
   }
 
   .surface-panel::before {
@@ -314,10 +314,10 @@ body,
     pointer-events: none;
     background: linear-gradient(
       180deg,
-      color-mix(in oklch, white 7%, transparent),
-      transparent 32%
+      color-mix(in oklch, white 4%, transparent),
+      transparent 20%
     );
-    opacity: 0.45;
+    opacity: 0.8;
     z-index: 0;
     border-radius: inherit;
   }
@@ -329,16 +329,16 @@ body,
 
   .dashboard-shell .surface-panel,
   .compact-shell .surface-panel {
-    border-color: color-mix(in oklch, var(--border) 68%, transparent);
+    border-color: color-mix(in oklch, var(--border) 100%, transparent);
     background: linear-gradient(
       160deg,
-      color-mix(in oklch, var(--background) 84%, transparent),
-      color-mix(in oklch, var(--card) 78%, transparent)
+      color-mix(in oklch, var(--background) 95%, transparent),
+      color-mix(in oklch, var(--card) 85%, transparent)
     );
     box-shadow:
-      0 16px 42px color-mix(in oklch, var(--foreground) 14%, transparent),
-      0 0 0 1px color-mix(in oklch, var(--electric-cyan) 10%, transparent);
-    backdrop-filter: blur(20px) saturate(1.1);
+      0 16px 42px color-mix(in oklch, black 50%, transparent),
+      0 0 0 1px color-mix(in oklch, var(--electric-cyan) 30%, transparent);
+    backdrop-filter: blur(32px) saturate(1.2);
   }
 
   .dashboard-shell .surface-panel::before,
@@ -353,8 +353,8 @@ body,
 
   .dashboard-shell .stream-card,
   .compact-shell .stream-card {
-    background: color-mix(in oklch, var(--background) 84%, transparent);
-    border-color: color-mix(in oklch, var(--border) 74%, transparent);
+    background: color-mix(in oklch, var(--card) 100%, transparent);
+    border-color: color-mix(in oklch, var(--border) 100%, transparent);
   }
 
   .dashboard-shell .stream-card:hover,
@@ -424,25 +424,25 @@ body,
   }
 
   .sf-activity-card {
-    border-radius: 26px;
-    border: 1px solid color-mix(in oklch, var(--electric-cyan) 26%, transparent);
+    border-radius: 16px;
+    border: 1px solid color-mix(in oklch, var(--electric-cyan) 60%, transparent);
     background:
-      linear-gradient(142deg, rgba(2, 6, 23, 0.74), rgba(15, 23, 42, 0.56));
+      linear-gradient(142deg, rgba(8, 8, 8, 0.90), rgba(12, 12, 12, 0.85));
     box-shadow:
-      0 12px 34px rgba(2, 6, 23, 0.45),
-      0 0 0 1px color-mix(in oklch, var(--electric-cyan) 12%, transparent);
+      0 12px 34px rgba(0, 0, 0, 0.8),
+      0 0 0 1px color-mix(in oklch, var(--electric-cyan) 40%, transparent);
   }
 
   .sf-social-card {
-    border-radius: 22px;
-    border: 1px solid color-mix(in oklch, var(--border) 66%, transparent);
+    border-radius: 16px;
+    border: 1px solid color-mix(in oklch, var(--border) 100%, transparent);
     background:
       linear-gradient(
         148deg,
-        color-mix(in oklch, var(--card) 74%, transparent),
-        color-mix(in oklch, var(--card) 58%, transparent)
+        color-mix(in oklch, var(--card) 95%, transparent),
+        color-mix(in oklch, var(--card) 85%, transparent)
       );
-    box-shadow: 0 12px 30px color-mix(in oklch, var(--foreground) 10%, transparent);
+    box-shadow: 0 12px 30px color-mix(in oklch, black 40%, transparent);
   }
 
   .sf-activity-badge {
@@ -463,17 +463,17 @@ body,
   .glass-panel {
     background: linear-gradient(
       135deg,
-      color-mix(in oklch, var(--card) 72%, transparent),
-      color-mix(in oklch, var(--electric-cyan) 14%, transparent) 46%,
-      color-mix(in oklch, var(--electric-lime) 10%, transparent) 72%,
-      color-mix(in oklch, var(--card) 68%, transparent)
+      color-mix(in oklch, var(--card) 85%, transparent),
+      color-mix(in oklch, var(--electric-cyan) 20%, transparent) 46%,
+      color-mix(in oklch, var(--electric-lime) 15%, transparent) 72%,
+      color-mix(in oklch, var(--card) 80%, transparent)
     );
-    border: 1px solid color-mix(in oklch, var(--border) 82%, transparent);
+    border: 1px solid color-mix(in oklch, var(--border) 100%, transparent);
     box-shadow:
-      0 22px 70px color-mix(in oklch, var(--foreground) 14%, transparent),
-      0 0 0 1px color-mix(in oklch, var(--electric-cyan) 20%, transparent),
-      0 0 44px var(--neon-soft);
-    backdrop-filter: blur(18px);
+      0 22px 70px color-mix(in oklch, black 50%, transparent),
+      0 0 0 1px color-mix(in oklch, var(--electric-cyan) 50%, transparent),
+      0 0 24px var(--neon-soft);
+    backdrop-filter: blur(32px);
   }
 
   .ei-border-gradient {
@@ -599,16 +599,17 @@ body,
   }
 
   .stream-card {
-    border-radius: 22px;
-    border: 1px solid color-mix(in oklch, var(--border) 56%, transparent);
-    background: color-mix(in oklch, var(--background) 76%, transparent);
+    border-radius: 16px;
+    border: 1px solid color-mix(in oklch, var(--border) 100%, transparent);
+    background: color-mix(in oklch, var(--card) 100%, transparent);
     padding: 1rem;
-    transition: border-color 180ms ease, transform 180ms ease;
+    transition: border-color 150ms ease, transform 150ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 150ms ease;
   }
 
   .stream-card:hover {
-    transform: translateY(-1px);
-    border-color: color-mix(in oklch, var(--electric-cyan) 36%, var(--border));
+    transform: translateY(-2px);
+    border-color: var(--electric-cyan);
+    box-shadow: 0 4px 12px color-mix(in oklch, black 20%, transparent), 0 0 0 1px color-mix(in oklch, var(--electric-cyan) 50%, transparent);
   }
 
   @media (min-width: 1024px) {

@@ -126,12 +126,12 @@ export function MetricOrb({
       <div
         className={cn(
           "relative isolate flex items-center justify-center rounded-full",
-          "bg-[radial-gradient(circle_at_30%_25%,color-mix(in_oklch,var(--card)_85%,white_15%),color-mix(in_oklch,var(--card)_94%,transparent)_70%)]",
-          "shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--border)_90%,transparent)]",
+          "bg-[radial-gradient(circle_at_30%_25%,color-mix(in_oklch,var(--card)_100%,white_12%),color-mix(in_oklch,var(--card)_100%,transparent)_75%)]",
+          "shadow-[inset_0_0_0_1px_color-mix(in_oklch,var(--border)_100%,transparent)]",
           SIZE_CLASSES[size],
         )}
         style={{
-          boxShadow: `0 0 0 1px color-mix(in oklch, var(--border) 85%, transparent), 0 0 24px color-mix(in oklch, ${ringColor} 22%, transparent)`,
+          boxShadow: `0 0 0 1px color-mix(in oklch, var(--border) 100%, transparent), 0 0 24px color-mix(in oklch, ${ringColor} 15%, transparent)`,
         }}
       >
         <svg
@@ -143,7 +143,7 @@ export function MetricOrb({
             cx="60"
             cy="60"
             r={radius}
-            stroke="color-mix(in oklch, var(--border) 86%, transparent)"
+            stroke="color-mix(in oklch, var(--border) 100%, transparent)"
             strokeWidth={strokeWidth}
             fill="none"
           />
@@ -164,7 +164,7 @@ export function MetricOrb({
                 : { duration: 0.65, ease: [0.2, 0.9, 0.2, 1] }
             }
             style={{
-              filter: `drop-shadow(0 0 8px color-mix(in oklch, ${ringColor} 45%, transparent))`,
+              filter: `drop-shadow(0 0 6px color-mix(in oklch, ${ringColor} 70%, transparent))`,
             }}
           />
         </svg>
@@ -180,7 +180,7 @@ export function MetricOrb({
           ) : null}
           <div
             className={cn(
-              "max-w-full whitespace-nowrap font-display font-bold leading-[1.05] tracking-tight text-foreground drop-shadow-[0_1px_6px_color-mix(in_oklch,var(--background)_75%,transparent)]",
+              "max-w-full whitespace-nowrap font-display font-bold leading-[1.05] tracking-tight neon-gradient-text drop-shadow-[0_2px_4px_black]",
               getAdaptiveValueClass(value, size)
             )}
           >
@@ -189,7 +189,7 @@ export function MetricOrb({
         </div>
         <div
           className={cn(
-            "absolute bottom-1 left-1/2 z-20 min-w-[2.1rem] -translate-x-1/2 rounded-full border border-border/80 bg-background/92 px-1.5 py-[2px] text-center font-semibold uppercase leading-none tracking-[0.12em] text-foreground shadow-[0_5px_14px_color-mix(in_oklch,var(--foreground)_14%,transparent)] backdrop-blur-sm",
+            "absolute bottom-0 left-1/2 z-20 min-w-[2.1rem] -translate-x-1/2 translate-y-1/2 rounded-full border border-border bg-background px-1.5 py-[2px] text-center font-semibold uppercase leading-none tracking-[0.12em] text-foreground shadow-[0_4px_12px_black] backdrop-blur-sm",
             PROGRESS_CLASSES[size]
           )}
         >
@@ -198,7 +198,7 @@ export function MetricOrb({
       </div>
 
       <div className="w-full text-center">
-        <div className={cn("max-w-full truncate font-semibold uppercase tracking-[0.14em] text-muted-foreground", LABEL_CLASSES[size])}>
+        <div className={cn("max-w-full mt-3 truncate font-semibold uppercase tracking-[0.14em] text-muted-foreground", LABEL_CLASSES[size])}>
           {label}
         </div>
         {helper ? <div className={cn("mt-1 max-w-full truncate text-foreground/85", HELPER_CLASSES[size])}>{helper}</div> : null}

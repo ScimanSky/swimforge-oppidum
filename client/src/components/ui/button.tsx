@@ -17,8 +17,8 @@ const buttonVariants = cva(
             // Neon soft dark: keep accents decisive but not rainbow.
             'bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime))]',
             'bg-[length:220%_220%] bg-[position:0%_50%] hover:bg-[position:100%_50%]',
-            'text-primary-foreground',
-            'shadow-[0_0_36px_var(--neon-glow)] hover:shadow-[0_0_56px_var(--neon-glow)]',
+            'text-primary-foreground font-bold tracking-tight',
+            'shadow-[0_0_24px_var(--neon-glow),0_0_48px_var(--neon-soft)] hover:shadow-[0_0_36px_var(--neon-glow),0_0_64px_var(--neon-soft)]',
             'hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]',
             "before:pointer-events-none before:absolute before:inset-0 before:content-['']",
             'before:bg-[radial-gradient(circle_at_30%_20%,color-mix(in_oklch,white_35%,transparent)_0%,transparent_58%)]',
@@ -30,12 +30,12 @@ const buttonVariants = cva(
         'outline-neon':
           [
             'ei-border-gradient',
-            'text-foreground',
-            'shadow-[0_0_16px_var(--neon-soft)] hover:shadow-[0_0_28px_var(--neon-soft)]',
+            'text-foreground font-semibold',
+            'shadow-[0_0_12px_var(--neon-soft),inset_0_0_12px_var(--neon-soft)] hover:shadow-[0_0_24px_var(--neon-soft),inset_0_0_24px_var(--neon-soft)] bg-background/50',
             'hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99]',
           ].join(' '),
         'ghost-neon':
-          'text-primary hover:bg-primary/12 hover:shadow-[0_0_22px_var(--neon-soft)]',
+          'text-primary font-semibold hover:bg-primary/10 hover:shadow-[0_0_16px_var(--neon-soft)] hover:text-primary-foreground',
         destructive:
           'bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
         outline:
