@@ -23,7 +23,7 @@ import {
   validatePostMediaFile,
   type PostMediaKind,
 } from "@/lib/post-media"
-import { uploadVideoToCloudinary } from "@/lib/cloudinary-upload"
+import { uploadActivityShareMedia } from "@/lib/activity-share-media-upload"
 
 interface ShareActivityPickerProps {
   open: boolean
@@ -65,6 +65,7 @@ export function ShareActivityPicker({
 
   const utils = trpc.useUtils()
   const imageKitAuth = trpc.community.postImageKitAuth.useMutation()
+  const postImageUpload = trpc.community.postUploadImage.useMutation()
   const cloudinaryVideoAuth = trpc.community.cloudinaryVideoAuth.useMutation()
   const tagSearchEnabled = open && !!selectedId && tagQuery.trim().length >= 2
   const tagSearchQuery = trpc.community.users.search.useQuery(
@@ -180,53 +181,15 @@ export function ShareActivityPicker({
     setTaggedUsers((prev) => prev.filter((item) => item.userId !== userId))
   }
 
-  const uploadMediaToImageKit = async (file: File) => {
-    const auth = await imageKitAuth.mutateAsync()
-    const safeFileName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
-    const fileName = `activity-post-${Date.now()}-${safeFileName}`
-
-    const formData = new FormData()
-    formData.append("file", file)
-    formData.append("fileName", fileName)
-    formData.append("publicKey", auth.publicKey)
-    formData.append("token", auth.token)
-    formData.append("signature", auth.signature)
-    formData.append("expire", String(auth.expire))
-    formData.append("folder", auth.folder)
-    formData.append("useUniqueFileName", "true")
-    formData.append("tags", "activity,post,swimforge")
-
-    const uploadResponse = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
-      method: "POST",
-      body: formData,
-    })
-
-    if (!uploadResponse.ok) {
-      let detail = ""
-      try {
-        const payload = (await uploadResponse.json()) as { message?: string; help?: string }
-        detail = payload.message || payload.help || ""
-      } catch {
-        detail = await uploadResponse.text().catch(() => "")
-      }
-      throw new Error(detail || "Upload media fallito")
-    }
-
-    const uploaded = (await uploadResponse.json()) as { url?: string }
-    if (!uploaded.url) throw new Error("ImageKit non ha restituito un URL valido")
-    return uploaded.url
-  }
-
   const uploadMedia = async (file: File, kind: PostMediaKind) => {
-    if (kind === "video") {
-      const auth = await cloudinaryVideoAuth.mutateAsync({ scope: "posts" })
-      if (auth.warning) {
-        toast.warning(auth.warning)
-      }
-      const uploaded = await uploadVideoToCloudinary(file, auth)
-      return uploaded.url
-    }
-    return uploadMediaToImageKit(file)
+    return uploadActivityShareMedia({
+      file,
+      kind,
+      getImageKitAuth: () => imageKitAuth.mutateAsync(),
+      uploadImageFallback: (payload) => postImageUpload.mutateAsync(payload),
+      getCloudinaryAuth: () => cloudinaryVideoAuth.mutateAsync({ scope: "posts" }),
+      notifyWarning: (message) => toast.warning(message),
+    })
   }
 
   const handleShare = async () => {
@@ -252,7 +215,8 @@ export function ShareActivityPicker({
     }
   }
 
-  const isPending = createPost.isPending || imageKitAuth.isPending || cloudinaryVideoAuth.isPending
+  const isPending =
+    createPost.isPending || imageKitAuth.isPending || postImageUpload.isPending || cloudinaryVideoAuth.isPending
 
   return (
     <Sheet open={open} onOpenChange={handleClose}>
