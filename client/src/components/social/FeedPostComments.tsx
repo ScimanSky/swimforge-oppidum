@@ -5,6 +5,7 @@ import { Send } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
 import { getInitials } from "@/lib/format"
+import type { FeedCommentRecord } from "./feed-types"
 
 interface FeedPostCommentsProps {
   postId: number
@@ -20,7 +21,7 @@ export default function FeedPostComments({ postId, isOpen }: FeedPostCommentsPro
   )
 
   const addComment = trpc.community.addComment.useMutation({
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
         toast.success(`+${data.actionXp.awardedXp} XP Action`)
       }
@@ -36,7 +37,7 @@ export default function FeedPostComments({ postId, isOpen }: FeedPostCommentsPro
     addComment.mutate({ postId, content })
   }
 
-  const comments = commentsQuery.data ?? []
+  const comments: FeedCommentRecord[] = (commentsQuery.data as FeedCommentRecord[] | undefined) ?? []
 
   return (
     <AnimatePresence initial={false}>
@@ -54,7 +55,7 @@ export default function FeedPostComments({ postId, isOpen }: FeedPostCommentsPro
               <div className="text-xs text-muted-foreground py-1">Caricamento...</div>
             ) : comments.length > 0 ? (
               <>
-                {comments.slice(0, 2).map((comment: any) => (
+                {comments.slice(0, 2).map((comment) => (
                   <div key={comment.id} className="flex items-start gap-2">
                     <Avatar className="size-6 border border-border/60 shrink-0 mt-0.5">
                       <AvatarImage src={comment.user_avatar || ""} />

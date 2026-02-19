@@ -7,9 +7,10 @@ import FeedPostActions from "./FeedPostActions"
 import FeedPostComments from "./FeedPostComments"
 import { isVideoUrl } from "@/lib/post-media"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
+import type { FeedPostRecord } from "./feed-types"
 
 interface FeedPostProps {
-  post: any
+  post: FeedPostRecord
   currentUserId?: number
   index?: number
   autoplayVideos?: boolean
@@ -116,13 +117,15 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
         <div className={isActivityPost ? "relative !z-10" : undefined}>
           <FeedPostHeader post={post} isOwner={isOwner} isFollowing={post.is_following} />
 
-          <FeedPostMetrics
-            distanceMeters={post.activity_distance_meters}
-            durationSeconds={post.activity_duration_seconds}
-            calories={post.activity_calories}
-            heartRate={post.activity_heart_rate}
-            swolf={post.activity_swolf}
-          />
+          {isActivityPost ? (
+            <FeedPostMetrics
+              distanceMeters={post.activity_distance_meters}
+              durationSeconds={post.activity_duration_seconds}
+              calories={post.activity_calories}
+              heartRate={post.activity_heart_rate}
+              swolf={post.activity_swolf}
+            />
+          ) : null}
 
           {post.content && (
             <p

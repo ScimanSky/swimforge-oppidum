@@ -12,10 +12,15 @@ import FeedPost from "@/components/social/FeedPost"
 import FeedSkeleton from "@/components/social/FeedSkeleton"
 import FeedSidebar from "@/components/social/FeedSidebar"
 import FollowStarterCard from "@/components/social/FollowStarterCard"
+import type { FeedPostRecord } from "@/components/social/feed-types"
 import { Button } from "@/components/ui/button"
 import { Waves, Users, RefreshCw, Loader2 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
-import { buildDisplayStoryGroups, findStoryGroupIndex } from "@/lib/social-feed-stories"
+import {
+  buildDisplayStoryGroups,
+  findStoryGroupIndex,
+  type SocialStoryGroup,
+} from "@/lib/social-feed-stories"
 
 function EmptyFeedPerTe({ onCreatePost }: { onCreatePost: () => void }) {
   return (
@@ -61,7 +66,7 @@ function EmptyFeedSeguiti() {
 export default function SocialFeed() {
   const [tab, setTab] = useState<"perte" | "seguiti">("perte")
   const [cursor, setCursor] = useState<string | undefined>(undefined)
-  const [extraPosts, setExtraPosts] = useState<any[]>([])
+  const [extraPosts, setExtraPosts] = useState<FeedPostRecord[]>([])
   const [hasMore, setHasMore] = useState(true)
   const [visibleCount, setVisibleCount] = useState(5)
   const [storyViewerOpen, setStoryViewerOpen] = useState(false)
@@ -84,11 +89,11 @@ export default function SocialFeed() {
     staleTime: 30_000,
   })
 
-  const allGroups = storyGroups ?? []
+  const allGroups: SocialStoryGroup[] = (storyGroups as SocialStoryGroup[] | undefined) ?? []
   const displayName = profile?.username || profile?.userId?.toString() || "Nuotatore"
   const displayStoryGroups = useMemo(() => {
     return buildDisplayStoryGroups({
-      allGroups: allGroups as any,
+      allGroups,
       currentUserId: currentUserId ?? null,
       displayName,
       avatarUrl: profile?.avatarUrl ?? null,
@@ -96,7 +101,7 @@ export default function SocialFeed() {
   }, [allGroups, currentUserId, displayName, profile?.avatarUrl])
 
   const handleViewStory = useCallback((userId: number) => {
-    const idx = findStoryGroupIndex(displayStoryGroups as any, userId)
+    const idx = findStoryGroupIndex(displayStoryGroups, userId)
     if (idx >= 0) {
       setStoryViewerGroupIdx(idx)
       setStoryViewerOpen(true)
@@ -129,12 +134,12 @@ export default function SocialFeed() {
     if (!nextPageQuery.data) return
     lastCursorRef.current = cursor
 
-    const newPosts = nextPageQuery.data as any[]
+    const newPosts = nextPageQuery.data as unknown as FeedPostRecord[]
     if (newPosts.length < 20) setHasMore(false)
 
     setExtraPosts((prev) => {
-      const existingIds = new Set(prev.map((p: any) => p.id))
-      const fresh = newPosts.filter((p: any) => !existingIds.has(p.id))
+      const existingIds = new Set(prev.map((p) => p.id))
+      const fresh = newPosts.filter((p) => !existingIds.has(p.id))
       return [...prev, ...fresh]
     })
   }, [cursor, nextPageQuery.data])
@@ -147,11 +152,11 @@ export default function SocialFeed() {
     lastCursorRef.current = undefined
   }, [tab])
 
-  const firstPagePosts = (firstPageQuery.data as any[]) ?? []
+  const firstPagePosts = (firstPageQuery.data as unknown as FeedPostRecord[] | undefined) ?? []
   const allPosts = cursor ? [...firstPagePosts, ...extraPosts] : firstPagePosts
 
   const seen = new Set<number>()
-  const posts = allPosts.filter((p: any) => {
+  const posts = allPosts.filter((p) => {
     if (seen.has(p.id)) return false
     seen.add(p.id)
     return true
@@ -166,14 +171,15 @@ export default function SocialFeed() {
   }, [posts, nextPageQuery.isFetching])
 
   const isInitialLoading = firstPageQuery.isLoading && posts.length === 0
+  const hasFeedError = Boolean(firstPageQuery.error) && posts.length === 0 && !isInitialLoading
 
   const headerStoriesSlot = (
     <div className="flex h-12 min-w-0 max-w-[min(68vw,860px)] items-center gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide pr-1">
       {displayStoryGroups.length > 0 ? (
-        displayStoryGroups.map((group: any) => {
+        displayStoryGroups.map((group) => {
           const isCurrent = Number(group.userId) === Number(currentUserId)
           const hasStories = (group.stories?.length ?? 0) > 0
-          const hasUnviewed = group.stories.some((s: any) => !s.hasViewed)
+          const hasUnviewed = group.stories.some((story) => !story.hasViewed)
           return (
             <StoryAvatar
               key={group.userId}
@@ -218,6 +224,20 @@ export default function SocialFeed() {
               />
               {isInitialLoading ? (
                 <FeedSkeleton />
+              ) : hasFeedError ? (
+                <div className="surface-panel p-6 text-center">
+                  <p className="text-sm text-foreground">Impossibile caricare il feed al momento.</p>
+                  <Button
+                    type="button"
+                    variant="outline-neon"
+                    className="mt-3"
+                    onClick={() => {
+                      void firstPageQuery.refetch()
+                    }}
+                  >
+                    Riprova
+                  </Button>
+                </div>
               ) : posts.length === 0 ? (
                 tab === "seguiti" ? (
                   <EmptyFeedSeguiti />
@@ -226,7 +246,7 @@ export default function SocialFeed() {
                 )
               ) : (
                 <div className="flex flex-col gap-4">
-                  {posts.slice(0, visibleCount).map((post: any, index: number) => (
+                  {posts.slice(0, visibleCount).map((post, index) => (
                     <div key={post.id} data-tour={index === 0 ? "feed-first-post" : undefined}>
                       <FeedPost
                         post={post}
@@ -278,7 +298,7 @@ export default function SocialFeed() {
       {/* Story Viewer */}
       {storyViewerOpen && displayStoryGroups.length > 0 && (
         <StoryViewer
-          groups={displayStoryGroups as any}
+          groups={displayStoryGroups as unknown as Parameters<typeof StoryViewer>[0]["groups"]}
           initialGroupIndex={storyViewerGroupIdx}
           onClose={() => setStoryViewerOpen(false)}
         />

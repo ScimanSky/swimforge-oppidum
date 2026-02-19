@@ -1,4 +1,4 @@
-import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean, json, serial, unique, doublePrecision, date, real } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean, json, serial, unique, index, doublePrecision, date, real } from "drizzle-orm/pg-core";
 
 // ============================================
 // ENUMS for PostgreSQL
@@ -139,7 +139,11 @@ export const swimmingActivities = pgTable("swimming_activities", {
   rawData: json("raw_data"),
   shareToFeed: boolean("share_to_feed").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  swimmingActivitiesUserDateIdx: index("idx_swimming_activities_user_activity_date_desc").on(table.userId, table.activityDate),
+  swimmingActivitiesGarminIdIdx: index("idx_swimming_activities_garmin_activity_id").on(table.garminActivityId),
+  swimmingActivitiesStravaIdIdx: index("idx_swimming_activities_strava_activity_id").on(table.stravaActivityId),
+}));
 
 // ============================================
 // GHOST CHALLENGES (Club + Feed)
@@ -301,7 +305,12 @@ export const socialPosts = pgTable("social_posts", {
   isDeleted: boolean("is_deleted").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  socialPostsCreatedAtIdx: index("idx_social_posts_created_at_desc").on(table.createdAt),
+  socialPostsUserCreatedAtIdx: index("idx_social_posts_user_id_created_at_desc").on(table.userId, table.createdAt),
+  socialPostsClubCreatedAtIdx: index("idx_social_posts_club_id_created_at_desc").on(table.clubId, table.createdAt),
+  socialPostsDeletedCreatedAtIdx: index("idx_social_posts_is_deleted_created_at_desc").on(table.isDeleted, table.createdAt),
+}));
 
 export const socialSplashes = pgTable("social_splashes", {
   id: serial("id").primaryKey(),
@@ -329,6 +338,7 @@ export const socialFollows = pgTable("social_follows", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueFollow: unique().on(table.followerId, table.followingId),
+  followingIdx: index("idx_social_follows_following_id").on(table.followingId),
 }));
 
 export const socialHiddenPosts = pgTable("social_hidden_posts", {
@@ -368,7 +378,10 @@ export const stories = pgTable("stories", {
   type: varchar("type", { length: 10 }).notNull(), // image, video, text
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  storiesExpiresAtIdx: index("idx_stories_expires_at").on(table.expiresAt),
+  storiesUserCreatedAtIdx: index("idx_stories_user_created_at_desc").on(table.userId, table.createdAt),
+}));
 
 export const storyViews = pgTable("story_views", {
   id: serial("id").primaryKey(),
@@ -486,7 +499,9 @@ export const directMessages = pgTable("direct_messages", {
   isRead: boolean("is_read").default(false).notNull(),
   readAt: timestamp("read_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  directMessagesReceiverCreatedAtIdx: index("idx_direct_messages_receiver_created_at_desc").on(table.receiverId, table.createdAt),
+}));
 
 // ============================================
 // USER NOTIFICATIONS (Sistema notifiche)
@@ -502,7 +517,9 @@ export const userNotifications = pgTable("user_notifications", {
   isRead: boolean("is_read").default(false).notNull(),
   readAt: timestamp("read_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  userNotificationsUserCreatedAtIdx: index("idx_user_notifications_user_created_at_desc").on(table.userId, table.createdAt),
+}));
 
 // ============================================
 // CLUB ANNOUNCEMENTS (Annunci importanti)
@@ -556,7 +573,9 @@ export const userAchievementBadges = pgTable("user_achievement_badges", {
   badgeId: integer("badge_id").notNull(),
   awardedAt: timestamp("awarded_at").defaultNow().notNull(),
   activityId: integer("activity_id"),
-});
+}, (table) => ({
+  uniqueAchievementBadge: unique().on(table.userId, table.badgeId),
+}));
 
 // ============================================
 // XP TRANSACTIONS (Audit log)
@@ -569,7 +588,9 @@ export const xpTransactions = pgTable("xp_transactions", {
   referenceId: integer("reference_id"),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  xpTransactionsUserCreatedAtIdx: index("idx_xp_transactions_user_created_at_desc").on(table.userId, table.createdAt),
+}));
 
 // ============================================
 // PERSONAL RECORDS
@@ -583,7 +604,9 @@ export const personalRecords = pgTable("personal_records", {
   activityId: integer("activity_id"),
   achievedAt: timestamp("achieved_at").defaultNow().notNull(),
   previousValue: integer("previous_value"),
-});
+}, (table) => ({
+  personalRecordsUserTypeStrokeIdx: index("idx_personal_records_user_type_stroke").on(table.userId, table.recordType, table.strokeType),
+}));
 
 // ============================================
 // LEVEL THRESHOLDS
@@ -639,7 +662,9 @@ export const weeklyStats = pgTable("weekly_stats", {
   totalTimeSeconds: integer("total_time_seconds").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  uniqueWeeklyStatsUserWeek: unique().on(table.userId, table.weekStart),
+}));
 
 // ============================================
 // AI INSIGHTS CACHE

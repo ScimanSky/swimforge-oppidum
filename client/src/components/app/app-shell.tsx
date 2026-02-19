@@ -268,7 +268,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
             ) : null}
           </div>
 
-          <div data-tour="top-actions" className="flex items-center gap-2">
+          <div data-tour="top-actions" className="flex items-center gap-2 lg:hidden">
             <NotificationBell />
             <DirectMessages />
 

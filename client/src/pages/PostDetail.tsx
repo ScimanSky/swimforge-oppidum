@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import FeedPost from "@/components/social/FeedPost";
+import type { FeedPostRecord } from "@/components/social/feed-types";
 import { trpc } from "@/lib/trpc";
 
 export default function PostDetail() {
@@ -45,7 +46,11 @@ export default function PostDetail() {
             {postQuery.error.message || "Post non disponibile."}
           </div>
         ) : postQuery.data ? (
-          <FeedPost post={postQuery.data} currentUserId={currentUserId} autoplayVideos={autoplayVideos} />
+          <FeedPost
+            post={postQuery.data as unknown as FeedPostRecord}
+            currentUserId={currentUserId}
+            autoplayVideos={autoplayVideos}
+          />
         ) : (
           <div className="surface-panel p-6 text-sm text-muted-foreground">Post non trovato.</div>
         )}

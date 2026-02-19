@@ -91,6 +91,7 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
   const startRef = useRef(0)
   const rafRef = useRef(0)
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
   const clipRangeRef = useRef<VideoClipRange>(DEFAULT_VIDEO_CLIP_RANGE)
   const advancedFromClipRef = useRef(false)
 
@@ -190,10 +191,48 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
 
   // Keyboard
   useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    const previousActive = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    container.focus()
+    return () => {
+      previousActive?.focus()
+    }
+  }, [])
+
+  useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose()
       if (e.key === "ArrowRight") goNext()
       if (e.key === "ArrowLeft") goPrev()
+      if (e.key === "Tab") {
+        const container = containerRef.current
+        if (!container) return
+
+        const focusable = Array.from(
+          container.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          )
+        ).filter((node) => !node.hasAttribute("disabled") && node.tabIndex >= 0)
+
+        if (focusable.length === 0) {
+          e.preventDefault()
+          container.focus()
+          return
+        }
+
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+        const active = document.activeElement as HTMLElement | null
+
+        if (!e.shiftKey && (active === last || active === container)) {
+          e.preventDefault()
+          first.focus()
+        } else if (e.shiftKey && (active === first || active === container)) {
+          e.preventDefault()
+          last.focus()
+        }
+      }
     }
     window.addEventListener("keydown", handler)
     return () => window.removeEventListener("keydown", handler)
@@ -277,9 +316,13 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
     <AnimatePresence>
       <motion.div
         key="story-viewer"
+        ref={containerRef}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        role="dialog"
+        aria-modal="true"
+        tabIndex={-1}
         className="fixed inset-0 z-[60] flex items-center justify-center bg-black"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
