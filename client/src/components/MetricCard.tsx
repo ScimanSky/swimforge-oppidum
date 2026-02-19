@@ -27,34 +27,34 @@ interface MetricCardProps {
 
 const colorClasses = {
   green: {
-    bg: "bg-green-50 dark:bg-green-900/20",
-    border: "border-green-200 dark:border-green-800",
-    text: "text-green-700 dark:text-green-300",
-    gauge: "bg-green-500",
+    bg: "bg-green-50 dark:bg-transparent dark:shadow-[0_0_20px_rgba(34,197,94,0.15)]",
+    border: "border-green-200 dark:border-green-500/30",
+    text: "text-green-700 dark:text-green-400 dark:drop-shadow-[0_0_8px_rgba(34,197,94,0.6)]",
+    gauge: "bg-green-500 dark:bg-green-400 dark:shadow-[0_0_12px_rgba(34,197,94,0.8)]",
   },
   blue: {
-    bg: "bg-blue-50 dark:bg-blue-900/20",
-    border: "border-blue-200 dark:border-blue-800",
-    text: "text-blue-700 dark:text-blue-300",
-    gauge: "bg-blue-500",
+    bg: "bg-blue-50 dark:bg-transparent dark:shadow-[0_0_20px_var(--neon-soft)]",
+    border: "border-blue-200 dark:border-primary/40",
+    text: "text-blue-700 dark:text-primary dark:drop-shadow-[0_0_8px_var(--neon-glow)]",
+    gauge: "bg-blue-500 dark:bg-primary dark:shadow-[0_0_12px_var(--neon-glow)]",
   },
   yellow: {
-    bg: "bg-yellow-50 dark:bg-yellow-900/20",
-    border: "border-yellow-200 dark:border-yellow-800",
-    text: "text-yellow-700 dark:text-yellow-300",
-    gauge: "bg-yellow-500",
+    bg: "bg-yellow-50 dark:bg-transparent dark:shadow-[0_0_20px_rgba(234,179,8,0.15)]",
+    border: "border-yellow-200 dark:border-yellow-500/30",
+    text: "text-yellow-700 dark:text-yellow-400 dark:drop-shadow-[0_0_8px_rgba(234,179,8,0.6)]",
+    gauge: "bg-yellow-500 dark:bg-yellow-400 dark:shadow-[0_0_12px_rgba(234,179,8,0.8)]",
   },
   red: {
-    bg: "bg-red-50 dark:bg-red-900/20",
-    border: "border-red-200 dark:border-red-800",
-    text: "text-red-700 dark:text-red-300",
-    gauge: "bg-red-500",
+    bg: "bg-red-50 dark:bg-transparent dark:shadow-[0_0_20px_rgba(239,68,68,0.15)]",
+    border: "border-red-200 dark:border-red-500/30",
+    text: "text-red-700 dark:text-red-400 dark:drop-shadow-[0_0_8px_rgba(239,68,68,0.6)]",
+    gauge: "bg-red-500 dark:bg-red-500 dark:shadow-[0_0_12px_rgba(239,68,68,0.8)]",
   },
   gray: {
-    bg: "bg-gray-50 dark:bg-gray-800",
-    border: "border-gray-200 dark:border-gray-700",
+    bg: "bg-gray-50 dark:bg-transparent",
+    border: "border-gray-200 dark:border-border/50",
     text: "text-gray-500 dark:text-gray-400",
-    gauge: "bg-gray-400",
+    gauge: "bg-gray-400 dark:bg-gray-600",
   },
 };
 
@@ -78,7 +78,7 @@ export function MetricCard({
     <>
       {/* Card */}
       <div
-        className={`relative p-4 rounded-lg border ${colors.bg} ${colors.border} transition-all hover:shadow-md`}
+        className={`surface-panel relative p-4 rounded-xl border ${colors.bg} ${colors.border} transition-all hover:shadow-[0_8px_30px_var(--neon-soft)] group`}
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
       >

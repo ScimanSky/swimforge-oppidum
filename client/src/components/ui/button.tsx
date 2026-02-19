@@ -10,40 +10,42 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground shadow-[0_0_22px_var(--neon-soft)] hover:shadow-[0_0_34px_var(--neon-glow)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99]',
+          'bg-primary text-primary-foreground shadow-[0_0_22px_var(--neon-soft)] hover:shadow-[0_0_40px_var(--neon-glow)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]',
         neon:
           [
             'relative overflow-hidden',
-            // Neon soft dark: keep accents decisive but not rainbow.
+            // Stark solid cyber gradient
             'bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime))]',
             'bg-[length:220%_220%] bg-[position:0%_50%] hover:bg-[position:100%_50%]',
-            'text-primary-foreground font-bold tracking-tight',
-            'shadow-[0_0_24px_var(--neon-glow),0_0_48px_var(--neon-soft)] hover:shadow-[0_0_36px_var(--neon-glow),0_0_64px_var(--neon-soft)]',
-            'hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]',
+            'text-primary-foreground font-extrabold tracking-widest uppercase text-xs',
+            'shadow-[0_0_24px_var(--neon-soft),0_0_48px_var(--neon-soft)] hover:shadow-[0_0_40px_var(--neon-glow),0_0_80px_var(--neon-soft)]',
+            'border-[1.5px] border-primary-foreground/30 hover:border-primary-foreground/60',
+            'hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.98]',
             "before:pointer-events-none before:absolute before:inset-0 before:content-['']",
-            'before:bg-[radial-gradient(circle_at_30%_20%,color-mix(in_oklch,white_35%,transparent)_0%,transparent_58%)]',
-            'before:opacity-60 hover:before:opacity-85 before:transition-opacity before:duration-300',
+            'before:bg-[radial-gradient(circle_at_30%_20%,color-mix(in_oklch,white_40%,transparent)_0%,transparent_60%)]',
+            'before:opacity-40 hover:before:opacity-100 before:transition-opacity before:duration-200',
             "after:pointer-events-none after:absolute after:inset-0 after:content-['']",
-            'after:bg-[linear-gradient(90deg,transparent,color-mix(in_oklch,white_30%,transparent),transparent)]',
-            'after:translate-x-[-120%] hover:after:translate-x-[120%] after:transition-transform after:duration-700 after:ease-out',
+            'after:bg-[linear-gradient(90deg,transparent,color-mix(in_oklch,white_60%,transparent),transparent)]',
+            'after:translate-x-[-150%] hover:after:translate-x-[150%] after:transition-transform after:duration-[600ms] after:ease-out',
           ].join(' '),
         'outline-neon':
           [
-            'ei-border-gradient',
-            'text-foreground font-semibold',
-            'shadow-[0_0_12px_var(--neon-soft),inset_0_0_12px_var(--neon-soft)] hover:shadow-[0_0_24px_var(--neon-soft),inset_0_0_24px_var(--neon-soft)] bg-background/50',
-            'hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99]',
+            'border-2 border-primary bg-background/50',
+            'text-primary font-bold tracking-widest uppercase text-xs hover:text-primary-foreground hover:bg-primary',
+            'shadow-[0_0_12px_var(--neon-soft),inset_0_0_12px_var(--neon-soft)] hover:shadow-[0_0_30px_var(--neon-glow)]',
+            'hover:-translate-y-[2px] active:translate-y-0 active:scale-[0.98]',
+            'transition-all duration-300'
           ].join(' '),
         'ghost-neon':
-          'text-primary font-semibold hover:bg-primary/10 hover:shadow-[0_0_16px_var(--neon-soft)] hover:text-primary-foreground',
+          'text-primary font-bold tracking-widest uppercase text-xs hover:bg-primary/20 hover:shadow-[0_0_20px_var(--neon-soft)] hover:text-primary',
         destructive:
           'bg-destructive text-white hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
         outline:
-          'border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50',
+          'border border-border/60 bg-background/40 shadow-sm hover:bg-accent/20 hover:text-accent-foreground backdrop-blur-md',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+          'bg-secondary/80 text-secondary-foreground hover:bg-secondary border border-border/40',
         ghost:
-          'hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50',
+          'hover:bg-accent/20 hover:text-accent-foreground',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {

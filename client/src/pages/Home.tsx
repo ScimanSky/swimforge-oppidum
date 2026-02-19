@@ -97,16 +97,16 @@ function FeatureCard({
 }) {
   const Icon = icon;
   return (
-    <Surface className="relative overflow-hidden border-border/50 bg-card/65 backdrop-blur transition-all hover:border-primary/30 hover:shadow-md">
+    <Surface className="relative overflow-hidden group transition-all hover:border-primary/60 hover:shadow-[0_8px_30px_var(--neon-soft)] hover:-translate-y-1">
       {backgroundImageSrc && (
         <div aria-hidden className="pointer-events-none absolute inset-0">
           <img
             src={backgroundImageSrc}
             alt=""
-            className="h-full w-full object-cover opacity-35"
+            className="h-full w-full object-cover opacity-30 transition-transform duration-700 group-hover:scale-105"
             loading="lazy"
           />
-          <div className="absolute inset-0 bg-gradient-to-br from-background/24 via-background/56 to-background/78" />
+          <div className="absolute inset-0 bg-gradient-to-br from-background/40 via-background/70 to-background/95" />
         </div>
       )}
       <SurfaceContent className="relative pt-6">

@@ -12,17 +12,17 @@ const badgeVariants = cva(
         default:
           'border-transparent bg-primary text-primary-foreground [a&]:hover:bg-primary/90',
         secondary:
-          'border-transparent bg-secondary text-secondary-foreground [a&]:hover:bg-secondary/90',
+          'border-transparent bg-secondary text-secondary-foreground flex-none',
         destructive:
-          'border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/60',
+          'border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90',
         neon:
-          'border-primary/80 bg-primary/20 text-primary shadow-[0_0_16px_var(--neon-soft)] font-bold tracking-tight',
+          'border-[1.5px] border-primary bg-primary/20 text-primary shadow-[0_0_20px_var(--neon-soft)] font-extrabold tracking-widest uppercase text-[0.65rem] px-2.5 py-1',
         'rank-gold':
-          'border-[var(--gold)]/80 bg-[var(--gold)]/20 text-[var(--gold)] font-bold tracking-tight shadow-[0_0_12px_color-mix(in_oklch,var(--gold)_30%,transparent)]',
+          'border-[1.5px] border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--gold)] font-extrabold tracking-widest uppercase text-[0.65rem] px-2.5 py-1 shadow-[0_0_16px_color-mix(in_oklch,var(--gold)_40%,transparent)]',
         'rank-silver':
-          'border-slate-300/80 bg-slate-300/20 text-slate-200 font-bold tracking-tight',
+          'border-[1.5px] border-slate-300 bg-slate-300/20 text-slate-200 font-extrabold tracking-widest uppercase text-[0.65rem] px-2.5 py-1 shell-text-shadow',
         'rank-bronze':
-          'border-orange-500/80 bg-orange-500/20 text-orange-400 font-bold tracking-tight',
+          'border-[1.5px] border-orange-500 bg-orange-500/20 text-orange-400 font-extrabold tracking-widest uppercase text-[0.65rem] px-2.5 py-1 shell-text-shadow',
       },
     },
     defaultVariants: {

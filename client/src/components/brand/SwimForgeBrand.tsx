@@ -8,9 +8,9 @@ interface SwimForgeMarkProps {
 export function SwimForgeMark({ className, alt = "SwimForge" }: SwimForgeMarkProps) {
   return (
     <img
-      src="/brand/swimforge-mark.svg"
+      src="/images/theme-v3/logo-cyber.webp"
       alt={alt}
-      className={cn("h-9 w-9 object-contain", className)}
+      className={cn("h-10 w-10 object-contain drop-shadow-md", className)}
       loading="eager"
       decoding="async"
     />
