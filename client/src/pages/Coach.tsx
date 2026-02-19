@@ -514,13 +514,13 @@ export default function Coach() {
           <img
             src="/images/theme-v3/coach-chat-bg.png"
             alt=""
-            className="h-full w-full object-cover opacity-[0.16]"
+            className="h-full w-full object-cover opacity-[0.28]"
             loading="lazy"
           />
           <img
             src="/images/theme-v3/overlay-energy.png"
             alt=""
-            className="absolute inset-0 h-full w-full object-cover opacity-[0.08] mix-blend-screen"
+            className="absolute inset-0 h-full w-full object-cover opacity-[0.15] mix-blend-screen"
             loading="lazy"
           />
         </div>

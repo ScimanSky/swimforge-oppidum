@@ -202,7 +202,21 @@ export default function SocialFeed() {
 
   return (
     <AppLayout headerSlot={headerStoriesSlot}>
-      <div className="compact-shell space-y-4 lg:space-y-2">
+      <div className="compact-shell relative space-y-4 lg:space-y-2">
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-3xl">
+          <img
+            src="/images/theme-v3/feed-social-bg.png"
+            alt=""
+            className="h-full w-full object-cover opacity-[0.16]"
+            loading="lazy"
+          />
+          <img
+            src="/images/theme-v3/overlay-caustics.png"
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover opacity-[0.10] mix-blend-screen"
+            loading="lazy"
+          />
+        </div>
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
           <div className="w-full min-w-0 max-w-2xl">
             <div

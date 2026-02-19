@@ -84,8 +84,8 @@ export default function ResetPassword() {
       <ThemeToggleButton className="absolute right-4 top-4 z-20" />
       <div className="hidden lg:flex lg:w-1/2 relative">
         <Image src="/images/theme-v3/auth-bg.png" alt="Swimmer" fill className="object-cover" />
-        <Image src="/images/theme-v3/overlay-caustics.png" alt="" fill className="object-cover opacity-20 mix-blend-screen" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/80 to-transparent" />
+        <Image src="/images/theme-v3/overlay-caustics.png" alt="" fill className="object-cover opacity-[0.28] mix-blend-screen" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/58 to-transparent" />
         <div className="absolute bottom-12 left-12 max-w-md">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">

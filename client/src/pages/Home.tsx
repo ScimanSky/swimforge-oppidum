@@ -155,13 +155,13 @@ export default function Home() {
         <img
           src="/images/theme-v3/landing-hero.jpg"
           alt=""
-          className="h-full w-full object-cover opacity-[0.18]"
+          className="h-full w-full object-cover opacity-[0.30]"
           loading="lazy"
         />
         <img
           src="/images/theme-v3/overlay-caustics.png"
           alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-10 mix-blend-screen"
+          className="absolute inset-0 h-full w-full object-cover opacity-[0.16] mix-blend-screen"
           loading="lazy"
         />
       </div>
