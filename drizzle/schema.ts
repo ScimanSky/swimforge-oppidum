@@ -26,6 +26,12 @@ export const users = pgTable("users", {
   lastSignedIn: timestamp("last_signed_in").defaultNow().notNull(),
 });
 
+export const userPresence = pgTable("user_presence", {
+  userId: integer("user_id").primaryKey(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // ============================================
 // USER CONSENTS (GDPR audit trail)
 // ============================================

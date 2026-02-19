@@ -201,7 +201,7 @@ export default function SocialFeed() {
           <div className="w-full min-w-0 max-w-2xl">
             <div
               data-tour="feed-tabs"
-              className="sticky top-16 z-20 mb-3 bg-background/80 py-3 backdrop-blur-lg"
+              className="relative z-10 mb-3 bg-background/70 py-2 backdrop-blur-sm"
             >
               {firstPageQuery.isFetching && !isInitialLoading && (
                 <div className="flex justify-center py-1">

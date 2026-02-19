@@ -33,6 +33,7 @@ interface FeedPostHeaderProps {
     activity_is_open_water?: boolean | null
     created_at: string
     user_level?: number | null
+    user_is_online?: boolean | null
   }
   isOwner: boolean
   isFollowing?: boolean
@@ -91,7 +92,9 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
             <AvatarImage src={post.user_avatar || ""} alt={name} />
             <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
           </Avatar>
-          <span className="absolute -left-0.5 -top-0.5 size-3 rounded-full border-2 border-card bg-emerald-400" />
+          {post.user_is_online ? (
+            <span className="absolute -left-0.5 -top-0.5 size-3 rounded-full border-2 border-card bg-emerald-400" />
+          ) : null}
         </div>
       </Link>
       <div className="flex-1 min-w-0">

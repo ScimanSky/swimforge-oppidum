@@ -14,6 +14,7 @@ import { createHash } from "crypto";
 import { ENV } from "../_core/env";
 import { socialPosts } from "../../drizzle/schema";
 import { getCloudinaryCreditUsage } from "../lib/cloudinary";
+import { ensureUserPresenceSchema, getOnlineIntervalSql } from "../user_presence";
 
 const CLUB_STAFF_ROLES = new Set(["owner", "admin", "moderator"]);
 const REACTION_TYPES = ["splash", "fire", "strong", "clap", "wave", "love", "rocket", "wow", "laugh", "cry"] as const;
@@ -228,6 +229,7 @@ export const communityRouter = router({
         .input(z.object({ postId: z.number() }))
         .query(async ({ ctx, input }) => {
             await requirePostReadable(ctx.user.id, input.postId);
+            await ensureUserPresenceSchema();
 
             const { getDb } = await import("../db");
             const { sql } = await import("drizzle-orm");
@@ -251,6 +253,11 @@ export const communityRouter = router({
                   u.name AS user_name,
                   u.email AS user_email,
                   sp.avatar_url AS user_avatar,
+                  EXISTS(
+                    SELECT 1 FROM user_presence up
+                    WHERE up.user_id = p.user_id
+                      AND up.last_seen_at >= ${getOnlineIntervalSql()}
+                  ) AS user_is_online,
                   a.distance_meters AS activity_distance_meters,
                   a.duration_seconds AS activity_duration_seconds,
                   a.activity_date AS activity_date,

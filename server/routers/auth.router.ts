@@ -9,6 +9,7 @@ import { getSupabaseAdminClient } from "../_core/supabase_admin";
 import { sendAccountDeletionConfirmationEmail } from "../_core/email";
 import { ENV } from "../_core/env";
 import { ensureRequiredLegalConsents } from "../consent";
+import { markUserOffline, touchUserPresence } from "../user_presence";
 
 const DEV_RESET_EMAIL = "shardanu@gmail.com";
 const RESET_CONFIRMATION_PHRASE = "RESET APP";
@@ -85,10 +86,22 @@ export const authRouter = router({
             return { success: true, user: { id: result.user.id, email: result.user.email, name: result.user.name } };
         }),
 
-    logout: publicProcedure.mutation(({ ctx }) => {
+    logout: publicProcedure.mutation(async ({ ctx }) => {
+        if (ctx.user?.id) {
+            try {
+                await markUserOffline(ctx.user.id);
+            } catch {
+                // Non-blocking: logout should still succeed even if presence update fails.
+            }
+        }
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.clearCookie(COOKIE_NAME, cookieOptions);
         return { success: true } as const;
+    }),
+
+    heartbeat: protectedProcedure.mutation(async ({ ctx }) => {
+        await touchUserPresence(ctx.user.id);
+        return { ok: true } as const;
     }),
 
     // Sync Supabase OAuth user

@@ -1,5 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "./db";
+import { ensureUserPresenceSchema, getOnlineIntervalSql } from "./user_presence";
 import {
   socialPosts,
   socialSplashes,
@@ -18,6 +19,7 @@ const POST_DELETE_WINDOW_HOURS = Math.max(1, Number.parseInt(process.env.POST_DE
 export async function getSocialFeed(userId: number, options: { limit?: number; scope?: FeedScope; before?: Date } = {}) {
   const db = await getDb();
   if (!db) return [];
+  await ensureUserPresenceSchema();
 
   const limit = options.limit ?? 20;
   const scope = options.scope ?? "global";
@@ -54,6 +56,11 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
       u.name AS user_name,
       u.email AS user_email,
       sp.avatar_url AS user_avatar,
+      EXISTS(
+        SELECT 1 FROM user_presence up
+        WHERE up.user_id = p.user_id
+          AND up.last_seen_at >= ${getOnlineIntervalSql()}
+      ) AS user_is_online,
       a.distance_meters AS activity_distance_meters,
       a.duration_seconds AS activity_duration_seconds,
       a.activity_date AS activity_date,

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { Link, useLocation } from "wouter"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import {
@@ -123,12 +123,38 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const { theme, toggleTheme, switchable } = useTheme()
   const logoutMutation = trpc.auth.logout.useMutation()
+  const heartbeatMutation = trpc.auth.heartbeat.useMutation()
   const meQuery = trpc.auth.me.useQuery()
   const reduceMotion = useReducedMotion()
   const isAdmin = meQuery.data?.role === "admin"
 
   const pageTitle = useMemo(() => titleForPath(location), [location])
   const showPageTitle = !(headerSlot && pageTitle === "Feed")
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return
+
+    const sendHeartbeat = () => {
+      if (document.visibilityState !== "visible") return
+      heartbeatMutation.mutate(undefined, {
+        onError: () => {
+          // Presence updates are best-effort and should not affect UX.
+        },
+      })
+    }
+
+    sendHeartbeat()
+    const intervalId = window.setInterval(sendHeartbeat, 60_000)
+    const onVisibilityOrFocus = () => sendHeartbeat()
+    document.addEventListener("visibilitychange", onVisibilityOrFocus)
+    window.addEventListener("focus", onVisibilityOrFocus)
+
+    return () => {
+      window.clearInterval(intervalId)
+      document.removeEventListener("visibilitychange", onVisibilityOrFocus)
+      window.removeEventListener("focus", onVisibilityOrFocus)
+    }
+  }, [heartbeatMutation.mutate])
 
   const handleLogout = async () => {
     if (isLoggingOut) return
