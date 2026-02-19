@@ -7,8 +7,9 @@
 
 import { getDb } from "./db";
 import { achievementBadgeDefinitions, userAchievementBadges, swimmingActivities, swimmerProfiles } from "../drizzle/schema";
-import { eq, and, gte, sql } from "drizzle-orm";
+import { eq, and, gte, gt, sql } from "drizzle-orm";
 import { calculateSEI, calculateSER, calculateTCI } from "./advanced_metrics";
+import { logger } from "./middleware/logger";
 
 interface BadgeCriteria {
   metric: string;
@@ -17,6 +18,21 @@ interface BadgeCriteria {
   min_activities_per_week?: number;
   consecutive_weeks?: number;
 }
+
+type SwimmerProfileRow = typeof swimmerProfiles.$inferSelect;
+type SwimmingActivityRow = typeof swimmingActivities.$inferSelect;
+
+type ActivityForBadges = {
+  id: number;
+  activityDate: Date;
+  distanceMeters: number;
+  durationSeconds: number;
+  avgSwolf: number | null;
+  avgPacePer100m: number | null;
+  maxHeartRate: number | null;
+  avgHeartRate: number | null;
+  calories: number | null;
+};
 
 /**
  * Main function to check and award badges for a user
@@ -27,6 +43,8 @@ export async function checkAndAwardBadges(userId: number): Promise<string[]> {
   if (!db) return [];
 
   try {
+    const log = logger.child({ component: "badge_engine" });
+
     // Get all badge definitions
     const allBadges = await db.select().from(achievementBadgeDefinitions);
 
@@ -56,85 +74,137 @@ export async function checkAndAwardBadges(userId: number): Promise<string[]> {
 
     const newlyAwardedBadges: string[] = [];
 
-    // Evaluate each badge
-    for (const badge of allBadges) {
-      // Skip if user already has this badge
-      if (ownedBadgeIds.has(badge.id)) continue;
+    // Work only on badges the user doesn't already own.
+    const pendingBadges = allBadges.filter(b => !ownedBadgeIds.has(b.id));
 
+    // Pre-evaluate badges that don't require scanning all activities.
+    const metricPeakBadges: typeof pendingBadges = [];
+    const singleActivityBadges: typeof pendingBadges = [];
+    const consistencyBadges: typeof pendingBadges = [];
+
+    for (const badge of pendingBadges) {
+      switch (badge.criteriaType) {
+        case "aggregate_total": {
+          const criteria = badge.criteriaJson as BadgeCriteria;
+          if (evaluateAggregateTotalCriteria(criteria, profile)) {
+            await db.insert(userAchievementBadges).values({ userId, badgeId: badge.id });
+            newlyAwardedBadges.push(badge.name);
+            log.info("Badge awarded", { userId, badgeId: badge.id, badgeName: badge.name, criteriaType: badge.criteriaType });
+          }
+          break;
+        }
+        case "metric_peak":
+          metricPeakBadges.push(badge);
+          break;
+        case "single_activity":
+          singleActivityBadges.push(badge);
+          break;
+        case "consistency":
+          consistencyBadges.push(badge);
+          break;
+        default:
+          log.warn("Unknown badge criteria type", { userId, badgeId: badge.id, criteriaType: badge.criteriaType });
+          break;
+      }
+    }
+
+    // metric_peak evaluation uses its own bounded query (already limited).
+    for (const badge of metricPeakBadges) {
       const criteria = badge.criteriaJson as BadgeCriteria;
-      const criteriaMet = await evaluateBadgeCriteria(
-        userId,
-        badge.criteriaType,
-        criteria,
-        userActivities,
-        profile
-      );
+      const met = await evaluateMetricPeakCriteria(criteria, userId);
+      if (!met) continue;
 
-      if (criteriaMet) {
-        // Award the badge
-        await db.insert(userAchievementBadges).values({
-          userId,
-          badgeId: badge.id,
-        });
+      await db.insert(userAchievementBadges).values({ userId, badgeId: badge.id });
+      newlyAwardedBadges.push(badge.name);
+      log.info("Badge awarded", { userId, badgeId: badge.id, badgeName: badge.name, criteriaType: badge.criteriaType });
+    }
 
+    // For large datasets, scan activities in batches with a cursor on id (avoid loading everything in memory).
+    if (singleActivityBadges.length > 0 || consistencyBadges.length > 0) {
+      const BATCH_SIZE = 100;
+      let lastId = 0;
+
+      const metSingleBadges = new Set<number>();
+      const weeklyActivities: Map<string, number> = new Map();
+
+      while (true) {
+        const batch = (await db
+          .select({
+            id: swimmingActivities.id,
+            activityDate: swimmingActivities.activityDate,
+            distanceMeters: swimmingActivities.distanceMeters,
+            durationSeconds: swimmingActivities.durationSeconds,
+            avgSwolf: swimmingActivities.avgSwolf,
+            avgPacePer100m: swimmingActivities.avgPacePer100m,
+            maxHeartRate: swimmingActivities.maxHeartRate,
+            avgHeartRate: swimmingActivities.avgHeartRate,
+            calories: swimmingActivities.calories,
+          })
+          .from(swimmingActivities)
+          .where(and(eq(swimmingActivities.userId, userId), gt(swimmingActivities.id, lastId)))
+          .orderBy(swimmingActivities.id)
+          .limit(BATCH_SIZE)) as ActivityForBadges[];
+
+        if (batch.length === 0) break;
+
+        for (const activity of batch) {
+          // Build per-week counts for consistency badges.
+          if (consistencyBadges.length > 0) {
+            const date = activity.activityDate;
+            if (!Number.isNaN(date.getTime())) {
+              const weekKey = getWeekKey(date);
+              weeklyActivities.set(weekKey, (weeklyActivities.get(weekKey) || 0) + 1);
+            }
+          }
+
+          // Evaluate "single_activity" badges; short-circuit per-badge as soon as it's met.
+          for (const badge of singleActivityBadges) {
+            if (metSingleBadges.has(badge.id)) continue;
+            const criteria = badge.criteriaJson as BadgeCriteria;
+            const value = getActivityValue(activity, criteria.metric);
+            if (value !== null && evaluateOperator(value, criteria.operator, criteria.value)) {
+              metSingleBadges.add(badge.id);
+            }
+          }
+        }
+
+        lastId = batch[batch.length - 1]!.id;
+
+        // If we don't need consistency counts, we can stop early once every single-activity badge is met.
+        if (consistencyBadges.length === 0 && metSingleBadges.size === singleActivityBadges.length) {
+          break;
+        }
+      }
+
+      // Award met single-activity badges.
+      for (const badge of singleActivityBadges) {
+        if (!metSingleBadges.has(badge.id)) continue;
+        await db.insert(userAchievementBadges).values({ userId, badgeId: badge.id });
         newlyAwardedBadges.push(badge.name);
-        console.log(`[Badge Engine] Awarded badge "${badge.name}" to user ${userId}`);
+        log.info("Badge awarded", { userId, badgeId: badge.id, badgeName: badge.name, criteriaType: badge.criteriaType });
+      }
+
+      // Evaluate and award consistency badges using the weekly counts.
+      for (const badge of consistencyBadges) {
+        const criteria = badge.criteriaJson as BadgeCriteria;
+        if (!evaluateConsistencyCriteriaFromWeeklyCounts(criteria, weeklyActivities)) continue;
+        await db.insert(userAchievementBadges).values({ userId, badgeId: badge.id });
+        newlyAwardedBadges.push(badge.name);
+        log.info("Badge awarded", { userId, badgeId: badge.id, badgeName: badge.name, criteriaType: badge.criteriaType });
       }
     }
 
     return newlyAwardedBadges;
   } catch (error) {
-    console.error(`[Badge Engine] Error checking badges for user ${userId}:`, error);
+    logger.error("Error checking badges", { component: "badge_engine", userId, error });
     return [];
   }
 }
 
 /**
- * Evaluate if a badge's criteria are met
- */
-async function evaluateBadgeCriteria(
-  userId: number,
-  criteriaType: string,
-  criteria: BadgeCriteria,
-  activities: any[],
-  profile: any
-): Promise<boolean> {
-  switch (criteriaType) {
-    case 'single_activity':
-      return evaluateSingleActivityCriteria(criteria, activities);
-
-    case 'aggregate_total':
-      return evaluateAggregateTotalCriteria(criteria, profile);
-
-    case 'consistency':
-      return evaluateConsistencyCriteria(criteria, activities);
-
-    case 'metric_peak':
-      return await evaluateMetricPeakCriteria(criteria, userId);
-
-    default:
-      console.warn(`[Badge Engine] Unknown criteria type: ${criteriaType}`);
-      return false;
-  }
-}
-
-/**
- * Check if any single activity meets the criteria
- */
-function evaluateSingleActivityCriteria(criteria: BadgeCriteria, activities: any[]): boolean {
-  for (const activity of activities) {
-    const value = getActivityValue(activity, criteria.metric);
-    if (value !== null && evaluateOperator(value, criteria.operator, criteria.value)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
  * Check if aggregate totals meet the criteria
  */
-function evaluateAggregateTotalCriteria(criteria: BadgeCriteria, profile: any): boolean {
+function evaluateAggregateTotalCriteria(criteria: BadgeCriteria, profile: SwimmerProfileRow): boolean {
   let value: number | null = null;
 
   switch (criteria.metric) {
@@ -155,27 +225,15 @@ function evaluateAggregateTotalCriteria(criteria: BadgeCriteria, profile: any): 
 }
 
 /**
- * Check if consistency criteria are met (e.g., 3 sessions per week for 4 weeks)
+ * Check if consistency criteria are met (e.g., 3 sessions per week for 4 weeks),
+ * using pre-aggregated weekly counts (computed while scanning activities in batches).
  */
-function evaluateConsistencyCriteria(criteria: BadgeCriteria, activities: any[]): boolean {
+function evaluateConsistencyCriteriaFromWeeklyCounts(
+  criteria: BadgeCriteria,
+  weeklyActivities: Map<string, number>
+): boolean {
   if (!criteria.min_activities_per_week || !criteria.consecutive_weeks) {
     return false;
-  }
-
-  // Sort activities by date (oldest first)
-  const sortedActivities = [...activities].sort(
-    (a, b) => new Date(a.activityDate).getTime() - new Date(b.activityDate).getTime()
-  );
-
-  if (sortedActivities.length === 0) return false;
-
-  // Group activities by week
-  const weeklyActivities: Map<string, number> = new Map();
-
-  for (const activity of sortedActivities) {
-    const date = new Date(activity.activityDate);
-    const weekKey = getWeekKey(date);
-    weeklyActivities.set(weekKey, (weeklyActivities.get(weekKey) || 0) + 1);
   }
 
   // Check for consecutive weeks meeting the minimum, including missing weeks as breaks
@@ -290,14 +348,25 @@ async function evaluateMetricPeakCriteria(criteria: BadgeCriteria, userId: numbe
 /**
  * Get a value from an activity based on the metric name
  */
-function getActivityValue(activity: any, metric: string): number | null {
+type ActivityValueSource = Pick<
+  SwimmingActivityRow,
+  | "distanceMeters"
+  | "durationSeconds"
+  | "avgSwolf"
+  | "avgPacePer100m"
+  | "maxHeartRate"
+  | "avgHeartRate"
+  | "calories"
+>;
+
+function getActivityValue(activity: ActivityValueSource, metric: string): number | null {
   switch (metric) {
     case 'distance':
       return activity.distanceMeters;
     case 'duration':
       return activity.durationSeconds;
     case 'swolf_score':
-      return activity.swolfScore ?? activity.avgSwolf ?? null;
+      return activity.avgSwolf ?? null;
     case 'avg_pace_per_100m':
       return activity.avgPacePer100m;
     case 'max_heart_rate':

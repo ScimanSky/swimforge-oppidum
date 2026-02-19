@@ -6,19 +6,20 @@
 import { getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
+import { logger } from "./middleware/logger";
 
 async function fixDatabase() {
-  console.log("🔧 Starting database fix...\n");
+  logger.info("🔧 Starting database fix...\n");
 
   const db = await getDb();
   if (!db) {
-    console.error("❌ Database not available");
+    logger.error("❌ Database not available");
     return;
   }
 
   try {
     // 1. Check if ai_insights_cache has period_days column
-    console.log("1️⃣ Checking ai_insights_cache table...");
+    logger.info("1️⃣ Checking ai_insights_cache table...");
     try {
       const result = await db.execute(sql`
         SELECT column_name 
@@ -27,21 +28,21 @@ async function fixDatabase() {
       `);
       
       if (result.rows.length === 0) {
-        console.log("   ⚠️  Missing period_days column, adding it...");
+        logger.info("   ⚠️  Missing period_days column, adding it...");
         await db.execute(sql`
           ALTER TABLE ai_insights_cache 
           ADD COLUMN IF NOT EXISTS period_days integer NOT NULL DEFAULT 30
         `);
-        console.log("   ✅ Added period_days column");
+        logger.info("   ✅ Added period_days column");
       } else {
-        console.log("   ✅ period_days column exists");
+        logger.info("   ✅ period_days column exists");
       }
     } catch (error) {
-      console.error("   ❌ Error checking ai_insights_cache:", error);
+      logger.error("   ❌ Error checking ai_insights_cache:", error);
     }
 
     // 2. Check if ai_insights_cache has generated_at column
-    console.log("\n2️⃣ Checking generated_at column...");
+    logger.info("\n2️⃣ Checking generated_at column...");
     try {
       const result = await db.execute(sql`
         SELECT column_name 
@@ -50,21 +51,21 @@ async function fixDatabase() {
       `);
       
       if (result.rows.length === 0) {
-        console.log("   ⚠️  Missing generated_at column, adding it...");
+        logger.info("   ⚠️  Missing generated_at column, adding it...");
         await db.execute(sql`
           ALTER TABLE ai_insights_cache 
           ADD COLUMN IF NOT EXISTS generated_at timestamp DEFAULT now()
         `);
-        console.log("   ✅ Added generated_at column");
+        logger.info("   ✅ Added generated_at column");
       } else {
-        console.log("   ✅ generated_at column exists");
+        logger.info("   ✅ generated_at column exists");
       }
     } catch (error) {
-      console.error("   ❌ Error checking generated_at:", error);
+      logger.error("   ❌ Error checking generated_at:", error);
     }
 
     // 3. Check if swimmer_profiles has last_garmin_sync_at column
-    console.log("\n3️⃣ Checking last_garmin_sync_at column...");
+    logger.info("\n3️⃣ Checking last_garmin_sync_at column...");
     try {
       const result = await db.execute(sql`
         SELECT column_name 
@@ -73,21 +74,21 @@ async function fixDatabase() {
       `);
       
       if (result.rows.length === 0) {
-        console.log("   ⚠️  Missing last_garmin_sync_at column, adding it...");
+        logger.info("   ⚠️  Missing last_garmin_sync_at column, adding it...");
         await db.execute(sql`
           ALTER TABLE swimmer_profiles 
           ADD COLUMN IF NOT EXISTS last_garmin_sync_at timestamp
         `);
-        console.log("   ✅ Added last_garmin_sync_at column");
+        logger.info("   ✅ Added last_garmin_sync_at column");
       } else {
-        console.log("   ✅ last_garmin_sync_at column exists");
+        logger.info("   ✅ last_garmin_sync_at column exists");
       }
     } catch (error) {
-      console.error("   ❌ Error checking last_garmin_sync_at:", error);
+      logger.error("   ❌ Error checking last_garmin_sync_at:", error);
     }
 
     // 4. Check if achievement badge tables exist
-    console.log("\n4️⃣ Checking achievement badge tables...");
+    logger.info("\n4️⃣ Checking achievement badge tables...");
     try {
       const result = await db.execute(sql`
         SELECT table_name 
@@ -96,7 +97,7 @@ async function fixDatabase() {
       `);
       
       if (result.rows.length < 2) {
-        console.log("   ⚠️  Achievement badge tables missing, creating them...");
+        logger.info("   ⚠️  Achievement badge tables missing, creating them...");
         
         // Create achievement_badge_definitions table
         await db.execute(sql`
@@ -147,16 +148,16 @@ async function fixDatabase() {
           ON CONFLICT DO NOTHING
         `);
 
-        console.log("   ✅ Created achievement badge tables");
+        logger.info("   ✅ Created achievement badge tables");
       } else {
-        console.log("   ✅ Achievement badge tables exist");
+        logger.info("   ✅ Achievement badge tables exist");
       }
     } catch (error) {
-      console.error("   ❌ Error checking achievement badge tables:", error);
+      logger.error("   ❌ Error checking achievement badge tables:", error);
     }
 
     // 5. Fix profile badges for all users
-    console.log("\n5️⃣ Fixing profile badges for all users...");
+    logger.info("\n5️⃣ Fixing profile badges for all users...");
     try {
       const users = await db.execute(sql`
         SELECT sp.user_id, sp.total_xp, sp.profile_badge_id
@@ -171,14 +172,14 @@ async function fixDatabase() {
         }
       }
 
-      console.log(`   ✅ Fixed ${fixed} user profile badges`);
+      logger.info(`   ✅ Fixed ${fixed} user profile badges`);
     } catch (error) {
-      console.error("   ❌ Error fixing profile badges:", error);
+      logger.error("   ❌ Error fixing profile badges:", error);
     }
 
-    console.log("\n✅ Database fix completed!");
+    logger.info("\n✅ Database fix completed!");
   } catch (error) {
-    console.error("\n❌ Database fix failed:", error);
+    logger.error("\n❌ Database fix failed:", error);
   }
 
   process.exit(0);

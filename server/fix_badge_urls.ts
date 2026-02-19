@@ -1,10 +1,11 @@
 import { getDb } from "./db";
 import { sql } from "drizzle-orm";
+import { logger } from "./middleware/logger";
 
 export async function fixBadgeUrls() {
   const db = await getDb();
   if (!db) {
-    console.error("Database not available");
+    logger.error("Database not available");
     return { success: false, error: "Database not available" };
   }
 
@@ -18,10 +19,10 @@ export async function fixBadgeUrls() {
     await db.execute(sql`UPDATE profile_badges SET badge_image_url = '/profile_badges/level_6_maestro.png' WHERE level = 6`);
     await db.execute(sql`UPDATE profile_badges SET badge_image_url = '/profile_badges/level_7_leggenda.png' WHERE level = 7`);
 
-    console.log("Badge URLs updated successfully");
+    logger.info("Badge URLs updated successfully");
     return { success: true, message: "Badge URLs updated successfully" };
   } catch (error) {
-    console.error("Error updating badge URLs:", error);
+    logger.error("Error updating badge URLs:", error);
     return { success: false, error: String(error) };
   }
 }

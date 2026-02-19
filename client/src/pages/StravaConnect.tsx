@@ -15,7 +15,7 @@ export default function StravaConnect() {
     onSuccess: () => {
       setStatus("success");
       setMessage("Account Strava connesso con successo!");
-      setTimeout(() => navigate("/dashboard"), 2000);
+      setTimeout(() => navigate("/home"), 2000);
     },
     onError: (error) => {
       setStatus("error");
@@ -43,7 +43,7 @@ export default function StravaConnect() {
   }, []);
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4">
+    <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4" withShell={false}>
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -105,7 +105,7 @@ export default function StravaConnect() {
               Impostazioni
             </button>
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/home")}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition"
             >
               Dashboard

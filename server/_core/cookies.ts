@@ -1,4 +1,6 @@
-import type { CookieOptions, Request } from "express";
+import { CSRF_COOKIE_NAME } from "@shared/const";
+import { randomBytes } from "crypto";
+import type { CookieOptions, Request, Response } from "express";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -45,4 +47,21 @@ export function getSessionCookieOptions(
     sameSite: isSecureRequest(req) ? "none" : "lax",
     secure: isSecureRequest(req),
   };
+}
+
+export function getCsrfCookieOptions(
+  req: Request
+): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
+  return {
+    httpOnly: false,
+    path: "/",
+    sameSite: isSecureRequest(req) ? "none" : "lax",
+    secure: isSecureRequest(req),
+  };
+}
+
+export function issueCsrfCookie(req: Request, res: Response): string {
+  const token = randomBytes(24).toString("hex");
+  res.cookie(CSRF_COOKIE_NAME, token, getCsrfCookieOptions(req));
+  return token;
 }

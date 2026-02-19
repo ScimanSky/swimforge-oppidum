@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Surface, SurfaceContent } from "@/components/ui/surface";
+import { MetricOrb } from "@/components/metrics/MetricOrb";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import {
@@ -14,10 +15,10 @@ import {
   CheckCircle2,
   Zap,
   Flame,
+  Sparkles,
   RefreshCw,
 } from "lucide-react";
 import { trpc } from "../lib/trpc";
-import MobileNav from "@/components/MobileNav";
 import { AppLayout } from "@/components/AppLayout";
 
 type WorkoutSection = {
@@ -56,15 +57,20 @@ type InsightItem = {
 };
 
 export default function CoachDryland() {
-  const [dryRegenerate, setDryRegenerate] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [insightsRefreshing, setInsightsRefreshing] = useState(false);
 
-  const drylandWorkoutQuery = trpc.aiCoach.getDrylandWorkout.useQuery(
-    { forceRegenerate: dryRegenerate },
-    {
-      staleTime: dryRegenerate ? 0 : 1000 * 60 * 60 * 24,
-    }
-  );
+  const workoutsQuery = trpc.aiCoach.getWorkouts.useQuery(undefined, {
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+
+  const utils = trpc.useUtils();
+  const generateMutation = trpc.aiCoach.generateWorkouts.useMutation();
+
+  const workoutsData = workoutsQuery.data;
+  const canGenerate = workoutsData?.canGenerate ?? true;
 
   const advancedQuery = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
@@ -79,7 +85,7 @@ export default function CoachDryland() {
   const { data: garminStatus } = trpc.garmin.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
   const { data: stravaStatus } = trpc.strava.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
 
-  const drylandWorkout = drylandWorkoutQuery.data as GeneratedWorkout | undefined;
+  const drylandWorkout = workoutsData?.dryland as GeneratedWorkout | undefined;
 
   const lastSyncDate = useMemo(() => {
     const garmin = garminStatus?.lastSync ? new Date(garminStatus.lastSync) : null;
@@ -106,10 +112,43 @@ export default function CoachDryland() {
   }, [advanced?.recoveryReadinessScore]);
 
   const conditionClass = conditionLabel === "Ottima"
-    ? "text-cyan-200"
+    ? "text-emerald-500 dark:text-cyan-200"
     : conditionLabel === "Buona"
-    ? "text-amber-300"
-    : "text-rose-300";
+      ? "text-amber-500 dark:text-amber-300"
+      : "text-rose-500 dark:text-rose-300";
+  const drylandOrbs = useMemo(() => {
+    const recovery = advanced?.recoveryReadinessScore ?? 0;
+    const focusProgress =
+      focusLabel === "Potenza" ? 84 : focusLabel === "Cardio" ? 72 : focusLabel === "Stabilità" ? 68 : 76;
+    const connectedCount = Number(Boolean(garminStatus?.connected)) + Number(Boolean(stravaStatus?.connected));
+
+    return [
+      {
+        label: "Focus oggi",
+        value: focusLabel,
+        progress: focusProgress,
+        helper: "Priorità training",
+        icon: <Zap className="h-4 w-4" />,
+        tone: "amber" as const,
+      },
+      {
+        label: "Condition",
+        value: conditionLabel,
+        progress: Math.min(100, Math.round(recovery)),
+        helper: `RRS ${recovery ? Math.round(recovery) : "N/D"}`,
+        icon: <TrendingUp className="h-4 w-4" />,
+        tone: "cyan" as const,
+      },
+      {
+        label: "Connessioni",
+        value: `${connectedCount}/2`,
+        progress: Math.round((connectedCount / 2) * 100),
+        helper: `${timeline?.length ?? 0} sessioni analizzate`,
+        icon: <Activity className="h-4 w-4" />,
+        tone: "lime" as const,
+      },
+    ];
+  }, [advanced?.recoveryReadinessScore, focusLabel, conditionLabel, garminStatus?.connected, stravaStatus?.connected, timeline?.length]);
 
   const drylandInsights = useMemo<InsightItem[]>(() => {
     if (!advanced) return [];
@@ -130,8 +169,8 @@ export default function CoachDryland() {
           cardioScore === null || cardioScore === undefined
             ? "Dati insufficienti: completa più sessioni per stimare la base aerobica."
             : cardioScore < 55
-            ? "Base aerobica da rinforzare: inserisci blocchi cardio continui e recuperi controllati."
-            : "Buona base cardio: mantieni volume costante e lavora su progressioni graduali.",
+              ? "Base aerobica da rinforzare: inserisci blocchi cardio continui e recuperi controllati."
+              : "Buona base cardio: mantieni volume costante e lavora su progressioni graduali.",
         metric: cardioMetric,
       },
       {
@@ -141,8 +180,8 @@ export default function CoachDryland() {
           strengthScore === null || strengthScore === undefined
             ? "Mancano dati per la progressione di carico."
             : strengthScore < 0
-            ? "Progressione ridotta: integra sessioni di forza con carichi gestibili e tecnica pulita."
-            : "Buona spinta: continua con esercizi multiarticolari e controllo del core.",
+              ? "Progressione ridotta: integra sessioni di forza con carichi gestibili e tecnica pulita."
+              : "Buona spinta: continua con esercizi multiarticolari e controllo del core.",
         metric: strengthMetric,
       },
       {
@@ -152,19 +191,23 @@ export default function CoachDryland() {
           recoveryScore === null || recoveryScore === undefined
             ? "Recupero non stimabile: servono più dati HR/sonno."
             : recoveryScore < 50
-            ? "Recupero basso: scegli intensità moderate e cura mobilità e sonno."
-            : "Recupero solido: ottimo momento per una seduta secca intensa.",
+              ? "Recupero basso: scegli intensità moderate e cura mobilità e sonno."
+              : "Recupero solido: ottimo momento per una seduta secca intensa.",
         metric: recoveryMetric,
       },
     ];
   }, [advanced]);
 
-  const handleRegenerateDryland = async () => {
-    setDryRegenerate(true);
+  const handleGenerateWorkouts = async () => {
+    setIsGenerating(true);
     try {
-      await drylandWorkoutQuery.refetch();
+      const result = await generateMutation.mutateAsync();
+      utils.aiCoach.getWorkouts.setData(undefined, result);
+      await utils.aiCoach.getWorkouts.refetch();
+    } catch (error) {
+      console.error("Generation failed:", error);
     } finally {
-      setDryRegenerate(false);
+      setIsGenerating(false);
     }
   };
 
@@ -197,7 +240,7 @@ export default function CoachDryland() {
     if (key.includes("cool") || key.includes("defatic")) {
       return "bg-sky-500/15 text-sky-200 border border-sky-400/40";
     }
-    return "bg-white/10 text-white/70 border border-white/10";
+    return "bg-muted/50 text-muted-foreground border border-border/60 dark:bg-white/10 dark:text-white/70 dark:border-white/10";
   };
 
   const getExerciseDetails = (exercise: WorkoutExercise) =>
@@ -213,7 +256,7 @@ export default function CoachDryland() {
 
   const renderCoachNotes = (notes?: string[]) =>
     notes?.length ? (
-      <ul className="text-sm text-white/80 space-y-1">
+      <ul className="text-sm text-muted-foreground space-y-1">
         {notes.map((note, noteIdx) => (
           <li key={noteIdx} className="flex items-start gap-2">
             <span className="text-[var(--gold)]">•</span>
@@ -222,12 +265,12 @@ export default function CoachDryland() {
         ))}
       </ul>
     ) : (
-      <div className="text-white/60 text-sm">Nota coach non disponibile.</div>
+      <div className="text-muted-foreground text-sm">Nota coach non disponibile.</div>
     );
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
-      <div className="min-h-screen overflow-x-hidden font-sans text-foreground relative pb-24">
+    <AppLayout showBubbles={true} bubbleIntensity="medium">
+      <div className="overflow-x-hidden font-sans text-foreground relative pb-12 lg:pb-2">
         {/* Background Image with low opacity */}
         <div className="fixed inset-0 opacity-10 pointer-events-none -z-40">
           <img
@@ -261,29 +304,29 @@ export default function CoachDryland() {
           ))}
         </div>
 
-        <div className="container py-8 md:py-12">
+        <div className="container py-6 md:py-8 lg:py-3">
           {/* Navigation & Header */}
           <div className="flex flex-col gap-3 mb-8 md:flex-row md:items-center md:gap-4">
             <div className="flex items-center gap-3">
               <Link href="/coach">
-                <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10 px-2">
+                <Button variant="ghost" className="text-muted-foreground hover:text-foreground hover:bg-muted/60 px-2">
                   <ChevronLeft className="h-5 w-5" />
                   <span className="ml-1 hidden sm:inline">Coach</span>
                 </Button>
               </Link>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold text-white">Dryland Coach</h1>
+                <h1 className="text-2xl font-bold text-foreground">Dryland Coach</h1>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold)]/30">Premium</span>
               </div>
             </div>
             <div className="md:ml-auto w-full md:w-auto flex flex-col sm:flex-row gap-2">
-              <Link href="/session-iq" className="w-full sm:w-auto">
+              <Link href="/coach?tab=session-iq" className="w-full sm:w-auto">
                 <Button variant="outline" className="w-full sm:w-auto border-[var(--gold)]/40 text-[var(--gold)] hover:bg-[var(--gold)]/10">
                   Session IQ
                 </Button>
               </Link>
               <Link href="/coach" className="w-full sm:w-auto">
-                <Button variant="outline" className="w-full sm:w-auto border-cyan-400/40 text-cyan-100 hover:bg-cyan-500/10">
+                <Button variant="outline" className="w-full sm:w-auto border-cyan-400/40 text-cyan-700 dark:text-cyan-100 hover:bg-cyan-500/10">
                   Allenamento in Vasca
                 </Button>
               </Link>
@@ -294,7 +337,7 @@ export default function CoachDryland() {
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-card/30 backdrop-blur-md border border-white/10 rounded-2xl p-6 mb-8 relative overflow-hidden"
+            className="bg-card/60 backdrop-blur-md border border-border/60 rounded-2xl p-6 mb-8 relative overflow-hidden"
           >
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50 animate-pulse" />
 
@@ -307,13 +350,13 @@ export default function CoachDryland() {
                   </div>
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-xl font-bold text-white flex flex-wrap items-center gap-2">
+                  <h2 className="text-xl font-bold text-foreground flex flex-wrap items-center gap-2">
                     Analisi Dryland Attiva
                     <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 whitespace-nowrap">
                       Active
                     </span>
                   </h2>
-                  <p className="text-white/60 text-sm flex items-center gap-2 mt-1">
+                  <p className="text-muted-foreground text-sm flex items-center gap-2 mt-1">
                     <Activity className="h-3 w-3" />
                     {lastSyncDate
                       ? `Ultimo sync: ${lastSyncDate.toLocaleDateString("it-IT")} • ${lastSyncDate.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`
@@ -322,21 +365,19 @@ export default function CoachDryland() {
                 </div>
               </div>
 
-              <div className="flex gap-4 w-full md:w-auto">
-                <div className="bg-white/5 rounded-lg p-3 px-5 flex-1 md:flex-none border border-white/5">
-                  <div className="text-xs text-white/50 uppercase tracking-wider mb-1">Focus Oggi</div>
-                  <div className="text-lg font-bold text-[var(--gold)] flex items-center gap-2">
-                    <Zap className="h-4 w-4" />
-                    {focusLabel}
-                  </div>
-                </div>
-                <div className="bg-white/5 rounded-lg p-3 px-5 flex-1 md:flex-none border border-white/5">
-                  <div className="text-xs text-white/50 uppercase tracking-wider mb-1">Condition</div>
-                  <div className={`text-lg font-bold ${conditionClass} flex items-center gap-2`}>
-                    <TrendingUp className="h-4 w-4" />
-                    {conditionLabel}
-                  </div>
-                </div>
+              <div className="grid w-full gap-3 sm:grid-cols-3 md:w-auto">
+                {drylandOrbs.map((item) => (
+                  <MetricOrb
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    progress={item.progress}
+                    helper={item.helper}
+                    icon={item.icon}
+                    tone={item.tone}
+                    size="sm"
+                  />
+                ))}
               </div>
             </div>
           </motion.div>
@@ -344,7 +385,7 @@ export default function CoachDryland() {
           <div className="grid lg:grid-cols-12 gap-8">
             {/* 2. Colonna Sinistra: AI Insights Cardio & Forza */}
             <div className="lg:col-span-4 space-y-6">
-              <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <h3 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
                 <Dumbbell className="h-5 w-5 text-[var(--gold)]" />
                 Insights Cardio & Forza
               </h3>
@@ -357,17 +398,16 @@ export default function CoachDryland() {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: idx * 0.1 }}
                   >
-                    <Card className="bg-card/20 backdrop-blur-sm border-white/10 hover:bg-card/30 transition-colors">
-                      <CardContent className="p-5">
+                    <Surface className="bg-card/50 backdrop-blur-sm border-border/60 hover:bg-card/60 transition-colors">
+                      <SurfaceContent className="p-5">
                         <div className="flex justify-between items-start mb-2">
                           <div
-                            className={`p-2 rounded-lg ${
-                              insight.type === "warning"
-                                ? "bg-orange-500/20 text-orange-400"
-                                : insight.type === "success"
+                            className={`p-2 rounded-lg ${insight.type === "warning"
+                              ? "bg-orange-500/20 text-orange-400"
+                              : insight.type === "success"
                                 ? "bg-green-500/20 text-green-400"
                                 : "bg-blue-500/20 text-blue-400"
-                            }`}
+                              }`}
                           >
                             {insight.type === "warning" ? (
                               <AlertCircle className="h-5 w-5" />
@@ -377,41 +417,41 @@ export default function CoachDryland() {
                               <Activity className="h-5 w-5" />
                             )}
                           </div>
-                          <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded text-white/70">
+                          <span className="text-xs font-mono bg-muted/40 px-2 py-1 rounded text-muted-foreground dark:bg-white/5 dark:text-white/70">
                             {insight.metric}
                           </span>
                         </div>
-                        <h4 className="font-bold text-white mb-1">{insight.title}</h4>
-                        <p className="text-sm text-white/70 leading-relaxed">{insight.message}</p>
-                      </CardContent>
-                    </Card>
+                        <h4 className="font-bold text-foreground mb-1">{insight.title}</h4>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{insight.message}</p>
+                      </SurfaceContent>
+                    </Surface>
                   </motion.div>
                 ))
               ) : (
-                <Card className="bg-card/20 backdrop-blur-sm border-white/10">
-                  <CardContent className="p-5 text-sm text-white/70">
+                <Surface className="bg-card/50 backdrop-blur-sm border-border/60">
+                  <SurfaceContent className="p-5 text-sm text-muted-foreground">
                     Nessun insight disponibile. Completa più sessioni per ottenere analisi personalizzate.
-                  </CardContent>
-                </Card>
+                  </SurfaceContent>
+                </Surface>
               )}
 
               {timeline?.length ? (
-                <Card className="bg-gradient-to-br from-purple-900/40 to-indigo-900/40 border-purple-500/20">
-                  <CardContent className="p-5 text-center">
-                    <p className="text-purple-200 text-sm mb-3">
+                <Surface className="bg-gradient-to-br from-purple-200/40 to-indigo-200/40 dark:from-purple-900/40 dark:to-indigo-900/40 border-purple-500/20">
+                  <SurfaceContent className="p-5 text-center">
+                    <p className="text-purple-700 dark:text-purple-200 text-sm mb-3">
                       Analizzati {timeline.length} allenamenti recenti
                     </p>
                     <Button
                       variant="outline"
                       onClick={handleRefreshInsights}
                       disabled={insightsRefreshing}
-                      className="w-full border-purple-500/50 text-purple-300 hover:bg-purple-500/20 hover:text-purple-100"
+                      className="w-full border-purple-500/50 text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 hover:text-purple-100"
                     >
                       <RefreshCw className={`h-4 w-4 mr-2 ${insightsRefreshing ? "animate-spin" : ""}`} />
                       Rigenera Insights
                     </Button>
-                  </CardContent>
-                </Card>
+                  </SurfaceContent>
+                </Surface>
               ) : null}
             </div>
 
@@ -419,28 +459,28 @@ export default function CoachDryland() {
             <div className="lg:col-span-8 space-y-8">
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <h3 className="text-xl font-bold text-foreground flex items-center gap-2">
                     <Dumbbell className="h-5 w-5 text-[var(--gold)]" />
                     Fuori Vasca (Dryland)
                   </h3>
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={handleRegenerateDryland}
-                    disabled={dryRegenerate || drylandWorkoutQuery.isFetching}
-                    className="text-[var(--gold)] hover:text-white hover:bg-white/10"
+                    onClick={handleGenerateWorkouts}
+                    disabled={!canGenerate || isGenerating}
+                    className="text-[var(--gold)] hover:text-foreground hover:bg-muted/60"
                   >
-                    <RefreshCw className={`h-4 w-4 mr-2 ${dryRegenerate ? "animate-spin" : ""}`} />
-                    Rigenera
+                    <Sparkles className={`h-4 w-4 mr-2 ${isGenerating ? "animate-spin" : ""}`} />
+                    {isGenerating ? "Generazione..." : "Genera workouts"}
                   </Button>
                 </div>
 
-                <Card className="bg-card/20 backdrop-blur-sm border-white/10 overflow-hidden">
-                  <div className="bg-gradient-to-r from-[var(--gold)]/20 to-amber-900/30 p-6 border-b border-white/5">
+                <Surface className="bg-card/50 backdrop-blur-sm border-border/60 overflow-hidden">
+                  <div className="bg-gradient-to-r from-[var(--gold)]/20 to-amber-200/30 dark:to-amber-900/30 p-6 border-b border-border/60 dark:border-white/5">
                     {drylandWorkout ? (
                       <div className="flex flex-wrap justify-between items-center gap-4">
                         <div>
-                          <h2 className="text-2xl font-bold text-white mb-1">{drylandWorkout.title}</h2>
+                          <h2 className="text-2xl font-bold text-foreground mb-1">{drylandWorkout.title}</h2>
                           <div className="flex gap-4 text-sm text-[var(--gold)]/80">
                             <span className="flex items-center gap-1"><Timer className="h-4 w-4" /> {drylandWorkout.duration}</span>
                             <span className="flex items-center gap-1"><Flame className="h-4 w-4" /> {drylandWorkout.description}</span>
@@ -451,15 +491,15 @@ export default function CoachDryland() {
                         </div>
                       </div>
                     ) : (
-                      <div className="text-white/70">Allenamento dryland non disponibile.</div>
+                      <div className="text-muted-foreground">Allenamento dryland non disponibile.</div>
                     )}
                   </div>
 
-                  <CardContent className="p-0">
-                    {drylandWorkoutQuery.isFetching && (
-                      <div className="p-5 text-white/60">Sto preparando l'allenamento...</div>
+                  <SurfaceContent className="p-0">
+                    {workoutsQuery.isFetching && (
+                      <div className="p-5 text-muted-foreground">Sto preparando l'allenamento...</div>
                     )}
-                    {drylandWorkoutQuery.isError && (
+                    {workoutsQuery.isError && (
                       <div className="p-5 text-red-300">Errore nel caricamento dell'allenamento.</div>
                     )}
                     {drylandWorkout?.sections?.map((section, idx) => {
@@ -468,59 +508,58 @@ export default function CoachDryland() {
                       return (
                         <div
                           key={idx}
-                          className="p-4 md:p-5 border-b border-white/5 last:border-0 flex flex-col sm:flex-row gap-3 sm:gap-4 hover:bg-white/5 transition-colors"
+                          className="p-4 md:p-5 border-b border-border/60 dark:border-white/5 last:border-0 flex flex-col sm:flex-row gap-3 sm:gap-4 hover:bg-muted/40 dark:hover:bg-white/5 transition-colors"
                         >
                           <div className="w-full sm:w-56 lg:w-64 flex-shrink-0">
                             <span className={`inline-flex text-xs font-semibold tracking-wide px-2 py-1 rounded ${pillClass} leading-snug break-words`}>
                               {sectionLabel}
                             </span>
                           </div>
-                          <div className="flex-1 space-y-2 text-white/90">
+                          <div className="flex-1 space-y-2 text-foreground">
                             {section.exercises?.length ? (
                               section.exercises.map((exercise, exIdx) => {
                                 const details = getExerciseDetails(exercise);
                                 return (
-                                  <div key={exIdx} className="rounded-lg bg-white/5 px-3 py-2 border border-white/5">
+                                  <div key={exIdx} className="rounded-lg bg-muted/40 dark:bg-white/5 px-3 py-2 border border-border/60 dark:border-white/5">
                                     <div className="font-medium">{exercise.name}</div>
                                     {details.length ? (
-                                      <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-white/60">
+                                      <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground">
                                         {details.map((detail, detailIdx) => (
                                           <span key={detailIdx}>{detail}</span>
                                         ))}
                                       </div>
                                     ) : null}
                                     {exercise.notes && (
-                                      <div className="mt-2 text-xs text-cyan-100/80">💡 {exercise.notes}</div>
+                                      <div className="mt-2 text-xs text-cyan-700 dark:text-cyan-100/80">💡 {exercise.notes}</div>
                                     )}
                                   </div>
                                 );
                               })
                             ) : section.notes ? (
-                              <div className="text-white/70 text-sm">{section.notes}</div>
+                              <div className="text-muted-foreground text-sm">{section.notes}</div>
                             ) : (
-                              <div className="text-white/50 text-sm">Dettagli non disponibili</div>
+                              <div className="text-muted-foreground text-sm">Dettagli non disponibili</div>
                             )}
                           </div>
                         </div>
                       );
                     })}
-                  </CardContent>
-                </Card>
+                  </SurfaceContent>
+                </Surface>
 
                 {drylandWorkout ? (
-                  <Card className="mt-6 bg-[var(--gold)]/10 border border-[var(--gold)]/30">
-                    <CardContent className="p-5 space-y-3">
+                  <Surface className="mt-6 bg-[var(--gold)]/10 border border-[var(--gold)]/30">
+                    <SurfaceContent className="p-5 space-y-3">
                       <div className="text-xs uppercase tracking-wider text-[var(--gold)]">Nota Coach Dryland</div>
                       {renderCoachNotes(drylandWorkout.coachNotes)}
-                    </CardContent>
-                  </Card>
+                    </SurfaceContent>
+                  </Surface>
                 ) : null}
               </div>
             </div>
           </div>
         </div>
 
-        <MobileNav />
       </div>
     </AppLayout>
   );

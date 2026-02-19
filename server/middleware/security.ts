@@ -11,30 +11,44 @@ import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 import helmet from 'helmet';
 import { Request, Response, NextFunction } from 'express';
+import { createRedisStore } from '../lib/redis-rate-limit-store';
+import { logger } from "./logger";
+
+const log = logger.child({ component: "security" });
+
+function parseCspList(value: string | undefined): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function toOrigin(value: string | undefined): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  try {
+    return new URL(trimmed).origin;
+  } catch {
+    return trimmed;
+  }
+}
+
+function uniq(values: Array<string | null | undefined>): string[] {
+  return Array.from(new Set(values.filter((value): value is string => Boolean(value))));
+}
+
+const supabaseOrigin = toOrigin(process.env.SUPABASE_URL);
+const imagekitEndpointOrigin = toOrigin(process.env.IMAGEKIT_URL_ENDPOINT);
+const cloudinaryResOrigin = toOrigin(process.env.CLOUDINARY_CLOUD_NAME ? `https://res.cloudinary.com/${process.env.CLOUDINARY_CLOUD_NAME}` : undefined);
+const extraConnectSrc = parseCspList(process.env.CSP_CONNECT_SRC_EXTRA);
+const extraImgSrc = parseCspList(process.env.CSP_IMG_SRC_EXTRA);
+const extraMediaSrc = parseCspList(process.env.CSP_MEDIA_SRC_EXTRA);
 
 // ============================================================================
 // RATE LIMITING - SEMPLIFICATO
 // ============================================================================
-
-/**
- * Store in memoria per rate limiting
- * In produzione, usa Redis per distribuito
- */
-const store = new Map<string, { count: number; resetTime: number }>();
-
-/**
- * Helper per ottenere chiave di rate limiting
- */
-function getRateLimitKey(req: any): string {
-  // Usa user ID se disponibile, altrimenti IP
-  if (req.user?.id) {
-    return `user:${req.user.id}`;
-  }
-  
-  // Fallback a IP (supporta IPv4 e IPv6)
-  const ip = req.ip || req.connection?.remoteAddress || 'unknown';
-  return `ip:${ip}`;
-}
 
 /**
  * Rate limiter per endpoint di login
@@ -48,9 +62,7 @@ export const loginLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req: any) => {
-    return req.ip === process.env.ADMIN_IP;
-  },
+  store: createRedisStore({ prefix: 'rl:login:', windowMs: 15 * 60 * 1000 }),
 });
 
 /**
@@ -65,6 +77,7 @@ export const registrationLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createRedisStore({ prefix: 'rl:registration:', windowMs: 60 * 60 * 1000 }),
 });
 
 /**
@@ -79,9 +92,10 @@ export const apiLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req: any) => {
-    return req.path === '/health' || req.path === '/status';
+  skip: (req: Request) => {
+    return req.path === '/health' || req.path === '/ready' || req.path === '/status';
   },
+  store: createRedisStore({ prefix: 'rl:api:', windowMs: 1 * 60 * 1000 }),
 });
 
 /**
@@ -96,6 +110,7 @@ export const garminSyncLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createRedisStore({ prefix: 'rl:garmin:', windowMs: 5 * 60 * 1000 }),
 });
 
 /**
@@ -110,6 +125,37 @@ export const aiCoachLimiter = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  store: createRedisStore({ prefix: 'rl:ai:', windowMs: 60 * 60 * 1000 }),
+});
+
+/**
+ * Rate limiter per sync endpoints (Strava / Garmin)
+ */
+export const syncLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minuti
+  max: 5, // 5 richieste ogni 5 minuti
+  message: {
+    error: 'Sync Rate Limit',
+    message: 'Troppi tentativi di sincronizzazione. Riprova tra 5 minuti.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createRedisStore({ prefix: 'rl:sync:', windowMs: 5 * 60 * 1000 }),
+});
+
+/**
+ * Rate limiter per commenti community
+ */
+export const commentLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 minuto
+  max: 20, // 20 commenti al minuto
+  message: {
+    error: 'Comment Rate Limit',
+    message: 'Troppi commenti. Riprova tra 1 minuto.',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: createRedisStore({ prefix: 'rl:comment:', windowMs: 1 * 60 * 1000 }),
 });
 
 // ============================================================================
@@ -128,7 +174,11 @@ export const corsOptions: cors.CorsOptions = {
       .map(value => value.trim())
       .filter(Boolean);
 
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin) {
+      // Allow missing origin only in development (same-site requests)
+      return callback(null, process.env.NODE_ENV !== "production");
+    }
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error(`CORS policy: origin ${origin} not allowed`));
@@ -136,7 +186,7 @@ export const corsOptions: cors.CorsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-csrf-token'],
   exposedHeaders: ['X-Total-Count', 'X-Page-Number', 'RateLimit-Remaining'],
   maxAge: 86400,
 };
@@ -152,22 +202,59 @@ export const helmetConfig = {
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", 'cdn.jsdelivr.net'],
-      styleSrc: ["'self'", "'unsafe-inline'", 'fonts.googleapis.com'],
-      fontSrc: ["'self'", 'fonts.gstatic.com'],
-      imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: [
+      baseUri: ["'self'"],
+      scriptSrc: ["'self'", 'https://cdn.jsdelivr.net'],
+      styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+      imgSrc: uniq([
         "'self'",
-        'api.garmin.com',
-        'api.strava.com',
+        'data:',
+        'blob:',
+        supabaseOrigin,
+        'https://*.supabase.co',
+        imagekitEndpointOrigin,
+        'https://ik.imagekit.io',
+        cloudinaryResOrigin,
+        'https://res.cloudinary.com',
+        'https://avatars.githubusercontent.com',
+        'https://lh3.googleusercontent.com',
+        'https://*.googleusercontent.com',
+        'https://secure.gravatar.com',
+        'https://*.gravatar.com',
+        'https://*.tile.openstreetmap.org',
+        ...extraImgSrc,
+      ]),
+      mediaSrc: uniq([
+        "'self'",
+        'blob:',
+        'data:',
+        supabaseOrigin,
+        'https://*.supabase.co',
+        imagekitEndpointOrigin,
+        'https://ik.imagekit.io',
+        cloudinaryResOrigin,
+        'https://res.cloudinary.com',
+        ...extraMediaSrc,
+      ]),
+      connectSrc: uniq([
+        "'self'",
+        'https://api.garmin.com',
+        'https://api.strava.com',
         'https://sentry.io',
-        'https://wpnxaadvyxmhlcgdobla.supabase.co', // Supabase Auth
-        'https://*.supabase.co', // Supabase wildcard
-        'https://api.manus.im', // Manus OAuth
-        'https://oauth.manus.im', // Manus OAuth Portal
-      ],
-      frameSrc: ["'none'"],
+        'https://nominatim.openstreetmap.org',
+        supabaseOrigin,
+        'https://*.supabase.co',
+        'wss://*.supabase.co',
+        'https://upload.imagekit.io',
+        'https://api.cloudinary.com',
+        imagekitEndpointOrigin,
+        ...extraConnectSrc,
+      ]),
+      frameSrc: ["'self'", 'https://www.openstreetmap.org'],
+      frameAncestors: ["'none'"],
+      formAction: ["'self'"],
       objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
     },
   },
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' } as any,
@@ -186,22 +273,6 @@ export const helmetConfig = {
 // ============================================================================
 
 /**
- * Middleware per loggare richieste sospette
- * 
- * DISABILITATO: Troppi falsi positivi su richieste tRPC batch e API valide.
- * Implementare un pattern più sofisticato in futuro.
- */
-export function suspiciousRequestLogger(
-  req: Request,
-  res: Response,
-  next: NextFunction
-) {
-  // Disabilitato temporaneamente - troppi falsi positivi
-  // TODO: Implementare pattern più accurato per SQL injection detection
-  next();
-}
-
-/**
  * Middleware per validare user agent
  */
 export function userAgentValidation(
@@ -213,7 +284,8 @@ export function userAgentValidation(
   const suspiciousAgents = ['sqlmap', 'nikto', 'nmap', 'masscan', 'nessus'];
 
   if (suspiciousAgents.some((agent) => userAgent.toLowerCase().includes(agent))) {
-    console.warn('[SECURITY] Suspicious user agent detected', {
+    log.warn('[SECURITY] Suspicious user agent detected', {
+      event: "security:suspicious_user_agent",
       ip: req.ip,
       userAgent,
     });
@@ -235,7 +307,10 @@ export function payloadSizeLimit(
   res: Response,
   next: NextFunction
 ) {
-  const maxSize = 1024 * 1024; // 1 MB
+  const configuredMaxSize = Number.parseInt(process.env.MAX_REQUEST_BYTES ?? '', 10);
+  const maxSize = Number.isFinite(configuredMaxSize) && configuredMaxSize > 0
+    ? configuredMaxSize
+    : 5 * 1024 * 1024; // 5 MB default
   const contentLength = parseInt(req.headers['content-length'] || '0');
 
   if (contentLength > maxSize) {
@@ -260,7 +335,6 @@ export function applySecurityMiddleware() {
     helmet(helmetConfig as any),
     cors(corsOptions),
     userAgentValidation,
-    suspiciousRequestLogger,
     payloadSizeLimit,
   ];
 }
@@ -282,9 +356,10 @@ export default {
   apiLimiter,
   garminSyncLimiter,
   aiCoachLimiter,
+  syncLimiter,
+  commentLimiter,
   corsOptions,
   helmetConfig,
-  suspiciousRequestLogger,
   userAgentValidation,
   payloadSizeLimit,
   applySecurityMiddleware,

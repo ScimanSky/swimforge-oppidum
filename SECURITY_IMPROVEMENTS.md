@@ -104,8 +104,7 @@ Automated testing on every push:
   "cors": "^2.8.6",
   "helmet": "^8.1.0",
   "winston": "^3.19.0",
-  "@sentry/node": "^10.37.0",
-  "@sentry/tracing": "^7.120.4"
+  "@sentry/node": "^10.37.0"
 }
 ```
 

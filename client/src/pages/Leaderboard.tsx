@@ -2,7 +2,8 @@ import { AppLayout } from "@/components/AppLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { MetricOrb } from "@/components/metrics/MetricOrb";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { motion } from "framer-motion";
@@ -16,8 +17,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { Link, Redirect } from "wouter";
-import MobileNav from "@/components/MobileNav";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type OrderBy = "level" | "totalXp" | "badges";
 type Period = "all" | "week" | "month";
@@ -27,6 +27,8 @@ interface NormalizedEntry {
   id: number;
   userId: string;
   userName: string;
+  avatarUrl?: string;
+  username?: string;
   level: number;
   totalXp: number;
   badgeCount?: number;
@@ -39,11 +41,15 @@ function normalizeEntry(entry: any): NormalizedEntry {
   const profile = entry.profile || entry;
   const userId = profile.userId ?? entry.userId ?? 0;
   const userName = entry.userName ?? entry.name ?? "Nuotatore";
+  const avatarUrl = profile.avatarUrl ?? profile.avatar_url ?? entry.avatarUrl ?? entry.avatar_url ?? "";
+  const username = profile.username ?? entry.username ?? "";
   
   return {
     id: profile.id ?? entry.id ?? 0,
     userId: String(userId),
     userName,
+    avatarUrl: avatarUrl || undefined,
+    username: username || undefined,
     level: profile.level ?? entry.level ?? 1,
     totalXp: profile.totalXp ?? entry.totalXp ?? 0,
     badgeCount: entry.badgeCount ?? 0,
@@ -56,10 +62,17 @@ export default function Leaderboard() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [orderBy, setOrderBy] = useState<OrderBy>("totalXp");
   const [period, setPeriod] = useState<Period>("all");
+  const [listPage, setListPage] = useState(1);
 
   const { data: leaderboard, isLoading } = trpc.leaderboard.get.useQuery(
     { orderBy, period, limit: 50 },
-    { enabled: isAuthenticated }
+    {
+      enabled: isAuthenticated,
+      staleTime: 15_000,
+      refetchInterval: 30_000,
+      refetchOnWindowFocus: true,
+      refetchOnMount: "always",
+    }
   );
 
   // Redirect if not authenticated
@@ -100,36 +113,97 @@ export default function Leaderboard() {
 
   // Normalize all entries
   const normalizedLeaderboard = leaderboard?.map(normalizeEntry) || [];
-  
-  // Debug logging
-  console.log('[Leaderboard] Raw data:', leaderboard);
-  console.log('[Leaderboard] Raw data length:', leaderboard?.length);
-  console.log('[Leaderboard] Normalized:', normalizedLeaderboard);
-  console.log('[Leaderboard] Normalized length:', normalizedLeaderboard.length);
-  console.log('[Leaderboard] Order by:', orderBy);
-  console.log('[Leaderboard] isLoading:', isLoading);
+  const podiumOffset = normalizedLeaderboard.length >= 3 ? 3 : 0;
+  const restEntries = normalizedLeaderboard.slice(podiumOffset);
+  const restPageSize = 4;
+  const restTotalPages = Math.max(1, Math.ceil(restEntries.length / restPageSize));
+  const pagedRestEntries = useMemo(() => {
+    const start = (listPage - 1) * restPageSize;
+    return restEntries.slice(start, start + restPageSize);
+  }, [restEntries, listPage]);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [period, orderBy]);
+
+  useEffect(() => {
+    if (listPage > restTotalPages) setListPage(restTotalPages);
+  }, [listPage, restTotalPages]);
+  const summaryOrbs = useMemo(() => {
+    const numericValue = (entry: NormalizedEntry) => {
+      if (orderBy === "badges") return period === "all" ? entry.badgeCount || 0 : entry.periodBadgeCount || 0;
+      if (orderBy === "level") return entry.level;
+      return period === "all" ? entry.totalXp : entry.periodXp || 0;
+    };
+    const topValue = normalizedLeaderboard.length ? numericValue(normalizedLeaderboard[0]) : 0;
+    const myIndex = normalizedLeaderboard.findIndex((entry) => String(entry.userId) === String(user?.id));
+    const myRank = myIndex >= 0 ? myIndex + 1 : null;
+    const myValue = myIndex >= 0 ? numericValue(normalizedLeaderboard[myIndex]) : 0;
+    const totalPlayers = normalizedLeaderboard.length;
+
+    return [
+      {
+        label: "Nuotatori",
+        value: totalPlayers,
+        progress: Math.min(100, Math.round((totalPlayers / 100) * 100)),
+        helper: "In classifica",
+        icon: <Trophy className="h-4 w-4" />,
+        tone: "cyan" as const,
+      },
+      {
+        label: "Top score",
+        value: formatValue(normalizedLeaderboard[0] || normalizeEntry({})),
+        progress:
+          orderBy === "totalXp"
+            ? Math.min(100, Math.round((topValue / 12000) * 100))
+            : Math.min(100, Math.round((topValue / 120) * 100)),
+        helper: normalizedLeaderboard[0]?.userName || "—",
+        icon: <Crown className="h-4 w-4" />,
+        tone: "lime" as const,
+      },
+      {
+        label: "La tua posizione",
+        value: myRank ? `#${myRank}` : "—",
+        progress: myRank ? Math.min(100, Math.round(((totalPlayers - myRank + 1) / Math.max(totalPlayers, 1)) * 100)) : 0,
+        helper: myRank ? formatValue(normalizedLeaderboard[myIndex]) : "Non in classifica",
+        icon: <Medal className="h-4 w-4" />,
+        tone: "amber" as const,
+      },
+      {
+        label: "Il tuo valore",
+        value: myRank ? formatValue(normalizedLeaderboard[myIndex]) : "—",
+        progress:
+          orderBy === "totalXp"
+            ? Math.min(100, Math.round((myValue / 12000) * 100))
+            : Math.min(100, Math.round((myValue / 120) * 100)),
+        helper: orderBy === "totalXp" ? "XP" : orderBy === "level" ? "Livello" : "Badge",
+        icon: <Zap className="h-4 w-4" />,
+        tone: "sky" as const,
+      },
+    ];
+  }, [normalizedLeaderboard, orderBy, period, user?.id]);
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="low">
-    <div className="pb-20">
+    <div className="pb-12 lg:pb-2">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-white">
+      <header className="sticky top-0 z-40 bg-gradient-to-r from-[var(--navy)] to-[var(--navy-light)] text-foreground">
         <div className="container py-4">
           <div className="flex items-center gap-3">
-            <Link href="/challenges">
-              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
+            <Link href="/season/challenges">
+              <Button variant="ghost" size="icon" className="text-foreground hover:bg-muted/60">
                 <ChevronLeft className="h-5 w-5" />
               </Button>
             </Link>
             <div>
               <h1 className="font-semibold text-lg">Classifica</h1>
-              <p className="text-sm text-white/70">Sfida i tuoi compagni</p>
+              <p className="text-sm text-muted-foreground">Sfida i tuoi compagni</p>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="container py-6 space-y-6">
+      <main className="container py-5 lg:py-3 space-y-6 lg:space-y-3">
         {/* Period Tabs */}
         <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
           <TabsList className="grid w-full grid-cols-3">
@@ -156,6 +230,21 @@ export default function Leaderboard() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
+
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+          {summaryOrbs.map((item) => (
+            <MetricOrb
+              key={item.label}
+              label={item.label}
+              value={item.value}
+              progress={item.progress}
+              helper={item.helper}
+              icon={item.icon}
+              tone={item.tone}
+              size="sm"
+            />
+          ))}
+        </div>
 
         {/* Leaderboard List */}
         {isLoading ? (
@@ -184,12 +273,18 @@ export default function Leaderboard() {
               >
                 {/* Second Place */}
                 <div className="flex flex-col items-center pt-8">
-                  <div className="w-16 h-16 rounded-full bg-gray-100 border-4 border-gray-400 flex items-center justify-center mb-2 shadow-lg">
-                    <span className="text-2xl font-bold text-gray-600">2</span>
-                  </div>
-                  <p className="text-sm font-medium text-center truncate w-full">
+                  <Link href={`/u/${normalizedLeaderboard[1]?.userId ?? ""}`}>
+                    <div className="relative mb-2 cursor-pointer">
+                      <Avatar className="w-16 h-16 border-4 border-gray-400 shadow-lg">
+                        <AvatarImage src={normalizedLeaderboard[1]?.avatarUrl || ""} alt={normalizedLeaderboard[1]?.userName || "Nuotatore"} />
+                        <AvatarFallback>{(normalizedLeaderboard[1]?.userName?.[0] || "N").toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 border border-gray-400 text-xs font-bold text-gray-700">2</div>
+                    </div>
+                  </Link>
+                  <Link href={`/u/${normalizedLeaderboard[1]?.userId ?? ""}`} className="text-sm font-medium text-center truncate w-full hover:underline">
                     {normalizedLeaderboard[1]?.userName || "Nuotatore"}
-                  </p>
+                  </Link>
                   <p className="text-xs text-muted-foreground">
                     {normalizedLeaderboard[1] ? formatValue(normalizedLeaderboard[1]) : "—"}
                   </p>
@@ -198,12 +293,18 @@ export default function Leaderboard() {
                 {/* First Place */}
                 <div className="flex flex-col items-center">
                   <Crown className="h-8 w-8 text-yellow-500 mb-1" />
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 border-4 border-yellow-500 flex items-center justify-center mb-2 shadow-xl">
-                    <span className="text-3xl font-bold text-white">1</span>
-                  </div>
-                  <p className="text-sm font-bold text-center truncate w-full">
+                  <Link href={`/u/${normalizedLeaderboard[0]?.userId ?? ""}`}>
+                    <div className="relative mb-2 cursor-pointer">
+                      <Avatar className="w-20 h-20 border-4 border-yellow-500 shadow-xl">
+                        <AvatarImage src={normalizedLeaderboard[0]?.avatarUrl || ""} alt={normalizedLeaderboard[0]?.userName || "Nuotatore"} />
+                        <AvatarFallback>{(normalizedLeaderboard[0]?.userName?.[0] || "N").toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -bottom-1 -right-1 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 border border-yellow-500 text-sm font-bold text-white">1</div>
+                    </div>
+                  </Link>
+                  <Link href={`/u/${normalizedLeaderboard[0]?.userId ?? ""}`} className="text-sm font-bold text-center truncate w-full hover:underline">
                     {normalizedLeaderboard[0]?.userName || "Nuotatore"}
-                  </p>
+                  </Link>
                   <p className="text-xs text-[var(--gold)] font-semibold">
                     {normalizedLeaderboard[0] ? formatValue(normalizedLeaderboard[0]) : "—"}
                   </p>
@@ -211,12 +312,18 @@ export default function Leaderboard() {
 
                 {/* Third Place */}
                 <div className="flex flex-col items-center pt-12">
-                  <div className="w-14 h-14 rounded-full bg-amber-100 border-4 border-amber-600 flex items-center justify-center mb-2 shadow-lg">
-                    <span className="text-xl font-bold text-amber-700">3</span>
-                  </div>
-                  <p className="text-sm font-medium text-center truncate w-full">
+                  <Link href={`/u/${normalizedLeaderboard[2]?.userId ?? ""}`}>
+                    <div className="relative mb-2 cursor-pointer">
+                      <Avatar className="w-14 h-14 border-4 border-amber-600 shadow-lg">
+                        <AvatarImage src={normalizedLeaderboard[2]?.avatarUrl || ""} alt={normalizedLeaderboard[2]?.userName || "Nuotatore"} />
+                        <AvatarFallback>{(normalizedLeaderboard[2]?.userName?.[0] || "N").toUpperCase()}</AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 border border-amber-600 text-[10px] font-bold text-amber-700">3</div>
+                    </div>
+                  </Link>
+                  <Link href={`/u/${normalizedLeaderboard[2]?.userId ?? ""}`} className="text-sm font-medium text-center truncate w-full hover:underline">
                     {normalizedLeaderboard[2]?.userName || "Nuotatore"}
-                  </p>
+                  </Link>
                   <p className="text-xs text-muted-foreground">
                     {normalizedLeaderboard[2] ? formatValue(normalizedLeaderboard[2]) : "—"}
                   </p>
@@ -225,8 +332,8 @@ export default function Leaderboard() {
             )}
 
             {/* Rest of the list */}
-            {normalizedLeaderboard.slice(normalizedLeaderboard.length >= 3 ? 3 : 0).map((entry, index) => {
-              const position = normalizedLeaderboard.length >= 3 ? index + 4 : index + 1;
+            {pagedRestEntries.map((entry, index) => {
+              const position = podiumOffset + (listPage - 1) * restPageSize + index + 1;
               const isCurrentUser = String(entry.userId) === String(user?.id);
 
               return (
@@ -238,8 +345,8 @@ export default function Leaderboard() {
                   whileHover={{ scale: 1.02, x: 5 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  <Card className={`${isCurrentUser ? "ring-2 ring-[var(--azure)] bg-[var(--azure)]/5" : ""}`}>
-                    <CardContent className="p-4">
+                  <Link href={`/u/${entry.userId}`}>
+                  <div className={`surface-panel p-4 ${isCurrentUser ? "ring-2 ring-[var(--azure)] bg-[var(--azure)]/8" : ""} cursor-pointer`}>
                       <div className="flex items-center gap-4">
                         {/* Position */}
                         <div className="w-8 flex justify-center">
@@ -247,11 +354,12 @@ export default function Leaderboard() {
                         </div>
 
                         {/* Avatar */}
-                        <div 
-                          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold bg-[var(--azure)]"
-                        >
-                          {entry.userName[0].toUpperCase()}
-                        </div>
+                        <Avatar className="h-10 w-10 border border-border">
+                          <AvatarImage src={entry.avatarUrl || ""} alt={entry.userName} />
+                          <AvatarFallback>
+                            {(entry.userName?.[0] || "S").toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
 
                         {/* Name & Level */}
                         <div className="flex-1 min-w-0">
@@ -271,11 +379,36 @@ export default function Leaderboard() {
                           </p>
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
+                  </div>
+                  </Link>
                 </motion.div>
               );
             })}
+            {restEntries.length > restPageSize && (
+              <div className="mt-3 flex items-center justify-between rounded-xl border border-border/60 bg-card/50 px-3 py-2">
+                <p className="text-xs text-muted-foreground">
+                  Pagina {listPage} di {restTotalPages}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline-neon"
+                    onClick={() => setListPage((prev) => Math.max(1, prev - 1))}
+                    disabled={listPage === 1}
+                  >
+                    Indietro
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline-neon"
+                    onClick={() => setListPage((prev) => Math.min(restTotalPages, prev + 1))}
+                    disabled={listPage === restTotalPages}
+                  >
+                    Avanti
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {normalizedLeaderboard.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
@@ -288,7 +421,6 @@ export default function Leaderboard() {
         )}
       </main>
 
-      <MobileNav />
     </div>
     </AppLayout>
   );

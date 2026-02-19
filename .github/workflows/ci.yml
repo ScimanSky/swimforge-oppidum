@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, "swimforge-*"]
 
 jobs:
   build-test:
@@ -16,13 +16,10 @@ jobs:
       - uses: pnpm/action-setup@v4
       - name: Install deps
         run: pnpm install --frozen-lockfile
-      - name: Typecheck (non-blocking)
-        # NOTE: The repo currently has known TS issues tracked in backlog.
-        # Keeping typecheck visible for reviewers while not blocking CI.
+      - name: Typecheck
         run: pnpm check
-        continue-on-error: true
-      # Tests are currently lightweight (vitest). If they become flaky in CI,
-      # replace with `pnpm build` and keep this note for reviewers.
+      - name: Build
+        run: pnpm build
       - name: Tests
         run: pnpm test
         env:

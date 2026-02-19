@@ -5,6 +5,9 @@ import { nanoid } from "nanoid";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
+import { logger } from "../middleware/logger";
+
+const log = logger.child({ component: "vite" });
 
 export async function setupVite(app: Express, server: Server) {
   const serverOptions = {
@@ -53,15 +56,41 @@ export function serveStatic(app: Express) {
       ? path.resolve(import.meta.dirname, "../..", "dist", "public")
       : path.resolve(import.meta.dirname, "public");
   if (!fs.existsSync(distPath)) {
-    console.error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`
+    log.error("Could not find the build directory, make sure to build the client first", {
+      event: "vite:missing_dist",
+      distPath,
+    });
+  }
+
+  const assetsPath = path.resolve(distPath, "assets");
+  if (fs.existsSync(assetsPath)) {
+    app.use(
+      "/assets",
+      express.static(assetsPath, {
+        maxAge: "365d",
+        immutable: true,
+      })
     );
   }
 
-  app.use(express.static(distPath));
+  app.use(
+    express.static(distPath, {
+      maxAge: "1h",
+      setHeaders: (res, filePath) => {
+        if (path.basename(filePath) === "index.html") {
+          res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+        }
+      },
+    })
+  );
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
+  // Fall through to index.html only for SPA routes.
+  // Requests for missing static assets should return 404 (not HTML) to avoid MIME errors.
+  app.use("*", (req, res) => {
+    if (path.extname(req.path)) {
+      return res.status(404).end();
+    }
+    res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

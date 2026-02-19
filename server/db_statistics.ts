@@ -11,6 +11,14 @@ import {
   calculatePOI 
 } from "./advanced_metrics";
 
+type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+
+async function requireDb(): Promise<DbClient> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db;
+}
+
 // ============================================
 // TYPES
 // ============================================
@@ -46,6 +54,7 @@ export interface AdvancedMetrics {
     direction: 'up' | 'down' | 'stable';
     percentage: number;
   };
+  trendBaseline: boolean;
   insights: string[];
   predictions: {
     targetKm: number;
@@ -63,6 +72,7 @@ export interface AdvancedMetrics {
   aerobicCapacityScore: number | null; // ACS: 0-100
   recoveryReadinessScore: number | null; // RRS: 0-100
   progressiveOverloadIndex: number | null; // POI: -100 to +100
+  poiBaseline: boolean;
 }
 
 // ============================================
@@ -99,7 +109,7 @@ export async function getProgressTimeline(
 ): Promise<TimelineDataPoint[]> {
   const startDate = getDaysAgo(days);
 
-  const db = await getDb();
+  const db = await requireDb();
   const rows = await db
     .select({
       date: sql<string>`date(${swimmingActivities.activityDate})`,
@@ -135,7 +145,7 @@ export async function getPerformanceAnalysis(
 ): Promise<PerformanceAnalysis> {
   const startDate = getDaysAgo(days);
 
-  const db = await getDb();
+  const db = await requireDb();
   const aggregates = await db
     .select({
       zone1: sql<number>`coalesce(sum(${swimmingActivities.hrZone1Seconds}), 0)`,
@@ -221,7 +231,7 @@ export async function getAdvancedMetrics(
   const startDate = getDaysAgo(days);
   const previousStartDate = getDaysAgo(days * 2);
 
-  const db = await getDb();
+  const db = await requireDb();
   // Current period
   const currentActivities = await db
     .select()
@@ -246,6 +256,16 @@ export async function getAdvancedMetrics(
       )
     );
 
+  // If no previous period activities, fall back to splitting the current period in half
+  const midDate = getDaysAgo(Math.floor(days / 2));
+  const useFallbackComparison = previousActivities.length === 0;
+  const comparisonCurrentActivities = useFallbackComparison
+    ? currentActivities.filter((a) => new Date(a.activityDate).getTime() >= midDate.getTime())
+    : currentActivities;
+  const comparisonPreviousActivities = useFallbackComparison
+    ? currentActivities.filter((a) => new Date(a.activityDate).getTime() < midDate.getTime())
+    : previousActivities;
+
   // Calculate Performance Index (0-100)
   const currentDistance = currentActivities.reduce((sum, a) => sum + a.distanceMeters, 0) / 1000;
   const currentSessions = currentActivities.length;
@@ -265,34 +285,44 @@ export async function getAdvancedMetrics(
   );
   const regularityScore = (datesWithActivity.size / days) * 50; // 50 points max
 
-  // Calculate streak
-  let currentStreak = 0;
-  let recordStreak = 0;
-  let tempStreak = 0;
+  // Calculate streak based on training days (Mon/Wed/Fri)
+  const trainingDays = new Set([1, 3, 5]); // 0=Sun, 1=Mon, 3=Wed, 5=Fri
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const trainingDates: string[] = [];
 
   for (let i = 0; i < 365; i++) {
     const checkDate = new Date(today);
     checkDate.setDate(checkDate.getDate() - i);
-    const dateStr = formatDate(checkDate);
+    if (trainingDays.has(checkDate.getDay())) {
+      trainingDates.push(formatDate(checkDate));
+    }
+  }
 
+  trainingDates.reverse(); // oldest -> newest
+
+  let recordStreak = 0;
+  let tempStreak = 0;
+  for (const dateStr of trainingDates) {
     if (datesWithActivity.has(dateStr)) {
-      tempStreak++;
-      if (i === 0 || currentStreak > 0) {
-        currentStreak = tempStreak;
-      }
+      tempStreak += 1;
       recordStreak = Math.max(recordStreak, tempStreak);
     } else {
-      if (i === 0) {
-        // Check yesterday
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-        if (!datesWithActivity.has(formatDate(yesterday))) {
-          currentStreak = 0;
-        }
-      }
       tempStreak = 0;
+    }
+  }
+
+  let currentStreak = 0;
+  let endIndex = trainingDates.length - 1;
+  const todayStr = formatDate(today);
+  if (trainingDays.has(today.getDay()) && !datesWithActivity.has(todayStr)) {
+    endIndex -= 1;
+  }
+  for (let i = endIndex; i >= 0; i--) {
+    if (datesWithActivity.has(trainingDates[i])) {
+      currentStreak += 1;
+    } else {
+      break;
     }
   }
 
@@ -302,9 +332,13 @@ export async function getAdvancedMetrics(
   const consistencyScore = Math.round(Math.min(regularityScore + streakScore - gapPenalty, 100));
 
   // Trend Indicator
-  const previousDistance = previousActivities.reduce((sum, a) => sum + a.distanceMeters, 0) / 1000;
-  const trendPercentage = previousDistance > 0
-    ? Math.round(((currentDistance - previousDistance) / previousDistance) * 100)
+  const comparisonCurrentDistance =
+    comparisonCurrentActivities.reduce((sum, a) => sum + a.distanceMeters, 0) / 1000;
+  const previousDistance =
+    comparisonPreviousActivities.reduce((sum, a) => sum + a.distanceMeters, 0) / 1000;
+  const trendBaseline = previousDistance > 0;
+  const trendPercentage = trendBaseline
+    ? Math.round(((comparisonCurrentDistance - previousDistance) / previousDistance) * 100)
     : 0;
 
   const trendIndicator = {
@@ -398,19 +432,28 @@ export async function getAdvancedMetrics(
     : undefined;
 
   // POI: Compare current vs previous period
+  const comparisonAvgPace = comparisonCurrentActivities.length > 0
+    ? comparisonCurrentActivities
+        .filter(a => a.avgPacePer100m)
+        .reduce((sum, a) => sum + a.avgPacePer100m!, 0) / Math.max(comparisonCurrentActivities.filter(a => a.avgPacePer100m).length, 1)
+    : 0;
   const currentStats = {
-    distance: currentDistance,
-    intensity: avgPace > 0 ? 120 / avgPace : 0,  // Normalized intensity
-    frequency: currentSessions
+    distance: comparisonCurrentDistance,
+    intensity: comparisonAvgPace > 0 ? 120 / comparisonAvgPace : 0,  // Normalized intensity
+    frequency: comparisonCurrentActivities.length
   };
+  const avgPrevPace = comparisonPreviousActivities.length > 0
+    ? comparisonPreviousActivities.reduce((sum, a) => sum + (a.avgPacePer100m || 0), 0) / comparisonPreviousActivities.length
+    : 0;
   const previousStats = {
     distance: previousDistance,
-    intensity: previousActivities.length > 0 
-      ? previousActivities.reduce((sum, a) => sum + (a.avgPacePer100m || 0), 0) / previousActivities.length
-      : 0,
-    frequency: previousActivities.length
+    intensity: avgPrevPace > 0 ? 120 / avgPrevPace : 0,
+    frequency: comparisonPreviousActivities.length
   };
-  const progressiveOverloadIndex = calculatePOI(currentStats, previousStats) || undefined;
+  const poiBaseline = previousStats.distance > 0 || previousStats.intensity > 0 || previousStats.frequency > 0;
+  const progressiveOverloadIndex = poiBaseline
+    ? calculatePOI(currentStats, previousStats) ?? undefined
+    : undefined;
 
   // Prepare data for AI
   const userData: UserStatsData = {
@@ -455,21 +498,23 @@ export async function getAdvancedMetrics(
 
   // Remove static insight - only AI insights
 
-  return {
-    performanceIndex,
-    consistencyScore,
-    trendIndicator,
-    insights,
-    predictions,
-    streak: {
-      current: currentStreak,
-      record: recordStreak,
-    },
-    swimmingEfficiencyIndex,
-    technicalConsistencyIndex,
-    strokeEfficiencyRating,
-    aerobicCapacityScore,
-    recoveryReadinessScore,
-    progressiveOverloadIndex,
-  };
-}
+	  return {
+	    performanceIndex,
+	    consistencyScore,
+	    trendIndicator,
+	    trendBaseline,
+	    insights,
+	    predictions,
+	    streak: {
+	      current: currentStreak,
+	      record: recordStreak,
+	    },
+	    swimmingEfficiencyIndex: swimmingEfficiencyIndex ?? null,
+	    technicalConsistencyIndex: technicalConsistencyIndex ?? null,
+	    strokeEfficiencyRating: strokeEfficiencyRating ?? null,
+	    aerobicCapacityScore: aerobicCapacityScore ?? null,
+	    recoveryReadinessScore: recoveryReadinessScore ?? null,
+	    progressiveOverloadIndex: progressiveOverloadIndex ?? null,
+	    poiBaseline,
+	  };
+	}

@@ -5,14 +5,17 @@
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getDb } from "./db";
-import { aiCoachWorkouts } from "../drizzle/schema";
-import { eq, and, gt } from "drizzle-orm";
-import { 
-  calculateSEI, 
-  calculateTCI, 
-  calculateSER, 
-  calculateACS, 
-  calculateRRS 
+import { aiCoachWorkouts, swimmerProfiles, swimmingActivities } from "../drizzle/schema";
+import { eq, and, gt, gte, desc } from "drizzle-orm";
+import { logger } from "./middleware/logger";
+import { withErrorHandling } from "./lib/withErrorHandling";
+import { config } from "./config";
+import {
+  calculateSEI,
+  calculateTCI,
+  calculateSER,
+  calculateACS,
+  calculateRRS
 } from "./advanced_metrics";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
@@ -45,63 +48,315 @@ export interface GeneratedWorkout {
   coachNotes: string[];
 }
 
-/**
- * Get cached workout or generate new one
- */
-export async function getOrGenerateWorkout(
+type UserStatsForCoach = {
+  profile: {
+    aiSkillLabel: string | null;
+    level: number;
+    totalXp: number;
+    totalDistanceMeters: number;
+    totalSessions: number;
+  };
+  recent: {
+    activitiesCount: number;
+    totalDistance: number;
+    totalTime: number;
+    avgPace: string;
+    avgSwolf: string;
+    sessionsPerWeek: string;
+  };
+  advancedMetrics: {
+    sei: number;
+    tci: number;
+    ser: number;
+    acs: number;
+    rrs: number;
+    poi: number;
+  };
+  hrZones: {
+    hasData: boolean;
+    activitiesWithHR: number;
+    zone1: string;
+    zone2: string;
+    zone3: string;
+    zone4: string;
+    zone5: string;
+  };
+  latestActivities: Array<{
+    date: Date;
+    distance: number;
+    duration: number;
+    pace: number | null;
+    swolf: number | null;
+    strokes: number | null;
+    strokeRate: number | null;
+  }>;
+};
+
+function buildDefaultWorkout(workoutType: "pool" | "dryland"): GeneratedWorkout {
+  if (workoutType === "dryland") {
+    return {
+      type: "dryland",
+      title: "Workout Dryland (Standard)",
+      description: "Allenamento standard generato in fallback (AI non disponibile).",
+      duration: "30-40 min",
+      difficulty: "Intermedio",
+      sections: [
+        {
+          title: "Riscaldamento",
+          exercises: [
+            { name: "Mobilita' spalle e anca", duration: "6-8 min", notes: "Movimenti controllati" },
+          ],
+        },
+        {
+          title: "Forza + Core",
+          exercises: [
+            { name: "Squat a corpo libero", sets: "3", reps: "12" },
+            { name: "Push-up (variante)", sets: "3", reps: "8-12" },
+            { name: "Rematore con elastico", sets: "3", reps: "12-15" },
+            { name: "Plank", sets: "3", duration: "30-45s" },
+          ],
+        },
+        {
+          title: "Defaticamento",
+          exercises: [
+            { name: "Stretching pettorali/dorso", duration: "5 min" },
+          ],
+        },
+      ],
+      coachNotes: [
+        "AI Coach temporaneamente non disponibile: workout standard in fallback.",
+        "Se senti dolore acuto, interrompi l'esercizio.",
+      ],
+    };
+  }
+
+  return {
+    type: "pool",
+    title: "Workout Piscina (Standard)",
+    description: "Allenamento standard generato in fallback (AI non disponibile).",
+    duration: "45-60 min",
+    difficulty: "Intermedio",
+    sections: [
+      {
+        title: "Riscaldamento",
+        exercises: [
+          { name: "200m stile facile", distance: "200m", rest: "20s" },
+          { name: "4x50m tecnica (catch-up / sculling)", distance: "4x50m", rest: "20s" },
+        ],
+      },
+      {
+        title: "Serie Principale",
+        exercises: [
+          { name: "6x100m a ritmo controllato", distance: "6x100m", rest: "20-30s", intensity: "RPE 6-7" },
+          { name: "4x50m forte", distance: "4x50m", rest: "30-40s", intensity: "RPE 8" },
+        ],
+      },
+      {
+        title: "Defaticamento",
+        exercises: [
+          { name: "200m facile", distance: "200m", rest: "0-20s" },
+        ],
+      },
+    ],
+    coachNotes: [
+      "AI Coach temporaneamente non disponibile: workout standard in fallback.",
+      "Mantieni tecnica pulita: priorita' alla qualita'.",
+    ],
+  };
+}
+
+async function getLatestCachedWorkout(
   userId: number,
   workoutType: "pool" | "dryland",
-  forceRegenerate: boolean = false
-): Promise<GeneratedWorkout> {
+): Promise<GeneratedWorkout | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const cached = await db
+    .select()
+    .from(aiCoachWorkouts)
+    .where(and(eq(aiCoachWorkouts.userId, userId), eq(aiCoachWorkouts.workoutType, workoutType)))
+    .orderBy(desc(aiCoachWorkouts.generatedAt))
+    .limit(1);
+
+  if (cached.length === 0) return null;
+  try {
+    return JSON.parse(cached[0].workoutData);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`[AI Coach] Failed to parse cached workout JSON: ${message}`, {
+      event: "ai_coach:cache_parse_failed",
+      userId,
+      workoutType,
+      message,
+    });
+    return null;
+  }
+}
+
+const COOLDOWN_DAYS = 7;
+
+export interface WorkoutsResponse {
+  pool: GeneratedWorkout | null;
+  dryland: GeneratedWorkout | null;
+  generatedAt: string | null;
+  nextAvailableAt: string | null;
+  canGenerate: boolean;
+}
+
+/**
+ * Get existing cached workouts (read-only, no generation)
+ */
+export async function getExistingWorkouts(userId: number): Promise<WorkoutsResponse> {
   const db = await getDb();
   if (!db) {
     throw new Error("Database not available");
   }
 
-  // Check cache first (unless force regenerate)
-  if (!forceRegenerate) {
-    const cached = await db
-      .select()
-      .from(aiCoachWorkouts)
-      .where(
-        and(
-          eq(aiCoachWorkouts.userId, userId),
-          eq(aiCoachWorkouts.workoutType, workoutType),
-          gt(aiCoachWorkouts.expiresAt, new Date())
-        )
-      )
-      .limit(1);
+  const cached = await db
+    .select()
+    .from(aiCoachWorkouts)
+    .where(eq(aiCoachWorkouts.userId, userId))
+    .orderBy(desc(aiCoachWorkouts.generatedAt));
 
-    if (cached.length > 0) {
-      return JSON.parse(cached[0].workoutData);
+  let pool: GeneratedWorkout | null = null;
+  let dryland: GeneratedWorkout | null = null;
+  let latestGeneratedAt: Date | null = null;
+
+  for (const row of cached) {
+    try {
+      const workout = JSON.parse(row.workoutData) as GeneratedWorkout;
+      if (row.workoutType === "pool" && !pool) pool = workout;
+      if (row.workoutType === "dryland" && !dryland) dryland = workout;
+      if (!latestGeneratedAt || row.generatedAt > latestGeneratedAt) {
+        latestGeneratedAt = row.generatedAt;
+      }
+    } catch {
+      // skip corrupt cache entries
     }
   }
 
-  // Generate new workout
-  const workout = await generateWorkout(userId, workoutType);
+  const nextAvailableAt = latestGeneratedAt
+    ? new Date(latestGeneratedAt.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000)
+    : null;
+  const canGenerate = !nextAvailableAt || nextAvailableAt <= new Date();
 
-  // Cache the workout (24 hour expiration)
-  const expiresAt = new Date();
-  expiresAt.setHours(expiresAt.getHours() + 24);
+  return {
+    pool,
+    dryland,
+    generatedAt: latestGeneratedAt?.toISOString() ?? null,
+    nextAvailableAt: nextAvailableAt?.toISOString() ?? null,
+    canGenerate,
+  };
+}
 
-  await db
-    .insert(aiCoachWorkouts)
-    .values({
-      userId,
-      workoutType,
-      workoutData: JSON.stringify(workout),
-      expiresAt,
-    })
-    .onConflictDoUpdate({
-      target: [aiCoachWorkouts.userId, aiCoachWorkouts.workoutType],
-      set: {
-        workoutData: JSON.stringify(workout),
-        generatedAt: new Date(),
-        expiresAt,
-      },
-    });
+/**
+ * Generate both pool + dryland workouts (7-day cooldown)
+ */
+export async function generateBothWorkouts(userId: number): Promise<WorkoutsResponse> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
 
-  return workout;
+  // Check cooldown: find the most recent generation
+  const latest = await db
+    .select({ generatedAt: aiCoachWorkouts.generatedAt })
+    .from(aiCoachWorkouts)
+    .where(eq(aiCoachWorkouts.userId, userId))
+    .orderBy(desc(aiCoachWorkouts.generatedAt))
+    .limit(1);
+
+  if (latest.length > 0) {
+    const cooldownEnd = new Date(latest[0].generatedAt.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+    if (cooldownEnd > new Date()) {
+      throw new Error(`Workout generation is on cooldown until ${cooldownEnd.toISOString()}`);
+    }
+  }
+
+  // Generate both workouts in parallel
+  const [poolWorkout, drylandWorkout] = await Promise.all([
+    generateWorkout(userId, "pool"),
+    generateWorkout(userId, "dryland"),
+  ]);
+
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+
+  // Save both
+  logger.info(`[AI Coach] Starting persistence for user ${userId}`, { event: "ai_coach:persistence_start" });
+
+  for (const { type, workout } of [
+    { type: "pool" as const, workout: poolWorkout },
+    { type: "dryland" as const, workout: drylandWorkout },
+  ]) {
+    try {
+      // Manual upsert to avoid issues if unique constraint is missing
+      const existing = await db
+        .select({ id: aiCoachWorkouts.id })
+        .from(aiCoachWorkouts)
+        .where(
+          and(
+            eq(aiCoachWorkouts.userId, userId),
+            eq(aiCoachWorkouts.workoutType, type)
+          )
+        )
+        .limit(1);
+
+      if (existing.length > 0) {
+        await db
+          .update(aiCoachWorkouts)
+          .set({
+            workoutData: JSON.stringify(workout),
+            generatedAt: now,
+            expiresAt,
+          })
+          .where(eq(aiCoachWorkouts.id, existing[0].id));
+
+        logger.info(`[AI Coach] Updated existing workout for user ${userId} type ${type}`, {
+          event: "ai_coach:workout_updated",
+          userId,
+          workoutType: type
+        });
+      } else {
+        await db.insert(aiCoachWorkouts).values({
+          userId,
+          workoutType: type,
+          workoutData: JSON.stringify(workout),
+          expiresAt,
+        });
+
+        logger.info(`[AI Coach] Inserted new workout for user ${userId} type ${type}`, {
+          event: "ai_coach:workout_inserted",
+          userId,
+          workoutType: type
+        });
+      }
+    } catch (error: any) {
+      const message = error.message || String(error);
+      logger.error(`[AI Coach] Persistence failed for ${type}: ${message}`, {
+        event: "ai_coach:persistence_error",
+        userId,
+        workoutType: type,
+        error: message,
+        code: error.code,
+        detail: error.detail,
+        hint: error.hint
+      });
+      throw error;
+    }
+  }
+
+
+  const nextAvailableAt = new Date(now.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
+
+  return {
+    pool: poolWorkout,
+    dryland: drylandWorkout,
+    generatedAt: now.toISOString(),
+    nextAvailableAt: nextAvailableAt.toISOString(),
+    canGenerate: false,
+  };
 }
 
 /**
@@ -111,59 +366,72 @@ async function generateWorkout(
   userId: number,
   workoutType: "pool" | "dryland"
 ): Promise<GeneratedWorkout> {
-  try {
-    console.log(`[AI Coach] Starting workout generation for user ${userId}, type: ${workoutType}`);
-    
-    // Fetch user statistics
-    console.log(`[AI Coach] Fetching user stats for user ${userId}`);
-    const userStats = await fetchUserStats(userId);
-    console.log(`[AI Coach] User stats fetched successfully`);
+  const context = `ai_coach:generateWorkout user=${userId} type=${workoutType}`;
+  const fallback =
+    (await getLatestCachedWorkout(userId, workoutType)) ?? buildDefaultWorkout(workoutType);
 
-    // Build prompt based on workout type
-    const prompt =
-      workoutType === "pool"
-        ? buildPoolWorkoutPrompt(userStats)
-        : buildDrylandWorkoutPrompt(userStats);
-    console.log(`[AI Coach] Prompt built, length: ${prompt.length} chars`);
+  return withErrorHandling(
+    async () => {
+      logger.info(`[AI Coach] Starting workout generation for user ${userId}`, {
+        event: "ai_coach:generate_start",
+        userId,
+        workoutType,
+      });
 
-    // Call Gemini API with timeout
-    console.log(`[AI Coach] Calling Gemini API...`);
-    const result = await Promise.race([
-      model.generateContent(prompt),
-      new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Gemini API timeout after 60s')), 60000)
-      )
-    ]) as any;
-    
-    const response = result.response;
-    const text = response.text();
-    console.log(`[AI Coach] Gemini response received, length: ${text.length} chars`);
+      if (!process.env.GEMINI_API_KEY) {
+        throw new Error("Gemini not configured (missing GEMINI_API_KEY)");
+      }
 
-    // Parse the response
-    console.log(`[AI Coach] Parsing workout response...`);
-    const workout = parseWorkoutResponse(text, workoutType);
-    console.log(`[AI Coach] Workout generated successfully with ${workout.sections.length} sections`);
+      const userStats = await fetchUserStats(userId);
 
-    return workout;
-  } catch (error) {
-    console.error(`[AI Coach] Error generating workout for user ${userId}:`, error);
-    throw error;
-  }
+      const prompt =
+        workoutType === "pool"
+          ? buildPoolWorkoutPrompt(userStats)
+          : buildDrylandWorkoutPrompt(userStats);
+
+      // Call Gemini API with timeout
+      const result = (await Promise.race([
+        model.generateContent(prompt),
+        new Promise((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(`Gemini API timeout after ${config.GEMINI_API_TIMEOUT_MS}ms`)
+              ),
+            config.GEMINI_API_TIMEOUT_MS
+          )
+        ),
+      ])) as any;
+
+      const response = result.response;
+      const text = response.text();
+
+      const workout = parseWorkoutResponse(text, workoutType);
+
+      logger.info(`[AI Coach] Workout generated successfully for user ${userId}`, {
+        event: "ai_coach:generate_success",
+        userId,
+        workoutType,
+        sections: workout.sections.length,
+      });
+
+      return workout;
+    },
+    fallback,
+    context
+  );
 }
 
 /**
  * Fetch comprehensive user statistics for workout generation
  */
-async function fetchUserStats(userId: number): Promise<any> {
+async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
   const db = await getDb();
   if (!db) {
     throw new Error("Database not available");
   }
 
   // Get swimmer profile
-  const { swimmerProfiles, swimmingActivities } = await import("../drizzle/schema");
-  const { eq, and, gte, desc } = await import("drizzle-orm");
-  
   const profileResult = await db
     .select()
     .from(swimmerProfiles)
@@ -173,7 +441,7 @@ async function fetchUserStats(userId: number): Promise<any> {
   if (profileResult.length === 0) {
     throw new Error("Swimmer profile not found");
   }
-  
+
   const profile = profileResult[0];
 
   // Get recent activities (last 30 days)
@@ -201,13 +469,13 @@ async function fetchUserStats(userId: number): Promise<any> {
     (sum, a) => sum + (a.durationSeconds || 0),
     0
   );
-  
+
   // Calculate average pace from activities that have pace data
-  const activitiesWithPace = recentActivities.filter(a => a.avgPacePerHundredMeters && a.avgPacePerHundredMeters > 0);
+  const activitiesWithPace = recentActivities.filter(a => a.avgPacePer100m && a.avgPacePer100m > 0);
   const avgPace = activitiesWithPace.length > 0
-    ? activitiesWithPace.reduce((sum, a) => sum + (a.avgPacePerHundredMeters || 0), 0) / activitiesWithPace.length
+    ? activitiesWithPace.reduce((sum, a) => sum + (a.avgPacePer100m || 0), 0) / activitiesWithPace.length
     : 0; // seconds per 100m
-    
+
   const avgSwolf =
     recentActivities.reduce((sum, a) => sum + (a.avgSwolf || 0), 0) /
     (recentActivities.length || 1);
@@ -240,24 +508,23 @@ async function fetchUserStats(userId: number): Promise<any> {
     ? Math.round(acsScores.reduce((sum, s) => sum + s, 0) / acsScores.length)
     : 0;
 
-  // RRS: Average across all activities
-  const rrsScores = recentActivities
-    .map(a => calculateRRS(a))
-    .filter((s): s is number => s !== null);
-  const avgRRS = rrsScores.length > 0
-    ? Math.round(rrsScores.reduce((sum, s) => sum + s, 0) / rrsScores.length)
-    : 0;
+  // RRS: based on time since last workout (resting HR baseline not available in this context)
+  const lastWorkoutAt = recentActivities[0]?.activityDate ?? null;
+  const hoursSinceLastWorkout = lastWorkoutAt
+    ? (Date.now() - lastWorkoutAt.getTime()) / (1000 * 60 * 60)
+    : 999;
+  const avgRRS = calculateRRS(null, 60, hoursSinceLastWorkout) ?? 0;
 
   // POI: Simplified (would need previous period for proper calculation)
   const avgPOI = 0;
 
   // HR zones analysis - only from activities with HR data (using hrZoneXSeconds)
-  const activitiesWithHR = recentActivities.filter(a => 
+  const activitiesWithHR = recentActivities.filter(a =>
     (a.hrZone1Seconds || 0) + (a.hrZone2Seconds || 0) + (a.hrZone3Seconds || 0) + (a.hrZone4Seconds || 0) + (a.hrZone5Seconds || 0) > 0
   );
-  
+
   const hasHRData = activitiesWithHR.length > 0;
-  
+
   // Calculate total seconds in each zone across all activities with HR data
   const zone1Total = activitiesWithHR.reduce((sum, a) => sum + (a.hrZone1Seconds || 0), 0);
   const zone2Total = activitiesWithHR.reduce((sum, a) => sum + (a.hrZone2Seconds || 0), 0);
@@ -265,7 +532,7 @@ async function fetchUserStats(userId: number): Promise<any> {
   const zone4Total = activitiesWithHR.reduce((sum, a) => sum + (a.hrZone4Seconds || 0), 0);
   const zone5Total = activitiesWithHR.reduce((sum, a) => sum + (a.hrZone5Seconds || 0), 0);
   const totalHRSeconds = zone1Total + zone2Total + zone3Total + zone4Total + zone5Total;
-  
+
   // Convert to percentages
   const avgHRZone1Pct = totalHRSeconds > 0 ? (zone1Total / totalHRSeconds) * 100 : 0;
   const avgHRZone2Pct = totalHRSeconds > 0 ? (zone2Total / totalHRSeconds) * 100 : 0;
@@ -278,6 +545,7 @@ async function fetchUserStats(userId: number): Promise<any> {
 
   return {
     profile: {
+      aiSkillLabel: profile.aiSkillLabel ?? null,
       level: profile.level,
       totalXp: profile.totalXp,
       totalDistanceMeters: profile.totalDistanceMeters,
@@ -312,10 +580,10 @@ async function fetchUserStats(userId: number): Promise<any> {
       date: a.activityDate,
       distance: a.distanceMeters,
       duration: a.durationSeconds,
-      pace: a.avgPacePerHundredMeters,
+      pace: a.avgPacePer100m ?? null,
       swolf: a.avgSwolf,
-      strokes: a.avgStrokesPerLength,
-      strokeRate: a.avgStrokeRate,
+      strokes: a.avgStrokes ?? null,
+      strokeRate: a.avgStrokeCadence ?? null,
     })),
   };
 }
@@ -323,7 +591,7 @@ async function fetchUserStats(userId: number): Promise<any> {
 /**
  * Build prompt for pool workout generation
  */
-function buildPoolWorkoutPrompt(userStats: any): string {
+function buildPoolWorkoutPrompt(userStats: UserStatsForCoach): string {
   return `Sei un ALLENATORE OLIMPICO DI NUOTO con 20+ anni di esperienza nell'allenamento di atleti di livello mondiale. Genera un allenamento personalizzato IN VASCA completo e vario per un nuotatore basato sulle sue statistiche.
 
 **STATISTICHE NUOTATORE:**
@@ -459,7 +727,7 @@ Rispondi SOLO con il JSON valido, senza testo aggiuntivo.`;
 /**
  * Build prompt for dryland workout generation
  */
-function buildDrylandWorkoutPrompt(userStats: any): string {
+function buildDrylandWorkoutPrompt(userStats: UserStatsForCoach): string {
   return `Sei un allenatore olimpico di nuoto e preparatore atletico esperto. Genera un allenamento FUORI VASCA (dryland) personalizzato per un nuotatore basato sulle sue statistiche.
 
 **STATISTICHE NUOTATORE:**
@@ -574,18 +842,18 @@ function parseWorkoutResponse(
   try {
     // Remove markdown code blocks if present
     let cleanText = text.trim();
-    
+
     // More robust markdown block removal
-    const jsonMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/) || 
-                      cleanText.match(/```\s*([\s\S]*?)\s*```/);
-    
+    const jsonMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/) ||
+      cleanText.match(/```\s*([\s\S]*?)\s*```/);
+
     if (jsonMatch) {
       cleanText = jsonMatch[1];
     } else {
       // Fallback: strip any backticks and common text before/after
       cleanText = cleanText.replace(/```json/g, "")
-                          .replace(/```/g, "")
-                          .trim();
+        .replace(/```/g, "")
+        .trim();
     }
 
     // Parse JSON
@@ -598,8 +866,13 @@ function parseWorkoutResponse(
 
     return workout;
   } catch (error) {
-    console.error("Failed to parse workout response:", error);
-    console.error("Raw response:", text);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`Failed to parse workout response: ${message}`, {
+      event: "ai_coach:parse_failed",
+      message,
+      // Keep logs bounded; raw model output can be large and may contain junk.
+      rawPreview: typeof text === "string" ? text.slice(0, 800) : undefined,
+    });
 
     // Return fallback workout
     return createFallbackWorkout(workoutType);

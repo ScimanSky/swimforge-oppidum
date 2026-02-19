@@ -1,0 +1,421 @@
+"use client"
+
+import React, { useEffect, useMemo, useState } from "react"
+import { Link, useLocation } from "wouter"
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
+import {
+  BarChart3,
+  Bot,
+  Home,
+  LogOut,
+  Trophy,
+  Orbit,
+  Moon,
+  MoreHorizontal,
+  Plus,
+  Settings,
+  Shield,
+  Sun,
+  User,
+  Users,
+  Waves,
+} from "lucide-react"
+
+import { cn } from "@/lib/utils"
+import { trpc } from "@/lib/trpc"
+import { supabase } from "@/lib/supabase"
+import { useTheme } from "@/contexts/ThemeContext"
+
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import NotificationBell from "@/components/NotificationBell"
+import DirectMessages from "@/components/DirectMessages"
+import { CreatePostSheet } from "@/components/social/CreatePostSheet"
+
+type NavItem = {
+  label: string
+  path: string
+  icon: React.ReactNode
+}
+
+const navPrimary: NavItem[] = [
+  { label: "Feed", path: "/home", icon: <Home className="size-5" /> },
+  { label: "Club", path: "/home/community", icon: <Users className="size-5" /> },
+  { label: "Season", path: "/season", icon: <Orbit className="size-5" /> },
+]
+
+const navSecondary: NavItem[] = [
+  { label: "Coach", path: "/coach", icon: <Bot className="size-5" /> },
+  { label: "Track", path: "/track", icon: <Waves className="size-5" /> },
+  { label: "Profilo", path: "/profile", icon: <User className="size-5" /> },
+]
+
+function titleForPath(path: string) {
+  if (path.startsWith("/community/club") && path.includes("/event/")) return "Evento Club"
+  if (path.startsWith("/community/club")) return "Club"
+  if (path.startsWith("/home/community") || path.startsWith("/community")) return "Club"
+  if (path.startsWith("/season/challenges") || path.startsWith("/challenges")) return "Sfide"
+  if (path === "/" || path === "/home" || path.startsWith("/dashboard")) return "Feed"
+  if (path.startsWith("/track") || path.startsWith("/activities")) return "Track"
+  if (path.startsWith("/season")) return "Season"
+  if (path.startsWith("/profile/performance") || path.startsWith("/statistics")) return "Progressi"
+  if (path.startsWith("/coach")) return "Coach"
+  if (path.startsWith("/profile")) return "Profilo"
+  if (path.startsWith("/settings")) return "Impostazioni"
+  return "SwimForge"
+}
+
+function isNavItemActive(path: string, location: string) {
+  const normalized = location.split("?")[0].split("#")[0]
+  if (path === "/home" && normalized.startsWith("/home/community")) {
+    return false
+  }
+  return normalized === path || normalized.startsWith(path + "/")
+}
+
+function RailLink({ item, location }: { item: NavItem; location: string }) {
+  const isActive = isNavItemActive(item.path, location)
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Link
+          href={item.path}
+          className={cn(
+            [
+              "group relative flex size-11 items-center justify-center rounded-2xl",
+              "transition-[transform,box-shadow,background-color,color] duration-200 will-change-transform",
+              "hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]",
+            ].join(" "),
+            isActive
+              ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_22%,transparent),color-mix(in_oklch,var(--electric-lime)_18%,transparent))] text-foreground shadow-[0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_28%,transparent),0_18px_55px_color-mix(in_oklch,var(--foreground)_14%,transparent),0_0_34px_var(--neon-soft)]"
+              : "text-muted-foreground hover:text-foreground hover:bg-card/45 hover:shadow-[0_16px_44px_color-mix(in_oklch,var(--foreground)_12%,transparent)]",
+          )}
+          aria-current={isActive ? "page" : undefined}
+        >
+          {item.icon}
+          <span
+            className={cn(
+              "pointer-events-none absolute -right-2 top-1/2 hidden h-6 w-1 -translate-y-1/2 rounded-full bg-[linear-gradient(to_bottom,var(--electric-cyan),var(--electric-lime))] opacity-0 transition-opacity lg:block",
+              isActive && "opacity-100",
+            )}
+          />
+        </Link>
+      </TooltipTrigger>
+      <TooltipContent side="right" sideOffset={10}>
+        {item.label}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
+export function AppShell({ children, headerSlot }: { children: React.ReactNode; headerSlot?: React.ReactNode }) {
+  const [location] = useLocation()
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const { theme, toggleTheme, switchable } = useTheme()
+  const logoutMutation = trpc.auth.logout.useMutation()
+  const heartbeatMutation = trpc.auth.heartbeat.useMutation()
+  const meQuery = trpc.auth.me.useQuery()
+  const reduceMotion = useReducedMotion()
+  const isAdmin = meQuery.data?.role === "admin"
+
+  const pageTitle = useMemo(() => titleForPath(location), [location])
+  const showPageTitle = !(headerSlot && pageTitle === "Feed")
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof document === "undefined") return
+
+    const sendHeartbeat = () => {
+      if (document.visibilityState !== "visible") return
+      heartbeatMutation.mutate(undefined, {
+        onError: () => {
+          // Presence updates are best-effort and should not affect UX.
+        },
+      })
+    }
+
+    sendHeartbeat()
+    const intervalId = window.setInterval(sendHeartbeat, 60_000)
+    const onVisibilityOrFocus = () => sendHeartbeat()
+    document.addEventListener("visibilitychange", onVisibilityOrFocus)
+    window.addEventListener("focus", onVisibilityOrFocus)
+
+    return () => {
+      window.clearInterval(intervalId)
+      document.removeEventListener("visibilitychange", onVisibilityOrFocus)
+      window.removeEventListener("focus", onVisibilityOrFocus)
+    }
+  }, [heartbeatMutation.mutate])
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return
+    setIsLoggingOut(true)
+    try {
+      await logoutMutation.mutateAsync()
+    } catch {
+      // ignore logout errors, still clear client session
+    }
+    try {
+      await supabase.auth.signOut()
+    } catch {
+      // ignore
+    }
+    localStorage.removeItem("swimforge:autoSync:dashboardReady")
+    localStorage.removeItem("swimforge:autoSync:last")
+    window.location.href = "/"
+  }
+
+  return (
+    <div className="min-h-[100dvh] bg-transparent overflow-x-hidden">
+      {/* Desktop Rail */}
+      <aside
+        data-tour="main-navigation"
+        className="fixed left-0 top-0 z-40 hidden h-screen w-[88px] border-r border-border/40 bg-sidebar/95 backdrop-blur-xl shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_14%,transparent)] lg:flex"
+      >
+        <div className="flex h-full w-full flex-col items-center">
+          <div className="flex h-16 items-center justify-center">
+            <Link
+              href="/home"
+              className="group relative flex size-11 items-center justify-center rounded-2xl ei-border-gradient shadow-[0_0_32px_var(--neon-soft)] transition-transform hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
+              aria-label="Vai alla Home"
+            >
+              <img
+                src="/swimforge-logo.png"
+                alt="SwimForge"
+                className="h-8 w-8 object-contain"
+              />
+            </Link>
+          </div>
+
+          <nav className="flex w-full flex-col items-center gap-2 px-3 py-4">
+            {navPrimary.map((item) => (
+              <RailLink key={item.path} item={item} location={location} />
+            ))}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOpen(true)}
+                  data-tour="create-post"
+                  className="group relative my-1 flex size-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime))] text-background shadow-[0_0_22px_var(--neon-soft)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
+                  aria-label="Crea post"
+                >
+                  <Plus className="size-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={10}>
+                Crea
+              </TooltipContent>
+            </Tooltip>
+            <div className="my-2 h-px w-full bg-border/70" />
+            {navSecondary.map((item) => (
+              <RailLink key={item.path} item={item} location={location} />
+            ))}
+          </nav>
+
+          <div className="mt-auto w-full border-t border-border/70 px-3 py-3">
+            <div className="flex items-center justify-center gap-2">
+              <NotificationBell />
+              <DirectMessages />
+            </div>
+            <div className="mt-3 flex items-center justify-center gap-2">
+              {switchable && toggleTheme && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  onClick={() => toggleTheme()}
+                  aria-label={theme === "dark" ? "Passa al tema chiaro" : "Passa al tema scuro"}
+                  className="rounded-2xl hover:shadow-[0_0_22px_var(--neon-soft)]"
+                >
+                  {theme === "dark" ? <Moon className="size-4" /> : <Sun className="size-4" />}
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => void handleLogout()}
+                disabled={isLoggingOut}
+                aria-label="Logout"
+                className="rounded-2xl hover:shadow-[0_0_22px_var(--neon-soft)]"
+              >
+                <LogOut className="size-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      {/* Top Bar */}
+      <header className="fixed left-0 right-0 top-0 z-50 h-16 border-b border-border/40 bg-background/80 backdrop-blur-xl shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_12%,transparent)] lg:pl-[88px]">
+        <div className="flex h-full items-center justify-between gap-3 px-4">
+          <div className="flex min-w-0 items-center gap-3">
+            {headerSlot}
+            {showPageTitle ? (
+              <div className="min-w-0">
+                <div className="truncate text-lg font-display font-semibold tracking-wide">
+                  {pageTitle}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div data-tour="top-actions" className="flex items-center gap-2 lg:hidden">
+            <NotificationBell />
+            <DirectMessages />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline-neon" size="icon" aria-label="Menu">
+                  <MoreHorizontal className="size-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Menu</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/season/challenges" className="flex items-center gap-2">
+                    <Trophy className="size-4" />
+                    Sfide
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/profile/performance" className="flex items-center gap-2">
+                    <BarChart3 className="size-4" />
+                    Progressi
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/track" className="flex items-center gap-2">
+                    <Waves className="size-4" />
+                    Attività
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/coach" className="flex items-center gap-2">
+                    <Bot className="size-4" />
+                    Coach
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/settings" className="flex items-center gap-2">
+                    <Settings className="size-4" />
+                    Impostazioni
+                  </Link>
+                </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/reports" className="flex items-center gap-2">
+                      <Shield className="size-4" />
+                      Moderazione
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {switchable && toggleTheme && (
+                  <DropdownMenuItem onClick={() => toggleTheme()}>
+                    {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                    Tema: {theme === "dark" ? "Scuro" : "Chiaro"}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem variant="destructive" onClick={() => void handleLogout()}>
+                  <LogOut className="size-4" />
+                  {isLoggingOut ? "Logout..." : "Logout"}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </header>
+
+      {/* Mobile Bottom Nav */}
+      <nav
+        data-tour="main-navigation"
+        className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/40 bg-background/90 backdrop-blur-xl lg:hidden"
+      >
+        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-2">
+          {[navPrimary[0], navPrimary[1]].map((item) => {
+            const isActive = isNavItemActive(item.path, location)
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={cn(
+                  "flex min-h-[44px] min-w-[44px] h-12 w-full flex-col items-center justify-center gap-0.5 rounded-2xl text-[10px] font-semibold transition-[transform,box-shadow,background-color,color] active:scale-[0.96]",
+                  isActive
+                    ? "text-foreground bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_14%,transparent))] shadow-[0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_22%,transparent),0_10px_26px_var(--neon-soft)]"
+                    : "text-muted-foreground hover:bg-card/45 hover:text-foreground",
+                )}
+              >
+                <span className={cn("transition-colors", isActive && "text-foreground")}>
+                  {item.icon}
+                </span>
+                <span className="leading-none">{item.label}</span>
+              </Link>
+            )
+          })}
+
+          {/* Create button - prominent */}
+          <button
+            type="button"
+            onClick={() => setIsCreateOpen(true)}
+            data-tour="create-post"
+            className="flex min-h-[44px] min-w-[44px] w-full flex-col items-center justify-center transition-transform active:scale-[0.92]"
+            aria-label="Crea post"
+          >
+            <span className="flex size-12 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime))] text-background shadow-[0_0_22px_var(--neon-soft)] -mt-3">
+              <Plus className="size-6" />
+            </span>
+          </button>
+
+          {[navPrimary[2], navSecondary[2]].map((item) => {
+            const isActive = isNavItemActive(item.path, location)
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={cn(
+                  "flex min-h-[44px] min-w-[44px] h-12 w-full flex-col items-center justify-center gap-0.5 rounded-2xl text-[10px] font-semibold transition-[transform,box-shadow,background-color,color] active:scale-[0.96]",
+                  isActive
+                    ? "text-foreground bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_14%,transparent))] shadow-[0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_22%,transparent),0_10px_26px_var(--neon-soft)]"
+                    : "text-muted-foreground hover:bg-card/45 hover:text-foreground",
+                )}
+              >
+                <span className={cn("transition-colors", isActive && "text-foreground")}>
+                  {item.icon}
+                </span>
+                <span className="leading-none">{item.label}</span>
+              </Link>
+            )
+          })}
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <main className="min-h-[calc(100dvh-4rem)] min-w-0 pb-20 pt-16 lg:pb-0 lg:pl-[88px]">
+        <div className="mx-auto max-w-[1520px] min-w-0 p-4 md:p-5 lg:p-6">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={location}
+              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10, filter: "blur(4px)" }}
+              animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: "blur(0px)" }}
+              exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -8, filter: "blur(4px)" }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: "easeOut" }}
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </main>
+      <CreatePostSheet open={isCreateOpen} onOpenChange={setIsCreateOpen} />
+    </div>
+  )
+}

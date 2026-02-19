@@ -1,5 +1,21 @@
 import { sql } from "drizzle-orm";
 import { getDb } from "./db";
+import { logger } from "./middleware/logger";
+
+type ExpiredChallengeRow = {
+  id: number;
+  name: string;
+  objective: string | null;
+  badge_name: string | null;
+  badge_image_url: string | null;
+};
+
+type WinnerRow = {
+  user_id: number;
+  current_progress: number;
+};
+
+const log = logger.child({ component: "cron_challenges" });
 
 /**
  * Cron job to complete expired challenges and determine winners
@@ -15,13 +31,13 @@ export async function completeChallenges(): Promise<{
   try {
     // Find all active challenges that have ended
     const expiredChallengesResult = await db.execute(sql`
-      SELECT id, name, badge_name, badge_image_url
+      SELECT id, name, objective, badge_name, badge_image_url
       FROM challenges
       WHERE status = 'active'
         AND end_date < NOW()
     `);
 
-    const expiredChallenges = expiredChallengesResult.rows as any[];
+    const expiredChallenges = expiredChallengesResult.rows as unknown as ExpiredChallengeRow[];
     let completedCount = 0;
     let winnersCount = 0;
 
@@ -35,7 +51,7 @@ export async function completeChallenges(): Promise<{
         LIMIT 1
       `);
 
-      const winner = (winnerResult.rows[0] as any);
+      const winner = (winnerResult.rows[0] as unknown as WinnerRow | undefined);
 
       if (winner && winner.current_progress > 0) {
         // Mark winner
@@ -79,9 +95,20 @@ export async function completeChallenges(): Promise<{
           // Badge not found is expected, just log as info
           const errorMessage = error instanceof Error ? error.message : String(error);
           if (errorMessage.includes('not found') || errorMessage.includes('no rows')) {
-            console.log(`[Cron] Badge ${badgeName} not found in database, skipping award`);
+            log.info("[Cron] Badge not found in database, skipping award", {
+              event: "cron:badge_missing",
+              badgeName,
+              userId: winner.user_id,
+              challengeId: challenge.id,
+            });
           } else {
-            console.warn(`[Cron] Unexpected error awarding badge ${badgeName}:`, errorMessage);
+            log.warn("[Cron] Unexpected error awarding badge", {
+              event: "cron:badge_award_error",
+              badgeName,
+              userId: winner.user_id,
+              challengeId: challenge.id,
+              message: errorMessage,
+            });
           }
         }
 
@@ -113,13 +140,18 @@ export async function completeChallenges(): Promise<{
       completedCount++;
     }
 
-    console.log(`[Cron] Completed ${completedCount} challenges, ${winnersCount} winners determined`);
+    log.info("[Cron] Completed challenges", {
+      event: "cron:complete_challenges_ok",
+      completedCount,
+      winnersCount,
+    });
     return { completed: completedCount, winners: winnersCount };
   } catch (error) {
     // Log error with proper message extraction
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
-    console.error("[Cron] Error completing challenges:", {
+    log.error("[Cron] Error completing challenges", {
+      event: "cron:complete_challenges_error",
       message: errorMessage,
       stack: errorStack,
     });
@@ -149,7 +181,9 @@ export async function triggerChallengeCompletion(challengeId: number): Promise<b
     // Log error with proper message extraction
     const errorMessage = error instanceof Error ? error.message : String(error);
     const errorStack = error instanceof Error ? error.stack : undefined;
-    console.error("[Cron] Error triggering challenge completion:", {
+    log.error("[Cron] Error triggering challenge completion", {
+      event: "cron:trigger_completion_error",
+      challengeId,
       message: errorMessage,
       stack: errorStack,
     });

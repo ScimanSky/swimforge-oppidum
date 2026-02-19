@@ -2,6 +2,11 @@
 **/node_modules
 .pnpm-store/
 
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
 # Build outputs
 dist/
 build/
@@ -18,6 +23,9 @@ build/
 # Supabase CLI local metadata
 supabase/
 
+# Claude Code local settings
+.claude/
+
 # IDE and editor files
 .vscode/
 .idea/
@@ -33,6 +41,7 @@ supabase/
 .Trashes
 ehthumbs.db
 Thumbs.db
+*:Zone.Identifier
 
 # Logs
 logs
@@ -107,6 +116,9 @@ temp/
 
 # Local landing drafts (do not commit)
 assets/landing_drafts/
+assets/_swim-forge-v0/
+assets/swim-forge.zip
+assets/swim-forge.zip:Zone.Identifier
 
 # Database
 *.db
@@ -117,7 +129,11 @@ assets/landing_drafts/
 assets/coach_drafts/
 
 # Local-only PDFs
-assets/pdf-social/
 
-# Local-only PDFs
-assets/pdf-social/
+package-lock.json
+
+# Generated API docs
+docs/api/
+
+# Local analysis reports (do not commit)
+docs/reports/

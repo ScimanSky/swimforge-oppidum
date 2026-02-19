@@ -8,6 +8,9 @@
 import swaggerJsdoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import { Express } from 'express';
+import { logger } from "./middleware/logger";
+
+const log = logger.child({ component: "swagger" });
 
 const options = {
   definition: {
@@ -165,7 +168,10 @@ export function setupSwagger(app: Express) {
     res.send(swaggerSpec);
   });
 
-  console.log('[Swagger] Documentation available at /api/docs');
+  log.info("[Swagger] Documentation available at /api/docs", {
+    event: "swagger:enabled",
+    path: "/api/docs",
+  });
 }
 
 export default swaggerSpec;

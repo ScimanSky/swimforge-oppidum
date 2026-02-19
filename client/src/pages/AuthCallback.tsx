@@ -17,8 +17,9 @@ export default function AuthCallback() {
       setStatus("success");
       toast.success("Accesso effettuato con successo!");
       setTimeout(() => {
-        console.log('[AuthCallback] Redirecting to dashboard...');
-        window.location.href = "/dashboard";
+        const target = data?.isNewUser ? "/settings?tab=profile&onboarding=1" : "/home";
+        console.log('[AuthCallback] Redirecting to:', target);
+        window.location.href = target;
       }, 1000);
     },
     onError: (error) => {
@@ -33,24 +34,50 @@ export default function AuthCallback() {
     const handleAuthCallback = async () => {
       try {
         console.log('[AuthCallback] Starting auth callback...');
-        
-        // Parse hash fragment and exchange for session
+        console.log('[AuthCallback] Full URL:', window.location.href);
+
+        let session = null;
+        let error = null;
+
+        // 1. Check for PKCE flow (code in query params)
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+
+        // 2. Check for implicit flow (tokens in hash fragment)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
-        
-        console.log('[AuthCallback] Hash params:', { hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken });
-        
-        if (!accessToken) {
-          throw new Error("Nessun access token trovato nell'URL");
+
+        console.log('[AuthCallback] Params:', { hasCode: !!code, hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken });
+
+        if (code) {
+          // PKCE flow: exchange code for session
+          console.log('[AuthCallback] Using PKCE flow (code exchange)');
+          const result = await supabase.auth.exchangeCodeForSession(code);
+          session = result.data.session;
+          error = result.error;
+        } else if (accessToken) {
+          // Implicit flow: set session from hash tokens
+          console.log('[AuthCallback] Using implicit flow (hash tokens)');
+          const result = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken || '',
+          });
+          session = result.data.session;
+          error = result.error;
+        } else {
+          // Supabase with detectSessionInUrl may have already consumed the params.
+          // Wait briefly and check if a session was established automatically.
+          console.log('[AuthCallback] No URL params found, checking existing session...');
+          await new Promise((r) => setTimeout(r, 1000));
+          const { data } = await supabase.auth.getSession();
+          session = data.session;
+          if (!session) {
+            throw new Error("Nessun access token o codice di autorizzazione trovato nell'URL");
+          }
+          console.log('[AuthCallback] Found existing session from auto-detection');
         }
-        
-        // Set the session with the tokens from the hash
-        const { data: { session }, error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken || '',
-        });
-        
+
         console.log('[AuthCallback] Session result:', { session: !!session, error });
 
         if (error) {
@@ -86,7 +113,7 @@ export default function AuthCallback() {
         
         // Redirect alla pagina di login dopo 3 secondi
         setTimeout(() => {
-          navigate("/auth");
+          navigate("/login");
         }, 3000);
       }
     };
@@ -95,7 +122,7 @@ export default function AuthCallback() {
   }, []);
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4">
+    <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4" withShell={false}>
       <div className="relative w-full max-w-md">
         {/* Local glow accents */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">

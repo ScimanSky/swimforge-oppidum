@@ -17,18 +17,22 @@
  */
 
 import { getDb } from "./db";
-import { stravaTokens, swimmingActivities, swimmerProfiles, xpTransactions, badgeDefinitions, userBadges } from "../drizzle/schema";
+import { stravaTokens, swimmingActivities, swimmerProfiles, xpTransactions } from "../drizzle/schema";
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
 import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
 import { invalidateUserCache } from "./lib/cache";
+import { calculateActivityXp } from "./lib/utils";
+import { logger } from "./middleware/logger";
+import { config } from "./config";
+import { fetchWithTimeout } from "./lib/fetchWithTimeout";
 
 // Strava microservice configuration
-const STRAVA_SERVICE_URL = process.env.STRAVA_SERVICE_URL || "https://swimforge-strava-service.onrender.com";
+const STRAVA_SERVICE_URL =
+  process.env.STRAVA_SERVICE_URL ||
+  (process.env.NODE_ENV === "production" ? "https://swimforge-strava-service.onrender.com" : "");
 const STRAVA_SERVICE_SECRET = process.env.STRAVA_SERVICE_SECRET;
-if (!STRAVA_SERVICE_SECRET) {
-  throw new Error("STRAVA_SERVICE_SECRET is required");
-}
+const log = logger.child({ component: "strava" });
 
 interface StravaServiceActivity {
   activity_id: string;
@@ -52,6 +56,7 @@ interface StravaServiceResponse {
   access_token?: string;
   refresh_token?: string;
   expires_at?: number;
+  authorize_url?: string;
   athlete?: {
     id: number;
     username: string;
@@ -61,41 +66,81 @@ interface StravaServiceResponse {
   error?: string;
 }
 
+type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+
+async function requireDb(): Promise<DbClient> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  return db;
+}
+
 /**
  * Call the Strava microservice
  */
 async function callStravaService(
   endpoint: string,
   method: "GET" | "POST" = "POST",
-  body?: object
-): Promise<any> {
+  body?: Record<string, unknown>
+): Promise<StravaServiceResponse> {
+  if (!STRAVA_SERVICE_SECRET) {
+    throw new Error("Strava service not configured (missing STRAVA_SERVICE_SECRET)");
+  }
+  if (!STRAVA_SERVICE_URL) {
+    throw new Error("Strava service not configured (missing STRAVA_SERVICE_URL)");
+  }
+
   const url = `${STRAVA_SERVICE_URL}${endpoint}`;
   
   try {
-    const response = await fetch(url, {
-      method,
-      headers: {
-        "Content-Type": "application/json",
-        "X-Service-Secret": STRAVA_SERVICE_SECRET,
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Service-Secret": STRAVA_SERVICE_SECRET,
+        },
+        body: body ? JSON.stringify(body) : undefined,
       },
-      body: body ? JSON.stringify(body) : undefined,
-    });
+      config.EXTERNAL_API_TIMEOUT_MS,
+      `strava:service ${method} ${endpoint}`,
+    );
 
-    const data = await response.json().catch(() => ({ error: "Unknown error" }));
+    const data = (await response.json().catch(() => ({ error: "Unknown error" }))) as unknown;
+    const record =
+      data && typeof data === "object" ? (data as Record<string, unknown>) : {};
 
     if (!response.ok) {
-      throw new Error(data.error || data.detail || `HTTP ${response.status}`);
+      const message =
+        (typeof record["error"] === "string" && record["error"]) ||
+        (typeof record["detail"] === "string" && record["detail"]) ||
+        `HTTP ${response.status}`;
+      throw new Error(message);
     }
 
-    return data;
-  } catch (error: any) {
-    console.error(`[Strava Service] Error calling ${endpoint}:`, error.message);
+    return data as StravaServiceResponse;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    log.warn("[Strava Service] Error calling endpoint", {
+      event: "strava:service_error",
+      endpoint,
+      method,
+      message,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     throw error;
   }
 }
 
 /**
  * Get Strava connection status for a user
+ */
+/**
+ * Returns current Strava connection status for a user.
+ *
+ * This reads stored OAuth tokens from the database and may refresh tokens if expired.
+ *
+ * @param userId - SwimForge user id.
  */
 export async function getStravaStatus(userId: number): Promise<{
   connected: boolean;
@@ -104,7 +149,7 @@ export async function getStravaStatus(userId: number): Promise<{
   displayName?: string;
   lastSync?: Date;
 }> {
-  const db = await getDb();
+  const db = await requireDb();
   
   try {
     const [tokens] = await db
@@ -141,7 +186,12 @@ export async function getStravaStatus(userId: number): Promise<{
           };
         }
       } catch (error) {
-        console.error("[Strava] Token refresh failed:", error);
+        const message = error instanceof Error ? error.message : String(error);
+        log.warn("[Strava] Token refresh failed", {
+          event: "strava:refresh_failed",
+          userId,
+          message,
+        });
         return { connected: false };
       }
     }
@@ -154,13 +204,24 @@ export async function getStravaStatus(userId: number): Promise<{
       lastSync: tokens.lastSync || undefined,
     };
   } catch (error) {
-    console.error("[Strava] Error getting status:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    log.error("[Strava] Error getting status", {
+      event: "strava:status_error",
+      userId,
+      message,
+    });
     return { connected: false };
   }
 }
 
 /**
  * Generate Strava OAuth authorization URL
+ */
+/**
+ * Generates the Strava OAuth authorization URL via the Strava microservice.
+ *
+ * @param userId - SwimForge user id.
+ * @returns Authorization URL to redirect the user to.
  */
 export async function getStravaAuthorizeUrl(userId: number): Promise<string> {
   try {
@@ -175,14 +236,25 @@ export async function getStravaAuthorizeUrl(userId: number): Promise<string> {
     }
 
     return response.authorize_url;
-  } catch (error: any) {
-    console.error("[Strava] Error getting authorize URL:", error);
-    throw new Error(`Failed to generate Strava authorization URL: ${error.message}`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    log.error("[Strava] Error getting authorize URL", {
+      event: "strava:authorize_url_error",
+      userId,
+      message,
+    });
+    throw new Error(`Failed to generate Strava authorization URL: ${message}`);
   }
 }
 
 /**
  * Exchange authorization code for access token
+ */
+/**
+ * Exchanges an OAuth code for Strava access/refresh tokens via microservice and stores them.
+ *
+ * @param userId - SwimForge user id.
+ * @param code - OAuth authorization code from Strava.
  */
 export async function exchangeStravaToken(
   userId: number,
@@ -193,7 +265,7 @@ export async function exchangeStravaToken(
   username?: string;
   error?: string;
 }> {
-  const db = await getDb();
+  const db = await requireDb();
   
   try {
     // Call microservice to exchange code
@@ -247,18 +319,27 @@ export async function exchangeStravaToken(
       .set({ stravaConnected: true })
       .where(eq(swimmerProfiles.userId, userId));
 
-    console.log(`[Strava] Token exchange successful for user ${userId}, athlete ${response.athlete?.id}`);
+    log.info("[Strava] Token exchange successful", {
+      event: "strava:token_exchange_ok",
+      userId,
+      athleteId: response.athlete?.id ?? null,
+    });
 
     return {
       success: true,
       athleteId: response.athlete?.id,
       username: response.athlete?.username,
     };
-  } catch (error: any) {
-    console.error("[Strava] Error exchanging token:", error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    log.error("[Strava] Error exchanging token", {
+      event: "strava:token_exchange_error",
+      userId,
+      message,
+    });
     return {
       success: false,
-      error: error.message
+      error: message
     };
   }
 }
@@ -266,8 +347,14 @@ export async function exchangeStravaToken(
 /**
  * Refresh Strava access token
  */
+/**
+ * Refreshes an expired Strava access token using the stored refresh token.
+ *
+ * @param userId - SwimForge user id.
+ * @returns `true` if refresh succeeded and tokens were updated.
+ */
 export async function refreshStravaToken(userId: number): Promise<boolean> {
-  const db = await getDb();
+  const db = await requireDb();
   
   try {
     // Get current tokens
@@ -307,16 +394,23 @@ export async function refreshStravaToken(userId: number): Promise<boolean> {
       })
       .where(eq(stravaTokens.userId, userId));
 
-    console.log(`[Strava] Token refresh successful for user ${userId}`);
+    log.info("[Strava] Token refresh successful", { event: "strava:refresh_ok", userId });
     return true;
-  } catch (error: any) {
-    console.error("[Strava] Error refreshing token:", error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    log.error("[Strava] Error refreshing token", { event: "strava:refresh_error", userId, message });
     return false;
   }
 }
 
 /**
  * Sync swimming activities from Strava
+ */
+/**
+ * Imports recent swimming activities for the given user from Strava via microservice.
+ *
+ * @param userId - SwimForge user id.
+ * @param daysBack - How many days back to fetch (default 30).
  */
 export async function syncStravaActivities(
   userId: number,
@@ -326,7 +420,7 @@ export async function syncStravaActivities(
   count: number;
   message?: string;
 }> {
-  const db = await getDb();
+  const db = await requireDb();
   
   try {
     // Get user profile
@@ -410,10 +504,14 @@ export async function syncStravaActivities(
           )
           .limit(1);
 
-        if (existingStrava) {
-          console.log(`[Strava] Activity ${activity.activity_id} already exists, skipping`);
-          continue;
-        }
+	        if (existingStrava) {
+	          log.debug("[Strava] Activity already exists, skipping", {
+	            event: "strava:activity_skip_exists",
+	            userId,
+	            stravaActivityId: activity.activity_id,
+	          });
+	          continue;
+	        }
 
         // Check for cross-platform duplicates (Garmin)
         // Match by timestamp (±5 min), distance (±10%), and duration (±10%)
@@ -442,33 +540,26 @@ export async function syncStravaActivities(
           )
           .limit(1);
 
-        if (existingCrossPlatform) {
-          console.log(`[Strava] Activity ${activity.activity_id} is a duplicate of Garmin activity ${existingCrossPlatform.id}, skipping`);
-          continue;
-        }
+	        if (existingCrossPlatform) {
+	          log.debug("[Strava] Activity duplicate of Garmin, skipping", {
+	            event: "strava:activity_skip_duplicate",
+	            userId,
+	            stravaActivityId: activity.activity_id,
+	            garminActivityId: existingCrossPlatform.id,
+	          });
+	          continue;
+	        }
 
-        // Calculate XP (same formula as Garmin)
-        let xpEarned = 0;
-        
-        // Base XP: 1 XP per 100 meters
-        xpEarned += Math.floor(activity.distance_meters / 100);
-        
-        // Bonus for session completion
-        xpEarned += 50;
-        
-        // Bonus for longer sessions (over 3km)
-        if (activity.distance_meters >= 3000) {
-          xpEarned += 25;
-        }
-        
-        // Bonus for very long sessions (over 4km)
-        if (activity.distance_meters >= 4000) {
-          xpEarned += 25;
-        }
-        
-        // Note: Strava doesn't provide open water flag, so we can't add that bonus
+        // Calculate XP (shared formula). Strava doesn't provide open water flag, so keep it false.
+        const xpEarned = calculateActivityXp(activity.distance_meters, false);
 
-        console.log(`[Strava] Importing activity ${activity.activity_id}: ${activity.distance_meters}m, ${xpEarned} XP`);
+	        log.info("[Strava] Importing activity", {
+	          event: "strava:activity_import_start",
+	          userId,
+	          stravaActivityId: activity.activity_id,
+	          distanceMeters: activity.distance_meters,
+	          xpEarned,
+	        });
 
         // Insert activity
         await db.insert(swimmingActivities).values({
@@ -476,7 +567,7 @@ export async function syncStravaActivities(
           activityDate: new Date(activity.start_time),
           distanceMeters: activity.distance_meters,
           durationSeconds: activity.duration_seconds,
-          poolLength: 25, // Default, Strava doesn't provide this
+          poolLengthMeters: 25, // Default, Strava doesn't provide this
           strokeType: "mixed", // Default, Strava doesn't provide this
           avgPacePer100m: activity.moving_time_seconds > 0
             ? (activity.moving_time_seconds / (activity.distance_meters / 100))
@@ -492,7 +583,11 @@ export async function syncStravaActivities(
           createdAt: new Date(),
         });
 
-        console.log(`[Strava] Activity ${activity.activity_id} inserted successfully`);
+	        log.debug("[Strava] Activity inserted", {
+	          event: "strava:activity_insert_ok",
+	          userId,
+	          stravaActivityId: activity.activity_id,
+	        });
 
         // Add XP transaction
         await db.insert(xpTransactions).values({
@@ -502,17 +597,33 @@ export async function syncStravaActivities(
           description: `Attività: ${activity.activity_name} - ${Math.round(activity.distance_meters)}m`,
         });
 
-        console.log(`[Strava] XP transaction created for activity ${activity.activity_id}`);
+	        log.debug("[Strava] XP transaction created", {
+	          event: "strava:xp_tx_ok",
+	          userId,
+	          stravaActivityId: activity.activity_id,
+	          xpEarned,
+	        });
 
         importedCount++;
         totalNewXp += xpEarned;
         totalNewDistance += activity.distance_meters;
         totalNewDuration += activity.duration_seconds;
-        console.log(`[Strava] Imported activity ${activity.activity_id} (+${xpEarned} XP)`);
-      } catch (error) {
-        console.error(`[Strava] Error importing activity ${activity.activity_id}:`, error);
-      }
-    }
+	        log.info("[Strava] Activity imported", {
+	          event: "strava:activity_import_ok",
+	          userId,
+	          stravaActivityId: activity.activity_id,
+	          xpEarned,
+	        });
+	      } catch (error) {
+	        const message = error instanceof Error ? error.message : String(error);
+	        log.error("[Strava] Error importing activity", {
+	          event: "strava:activity_import_error",
+	          userId,
+	          stravaActivityId: activity.activity_id,
+	          message,
+	        });
+	      }
+	    }
 
     // Update profile totals
     if (importedCount > 0) {
@@ -535,16 +646,17 @@ export async function syncStravaActivities(
         })
         .where(eq(swimmerProfiles.userId, userId));
 
-      console.log(`[Strava] Updated profile for user ${userId}: +${totalNewXp} XP, Level ${newLevel}, ${newTotalSessions} sessions`);
-
-      // Check and award badges with updated stats
-      await checkAndAwardBadges(userId, {
-        totalDistance: newTotalDistance,
-        totalSessions: newTotalSessions,
-        totalXp: newTotalXp,
-        level: newLevel,
-        totalTime: newTotalTime,
+      log.info("[Strava] Updated profile after sync", {
+        event: "strava:profile_updated",
+        userId,
+        totalNewXp,
+        newLevel,
+        newTotalSessions,
       });
+
+      // Check and award achievement badges using the shared engine.
+      const { checkAndAwardBadges } = await import("./badge_engine");
+      await checkAndAwardBadges(userId);
 
       // Auto-update challenge progress for active challenges
       await updateActiveChallengesProgress(userId);
@@ -559,19 +671,29 @@ export async function syncStravaActivities(
       .set({ lastSync: new Date() })
       .where(eq(stravaTokens.userId, userId));
 
-    console.log(`[Strava] Sync complete for user ${userId}: ${importedCount}/${response.count} activities imported`);
+    log.info("[Strava] Sync complete", {
+      event: "strava:sync_complete",
+      userId,
+      importedCount,
+      reportedCount: response.count ?? null,
+    });
 
     return {
       success: true,
       count: importedCount,
       message: `Sincronizzate ${importedCount} attività da Strava`
     };
-  } catch (error: any) {
-    console.error("[Strava] Error syncing activities:", error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    log.error("[Strava] Error syncing activities", {
+      event: "strava:sync_error",
+      userId,
+      message,
+    });
     return {
       success: false,
       count: 0,
-      message: error.message
+      message
     };
   }
 }
@@ -594,7 +716,7 @@ async function updateActiveChallengesProgress(userId: number): Promise<void> {
         AND c.end_date >= NOW()
     `);
 
-    const challenges = result.rows as any[];
+    const challenges = (result.rows ?? []) as Array<{ id: number }>;
 
     // Update progress for each challenge
     for (const challenge of challenges) {
@@ -602,17 +724,31 @@ async function updateActiveChallengesProgress(userId: number): Promise<void> {
       await challengesDb.calculateChallengeProgress(challenge.id);
     }
 
-    console.log(`[Strava] Updated progress for ${challenges.length} active challenges for user ${userId}`);
+    log.info("[Strava] Updated active challenges progress", {
+      event: "strava:challenges_progress_updated",
+      userId,
+      challengesCount: challenges.length,
+    });
   } catch (error) {
-    console.error("[Strava] Error updating challenge progress:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    log.error("[Strava] Error updating challenge progress", {
+      event: "strava:challenges_progress_error",
+      userId,
+      message,
+    });
   }
 }
 
 /**
  * Disconnect Strava account
  */
+/**
+ * Disconnects Strava for the user by deleting tokens and updating the profile flag.
+ *
+ * @param userId - SwimForge user id.
+ */
 export async function disconnectStrava(userId: number): Promise<boolean> {
-  const db = await getDb();
+  const db = await requireDb();
   
   try {
     // Delete tokens
@@ -626,145 +762,29 @@ export async function disconnectStrava(userId: number): Promise<boolean> {
       .set({ stravaConnected: false })
       .where(eq(swimmerProfiles.userId, userId));
 
-    console.log(`[Strava] Disconnected for user ${userId}`);
+    log.info("[Strava] Disconnected", { event: "strava:disconnect_ok", userId });
     return true;
   } catch (error) {
-    console.error("[Strava] Error disconnecting:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    log.error("[Strava] Error disconnecting", { event: "strava:disconnect_error", userId, message });
     return false;
-  }
-}
-
-/**
- * Check and award badges based on activities
- */
-async function checkAndAwardBadges(
-  userId: number,
-  stats?: {
-    totalDistance: number;
-    totalSessions: number;
-    totalXp: number;
-    level: number;
-    totalTime?: number;
-  }
-): Promise<void> {
-  const db = await getDb();
-  
-  try {
-    // Get all badge definitions
-    const badges = await db.select().from(badgeDefinitions);
-
-    for (const badge of badges) {
-      // Check if user already has this badge
-      const [existing] = await db
-        .select()
-        .from(userBadges)
-        .where(
-          and(
-            eq(userBadges.userId, userId),
-            eq(userBadges.badgeId, badge.id)
-          )
-        )
-        .limit(1);
-
-      if (existing) continue;
-
-      // Check badge criteria
-      let earned = false;
-
-      if (badge.criteriaType === "total_distance") {
-        if (stats) {
-          // Use provided stats
-          if (stats.totalDistance >= (badge.criteriaValue || 0)) {
-            earned = true;
-          }
-        } else {
-          // Query database
-          const [result] = await db
-            .select({ total: sql<number>`COALESCE(SUM(${swimmingActivities.distanceMeters}), 0)` })
-            .from(swimmingActivities)
-            .where(eq(swimmingActivities.userId, userId));
-          
-          if (result && result.total >= (badge.criteriaValue || 0)) {
-            earned = true;
-          }
-        }
-      } else if (badge.criteriaType === "activity_count") {
-        if (stats) {
-          // Use provided stats
-          if (stats.totalSessions >= (badge.criteriaValue || 0)) {
-            earned = true;
-          }
-        } else {
-          // Query database
-          const [result] = await db
-            .select({ count: sql<number>`COUNT(*)` })
-            .from(swimmingActivities)
-            .where(eq(swimmingActivities.userId, userId));
-          
-          if (result && result.count >= (badge.criteriaValue || 0)) {
-            earned = true;
-          }
-        }
-      } else if (badge.criteriaType === "consecutive_days") {
-        // Check consecutive days logic (simplified)
-        const activities = await db
-          .select({ activityDate: swimmingActivities.activityDate })
-          .from(swimmingActivities)
-          .where(eq(swimmingActivities.userId, userId))
-          .orderBy(desc(swimmingActivities.activityDate));
-
-        let consecutive = 0;
-        let lastDate: Date | null = null;
-
-        for (const activity of activities) {
-          if (!lastDate) {
-            consecutive = 1;
-            lastDate = activity.activityDate;
-          } else {
-            const diffDays = Math.floor(
-              (lastDate.getTime() - activity.activityDate.getTime()) / (1000 * 60 * 60 * 24)
-            );
-            if (diffDays === 1) {
-              consecutive++;
-              lastDate = activity.activityDate;
-            } else {
-              break;
-            }
-          }
-        }
-
-        if (consecutive >= (badge.criteriaValue || 0)) {
-          earned = true;
-        }
-      }
-
-      // Award badge if earned
-      if (earned) {
-        await db.insert(userBadges).values({
-          userId,
-          badgeId: badge.id,
-          earnedAt: new Date(),
-        });
-
-        // Update profile badge if higher tier
-        await updateUserProfileBadge(userId, badge.id);
-
-        console.log(`[Strava] Awarded badge ${badge.name} to user ${userId}`);
-      }
-    }
-  } catch (error) {
-    console.error("[Strava] Error checking badges:", error);
   }
 }
 
 /**
  * Auto-sync Strava activities on login (if last sync > 6 hours ago)
  */
+/**
+ * Runs an automatic Strava sync if the last sync is older than the configured interval.
+ *
+ * @param userId - SwimForge user id.
+ * @param options - Pass `force: true` to bypass the interval check.
+ */
 export async function autoSyncStrava(
   userId: number,
   options: { force?: boolean } = {}
 ): Promise<void> {
-  const db = await getDb();
+  const db = await requireDb();
   
   try {
     const [tokens] = await db
@@ -789,22 +809,29 @@ export async function autoSyncStrava(
         const threshold = new Date(
           Date.now() - syncIntervalHours * 60 * 60 * 1000
         );
-        if (tokens.lastSync > threshold) {
-          console.log(
-            `[Strava] Auto-sync skipped for user ${userId} (last sync: ${tokens.lastSync})`
-          );
-          return;
-        }
-      }
-    }
+	        if (tokens.lastSync > threshold) {
+	          log.info("[Strava] Auto-sync skipped (recent sync)", {
+	            event: "strava:auto_sync_skipped",
+	            userId,
+	            lastSync: tokens.lastSync,
+	          });
+	          return;
+	        }
+	      }
+	    }
 
-    // Sync activities (last 7 days)
-    console.log(`[Strava] Auto-sync starting for user ${userId}`);
-    await syncStravaActivities(userId, 7);
-  } catch (error) {
-    console.error("[Strava] Error in auto-sync:", error);
-  }
-}
+	    // Sync activities (last 7 days)
+	    log.info("[Strava] Auto-sync starting", { event: "strava:auto_sync_start", userId });
+	    await syncStravaActivities(userId, 7);
+	  } catch (error) {
+	    const message = error instanceof Error ? error.message : String(error);
+	    log.error("[Strava] Error in auto-sync", {
+	      event: "strava:auto_sync_error",
+	      userId,
+	      message,
+	    });
+	  }
+	}
 
 
 /**

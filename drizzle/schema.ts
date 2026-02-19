@@ -1,4 +1,4 @@
-import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean, json, serial, unique } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, text, timestamp, varchar, boolean, json, serial, unique, index, doublePrecision, date, real } from "drizzle-orm/pg-core";
 
 // ============================================
 // ENUMS for PostgreSQL
@@ -20,10 +20,40 @@ export const users = pgTable("users", {
   passwordHash: text("password_hash"), // For email/password authentication
   loginMethod: varchar("login_method", { length: 64 }).default("email").notNull(),
   role: roleEnum("role").default("user").notNull(),
+  sessionTokenVersion: integer("session_token_version").default(1).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   lastSignedIn: timestamp("last_signed_in").defaultNow().notNull(),
 });
+
+export const userPresence = pgTable("user_presence", {
+  userId: integer("user_id").primaryKey(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// USER CONSENTS (GDPR audit trail)
+// ============================================
+export const userConsents = pgTable("user_consents", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  consentType: varchar("consent_type", { length: 64 }).notNull(),
+  consentVersion: varchar("consent_version", { length: 32 }).notNull(),
+  granted: boolean("granted").notNull().default(false),
+  grantedAt: timestamp("granted_at"),
+  withdrawnAt: timestamp("withdrawn_at"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userConsentUnique: unique("user_consents_user_type_version_unique").on(
+    table.userId,
+    table.consentType,
+    table.consentVersion,
+  ),
+}));
 
 // ============================================
 // SWIMMER PROFILES (Extended user data)
@@ -32,6 +62,15 @@ export const swimmerProfiles = pgTable("swimmer_profiles", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().unique(),
   avatarUrl: text("avatar_url"),
+  coverUrl: text("cover_url"),
+  bio: text("bio"),
+  location: text("location"),
+  lastName: text("last_name"),
+  username: text("username"),
+  birthDate: date("birth_date"),
+  preferredStroke: strokeTypeEnum("preferred_stroke"),
+  preferredPoolLengthMeters: integer("preferred_pool_length_meters"),
+  masterCategory: text("master_category"),
   level: integer("level").default(1).notNull(),
   totalXp: integer("total_xp").default(0).notNull(),
   currentLevelXp: integer("current_level_xp").default(0).notNull(),
@@ -51,6 +90,9 @@ export const swimmerProfiles = pgTable("swimmer_profiles", {
   aiSkillLastEvaluatedAt: timestamp("ai_skill_last_evaluated_at"),
   aiSkillChange: text("ai_skill_change"),
   aiSkillMessage: text("ai_skill_message"),
+  notificationSettings: json("notification_settings"),
+  preferences: json("preferences"),
+  privacySettings: json("privacy_settings"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -97,7 +139,105 @@ export const swimmingActivities = pgTable("swimming_activities", {
   rawData: json("raw_data"),
   shareToFeed: boolean("share_to_feed").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  swimmingActivitiesUserDateIdx: index("idx_swimming_activities_user_activity_date_desc").on(table.userId, table.activityDate),
+  swimmingActivitiesGarminIdIdx: index("idx_swimming_activities_garmin_activity_id").on(table.garminActivityId),
+  swimmingActivitiesStravaIdIdx: index("idx_swimming_activities_strava_activity_id").on(table.stravaActivityId),
+}));
+
+// ============================================
+// GHOST CHALLENGES (Club + Feed)
+// ============================================
+export const ghostChallenges = pgTable("ghost_challenges", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id"),
+  challengerUserId: integer("challenger_user_id").notNull(),
+  challengerActivityId: integer("challenger_activity_id").notNull(),
+  opponentUserId: integer("opponent_user_id").notNull(),
+  opponentActivityId: integer("opponent_activity_id").notNull(),
+  status: text("status").default("completed").notNull(),
+  winnerUserId: integer("winner_user_id"),
+  winnerReason: text("winner_reason"),
+  challengerDistanceMeters: integer("challenger_distance_meters"),
+  challengerDurationSeconds: integer("challenger_duration_seconds"),
+  challengerPacePer100m: integer("challenger_pace_per_100m"),
+  opponentDistanceMeters: integer("opponent_distance_meters"),
+  opponentDurationSeconds: integer("opponent_duration_seconds"),
+  opponentPacePer100m: integer("opponent_pace_per_100m"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// ============================================
+// GARMIN ACTIVITY LAPS (Detailed splits)
+// ============================================
+export const garminActivityLaps = pgTable(
+  "garmin_activity_laps",
+  {
+    id: serial("id").primaryKey(),
+    activityId: integer("activity_id")
+      .notNull()
+      .references(() => swimmingActivities.id, { onDelete: "cascade" }),
+    lapIndex: integer("lap_index").notNull(),
+    distanceMeters: integer("distance_meters"),
+    durationSeconds: doublePrecision("duration_seconds"),
+    movingDurationSeconds: doublePrecision("moving_duration_seconds"),
+    elapsedDurationSeconds: doublePrecision("elapsed_duration_seconds"),
+    averageSpeedMps: doublePrecision("average_speed_mps"),
+    maxSpeedMps: doublePrecision("max_speed_mps"),
+    averageMovingSpeedMps: doublePrecision("average_moving_speed_mps"),
+    averageSwolf: integer("average_swolf"),
+    averageStrokes: doublePrecision("average_strokes"),
+    totalNumberOfStrokes: integer("total_number_of_strokes"),
+    averageSwimCadence: integer("average_swim_cadence"),
+    calories: integer("calories"),
+    avgHeartRate: integer("avg_heart_rate"),
+    maxHeartRate: integer("max_heart_rate"),
+    numberOfActiveLengths: integer("number_of_active_lengths"),
+    strokeType: text("stroke_type"),
+    startTimeGmt: timestamp("start_time_gmt"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    activityLapUnique: unique("garmin_activity_laps_activity_lap_idx").on(
+      table.activityId,
+      table.lapIndex
+    ),
+  })
+);
+
+// ============================================
+// GARMIN ACTIVITY LENGTHS (Per pool length)
+// ============================================
+export const garminActivityLengths = pgTable(
+  "garmin_activity_lengths",
+  {
+    id: serial("id").primaryKey(),
+    activityId: integer("activity_id")
+      .notNull()
+      .references(() => swimmingActivities.id, { onDelete: "cascade" }),
+    lapId: integer("lap_id")
+      .notNull()
+      .references(() => garminActivityLaps.id, { onDelete: "cascade" }),
+    lengthIndex: integer("length_index").notNull(),
+    distanceMeters: integer("distance_meters"),
+    durationSeconds: doublePrecision("duration_seconds"),
+    averageSpeedMps: doublePrecision("average_speed_mps"),
+    maxSpeedMps: doublePrecision("max_speed_mps"),
+    averageSwolf: integer("average_swolf"),
+    totalNumberOfStrokes: integer("total_number_of_strokes"),
+    avgHeartRate: integer("avg_heart_rate"),
+    maxHeartRate: integer("max_heart_rate"),
+    strokeType: text("stroke_type"),
+    startTimeGmt: timestamp("start_time_gmt"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => ({
+    lapLengthUnique: unique("garmin_activity_lengths_lap_length_idx").on(
+      table.lapId,
+      table.lengthIndex
+    ),
+  })
+);
 
 // ============================================
 // BADGE DEFINITIONS
@@ -158,11 +298,19 @@ export const socialPosts = pgTable("social_posts", {
   clubId: integer("club_id"),
   content: text("content"),
   mediaUrl: text("media_url"),
+  mediaUrls: text("media_urls").array(),
+  taggedUserIds: integer("tagged_user_ids").array(),
+  hashtags: text("hashtags").array(),
   visibility: varchar("visibility", { length: 20 }).default("public").notNull(),
   isDeleted: boolean("is_deleted").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  socialPostsCreatedAtIdx: index("idx_social_posts_created_at_desc").on(table.createdAt),
+  socialPostsUserCreatedAtIdx: index("idx_social_posts_user_id_created_at_desc").on(table.userId, table.createdAt),
+  socialPostsClubCreatedAtIdx: index("idx_social_posts_club_id_created_at_desc").on(table.clubId, table.createdAt),
+  socialPostsDeletedCreatedAtIdx: index("idx_social_posts_is_deleted_created_at_desc").on(table.isDeleted, table.createdAt),
+}));
 
 export const socialSplashes = pgTable("social_splashes", {
   id: serial("id").primaryKey(),
@@ -190,6 +338,68 @@ export const socialFollows = pgTable("social_follows", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueFollow: unique().on(table.followerId, table.followingId),
+  followingIdx: index("idx_social_follows_following_id").on(table.followingId),
+}));
+
+export const socialHiddenPosts = pgTable("social_hidden_posts", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  postId: integer("post_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueHiddenPost: unique().on(table.userId, table.postId),
+}));
+
+export const socialPostReports = pgTable("social_post_reports", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").notNull(),
+  reporterUserId: integer("reporter_user_id").notNull(),
+  reason: varchar("reason", { length: 30 }).notNull(),
+  details: text("details"),
+  status: varchar("status", { length: 20 }).default("open").notNull(),
+  adminNote: text("admin_note"),
+  handledBy: integer("handled_by"),
+  handledAt: timestamp("handled_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  uniquePostReporter: unique().on(table.postId, table.reporterUserId),
+}));
+
+// ============================================
+// STORIES (Ephemeral 24h content)
+// ============================================
+export const stories = pgTable("stories", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  mediaUrl: text("media_url"),
+  imagekitFileId: text("imagekit_file_id"),
+  caption: text("caption"),
+  type: varchar("type", { length: 10 }).notNull(), // image, video, text
+  expiresAt: timestamp("expires_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  storiesExpiresAtIdx: index("idx_stories_expires_at").on(table.expiresAt),
+  storiesUserCreatedAtIdx: index("idx_stories_user_created_at_desc").on(table.userId, table.createdAt),
+}));
+
+export const storyViews = pgTable("story_views", {
+  id: serial("id").primaryKey(),
+  storyId: integer("story_id").notNull(),
+  viewerId: integer("viewer_id").notNull(),
+  viewedAt: timestamp("viewed_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueView: unique().on(table.storyId, table.viewerId),
+}));
+
+export const storyReactions = pgTable("story_reactions", {
+  id: serial("id").primaryKey(),
+  storyId: integer("story_id").notNull(),
+  userId: integer("user_id").notNull(),
+  reactionType: varchar("reaction_type", { length: 20 }).notNull(), // splash, fire, strong, clap, wave
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueStoryReaction: unique().on(table.storyId, table.userId),
 }));
 
 // ============================================
@@ -201,6 +411,10 @@ export const communityClubs = pgTable("community_clubs", {
   description: text("description"),
   rules: text("rules"),
   coverImageUrl: text("cover_image_url"),
+  websiteUrl: text("website_url"),
+  themeColor: varchar("theme_color", { length: 20 }).default("cyan"),
+  logoUrl: text("logo_url"),
+  tagline: varchar("tagline", { length: 200 }),
   ownerId: integer("owner_id").notNull(),
   isPrivate: boolean("is_private").default(false).notNull(),
   visibility: varchar("visibility", { length: 20 }).default("public").notNull(),
@@ -235,6 +449,122 @@ export const communityClubInvites = pgTable("community_club_invites", {
 });
 
 // ============================================
+// CLUB EVENTS (Allenamenti, gare, eventi sociali)
+// ============================================
+export const clubEvents = pgTable("club_events", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  creatorId: integer("creator_id").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  eventType: varchar("event_type", { length: 30 }).default("training").notNull(), // training, race, social, meeting
+  location: text("location"),
+  locationLat: real("location_lat"),
+  locationLng: real("location_lng"),
+  routeGeojson: json("route_geojson"),
+  routeDistanceMeters: integer("route_distance_meters"),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time"),
+  maxAttendees: integer("max_attendees"),
+  isRecurring: boolean("is_recurring").default(false).notNull(),
+  recurringRule: text("recurring_rule"), // RRULE format per eventi ricorrenti
+  coverImageUrl: text("cover_image_url"),
+  weatherSnapshot: json("weather_snapshot"),
+  weatherFetchedAt: timestamp("weather_fetched_at"),
+  status: varchar("status", { length: 20 }).default("active").notNull(), // active, cancelled, completed
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const eventAttendees = pgTable("event_attendees", {
+  id: serial("id").primaryKey(),
+  eventId: integer("event_id").notNull(),
+  userId: integer("user_id").notNull(),
+  status: varchar("status", { length: 20 }).default("going").notNull(), // going, maybe, not_going
+  rsvpAt: timestamp("rsvp_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueAttendee: unique().on(table.eventId, table.userId),
+}));
+
+// ============================================
+// DIRECT MESSAGES (Messaggi tra membri)
+// ============================================
+export const directMessages = pgTable("direct_messages", {
+  id: serial("id").primaryKey(),
+  senderId: integer("sender_id").notNull(),
+  receiverId: integer("receiver_id").notNull(),
+  content: text("content").notNull(),
+  messageType: varchar("message_type", { length: 32 }).default("text").notNull(),
+  metadata: json("metadata"),
+  isRead: boolean("is_read").default(false).notNull(),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  directMessagesReceiverCreatedAtIdx: index("idx_direct_messages_receiver_created_at_desc").on(table.receiverId, table.createdAt),
+}));
+
+// ============================================
+// USER NOTIFICATIONS (Sistema notifiche)
+// ============================================
+export const userNotifications = pgTable("user_notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  type: varchar("type", { length: 50 }).notNull(), // post_like, comment, follow, event_invite, dm, badge_earned, etc.
+  title: varchar("title", { length: 200 }).notNull(),
+  message: text("message").notNull(),
+  link: text("link"), // URL dove portare l'utente
+  referenceId: integer("reference_id"), // ID dell'oggetto correlato (post, evento, etc)
+  isRead: boolean("is_read").default(false).notNull(),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  userNotificationsUserCreatedAtIdx: index("idx_user_notifications_user_created_at_desc").on(table.userId, table.createdAt),
+}));
+
+// ============================================
+// CLUB ANNOUNCEMENTS (Annunci importanti)
+// ============================================
+export const clubAnnouncements = pgTable("club_announcements", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  authorId: integer("author_id").notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  content: text("content").notNull(),
+  isPinned: boolean("is_pinned").default(false).notNull(),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ============================================
+// CLUB MEDIA GALLERY (Foto e video condivisi)
+// ============================================
+export const clubMedia = pgTable("club_media", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  uploaderId: integer("uploader_id").notNull(),
+  mediaType: varchar("media_type", { length: 20 }).notNull(), // image, video
+  mediaUrl: text("media_url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  caption: text("caption"),
+  eventId: integer("event_id"), // Opzionale: collegato ad un evento
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ============================================
+// POST REACTIONS (Reazioni emotive avanzate)
+// ============================================
+export const postReactions = pgTable("post_reactions", {
+  id: serial("id").primaryKey(),
+  postId: integer("post_id").notNull(),
+  userId: integer("user_id").notNull(),
+  reactionType: varchar("reaction_type", { length: 20 }).notNull(), // splash, fire, strong, clap, wave
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueReaction: unique().on(table.postId, table.userId),
+}));
+
+// ============================================
 // USER ACHIEVEMENT BADGES (Earned achievement badges)
 // ============================================
 export const userAchievementBadges = pgTable("user_achievement_badges", {
@@ -243,7 +573,9 @@ export const userAchievementBadges = pgTable("user_achievement_badges", {
   badgeId: integer("badge_id").notNull(),
   awardedAt: timestamp("awarded_at").defaultNow().notNull(),
   activityId: integer("activity_id"),
-});
+}, (table) => ({
+  uniqueAchievementBadge: unique().on(table.userId, table.badgeId),
+}));
 
 // ============================================
 // XP TRANSACTIONS (Audit log)
@@ -256,7 +588,9 @@ export const xpTransactions = pgTable("xp_transactions", {
   referenceId: integer("reference_id"),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  xpTransactionsUserCreatedAtIdx: index("idx_xp_transactions_user_created_at_desc").on(table.userId, table.createdAt),
+}));
 
 // ============================================
 // PERSONAL RECORDS
@@ -270,7 +604,9 @@ export const personalRecords = pgTable("personal_records", {
   activityId: integer("activity_id"),
   achievedAt: timestamp("achieved_at").defaultNow().notNull(),
   previousValue: integer("previous_value"),
-});
+}, (table) => ({
+  personalRecordsUserTypeStrokeIdx: index("idx_personal_records_user_type_stroke").on(table.userId, table.recordType, table.strokeType),
+}));
 
 // ============================================
 // LEVEL THRESHOLDS
@@ -326,7 +662,9 @@ export const weeklyStats = pgTable("weekly_stats", {
   totalTimeSeconds: integer("total_time_seconds").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  uniqueWeeklyStatsUserWeek: unique().on(table.userId, table.weekStart),
+}));
 
 // ============================================
 // AI INSIGHTS CACHE
@@ -394,3 +732,15 @@ export type ActivityAiInsight = typeof activityAiInsights.$inferSelect;
 export type InsertActivityAiInsight = typeof activityAiInsights.$inferInsert;
 export type AiCoachWorkout = typeof aiCoachWorkouts.$inferSelect;
 export type InsertAiCoachWorkout = typeof aiCoachWorkouts.$inferInsert;
+export type UserConsent = typeof userConsents.$inferSelect;
+export type InsertUserConsent = typeof userConsents.$inferInsert;
+export type Story = typeof stories.$inferSelect;
+export type InsertStory = typeof stories.$inferInsert;
+export type StoryView = typeof storyViews.$inferSelect;
+export type InsertStoryView = typeof storyViews.$inferInsert;
+export type StoryReaction = typeof storyReactions.$inferSelect;
+export type InsertStoryReaction = typeof storyReactions.$inferInsert;
+export type SocialHiddenPost = typeof socialHiddenPosts.$inferSelect;
+export type InsertSocialHiddenPost = typeof socialHiddenPosts.$inferInsert;
+export type SocialPostReport = typeof socialPostReports.$inferSelect;
+export type InsertSocialPostReport = typeof socialPostReports.$inferInsert;

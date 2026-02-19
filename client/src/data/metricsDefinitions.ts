@@ -140,6 +140,24 @@ Dove ogni trend è:
       "Pianifica cicli di carico/scarico (3 settimane carico, 1 scarico)",
     ],
   },
+  trend: {
+    title: "Trend",
+    description:
+      "Mostra la direzione complessiva delle tue performance rispetto al periodo precedente, basata soprattutto su distanza totale e consistenza.",
+    formula: `Trend (%) = ((periodo_attuale - periodo_precedente) / periodo_precedente) × 100`,
+    interpretation: {
+      excellent: "Trend fortemente positivo",
+      good: "Trend positivo e stabile",
+      fair: "Trend stabile",
+      poor: "Trend in calo",
+    },
+    howToImprove: [
+      "Aumenta gradualmente il volume settimanale",
+      "Mantieni la costanza (2-4 sessioni/settimana)",
+      "Alterna sessioni di qualità e recupero",
+      "Riduci gli stop prolungati tra le sessioni",
+    ],
+  },
   performanceIndex: {
     title: "Performance Index",
     description:

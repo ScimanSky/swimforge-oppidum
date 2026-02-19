@@ -9,52 +9,7 @@
  */
 
 import winston from 'winston';
-import * as Sentry from '@sentry/node';
 import { Request, Response, NextFunction } from 'express';
-
-// ============================================================================
-// SENTRY INITIALIZATION
-// ============================================================================
-
-/**
- * Inizializza Sentry per error tracking (opzionale)
- */
-export function initSentry() {
-  // Solo se SENTRY_DSN è configurato
-  if (!process.env.SENTRY_DSN) {
-    console.log('[Logger] Sentry DSN non configurato, skipping initialization');
-    return;
-  }
-
-  try {
-    Sentry.init({
-      dsn: process.env.SENTRY_DSN,
-      environment: process.env.NODE_ENV,
-      tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
-      integrations: [
-        new Sentry.Integrations.Http({ tracing: true }),
-        new Sentry.Integrations.OnUncaughtException(),
-        new Sentry.Integrations.OnUnhandledRejection(),
-      ],
-      beforeSend(event, hint) {
-        // Filtra errori non critici
-        if (event.exception) {
-          const error = hint.originalException;
-          
-          // Non tracciare errori di validazione
-          if (error instanceof Error && error.message.includes('Validation')) {
-            return null;
-          }
-        }
-
-        return event;
-      },
-    });
-    console.log('[Logger] Sentry initialized successfully');
-  } catch (error) {
-    console.warn('[Logger] Failed to initialize Sentry:', error);
-  }
-}
 
 // ============================================================================
 // WINSTON LOGGER
@@ -64,6 +19,8 @@ export function initSentry() {
  * Crea logger Winston
  */
 export function createLogger() {
+  const enableFileLogging =
+    process.env.ENABLE_FILE_LOGGING === 'true' || process.env.NODE_ENV !== 'production';
   const logFormat = winston.format.combine(
     winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     winston.format.errors({ stack: true }),
@@ -84,11 +41,6 @@ export function createLogger() {
         return ''; // Skip this log entry
       }
       
-      // Skip error level logs that don't have meaningful content
-      if (level === 'error' && (!meta || Object.keys(meta).length === 0)) {
-        return ''; // Skip error logs with no metadata
-      }
-      
       return JSON.stringify({
         timestamp,
         level,
@@ -97,6 +49,28 @@ export function createLogger() {
       });
     })
   );
+
+  const fileTransports = enableFileLogging
+    ? [
+        new winston.transports.File({
+          filename: 'logs/error.log',
+          level: 'error',
+          maxsize: 10485760, // 10MB
+          maxFiles: 10,
+        }),
+        new winston.transports.File({
+          filename: 'logs/combined.log',
+          maxsize: 10485760, // 10MB
+          maxFiles: 10,
+        }),
+        new winston.transports.File({
+          filename: 'logs/audit.log',
+          level: 'info',
+          maxsize: 10485760, // 10MB
+          maxFiles: 10,
+        }),
+      ]
+    : [];
 
   const logger = winston.createLogger({
     level: process.env.LOG_LEVEL || 'info',
@@ -128,29 +102,7 @@ export function createLogger() {
           })
         ),
       }),
-
-      // Error log file
-      new winston.transports.File({
-        filename: 'logs/error.log',
-        level: 'error',
-        maxsize: 10485760, // 10MB
-        maxFiles: 10,
-      }),
-
-      // Combined log file
-      new winston.transports.File({
-        filename: 'logs/combined.log',
-        maxsize: 10485760, // 10MB
-        maxFiles: 10,
-      }),
-
-      // Audit log file
-      new winston.transports.File({
-        filename: 'logs/audit.log',
-        level: 'info',
-        maxsize: 10485760, // 10MB
-        maxFiles: 10,
-      }),
+      ...fileTransports,
     ],
   });
 
@@ -172,23 +124,23 @@ export function requestLogger(
   res: Response,
   next: NextFunction
 ) {
+  // Skip logging per path non significativi
+  const SKIP_PATHS = ['/favicon.ico', '/health', '/ready', '/status', '/robots.txt'];
+  const SKIP_EXTENSIONS = ['.js', '.css', '.png', '.jpg', '.svg', '.ico', '.woff', '.woff2', '.map'];
+  
+  if (SKIP_PATHS.includes(req.path) || SKIP_EXTENSIONS.some(ext => req.path.endsWith(ext))) {
+    return next();
+  }
+
   const startTime = Date.now();
 
-  // Log richiesta in ingresso
-  logger.info('Incoming request', {
-    method: req.method,
-    path: req.path,
-    ip: req.ip,
-    userAgent: req.headers['user-agent'],
-  });
-
-  // Intercetta response
+  // Intercetta response per loggare con statusCode e durata
   const originalSend = res.send;
   res.send = function (data) {
     const duration = Date.now() - startTime;
 
-    // Log risposta
-    logger.info('Outgoing response', {
+    // Log unico per richiesta (con status e durata)
+    logger.info('Request completed', {
       method: req.method,
       path: req.path,
       statusCode: res.statusCode,
@@ -219,22 +171,29 @@ export function requestLogger(
  * Middleware per gestire errori
  */
 export function errorHandler(
-  err: any,
+  err: unknown,
   req: Request,
   res: Response,
   next: NextFunction
 ) {
   // Log errore (skip if no actual error message)
-  const errorMessage = err instanceof Error ? err.message : String(err);
+  const errRec = (typeof err === "object" && err !== null) ? (err as Record<string, unknown>) : null;
+  const errorMessage =
+    err instanceof Error
+      ? err.message
+      : (typeof errRec?.["message"] === "string" ? (errRec["message"] as string) : String(err));
   if (!errorMessage || errorMessage === '[object Object]' || errorMessage === '{}') {
-    // Don't log empty errors
+    // Don't log empty errors but still propagate to next handler
+    next(err);
     return;
   }
   
+  const statusCode = typeof errRec?.["statusCode"] === "number" ? (errRec["statusCode"] as number) : 500;
+
   logger.error(`Request error: ${req.method} ${req.path} - ${errorMessage}`, {
     event: 'request:error',
-    statusCode: err.statusCode || 500,
-    stack: err instanceof Error ? err.stack : undefined,
+    statusCode,
+    stack: err instanceof Error ? err.stack : (typeof errRec?.["stack"] === "string" ? (errRec["stack"] as string) : undefined),
     ip: req.ip,
   });
 
@@ -243,15 +202,22 @@ export function errorHandler(
     try {
       // Rollbar will be called by the middleware in index.ts
     } catch (rollbarError) {
-      console.warn('[Logger] Failed to send error to Rollbar:', rollbarError);
+      const message =
+        rollbarError instanceof Error ? rollbarError.message : String(rollbarError);
+      logger.warn("[Logger] Failed to send error to Rollbar", {
+        event: "rollbar:send_failed",
+        message,
+      });
     }
   }
 
+  const clientErrorMessage = statusCode >= 500 ? "Internal Server Error" : errorMessage;
+
   // Risposta al client
-  res.status(err.statusCode || 500).json({
-    error: err.message || 'Internal Server Error',
-    statusCode: err.statusCode || 500,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+  res.status(statusCode).json({
+    error: clientErrorMessage,
+    statusCode,
+    ...(process.env.NODE_ENV === 'development' && { stack: err instanceof Error ? err.stack : errRec?.["stack"] }),
   });
 }
 
@@ -265,7 +231,7 @@ export function errorHandler(
 export function auditLog(
   action: string,
   userId: number | string | undefined,
-  details: Record<string, any>
+  details: Record<string, unknown>
 ) {
   logger.info(`[AUDIT] ${action}`, {
     userId,
@@ -304,7 +270,6 @@ export function performanceMonitor(
 // ============================================================================
 
 export default {
-  initSentry,
   createLogger,
   logger,
   requestLogger,

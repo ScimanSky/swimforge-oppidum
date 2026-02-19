@@ -1,21 +1,38 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { useLocation } from "wouter";
 
 const AUTO_SYNC_DEBOUNCE_MS = 2 * 60 * 1000;
 const LAST_AUTO_SYNC_KEY = "swimforge:autoSync:last";
+const DASHBOARD_READY_KEY = "swimforge:autoSync:dashboardReady";
 
 export function AutoSync() {
   const { isAuthenticated } = useAuth();
+  const [location] = useLocation();
   const autoSyncMutation = trpc.sync.auto.useMutation();
   const utils = trpc.useUtils();
   const syncIntervalHours = Number(
     import.meta.env.VITE_AUTO_SYNC_INTERVAL_HOURS || "6"
   );
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    if (location === "/home" || location === "/dashboard") {
+      localStorage.setItem(DASHBOARD_READY_KEY, "1");
+      setIsReady(true);
+      return;
+    }
+
+    if (localStorage.getItem(DASHBOARD_READY_KEY) === "1") {
+      setIsReady(true);
+    }
+  }, [location]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    if (!isReady) return;
 
     const triggerAutoSync = (force: boolean) => {
       if (autoSyncMutation.isPending) return;
@@ -36,7 +53,9 @@ export function AutoSync() {
             void utils.profile.get.invalidate();
             void utils.badges.userBadges.invalidate();
             void utils.badges.progress.invalidate();
+            void utils.badges.getUserAchievementBadges.invalidate();
             void utils.badges.checkNewBadges.invalidate();
+            void utils.season.getCurrent.invalidate();
           },
           onError: () => {
             toast.error("Errore nella sincronizzazione", { id: toastId });
@@ -58,7 +77,7 @@ export function AutoSync() {
     }, intervalMs);
 
     return () => window.clearInterval(id);
-  }, [isAuthenticated, syncIntervalHours]);
+  }, [isAuthenticated, isReady, syncIntervalHours]);
 
   return null;
 }

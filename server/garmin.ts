@@ -15,18 +15,30 @@
  */
 
 import { getDb } from "./db";
-import { garminTokens, swimmingActivities, swimmerProfiles, xpTransactions, badgeDefinitions, userBadges } from "../drizzle/schema";
+import {
+  garminTokens,
+  swimmingActivities,
+  swimmerProfiles,
+  xpTransactions,
+  badgeDefinitions,
+  userBadges,
+  garminActivityLaps,
+  garminActivityLengths,
+} from "../drizzle/schema";
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
-import { encryptForStorage } from "./lib/tokenCrypto";
+import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
 import { invalidateUserCache } from "./lib/cache";
+import { checkAndAwardBadges as checkAchievementBadges } from "./badge_engine";
+import { calculateActivityXp as calculateActivityXpCore } from "./lib/utils";
+import { logger } from "./middleware/logger";
+import { classifyAsyncError } from "./lib/withErrorHandling";
+import { config } from "./config";
+import { fetchWithTimeout } from "./lib/fetchWithTimeout";
 
 // Garmin microservice configuration
 const GARMIN_SERVICE_URL = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
 const GARMIN_SERVICE_SECRET = process.env.GARMIN_SERVICE_SECRET;
-if (!GARMIN_SERVICE_SECRET) {
-  throw new Error("GARMIN_SERVICE_SECRET is required");
-}
 
 interface GarminServiceActivity {
   activity_id: string;
@@ -77,17 +89,27 @@ async function callGarminService(
   method: "GET" | "POST" = "GET",
   body?: object
 ): Promise<any> {
+  if (!GARMIN_SERVICE_SECRET) {
+    throw new Error("Garmin service not configured (missing GARMIN_SERVICE_SECRET)");
+  }
+
   const url = `${GARMIN_SERVICE_URL}${endpoint}`;
+  const timeoutMs = config.GARMIN_SERVICE_TIMEOUT_MS;
   
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(
+      url,
+      {
       method,
       headers: {
         "Content-Type": "application/json",
         "X-API-Key": GARMIN_SERVICE_SECRET,
       },
       body: body ? JSON.stringify(body) : undefined,
-    });
+      },
+      timeoutMs,
+      `garmin:service ${method} ${endpoint}`,
+    );
 
     const data = await response.json().catch(() => ({ detail: "Unknown error" }));
 
@@ -96,14 +118,466 @@ async function callGarminService(
     }
 
     return data;
-  } catch (error: any) {
-    console.error(`[Garmin Service] Error calling ${endpoint}:`, error.message);
+  } catch (error: unknown) {
+    const { kind, message } = classifyAsyncError(error);
+    const level = kind === "unknown" ? "error" : "warn";
+    logger.log(level, `[Garmin Service] Error calling ${endpoint} (${kind}): ${message}`, {
+      event: "garmin:service_error",
+      endpoint,
+      method,
+      kind,
+      message,
+    });
+    if (kind === "timeout") {
+      throw new Error(`Garmin service timeout after ${timeoutMs}ms`);
+    }
     throw error;
   }
 }
 
+async function callGarminServiceWithUser(
+  endpoint: string,
+  userId: number,
+  method: "GET" | "POST" = "GET",
+  body?: object
+): Promise<any> {
+  if (!GARMIN_SERVICE_SECRET) {
+    throw new Error("Garmin service not configured (missing GARMIN_SERVICE_SECRET)");
+  }
+
+  const url = `${GARMIN_SERVICE_URL}${endpoint}`;
+  const timeoutMs = config.GARMIN_SERVICE_TIMEOUT_MS;
+
+  try {
+    const response = await fetchWithTimeout(
+      url,
+      {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "X-API-Key": GARMIN_SERVICE_SECRET,
+        "user-id": userId.toString(),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+      },
+      timeoutMs,
+      `garmin:service user=${userId} ${method} ${endpoint}`,
+    );
+
+    const data = await response.json().catch(() => ({ detail: "Unknown error" }));
+
+    if (!response.ok) {
+      throw new Error(data.detail || `HTTP ${response.status}`);
+    }
+
+    return data;
+  } catch (error: unknown) {
+    const { kind, message } = classifyAsyncError(error);
+    const level = kind === "unknown" ? "error" : "warn";
+    logger.log(level, `[Garmin Service] Error calling ${endpoint} (${kind}): ${message}`, {
+      event: "garmin:service_error",
+      endpoint,
+      method,
+      userId,
+      kind,
+      message,
+    });
+    if (kind === "timeout") {
+      throw new Error(`Garmin service timeout after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
+}
+
+async function ensureGarminSessionFromDb(userId: number): Promise<boolean> {
+  try {
+    const status = await callGarminService(`/auth/status/${userId}`);
+    if (status?.connected) return true;
+  } catch {
+    // ignore and try restore
+  }
+
+  const db = await getDb();
+  if (!db) return false;
+
+  const tokens = await db
+    .select()
+    .from(garminTokens)
+    .where(eq(garminTokens.userId, userId))
+    .limit(1);
+
+  const stored = tokens[0]?.oauth1Token;
+  if (!stored) return false;
+
+  const decrypted = decryptIfNeeded(stored);
+  if (!decrypted.startsWith("garth:")) {
+    return false;
+  }
+  const tokenData = decrypted.slice("garth:".length);
+  if (!tokenData) return false;
+
+  try {
+    const result = await callGarminService("/auth/restore", "POST", {
+      user_id: String(userId),
+      token_data: tokenData,
+    });
+    return Boolean(result?.success);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`[Garmin] Failed to restore session for user ${userId}: ${message}`, {
+      event: "garmin:restore_failed",
+      userId,
+      message,
+    });
+    return false;
+  }
+}
+
+export async function getGarminActivityFullDetails(
+  userId: number,
+  garminActivityId: string
+): Promise<unknown | null> {
+  try {
+    const restored = await ensureGarminSessionFromDb(userId);
+    if (!restored) {
+      return null;
+    }
+    return await callGarminServiceWithUser(
+      `/activity/${garminActivityId}/full`,
+      userId
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`[Garmin] Could not fetch full details for activity ${garminActivityId}: ${message}`, {
+      event: "garmin:activity_full_details_failed",
+      userId,
+      garminActivityId,
+      message,
+    });
+    return null;
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object") return null;
+  return value as Record<string, unknown>;
+}
+
+const toNumber = (value: unknown) => {
+  if (value === null || value === undefined || value === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
+
+const toInt = (value: unknown) => {
+  const num = toNumber(value);
+  return num !== null ? Math.round(num) : null;
+};
+
+const pickFirst = (obj: Record<string, unknown> | null | undefined, keys: string[]) => {
+  if (!obj) return null;
+  for (const key of keys) {
+    const value = obj[key];
+    if (value !== null && value !== undefined) {
+      return value;
+    }
+  }
+  return null;
+};
+
+const pickFirstFromSources = (sources: Array<Record<string, unknown>>, keys: string[]) => {
+  for (const source of sources) {
+    if (!source) continue;
+    const value = pickFirst(source, keys);
+    if (value !== null && value !== undefined) {
+      return value;
+    }
+  }
+  return null;
+};
+
+const normalizeStrokeType = (value: unknown) => {
+  if (!value) return null;
+  const raw = String(value).toLowerCase();
+  if (raw.includes("free") || raw.includes("stile") || raw.includes("crawl")) return "freestyle";
+  if (raw.includes("back") || raw.includes("dorso")) return "backstroke";
+  if (raw.includes("breast") || raw.includes("rana")) return "breaststroke";
+  if (raw.includes("butter") || raw.includes("farf")) return "butterfly";
+  if (raw.includes("mix")) return "mixed";
+  return "mixed";
+};
+
+const toTimestamp = (value: unknown) => {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+};
+
+const normalizeStrokeDistanceCm = (value: unknown) => {
+  const num = toNumber(value);
+  if (!num) return null;
+  return num < 10 ? Math.round(num * 100) : Math.round(num);
+};
+
+const normalizeTrainingEffect = (value: unknown) => {
+  const num = toNumber(value);
+  if (num === null) return null;
+  return num <= 10 ? Math.round(num * 10) : Math.round(num);
+};
+
+const normalizeRecoveryHours = (value: unknown) => {
+  const num = toNumber(value);
+  if (num === null) return null;
+  return num > 48 ? Math.round(num / 60) : Math.round(num);
+};
+
+const normalizeHrZones = (zones: unknown) => {
+  if (!zones) return null;
+  const map: Record<string, number> = {
+    hrZone1Seconds: 0,
+    hrZone2Seconds: 0,
+    hrZone3Seconds: 0,
+    hrZone4Seconds: 0,
+    hrZone5Seconds: 0,
+  };
+
+  if (Array.isArray(zones)) {
+    zones.forEach((zone) => {
+      const zoneRec = asRecord(zone);
+      const zoneNum = toInt(
+        zoneRec?.["zoneNumber"] ?? zoneRec?.["zone"] ?? zoneRec?.["zoneIndex"]
+      );
+      const seconds = toNumber(
+        pickFirst(zoneRec, ["secsInZone", "seconds", "timeInSeconds", "value"])
+      ) ?? 0;
+      if (zoneNum && zoneNum >= 1 && zoneNum <= 5) {
+        map[`hrZone${zoneNum}Seconds`] = Math.round(seconds);
+      }
+    });
+  } else if (typeof zones === "object") {
+    const zonesRec = asRecord(zones);
+    if (!zonesRec) return null;
+    const zoneValues = [
+      zonesRec["zone1TimeInSeconds"] ?? zonesRec["zone1"] ?? zonesRec["zone1Seconds"],
+      zonesRec["zone2TimeInSeconds"] ?? zonesRec["zone2"] ?? zonesRec["zone2Seconds"],
+      zonesRec["zone3TimeInSeconds"] ?? zonesRec["zone3"] ?? zonesRec["zone3Seconds"],
+      zonesRec["zone4TimeInSeconds"] ?? zonesRec["zone4"] ?? zonesRec["zone4Seconds"],
+      zonesRec["zone5TimeInSeconds"] ?? zonesRec["zone5"] ?? zonesRec["zone5Seconds"],
+    ];
+    zoneValues.forEach((value, index) => {
+      map[`hrZone${index + 1}Seconds`] = Math.round(toNumber(value) ?? 0);
+    });
+  }
+
+  return map;
+};
+
+export function extractGarminAdvancedFields(fullDetails: unknown) {
+  const full = asRecord(fullDetails);
+  const activity = asRecord(full?.["activity"] ?? null);
+  const summary = asRecord(activity?.["summaryDTO"] ?? full?.["summaryDTO"] ?? null);
+  const details = asRecord(full?.["details"] ?? null);
+
+  const sources = [details, summary, activity, full].filter((v): v is Record<string, unknown> => Boolean(v));
+
+  const strokeType = normalizeStrokeType(
+    pickFirstFromSources(sources, ["strokeType", "swimStrokeType", "avgStrokeType"])
+  );
+  const hrZones = normalizeHrZones(full?.["hr_zones"]);
+
+  return {
+    avgSwolf: toNumber(
+      pickFirstFromSources(sources, ["averageSwolf", "avgSwolf", "averageSWOLF"])
+    ),
+    avgStrokeDistance: normalizeStrokeDistanceCm(
+      pickFirstFromSources(sources, ["avgStrokeDistance", "averageStrokeDistance"])
+    ),
+    avgStrokes: toNumber(
+      pickFirstFromSources(sources, ["avgStrokes", "averageStrokes"])
+    ),
+    avgStrokeCadence: toNumber(
+      pickFirstFromSources(sources, [
+        "avgStrokeCadenceRpm",
+        "avgStrokeCadence",
+        "averageSwimCadence",
+      ])
+    ),
+    trainingEffect: normalizeTrainingEffect(
+      pickFirstFromSources(sources, ["aerobicTrainingEffect", "trainingEffect"])
+    ),
+    anaerobicTrainingEffect: normalizeTrainingEffect(
+      pickFirstFromSources(sources, ["anaerobicTrainingEffect"])
+    ),
+    vo2MaxValue: toNumber(
+      pickFirstFromSources(sources, ["vO2MaxValue", "vo2MaxValue"])
+    ),
+    recoveryTimeHours: normalizeRecoveryHours(
+      pickFirstFromSources(sources, ["recoveryTime", "recoveryTimeMinutes"])
+    ),
+    avgStress: toNumber(
+      pickFirstFromSources(sources, ["averageStress", "avgStress"])
+    ),
+    avgHeartRate: toNumber(
+      pickFirstFromSources(sources, ["averageHR", "avgHeartRate"])
+    ),
+    maxHeartRate: toNumber(
+      pickFirstFromSources(sources, ["maxHR", "maxHeartRate"])
+    ),
+    restingHeartRate: toNumber(
+      pickFirstFromSources(sources, ["restingHeartRate"])
+    ),
+    lapsCount: toNumber(
+      pickFirstFromSources(sources, [
+        "lapCount",
+        "totalLaps",
+        "numLaps",
+        "numberOfActiveLengths",
+      ])
+    ),
+    poolLengthMeters: toNumber(
+      pickFirstFromSources(sources, ["poolLength", "poolLengthMeters"])
+    ),
+    strokeType,
+    hrZones,
+  };
+}
+
+export async function persistGarminLapDetails(
+  db: Awaited<ReturnType<typeof getDb>>,
+  activityId: number,
+  fullDetails: unknown
+) {
+  if (!db) return;
+  const full = asRecord(fullDetails);
+  const splitsVal = full?.["splits"];
+  const splitsObj = asRecord(splitsVal);
+  const lapDtosVal = splitsObj?.["lapDTOs"];
+  const lapDtos: unknown[] = Array.isArray(lapDtosVal)
+    ? lapDtosVal
+    : Array.isArray(splitsVal)
+    ? splitsVal
+    : [];
+
+  if (lapDtos.length === 0) {
+    return;
+  }
+
+  // Reset existing laps/lengths for this activity
+  await db.delete(garminActivityLengths).where(eq(garminActivityLengths.activityId, activityId));
+  await db.delete(garminActivityLaps).where(eq(garminActivityLaps.activityId, activityId));
+
+  const lapRecords = lapDtos.map((lap, index: number) => {
+    const lapRec = asRecord(lap);
+    const lengthDtosVal = lapRec?.["lengthDTOs"];
+    const lengthDTOs: unknown[] = Array.isArray(lengthDtosVal) ? lengthDtosVal : [];
+    const strokeCounts: Record<string, number> = {};
+    lengthDTOs.forEach((length) => {
+      const lengthRec = asRecord(length);
+      const strokeKey = normalizeStrokeType(
+        lengthRec?.["swimStroke"] ?? lengthRec?.["strokeType"] ?? lengthRec?.["stroke"]
+      );
+      if (!strokeKey) return;
+      strokeCounts[strokeKey] = (strokeCounts[strokeKey] ?? 0) + 1;
+    });
+    const dominantStroke =
+      Object.entries(strokeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+
+    return {
+      activityId,
+      lapIndex: toInt(lapRec?.["lapIndex"]) ?? index + 1,
+      distanceMeters: toInt(lapRec?.["distance"]),
+      durationSeconds: toNumber(lapRec?.["duration"]),
+      movingDurationSeconds: toNumber(lapRec?.["movingDuration"]),
+      elapsedDurationSeconds: toNumber(lapRec?.["elapsedDuration"]),
+      averageSpeedMps: toNumber(lapRec?.["averageSpeed"]),
+      maxSpeedMps: toNumber(lapRec?.["maxSpeed"]),
+      averageMovingSpeedMps: toNumber(lapRec?.["averageMovingSpeed"]),
+      averageSwolf: toInt(lapRec?.["averageSWOLF"] ?? lapRec?.["averageSwolf"]),
+      averageStrokes: toNumber(lapRec?.["averageStrokes"] ?? lapRec?.["avgStrokes"]),
+      totalNumberOfStrokes: toInt(lapRec?.["totalNumberOfStrokes"]),
+      averageSwimCadence: toInt(lapRec?.["averageSwimCadence"]),
+      calories: toInt(lapRec?.["calories"]),
+      avgHeartRate: toInt(lapRec?.["averageHR"] ?? lapRec?.["avgHeartRate"]),
+      maxHeartRate: toInt(lapRec?.["maxHR"] ?? lapRec?.["maxHeartRate"]),
+      numberOfActiveLengths: toInt(lapRec?.["numberOfActiveLengths"]),
+      strokeType: dominantStroke,
+      startTimeGmt: toTimestamp(lapRec?.["startTimeGMT"]),
+    };
+  });
+
+  const insertedLaps = await db
+    .insert(garminActivityLaps)
+    .values(lapRecords)
+    .returning({ id: garminActivityLaps.id, lapIndex: garminActivityLaps.lapIndex });
+
+  const lapIdByIndex = new Map<number, number>();
+  insertedLaps.forEach((lap) => {
+    if (lap.lapIndex !== null && lap.lapIndex !== undefined) {
+      lapIdByIndex.set(lap.lapIndex, lap.id);
+    }
+  });
+
+  const lengthRecords: Array<{
+    activityId: number;
+    lapId: number;
+    lengthIndex: number;
+    distanceMeters?: number | null;
+    durationSeconds?: number | null;
+    averageSpeedMps?: number | null;
+    maxSpeedMps?: number | null;
+    averageSwolf?: number | null;
+    totalNumberOfStrokes?: number | null;
+    avgHeartRate?: number | null;
+    maxHeartRate?: number | null;
+    strokeType?: string | null;
+    startTimeGmt?: Date | null;
+  }> = [];
+
+  lapDtos.forEach((lap, index: number) => {
+    const lapRec = asRecord(lap);
+    const lapIndex = toInt(lapRec?.["lapIndex"]) ?? index + 1;
+    const lapId = lapIdByIndex.get(lapIndex);
+    if (!lapId) return;
+
+    const lengthDtosVal = lapRec?.["lengthDTOs"];
+    const lengthDTOs: unknown[] = Array.isArray(lengthDtosVal) ? lengthDtosVal : [];
+    lengthDTOs.forEach((length, lengthIndex: number) => {
+      const lengthRec = asRecord(length);
+      const strokeKey = normalizeStrokeType(
+        lengthRec?.["swimStroke"] ?? lengthRec?.["strokeType"] ?? lengthRec?.["stroke"]
+      );
+      lengthRecords.push({
+        activityId,
+        lapId,
+        lengthIndex: toInt(lengthRec?.["lengthIndex"]) ?? lengthIndex + 1,
+        distanceMeters: toInt(lengthRec?.["distance"]),
+        durationSeconds: toNumber(lengthRec?.["duration"]),
+        averageSpeedMps: toNumber(lengthRec?.["averageSpeed"]),
+        maxSpeedMps: toNumber(lengthRec?.["maxSpeed"]),
+        averageSwolf: toInt(lengthRec?.["averageSWOLF"] ?? lengthRec?.["averageSwolf"]),
+        totalNumberOfStrokes: toInt(lengthRec?.["totalNumberOfStrokes"]),
+        avgHeartRate: toInt(lengthRec?.["averageHR"] ?? lengthRec?.["avgHeartRate"]),
+        maxHeartRate: toInt(lengthRec?.["maxHR"] ?? lengthRec?.["maxHeartRate"]),
+        strokeType: strokeKey,
+        startTimeGmt: toTimestamp(lengthRec?.["startTimeGMT"]),
+      });
+    });
+  });
+
+  if (lengthRecords.length > 0) {
+    await db.insert(garminActivityLengths).values(lengthRecords);
+  }
+}
+
 /**
- * Get Garmin connection status for a user
+ * Returns Garmin connection status for a user.
+ *
+ * Reads local tokens from the DB and, when available, enriches status via the Garmin microservice.
+ *
+ * @param userId - SwimForge user id.
  */
 export async function getGarminStatus(userId: number): Promise<{
   connected: boolean;
@@ -136,7 +610,13 @@ export async function getGarminStatus(userId: number): Promise<{
       lastSync: tokens[0].lastSyncAt || undefined,
       displayName: status.display_name,
     };
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`[Garmin] Falling back to local status for user ${userId}: ${message}`, {
+      event: "garmin:status_fallback",
+      userId,
+      message,
+    });
     // Fallback to local data if microservice is unavailable
     return {
       connected: true,
@@ -199,26 +679,32 @@ export async function connectGarmin(
       return { success: false, error: result.message || "Authentication failed" };
     }
 
+    const tokenPayload = result.token_data ? `garth:${result.token_data}` : null;
+
     // Store connection info in local database
     await db.insert(garminTokens).values({
       userId,
       garminEmail: email,
-      oauth1Token: encryptForStorage(JSON.stringify({ 
-        connected: true, 
-        service_user_id: String(userId),
-        connected_at: new Date().toISOString()
-      })),
+      oauth1Token: tokenPayload
+        ? encryptForStorage(tokenPayload)
+        : encryptForStorage(JSON.stringify({ 
+            connected: true, 
+            service_user_id: String(userId),
+            connected_at: new Date().toISOString()
+          })),
       oauth2Token: null,
       tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     }).onConflictDoUpdate({
       target: garminTokens.userId,
       set: {
         garminEmail: email,
-        oauth1Token: encryptForStorage(JSON.stringify({ 
-          connected: true, 
-          service_user_id: String(userId),
-          connected_at: new Date().toISOString()
-        })),
+        oauth1Token: tokenPayload
+          ? encryptForStorage(tokenPayload)
+          : encryptForStorage(JSON.stringify({ 
+              connected: true, 
+              service_user_id: String(userId),
+              connected_at: new Date().toISOString()
+            })),
         tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         updatedAt: new Date(),
       },
@@ -231,11 +717,16 @@ export async function connectGarmin(
       .where(eq(swimmerProfiles.userId, userId));
 
     return { success: true };
-  } catch (error: any) {
-    console.error("[Garmin] Connection failed:", error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[Garmin] Connection failed: ${message}`, {
+      event: "garmin:connect_failed",
+      userId,
+      message,
+    });
     return { 
       success: false, 
-      error: error.message || "Connection failed. Check your credentials." 
+      error: message || "Connection failed. Check your credentials." 
     };
   }
 }
@@ -264,28 +755,34 @@ export async function completeMfa(
       return { success: false, error: result.message || "MFA verification failed" };
     }
 
+    const tokenPayload = result.token_data ? `garth:${result.token_data}` : null;
+
     // Store connection info in local database
     await db.insert(garminTokens).values({
       userId,
       garminEmail: email,
-      oauth1Token: encryptForStorage(JSON.stringify({ 
-        connected: true, 
-        service_user_id: String(userId),
-        connected_at: new Date().toISOString(),
-        mfa_completed: true
-      })),
+      oauth1Token: tokenPayload
+        ? encryptForStorage(tokenPayload)
+        : encryptForStorage(JSON.stringify({ 
+            connected: true, 
+            service_user_id: String(userId),
+            connected_at: new Date().toISOString(),
+            mfa_completed: true
+          })),
       oauth2Token: null,
       tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
     }).onConflictDoUpdate({
       target: garminTokens.userId,
       set: {
         garminEmail: email,
-        oauth1Token: encryptForStorage(JSON.stringify({ 
-          connected: true, 
-          service_user_id: String(userId),
-          connected_at: new Date().toISOString(),
-          mfa_completed: true
-        })),
+        oauth1Token: tokenPayload
+          ? encryptForStorage(tokenPayload)
+          : encryptForStorage(JSON.stringify({ 
+              connected: true, 
+              service_user_id: String(userId),
+              connected_at: new Date().toISOString(),
+              mfa_completed: true
+            })),
         tokenExpiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         updatedAt: new Date(),
       },
@@ -298,11 +795,16 @@ export async function completeMfa(
       .where(eq(swimmerProfiles.userId, userId));
 
     return { success: true };
-  } catch (error: any) {
-    console.error("[Garmin] MFA completion failed:", error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[Garmin] MFA completion failed: ${message}`, {
+      event: "garmin:mfa_failed",
+      userId,
+      message,
+    });
     return { 
       success: false, 
-      error: error.message || "MFA verification failed" 
+      error: message || "MFA verification failed" 
     };
   }
 }
@@ -331,7 +833,12 @@ export async function disconnectGarmin(userId: number): Promise<boolean> {
     
     return true;
   } catch (error) {
-    console.error("[Garmin] Disconnect failed:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[Garmin] Disconnect failed: ${message}`, {
+      event: "garmin:disconnect_failed",
+      userId,
+      message,
+    });
     return false;
   }
 }
@@ -372,17 +879,25 @@ export async function autoSyncGarmin(
         syncIntervalHours * 60 * 60 * 1000;
 
     if (shouldSync) {
-      console.log(`[Auto-Sync] Triggering Garmin sync for user ${userId}`);
+      logger.info(`[Auto-Sync] Triggering Garmin sync for user ${userId}`, {
+        event: "garmin:auto_sync_trigger",
+        userId,
+      });
       await syncGarminActivities(userId);
     } else {
-      console.log(
-        `[Auto-Sync] Skipping Garmin sync for user ${userId}, last synced ${Math.round(
-          (now.getTime() - new Date(lastSync).getTime()) / (60 * 60 * 1000)
-        )}h ago`
-      );
+      logger.info(`[Auto-Sync] Skipping Garmin sync for user ${userId}`, {
+        event: "garmin:auto_sync_skip",
+        userId,
+        hoursAgo: Math.round((now.getTime() - new Date(lastSync).getTime()) / (60 * 60 * 1000)),
+      });
     }
   } catch (error) {
-    console.error(`[Auto-Sync] Garmin failed for user ${userId}:`, error);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`[Auto-Sync] Garmin failed for user ${userId}: ${message}`, {
+      event: "garmin:auto_sync_failed",
+      userId,
+      message,
+    });
   }
 }
 
@@ -390,34 +905,15 @@ export async function autoSyncGarmin(
  * Calculate XP for a swimming activity
  */
 function calculateActivityXp(activity: GarminServiceActivity): number {
-  let xp = 0;
-  
-  // Base XP: 1 XP per 100 meters
-  xp += Math.floor(activity.distance_meters / 100);
-  
-  // Bonus for session completion
-  xp += 50;
-  
-  // Bonus for longer sessions (over 3km)
-  if (activity.distance_meters >= 3000) {
-    xp += 25;
-  }
-  
-  // Bonus for very long sessions (over 4km)
-  if (activity.distance_meters >= 4000) {
-    xp += 25;
-  }
-  
-  // Bonus for open water swimming
-  if (activity.is_open_water) {
-    xp += 50;
-  }
-  
-  return xp;
+  return calculateActivityXpCore(activity.distance_meters, activity.is_open_water);
 }
 
 /**
- * Sync swimming activities from Garmin Connect via microservice
+ * Syncs swimming activities from Garmin Connect via the Garmin microservice.
+ *
+ * @param userId - SwimForge user id.
+ * @param daysBack - How many days back to fetch (default 30).
+ * @returns Number of activities synced and newly earned XP.
  */
 export async function syncGarminActivities(
   userId: number,
@@ -440,6 +936,14 @@ export async function syncGarminActivities(
   }
 
   try {
+    const restored = await ensureGarminSessionFromDb(userId);
+    if (!restored) {
+      return {
+        synced: 0,
+        newXp: 0,
+        error: "Sessione Garmin non attiva. Ricollega Garmin Connect.",
+      };
+    }
     // Call microservice to sync activities
     const result: GarminServiceResponse = await callGarminService("/sync", "POST", {
       user_id: String(userId),
@@ -465,21 +969,168 @@ export async function syncGarminActivities(
       return { synced: 0, newXp: 0, error: "Profile not found" };
     }
 
+    const enrichActivityDetails = async (params: {
+      activityId: number;
+      garminActivityId: string;
+      currentStrokeType?: string | null;
+      baseRawData?: Record<string, any> | null;
+    }) => {
+      const fullDetails = await getGarminActivityFullDetails(
+        userId,
+        params.garminActivityId
+      );
+      if (!fullDetails) return;
+
+      const advanced = extractGarminAdvancedFields(fullDetails);
+      const updates: Record<string, any> = {
+        rawData: {
+          ...(params.baseRawData ?? {}),
+          garmin_details: fullDetails,
+        },
+      };
+
+      const setIfDefined = (key: string, value: unknown) => {
+        if (value === null || value === undefined) return;
+        updates[key] = value;
+      };
+
+      const setIfDefinedInt = (key: string, value: unknown) => {
+        if (value === null || value === undefined) return;
+        const num = toNumber(value);
+        if (num === null) return;
+        updates[key] = Math.round(num);
+      };
+
+      setIfDefinedInt("avgSwolf", advanced.avgSwolf);
+      setIfDefined("avgStrokeDistance", advanced.avgStrokeDistance);
+      setIfDefinedInt("avgStrokes", advanced.avgStrokes);
+      setIfDefinedInt("avgStrokeCadence", advanced.avgStrokeCadence);
+      setIfDefinedInt("trainingEffect", advanced.trainingEffect);
+      setIfDefinedInt("anaerobicTrainingEffect", advanced.anaerobicTrainingEffect);
+      setIfDefinedInt("vo2MaxValue", advanced.vo2MaxValue);
+      setIfDefinedInt("recoveryTimeHours", advanced.recoveryTimeHours);
+      setIfDefinedInt("avgStress", advanced.avgStress);
+      setIfDefinedInt("avgHeartRate", advanced.avgHeartRate);
+      setIfDefinedInt("maxHeartRate", advanced.maxHeartRate);
+      setIfDefinedInt("restingHeartRate", advanced.restingHeartRate);
+      setIfDefinedInt("lapsCount", advanced.lapsCount);
+      setIfDefinedInt("poolLengthMeters", advanced.poolLengthMeters);
+
+      if (
+        advanced.strokeType &&
+        (!params.currentStrokeType || params.currentStrokeType === "mixed")
+      ) {
+        updates.strokeType = advanced.strokeType;
+      }
+
+      if (advanced.hrZones) {
+        const hrValues = Object.values(advanced.hrZones);
+        const hasZones = hrValues.some((value) => Number(value) > 0);
+        if (hasZones) {
+          setIfDefinedInt("hrZone1Seconds", advanced.hrZones.hrZone1Seconds);
+          setIfDefinedInt("hrZone2Seconds", advanced.hrZones.hrZone2Seconds);
+          setIfDefinedInt("hrZone3Seconds", advanced.hrZones.hrZone3Seconds);
+          setIfDefinedInt("hrZone4Seconds", advanced.hrZones.hrZone4Seconds);
+          setIfDefinedInt("hrZone5Seconds", advanced.hrZones.hrZone5Seconds);
+        }
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await db
+          .update(swimmingActivities)
+          .set(updates)
+          .where(eq(swimmingActivities.id, params.activityId));
+      }
+
+      await persistGarminLapDetails(db, params.activityId, fullDetails);
+    };
+
+    // Bulk fetch all existing Garmin activity IDs for this user to avoid N+1 queries
+    const existingActivities = await db
+      .select({
+        garminActivityId: swimmingActivities.garminActivityId,
+        id: swimmingActivities.id,
+        strokeType: swimmingActivities.strokeType,
+        rawData: swimmingActivities.rawData,
+        avgSwolf: swimmingActivities.avgSwolf,
+        avgStrokeDistance: swimmingActivities.avgStrokeDistance,
+        avgStrokes: swimmingActivities.avgStrokes,
+        avgStrokeCadence: swimmingActivities.avgStrokeCadence,
+        trainingEffect: swimmingActivities.trainingEffect,
+        anaerobicTrainingEffect: swimmingActivities.anaerobicTrainingEffect,
+        avgHeartRate: swimmingActivities.avgHeartRate,
+        hrZone1Seconds: swimmingActivities.hrZone1Seconds,
+      })
+      .from(swimmingActivities)
+      .where(eq(swimmingActivities.userId, userId));
+
+    const existingGarminMap = new Map(
+      existingActivities
+        .filter(a => a.garminActivityId)
+        .map(a => [a.garminActivityId!, a])
+    );
+
     // Process each activity
     for (const activity of result.activities) {
-      // Check if activity already exists (by Garmin ID)
-      const existingGarmin = await db
-        .select()
-        .from(swimmingActivities)
-        .where(
-          and(
-            eq(swimmingActivities.userId, userId),
-            eq(swimmingActivities.garminActivityId, activity.activity_id)
-          )
-        )
-        .limit(1);
+      // Check if activity already exists (by Garmin ID) using our pre-fetched map
+      const existing = existingGarminMap.get(activity.activity_id);
 
-      if (existingGarmin.length > 0) {
+      if (existing) {
+        const existingRaw = (existing.rawData ?? {}) as Record<string, any>;
+        const existingDetails = existingRaw.garmin_details;
+        const hasSummary =
+          Boolean(existingDetails?.activity?.summaryDTO ?? existingDetails?.summaryDTO);
+        const hasAdvanced =
+          Boolean(
+            existing.avgSwolf ||
+              existing.avgStrokeDistance ||
+              existing.avgStrokes ||
+              existing.avgStrokeCadence ||
+              existing.trainingEffect ||
+              existing.anaerobicTrainingEffect ||
+              existing.avgHeartRate ||
+              existing.hrZone1Seconds
+          );
+
+        const [existingLap] = await db
+          .select({ id: garminActivityLaps.id })
+          .from(garminActivityLaps)
+          .where(eq(garminActivityLaps.activityId, existing.id))
+          .limit(1);
+
+        if (!existingLap && existingDetails) {
+          try {
+            await persistGarminLapDetails(db, existing.id, existingDetails);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            logger.warn(`[Garmin] Failed to persist laps for activity ${activity.activity_id}: ${message}`, {
+              event: "garmin:laps_persist_failed",
+              userId,
+              garminActivityId: activity.activity_id,
+              message,
+            });
+          }
+        }
+
+        if (!hasSummary || !hasAdvanced) {
+          try {
+            await enrichActivityDetails({
+              activityId: existing.id,
+              garminActivityId: activity.activity_id,
+              currentStrokeType: existing.strokeType,
+              baseRawData: existingRaw,
+            });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            logger.warn(`[Garmin] Failed to enrich existing activity ${activity.activity_id}: ${message}`, {
+              event: "garmin:activity_enrich_failed",
+              userId,
+              garminActivityId: activity.activity_id,
+              message,
+            });
+          }
+        }
+
         continue; // Skip already synced activities
       }
 
@@ -511,7 +1162,12 @@ export async function syncGarminActivities(
         .limit(1);
 
       if (existingCrossPlatform) {
-        console.log(`[Garmin] Activity ${activity.activity_id} is a duplicate of Strava activity ${existingCrossPlatform.id}, skipping`);
+        logger.info(`[Garmin] Activity ${activity.activity_id} is a duplicate of Strava activity ${existingCrossPlatform.id}, skipping`, {
+          event: "garmin:duplicate_strava_skip",
+          userId,
+          garminActivityId: activity.activity_id,
+          stravaActivityId: existingCrossPlatform.id,
+        });
         continue;
       }
 
@@ -519,21 +1175,21 @@ export async function syncGarminActivities(
       const activityXp = calculateActivityXp(activity);
 
       // Insert new activity
-      await db.insert(swimmingActivities).values({
+      const [inserted] = await db.insert(swimmingActivities).values({
         userId,
         garminActivityId: activity.activity_id,
         activitySource: "garmin",
         activityDate,
-        distanceMeters: activity.distance_meters,
-        durationSeconds: activity.duration_seconds,
-        poolLengthMeters: activity.pool_length || 25,
+        distanceMeters: Math.round(activity.distance_meters),
+        durationSeconds: Math.round(activity.duration_seconds),
+        poolLengthMeters: Math.round(activity.pool_length || 25),
         strokeType: activity.stroke_type as "freestyle" | "backstroke" | "breaststroke" | "butterfly" | "mixed",
-        avgPacePer100m: activity.avg_pace_per_100m,
-        calories: activity.calories,
-        avgHeartRate: activity.avg_heart_rate,
-        maxHeartRate: activity.max_heart_rate,
-        swolfScore: activity.swolf_score,
-        lapsCount: activity.laps_count,
+        avgPacePer100m: activity.avg_pace_per_100m ? Math.round(activity.avg_pace_per_100m) : undefined,
+        calories: activity.calories ? Math.round(activity.calories) : undefined,
+        avgHeartRate: activity.avg_heart_rate ? Math.round(activity.avg_heart_rate) : undefined,
+        maxHeartRate: activity.max_heart_rate ? Math.round(activity.max_heart_rate) : undefined,
+        avgSwolf: activity.swolf_score ? Math.round(activity.swolf_score) : undefined,
+        lapsCount: activity.laps_count ? Math.round(activity.laps_count) : undefined,
         avgStrokeDistance: activity.avg_stroke_distance ? Math.round(activity.avg_stroke_distance * 100) / 100 : undefined,
         avgStrokes: activity.avg_strokes ? Math.round(activity.avg_strokes) : undefined,
         avgStrokeCadence: activity.avg_stroke_cadence ? Math.round(activity.avg_stroke_cadence) : undefined,
@@ -551,7 +1207,26 @@ export async function syncGarminActivities(
         hrZone5Seconds: activity.hr_zone_5_seconds ? Math.round(activity.hr_zone_5_seconds) : undefined,
         rawData: activity.raw_data ?? undefined,
         xpEarned: activityXp,
-      });
+      }).returning({ id: swimmingActivities.id });
+
+      if (inserted?.id) {
+        try {
+          await enrichActivityDetails({
+            activityId: inserted.id,
+            garminActivityId: activity.activity_id,
+            currentStrokeType: activity.stroke_type,
+            baseRawData: (activity.raw_data ?? {}) as Record<string, any>,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          logger.warn(`[Garmin] Failed to enrich activity ${activity.activity_id}: ${message}`, {
+            event: "garmin:activity_enrich_failed",
+            userId,
+            garminActivityId: activity.activity_id,
+            message,
+          });
+        }
+      }
 
       totalNewXp += activityXp;
 
@@ -568,14 +1243,11 @@ export async function syncGarminActivities(
 
     // Update profile totals
     if (syncedCount > 0) {
+      // Use accurate aggregates from DB instead of incremental sums
+      const { getActivityAggregates } = await import("./db");
+      const aggregates = await getActivityAggregates(userId);
+      
       const newTotalXp = (profile.totalXp || 0) + totalNewXp;
-      const newTotalDistance = (profile.totalDistanceMeters || 0) + 
-        result.activities.reduce((sum, a) => sum + a.distance_meters, 0);
-      const newTotalTime = (profile.totalTimeSeconds || 0) + 
-        result.activities.reduce((sum, a) => sum + a.duration_seconds, 0);
-      const newTotalSessions = (profile.totalSessions || 0) + syncedCount;
-
-      // Calculate new level
       const newLevel = calculateLevel(newTotalXp);
 
       await db
@@ -583,24 +1255,11 @@ export async function syncGarminActivities(
         .set({
           totalXp: newTotalXp,
           level: newLevel,
-          totalDistanceMeters: newTotalDistance,
-          totalTimeSeconds: newTotalTime,
-          totalSessions: newTotalSessions,
-        })
-        .where(eq(swimmerProfiles.userId, userId));
-
-      // Calculate open water stats
-      const newTotalOpenWaterSessions = (profile.totalOpenWaterSessions || 0) + 
-        result.activities.filter(a => a.is_open_water).length;
-      const newTotalOpenWaterDistance = (profile.totalOpenWaterMeters || 0) + 
-        result.activities.filter(a => a.is_open_water).reduce((sum, a) => sum + a.distance_meters, 0);
-
-      // Update profile with open water stats
-      await db
-        .update(swimmerProfiles)
-        .set({
-          totalOpenWaterSessions: newTotalOpenWaterSessions,
-          totalOpenWaterMeters: newTotalOpenWaterDistance,
+          totalDistanceMeters: aggregates.totalDistance,
+          totalTimeSeconds: aggregates.totalTime,
+          totalSessions: aggregates.totalSessions,
+          totalOpenWaterSessions: aggregates.totalOpenWaterSessions,
+          totalOpenWaterMeters: aggregates.totalOpenWaterMeters,
         })
         .where(eq(swimmerProfiles.userId, userId));
 
@@ -614,11 +1273,11 @@ export async function syncGarminActivities(
       const longestSessionDistance = longestActivity[0]?.distanceMeters || 0;
       // Check and award badges
       await checkAndAwardBadges(userId, {
-        totalDistance: newTotalDistance,
-        totalSessions: newTotalSessions,
+        totalDistance: aggregates.totalDistance,
+        totalSessions: aggregates.totalSessions,
         totalXp: newTotalXp,
         level: newLevel,
-        totalTime: newTotalTime,
+        totalTime: aggregates.totalTime,
         longestSessionDistance,
       });
 
@@ -626,17 +1285,24 @@ export async function syncGarminActivities(
       await updateUserProfileBadge(userId, newTotalXp);
 
       // Check and award achievement badges
-      const { checkAndAwardBadges: checkAchievementBadges } = await import("./badge_engine");
-      (async () => {
-        try {
-          const newBadges = await checkAchievementBadges(userId);
-          if (newBadges.length > 0) {
-            console.log(`[Badge Engine] Awarded ${newBadges.length} new badges: ${newBadges.join(", ")}`);
-          }
-        } catch (error) {
-          console.error(`[Badge Engine] Failed for user ${userId}:`, error);
+      try {
+        const newBadges = await checkAchievementBadges(userId);
+        if (newBadges.length > 0) {
+          logger.info(`[Badge Engine] Awarded ${newBadges.length} new badges: ${newBadges.join(", ")}`, {
+            event: "badge_engine:awarded",
+            userId,
+            count: newBadges.length,
+            badges: newBadges,
+          });
         }
-      })();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.warn(`[Badge Engine] Failed for user ${userId}: ${message}`, {
+          event: "badge_engine:failed",
+          userId,
+          message,
+        });
+      }
 
       // Auto-update challenge progress for active challenges
       await updateActiveChallengesProgress(userId);
@@ -657,23 +1323,44 @@ export async function syncGarminActivities(
       .set({ lastGarminSyncAt: new Date() })
       .where(eq(swimmerProfiles.userId, userId));
 
-    console.log(`[Garmin Sync] Updated last_garmin_sync_at for user ${userId}`);
+    logger.info(`[Garmin Sync] Updated last_garmin_sync_at for user ${userId}`, {
+      event: "garmin:sync_updated_last_sync",
+      userId,
+    });
 
     // Auto-migrate HR zones for activities that don't have them
     if (syncedCount > 0) {
-      console.log(`[Garmin Sync] Starting automatic HR zones migration for ${syncedCount} new activities`);
+      logger.info(`[Garmin Sync] Starting automatic HR zones migration for ${syncedCount} new activities`, {
+        event: "garmin:sync_hr_migration_start",
+        userId,
+        syncedCount,
+      });
       try {
         const migrationResult = await migrateHrZones(userId);
-        console.log(`[Garmin Sync] HR zones migration result: ${migrationResult.message}`);
+        logger.info(`[Garmin Sync] HR zones migration result: ${migrationResult.message}`, {
+          event: "garmin:sync_hr_migration_done",
+          userId,
+          message: migrationResult.message,
+        });
       } catch (error) {
-        console.error(`[Garmin Sync] HR zones migration failed:`, error);
+        const message = error instanceof Error ? error.message : String(error);
+        logger.warn(`[Garmin Sync] HR zones migration failed: ${message}`, {
+          event: "garmin:sync_hr_migration_failed",
+          userId,
+          message,
+        });
       }
     }
 
     return { synced: syncedCount, newXp: totalNewXp };
-  } catch (error: any) {
-    console.error("[Garmin] Sync failed:", error);
-    return { synced: 0, newXp: 0, error: error.message || "Sync failed" };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[Garmin] Sync failed: ${message}`, {
+      event: "garmin:sync_failed",
+      userId,
+      message,
+    });
+    return { synced: 0, newXp: 0, error: message || "Sync failed" };
   }
 }
 
@@ -853,37 +1540,31 @@ export async function getPersonalRecords(userId: number): Promise<{
     return { longestSession: 0, fastestPace100m: 0, mostDistanceWeek: 0 };
   }
 
-  const activities = await db
-    .select()
+  // Single query for max distance and min pace
+  const [stats] = await db
+    .select({
+      longestSession: sql<number>`coalesce(max(${swimmingActivities.distanceMeters}), 0)`,
+      fastestPace100m: sql<number>`coalesce(min(${swimmingActivities.avgPacePer100m}), 0)`,
+    })
     .from(swimmingActivities)
     .where(eq(swimmingActivities.userId, userId));
 
-  let longestSession = 0;
-  let fastestPace100m = Infinity;
+  // Weekly distance aggregation
+  const weeklyResult = await db.execute(sql`
+    SELECT coalesce(max(weekly_distance), 0) as most_distance_week
+    FROM (
+      SELECT sum(distance_meters) as weekly_distance
+      FROM swimming_activities
+      WHERE user_id = ${userId}
+      GROUP BY date_trunc('week', activity_date)
+    ) weekly
+  `);
 
-  for (const activity of activities) {
-    if (activity.distanceMeters > longestSession) {
-      longestSession = activity.distanceMeters;
-    }
-    if (activity.avgPacePer100m && activity.avgPacePer100m < fastestPace100m) {
-      fastestPace100m = activity.avgPacePer100m;
-    }
-  }
-
-  // Calculate most distance in a week
-  const weekDistances: { [key: string]: number } = {};
-  for (const activity of activities) {
-    const date = new Date(activity.activityDate);
-    const weekStart = new Date(date);
-    weekStart.setDate(date.getDate() - date.getDay());
-    const weekKey = weekStart.toISOString().split("T")[0];
-    weekDistances[weekKey] = (weekDistances[weekKey] || 0) + activity.distanceMeters;
-  }
-  const mostDistanceWeek = Math.max(0, ...Object.values(weekDistances));
+  const mostDistanceWeek = Number((weeklyResult.rows[0] as any)?.most_distance_week ?? 0);
 
   return {
-    longestSession,
-    fastestPace100m: fastestPace100m === Infinity ? 0 : fastestPace100m,
+    longestSession: Number(stats?.longestSession ?? 0),
+    fastestPace100m: Number(stats?.fastestPace100m ?? 0),
     mostDistanceWeek,
   };
 }
@@ -914,9 +1595,18 @@ async function updateActiveChallengesProgress(userId: number): Promise<void> {
       await challengesDb.calculateChallengeProgress(challenge.id);
     }
 
-    console.log(`[Garmin] Updated progress for ${challenges.length} active challenges for user ${userId}`);
+    logger.info(`[Garmin] Updated progress for ${challenges.length} active challenges for user ${userId}`, {
+      event: "garmin:challenge_progress_updated",
+      userId,
+      count: challenges.length,
+    });
   } catch (error) {
-    console.error("[Garmin] Error updating challenge progress:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`[Garmin] Error updating challenge progress: ${message}`, {
+      event: "garmin:challenge_progress_update_failed",
+      userId,
+      message,
+    });
   }
 }
 
@@ -943,7 +1633,20 @@ export async function migrateHrZones(userId: number): Promise<{
   }
 
   try {
-    console.log(`[Garmin] Starting HR zones migration for user ${userId}`);
+    if (!GARMIN_SERVICE_SECRET) {
+      return {
+        success: false,
+        message: "Garmin service not configured",
+        updated: 0,
+        failed: 0,
+        total: 0,
+      };
+    }
+
+    logger.info(`[Garmin] Starting HR zones migration for user ${userId}`, {
+      event: "garmin:hr_migration_start",
+      userId,
+    });
 
     // Get all activities without HR zones data
     const activitiesWithoutHR = await db
@@ -966,7 +1669,11 @@ export async function migrateHrZones(userId: number): Promise<{
       };
     }
 
-    console.log(`[Garmin] Found ${activitiesWithoutHR.length} activities without HR zones`);
+    logger.info(`[Garmin] Found ${activitiesWithoutHR.length} activities without HR zones`, {
+      event: "garmin:hr_migration_candidates",
+      userId,
+      count: activitiesWithoutHR.length,
+    });
 
     let updated = 0;
     let failed = 0;
@@ -975,19 +1682,27 @@ export async function migrateHrZones(userId: number): Promise<{
     for (const activity of activitiesWithoutHR) {
       try {
         // Call Garmin Service to get HR zones data
-        const response = await fetch(
+        const response = await fetchWithTimeout(
           `${GARMIN_SERVICE_URL}/activity/${activity.garminActivityId}/hr-zones`,
           {
             headers: {
               "user-id": userId.toString(),
               "X-API-Key": GARMIN_SERVICE_SECRET,
             },
-          }
+          },
+          config.GARMIN_SERVICE_TIMEOUT_MS,
+          `garmin:hr_zones activity=${activity.garminActivityId}`,
         );
 
         if (!response.ok) {
-          console.error(
-            `[Garmin] Failed to fetch HR zones for activity ${activity.garminActivityId}: ${response.status}`
+          logger.warn(
+            `[Garmin] Failed to fetch HR zones for activity ${activity.garminActivityId}: ${response.status}`,
+            {
+              event: "garmin:hr_migration_fetch_failed",
+              userId,
+              garminActivityId: activity.garminActivityId,
+              status: response.status,
+            }
           );
           failed++;
           continue;
@@ -996,16 +1711,18 @@ export async function migrateHrZones(userId: number): Promise<{
         const hrZones = await response.json();
 
         // Fetch activity details (including SWOLF)
-        let swolfScore = activity.swolfScore; // Keep existing value if fetch fails
+        let swolfScore = activity.avgSwolf; // Keep existing value if fetch fails
         try {
-          const detailsResponse = await fetch(
+          const detailsResponse = await fetchWithTimeout(
             `${GARMIN_SERVICE_URL}/activity/${activity.garminActivityId}/details`,
             {
               headers: {
                 "user-id": userId.toString(),
                 "X-API-Key": GARMIN_SERVICE_SECRET,
               },
-            }
+            },
+            config.GARMIN_SERVICE_TIMEOUT_MS,
+            `garmin:details activity=${activity.garminActivityId}`,
           );
           
           if (detailsResponse.ok) {
@@ -1015,10 +1732,13 @@ export async function migrateHrZones(userId: number): Promise<{
             }
           }
         } catch (detailsError) {
-          console.warn(
-            `[Garmin] Could not fetch details for activity ${activity.garminActivityId}:`,
-            detailsError
-          );
+          const message = detailsError instanceof Error ? detailsError.message : String(detailsError);
+          logger.warn(`[Garmin] Could not fetch details for activity ${activity.garminActivityId}: ${message}`, {
+            event: "garmin:hr_migration_details_failed",
+            userId,
+            garminActivityId: activity.garminActivityId,
+            message,
+          });
         }
 
         // Update activity with HR zones data and SWOLF (round to integers)
@@ -1030,22 +1750,34 @@ export async function migrateHrZones(userId: number): Promise<{
             hrZone3Seconds: Math.round(hrZones.zone3 || 0),
             hrZone4Seconds: Math.round(hrZones.zone4 || 0),
             hrZone5Seconds: Math.round(hrZones.zone5 || 0),
-            swolfScore: swolfScore,
+            avgSwolf: swolfScore,
           })
           .where(eq(swimmingActivities.id, activity.id));
 
         updated++;
-        console.log(`[Garmin] Updated HR zones for activity ${activity.garminActivityId}`);
+        logger.info(`[Garmin] Updated HR zones for activity ${activity.garminActivityId}`, {
+          event: "garmin:hr_migration_activity_updated",
+          userId,
+          garminActivityId: activity.garminActivityId,
+        });
       } catch (error) {
-        console.error(
-          `[Garmin] Error processing activity ${activity.garminActivityId}:`,
-          error
-        );
+        const message = error instanceof Error ? error.message : String(error);
+        logger.warn(`[Garmin] Error processing activity ${activity.garminActivityId}: ${message}`, {
+          event: "garmin:hr_migration_activity_failed",
+          userId,
+          garminActivityId: activity.garminActivityId,
+          message,
+        });
         failed++;
       }
     }
 
-    console.log(`[Garmin] HR zones migration complete: ${updated} updated, ${failed} failed`);
+    logger.info(`[Garmin] HR zones migration complete: ${updated} updated, ${failed} failed`, {
+      event: "garmin:hr_migration_complete",
+      userId,
+      updated,
+      failed,
+    });
 
     return {
       success: true,
@@ -1055,7 +1787,12 @@ export async function migrateHrZones(userId: number): Promise<{
       total: activitiesWithoutHR.length,
     };
   } catch (error) {
-    console.error("[Garmin] Error during HR zones migration:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(`[Garmin] Error during HR zones migration: ${message}`, {
+      event: "garmin:hr_migration_crash",
+      userId,
+      message,
+    });
     return {
       success: false,
       message: error instanceof Error ? error.message : "Unknown error",

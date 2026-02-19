@@ -137,7 +137,7 @@ const normalizeContentPart = (
 };
 
 const normalizeMessage = (message: Message) => {
-  const { role, name, tool_call_id } = message;
+  const { role, name, tool_call_id: toolCallId } = message;
 
   if (role === "tool" || role === "function") {
     const content = ensureArray(message.content)
@@ -147,7 +147,7 @@ const normalizeMessage = (message: Message) => {
     return {
       role,
       name,
-      tool_call_id,
+      tool_call_id: toolCallId,
       content,
     };
   }
@@ -216,15 +216,15 @@ const resolveApiUrl = () =>
 
 const assertApiKey = () => {
   if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
+    throw new Error("BUILT_IN_FORGE_API_KEY is not configured");
   }
 };
 
 const normalizeResponseFormat = ({
   responseFormat,
-  response_format,
+  response_format: responseFormatLegacy,
   outputSchema,
-  output_schema,
+  output_schema: outputSchemaLegacy,
 }: {
   responseFormat?: ResponseFormat;
   response_format?: ResponseFormat;
@@ -235,7 +235,7 @@ const normalizeResponseFormat = ({
   | { type: "text" }
   | { type: "json_object" }
   | undefined => {
-  const explicitFormat = responseFormat || response_format;
+  const explicitFormat = responseFormat || responseFormatLegacy;
   if (explicitFormat) {
     if (
       explicitFormat.type === "json_schema" &&
@@ -248,7 +248,7 @@ const normalizeResponseFormat = ({
     return explicitFormat;
   }
 
-  const schema = outputSchema || output_schema;
+  const schema = outputSchema || outputSchemaLegacy;
   if (!schema) return undefined;
 
   if (!schema.name || !schema.schema) {
@@ -272,11 +272,11 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     messages,
     tools,
     toolChoice,
-    tool_choice,
+    tool_choice: toolChoiceLegacy,
     outputSchema,
-    output_schema,
+    output_schema: outputSchemaLegacy,
     responseFormat,
-    response_format,
+    response_format: responseFormatLegacy,
   } = params;
 
   const payload: Record<string, unknown> = {
@@ -289,7 +289,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   }
 
   const normalizedToolChoice = normalizeToolChoice(
-    toolChoice || tool_choice,
+    toolChoice || toolChoiceLegacy,
     tools
   );
   if (normalizedToolChoice) {
@@ -303,9 +303,9 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
   const normalizedResponseFormat = normalizeResponseFormat({
     responseFormat,
-    response_format,
+    response_format: responseFormatLegacy,
     outputSchema,
-    output_schema,
+    output_schema: outputSchemaLegacy,
   });
 
   if (normalizedResponseFormat) {

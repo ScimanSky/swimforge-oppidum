@@ -73,6 +73,7 @@ class LoginResponse(BaseModel):
     message: str
     user_id: Optional[str] = None
     mfa_required: bool = False
+    token_data: Optional[str] = None
 
 
 class StatusResponse(BaseModel):
@@ -126,6 +127,11 @@ class SyncResponse(BaseModel):
     message: Optional[str] = None
 
 
+class RestoreRequest(BaseModel):
+    user_id: str
+    token_data: str
+
+
 # Lifespan context manager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -172,7 +178,40 @@ def get_garmin_client(user_id: str):
     session = sessions.get(user_id)
     if session and session.get("client"):
         return session["client"]
+    # Try to restore session from token store (after deploy/restart)
+    token_path = get_token_path(user_id)
+    if token_path.exists():
+        try:
+            from garminconnect import Garmin
+            client = Garmin()
+            client.login(str(token_path))
+            try:
+                display_name = client.display_name
+            except Exception:
+                display_name = None
+            sessions[user_id] = {
+                "client": client,
+                "email": None,
+                "display_name": display_name,
+                "last_sync": None,
+                "connected_at": datetime.now().isoformat()
+            }
+            logger.info(f"Restored Garmin session from tokens for user {user_id}")
+            return client
+        except Exception as e:
+            logger.warning(f"Failed to restore Garmin session for user {user_id}: {e}")
     return None
+
+
+def safe_garmin_call(method, *args):
+    """Safely call Garmin Connect methods without breaking the whole response."""
+    if method is None:
+        return None
+    try:
+        return method(*args)
+    except Exception as err:
+        logger.warning(f"Garmin call {getattr(method, '__name__', str(method))} failed: {err}")
+        return None
 
 
 def determine_stroke_type(activity_name: str, activity_type: str) -> str:
@@ -453,6 +492,12 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
             logger.info(f"Saved tokens for user {request.user_id}")
         except Exception as e:
             logger.warning(f"Could not save tokens: {e}")
+        token_data = None
+        try:
+            if token_path.exists():
+                token_data = token_path.read_text()
+        except Exception as e:
+            logger.warning(f"Could not read token data: {e}")
         
         # Get display name
         try:
@@ -473,7 +518,8 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
             success=True,
             message="Connesso a Garmin Connect con successo!",
             user_id=request.user_id,
-            mfa_required=False
+            mfa_required=False,
+            token_data=token_data
         )
         
     except HTTPException:
@@ -572,6 +618,12 @@ async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_ke
             logger.info(f"Saved tokens for user {request.user_id}")
         except Exception as e:
             logger.warning(f"Could not save tokens: {e}")
+        token_data = None
+        try:
+            if token_path.exists():
+                token_data = token_path.read_text()
+        except Exception as e:
+            logger.warning(f"Could not read token data: {e}")
         
         # Get display name
         try:
@@ -592,7 +644,8 @@ async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_ke
             success=True,
             message="Connesso a Garmin Connect con successo!",
             user_id=request.user_id,
-            mfa_required=False
+            mfa_required=False,
+            token_data=token_data
         )
         
     except HTTPException:
@@ -640,6 +693,50 @@ async def logout(user_id: str, api_key: str = Depends(verify_api_key)):
         pass
     
     return {"success": True, "message": "Disconnesso con successo"}
+
+
+@app.post("/auth/restore")
+async def restore_session(
+    request: RestoreRequest,
+    api_key: str = Depends(verify_api_key)
+):
+    """Restore Garmin session from token data stored in DB."""
+    try:
+        token_path = get_token_path(request.user_id)
+        token_path.write_text(request.token_data)
+
+        try:
+            from garminconnect import Garmin
+        except ImportError as e:
+            logger.error(f"Failed to import garminconnect: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail="Garmin Connect library not available."
+            )
+
+        client = Garmin()
+        client.login(str(token_path))
+
+        try:
+            display_name = client.display_name
+        except Exception:
+            display_name = None
+
+        sessions[request.user_id] = {
+            "client": client,
+            "email": None,
+            "display_name": display_name,
+            "last_sync": None,
+            "connected_at": datetime.now().isoformat()
+        }
+
+        return {"success": True, "message": "Sessione Garmin ripristinata"}
+    except Exception as e:
+        logger.error(f"Failed to restore session for user {request.user_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Errore nel ripristino della sessione Garmin: {str(e)}"
+        )
 
 
 @app.get("/auth/status/{user_id}", response_model=StatusResponse)
@@ -883,6 +980,54 @@ async def get_activity_details(
             status_code=500,
             detail=f"Errore nel recupero dei dettagli: {str(e)}"
         )
+
+
+@app.get("/activity/{activity_id}/full")
+async def get_activity_full_details(
+    activity_id: str,
+    user_id: str = Header(None, alias="user-id"),
+    api_key: str = Depends(verify_api_key)
+):
+    """Get full Garmin activity details (splits, typed splits, weather, gear, zones, etc)."""
+    if not user_id:
+        raise HTTPException(
+            status_code=400,
+            detail="user-id header is required"
+        )
+
+    client = get_garmin_client(user_id)
+
+    if not client:
+        raise HTTPException(
+            status_code=401,
+            detail="Non autenticato. Effettua prima il login."
+        )
+
+    logger.info(f"Fetching full Garmin details for activity {activity_id}")
+
+    details = safe_garmin_call(getattr(client, "get_activity_details", None), activity_id)
+    activity = safe_garmin_call(getattr(client, "get_activity", None), activity_id)
+    splits = safe_garmin_call(getattr(client, "get_activity_splits", None), activity_id)
+    typed_splits = safe_garmin_call(getattr(client, "get_activity_typed_splits", None), activity_id)
+    split_summaries = safe_garmin_call(getattr(client, "get_activity_split_summaries", None), activity_id)
+    weather = safe_garmin_call(getattr(client, "get_activity_weather", None), activity_id)
+    hr_zones = safe_garmin_call(getattr(client, "get_activity_hr_in_timezones", None), activity_id)
+    power_zones = safe_garmin_call(getattr(client, "get_activity_power_in_timezones", None), activity_id)
+    gear = safe_garmin_call(getattr(client, "get_activity_gear", None), activity_id)
+    exercise_sets = safe_garmin_call(getattr(client, "get_activity_exercise_sets", None), activity_id)
+
+    return {
+        "activity": activity,
+        "details": details,
+        "splits": splits,
+        "typed_splits": typed_splits,
+        "split_summaries": split_summaries,
+        "weather": weather,
+        "hr_zones": hr_zones,
+        "power_zones": power_zones,
+        "gear": gear,
+        "exercise_sets": exercise_sets,
+    }
 
 
 @app.post("/sync", response_model=SyncResponse)

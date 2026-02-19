@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SwimForge — Social First + Web3 Token Economy</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+:root {
+  --brand: #9945FF;
+  --brand-light: #c4a1ff;
+  --accent: #14F195;
+  --dark: #0d1117;
+  --dark-surface: #161b22;
+  --text: #c9d1d9;
+  --text-bright: #f0f6fc;
+  --border: #30363d;
+  --warn: #f59e0b;
+  --danger: #f85149;
+  --success: #3fb950;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: var(--dark);
+  color: var(--text);
+  font-size: 11pt;
+  line-height: 1.55;
+}
+
+h1 {
+  font-size: 26pt;
+  font-weight: 800;
+  color: var(--text-bright);
+  border-bottom: 3px solid var(--brand);
+  padding-bottom: 8px;
+  margin-top: 28px;
+  margin-bottom: 16px;
+  letter-spacing: -0.5px;
+}
+
+h2 {
+  font-size: 18pt;
+  font-weight: 700;
+  color: var(--accent);
+  margin-top: 24px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+}
+
+h3 {
+  font-size: 13pt;
+  font-weight: 600;
+  color: var(--brand-light);
+  margin-top: 18px;
+  margin-bottom: 8px;
+}
+
+h4 {
+  font-size: 11pt;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-top: 14px;
+  margin-bottom: 6px;
+}
+
+p { margin-bottom: 8px; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0 16px 0;
+  font-size: 9.5pt;
+}
+
+th {
+  background: var(--brand);
+  color: white;
+  font-weight: 600;
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 9pt;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+tr:nth-child(even) td {
+  background: rgba(255,255,255,0.02);
+}
+
+tr:last-child td {
+  font-weight: 600;
+}
+
+code {
+  background: var(--dark-surface);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 9pt;
+  color: var(--accent);
+  border: 1px solid var(--border);
+}
+
+pre {
+  background: var(--dark-surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px 16px;
+  overflow-x: auto;
+  margin: 10px 0 14px 0;
+  font-size: 8.5pt;
+  line-height: 1.5;
+}
+
+pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text);
+}
+
+blockquote {
+  border-left: 3px solid var(--brand);
+  padding: 10px 14px;
+  margin: 12px 0;
+  background: rgba(153, 69, 255, 0.08);
+  border-radius: 0 6px 6px 0;
+  font-style: italic;
+  color: var(--text-bright);
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 24px 0;
+}
+
+ul, ol {
+  margin: 6px 0 12px 20px;
+}
+
+li {
+  margin-bottom: 4px;
+}
+
+strong { color: var(--text-bright); }
+
+a { color: var(--brand-light); text-decoration: none; }
+
+.page-break { page-break-before: always; }
+
+@page {
+  size: A4;
+  margin: 20mm 18mm 20mm 18mm;
+
+  @bottom-center {
+    content: "SwimForge — Confidential";
+    font-size: 7pt;
+    color: #555;
+  }
+  @bottom-right {
+    content: counter(page);
+    font-size: 8pt;
+    color: #888;
+  }
+}
+
+@page :first {
+  margin: 0;
+  @bottom-center { content: none; }
+  @bottom-right { content: none; }
+}
+
+.cover {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  background: linear-gradient(135deg, #0d1117 0%, #161b22 40%, #1a1040 70%, #0d1117 100%);
+  padding: 40px;
+}
+
+.cover h1 {
+  font-size: 38pt;
+  border: none;
+  background: linear-gradient(135deg, #9945FF, #14F195);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+  letter-spacing: -1px;
+}
+
+.cover .subtitle {
+  font-size: 16pt;
+  color: var(--text);
+  font-weight: 300;
+  margin-bottom: 30px;
+}
+
+.cover .meta {
+  font-size: 10pt;
+  color: #555;
+  margin-top: 40px;
+  line-height: 1.8;
+}
+
+.cover .badge {
+  display: inline-block;
+  background: rgba(153, 69, 255, 0.15);
+  border: 1px solid var(--brand);
+  color: var(--brand-light);
+  padding: 6px 18px;
+  border-radius: 20px;
+  font-size: 10pt;
+  font-weight: 600;
+  margin: 6px;
+}
+
+.highlight-box {
+  background: rgba(20, 241, 149, 0.06);
+  border: 1px solid rgba(20, 241, 149, 0.2);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 12px 0;
+}
+
+.warning-box {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 12px 0;
+}
+
+.danger-box {
+  background: rgba(248, 81, 73, 0.08);
+  border: 1px solid rgba(248, 81, 73, 0.3);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin: 12px 0;
+}
+/* Print overrides to ensure background colors print */
+@media print {
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+
+<div class="cover">
+
+<h1>SwimForge</h1>
+
+<div class="subtitle">Social First + Web3 Token Economy</div>
+
+<div>
+  <span class="badge">🪙 $SWIM Token</span>
+  <span class="badge">⛓️ Solana</span>
+  <span class="badge">🏊 Swim-to-Earn</span>
+</div>
+
+<div class="meta">
+  <strong>Versione:</strong> 2.0 — Solana + Multi-Wallet<br>
+  <strong>Data:</strong> 14 Febbraio 2026<br>
+  <strong>Branch:</strong> swimforge-4.3<br>
+  <strong>Classificazione:</strong> Confidential
+</div>
+
+</div>
+
+<div class="page-break"></div>
+
+<h1>Indice</h1>
+
+<p>1. <strong>Riepilogo Esecutivo</strong> — Panoramica del progetto</p>
+<p>2. <strong>Token Economy ($SWIM)</strong> — Earn/Spend mechanics, tokenomics</p>
+<p>3. <strong>Architettura Tecnica</strong> — Hybrid off-chain/on-chain, Solana, multi-wallet</p>
+<p>4. <strong>Architettura App</strong> — 4 Tab + Coach Premium</p>
+<p>5. <strong>Flusso Utente</strong> — Journey swim-to-earn</p>
+<p>6. <strong>Anti-Cheat e Validazione</strong> — 5 livelli di protezione</p>
+<p>7. <strong>Roadmap Implementazione</strong> — 5 fasi, 11-15 settimane</p>
+<p>8. <strong>Confronto Stripe vs Web3</strong> — Analisi comparativa</p>
+<p>9. <strong>Decision Points</strong> — Decisioni aperte</p>
+
+<div class="page-break"></div>
+
+<h1>1. Riepilogo Esecutivo</h1>
+
+<strong>SwimForge</strong> si evolve da app di tracking per nuotatori a <strong>piattaforma social-first con monetizzazione Web3</strong>. I nuotatori guadagnano token <strong>$SWIM</strong> nuotando e li spendono per sbloccare il <strong>Coach AI premium</strong>.
+
+<table>
+<thead><tr><th>Dimensione</th><th>Stato Attuale</th><th>Target Social First + Web3</th></tr></thead>
+<tbody>
+<tr><td><strong>Navigazione</strong></td><td>6 tab</td><td>4 tab (Social Home, Season, Track, Profilo)</td></tr>
+<tr><td><strong>Social</strong></td><td>Feed secondario</td><td>Feed = schermata principale, 70% visibilità</td></tr>
+<tr><td><strong>Season</strong></td><td>Predizioni/assignment</td><td>Ciclo mensile + obiettivi collettivi + token rewards</td></tr>
+<tr><td><strong>Coach</strong></td><td>AI workout gratis</td><td><strong>Swim-to-Unlock</strong>: spendi $SWIM per piani premium</td></tr>
+<tr><td><strong>Monetizzazione</strong></td><td>❌ Assente</td><td><strong>$SWIM token</strong> — earn by swimming, spend on Coach</td></tr>
+<tr><td><strong>Badge</strong></td><td>Immagini statiche</td><td><strong>NFT Badge</strong> su Solana, collezionabili</td></tr>
+</tbody></table>
+
+<h3>Vision</h3>
+
+<blockquote><strong>"Nuota, Guadagna, Sblocca"</strong> — Ogni metro nuotato genera valore. I token $SWIM sono la valuta dell'ecosistema SwimForge.</blockquote>
+
+<h3>Modello Core</h3>
+
+<pre><code>   SWIM  →  EARN $SWIM  →  SPEND on Coach / NFT
+<p>────      ──────────     ──────────────────────</p>
+<p>Garmin     Token Engine    AI Premium Plans</p>
+<p>Strava     Anti-cheat      Badge NFT Mint</p>
+<p>Manual     Off-chain DB    On-chain Bridge</p>
+</code></pre>
+
+<div class="page-break"></div>
+
+<h1>2. Token Economy — $SWIM</h1>
+
+<h2>2.1 Earn Mechanics — Come si guadagnano $SWIM</h2>
+
+<table>
+<thead><tr><th>Azione</th><th>$SWIM Guadagnati</th><th>Frequenza</th><th>Anti-cheat</th></tr></thead>
+<tbody>
+<tr><td><strong>Sync attività</strong> (qualsiasi)</td><td>10 + (km × 2)</td><td>Per sessione, max 3/gg</td><td>HR range + pace plausibile</td></tr>
+<tr><td><strong>Season: obiettivo individuale</strong></td><td>50 al raggiungimento</td><td>1×/mese</td><td>Accumulo progressivo</td></tr>
+<tr><td><strong>Season: obiettivo di gruppo</strong></td><td>100 divisi tra membri</td><td>1×/mese</td><td>Tutti ≥10% contributo</td></tr>
+<tr><td><strong>Season: obiettivo globale</strong></td><td>25 per tutti</td><td>1×/mese</td><td>≥1 attività nel mese</td></tr>
+<tr><td><strong>Challenge vinta</strong></td><td>1°=90, 2°=60, 3°=30</td><td>Per challenge</td><td>Validazione Garmin/Strava</td></tr>
+<tr><td><strong>Streak 7 giorni</strong></td><td>20 bonus</td><td>Settimanale</td><td>≥1 attività/giorno</td></tr>
+<tr><td><strong>Streak 30 giorni</strong></td><td>100 bonus</td><td>Mensile</td><td>30/30 giorni</td></tr>
+<tr><td><strong>Referral</strong></td><td>50 + 25 (invitato)</td><td>1× per coppia</td><td>1ª attività completata</td></tr>
+<tr><td><strong>Post feed</strong> con ≥5 splash</td><td>5</td><td>Max 1×/giorno</td><td>Diversi user splash</td></tr>
+</tbody></table>
+
+<h2>2.2 Spend Mechanics — Come si spendono $SWIM</h2>
+
+<table>
+<thead><tr><th>Azione</th><th>Costo $SWIM</th><th>Tipo</th></tr></thead>
+<tbody>
+<tr><td><strong>Coach AI: 1 piano personalizzato</strong></td><td>50</td><td>Consumabile</td></tr>
+<tr><td><strong>Coach AI: abbonamento settimanale</strong></td><td>100</td><td>7 giorni accesso illimitato</td></tr>
+<tr><td><strong>Coach AI: analisi SWOLF avanzata</strong></td><td>30</td><td>Consumabile</td></tr>
+<tr><td><strong>Mint badge NFT Season</strong></td><td>20</td><td>NFT permanente</td></tr>
+<tr><td><strong>Mint badge NFT Challenge Winner</strong></td><td>15</td><td>NFT permanente</td></tr>
+<tr><td><strong>Boost profilo</strong> (highlight 24h)</td><td>25</td><td>Consumabile</td></tr>
+<tr><td><strong>Sblocca statistiche avanzate</strong> (30gg)</td><td>40</td><td>30 giorni</td></tr>
+</tbody></table>
+
+<h2>2.3 Tokenomics — Equilibrio</h2>
+
+<table>
+<thead><tr><th>Parametro</th><th>Valore</th><th>Nota</th></tr></thead>
+<tbody>
+<tr><td><strong>Emissione max/utente/mese</strong></td><td>~400 $SWIM</td><td>Cap anti-inflazione</td></tr>
+<tr><td><strong>Burn rate medio</strong></td><td>~150 $SWIM/utente/mese</td><td>Coach + badge mint</td></tr>
+<tr><td><strong>Supply iniziale</strong></td><td>0 (fair launch)</td><td>Nessun pre-mine</td></tr>
+<tr><td><strong>Meccanismo deflazione</strong></td><td>Burn on spend</td><td>$SWIM spesi = eliminati</td></tr>
+<tr><td><strong>Riserva team</strong></td><td>5% emissione mensile</td><td>Development + marketing</td></tr>
+</tbody></table>
+
+<h4>Distribuzione Emissione Mensile</h4>
+
+<table>
+<thead><tr><th>Categoria</th><th>%</th></tr></thead>
+<tbody>
+<tr><td>🏊 Swim-to-Earn (attività)</td><td>45%</td></tr>
+<tr><td>🏆 Season Rewards</td><td>25%</td></tr>
+<tr><td>⚔️ Challenge Prizes</td><td>15%</td></tr>
+<tr><td>🤝 Referral + Social</td><td>10%</td></tr>
+<tr><td>🔧 Riserva team</td><td>5%</td></tr>
+</tbody></table>
+
+<div class="highlight-box">
+
+<strong>Deflazionario by design</strong>: I $SWIM spesi per Coach e mint vengono bruciati permanentemente. Questo crea scarsità naturale, premiando gli early adopter.
+
+</div>
+
+<div class="page-break"></div>
+
+<h1>3. Architettura Tecnica — Hybrid Off-chain / On-chain</h1>
+
+<h2>3.1 Approccio Ibrido</h2>
+
+<table>
+<thead><tr><th>Approccio</th><th>Pro</th><th>Contro</th></tr></thead>
+<tbody>
+<tr><td><strong>100% on-chain</strong></td><td>Trasparenza totale, vero ownership</td><td>Gas fees, UX complessa</td></tr>
+<tr><td><strong>100% off-chain</strong></td><td>UX semplice, zero gas</td><td>Non è vero Web3</td></tr>
+<tr><td><strong>✅ Ibrido</strong></td><td><strong>UX semplice + ownership reale</strong></td><td>Più complesso</td></tr>
+</tbody></table>
+
+<h3>Flusso Operativo</h3>
+
+<pre><code>📱 EARN FLOW
+<p>User → Sync Garmin → Validate(HR, pace) → DB: +22 $SWIM</p>
+
+<p>💰 SPEND FLOW (Coach)</p>
+<p>User → "Sblocca Coach" → DB: -50 $SWIM (burn) → AI Plan Generated ✅</p>
+
+<p>🎖️ MINT FLOW (NFT Badge)</p>
+<p>User → "Mint Badge" → DB: -20 $SWIM → Solana: Metaplex cNFT → Wallet ✅</p>
+
+<p>🌉 BRIDGE FLOW (opzionale)</p>
+<p>User → "Bridge 100 $SWIM" → DB: -100 off-chain → Solana: SPL Token mint</p>
+</code></pre>
+
+<h2>3.2 Blockchain: Solana</h2>
+
+<table>
+<thead><tr><th>Criterio</th><th>Solana (scelta)</th><th>Base L2</th><th>Polygon</th></tr></thead>
+<tbody>
+<tr><td><strong>Gas fees</strong></td><td>~$0.001</td><td>< $0.01</td><td>~$0.01</td></tr>
+<tr><td><strong>TPS</strong></td><td>~65.000</td><td>~1.000</td><td>~7.000</td></tr>
+<tr><td><strong>Finalità</strong></td><td>~400ms</td><td>~2s</td><td>~2s</td></tr>
+<tr><td><strong>Dev tools</strong></td><td>Anchor (Rust), Metaplex</td><td>Hardhat, Foundry</td><td>Simile</td></tr>
+<tr><td><strong>Mobile SDK</strong></td><td>✅ Solana Mobile Stack</td><td>🟡 Limitato</td><td>🟡 Limitato</td></tr>
+<tr><td><strong>NFT ecosystem</strong></td><td>✅ Metaplex (standard)</td><td>🟡 ERC-721</td><td>🟡 ERC-721</td></tr>
+<tr><td><strong>Token standard</strong></td><td>SPL Token-2022</td><td>ERC-20</td><td>ERC-20</td></tr>
+</tbody></table>
+
+<div class="highlight-box">
+
+<strong>Perché Solana?</strong> Gas quasi zero (~$0.001), finalità sub-secondo, miglior ecosistema NFT (Metaplex), Solana Wallet Adapter per multi-wallet senza lock-in.
+
+</div>
+
+<h2>3.3 Multi-Wallet Strategy</h2>
+
+<p>Utilizziamo il <strong>Solana Wallet Adapter</strong> (<code>@solana/wallet-adapter</code>) per supportare tutti i wallet principali:</p>
+
+<table>
+<thead><tr><th>Wallet</th><th>Tipo</th><th>Target Users</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td><strong>👻 Phantom</strong></td><td>Nativo Solana</td><td>Crypto-native, mobile-first</td><td>Wallet #1 su Solana</td></tr>
+<tr><td><strong>🦊 MetaMask (Snaps)</strong></td><td>Cross-chain</td><td>Utenti EVM esistenti</td><td>Via Solflare Snap</td></tr>
+<tr><td><strong>🎒 Backpack</strong></td><td>Nativo Solana</td><td>Power users, xNFT</td><td>Mini-app nel wallet</td></tr>
+<tr><td><strong>☀️ Solflare</strong></td><td>Nativo Solana</td><td>Desktop users</td><td>Buona UX desktop</td></tr>
+<tr><td><strong>🔒 Ledger</strong></td><td>Hardware</td><td>High-value holders</td><td>Massima sicurezza</td></tr>
+</tbody></table>
+
+<pre><code>┌─────────────────────────────────────────────┐
+<p>│         @solana/wallet-adapter-react         │</p>
+<p>│                                              │</p>
+<p>│  👻 Phantom ─────┐                          │</p>
+<p>│  🦊 MetaMask ────┤                          │</p>
+<p>│  🎒 Backpack ────┼──→  📱 SwimForge App    │</p>
+<p>│  ☀️ Solflare ────┤                          │</p>
+<p>│  🔒 Ledger ──────┘                          │</p>
+<p>└─────────────────────────────────────────────┘</p>
+</code></pre>
+
+<h2>3.4 Schema Database — Off-chain Ledger</h2>
+
+<pre><code>-- Bilancio token utente
+<p>CREATE TABLE swim_token_balances (</p>
+<p>id SERIAL PRIMARY KEY,</p>
+<p>user_id INTEGER NOT NULL UNIQUE,</p>
+<p>balance INTEGER NOT NULL DEFAULT 0,</p>
+<p>total_earned INTEGER NOT NULL DEFAULT 0,</p>
+<p>total_spent INTEGER NOT NULL DEFAULT 0,</p>
+<p>total_bridged INTEGER NOT NULL DEFAULT 0,</p>
+<p>updated_at TIMESTAMP DEFAULT NOW()</p>
+<p>);</p>
+
+<p>-- Log transazioni (append-only)</p>
+<p>CREATE TABLE swim_token_transactions (</p>
+<p>id SERIAL PRIMARY KEY,</p>
+<p>user_id INTEGER NOT NULL,</p>
+<p>amount INTEGER NOT NULL,</p>
+<p>tx_type TEXT NOT NULL,</p>
+<p>reference_id INTEGER,</p>
+<p>reference_type TEXT,</p>
+<p>description TEXT,</p>
+<p>balance_after INTEGER NOT NULL,</p>
+<p>created_at TIMESTAMP DEFAULT NOW()</p>
+<p>);</p>
+
+<p>-- Multi-wallet (un utente = N wallet)</p>
+<p>CREATE TABLE user_wallets (</p>
+<p>id SERIAL PRIMARY KEY,</p>
+<p>user_id INTEGER NOT NULL,</p>
+<p>wallet_address TEXT NOT NULL UNIQUE,</p>
+<p>wallet_provider TEXT NOT NULL,</p>
+<p>is_primary BOOLEAN DEFAULT false,</p>
+<p>label TEXT,</p>
+<p>created_at TIMESTAMP DEFAULT NOW()</p>
+<p>);</p>
+
+<p>-- NFT badge mintati</p>
+<p>CREATE TABLE minted_badges (</p>
+<p>id SERIAL PRIMARY KEY,</p>
+<p>user_id INTEGER NOT NULL,</p>
+<p>badge_definition_id INTEGER NOT NULL,</p>
+<p>mint_address TEXT,</p>
+<p>collection_address TEXT,</p>
+<p>tx_signature TEXT,</p>
+<p>minted_at TIMESTAMP DEFAULT NOW(),</p>
+<p>metadata_uri TEXT</p>
+<p>);</p>
+</code></pre>
+
+<h2>3.5 Solana Programs (Anchor)</h2>
+
+<table>
+<thead><tr><th>Programma</th><th>Standard</th><th>Funzione</th></tr></thead>
+<tbody>
+<tr><td><code>swim_token</code></td><td>SPL Token-2022</td><td>Token $SWIM con metadata on-chain</td></tr>
+<tr><td><code>swim_badge</code></td><td>Metaplex cNFT (Bubblegum)</td><td>Badge NFT compressi, costo < $0.0001</td></tr>
+<tr><td><code>swim_bridge</code></td><td>Custom Anchor</td><td>Bridge off-chain ↔ on-chain, PDA authority</td></tr>
+</tbody></table>
+
+<div class="highlight-box">
+
+<strong>Compressed NFTs (cNFT)</strong> via Metaplex Bubblegum: il costo mint scende da ~$0.01 a <strong>< $0.0001</strong> per badge. Fondamentale per scalare a migliaia di utenti.
+
+</div>
+
+<div class="page-break"></div>
+
+<h1>4. Architettura App — 4 Tab</h1>
+
+<table>
+<thead><tr><th>Tab</th><th>Contenuto</th><th>Web3 Integration</th></tr></thead>
+<tbody>
+<tr><td><strong>🏠 Social Home</strong></td><td>Feed, gruppi, notifiche</td><td>$SWIM guadagnati nel feed, earning toast</td></tr>
+<tr><td><strong>🏆 Season</strong></td><td>Obiettivi mensili, leaderboard</td><td>Token rewards, NFT badge Season</td></tr>
+<tr><td><strong>📍 Track</strong></td><td>Quick sync, 3 KPI</td><td>"+22 $SWIM" toast dopo sync</td></tr>
+<tr><td><strong>👤 Profilo</strong></td><td>Progressi, badge, wallet</td><td>Bilancio $SWIM, NFT gallery, bridge</td></tr>
+</tbody></table>
+
+<h2>4.1 Coach Premium — Swim-to-Unlock</h2>
+
+<pre><code>                    ┌─────────────────┐
+<p>│    Coach AI     │</p>
+<p>└────────┬────────┘</p>
+<p>│</p>
+<p>┌────────▼────────┐</p>
+<p>│ Utente ha $SWIM? │</p>
+<p>└───┬─────────┬───┘</p>
+<p>│         │</p>
+<p>≥50 $SWIM   &lt; 50 $SWIM</p>
+<p>│         │</p>
+<p>┌────────▼──┐  ┌───▼────────────┐</p>
+<p>│ 🔓 Piano   │  │ 🔒 "Nuota per  │</p>
+<p>│ personaliz.│  │  sbloccare!"   │</p>
+<p>│ (-50 burn) │  │ Mostra km      │</p>
+<p>└────────────┘  │ mancanti       │</p>
+<p>└───┬────────────┘</p>
+<p>│</p>
+<p>┌────────▼────────┐</p>
+<p>│ 5 piani base    │</p>
+<p>│ GRATUITI sempre  │</p>
+<p>└─────────────────┘</p>
+</code></pre>
+
+<table>
+<thead><tr><th>Feature Coach</th><th>Tipo</th><th>Costo</th></tr></thead>
+<tbody>
+<tr><td>5 piani template (tecnica, endurance, velocità, OW, recupero)</td><td>✅ Free</td><td>0</td></tr>
+<tr><td>CSS calcolato auto</td><td>✅ Free</td><td>0</td></tr>
+<tr><td>Log allenamenti passati</td><td>✅ Free</td><td>0</td></tr>
+<tr><td>Piano AI personalizzato su tuoi dati</td><td>💰 Premium</td><td>50 $SWIM</td></tr>
+<tr><td>Abbonamento settimanale Coach</td><td>💰 Premium</td><td>100 $SWIM</td></tr>
+<tr><td>Analisi SWOLF trend AI</td><td>💰 Premium</td><td>30 $SWIM</td></tr>
+<tr><td>Video analisi stroke (v2)</td><td>💰 Premium</td><td>80 $SWIM</td></tr>
+</tbody></table>
+
+<div class="page-break"></div>
+
+<h1>5. Flusso Utente — Swim-to-Earn Journey</h1>
+
+<h3>Onboarding</h3>
+
+<table>
+<thead><tr><th>Step</th><th>Azione</th><th>Chi</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Connetti Garmin/Strava</td><td>Utente</td></tr>
+<tr><td>2</td><td>Scegli tipo nuoto (pool/OW)</td><td>Utente</td></tr>
+<tr><td>3</td><td>Connetti wallet (opzionale)</td><td>Utente</td></tr>
+</tbody></table>
+
+<h3>Proiezione guadagno — Nuotatore 3×/settimana (2km avg)</h3>
+
+<table>
+<thead><tr><th>Settimana</th><th>Attività</th><th>$SWIM +</th><th>$SWIM −</th><th>Bilancio</th></tr></thead>
+<tbody>
+<tr><td><strong>Sett 1</strong></td><td>3 sync</td><td>42 + 20 (streak) = <strong>62</strong></td><td>0</td><td><strong>62</strong></td></tr>
+<tr><td><strong>Sett 2</strong></td><td>3 sync</td><td><strong>42</strong></td><td>50 (Coach)</td><td><strong>54</strong></td></tr>
+<tr><td><strong>Sett 3</strong></td><td>3 sync</td><td><strong>42</strong></td><td>0</td><td><strong>96</strong></td></tr>
+<tr><td><strong>Sett 4</strong></td><td>3 sync + Season ✅</td><td>42 + 50 = <strong>92</strong></td><td>20 (NFT) + 50 (Coach)</td><td><strong>118</strong></td></tr>
+<tr><td><strong>Mese 1</strong></td><td><strong>12 sessioni</strong></td><td><strong>~238</strong></td><td><strong>~120</strong></td><td><strong>~118</strong></td></tr>
+</tbody></table>
+
+<h3>Timeline mensile</h3>
+
+<pre><code>GG 1-7:   Sync × 3 → 42 $SWIM + 20 streak bonus = 62 $SWIM
+<p>GG 8-14:  Sync × 3 → 42 $SWIM, sblocca Coach (-50) = bilancio 54</p>
+<p>GG 15-21: Sync × 3 → 42 $SWIM, accumula = bilancio 96</p>
+<p>GG 22-30: Sync × 3 → 42 $SWIM + Season bonus (50)</p>
+<p>Mint badge Season NFT (-20), Coach piano (-50)</p>
+<p>════════════════════════════════════════════</p>
+<p>FINE MESE 1: bilancio ~118 $SWIM + 1 NFT Badge</p>
+</code></pre>
+
+<div class="page-break"></div>
+
+<h1>6. Anti-Cheat e Validazione</h1>
+
+<div class="danger-box">
+
+<strong>⚠️ CRITICO</strong>: L'anti-cheat è fondamentale in un modello swim-to-earn. Senza validazione, gli utenti potrebbero falsificare attività per guadagnare token.
+
+</div>
+
+<table>
+<thead><tr><th>Livello</th><th>Controllo</th><th>Implementazione</th></tr></thead>
+<tbody>
+<tr><td><strong>L1 — Base</strong></td><td>Source verification</td><td>Solo dati da Garmin/Strava API, no input manuale</td></tr>
+<tr><td><strong>L2 — Plausibilità</strong></td><td>Pace range check</td><td>Pool: 1:00-3:30/100m, OW: 1:20-4:00/100m</td></tr>
+<tr><td><strong>L3 — HR</strong></td><td>Heart rate correlation</td><td>HR deve correlare con pace dichiarata</td></tr>
+<tr><td><strong>L4 — Frequenza</strong></td><td>Max 3 earn/giorno</td><td>Oltre 3 sync → solo log, no $SWIM</td></tr>
+<tr><td><strong>L5 — ML</strong></td><td>Anomaly detection (futuro)</td><td>Pattern GPS, durata, anomalie statistiche</td></tr>
+</tbody></table>
+
+<h3>Regole di validazione</h3>
+
+<pre><code>IF source ≠ (Garmin | Strava)        → 0 $SWIM (L1)
+<p>IF pace &lt; 1:00/100m OR &gt; 3:30/100m  → 0 $SWIM (L2)</p>
+<p>IF HR_available AND HR &lt; 80bpm       → flag per review (L3)</p>
+<p>IF daily_earn_count ≥ 3             → log only, no earn (L4)</p>
+</code></pre>
+
+<div class="page-break"></div>
+
+<h1>7. Roadmap Implementazione</h1>
+
+<h2>Fase 1: Social Foundations (2-3 settimane)</h2>
+
+<table>
+<thead><tr><th>#</th><th>Task</th><th>💪</th></tr></thead>
+<tbody>
+<tr><td>1.1</td><td>Ridurre MobileNav da 6 a 4 tab</td><td>🟢</td></tr>
+<tr><td>1.2</td><td>Community → Social Home con filtri feed</td><td>🟠</td></tr>
+<tr><td>1.3</td><td>Card feed con mini-mappa e 3 KPI</td><td>🟠</td></tr>
+<tr><td>1.4</td><td>Swipe gruppi locali</td><td>🟠</td></tr>
+<tr><td>1.5</td><td>Redirect dashboard → Social Home</td><td>🟢</td></tr>
+<tr><td>1.6</td><td>Tab Track (quick sync + KPI compatte)</td><td>🟠</td></tr>
+</tbody></table>
+
+<h2>Fase 2: Season v2 + Token Earn (3 settimane)</h2>
+
+<table>
+<thead><tr><th>#</th><th>Task</th><th>💪</th></tr></thead>
+<tbody>
+<tr><td>2.1</td><td>Schema DB <code>swim_token_balances</code> + <code>swim_token_transactions</code></td><td>🟠</td></tr>
+<tr><td>2.2</td><td><strong>Token Engine</strong> — logica earn per attività sync</td><td>🔴</td></tr>
+<tr><td>2.3</td><td>Anti-cheat L1-L4 (source, pace, HR, cap)</td><td>🟠</td></tr>
+<tr><td>2.4</td><td>Season obiettivi multi-livello con $SWIM rewards</td><td>🟠</td></tr>
+<tr><td>2.5</td><td>Reset mensile automatico + pre-lancio 3gg</td><td>🟠</td></tr>
+<tr><td>2.6</td><td>Streak counter + bonus $SWIM</td><td>🟠</td></tr>
+<tr><td>2.7</td><td>UI bilancio $SWIM nel header/profilo + earning toasts</td><td>🟠</td></tr>
+<tr><td>2.8</td><td>Leaderboard Season filtrata (età/tipo/città)</td><td>🟠</td></tr>
+</tbody></table>
+
+<h2>Fase 3: Coach Swim-to-Unlock (2-3 settimane)</h2>
+
+<table>
+<thead><tr><th>#</th><th>Task</th><th>💪</th></tr></thead>
+<tbody>
+<tr><td>3.1</td><td>5 piani Coach gratuiti (template statici)</td><td>🟢</td></tr>
+<tr><td>3.2</td><td><strong>Paywall $SWIM</strong> per Coach AI premium</td><td>🟠</td></tr>
+<tr><td>3.3</td><td>Middleware <code>requireSwimTokens(amount)</code> su endpoint Coach</td><td>🟠</td></tr>
+<tr><td>3.4</td><td>UI "Sblocca con $SWIM" / "Nuota X km per sbloccare"</td><td>🟠</td></tr>
+<tr><td>3.5</td><td>Storico transazioni $SWIM nel profilo</td><td>🟢</td></tr>
+<tr><td>3.6</td><td>Referral system (+50 invitante, +25 invitato)</td><td>🟠</td></tr>
+</tbody></table>
+
+<h2>Fase 4: NFT Badge + On-chain Bridge — Solana (3-4 settimane)</h2>
+
+<table>
+<thead><tr><th>#</th><th>Task</th><th>💪</th></tr></thead>
+<tbody>
+<tr><td>4.1</td><td>Anchor program <code>swim_badge</code> (Metaplex cNFT Bubblegum)</td><td>🔴</td></tr>
+<tr><td>4.2</td><td>Anchor program <code>swim_token</code> (SPL Token-2022)</td><td>🔴</td></tr>
+<tr><td>4.3</td><td><strong>Multi-wallet adapter</strong> (Phantom, MetaMask, Backpack, Solflare, Ledger)</td><td>🔴</td></tr>
+<tr><td>4.4</td><td>Wallet management UI (connetti, disconnetti, primary, label)</td><td>🟠</td></tr>
+<tr><td>4.5</td><td>Mint badge cNFT dalla Season/Challenge</td><td>🟠</td></tr>
+<tr><td>4.6</td><td>Bridge $SWIM off-chain → on-chain (SPL mint con PDA)</td><td>🟠</td></tr>
+<tr><td>4.7</td><td>NFT gallery nel profilo (Helius DAS API)</td><td>🟠</td></tr>
+<tr><td>4.8</td><td>Metadata Arweave/IPFS per badge (Metaplex standard)</td><td>🟠</td></tr>
+</tbody></table>
+
+<h2>Fase 5: Onboarding + Polish (1-2 settimane)</h2>
+
+<table>
+<thead><tr><th>#</th><th>Task</th><th>💪</th></tr></thead>
+<tbody>
+<tr><td>5.1</td><td>Onboarding 3-step (connect, tipo, wallet opzionale)</td><td>🟠</td></tr>
+<tr><td>5.2</td><td>Push notifications (Web Push) + limiti smart</td><td>🔴</td></tr>
+<tr><td>5.3</td><td>Auto-post dopo sync nel feed</td><td>🟠</td></tr>
+<tr><td>5.4</td><td>Fix P0 sicurezza (token encryption, FK, indici)</td><td>🔴</td></tr>
+<tr><td>5.5</td><td>Test E2E completo (incl. multi-wallet)</td><td>🟠</td></tr>
+</tbody></table>
+
+<h2>Stima Tempi</h2>
+
+<table>
+<thead><tr><th>Fase</th><th>Durata</th><th>Dipendenze</th></tr></thead>
+<tbody>
+<tr><td><strong>Fase 1</strong> — Social Foundations</td><td>2-3 sett</td><td>—</td></tr>
+<tr><td><strong>Fase 2</strong> — Season + Token Earn</td><td>3 sett</td><td>Fase 1</td></tr>
+<tr><td><strong>Fase 3</strong> — Coach Swim-to-Unlock</td><td>2-3 sett</td><td>Fase 2</td></tr>
+<tr><td><strong>Fase 4</strong> — NFT + On-chain Solana</td><td>3-4 sett</td><td>Fasi 2-3</td></tr>
+<tr><td><strong>Fase 5</strong> — Polish + Lancio</td><td>1-2 sett</td><td>Fasi 1-4</td></tr>
+<tr><td><strong>Totale</strong></td><td><strong>11-15 settimane</strong></td><td>—</td></tr>
+</tbody></table>
+
+<div class="highlight-box">
+
+<strong>Le Fasi 1-3 funzionano senza blockchain</strong> (tutto off-chain). La Fase 4 aggiunge Solana come upgrade. Lancio anticipato "Web2.5" possibile.
+
+</div>
+
+<div class="page-break"></div>
+
+<h1>8. Confronto: Stripe vs Web3</h1>
+
+<table>
+<thead><tr><th>Aspetto</th><th>❌ Stripe</th><th>✅ Web3 $SWIM</th></tr></thead>
+<tbody>
+<tr><td><strong>Barriera ingresso</strong></td><td>Carta di credito</td><td>Zero — guadagni nuotando</td></tr>
+<tr><td><strong>Motivazione</strong></td><td>Pagamento passivo</td><td>Gamification + earning attivo</td></tr>
+<tr><td><strong>Retention</strong></td><td>Churn se non usa Coach</td><td>Deve nuotare = retention naturale</td></tr>
+<tr><td><strong>Viralità</strong></td><td>Bassa</td><td>Referral token + NFT condivisibili</td></tr>
+<tr><td><strong>Revenue model</strong></td><td>Subscription</td><td>Token economy + valore NFT</td></tr>
+<tr><td><strong>Complessità dev</strong></td><td>Media (SDK)</td><td>Alta (Anchor + bridge)</td></tr>
+<tr><td><strong>Costi operativi</strong></td><td>2.9% + €0.25/tx</td><td>< $0.001/tx (gas Solana)</td></tr>
+<tr><td><strong>Regulatory</strong></td><td>PCI-DSS</td><td>Utility token</td></tr>
+</tbody></table>
+
+<div class="page-break"></div>
+
+<h1>9. Decision Points</h1>
+
+<div class="warning-box">
+
+<strong>Decisioni da prendere prima dell'implementazione:</strong>
+
+</div>
+
+<table>
+<thead><tr><th>#</th><th>Decisione</th><th>Opzioni</th><th>Default proposto</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><strong>Token naming</strong></td><td>$SWIM, $FORGE, $LANE, $LAP</td><td>$SWIM</td></tr>
+<tr><td>2</td><td><strong>Earn rates</strong></td><td>10 base + 2/km</td><td>Da validare con utenti 3×/sett</td></tr>
+<tr><td>3</td><td><strong>Coach cost</strong></td><td>50 $SWIM (~2.5 sessioni)</td><td>Equilibrato</td></tr>
+<tr><td>4</td><td><strong>On-chain subito?</strong></td><td>Web2.5 prima, Solana dopo</td><td>Fasi 1-3 first</td></tr>
+<tr><td>5</td><td><strong>NFT tradabili?</strong></td><td>Tradabili vs Soulbound (cNFT)</td><td>Tradabili</td></tr>
+<tr><td>6</td><td><strong>Blockchain</strong></td><td><del>Base L2</del> → ✅ <strong>Solana</strong></td><td>✅ Confermato</td></tr>
+<tr><td>7</td><td><strong>Solana cluster</strong></td><td>Devnet → Mainnet-Beta</td><td>Standard flow</td></tr>
+<tr><td>8</td><td><strong>cNFT vs standard</strong></td><td>Compressed vs full NFT</td><td>cNFT frequenti, full rari</td></tr>
+</tbody></table>
+
+<hr>
+
+<div style="text-align: center; margin-top: 40px; color: #555; font-size: 9pt;">
+
+<strong>SwimForge</strong> — Social First + Web3 Token Economy<br>
+<p>Documento generato il 14 Febbraio 2026<br></p>
+<p>Versione 2.0 — Solana + Multi-Wallet<br></p>
+<p>Confidential</p>
+
+</div>
+
+</body>
+</html>

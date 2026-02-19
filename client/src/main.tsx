@@ -1,5 +1,5 @@
 import { trpc } from "@/lib/trpc";
-import { UNAUTHED_ERR_MSG } from '@shared/const';
+import { CSRF_COOKIE_NAME, UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
@@ -43,8 +43,21 @@ const trpcClient = trpc.createClient({
       url: "/api/trpc",
       transformer: superjson,
       fetch(input, init) {
+        const csrfToken = typeof document === "undefined"
+          ? null
+          : document.cookie
+              .split(";")
+              .map((entry) => entry.trim())
+              .find((entry) => entry.startsWith(`${CSRF_COOKIE_NAME}=`))
+              ?.slice(CSRF_COOKIE_NAME.length + 1) ?? null;
+
+        const headers = new Headers(init?.headers ?? {});
+        if (csrfToken) {
+          headers.set("x-csrf-token", decodeURIComponent(csrfToken));
+        }
         return globalThis.fetch(input, {
           ...(init ?? {}),
+          headers,
           credentials: "include",
         });
       },

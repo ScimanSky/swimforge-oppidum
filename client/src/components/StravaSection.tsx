@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { trpc } from "../lib/trpc";
-import { Card, CardContent } from "./ui/card";
+import { Surface, SurfaceContent } from "./ui/surface";
 import { Button } from "./ui/button";
 import { Activity, CheckCircle, XCircle, Loader2, RefreshCw, Unlink } from "lucide-react";
 import { toast } from "sonner";
@@ -36,7 +36,7 @@ export function StravaSection() {
         utils.profile.get.invalidate();
         utils.strava.status.invalidate();
       } else {
-        toast.error(data.error || "Errore nella sincronizzazione");
+        toast.error(data.message || "Errore nella sincronizzazione");
       }
     },
     onError: (error) => {
@@ -74,8 +74,8 @@ export function StravaSection() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.5 }}
     >
-      <Card>
-        <CardContent className="p-4">
+      <Surface>
+        <SurfaceContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
@@ -144,8 +144,8 @@ export function StravaSection() {
               )}
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </SurfaceContent>
+      </Surface>
     </motion.div>
   );
 }

@@ -1,563 +1,1047 @@
-import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Link } from "wouter";
-import { motion } from "framer-motion";
+"use client"
+
+import AppLayout from "@/components/AppLayout"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { MetricOrb } from "@/components/metrics/MetricOrb"
+import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { AIChatBox, type Message as ChatMessage } from "@/components/AIChatBox"
+import { trpc } from "@/lib/trpc"
+import { toast } from "sonner"
 import {
-  ChevronLeft,
-  Activity,
   Brain,
-  Waves,
-  Timer,
-  TrendingUp,
-  AlertCircle,
-  CheckCircle2,
-  Zap,
-  RefreshCw,
-} from "lucide-react";
-import { trpc } from "../lib/trpc";
-import MobileNav from "@/components/MobileNav";
-import { AppLayout } from "@/components/AppLayout";
-import { useAuth } from "@/_core/hooks/useAuth";
+  Sparkles,
+  Target,
+  HeartPulse,
+  Activity,
+  AlertTriangle,
+} from "lucide-react"
+import { useLocation } from "wouter"
+
+
 
 type WorkoutSection = {
-  title: string;
-  exercises: WorkoutExercise[];
-  notes?: string;
-};
+  title: string
+  exercises: WorkoutExercise[]
+  notes?: string
+}
 
 type WorkoutExercise = {
-  name: string;
-  sets?: string;
-  reps?: string;
-  distance?: string;
-  duration?: string;
-  rest?: string;
-  intensity?: string;
-  equipment?: string;
-  notes?: string;
-};
+  name: string
+  sets?: string
+  reps?: string
+  distance?: string
+  duration?: string
+  rest?: string
+  intensity?: string
+  equipment?: string
+  notes?: string
+}
 
 type GeneratedWorkout = {
-  type: "pool" | "dryland";
-  title: string;
-  description: string;
-  duration: string;
-  difficulty: string;
-  sections: WorkoutSection[];
-  coachNotes: string[];
-};
+  type: "pool" | "dryland"
+  title: string
+  description: string
+  duration: string
+  difficulty: string
+  sections: WorkoutSection[]
+  coachNotes: string[]
+}
 
-type InsightItem = {
-  type: "warning" | "success" | "info";
-  title: string;
-  message: string;
-  metric: string;
-};
+const formatDistance = (meters?: number | null) => {
+  if (!meters) return null
+  if (meters >= 1000) return `${(meters / 1000).toFixed(1)} km`
+  return `${meters} m`
+}
+
+const formatTime = (seconds?: number | null) => {
+  if (!seconds) return null
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = seconds % 60
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
+      .toString()
+      .padStart(2, "0")}`
+  }
+  return `${minutes}:${secs.toString().padStart(2, "0")}`
+}
+
+const formatDate = (date?: string | null) => {
+  if (!date) return null
+  return new Date(date).toLocaleDateString("it-IT", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+const getExerciseDetails = (exercise: WorkoutExercise) =>
+  [
+    exercise.sets && `Serie: ${exercise.sets}`,
+    exercise.reps && `Rip: ${exercise.reps}`,
+    exercise.distance && `Distanza: ${exercise.distance}`,
+    exercise.duration && `Durata: ${exercise.duration}`,
+    exercise.rest && `Ripartenza: ${exercise.rest}`,
+    exercise.intensity && `Intensità: ${exercise.intensity}`,
+    exercise.equipment && `Attrezzi: ${exercise.equipment}`,
+  ].filter(Boolean) as string[]
+
+const getConditionLabel = (value?: number | null) => {
+  if (value === null || value === undefined) return "N/D"
+  if (value >= 75) return "Ottima"
+  if (value >= 55) return "Buona"
+  if (value >= 35) return "Da gestire"
+  return "Critica"
+}
+
+const getFocusLabel = (
+  performance?: number,
+  consistency?: number,
+  recovery?: number | null,
+  efficiency?: number | null
+) => {
+  const candidates = [
+    { label: "Performance", value: performance },
+    { label: "Costanza", value: consistency },
+    { label: "Recupero", value: recovery },
+    { label: "Efficienza", value: efficiency },
+  ].filter((item) => item.value !== null && item.value !== undefined)
+
+  if (!candidates.length) return "Analisi in corso"
+  candidates.sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
+  return candidates[0].label
+}
+
+const CHAT_STORAGE_KEY = "coach_chat_history_v1"
+const CHAT_GOAL_STORAGE_KEY = "coach_chat_goal_v1"
+const CHAT_CONSTRAINTS_STORAGE_KEY = "coach_chat_constraints_v1"
+const CHAT_MAX_MESSAGE_CHARS = 2000
+const CHAT_MAX_HISTORY = 20
+
+const clampChatContent = (value: string) => {
+  const normalized = value.trim()
+  if (normalized.length <= CHAT_MAX_MESSAGE_CHARS) return normalized
+  return `${normalized.slice(0, CHAT_MAX_MESSAGE_CHARS - 1).trimEnd()}…`
+}
+
+const sanitizeChatMessages = (messages: ChatMessage[]): ChatMessage[] =>
+  messages
+    .map((item): ChatMessage => ({
+      role: item.role === "assistant" ? "assistant" : "user",
+      content: clampChatContent(String(item.content ?? "")),
+    }))
+    .filter((item) => item.content.length > 0)
+    .slice(-CHAT_MAX_HISTORY)
 
 export default function Coach() {
-  const [poolRegenerate, setPoolRegenerate] = useState(false);
-  const [insightsRefreshing, setInsightsRefreshing] = useState(false);
-  const [showSkillModal, setShowSkillModal] = useState(false);
+  const [location] = useLocation()
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatGoal, setChatGoal] = useState("")
+  const [chatConstraints, setChatConstraints] = useState("")
+  const [chatProvider, setChatProvider] = useState<"forge" | "gemini" | "rule_based" | null>(null)
+  const fallbackToastShownRef = useRef(false)
+  const [activeTab, setActiveTab] = useState<"insights" | "workouts" | "session-iq" | "chat">("insights")
+  const [activeInsightIndex, setActiveInsightIndex] = useState(0)
+  const [activePoolSectionIndex, setActivePoolSectionIndex] = useState(0)
+  const [activeDrySectionIndex, setActiveDrySectionIndex] = useState(0)
+  const [activeWorkout, setActiveWorkout] = useState<"pool" | "dryland">("pool")
+  const [isGenerating, setIsGenerating] = useState(false)
 
-  const poolWorkoutQuery = trpc.aiCoach.getPoolWorkout.useQuery(
-    { forceRegenerate: poolRegenerate },
-    {
-      staleTime: poolRegenerate ? 0 : 1000 * 60 * 60 * 24,
-    }
-  );
-  const { user } = useAuth();
-  const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 60 * 1000 });
-  const pendingSessionInsights = trpc.activityInsights.pending.useQuery(
-    { limit: 3 },
-    { staleTime: 60 * 1000 }
-  );
-
-  const advancedQuery = trpc.statistics.getAdvanced.useQuery(
+  const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
-    { staleTime: 24 * 60 * 60 * 1000 }
-  );
-  const timelineQuery = trpc.statistics.getTimeline.useQuery(
-    { days: 14 },
-    { staleTime: 5 * 60 * 1000 }
-  );
-  const advanced = advancedQuery.data;
-  const timeline = timelineQuery.data;
-  const { data: garminStatus } = trpc.garmin.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
-  const { data: stravaStatus } = trpc.strava.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
+    { staleTime: 24 * 60 * 60 * 1000, refetchOnWindowFocus: false }
+  )
 
-  const poolWorkout = poolWorkoutQuery.data as GeneratedWorkout | undefined;
-  const profile = profileQuery.data as any;
+  // Read-only: fetch existing workouts (no generation)
+  const workoutsQuery = trpc.aiCoach.getWorkouts.useQuery(undefined, {
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  })
+
+  const utils = trpc.useUtils()
+
+  const generateMutation = trpc.aiCoach.generateWorkouts.useMutation()
+  const chatMutation = trpc.aiCoach.chat.useMutation()
+
+  const handleGenerate = async () => {
+    setIsGenerating(true)
+    try {
+      const result = await generateMutation.mutateAsync()
+      // Immediately update the query cache with the mutation result
+      utils.aiCoach.getWorkouts.setData(undefined, result)
+      // Also refetch to ensure consistency
+      await utils.aiCoach.getWorkouts.refetch()
+    } catch (error) {
+      console.error("Generation failed:", error)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const workoutsData = workoutsQuery.data
+  const poolWorkout = workoutsData?.pool as GeneratedWorkout | undefined
+  const drylandWorkout = workoutsData?.dryland as GeneratedWorkout | undefined
+  const canGenerate = workoutsData?.canGenerate ?? true
+
+  const cooldownLabel = useMemo(() => {
+    if (canGenerate) return null
+    if (!workoutsData?.nextAvailableAt) return null
+    const next = new Date(workoutsData.nextAvailableAt)
+    const now = new Date()
+    const diffMs = next.getTime() - now.getTime()
+    if (diffMs <= 0) return null
+    const days = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+    if (days === 1) return "Disponibile domani"
+    return `Disponibile tra ${days} giorni`
+  }, [canGenerate, workoutsData?.nextAvailableAt])
+
+  const generatedAtLabel = useMemo(() => {
+    if (!workoutsData?.generatedAt) return null
+    return formatDate(workoutsData.generatedAt)
+  }, [workoutsData?.generatedAt])
+
+  const suggestedChatPrompts = useMemo(
+    () => [
+      "Come imposto la prossima seduta in base al mio recupero?",
+      "Guardando i miei dati, cosa devo migliorare prima?",
+      "Mi prepari 2 obiettivi concreti per questa settimana?",
+      `Che lavoro faccio per alzare il mio ${getFocusLabel(
+        advanced?.performanceIndex,
+        advanced?.consistencyScore,
+        advanced?.recoveryReadinessScore,
+        advanced?.swimmingEfficiencyIndex
+      )}?`,
+    ],
+    [advanced]
+  )
+
+  const sessionInsightsQuery = trpc.activityInsights.list.useQuery(
+    { limit: 50, offset: 0 },
+    { staleTime: 60 * 1000 }
+  )
+
+  const insightCards = useMemo(() => {
+    const insights = advanced?.insights ?? []
+    if (!insights.length) return []
+    return insights.map((text, index) => {
+      const metricMatch = text.match(/(-?\d+(?:\.\d+)?%?)/)
+      return {
+        title: `Insight ${index + 1}`,
+        description: text.replace(/\*\*/g, ""),
+        metric: metricMatch?.[1] ?? null,
+      }
+    })
+  }, [advanced?.insights])
+
+  const safeInsightIndex = insightCards.length
+    ? Math.min(activeInsightIndex, insightCards.length - 1)
+    : 0
+  const activeInsight = insightCards[safeInsightIndex]
+
+  const keyMetricCards = useMemo(() => {
+    const performance = advanced?.performanceIndex ?? 0
+    const consistency = advanced?.consistencyScore ?? 0
+    const recovery = advanced?.recoveryReadinessScore ?? null
+    const streakCurrent = advanced?.streak?.current ?? 0
+    const streakRecord = advanced?.streak?.record ?? 0
+
+    return [
+      {
+        title: "Performance",
+        value: `${Math.round(performance)}`,
+        helper: `${Math.round(performance)}%`,
+      },
+      {
+        title: "Consistency",
+        value: `${Math.round(consistency)}`,
+        helper: `${Math.round(consistency)}%`,
+      },
+      {
+        title: "Recovery",
+        value:
+          recovery === null || recovery === undefined
+            ? "—"
+            : `${Math.round(recovery)}`,
+        helper:
+          recovery === null || recovery === undefined
+            ? "N/D"
+            : `${Math.round(recovery)}%`,
+      },
+      {
+        title: "Streak",
+        value: `${streakCurrent}`,
+        helper: `Record ${streakRecord}`,
+      },
+    ]
+  }, [advanced])
+
+  const advancedMetrics = useMemo(() => {
+    const metrics = [
+      { key: "SEI", value: advanced?.swimmingEfficiencyIndex },
+      { key: "TCI", value: advanced?.technicalConsistencyIndex },
+      { key: "SER", value: advanced?.strokeEfficiencyRating },
+      { key: "ACS", value: advanced?.aerobicCapacityScore },
+      { key: "RRS", value: advanced?.recoveryReadinessScore },
+      { key: "POI", value: advanced?.progressiveOverloadIndex },
+    ]
+    return metrics.map((metric) => ({
+      ...metric,
+      display:
+        metric.value === null || metric.value === undefined
+          ? "—"
+          : Math.round(metric.value),
+    }))
+  }, [advanced])
+
+  const sessionEntries = useMemo(() => {
+    const data = sessionInsightsQuery.data ?? []
+    const normalizeDate = (value: any) => {
+      if (!value) return null
+      if (value instanceof Date) return value
+      if (typeof value === "string") {
+        const normalized = value.includes("T") ? value : value.replace(" ", "T")
+        const date = new Date(normalized)
+        return Number.isNaN(date.getTime()) ? null : date
+      }
+      return null
+    }
+    return [...data]
+      .map((item: any) => {
+        const date =
+          normalizeDate(item.activity_date) ||
+          normalizeDate(item.activityDate) ||
+          normalizeDate(item.generated_at) ||
+          normalizeDate(item.generatedAt)
+        return {
+          ...item,
+          _date: date,
+          _sort: date ? date.getTime() : 0,
+        }
+      })
+      .sort((a, b) => b._sort - a._sort)
+  }, [sessionInsightsQuery.data])
+
+  const latestSessionInsight = sessionEntries[0] ?? null
+
+  const parseBullets = (value: any) => {
+    if (!value) return []
+    if (Array.isArray(value)) return value
+    try {
+      return JSON.parse(value ?? "[]")
+    } catch {
+      return []
+    }
+  }
+
+  const parsedSessionBullets = useMemo(() => {
+    if (!latestSessionInsight) return []
+    return parseBullets(latestSessionInsight.bullets)
+  }, [latestSessionInsight])
+
+  const activePoolSection = useMemo(() => {
+    const sections = poolWorkout?.sections ?? []
+    if (!sections.length) return null
+    const idx = Math.min(activePoolSectionIndex, sections.length - 1)
+    return sections[idx]
+  }, [poolWorkout?.sections, activePoolSectionIndex])
+
+  const activeDrySection = useMemo(() => {
+    const sections = drylandWorkout?.sections ?? []
+    if (!sections.length) return null
+    const idx = Math.min(activeDrySectionIndex, sections.length - 1)
+    return sections[idx]
+  }, [drylandWorkout?.sections, activeDrySectionIndex])
 
   useEffect(() => {
-    if (!profile || !user) return;
-    if (!profile.aiSkillLastEvaluatedAt) return;
-    const change = profile.aiSkillChange;
-    if (!change || change === "unchanged") return;
-    const key = `aiSkillSeen:${user.id}:${profile.aiSkillLastEvaluatedAt}`;
-    if (localStorage.getItem(key)) return;
-    setShowSkillModal(true);
-  }, [profile, user]);
+    setActivePoolSectionIndex(0)
+  }, [poolWorkout?.sections?.length])
 
-  const lastSyncDate = useMemo(() => {
-    const garmin = garminStatus?.lastSync ? new Date(garminStatus.lastSync) : null;
-    const strava = stravaStatus?.lastSync ? new Date(stravaStatus.lastSync) : null;
-    if (!garmin && !strava) return null;
-    if (garmin && strava) return garmin > strava ? garmin : strava;
-    return garmin || strava;
-  }, [garminStatus?.lastSync, stravaStatus?.lastSync]);
+  useEffect(() => {
+    setActiveDrySectionIndex(0)
+  }, [drylandWorkout?.sections?.length])
 
-  const focusLabel = useMemo(() => {
-    if (!advanced) return "Equilibrio";
-    if (advanced.progressiveOverloadIndex !== null && advanced.progressiveOverloadIndex > 15) return "Potenza";
-    if (advanced.aerobicCapacityScore !== null && advanced.aerobicCapacityScore < 55) return "Resistenza";
-    if (advanced.technicalConsistencyIndex !== null && advanced.technicalConsistencyIndex < 60) return "Tecnica";
-    if (advanced.strokeEfficiencyRating !== null && advanced.strokeEfficiencyRating < 60) return "Efficienza";
-    return "Equilibrio";
-  }, [advanced]);
+  const focusLabel = useMemo(
+    () =>
+      getFocusLabel(
+        advanced?.performanceIndex,
+        advanced?.consistencyScore,
+        advanced?.recoveryReadinessScore,
+        advanced?.swimmingEfficiencyIndex
+      ),
+    [advanced]
+  )
 
-  const conditionLabel = useMemo(() => {
-    const rrs = advanced?.recoveryReadinessScore;
-    if (rrs === null || rrs === undefined) return "—";
-    if (rrs >= 70) return "Ottima";
-    if (rrs >= 50) return "Buona";
-    return "Recupero";
-  }, [advanced?.recoveryReadinessScore]);
+  const conditionLabel = useMemo(
+    () => getConditionLabel(advanced?.recoveryReadinessScore),
+    [advanced?.recoveryReadinessScore]
+  )
 
-  const conditionClass = conditionLabel === "Ottima"
-    ? "text-cyan-200"
-    : conditionLabel === "Buona"
-    ? "text-amber-300"
-    : "text-rose-300";
+  const lastSyncLabel = useMemo(() => {
+    if (!latestSessionInsight?.activity_date) return "—"
+    return formatDate(latestSessionInsight.activity_date) ?? "—"
+  }, [latestSessionInsight])
 
-  const insights = useMemo<InsightItem[]>(() => {
-    const raw = advanced?.insights ?? [];
-    if (!raw.length) return [];
-    const metrics = [
-      advanced?.technicalConsistencyIndex !== null && advanced?.technicalConsistencyIndex !== undefined
-        ? `TCI ${Math.round(advanced.technicalConsistencyIndex)}`
-        : undefined,
-      advanced?.swimmingEfficiencyIndex !== null && advanced?.swimmingEfficiencyIndex !== undefined
-        ? `SEI ${Math.round(advanced.swimmingEfficiencyIndex)}`
-        : undefined,
-      advanced?.recoveryReadinessScore !== null && advanced?.recoveryReadinessScore !== undefined
-        ? `RRS ${Math.round(advanced.recoveryReadinessScore)}`
-        : undefined,
-      advanced?.strokeEfficiencyRating !== null && advanced?.strokeEfficiencyRating !== undefined
-        ? `SER ${Math.round(advanced.strokeEfficiencyRating)}`
-        : undefined,
-    ].filter(Boolean) as string[];
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const params = new URLSearchParams(window.location.search)
+    const tab = params.get("tab")
+    const workout = params.get("workout")
+    if (tab === "insights" || tab === "workouts" || tab === "session-iq" || tab === "chat") {
+      setActiveTab(tab)
+    } else {
+      setActiveTab("insights")
+    }
 
-    return raw.slice(0, 3).map((message, idx) => {
-      const type = idx === 0 ? "warning" : idx === 1 ? "success" : "info";
-      const title = idx === 0 ? "Punto di attenzione" : idx === 1 ? "Punto di forza" : "Nota coach";
-      return {
-        type,
-        title,
-        message,
-        metric: metrics[idx] ?? "—",
-      };
-    });
-  }, [advanced]);
+    if (workout === "pool" || workout === "dryland") {
+      setActiveWorkout(workout)
+    }
+  }, [location])
 
-  const handleRegeneratePool = async () => {
-    setPoolRegenerate(true);
+  useEffect(() => {
+    if (typeof window === "undefined") return
     try {
-      await poolWorkoutQuery.refetch();
-    } finally {
-      setPoolRegenerate(false);
+      const raw = window.localStorage.getItem(CHAT_STORAGE_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return
+      const safeMessages: ChatMessage[] = parsed
+        .filter((item) =>
+          item &&
+          typeof item === "object" &&
+          (item.role === "user" || item.role === "assistant") &&
+          typeof item.content === "string"
+        )
+        .map((item): ChatMessage => ({
+          role: item.role === "assistant" ? "assistant" : "user",
+          content: clampChatContent(item.content as string),
+        }))
+        .filter((item) => item.content.length > 0)
+        .slice(-CHAT_MAX_HISTORY)
+      if (safeMessages.length > 0) {
+        setChatMessages(safeMessages)
+      }
+    } catch {
+      // Ignore corrupted local chat storage
     }
-  };
+    const storedGoal = window.localStorage.getItem(CHAT_GOAL_STORAGE_KEY)
+    const storedConstraints = window.localStorage.getItem(CHAT_CONSTRAINTS_STORAGE_KEY)
+    if (storedGoal) setChatGoal(storedGoal)
+    if (storedConstraints) setChatConstraints(storedConstraints)
+  }, [])
 
-  const handleRefreshInsights = async () => {
-    setInsightsRefreshing(true);
+  useEffect(() => {
+    if (typeof window === "undefined") return
     try {
-      await Promise.all([advancedQuery.refetch(), timelineQuery.refetch()]);
-    } finally {
-      setInsightsRefreshing(false);
+      window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(sanitizeChatMessages(chatMessages)))
+    } catch {
+      // Best-effort persistence
     }
-  };
+  }, [chatMessages])
 
-  const formatSectionTitle = (title: string) =>
-    title
-      .replace(/_/g, " ")
-      .toLowerCase()
-      .replace(/(^|\s)\S/g, (char) => char.toUpperCase());
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(CHAT_GOAL_STORAGE_KEY, chatGoal)
+  }, [chatGoal])
 
-  const getSectionPillClass = (title: string) => {
-    const key = title.toLowerCase();
-    if (key.includes("warm") || key.includes("riscald")) {
-      return "bg-[var(--gold)]/15 text-[var(--gold)] border border-[var(--gold)]/40";
-    }
-    if (key.includes("main") || key.includes("principale")) {
-      return "bg-cyan-500/15 text-cyan-200 border border-cyan-400/40";
-    }
-    if (key.includes("drill") || key.includes("tecnica") || key.includes("attivazione")) {
-      return "bg-purple-500/15 text-purple-200 border border-purple-400/40";
-    }
-    if (key.includes("cool") || key.includes("defatic")) {
-      return "bg-sky-500/15 text-sky-200 border border-sky-400/40";
-    }
-    return "bg-white/10 text-white/70 border border-white/10";
-  };
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    window.localStorage.setItem(CHAT_CONSTRAINTS_STORAGE_KEY, chatConstraints)
+  }, [chatConstraints])
 
-  const getExerciseDetails = (exercise: WorkoutExercise) =>
-    [
-      exercise.sets && `Serie: ${exercise.sets}`,
-      exercise.reps && `Rip: ${exercise.reps}`,
-      exercise.distance && `Distanza: ${exercise.distance}`,
-      exercise.duration && `Durata: ${exercise.duration}`,
-      exercise.rest && `Ripartenza: ${exercise.rest}`,
-      exercise.intensity && `Intensità: ${exercise.intensity}`,
-      exercise.equipment && `Attrezzi: ${exercise.equipment}`,
-    ].filter(Boolean) as string[];
+  const handleSendChatMessage = async (content: string) => {
+    if (chatMutation.isPending) return
+
+    const originalTrimmed = content.trim()
+    const normalizedUserContent = clampChatContent(originalTrimmed)
+    if (!normalizedUserContent) return
+    if (originalTrimmed.length > CHAT_MAX_MESSAGE_CHARS) {
+      toast.info("Messaggio troppo lungo: inviati i primi 2000 caratteri.")
+    }
+
+    const userMessage: ChatMessage = { role: "user", content: normalizedUserContent }
+    const nextMessages = sanitizeChatMessages([...chatMessages, userMessage])
+    setChatMessages(nextMessages)
+
+    try {
+      const response = await chatMutation.mutateAsync({
+        messages: nextMessages.map((msg) => ({
+          role: msg.role === "assistant" ? "assistant" : "user",
+          content: clampChatContent(msg.content),
+        })),
+        goal: chatGoal.trim() || null,
+        constraints: chatConstraints.trim() || null,
+      })
+
+      const assistantContent = clampChatContent(String(response.message ?? ""))
+      if (!assistantContent) {
+        throw new Error("Risposta vuota dal Coach AI.")
+      }
+      const assistantMessage: ChatMessage = {
+        role: "assistant",
+        content: assistantContent,
+      }
+      setChatProvider((response.provider as "forge" | "gemini" | "rule_based" | undefined) ?? null)
+      if (response.fallback && !fallbackToastShownRef.current) {
+        toast.warning("Coach in modalità base: risposte semplificate (controlla la configurazione AI server).")
+        fallbackToastShownRef.current = true
+      }
+      if (!response.fallback) {
+        fallbackToastShownRef.current = false
+      }
+      setChatMessages((prev) => sanitizeChatMessages([...prev, assistantMessage]))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Impossibile contattare il Coach AI."
+      toast.error(message)
+    }
+  }
+
+  const clearChat = () => {
+    setChatMessages([])
+    setChatProvider(null)
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(CHAT_STORAGE_KEY)
+    }
+  }
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="medium" className="text-white">
-      <div className="min-h-screen overflow-x-hidden font-sans text-foreground relative pb-24">
-        {/* Background Image with low opacity */}
-        <div className="fixed inset-0 opacity-10 pointer-events-none -z-40">
-          <img
-            src="/images/ai_coach_digital.webp"
-            alt="Background"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-[var(--navy)]/80 via-[var(--navy)]/50 to-[var(--navy)]" />
-        </div>
+    <AppLayout>
+      <div className="compact-shell space-y-4 lg:space-y-2">
+        <section className="surface-panel p-6 glass-panel">
+          <div className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 p-3">
+                <Brain className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-3xl font-display font-bold neon-gradient-text">
+                    AI Coach
+                  </h1>
+                  <Badge variant="neon">Premium</Badge>
+                </div>
+                <p className="text-muted-foreground">
+                  Analisi e allenamenti personalizzati basati sui tuoi dati reali.
+                </p>
+              </div>
+            </div>
+            <Badge variant="outline" className="text-xs border-primary/40 text-primary">
+              Ultimo sync: {lastSyncLabel}
+            </Badge>
+          </div>
+        </section>
 
-        {/* Animated particles effect */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none -z-30">
-          {[...Array(15)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-2 h-2 bg-white/20 rounded-full"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-              }}
-              animate={{
-                y: [0, -30, 0],
-                opacity: [0.1, 0.3, 0.1],
-              }}
-              transition={{
-                duration: 4 + Math.random() * 3,
-                repeat: Infinity,
-                delay: Math.random() * 2,
-              }}
-            />
-          ))}
-        </div>
-
-        <div className="container py-8 md:py-12">
-          {showSkillModal && profile && user && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-              <div className="relative max-w-lg w-full mx-4">
-                <div className="absolute inset-0 bg-gradient-to-br from-[var(--gold)]/20 via-cyan-500/10 to-purple-500/20 rounded-3xl blur-2xl" />
-                <div className="relative bg-gradient-to-br from-[oklch(0.23_0.07_220)] to-[oklch(0.12_0.05_220)] rounded-3xl p-6 border border-[var(--gold)]/30 shadow-2xl">
-                  <div className="text-xs uppercase tracking-wider text-[var(--gold)] mb-2">Coach Update</div>
-                  <h2 className="text-xl font-bold text-white mb-2">
-                    Livello {profile.aiSkillLabel ?? "aggiornato"}
-                  </h2>
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-white/60 mb-3">
-                    <span className="px-2 py-0.5 rounded-full bg-white/10 border border-white/10">
-                      Stima AI settimanale
-                    </span>
-                    {profile.aiSkillConfidence !== null && profile.aiSkillConfidence !== undefined && (
-                      <span className="px-2 py-0.5 rounded-full bg-white/10 border border-white/10">
-                        Confidenza {profile.aiSkillConfidence}%
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-white/70 text-sm leading-relaxed mb-4">
-                    {profile.aiSkillMessage ??
-                      "Il tuo livello stimato è stato aggiornato in base alle ultime sessioni."}
-                  </p>
-                  <Button
-                    className="w-full bg-[var(--gold)] text-[var(--navy)] hover:bg-[var(--gold-light)]"
-                    onClick={() => {
-                      const key = `aiSkillSeen:${user.id}:${profile.aiSkillLastEvaluatedAt}`;
-                      localStorage.setItem(key, "1");
-                      setShowSkillModal(false);
-                    }}
-                  >
-                    Continua
-                  </Button>
+        <section className="surface-panel p-6">
+          <div className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10">
+                <Sparkles className="size-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Analisi</p>
+                <p className="text-lg font-semibold text-foreground">
+                  {advanced?.insights?.length ? "Analisi completata" : "Analisi in corso"}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-4">
+              <div className="rounded-lg border border-border bg-background/60 px-4 py-3">
+                <p className="text-xs text-muted-foreground">Focus oggi</p>
+                <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Target className="size-4 text-primary" />
+                  {focusLabel}
                 </div>
               </div>
-            </div>
-          )}
-          {/* Navigation & Header */}
-          <div className="flex flex-col gap-3 mb-8 md:flex-row md:items-center md:gap-4">
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard">
-                <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10 px-2">
-                  <ChevronLeft className="h-5 w-5" />
-                  <span className="ml-1 hidden sm:inline">Dashboard</span>
-                </Button>
-              </Link>
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold text-white">AI Coach Dashboard</h1>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold)]/30">Premium</span>
+              <div className="rounded-lg border border-border bg-background/60 px-4 py-3">
+                <p className="text-xs text-muted-foreground">Condition</p>
+                <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
+                  <HeartPulse className="size-4 text-primary" />
+                  {conditionLabel}
+                </div>
               </div>
-            </div>
-            <div className="md:ml-auto w-full md:w-auto flex flex-col sm:flex-row gap-2">
-              <Link href="/session-iq" className="w-full sm:w-auto">
-                <Button variant="outline" className="w-full sm:w-auto border-[var(--gold)]/40 text-[var(--gold)] hover:bg-[var(--gold)]/10">
-                  Session IQ
-                </Button>
-              </Link>
-              <Link href="/coach-dryland" className="w-full sm:w-auto">
-                <Button variant="outline" className="w-full sm:w-auto border-cyan-400/40 text-cyan-100 hover:bg-cyan-500/10">
-                  Coach Dryland
-                </Button>
-              </Link>
+              <div className="rounded-lg border border-border bg-background/60 px-4 py-3">
+                <p className="text-xs text-muted-foreground">Attività analizzate</p>
+                <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Activity className="size-4 text-primary" />
+                  {sessionInsightsQuery.data?.length ?? 0}
+                </div>
+              </div>
             </div>
           </div>
+        </section>
 
-          {/* 1. Header "Pulse" */}
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-card/30 backdrop-blur-md border border-white/10 rounded-2xl p-6 mb-8 relative overflow-hidden"
-          >
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50 animate-pulse" />
+        <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "insights" | "workouts" | "session-iq" | "chat")} className="space-y-3">
+          <TabsList>
+            <TabsTrigger value="insights">Insights</TabsTrigger>
+            <TabsTrigger value="workouts">Piano</TabsTrigger>
+            <TabsTrigger value="session-iq">Session IQ</TabsTrigger>
+            <TabsTrigger value="chat">Chat</TabsTrigger>
+          </TabsList>
 
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-cyan-500 blur-lg opacity-40 animate-pulse" />
-                  <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 flex items-center justify-center relative z-10">
-                    <Brain className="h-8 w-8 text-cyan-400" />
-                  </div>
+          <TabsContent value="insights" className="mt-3">
+            <div className="flex flex-col gap-4">
+              <div className="order-2 lg:order-1">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                  {keyMetricCards.map((metric, index) => {
+                    const helperProgress = Number(String(metric.helper).replace(/[^\d.-]/g, ""))
+                    const valueProgress = Number(String(metric.value).replace(/[^\d.-]/g, ""))
+                    const progress = Number.isFinite(helperProgress)
+                      ? Math.max(0, Math.min(100, helperProgress))
+                      : Number.isFinite(valueProgress)
+                        ? Math.max(0, Math.min(100, valueProgress))
+                        : 0
+                    const tones = ["cyan", "lime", "amber", "sky"] as const
+
+                    return (
+                      <MetricOrb
+                        key={metric.title}
+                        label={metric.title}
+                        value={metric.value}
+                        progress={progress}
+                        helper={metric.helper}
+                        tone={tones[index % tones.length]}
+                        size="sm"
+                      />
+                    )
+                  })}
                 </div>
-                <div className="flex-1">
-                  <h2 className="text-xl font-bold text-white flex flex-wrap items-center gap-2">
-                    Analisi Completata
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 whitespace-nowrap">
-                      Active
-                    </span>
-                  </h2>
-                  <p className="text-white/60 text-sm flex items-center gap-2 mt-1">
-                    <Activity className="h-3 w-3" />
-                    {lastSyncDate
-                      ? `Ultimo sync: ${lastSyncDate.toLocaleDateString("it-IT")} • ${lastSyncDate.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`
-                      : "Ultimo sync: non disponibile"}
-                  </p>
+                <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-6">
+                  {advancedMetrics.map((metric, index) => {
+                    const numeric = typeof metric.display === "number" ? metric.display : Number(metric.display)
+                    const safe = Number.isFinite(numeric) ? Math.max(0, Math.min(100, numeric)) : 0
+                    const color = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)", "var(--primary)"][index % 6]
+                    const radius = 19
+                    const circumference = 2 * Math.PI * radius
+                    const offset = circumference * (1 - safe / 100)
+                    return (
+                      <div key={metric.key} className="stream-card px-2 py-2 text-center">
+                        <div className="mx-auto relative h-14 w-14">
+                          <svg viewBox="0 0 60 60" className="h-full w-full -rotate-90">
+                            <circle cx="30" cy="30" r={radius} stroke="var(--border)" strokeWidth="5" fill="none" />
+                            <circle
+                              cx="30"
+                              cy="30"
+                              r={radius}
+                              stroke={color}
+                              strokeWidth="5"
+                              fill="none"
+                              strokeLinecap="round"
+                              strokeDasharray={circumference}
+                              strokeDashoffset={offset}
+                              style={{ filter: `drop-shadow(0 0 8px ${color})` }}
+                            />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center text-[11px] font-semibold text-foreground">
+                            {metric.display}
+                          </div>
+                        </div>
+                        <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                          {metric.key}
+                        </p>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
 
-              <div className="flex gap-4 w-full md:w-auto">
-                <div className="bg-white/5 rounded-lg p-3 px-5 flex-1 md:flex-none border border-white/5">
-                  <div className="text-xs text-white/50 uppercase tracking-wider mb-1">Focus Oggi</div>
-                  <div className="text-lg font-bold text-[var(--gold)] flex items-center gap-2">
-                    <Zap className="h-4 w-4" />
-                    {focusLabel}
-                  </div>
-                </div>
-                <div className="bg-white/5 rounded-lg p-3 px-5 flex-1 md:flex-none border border-white/5">
-                  <div className="text-xs text-white/50 uppercase tracking-wider mb-1">Condition</div>
-                  <div className={`text-lg font-bold ${conditionClass} flex items-center gap-2`}>
-                    <TrendingUp className="h-4 w-4" />
-                    {conditionLabel}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-
-          <div className="grid lg:grid-cols-12 gap-8">
-            {/* 2. Colonna Sinistra: AI Insights */}
-            <div className="lg:col-span-4 space-y-6">
-              <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <Activity className="h-5 w-5 text-purple-400" />
-                Insights & Analisi
-              </h3>
-
-              <div className="bg-gradient-to-br from-[oklch(0.24_0.08_230)] to-[oklch(0.14_0.06_230)] border border-[var(--gold)]/30 rounded-2xl p-5">
-                <div className="text-xs uppercase tracking-wider text-[var(--gold)] mb-2">Session IQ</div>
-                <div className="text-white font-semibold mb-1">Analisi sessioni disponibili</div>
-                <p className="text-white/70 text-sm">
-                  {pendingSessionInsights.data?.length
-                    ? `Hai ${pendingSessionInsights.data.length} nuove analisi pronte.`
-                    : "Nessuna nuova analisi, ma puoi rivedere le sessioni passate."}
-                </p>
-                <Link href="/session-iq">
-                  <Button className="mt-4 w-full bg-[var(--gold)] text-[var(--navy)] hover:bg-[var(--gold-light)]">
-                    Apri Session IQ
-                  </Button>
-                </Link>
-              </div>
-
-              {insights.length ? (
-                insights.map((insight, idx) => (
-                  <motion.div
-                    key={idx}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.1 }}
-                  >
-                    <Card className="bg-card/20 backdrop-blur-sm border-white/10 hover:bg-card/30 transition-colors">
-                      <CardContent className="p-5">
-                        <div className="flex justify-between items-start mb-2">
-                          <div
-                            className={`p-2 rounded-lg ${
-                              insight.type === "warning"
-                                ? "bg-orange-500/20 text-orange-400"
-                                : insight.type === "success"
-                                ? "bg-green-500/20 text-green-400"
-                                : "bg-blue-500/20 text-blue-400"
-                            }`}
+              <div className="order-1 lg:order-2">
+                {insightCards.length > 0 ? (
+                  <section className="surface-panel p-6">
+                    <div className="p-4 space-y-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {insightCards.map((_, index) => (
+                          <Button
+                            key={index}
+                            type="button"
+                            size="sm"
+                            variant={index === safeInsightIndex ? "neon" : "outline-neon"}
+                            className="h-8 w-8 rounded-full p-0"
+                            onClick={() => setActiveInsightIndex(index)}
                           >
-                            {insight.type === "warning" ? (
-                              <AlertCircle className="h-5 w-5" />
-                            ) : insight.type === "success" ? (
-                              <CheckCircle2 className="h-5 w-5" />
-                            ) : (
-                              <Activity className="h-5 w-5" />
-                            )}
-                          </div>
-                          <span className="text-xs font-mono bg-white/5 px-2 py-1 rounded text-white/70">
-                            {insight.metric}
-                          </span>
+                            {index + 1}
+                          </Button>
+                        ))}
+                      </div>
+                      <div className="flex items-start gap-4">
+                        <div className="p-2 rounded-lg bg-primary/10">
+                          <Sparkles className="w-5 h-5 text-primary" />
                         </div>
-                        <h4 className="font-bold text-white mb-1">{insight.title}</h4>
-                        <p className="text-sm text-white/70 leading-relaxed">{insight.message}</p>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                ))
-              ) : (
-                <Card className="bg-card/20 backdrop-blur-sm border-white/10">
-                  <CardContent className="p-5 text-sm text-white/70">
-                    Nessun insight disponibile. Completa più sessioni per ottenere analisi personalizzate.
-                  </CardContent>
-                </Card>
-              )}
-
-              {timeline?.length ? (
-                <Card className="bg-gradient-to-br from-purple-900/40 to-indigo-900/40 border-purple-500/20">
-                  <CardContent className="p-5 text-center">
-                    <p className="text-purple-200 text-sm mb-3">
-                      Analizzati {timeline.length} allenamenti recenti
-                    </p>
-                    <Button
-                      variant="outline"
-                      onClick={handleRefreshInsights}
-                      disabled={insightsRefreshing}
-                      className="w-full border-purple-500/50 text-purple-300 hover:bg-purple-500/20 hover:text-purple-100"
-                    >
-                      <RefreshCw className={`h-4 w-4 mr-2 ${insightsRefreshing ? "animate-spin" : ""}`} />
-                      Rigenera Insights
-                    </Button>
-                  </CardContent>
-                </Card>
-              ) : null}
-
-            </div>
-
-            {/* 3. Colonna Destra: Workout Plan */}
-            <div className="lg:col-span-8 space-y-8">
-              {/* Pool Workout */}
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Waves className="h-5 w-5 text-cyan-400" />
-                    Allenamento in Vasca
-                  </h3>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleRegeneratePool}
-                    disabled={poolRegenerate || poolWorkoutQuery.isFetching}
-                    className="text-cyan-200 hover:text-white hover:bg-white/10"
-                  >
-                    <RefreshCw className={`h-4 w-4 mr-2 ${poolRegenerate ? "animate-spin" : ""}`} />
-                    Rigenera
-                  </Button>
-                </div>
-
-                <Card className="bg-card/20 backdrop-blur-sm border-white/10 overflow-hidden">
-                  <div className="bg-gradient-to-r from-cyan-900/40 to-blue-900/40 p-6 border-b border-white/5">
-                    {poolWorkout ? (
-                      <div className="flex flex-wrap justify-between items-center gap-4">
-                        <div>
-                          <h2 className="text-2xl font-bold text-white mb-1">{poolWorkout.title}</h2>
-                          <div className="flex gap-4 text-sm text-cyan-200/80">
-                            <span className="flex items-center gap-1"><Timer className="h-4 w-4" /> {poolWorkout.duration}</span>
-                            <span className="flex items-center gap-1"><Waves className="h-4 w-4" /> {poolWorkout.description}</span>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <h3 className="font-medium text-foreground">
+                              {activeInsight?.title ?? "Insight"}
+                            </h3>
+                            {activeInsight?.metric ? (
+                              <Badge variant="neon">{activeInsight.metric}</Badge>
+                            ) : null}
                           </div>
-                        </div>
-                        <div className="px-4 py-2 bg-red-500/20 border border-red-500/30 rounded-lg text-red-400 font-bold text-sm uppercase tracking-wide">
-                          {poolWorkout.difficulty}
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {activeInsight?.description ?? "Seleziona un insight per leggerlo."}
+                          </p>
                         </div>
                       </div>
-                    ) : (
-                      <div className="text-white/70">Allenamento in vasca non disponibile.</div>
-                    )}
-                  </div>
-
-                  <CardContent className="p-0">
-                    {poolWorkoutQuery.isFetching && (
-                      <div className="p-5 text-white/60">Sto preparando l'allenamento...</div>
-                    )}
-                    {poolWorkoutQuery.isError && (
-                      <div className="p-5 text-red-300">Errore nel caricamento dell'allenamento.</div>
-                    )}
-                    {poolWorkout?.sections?.map((section, idx) => {
-                      const sectionLabel = formatSectionTitle(section.title);
-                      const pillClass = getSectionPillClass(section.title);
-                      return (
-                        <div
-                          key={idx}
-                          className={`p-4 md:p-5 border-b border-white/5 last:border-0 flex flex-col sm:flex-row gap-3 sm:gap-4 hover:bg-white/5 transition-colors ${
-                            section.title.toLowerCase().includes("main") ? "bg-cyan-500/5" : ""
-                          }`}
-                        >
-                          <div className="w-full sm:w-56 lg:w-64 flex-shrink-0">
-                            <span className={`inline-flex text-xs font-semibold tracking-wide px-2 py-1 rounded ${pillClass} leading-snug break-words`}>
-                              {sectionLabel}
-                            </span>
-                          </div>
-                          <div className="flex-1 space-y-2 text-white/90">
-                            {section.exercises?.length ? (
-                              section.exercises.map((exercise, exIdx) => {
-                                const details = getExerciseDetails(exercise);
-                                return (
-                                  <div key={exIdx} className="rounded-lg bg-white/5 px-3 py-2 border border-white/5">
-                                    <div className="font-medium">{exercise.name}</div>
-                                    {details.length ? (
-                                      <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-white/60">
-                                        {details.map((detail, detailIdx) => (
-                                          <span key={detailIdx}>{detail}</span>
-                                        ))}
-                                      </div>
-                                    ) : null}
-
-                                    {exercise.notes && (
-                                      <div className="mt-2 text-xs text-cyan-100/80">💡 {exercise.notes}</div>
-                                    )}
-                                  </div>
-                                );
-                              })
-                            ) : section.notes ? (
-                              <div className="text-white/70 text-sm">{section.notes}</div>
-                            ) : (
-                              <div className="text-white/50 text-sm">Dettagli non disponibili</div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </CardContent>
-                </Card>
+                    </div>
+                  </section>
+                ) : (
+                  <section className="surface-panel p-6">
+                    <div className="p-6 text-sm text-muted-foreground">
+                      Nessun insight disponibile. Sincronizza nuove attivita per ottenere suggerimenti AI.
+                    </div>
+                  </section>
+                )}
               </div>
 
             </div>
-          </div>
-        </div>
+          </TabsContent>
 
-        <MobileNav />
+          <TabsContent value="workouts" className="mt-3 space-y-3">
+            <section className="surface-panel p-4 lg:p-5">
+              <div>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="font-display">Allenamenti AI</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Allenamenti personalizzati in base alle tue statistiche.
+                      {generatedAtLabel && (
+                        <span className="ml-1">Generati il {generatedAtLabel}.</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <Button
+                      variant="neon"
+                      size="sm"
+                      onClick={handleGenerate}
+                      disabled={!canGenerate || isGenerating}
+                    >
+                      <Sparkles
+                        className={`mr-2 h-4 w-4 ${isGenerating ? "animate-spin" : ""}`}
+                      />
+                      {isGenerating ? "Generazione in corso..." : "Genera workouts"}
+                    </Button>
+                    {cooldownLabel && (
+                      <span className="text-xs text-muted-foreground">{cooldownLabel}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div className="space-y-4 mt-4">
+                  {(poolWorkout || drylandWorkout) ? (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={activeWorkout === "pool" ? "neon" : "outline-neon"}
+                          onClick={() => setActiveWorkout("pool")}
+                        >
+                          Allenamento in Vasca
+                        </Button>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={activeWorkout === "dryland" ? "neon" : "outline-neon"}
+                          onClick={() => setActiveWorkout("dryland")}
+                        >
+                          Allenamento Dryland
+                        </Button>
+                      </div>
+
+                      {activeWorkout === "pool" ? (
+                        poolWorkout ? (
+                          <>
+                            <div className="text-sm text-muted-foreground">
+                              Generato dall&apos;AI
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                              <span className="font-semibold text-foreground">
+                                {poolWorkout.title}
+                              </span>
+                              <span>• {poolWorkout.duration}</span>
+                              <span>• {poolWorkout.difficulty}</span>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              {poolWorkout.description}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {poolWorkout.sections.map((section, idx) => (
+                                <Button
+                                  key={idx}
+                                  type="button"
+                                  size="sm"
+                                  variant={idx === activePoolSectionIndex ? "default" : "outline"}
+                                  onClick={() => setActivePoolSectionIndex(idx)}
+                                >
+                                  {section.title}
+                                </Button>
+                              ))}
+                            </div>
+                            {activePoolSection ? (
+                              <div className="rounded-lg border border-border bg-background/60 p-4">
+                                <div className="mb-2 flex flex-wrap items-center gap-2">
+                                  <Badge variant="neon">{activePoolSection.title}</Badge>
+                                  {activePoolSection.notes && (
+                                    <span className="text-xs text-muted-foreground">
+                                      {activePoolSection.notes}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="space-y-3">
+                                  {activePoolSection.exercises.slice(0, 3).map((exercise, exIdx) => (
+                                    <div
+                                      key={exIdx}
+                                      className="rounded-md bg-background/80 p-3 text-sm"
+                                    >
+                                      <div className="font-medium text-foreground">
+                                        {exercise.name}
+                                      </div>
+                                      <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                        {getExerciseDetails(exercise).map(
+                                          (detail, detailIdx) => (
+                                            <span key={detailIdx}>{detail}</span>
+                                          )
+                                        )}
+                                      </div>
+                                      {exercise.notes && (
+                                        <p className="mt-2 text-xs text-muted-foreground">
+                                          {exercise.notes}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                                {activePoolSection.exercises.length > 3 && (
+                                  <p className="mt-3 text-xs text-muted-foreground">
+                                    +{activePoolSection.exercises.length - 3} esercizi aggiuntivi. Apri l&apos;allenamento completo nel dettaglio sessione.
+                                  </p>
+                                )}
+                              </div>
+                            ) : null}
+                          </>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">
+                            Allenamento in vasca non disponibile. Sincronizza nuove attività.
+                          </div>
+                        )
+                      ) : drylandWorkout ? (
+                        <>
+                          <div className="text-sm text-muted-foreground">
+                            Forza, core e mobilità
+                          </div>
+                          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                            <span className="font-semibold text-foreground">
+                              {drylandWorkout.title}
+                            </span>
+                            <span>• {drylandWorkout.duration}</span>
+                            <span>• {drylandWorkout.difficulty}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {drylandWorkout.description}
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {drylandWorkout.sections.map((section, idx) => (
+                              <Button
+                                key={idx}
+                                type="button"
+                                size="sm"
+                                variant={idx === activeDrySectionIndex ? "default" : "outline"}
+                                onClick={() => setActiveDrySectionIndex(idx)}
+                              >
+                                {section.title}
+                              </Button>
+                            ))}
+                          </div>
+                          {activeDrySection ? (
+                            <div className="rounded-lg border border-border bg-background/60 p-4">
+                              <div className="mb-2 flex flex-wrap items-center gap-2">
+                                <Badge variant="neon">{activeDrySection.title}</Badge>
+                                {activeDrySection.notes && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {activeDrySection.notes}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="space-y-3">
+                                {activeDrySection.exercises.slice(0, 3).map((exercise, exIdx) => (
+                                  <div
+                                    key={exIdx}
+                                    className="rounded-md bg-background/80 p-3 text-sm"
+                                  >
+                                    <div className="font-medium text-foreground">
+                                      {exercise.name}
+                                    </div>
+                                    <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                      {getExerciseDetails(exercise).map(
+                                        (detail, detailIdx) => (
+                                          <span key={detailIdx}>{detail}</span>
+                                        )
+                                      )}
+                                    </div>
+                                    {exercise.notes && (
+                                      <p className="mt-2 text-xs text-muted-foreground">
+                                        {exercise.notes}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                              {activeDrySection.exercises.length > 3 && (
+                                <p className="mt-3 text-xs text-muted-foreground">
+                                  +{activeDrySection.exercises.length - 3} esercizi aggiuntivi. Apri la scheda completa dal coach.
+                                </p>
+                              )}
+                            </div>
+                          ) : null}
+                        </>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">
+                          Allenamento dryland non disponibile. Sincronizza nuove attività.
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center gap-3 py-8 text-center">
+                      <Sparkles className="h-10 w-10 text-muted-foreground/40" />
+                      <p className="text-sm text-muted-foreground">
+                        Nessun allenamento generato. Premi il pulsante per creare i tuoi allenamenti personalizzati.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+          </TabsContent>
+
+          <TabsContent value="session-iq" className="mt-3 space-y-3">
+            <section className="surface-panel p-6">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="font-display">Session IQ</h3>
+                  <p>
+                    Analisi dell&apos;ultima sessione sincronizzata
+                  </p>
+                </div>
+                <Button variant="outline-neon" size="sm" asChild>
+                  <a href="/coach?tab=session-iq">Apri archivio</a>
+                </Button>
+              </div>
+              <div>
+                {latestSessionInsight ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                      <span className="rounded-full bg-primary/10 px-2 py-1 text-primary">
+                        Ultima sessione
+                      </span>
+                      {formatDate(latestSessionInsight.activity_date) && (
+                        <span>📅 {formatDate(latestSessionInsight.activity_date)}</span>
+                      )}
+                      {formatDistance(latestSessionInsight.activity_distance_meters) && (
+                        <span>
+                          🏊 {formatDistance(latestSessionInsight.activity_distance_meters)}
+                        </span>
+                      )}
+                      {formatTime(latestSessionInsight.activity_duration_seconds) && (
+                        <span>
+                          ⏱ {formatTime(latestSessionInsight.activity_duration_seconds)}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-lg font-semibold text-foreground">
+                      {latestSessionInsight.title}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {latestSessionInsight.summary}
+                    </p>
+                    {parsedSessionBullets.length > 0 && (
+                      <ul className="space-y-2 text-sm text-foreground">
+                        {parsedSessionBullets.map((bullet: string, idx: number) => (
+                          <li key={idx} className="flex items-start gap-2">
+                            <span className="text-primary">•</span>
+                            <span>{bullet}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    Nessuna analisi disponibile. Sincronizza una nuova attività per generare Session IQ.
+                  </div>
+                )}
+              </div>
+            </section>
+          </TabsContent>
+
+          <TabsContent value="chat" className="mt-3">
+            <section className="surface-panel p-6">
+              <div className="p-4 space-y-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium text-foreground">Coach Chat</p>
+                    <p className="text-xs text-muted-foreground">
+                      Risposte generate sui tuoi dati reali (sessioni, metriche e Session IQ).
+                    </p>
+                    {chatProvider === "gemini" && (
+                      <div className="mt-1">
+                        <Badge variant="outline" className="text-[11px] border-emerald-500/40 text-emerald-300">
+                          Provider attivo: Gemini
+                        </Badge>
+                      </div>
+                    )}
+                    {chatProvider === "rule_based" && (
+                      <div className="mt-1">
+                        <Badge variant="outline" className="text-[11px] border-amber-500/40 text-amber-300">
+                          <AlertTriangle className="mr-1 h-3 w-3" />
+                          Modalità base (AI cloud non raggiungibile)
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline-neon"
+                    disabled={chatMessages.length === 0 || chatMutation.isPending}
+                    onClick={clearChat}
+                  >
+                    Svuota chat
+                  </Button>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <Input
+                    value={chatGoal}
+                    onChange={(e) => setChatGoal(e.target.value)}
+                    placeholder="Obiettivo attuale (es. migliorare il passo sui 100m)"
+                    maxLength={120}
+                    className="bg-background/60"
+                  />
+                  <Input
+                    value={chatConstraints}
+                    onChange={(e) => setChatConstraints(e.target.value)}
+                    placeholder="Vincoli (es. 2 sedute, spalla delicata)"
+                    maxLength={240}
+                    className="bg-background/60"
+                  />
+                </div>
+                <AIChatBox
+                  messages={chatMessages}
+                  onSendMessage={handleSendChatMessage}
+                  isLoading={chatMutation.isPending}
+                  placeholder="Scrivi al Coach AI (es. 'Come imposto la seduta di domani?')"
+                  emptyStateMessage="Parti da una domanda operativa sul tuo allenamento."
+                  suggestedPrompts={suggestedChatPrompts}
+                  maxInputLength={CHAT_MAX_MESSAGE_CHARS}
+                  height={520}
+                />
+              </div>
+            </section>
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
-  );
+  )
 }

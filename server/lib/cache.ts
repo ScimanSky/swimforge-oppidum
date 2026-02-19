@@ -7,11 +7,15 @@
 
 import { createClient } from 'redis';
 import { logger } from '../middleware/logger';
+import { randomUUID } from 'node:crypto';
 
 export const redis = createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
   socket: {
-    reconnectStrategy: (retries) => Math.min(retries * 50, 500),
+    reconnectStrategy: (retries) => {
+      if (retries > 20) return false; // Stop reconnecting after 20 attempts
+      return Math.min(retries * 100, 3000);
+    },
   },
 });
 
@@ -53,13 +57,51 @@ export async function connectRedis() {
  * Cache TTL (Time To Live) in seconds
  */
 export const CACHE_TTL = {
-  LEADERBOARD: 3600,        // 1 hour
+  LEADERBOARD: 120,         // 2 minutes (near-real-time)
   USER_STATS: 300,          // 5 minutes
   BADGES: 86400,            // 24 hours
   ACTIVITIES: 60,           // 1 minute
   PROFILE: 1800,            // 30 minutes
   SEARCH: 600,              // 10 minutes
 };
+
+const CACHE_LOCK_TTL_MS = 10_000;
+const CACHE_LOCK_MAX_WAIT_MS = 2_500;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function lockKeyForCacheKey(key: string): string {
+  // Keep it readable for ops; Redis keys can be long but should remain bounded by our cache key sizes.
+  return `lock:cache:${key}`;
+}
+
+async function acquireLock(lockKey: string, ttlMs: number): Promise<{ token: string } | null> {
+  if (!redis.isOpen) return null;
+  const token = randomUUID();
+  const res = await redis.set(lockKey, token, { NX: true, PX: ttlMs });
+  if (res !== 'OK') return null;
+  return { token };
+}
+
+async function releaseLock(lockKey: string, token: string): Promise<void> {
+  if (!redis.isOpen) return;
+  // Only delete the lock if we still own it (prevents unlocking someone else's lock after TTL expiry).
+  const script = `
+    if redis.call("GET", KEYS[1]) == ARGV[1] then
+      return redis.call("DEL", KEYS[1])
+    else
+      return 0
+    end
+  `;
+  try {
+    await redis.eval(script, { keys: [lockKey], arguments: [token] });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`Failed to release cache lock ${lockKey}: ${message}`, { event: 'cache:lock_release_failed' });
+  }
+}
 
 /**
  * Get cached value
@@ -74,6 +116,7 @@ export async function getCached<T>(key: string): Promise<T | null> {
       event: 'cache:hit',
     });
 
+    // node-redis returns a string (or null); parse JSON payload.
     return JSON.parse(cached) as T;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -154,17 +197,54 @@ export async function getOrSetCached<T>(
   fetcher: () => Promise<T>,
   ttl: number = 3600
 ): Promise<T> {
+  if (!redis.isOpen) {
+    // Redis not connected; behave like a pass-through.
+    return await fetcher();
+  }
+
   // Try cache first
   const cached = await getCached<T>(key);
   if (cached) return cached;
 
-  // Fetch from source
-  const data = await fetcher();
+  const lKey = lockKeyForCacheKey(key);
+  const lock = await acquireLock(lKey, CACHE_LOCK_TTL_MS);
 
-  // Cache result
-  await setCached(key, data, ttl);
+  // If we didn't get the lock, wait for the other worker to populate the cache.
+  if (!lock) {
+    const start = Date.now();
+    let backoffMs = 50;
 
-  return data;
+    while (Date.now() - start < CACHE_LOCK_MAX_WAIT_MS) {
+      // Small jitter to avoid thundering herd.
+      const jitter = Math.floor(Math.random() * 30);
+      await sleep(backoffMs + jitter);
+
+      const cachedAfterWait = await getCached<T>(key);
+      if (cachedAfterWait) return cachedAfterWait;
+
+      backoffMs = Math.min(Math.floor(backoffMs * 1.5), 250);
+    }
+
+    // Fallback: if cache still not available, fetch directly (avoids long tail latency).
+    const data = await fetcher();
+    await setCached(key, data, ttl);
+    return data;
+  }
+
+  try {
+    // Double-check cache after acquiring lock.
+    const cachedAfterLock = await getCached<T>(key);
+    if (cachedAfterLock) return cachedAfterLock;
+
+    const data = await fetcher();
+
+    // Cache result
+    await setCached(key, data, ttl);
+
+    return data;
+  } finally {
+    await releaseLock(lKey, lock.token);
+  }
 }
 
 /**
@@ -173,10 +253,21 @@ export async function getOrSetCached<T>(
 export async function invalidateCachePattern(pattern: string): Promise<void> {
   try {
     if (!redis.isOpen) return; // Redis not connected
-    const keys = await redis.keys(pattern);
-    if (keys.length > 0) {
-      await redis.del(keys);
-      logger.debug(`Cache invalidate pattern: ${pattern} (${keys.length} keys)`, {
+    const keysToDelete: string[] = [];
+    
+    // Use SCAN instead of KEYS to avoid blocking Redis on Upstash
+    for await (const key of redis.scanIterator({ MATCH: pattern, COUNT: 100 })) {
+      keysToDelete.push(String(key));
+    }
+    
+    if (keysToDelete.length > 0) {
+      // Handle single key and multiple keys differently to avoid type assertion issues
+      if (keysToDelete.length === 1) {
+        await redis.del(keysToDelete[0]);
+      } else {
+        await redis.del(keysToDelete as [string, ...string[]]);
+      }
+      logger.debug(`Cache invalidate pattern: ${pattern} (${keysToDelete.length} keys)`, {
         event: 'cache:invalidate_pattern',
       });
     }
@@ -193,7 +284,7 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
  */
 export const cacheKeys = {
   leaderboard: (orderBy: string, period: string, limit: number, offset: number) =>
-    `leaderboard:${orderBy}:${period}:${limit}:${offset}`,
+    `leaderboard:v2:${orderBy}:${period}:${limit}:${offset}`,
   userStats: (userId: string) => `user:stats:${userId}`,
   userProfile: (userId: string) => `user:profile:${userId}`,
   badges: (userId: string) => `user:badges:${userId}`,
@@ -207,15 +298,37 @@ export const cacheKeys = {
  * Invalidate user-related caches
  */
 export async function invalidateUserCache(userId: string): Promise<void> {
-  const keys = [
-    cacheKeys.userStats(userId),
-    cacheKeys.userProfile(userId),
-    cacheKeys.badges(userId),
-    `user:activities:${userId}:*`,
-  ];
+  if (!redis.isOpen) return;
 
-  await deleteMultipleCached(keys);
-  await invalidateCachePattern(`user:activities:${userId}:*`);
+  const lockKey = `lock:cache_invalidate:user:${userId}`;
+  const lock = await acquireLock(lockKey, 5000);
+  if (!lock) {
+    // Another process is already invalidating; best effort, don't race.
+    return;
+  }
+
+  try {
+    const keys = [
+      cacheKeys.userStats(userId),
+      cacheKeys.userProfile(userId),
+      cacheKeys.badges(userId),
+      // REMOVED: `user:activities:${userId}:*` — DEL doesn't support wildcards
+    ];
+
+    // Delete fixed keys atomically.
+    const multi = redis.multi();
+    if (keys.length === 1) {
+      multi.del(keys[0]);
+    } else if (keys.length > 1) {
+      multi.del(keys as [string, ...string[]]);
+    }
+    await multi.exec();
+
+    // Pattern-based delete (SCAN) is best-effort; cannot be fully atomic with writes.
+    await invalidateCachePattern(`user:activities:${userId}:*`);
+  } finally {
+    await releaseLock(lockKey, lock.token);
+  }
 }
 
 /**

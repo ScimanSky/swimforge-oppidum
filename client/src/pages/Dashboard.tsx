@@ -1,639 +1,894 @@
-import { useAuth } from "@/_core/hooks/useAuth";
-import { trpc } from "@/lib/trpc";
-import { AppLayout } from "@/components/AppLayout";
-import { getBadgeImageUrl } from "@/lib/badgeImages";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { motion } from "framer-motion";
+"use client"
+
+import AppLayout from "@/components/AppLayout"
+import { trpc } from "@/lib/trpc"
+import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { Surface, SurfaceContent } from "@/components/ui/surface"
+import { Progress } from "@/components/ui/progress"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { MetricOrb } from "@/components/metrics/MetricOrb"
+import { useFormatters } from "@/_core/hooks/useFormatters"
+import {
+  Flame,
+  Orbit,
   Waves,
-  Clock,
+  Timer,
   Target,
-  Medal,
-  ChevronRight,
-  Zap,
-  Activity,
-  User,
-  Plus,
   Trophy,
-} from "lucide-react";
-import { Link, Redirect } from "wouter";
-import MobileNav from "@/components/MobileNav";
-import { useBadgeNotifications } from "@/hooks/useBadgeNotifications";
-import { useEffect } from "react";
-import CountUp from "react-countup";
+  Zap,
+  ChevronRight,
+} from "lucide-react"
+import { Link } from "wouter"
+import { SeasonRecapDialog } from "@/components/video/SeasonRecapDialog"
+
+const parseActivityDate = (value: string | Date | null | undefined) => {
+  if (!value) return null
+  if (value instanceof Date) return value
+  if (typeof value === "string") {
+    const normalized = value.includes("T") ? value : value.replace(" ", "T")
+    const date = new Date(normalized)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+  return null
+}
+
+const toNumber = (value: unknown) => {
+  if (value === null || value === undefined) return 0
+  const num = Number(value)
+  return Number.isFinite(num) ? num : 0
+}
+
+const getActivityDistance = (activity: any) =>
+  toNumber(
+    activity?.distanceMeters ??
+      activity?.distance_meters ??
+      activity?.distance ??
+      activity?.distanceMeters ??
+      0
+  )
+
+const getActivityDuration = (activity: any) =>
+  toNumber(
+    activity?.durationSeconds ??
+      activity?.duration_seconds ??
+      activity?.movingDuration ??
+      activity?.moving_duration ??
+      activity?.elapsedDuration ??
+      activity?.elapsed_duration ??
+      activity?.duration ??
+      0
+  )
+
+const getActivityPace = (activity: any) =>
+  toNumber(
+    activity?.avgPacePer100m ??
+      activity?.avg_pace_per_100m ??
+      activity?.pacePer100m ??
+      activity?.pace_per_100m ??
+      0
+  )
+
+const getActivityDateValue = (activity: any) =>
+  activity?.activityDate ??
+  activity?.activity_date ??
+  activity?.createdAt ??
+  activity?.created_at ??
+  null
+
+const changeLabel = (current: number, previous: number, suffix = "vs last week") => {
+  if (!previous && !current) return { label: "—", type: "neutral" as const }
+  if (!previous && current > 0) return { label: "New", type: "positive" as const }
+  if (previous === 0) return { label: "—", type: "neutral" as const }
+  const diff = ((current - previous) / previous) * 100
+  const sign = diff > 0 ? "+" : ""
+  const type = diff > 0 ? "positive" : diff < 0 ? "negative" : "neutral"
+  return { label: `${sign}${diff.toFixed(0)}% ${suffix}`, type }
+}
+
+const formatShortDate = (value: string | Date | null | undefined) => {
+  const parsed = parseActivityDate(value)
+  if (!parsed) return "—"
+  return parsed.toLocaleDateString("it-IT", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+function DashboardDetailDialog({
+  title,
+  description,
+  triggerLabel = "Dettagli",
+  children,
+}: {
+  title: string
+  description?: string
+  triggerLabel?: string
+  children: ReactNode
+}) {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button
+          variant="outline-neon"
+          size="sm"
+          className="h-8 px-3 text-xs rounded-xl border-primary/40 bg-background/55 hover:bg-primary/12"
+        >
+          {triggerLabel}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl border-border/80 bg-background/95 backdrop-blur-xl">
+        <DialogHeader>
+          <DialogTitle className="font-display text-lg text-foreground">{title}</DialogTitle>
+          {description ? <DialogDescription>{description}</DialogDescription> : null}
+        </DialogHeader>
+        <ScrollArea className="max-h-[62dvh] pr-4">
+          <div className="space-y-2">{children}</div>
+        </ScrollArea>
+      </DialogContent>
+    </Dialog>
+  )
+}
 
 export default function Dashboard() {
-  const { user, loading: authLoading, isAuthenticated } = useAuth();
-  const { addBadges } = useBadgeNotifications();
+  const { formatDuration, formatDistanceKm, formatPace } = useFormatters()
+  const meQuery = trpc.auth.me.useQuery()
+  const profileQuery = trpc.profile.get.useQuery()
+  const activitiesQuery = trpc.activities.list.useQuery(
+    { limit: 100, offset: 0, source: "all" },
+    { staleTime: 0, refetchOnWindowFocus: true, refetchOnMount: "always" }
+  )
+  const timelineQuery = trpc.statistics.getTimeline.useQuery({ days: 14 })
+  const advancedQuery = trpc.statistics.getAdvanced.useQuery({ days: 30 })
+  const challengesQuery = trpc.challenges.list.useQuery()
+  const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  })
+  const seasonLeaderboardQuery = trpc.season.getLeaderboard.useQuery(
+    { limit: 5 },
+    {
+      staleTime: 30_000,
+      refetchInterval: 60_000,
+      refetchOnWindowFocus: true,
+    }
+  )
 
-  const { data: profile, isLoading: profileLoading } = trpc.profile.get.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
+  const normalizedActivities = useMemo(() => {
+    const list = activitiesQuery.data ?? []
+    return list.map((activity) => {
+      const date = parseActivityDate(getActivityDateValue(activity))
+      const dateMs = date?.getTime() ?? 0
+      return {
+        activity,
+        date,
+        dateMs,
+        distance: getActivityDistance(activity),
+        duration: getActivityDuration(activity),
+        pace: getActivityPace(activity),
+      }
+    })
+  }, [activitiesQuery.data])
 
-  const { data: recentBadges, isLoading: badgesLoading } = trpc.badges.userBadges.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
+  const activitiesSortedByDate = useMemo(() => {
+    return [...normalizedActivities].sort((a, b) => b.dateMs - a.dateMs)
+  }, [normalizedActivities])
 
-  const { data: activities, isLoading: activitiesLoading } = trpc.activities.list.useQuery(
-    { limit: 3, offset: 0 },
-    { enabled: isAuthenticated }
-  );
+  const stats = useMemo(() => {
+    const activities = normalizedActivities
+    const timeline = timelineQuery.data ?? []
+    const profileTotals = profileQuery.data
+    const now = new Date()
+    const startOfToday = new Date(now)
+    startOfToday.setHours(0, 0, 0, 0)
+    const startOfWeek = new Date(startOfToday)
+    const dayOfWeek = startOfWeek.getDay()
+    const diffFromMonday = (dayOfWeek + 6) % 7
+    startOfWeek.setDate(startOfWeek.getDate() - diffFromMonday)
+    const startPrevWeek = new Date(startOfWeek)
+    startPrevWeek.setDate(startPrevWeek.getDate() - 7)
 
-  const { data: challenges, isLoading: challengesLoading } = trpc.challenges.list.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
+    const toDateKey = (date: Date) => {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, "0")
+      const day = String(date.getDate()).padStart(2, "0")
+      return `${year}-${month}-${day}`
+    }
+    const timelineMap = new Map(timeline.map((point) => [point.date, point]))
 
-  // Ensure server-side badge awarding runs (no UI directly from this query)
-  trpc.badges.checkNewBadges.useQuery(undefined, { enabled: isAuthenticated, refetchOnMount: true });
+    let currentDistance = 0
+    let currentTime = 0
+    let currentSessions = 0
 
-  const { data: achievementBadges } = trpc.badges.getUserAchievementBadges.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
-  );
+    let prevDistance = 0
+    let prevTime = 0
+    let prevSessions = 0
 
-  // Show badge notifications for newly earned standard badges
+    let validDates = 0
+
+    activities.forEach(({ date, distance, duration }) => {
+      if (!date) return
+      validDates += 1
+      if (date >= startOfWeek && date <= now) {
+        currentDistance += distance
+        currentTime += duration
+        currentSessions += 1
+      } else if (date >= startPrevWeek && date < startOfWeek) {
+        prevDistance += distance
+        prevTime += duration
+        prevSessions += 1
+      }
+    })
+
+    let timelineCurrentDistanceKm = 0
+    let timelineCurrentSessions = 0
+    let timelineCurrentPaceValues: number[] = []
+    let timelinePrevDistanceKm = 0
+    let timelinePrevSessions = 0
+    let timelinePrevPaceValues: number[] = []
+
+    for (let i = 0; i < 7; i += 1) {
+      const date = new Date(startOfWeek)
+      date.setDate(startOfWeek.getDate() + i)
+      const key = toDateKey(date)
+      const entry = timelineMap.get(key)
+      if (entry) {
+        timelineCurrentDistanceKm += Number(entry.distance || 0)
+        timelineCurrentSessions += Number(entry.sessions || 0)
+        if (entry.pace) timelineCurrentPaceValues.push(entry.pace)
+      }
+    }
+
+    for (let i = 0; i < 7; i += 1) {
+      const date = new Date(startPrevWeek)
+      date.setDate(startPrevWeek.getDate() + i)
+      const key = toDateKey(date)
+      const entry = timelineMap.get(key)
+      if (entry) {
+        timelinePrevDistanceKm += Number(entry.distance || 0)
+        timelinePrevSessions += Number(entry.sessions || 0)
+        if (entry.pace) timelinePrevPaceValues.push(entry.pace)
+      }
+    }
+
+    const fallbackCurrentPace =
+      timelineCurrentPaceValues.length > 0
+        ? timelineCurrentPaceValues.reduce((sum, value) => sum + value, 0) /
+          timelineCurrentPaceValues.length
+        : 0
+    const fallbackPrevPace =
+      timelinePrevPaceValues.length > 0
+        ? timelinePrevPaceValues.reduce((sum, value) => sum + value, 0) / timelinePrevPaceValues.length
+        : 0
+
+    if (currentDistance === 0 && timelineCurrentDistanceKm > 0) {
+      currentDistance = timelineCurrentDistanceKm * 1000
+      currentSessions = timelineCurrentSessions
+    }
+    if (prevDistance === 0 && timelinePrevDistanceKm > 0) {
+      prevDistance = timelinePrevDistanceKm * 1000
+      prevSessions = timelinePrevSessions
+    }
+
+    const currentPace =
+      currentDistance > 0 && currentTime > 0
+        ? currentTime / (currentDistance / 100)
+        : fallbackCurrentPace
+    const prevPace =
+      prevDistance > 0 && prevTime > 0
+        ? prevTime / (prevDistance / 100)
+        : fallbackPrevPace
+
+    if (currentTime === 0 && currentDistance > 0 && currentPace > 0) {
+      currentTime = Math.round((currentDistance / 100) * currentPace)
+    }
+    if (prevTime === 0 && prevDistance > 0 && prevPace > 0) {
+      prevTime = Math.round((prevDistance / 100) * prevPace)
+    }
+    if (validDates === 0 && activities.length > 0) {
+      currentDistance = activities.reduce((sum, entry) => sum + entry.distance, 0)
+      currentTime = activities.reduce((sum, entry) => sum + entry.duration, 0)
+      currentSessions = activities.length
+    }
+
+    if (
+      currentDistance === 0 &&
+      currentTime === 0 &&
+      currentSessions === 0 &&
+      profileTotals
+    ) {
+      currentDistance = Number(profileTotals.totalDistanceMeters ?? 0)
+      currentTime = Number(profileTotals.totalTimeSeconds ?? 0)
+      currentSessions = Number(profileTotals.totalSessions ?? 0)
+    }
+
+    if (currentDistance === 0 && activities.length > 0) {
+      const slice = activitiesSortedByDate.slice(0, 7)
+      currentDistance = slice.reduce((sum, entry) => sum + entry.distance, 0)
+      currentTime = slice.reduce((sum, entry) => sum + entry.duration, 0)
+      currentSessions = slice.length
+    }
+
+    const distanceChange = changeLabel(currentDistance, prevDistance)
+    const timeChange = changeLabel(currentTime, prevTime)
+    const paceChange = changeLabel(prevPace, currentPace, "pace change")
+    const sessionsChange = changeLabel(currentSessions, prevSessions)
+
+    const buildProgress = (current: number, previous: number) => {
+      const target = Math.max(current, previous, 1)
+      return Math.min(100, Math.round((current / target) * 100))
+    }
+
+    const paceProgress = prevPace > 0 ? Math.min(100, Math.round((prevPace / Math.max(currentPace, 1)) * 100)) : 100
+
+    return [
+      {
+        icon: Waves,
+        label: "Distanza settimanale",
+        value: formatDistanceKm(currentDistance),
+        change: distanceChange.label,
+        changeType: distanceChange.type,
+        progress: buildProgress(currentDistance, prevDistance),
+        color: "text-primary",
+        bgColor: "bg-primary/10",
+      },
+      {
+        icon: Timer,
+        label: "Tempo in acqua",
+        value: formatDuration(currentTime),
+        change: timeChange.label,
+        changeType: timeChange.type,
+        progress: buildProgress(currentTime, prevTime),
+        color: "text-chart-2",
+        bgColor: "bg-chart-2/10",
+      },
+      {
+        icon: Target,
+        label: "Pace medio",
+        value: formatPace(currentPace),
+        change: paceChange.label,
+        changeType: paceChange.type,
+        progress: paceProgress,
+        color: "text-chart-3",
+        bgColor: "bg-chart-3/10",
+      },
+      {
+        icon: Zap,
+        label: "Sessioni",
+        value: `${currentSessions}`,
+        change: sessionsChange.label,
+        changeType: sessionsChange.type,
+        progress: buildProgress(currentSessions, prevSessions),
+        color: "text-chart-5",
+        bgColor: "bg-chart-5/10",
+      },
+    ]
+  }, [normalizedActivities, activitiesSortedByDate, timelineQuery.data, profileQuery.data])
+
+  const weeklyData = useMemo(() => {
+    const timeline = timelineQuery.data ?? []
+    const map = new Map(timeline.map((point) => [point.date, point.distance]))
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const startOfWeek = new Date(today)
+    const dayOfWeek = startOfWeek.getDay()
+    const diffFromMonday = (dayOfWeek + 6) % 7
+    startOfWeek.setDate(startOfWeek.getDate() - diffFromMonday)
+
+    return Array.from({ length: 7 }).map((_, index) => {
+      const date = new Date(startOfWeek)
+      date.setDate(startOfWeek.getDate() + index)
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+        date.getDate()
+      ).padStart(2, "0")}`
+      const label = date.toLocaleDateString("it-IT", { weekday: "short" })
+      const distanceKm = Number(map.get(key) ?? 0)
+      return {
+        day: label,
+        distance: distanceKm * 1000,
+      }
+    })
+  }, [timelineQuery.data])
+
+  const seasonLeaderboardEntries = useMemo(() => {
+    const raw = seasonLeaderboardQuery.data ?? []
+    return raw.map((entry: any, index: number) => ({
+      rank: index + 1,
+      name: entry.name ?? `Nuotatore ${entry.userId ?? ""}`,
+      value: `${Number(entry.seasonXp ?? 0).toLocaleString()} XP`,
+      isCurrentUser: profileQuery.data?.userId
+        ? String(profileQuery.data.userId) === String(entry.userId)
+        : false,
+    }))
+  }, [seasonLeaderboardQuery.data, profileQuery.data?.userId])
+
+  const challenges = useMemo(() => (challengesQuery.data ?? []) as any[], [challengesQuery.data])
+  const activeChallenges = useMemo(() => {
+    return challenges.filter((challenge) => {
+      const status = String(challenge.status ?? "").toLowerCase()
+      if (status && status !== "active") return false
+      const raw =
+        challenge.isParticipant ??
+        challenge.is_participant ??
+        challenge.is_participating ??
+        null
+      if (raw === null || raw === undefined) return true
+      return raw === true || raw === "t" || raw === 1 || raw === "true"
+    })
+  }, [challenges])
+
+  const aiInsight = useMemo(() => {
+    const insights = advancedQuery.data?.insights ?? []
+    if (!insights.length) return null
+    return {
+      title: "Insight principale",
+      message: insights[0].replace(/\*\*/g, ""),
+    }
+  }, [advancedQuery.data?.insights])
+
+  const seasonSummary = useMemo(() => {
+    const season = seasonQuery.data
+    if (!season) {
+      return {
+        name: "Season Electric Ice",
+        level: 1,
+        seasonXp: 0,
+        levelProgress: 0,
+        completionRate: 0,
+        completedMissions: 0,
+        totalMissions: 0,
+        remainingDays: 0,
+      }
+    }
+    return {
+      name: season.season?.name ?? "Season Electric Ice",
+      level: Number(season.progress?.currentLevel ?? 1),
+      seasonXp: Number(season.progress?.seasonXp ?? 0),
+      levelProgress: Number(season.progress?.levelProgressPercent ?? 0),
+      completionRate: Number(season.missions?.completionRate ?? 0),
+      completedMissions: Number(season.missions?.completedMissions ?? 0),
+      totalMissions: Number(season.missions?.totalMissions ?? 0),
+      remainingDays: Number(season.season?.remainingDays ?? 0),
+    }
+  }, [seasonQuery.data])
+  type ProfileLike = {
+    firstName?: string | null
+    first_name?: string | null
+    lastName?: string | null
+    last_name?: string | null
+    name?: string | null
+    username?: string | null
+    handle?: string | null
+    displayName?: string | null
+    display_name?: string | null
+    avatarUrl?: string | null
+    avatar_url?: string | null
+    avatar?: string | null
+    coverUrl?: string | null
+    cover_url?: string | null
+    coverImageUrl?: string | null
+    cover_image_url?: string | null
+    totalXp?: number
+    nextLevelXp?: number | null
+    xpToNextLevel?: number
+    levelTitle?: string | null
+    profileBadge?: { name?: string | null } | null
+    xpEarned?: number
+    xp_earned?: number
+  } & Record<string, unknown>
+
+  const profile = profileQuery.data as unknown as ProfileLike | undefined
+  const [displayPreference, setDisplayPreference] = useState<"full" | "nickname">("full")
+
   useEffect(() => {
-    if (!recentBadges || !user) return;
-    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem("swimforge:dashboardDisplayName")
+    if (stored === "nickname") setDisplayPreference("nickname")
+  }, [])
 
-    const lastSeenKey = `lastBadgeSeenAt:${user.id}`;
-    const lastSeenAt = Number(localStorage.getItem(lastSeenKey) || 0);
+  const firstName =
+    profile?.firstName ||
+    profile?.first_name ||
+    profile?.name ||
+    meQuery.data?.name ||
+    ""
+  const lastName =
+    profile?.lastName ||
+    profile?.last_name ||
+    ""
+  const fullName = [firstName, lastName].filter(Boolean).join(" ")
+  const nickname =
+    profile?.username ||
+    profile?.handle ||
+    profile?.displayName ||
+    profile?.display_name ||
+    ""
 
-    const newlyEarned = recentBadges.filter((entry: any) => {
-      const earnedAt = new Date(entry?.userBadge?.earnedAt ?? entry?.userBadge?.earned_at ?? 0).getTime();
-      return earnedAt > lastSeenAt;
-    });
-
-    if (newlyEarned.length > 0) {
-      addBadges(newlyEarned.map((entry: any) => ({
-        id: entry.badge.id,
-        code: entry.badge.code,
-        name: entry.badge.name,
-        description: entry.badge.description,
-        image_url: getBadgeImageUrl(entry.badge.code),
-      })));
-    }
-
-    const maxEarnedAt = Math.max(
-      lastSeenAt,
-      ...newlyEarned.map((entry: any) => new Date(entry?.userBadge?.earnedAt ?? entry?.userBadge?.earned_at ?? 0).getTime())
-    );
-    if (maxEarnedAt > lastSeenAt) {
-      localStorage.setItem(lastSeenKey, String(maxEarnedAt));
-    }
-  }, [recentBadges, user, addBadges]);
-
-  const normalizeBadgeUrl = (url: string) =>
-    url.startsWith("/badges/") ? url.replace("/badges/", "/badges_new/") : url;
-
-  // Show badge notifications for newly earned achievement badges
-  useEffect(() => {
-    if (!achievementBadges || !user) return;
-    if (typeof window === "undefined") return;
-
-    const lastSeenKey = `lastAchievementBadgeSeenAt:${user.id}`;
-    const lastSeenAt = Number(localStorage.getItem(lastSeenKey) || 0);
-
-    const newlyEarned = achievementBadges.filter((entry: any) => {
-      const earnedAt = new Date(entry?.earnedAt ?? entry?.earned_at ?? 0).getTime();
-      return earnedAt > lastSeenAt;
-    });
-
-    if (newlyEarned.length > 0) {
-      addBadges(newlyEarned.map((entry: any) => ({
-        id: entry.badgeId,
-        code: `achievement_${entry.badgeId}`,
-        name: entry.badge?.name || "Achievement",
-        description: entry.badge?.description || "",
-        image_url: (() => {
-          const raw = entry.badge?.iconUrl || entry.badge?.icon_url || "";
-          return raw ? normalizeBadgeUrl(raw) : "";
-        })(),
-      })));
-    }
-
-    const maxEarnedAt = Math.max(
-      lastSeenAt,
-      ...newlyEarned.map((entry: any) => new Date(entry?.earnedAt ?? entry?.earned_at ?? 0).getTime())
-    );
-    if (maxEarnedAt > lastSeenAt) {
-      localStorage.setItem(lastSeenKey, String(maxEarnedAt));
-    }
-  }, [achievementBadges, user, addBadges]);
-
-
-  // Redirect to home if not authenticated
-  if (!authLoading && !isAuthenticated) {
-    return <Redirect to="/" />;
-  }
-
-  const isLoading = authLoading || profileLoading;
-
-  // Format helpers
-  const formatDistance = (meters: number) => {
-    if (meters >= 1000) {
-      return `${(meters / 1000).toFixed(1)} km`;
-    }
-    return `${meters} m`;
-  };
-
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
-  };
-
-  const formatDate = (date: Date | string) => {
-    return new Date(date).toLocaleDateString("it-IT", {
-      day: "numeric",
-      month: "short",
-    });
-  };
-
-  // Calculate XP progress percentage
-  const xpProgress = profile && profile.nextLevelXp
-    ? ((profile.totalXp - (profile.nextLevelXp - profile.xpToNextLevel)) / profile.xpToNextLevel) * 100
-    : 0;
+  const displayName =
+    (displayPreference === "nickname" && nickname) ||
+    fullName ||
+    nickname ||
+    meQuery.data?.email?.split("@")[0] ||
+    "Nuotatore"
+  const profileAvatarUrl =
+    profile?.avatarUrl ||
+    profile?.avatar_url ||
+    profile?.avatar ||
+    null
+  const profileCoverImage =
+    profile?.coverUrl ||
+    profile?.cover_url ||
+    profile?.coverImageUrl ||
+    profile?.cover_image_url ||
+    null
+  const coverImage = profileCoverImage || "/images/pool-lanes.jpg"
+  const totalXp = profile?.totalXp ?? 0
+  const xpProgress = profile?.nextLevelXp
+    ? Math.min(100, (totalXp / profile.nextLevelXp) * 100)
+    : 0
+  const compactLeaderboard = seasonLeaderboardEntries.slice(0, 3)
+  const activityDialogRows = useMemo(() => activitiesSortedByDate.slice(0, 12), [activitiesSortedByDate])
+  const challengeDialogRows = useMemo(() => activeChallenges.slice(0, 8), [activeChallenges])
+  const currentUserRank = useMemo(() => {
+    const found = seasonLeaderboardEntries.find((entry) => entry.isCurrentUser)
+    return found?.rank ?? null
+  }, [seasonLeaderboardEntries])
+  const seasonHeroOrbs = useMemo(() => {
+    const totalMissions = Math.max(seasonSummary.totalMissions || 0, 1)
+    return [
+      {
+        label: "Season XP",
+        value: seasonSummary.seasonXp.toLocaleString(),
+        progress: seasonSummary.levelProgress,
+        helper: `Livello ${seasonSummary.level}`,
+        icon: <Zap className="size-4" />,
+        tone: "cyan" as const,
+      },
+      {
+        label: "Giorni",
+        value: `${seasonSummary.remainingDays}`,
+        progress: Math.min(100, Math.round((seasonSummary.remainingDays / 30) * 100)),
+        helper: "Rimanenti",
+        icon: <Timer className="size-4" />,
+        tone: "sky" as const,
+      },
+      {
+        label: "Rank",
+        value: currentUserRank ? `#${currentUserRank}` : "—",
+        progress: currentUserRank ? Math.max(6, 100 - (currentUserRank - 1) * 12) : 0,
+        helper: "Stagione",
+        icon: <Trophy className="size-4" />,
+        tone: "amber" as const,
+      },
+      {
+        label: "Missioni",
+        value: `${seasonSummary.completedMissions}/${totalMissions}`,
+        progress: seasonSummary.completionRate,
+        helper: "Weekly+Daily",
+        icon: <Target className="size-4" />,
+        tone: "lime" as const,
+      },
+    ]
+  }, [seasonSummary, currentUserRank])
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low">
-    <div className="pb-24">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-[var(--navy)]/95 backdrop-blur-lg border-b border-[oklch(0.30_0.04_250_/_0.5)]">
-        <div className="container py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <img src="/swimforge-logo.png" alt="SwimForge" className="h-12 w-auto" />
-              <span className="font-bold text-lg text-[oklch(0.95_0.01_220)]">SwimForge</span>
-            </div>
-
-          </div>
-        </div>
-      </header>
-
-      <main className="container py-6 space-y-6">
-        {/* Welcome & Level Card */}
-        <motion.div
-              initial={{ opacity: 0, y: 30, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.5 }}
-          whileHover={{ scale: 1.02, y: -5 }}
-          style={{ transformStyle: "preserve-3d" }}
-        >
-          <div className="neon-card p-6">
-            {isLoading ? (
-              <div className="space-y-3">
-                <Skeleton className="h-6 w-32 bg-[oklch(0.25_0.03_250)]" />
-                <Skeleton className="h-8 w-48 bg-[oklch(0.25_0.03_250)]" />
+    <AppLayout>
+      <div className="dashboard-shell space-y-6 lg:space-y-3">
+        <div className="grid gap-3 lg:grid-cols-12">
+          <Surface className="relative overflow-hidden lg:col-span-8">
+            {coverImage ? (
+              <div className="absolute inset-0">
+                <img
+                  src={coverImage}
+                  alt="Cover profilo"
+                  className="h-full w-full object-cover opacity-34"
+                  loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-background/88 via-background/72 to-background/55" />
               </div>
-            ) : (
-              <>
-                <div className="flex items-start justify-between mb-6">
-                  <div>
-                    <p className="text-[oklch(0.60_0.03_220)] text-sm">Bentornato,</p>
-                    <h1 className="text-2xl font-bold text-[oklch(0.95_0.01_220)]">{user?.name || "Nuotatore"}</h1>
-                  </div>
-                  <Link href="/profile">
-                    <Button className="bg-[oklch(0.70_0.18_220)] hover:bg-[oklch(0.65_0.18_220)] text-white flex items-center gap-2">
-                      <User className="h-5 w-5" />
-                      Profilo
-                    </Button>
-                  </Link>
+            ) : null}
+            <SurfaceContent className="relative z-10 flex flex-col gap-3 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                  <Orbit className="size-3.5 text-primary" />
+                  Dashboard live
                 </div>
-                
-                {/* Level Badge */}
-                <div className="flex items-center gap-4 mb-6">
-                  <motion.div 
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1, rotateY: 360 }}
-                    transition={{ 
-                      scale: { type: "spring", duration: 0.6 },
-                      rotateY: { duration: 20, repeat: Infinity, ease: "linear" }
-                    }}
-                    style={{ transformStyle: "preserve-3d" }}
-                    className="w-32 h-32 flex-shrink-0"
-                  >
-                    {profile?.profileBadge?.badge_image_url ? (
-                      <img 
-                        src={profile.profileBadge.badge_image_url} 
-                        alt={profile.profileBadge.name}
-                        className="w-full h-full object-contain drop-shadow-2xl"
-                        onContextMenu={(e) => e.preventDefault()}
-                        draggable={false}
-                        style={{ 
-                          WebkitTouchCallout: 'none',
-                          WebkitUserSelect: 'none',
-                          userSelect: 'none',
-                          touchAction: 'manipulation'
-                        }}
-                      />
-                    ) : (
-                      <div className="level-badge">
-                        <span className="text-2xl font-bold text-[oklch(0.95_0.01_220)]">
-                          {profile?.level || 1}
-                        </span>
-                      </div>
-                    )}
-                  </motion.div>
-                  <div>
-                    <p className="text-[oklch(0.60_0.03_220)] text-sm uppercase tracking-wider">Livello Coach</p>
-                    <p className="text-xl font-bold text-[oklch(0.70_0.18_220)]">
-                      {profile?.aiSkillLabel || profile?.profileBadge?.name || profile?.levelTitle || "Novizio"}
-                    </p>
-                  </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline" className="text-[11px]">
+                    Lv {seasonSummary.level}
+                  </Badge>
+                  <Badge variant="outline" className="text-[11px]">
+                    Rank {currentUserRank ? `#${currentUserRank}` : "—"}
+                  </Badge>
+                  <Badge variant="outline" className="text-[11px]">
+                    Missioni {seasonSummary.completedMissions}/{seasonSummary.totalMissions || 0}
+                  </Badge>
                 </div>
+              </div>
 
-                {/* XP Progress */}
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-[oklch(0.60_0.03_220)] flex items-center gap-1">
-                      <Zap className="h-4 w-4 text-[oklch(0.82_0.18_85)]" />
-                      XP Totali
-                    </span>
-                    <span className="font-bold text-[oklch(0.82_0.18_85)]">{profile?.totalXp?.toLocaleString() || 0} XP</span>
-                  </div>
-                  <div className="text-xs text-[oklch(0.60_0.03_220)]">
-                    Livello XP {profile?.xpLevel ?? profile?.level ?? 1}
-                  </div>
-                  <div className="xp-bar-container">
-                    <motion.div
-                      className="xp-bar-fill"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${Math.min(xpProgress, 100)}%` }}
-                      transition={{ duration: 1, delay: 0.3 }}
+              <div className="flex w-fit items-center gap-3 rounded-2xl border border-border/70 bg-background/65 px-2.5 py-2 backdrop-blur-sm">
+                <div className="size-12 rounded-xl overflow-hidden ei-border-gradient shadow-[0_0_20px_var(--neon-soft)] shrink-0">
+                  {profileAvatarUrl ? (
+                    <img
+                      src={profileAvatarUrl}
+                      alt={displayName}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
                     />
-                  </div>
-                  {profile?.nextLevelXp && (
-                    <p className="text-xs text-[oklch(0.50_0.03_220)] text-right">
-                      {profile.xpToNextLevel.toLocaleString()} XP al prossimo livello
-                    </p>
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-primary/10 text-primary text-sm font-semibold">
+                      {displayName
+                        .split(" ")
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((part: string) => part[0])
+                        .join("")
+                        .toUpperCase()}
+                    </div>
                   )}
                 </div>
-              </>
-            )}
-          </div>
-        </motion.div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">Bentornato,</p>
+                  <h1 className="truncate text-lg font-display font-bold neon-gradient-text">{displayName}</h1>
+                  <p className="text-sm text-foreground/85">
+                    {profile?.profileBadge?.name || profile?.levelTitle || "Livello"} · {profile?.totalXp ?? 0} XP totali
+                  </p>
+                </div>
+              </div>
 
-        {/* Quick Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.1 }}
-          className="grid grid-cols-3 gap-3"
-        >
-          {[
-            {
-              icon: Waves,
-              label: "Distanza",
-              value: profile?.totalDistanceMeters || 0,
-              rawValue: profile?.totalDistanceMeters || 0,
-              format: (val: number) => val >= 1000 ? `${(val / 1000).toFixed(1)} km` : `${val} m`,
-              color: "oklch(0.70 0.18 220)",
-              glowColor: "oklch(0.70 0.18 220 / 0.3)",
-            },
-            {
-              icon: Clock,
-              label: "Tempo",
-              value: Math.floor((profile?.totalTimeSeconds || 0) / 60),
-              rawValue: profile?.totalTimeSeconds || 0,
-              format: (val: number) => {
-                const hours = Math.floor(val / 60);
-                const minutes = val % 60;
-                return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-              },
-              color: "oklch(0.82 0.18 85)",
-              glowColor: "oklch(0.82 0.18 85 / 0.3)",
-            },
-            {
-              icon: Target,
-              label: "Sessioni",
-              value: profile?.totalSessions || 0,
-              rawValue: profile?.totalSessions || 0,
-              format: (val: number) => val.toString(),
-              color: "oklch(0.70 0.20 145)",
-              glowColor: "oklch(0.70 0.20 145 / 0.3)",
-            },
-          ].map((stat, index) => (
-            <motion.div 
-              key={stat.label} 
-              className="stat-card bg-[oklch(0.18_0.03_250_/_0.55)] p-4 rounded-xl border border-[oklch(0.30_0.04_250)] text-center cursor-pointer"
-              whileHover={{ scale: 1.05, rotateY: 5 }}
-              whileTap={{ scale: 0.98 }}
-              transition={{ type: "spring", stiffness: 300 }}
-            >
-              <motion.div 
-                className="w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-2"
-                style={{ 
-                  backgroundColor: `${stat.glowColor}`,
-                  boxShadow: `0 0 15px ${stat.glowColor}`,
-                }}
-                whileHover={{ rotate: 360 }}
-                transition={{ duration: 0.6 }}
-              >
-                <stat.icon className="h-5 w-5" style={{ color: stat.color }} />
-              </motion.div>
-              <p className="text-lg font-bold text-[oklch(0.95_0.01_220)]">
-                {isLoading ? "..." : (
-                  <CountUp
-                    end={stat.value}
-                    duration={2}
-                    delay={index * 0.2}
-                    formattingFn={stat.format}
-                    preserveValue
-                  />
-                )}
-              </p>
-              <p className="text-xs text-[oklch(0.50_0.03_220)]">{stat.label}</p>
-            </motion.div>
-          ))}
-        </motion.div>
-
-        {/* Progress Charts */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.15 }}
-          whileHover={{ scale: 1.02, y: -5 }}
-        >
-          <div className="neon-card p-4">
-            <h3 className="text-lg font-bold flex items-center gap-2 mb-4 text-[oklch(0.95_0.01_220)]">
-              <Activity className="h-5 w-5 text-[oklch(0.70_0.18_220)]" />
-              Progressi Settimanali
-            </h3>
-            
-            {activitiesLoading ? (
-              <div className="h-48 flex items-end justify-between gap-2 px-2">
-                {[...Array(7)].map((_, i) => (
-                  <motion.div
-                    key={i}
-                    className="flex-1 rounded-t-lg bg-[oklch(0.20_0.03_250_/_0.55)]"
-                    animate={{ 
-                      height: [`${20 + Math.random() * 60}%`, `${30 + Math.random() * 50}%`],
-                      opacity: [0.3, 0.6, 0.3]
-                    }}
-                    transition={{ 
-                      duration: 1.5, 
-                      repeat: Infinity,
-                      delay: i * 0.1
-                    }}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                {stats.map((stat) => (
+                  <MetricOrb
+                    key={`top-${stat.label}`}
+                    label={stat.label}
+                    value={stat.value}
+                    progress={stat.progress}
+                    helper={stat.change}
+                    icon={<stat.icon className="size-4" />}
+                    tone="auto"
+                    size="sm"
                   />
                 ))}
               </div>
-            ) : activities && activities.length > 0 ? (
-              <div className="h-48 flex items-end justify-between gap-2 px-2">
-                {activities.slice(0, 7).reverse().map((activity, idx) => {
-                  const maxDistance = Math.max(...activities.slice(0, 7).map(a => a.distanceMeters));
-                  const height = (activity.distanceMeters / maxDistance) * 100;
-                  const date = new Date(activity.activityDate);
-                  const dayName = date.toLocaleDateString('it-IT', { weekday: 'short' });
-                  
-                  return (
-                    <div key={activity.id} className="flex-1 flex flex-col items-center gap-2">
-                      <motion.div
-                        initial={{ height: 0 }}
-                        animate={{ height: `${height}%` }}
-                        transition={{ duration: 0.5, delay: idx * 0.1 }}
-                        className="w-full rounded-t-lg relative group"
-                        style={{
-                          background: activity.isOpenWater 
-                            ? 'linear-gradient(to top, oklch(0.70 0.15 195), oklch(0.70 0.15 195 / 0.6))'
-                            : 'linear-gradient(to top, oklch(0.70 0.18 220), oklch(0.70 0.18 220 / 0.6))',
-                          boxShadow: activity.isOpenWater
-                            ? '0 0 10px oklch(0.70 0.15 195 / 0.5)'
-                            : '0 0 10px oklch(0.70 0.18 220 / 0.5)',
-                          minHeight: '20px',
-                        }}
+
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                {seasonHeroOrbs.map((metric) => (
+                  <MetricOrb
+                    key={`season-${metric.label}`}
+                    label={metric.label}
+                    value={metric.value}
+                    progress={metric.progress}
+                    helper={metric.helper}
+                    icon={metric.icon}
+                    tone={metric.tone}
+                    size="sm"
+                  />
+                ))}
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button variant="neon" size="sm" asChild>
+                  <Link href="/track">
+                    <Waves className="size-4" />
+                    Attività
+                  </Link>
+                </Button>
+                <Button variant="outline-neon" size="sm" asChild>
+                  <Link href="/season">
+                    <Orbit className="size-4" />
+                    Season
+                  </Link>
+                </Button>
+                <Button variant="outline-neon" size="sm" asChild>
+                  <Link href="/season/challenges">
+                    <Trophy className="size-4" />
+                    Sfide
+                  </Link>
+                </Button>
+                <Button variant="outline-neon" size="sm" asChild>
+                  <Link href="/home/community">
+                    <ChevronRight className="size-4" />
+                    Club
+                  </Link>
+                </Button>
+                <DashboardDetailDialog
+                  title="Feed attività"
+                  description="Lista completa delle attività recenti."
+                  triggerLabel="Feed"
+                >
+                  {activityDialogRows.length ? (
+                    activityDialogRows.map(({ activity }) => (
+                      <Link
+                        key={activity.id}
+                        href={`/track/${activity.id}`}
+                        className="stream-card block px-3 py-2"
                       >
-                        {/* Tooltip on hover */}
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                          <div className="bg-[oklch(0.15_0.03_250_/_0.45)] px-2 py-1 rounded text-xs whitespace-nowrap border border-[oklch(0.30_0.04_250)]">
-                            <p className="font-bold text-[oklch(0.95_0.01_220)]">{(activity.distanceMeters / 1000).toFixed(1)} km</p>
-                            <p className="text-[oklch(0.60_0.03_220)]">{formatDate(activity.activityDate)}</p>
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">
+                              {formatDistanceKm(getActivityDistance(activity))}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatShortDate(getActivityDateValue(activity))}
+                            </p>
+                          </div>
+                          <Badge variant="neon" className="text-[11px]">
+                            +{activity.xpEarned ?? 0} XP
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {formatDuration(getActivityDuration(activity))} · {formatPace(getActivityPace(activity))}
+                        </p>
+                      </Link>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Nessuna attività recente.</p>
+                  )}
+                </DashboardDetailDialog>
+                <DashboardDetailDialog
+                  title="Trend e sfide"
+                  description="Andamento settimana e progressi sfide."
+                  triggerLabel="Trend"
+                >
+                  <div className="stream-card px-3 py-2">
+                    <p className="text-xs font-semibold text-foreground">Progressi settimanali</p>
+                    <div className="mt-2 space-y-1.5">
+                      {weeklyData.map((day) => (
+                        <div key={`top-weekly-${day.day}`} className="flex items-center gap-2">
+                          <span className="w-8 text-[11px] text-muted-foreground">{day.day}</span>
+                          <Progress value={Math.min(100, (day.distance / 2000) * 100)} className="h-1.5 flex-1" />
+                          <span className="text-[11px] text-muted-foreground">{(day.distance / 1000).toFixed(1)} km</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {challengeDialogRows.length ? (
+                    challengeDialogRows.map((challenge) => {
+                      const leaderboard = (challenge.leaderboard ?? challenge.leaderboardEntries ?? []) as Array<{
+                        progress: number
+                      }>
+                      const progressValue = Number(
+                        challenge.current_progress ?? challenge.currentProgress ?? challenge.progress ?? 0
+                      )
+                      const maxProgress = Math.max(progressValue, ...leaderboard.map((item) => Number(item.progress || 0)))
+                      const progressPercent = maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
+                      return (
+                        <div key={`top-challenge-${challenge.id}`} className="stream-card px-3 py-2">
+                          <p className="text-sm font-semibold text-foreground">{challenge.name}</p>
+                          <p className="text-xs text-muted-foreground">{challenge.objective}</p>
+                          <Progress value={progressPercent} className="mt-2 h-1.5" />
+                        </div>
+                      )
+                    })
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Nessuna sfida attiva.</p>
+                  )}
+                </DashboardDetailDialog>
+                <DashboardDetailDialog title="Insight AI" description="Analisi completa della settimana." triggerLabel="Insight">
+                  {aiInsight ? (
+                    <div className="stream-card px-3 py-2">
+                      <p className="text-sm font-semibold text-primary">{aiInsight.title}</p>
+                      <p className="mt-2 text-sm text-muted-foreground">{aiInsight.message}</p>
+                      <Button variant="outline-neon" size="sm" className="mt-3" asChild>
+                        <Link href="/coach">Apri AI Coach</Link>
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Nessun insight disponibile.</p>
+                  )}
+                </DashboardDetailDialog>
+              </div>
+            </SurfaceContent>
+          </Surface>
+
+          <Surface className="lg:col-span-4">
+            <SurfaceContent className="space-y-4 p-4">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Status atleta</p>
+                  <p className="mt-1 text-base font-semibold text-foreground">Prossimo livello</p>
+                </div>
+                <SeasonRecapDialog triggerLabel="Video recap" buttonVariant="neon" />
+              </div>
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>XP mancanti</span>
+                <span className="font-semibold text-foreground">{profile?.xpToNextLevel ?? 0}</span>
+              </div>
+              <Progress value={xpProgress} className="h-2" />
+              <div className="rounded-xl border border-border/80 bg-background/70 px-3 py-2 text-xs text-muted-foreground flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Flame className="size-4 text-primary" />
+                  Streak attuale
+                </span>
+                <span className="font-semibold text-foreground">{advancedQuery.data?.streak?.current ?? 0}g</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline-neon" size="sm" asChild>
+                  <Link href="/profile/performance">Progressi</Link>
+                </Button>
+                <Button variant="outline-neon" size="sm" asChild>
+                  <Link href="/season">Season Hub</Link>
+                </Button>
+              </div>
+              <div className="rounded-xl border border-border/80 bg-background/65 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Classifica Season</p>
+                    <p className="text-[11px] text-muted-foreground">Top nuotatori della stagione</p>
+                  </div>
+                  <DashboardDetailDialog
+                    title="Classifica completa"
+                    description="Posizionamento attuale dei nuotatori della season."
+                    triggerLabel="Dettagli"
+                  >
+                    {seasonLeaderboardEntries.length ? (
+                      seasonLeaderboardEntries.map((entry) => (
+                        <div key={`status-${entry.rank}-${entry.name}`} className="stream-card px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
+                                {entry.rank}
+                              </div>
+                              <div className="min-w-0">
+                                <p className={`truncate text-sm ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
+                                  {entry.name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{entry.value}</p>
+                              </div>
+                            </div>
+                            {entry.isCurrentUser ? <Badge variant="neon">Tu</Badge> : null}
                           </div>
                         </div>
-                      </motion.div>
-                      <p className="text-xs text-[oklch(0.60_0.03_220)] font-medium">{dayName}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <motion.div 
-                className="h-48 flex flex-col items-center justify-center"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.5 }}
-              >
-                <motion.div
-                  animate={{ 
-                    y: [0, -10, 0],
-                    rotate: [0, 5, -5, 0]
-                  }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  <Activity className="h-16 w-16 text-[oklch(0.70_0.18_220)]/30 mb-4" />
-                </motion.div>
-                <p className="text-sm text-[oklch(0.60_0.03_220)] mb-2">Nessuna attività recente</p>
-                <p className="text-xs text-[oklch(0.50_0.03_220)]">Inizia a nuotare per vedere i tuoi progressi!</p>
-              </motion.div>
-            )}
-          </div>
-        </motion.div>
-
-        {/* Active Challenges */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          whileHover={{ scale: 1.02, y: -5 }}
-        >
-          <div className="neon-card p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold flex items-center gap-2 text-[oklch(0.95_0.01_220)]">
-                <Trophy className="h-5 w-5 text-[oklch(0.82_0.18_85)]" />
-                Sfide Attive
-              </h3>
-              <Link href="/challenges">
-                <Button variant="ghost" size="sm" className="text-[oklch(0.70_0.18_220)] hover:bg-[oklch(0.70_0.18_220_/_0.1)]">
-                  Crea Sfida
-                  <Plus className="h-4 w-4 ml-1" />
-                </Button>
-              </Link>
-            </div>
-            
-            <div className="space-y-3">
-              {challengesLoading ? (
-                <div className="space-y-3">
-                  {[...Array(2)].map((_, i) => (
-                    <motion.div
-                      key={i}
-                      className="p-3 rounded-lg bg-[oklch(0.18_0.03_250_/_0.55)] border border-[oklch(0.30_0.04_250)]"
-                      animate={{ opacity: [0.3, 0.6, 0.3] }}
-                      transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.2 }}
-                    >
-                      <div className="space-y-2">
-                        <div className="h-4 bg-[oklch(0.25_0.03_250)] rounded w-3/4" />
-                        <div className="h-3 bg-[oklch(0.25_0.03_250)] rounded w-1/2" />
-                      </div>
-                    </motion.div>
-                  ))}
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground">Nessuna classifica disponibile.</p>
+                    )}
+                  </DashboardDetailDialog>
                 </div>
-              ) : challenges && challenges.length > 0 ? (
-                challenges.slice(0, 2).map((challenge: any, idx: number) => (
-                  <motion.div 
-                    key={challenge.id} 
-                    className="p-3 rounded-lg bg-[oklch(0.18_0.03_250_/_0.55)] border border-[oklch(0.30_0.04_250)] cursor-pointer"
-                    whileHover={{ scale: 1.03, x: 5 }}
-                    whileTap={{ scale: 0.97 }}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.1, type: "spring", stiffness: 300 }}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <h4 className="font-semibold text-[oklch(0.95_0.01_220)] text-sm">{challenge.name}</h4>
-                      <span className="text-xs text-[oklch(0.70_0.18_85)] font-medium">
-                        {challenge.status === 'active' ? '✅ Attiva' : '⏳ In Arrivo'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[oklch(0.60_0.03_220)] mb-2">
-                      {challenge.type === 'pool' ? '🏊 Piscina' : challenge.type === 'open_water' ? '🌊 Acque Libere' : '🏊🌊 Entrambi'}
-                      {' • '}
-                      {challenge.duration === '3_days' ? '3 giorni' : challenge.duration === '1_week' ? '1 settimana' : challenge.duration === '2_weeks' ? '2 settimane' : '1 mese'}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-[oklch(0.50_0.03_220)]">
-                        {challenge.participantCount || 0} partecipanti
-                      </span>
-                      <Link href="/challenges">
-                        <Button size="sm" variant="ghost" className="h-7 text-xs text-[oklch(0.70_0.18_220)] hover:bg-[oklch(0.70_0.18_220_/_0.1)]">
-                          Dettagli
-                        </Button>
-                      </Link>
-                    </div>
-                  </motion.div>
-                ))
-              ) : (
-                <motion.div 
-                  className="text-center py-8"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5 }}
-                >
-                  <motion.div
-                    animate={{ 
-                      scale: [1, 1.1, 1],
-                      rotate: [0, 5, -5, 0]
-                    }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  >
-                    <Trophy className="h-12 w-12 mx-auto mb-3 text-[oklch(0.82_0.18_85)]" />
-                  </motion.div>
-                  <p className="text-sm text-[oklch(0.60_0.03_220)] mb-4">Nessuna sfida attiva al momento</p>
-                  <Link href="/challenges">
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      <Button className="bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] hover:opacity-90">
-                        <Plus className="h-4 w-4 mr-2" />
-                        Crea la Tua Prima Sfida
-                      </Button>
-                    </motion.div>
-                  </Link>
-                </motion.div>
-              )}
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Recent Activities */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
-          <div className="neon-card p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold flex items-center gap-2 text-[oklch(0.95_0.01_220)]">
-                <Activity className="h-5 w-5 text-[oklch(0.70_0.18_220)]" />
-                Log Attività
-              </h3>
-              <Link href="/activities">
-                <Button variant="ghost" size="sm" className="text-[oklch(0.70_0.18_220)] hover:bg-[oklch(0.70_0.18_220_/_0.1)]">
-                  Cronologia
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Button>
-              </Link>
-            </div>
-            
-            {activitiesLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-16 w-full bg-[oklch(0.20_0.03_250_/_0.55)]" />
-                ))}
-              </div>
-            ) : activities && activities.length > 0 ? (
-              <div className="space-y-3">
-                {activities.map((activity, idx) => (
-                  <motion.div
-                    key={activity.id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-[oklch(0.18_0.03_250_/_0.55)] hover:bg-[oklch(0.20_0.03_250_/_0.55)] transition-colors border border-[oklch(0.25_0.03_250)]"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.1 }}
-                    whileHover={{ scale: 1.03, x: 5 }}
-                  whileTap={{ scale: 0.97 }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                        activity.isOpenWater 
-                          ? "bg-[oklch(0.70_0.15_195_/_0.2)]" 
-                          : "bg-[oklch(0.70_0.18_220_/_0.2)]"
-                      }`}>
-                        <Waves className={`h-5 w-5 ${
-                          activity.isOpenWater 
-                            ? "text-[oklch(0.70_0.15_195)]" 
-                            : "text-[oklch(0.70_0.18_220)]"
-                        }`} />
+                <div className="space-y-1.5">
+                  {compactLeaderboard.length ? (
+                    compactLeaderboard.map((entry) => (
+                      <div key={`status-preview-${entry.rank}-${entry.name}`} className="stream-card px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <div className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                              {entry.rank}
+                            </div>
+                            <div className="min-w-0">
+                              <p className={`truncate text-xs ${entry.isCurrentUser ? "text-primary" : "text-foreground"}`}>
+                                {entry.name}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">{entry.value}</p>
+                            </div>
+                          </div>
+                          {entry.isCurrentUser ? (
+                            <Badge variant="neon" className="text-[10px]">
+                              Tu
+                            </Badge>
+                          ) : null}
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-medium text-[oklch(0.90_0.02_220)]">
-                          {formatDistance(activity.distanceMeters)}
-                        </p>
-                        <p className="text-xs text-[oklch(0.50_0.03_220)]">
-                          {formatDate(activity.activityDate)} • {formatTime(activity.durationSeconds)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right flex items-center gap-1">
-                      <Zap className="h-4 w-4 text-[oklch(0.82_0.18_85)]" />
-                      <span className="text-sm font-bold text-[oklch(0.82_0.18_85)]">
-                        +{activity.xpEarned}
-                      </span>
-                    </div>
-                  </motion.div>
-                ))}
+                    ))
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Nessuna classifica disponibile.</p>
+                  )}
+                </div>
               </div>
-            ) : (
-              <div className="text-center py-6">
-                <Activity className="h-10 w-10 mx-auto mb-2 text-[oklch(0.35_0.03_250)]" />
-                <p className="text-sm text-[oklch(0.50_0.03_220)]">Nessuna attività registrata</p>
-                <p className="text-xs mt-1 text-[oklch(0.40_0.03_220)]">Collega Garmin o aggiungi manualmente</p>
-              </div>
-            )}
-          </div>
-        </motion.div>
+            </SurfaceContent>
+          </Surface>
+        </div>
 
-
-      </main>
-
-      {/* Mobile Navigation */}
-      <MobileNav />
-    </div>
+      </div>
     </AppLayout>
-  );
+  )
 }

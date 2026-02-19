@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
+import { calculateActivityXp } from "./lib/utils";
 
 // Mock user for testing
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
@@ -35,27 +36,19 @@ describe("XP System", () => {
     // Test XP calculation logic
     const distanceMeters = 3500; // 3.5 km
     const isOpenWater = false;
-    
-    const baseXp = Math.floor(distanceMeters / 100); // 35 XP
-    const sessionBonus = 50;
-    const intensityBonus = isOpenWater ? 25 : 0;
-    const totalXp = baseXp + sessionBonus + intensityBonus;
-    
-    expect(baseXp).toBe(35);
-    expect(totalXp).toBe(85);
+    const totalXp = calculateActivityXp(distanceMeters, isOpenWater);
+
+    // base (35) + session (50) + 3km bonus (25) = 110
+    expect(totalXp).toBe(110);
   });
 
   it("adds open water bonus correctly", () => {
     const distanceMeters = 2500; // 2.5 km open water
     const isOpenWater = true;
-    
-    const baseXp = Math.floor(distanceMeters / 100); // 25 XP
-    const sessionBonus = 50;
-    const intensityBonus = isOpenWater ? 25 : 0;
-    const totalXp = baseXp + sessionBonus + intensityBonus;
-    
-    expect(intensityBonus).toBe(25);
-    expect(totalXp).toBe(100);
+    const totalXp = calculateActivityXp(distanceMeters, isOpenWater);
+
+    // base (25) + session (50) + open water bonus (50) = 125
+    expect(totalXp).toBe(125);
   });
 });
 

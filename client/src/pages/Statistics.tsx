@@ -1,7 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
-import MobileNav from "@/components/MobileNav";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   LineChart,
   Line,
@@ -17,11 +15,13 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { TrendingUp, TrendingDown, Minus, ChevronLeft, Info } from "lucide-react";
-import { Link } from "wouter";
+import { BarChart3, Gauge, Info, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { metricsDefinitions } from "@/data/metricsDefinitions";
 import { AppLayout } from "@/components/AppLayout";
+import { Button } from "@/components/ui/button";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Link } from "wouter";
 
 const PERIOD_OPTIONS = [
   { value: 7, label: "7 giorni" },
@@ -30,8 +30,13 @@ const PERIOD_OPTIONS = [
   { value: 365, label: "1 anno" },
 ];
 
-const HR_ZONE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#dc2626"];
-const PACE_COLORS = ["#06b6d4", "#0ea5e9", "#3b82f6", "#6366f1", "#8b5cf6"];
+const HR_ZONE_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+];
 
 function MetricInfoButton({ info }: { info: any }) {
   const [open, setOpen] = useState(false);
@@ -47,10 +52,10 @@ function MetricInfoButton({ info }: { info: any }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="p-1 rounded-md hover:bg-[oklch(0.25_0.03_250)] transition-colors"
+        className="p-1 rounded-md hover:bg-muted/60 transition-colors"
         title="Info"
       >
-        <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)]" />
+        <Info className="w-4 h-4 text-muted-foreground" />
       </button>
       {open && (
         <div
@@ -58,40 +63,32 @@ function MetricInfoButton({ info }: { info: any }) {
           onClick={() => setOpen(false)}
         >
           <div
-            className="rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto"
-            style={{
-              background: "oklch(0.15 0.03 250)",
-              border: "1px solid oklch(0.25 0.03 250)",
-            }}
+            className="rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto bg-card border border-border"
             ref={contentRef}
             onClick={(e) => e.stopPropagation()}
           >
             <div
-              className="sticky top-0 border-b p-6"
-              style={{
-                background: "oklch(0.15 0.03 250)",
-                borderColor: "oklch(0.25 0.03 250)",
-              }}
+              className="sticky top-0 border-b border-border p-6 bg-card"
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-[oklch(0.90_0.05_220)]">
+                <h2 className="text-2xl font-bold text-foreground">
                   {info.title}
                 </h2>
                 <button
                   onClick={() => setOpen(false)}
-                  className="text-[oklch(0.60_0.05_250)] hover:text-[oklch(0.80_0.05_220)]"
+                  className="text-muted-foreground hover:text-foreground"
                 >
                   ✕
                 </button>
               </div>
             </div>
-            <div className="p-6 space-y-4 text-sm text-[oklch(0.80_0.05_220)]">
+            <div className="p-6 space-y-4 text-sm text-muted-foreground">
               <p>{info.description}</p>
-              <div className="rounded-lg p-3 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)] text-xs whitespace-pre-line">
+              <div className="rounded-lg p-3 bg-secondary border border-border text-xs whitespace-pre-line text-foreground">
                 {info.formula}
               </div>
               <div>
-                <h3 className="font-semibold text-[oklch(0.90_0.05_220)] mb-2">Interpretazione</h3>
+                <h3 className="font-semibold text-foreground mb-2">Interpretazione</h3>
                 <ul className="space-y-1">
                   <li><strong>Ottimo:</strong> {info.interpretation.excellent}</li>
                   <li><strong>Buono:</strong> {info.interpretation.good}</li>
@@ -100,7 +97,7 @@ function MetricInfoButton({ info }: { info: any }) {
                 </ul>
               </div>
               <div>
-                <h3 className="font-semibold text-[oklch(0.90_0.05_220)] mb-2">Come migliorare</h3>
+                <h3 className="font-semibold text-foreground mb-2">Come migliorare</h3>
                 <ul className="list-disc pl-5 space-y-1">
                   {info.howToImprove.map((tip: string, idx: number) => (
                     <li key={idx}>{tip}</li>
@@ -129,15 +126,16 @@ function RingMetric({
   info: any;
 }) {
   const safeValue = value ?? null;
-  const pct = safeValue !== null ? Math.max(0, Math.min(100, (safeValue / max) * 100)) : 0;
+  const hasValue = safeValue !== null && Number.isFinite(safeValue);
+  const pct = hasValue ? Math.max(0, Math.min(100, (safeValue / max) * 100)) : 0;
   const radius = 32;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - pct / 100);
 
   return (
-    <div className="rounded-2xl p-3 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]">
+    <div className="rounded-2xl p-4 bg-card/80 border border-border/60 shadow-sm">
       <div className="flex items-center justify-between mb-3">
-        <div className="text-xs uppercase tracking-wide text-[oklch(0.65_0.05_250)]">{label}</div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
         <MetricInfoButton info={info} />
       </div>
       <div className="flex items-center gap-4">
@@ -147,33 +145,38 @@ function RingMetric({
               cx="50"
               cy="50"
               r={radius}
-              stroke="oklch(0.28 0.03 250)"
+              stroke="var(--border)"
               strokeWidth="7"
               fill="none"
             />
-            <circle
-              cx="50"
-              cy="50"
-              r={radius}
-              stroke={color}
-              strokeWidth="7"
-              fill="none"
-              strokeDasharray={circumference}
-              strokeDashoffset={offset}
-              strokeLinecap="round"
-              transform="rotate(-90 50 50)"
-              style={{ filter: `drop-shadow(0 0 10px ${color}55)` }}
-            />
+            {hasValue && (
+              <motion.circle
+                cx="50"
+                cy="50"
+                r={radius}
+                stroke={color}
+                strokeWidth="7"
+                fill="none"
+                strokeDasharray={circumference}
+                strokeDashoffset={offset}
+                strokeLinecap="round"
+                transform="rotate(-90 50 50)"
+                initial={{ strokeDashoffset: circumference }}
+                animate={{ strokeDashoffset: offset }}
+                transition={{ duration: 0.8, ease: [0.2, 0.9, 0.2, 1] }}
+                style={{ filter: `drop-shadow(0 0 10px ${color})` }}
+              />
+            )}
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div className="text-xl font-bold text-[oklch(0.92_0.05_220)]">
-              {safeValue !== null ? Math.round(safeValue) : "N/D"}
+            <div className="text-xl font-bold text-foreground">
+            {hasValue ? Math.round(safeValue) : "N/D"}
             </div>
-            <div className="text-[10px] text-[oklch(0.60_0.05_250)]">/{max}</div>
+            <div className="text-[10px] text-muted-foreground">/{max}</div>
           </div>
         </div>
-        <div className="text-xs text-[oklch(0.65_0.05_250)] leading-snug">
-          {safeValue !== null ? `${Math.round(pct)}%` : "Dato non disponibile"}
+        <div className="text-xs text-muted-foreground leading-snug">
+          {hasValue ? `${Math.round(pct)}%` : "Dato non disponibile"}
         </div>
       </div>
     </div>
@@ -185,30 +188,37 @@ function GaugeMetric({
   value,
   min = -100,
   max = 100,
+  neutralRange = 0,
   info,
 }: {
   label: string;
   value: number | null;
   min?: number;
   max?: number;
+  neutralRange?: number;
   info: any;
 }) {
   const safeValue = value ?? null;
-  const clamped = safeValue !== null ? Math.max(min, Math.min(max, safeValue)) : null;
-  const pct = clamped !== null ? ((clamped - min) / (max - min)) * 100 : 0;
+  const hasValue = safeValue !== null && Number.isFinite(safeValue);
+  const rounded = hasValue ? Math.round(safeValue) : null;
+  const clamped = rounded !== null ? Math.max(min, Math.min(max, rounded)) : null;
+  const isNeutral =
+    clamped !== null &&
+    (Math.abs(clamped) <= neutralRange || Math.round(clamped) === 0);
+  const pct = clamped !== null && !isNeutral ? ((clamped - min) / (max - min)) * 100 : 0;
   const color =
-    clamped === null
-      ? "oklch(0.60_0.05_250)"
+    clamped === null || isNeutral
+      ? "var(--muted-foreground)"
       : clamped > 20
-      ? "#22c55e"
+      ? "var(--chart-2)"
       : clamped > 0
-      ? "#f59e0b"
-      : "#ef4444";
+      ? "var(--chart-4)"
+      : "var(--destructive)";
 
   return (
-    <div className="rounded-2xl p-4 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]">
+    <div className="rounded-2xl p-4 bg-card/80 border border-border/60 shadow-sm">
       <div className="flex items-center justify-between mb-3">
-        <div className="text-xs uppercase tracking-wide text-[oklch(0.65_0.05_250)]">{label}</div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
         <MetricInfoButton info={info} />
       </div>
       <div className="relative">
@@ -216,28 +226,30 @@ function GaugeMetric({
           <path
             d="M10 110 A90 90 0 0 1 190 110"
             fill="none"
-            stroke="oklch(0.28 0.03 250)"
+            stroke="var(--border)"
             strokeWidth="12"
             pathLength={100}
             strokeLinecap="round"
           />
-          <path
-            d="M10 110 A90 90 0 0 1 190 110"
-            fill="none"
-            stroke={color}
-            strokeWidth="12"
-            pathLength={100}
-            strokeDasharray={100}
-            strokeDashoffset={100 - pct}
-            strokeLinecap="round"
-            style={{ filter: `drop-shadow(0 0 12px ${color}66)` }}
-          />
+          {clamped !== null && !isNeutral ? (
+            <path
+              d="M10 110 A90 90 0 0 1 190 110"
+              fill="none"
+              stroke={color}
+              strokeWidth="12"
+              pathLength={100}
+              strokeDasharray={100}
+              strokeDashoffset={100 - pct}
+              strokeLinecap="round"
+              style={{ filter: `drop-shadow(0 0 12px ${color})` }}
+            />
+          ) : null}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center pt-6">
-          <div className="text-2xl font-bold text-[oklch(0.92_0.05_220)]">
-            {safeValue !== null ? `${Math.round(safeValue)}%` : "N/D"}
+          <div className="text-2xl font-bold text-foreground">
+            {rounded !== null ? `${rounded}%` : "N/D"}
           </div>
-          <div className="text-[10px] text-[oklch(0.60_0.05_250)]">
+          <div className="text-[10px] text-muted-foreground">
             {min}% — {max}%
           </div>
         </div>
@@ -255,10 +267,10 @@ function StreakRing({
 }) {
   const max = Math.max(record || 0, 7);
   return (
-    <div className="rounded-2xl p-3 bg-[oklch(0.18_0.03_250)] border border-[oklch(0.25_0.03_250)]">
+    <div className="rounded-2xl p-4 bg-card/80 border border-border/60 shadow-sm">
       <div className="flex items-center justify-between mb-3">
-        <div className="text-xs uppercase tracking-wide text-[oklch(0.65_0.05_250)]">Streak</div>
-        <div className="text-[10px] text-[oklch(0.60_0.05_250)]">Record {record}g</div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground">Streak</div>
+        <div className="text-[10px] text-muted-foreground">Record {record}g</div>
       </div>
       <div className="flex items-center gap-4">
         <div className="relative w-20 h-20">
@@ -267,7 +279,7 @@ function StreakRing({
               cx="50"
               cy="50"
               r={32}
-              stroke="oklch(0.28 0.03 250)"
+              stroke="var(--border)"
               strokeWidth="7"
               fill="none"
             />
@@ -275,22 +287,22 @@ function StreakRing({
               cx="50"
               cy="50"
               r={32}
-              stroke="#f97316"
+              stroke="var(--chart-5)"
               strokeWidth="7"
               fill="none"
               strokeDasharray={2 * Math.PI * 32}
               strokeDashoffset={(2 * Math.PI * 32) * (1 - Math.min(1, current / max))}
               strokeLinecap="round"
               transform="rotate(-90 50 50)"
-              style={{ filter: "drop-shadow(0 0 10px #f9731655)" }}
+              style={{ filter: "drop-shadow(0 0 10px var(--chart-5))" }}
             />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div className="text-lg font-bold text-[oklch(0.92_0.05_220)]">{current}</div>
-            <div className="text-[10px] text-[oklch(0.60_0.05_250)]">giorni</div>
+            <div className="text-lg font-bold text-foreground">{current}</div>
+            <div className="text-[10px] text-muted-foreground">giorni</div>
           </div>
         </div>
-        <div className="text-xs text-[oklch(0.60_0.05_250)] leading-snug">
+        <div className="text-xs text-muted-foreground leading-snug">
           🔥 Consecutivi attuali
         </div>
       </div>
@@ -309,13 +321,12 @@ export default function Statistics() {
     { days: period },
     { staleTime: 5 * 60 * 1000 } // Cache for 5 minutes
   );
-  const { data: advanced, isLoading: advancedLoading } = trpc.statistics.getAdvanced.useQuery(
-    { days: period },
-    { 
-      staleTime: 24 * 60 * 60 * 1000, // Cache for 24 hours (AI insights)
-      cacheTime: 24 * 60 * 60 * 1000  // Keep in cache for 24 hours
-    }
-  );
+	  const { data: advanced, isLoading: advancedLoading } = trpc.statistics.getAdvanced.useQuery(
+	    { days: period },
+	    { 
+	      staleTime: 24 * 60 * 60 * 1000, // Cache for 24 hours (AI insights)
+	    }
+	  );
 
   const isLoading = timelineLoading || performanceLoading || advancedLoading;
 
@@ -338,304 +349,342 @@ export default function Statistics() {
     sessioni: point.sessions,
   }));
 
+  const progressiveOverloadValue =
+    advanced?.poiBaseline === false ? null : advanced?.progressiveOverloadIndex ?? null;
+
+  const trendValue =
+    advanced?.trendBaseline && advanced?.trendIndicator
+      ? advanced.trendIndicator.direction === "down"
+        ? -advanced.trendIndicator.percentage
+        : advanced.trendIndicator.percentage
+      : null;
+
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low" className="text-white">
-    <div className="pb-20 overflow-x-hidden">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-[oklch(0.18_0.03_250_/_0.55)] border-b border-[oklch(0.25_0.03_250)] px-4 py-4">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard">
-            <button className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-          </Link>
-          <h1 className="text-xl font-bold">📊 Statistiche</h1>
+    <AppLayout className="text-foreground">
+      <div className="compact-shell space-y-6 lg:space-y-3 pb-12 lg:pb-2">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Progressi</p>
+            <h1 className="text-3xl font-semibold text-foreground">Statistiche</h1>
+            <p className="text-sm text-muted-foreground">
+              Metriche avanzate e trend sulle tue sessioni recenti.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="neon" asChild>
+                <Link href="/profile/performance">Statistiche</Link>
+              </Button>
+              <Button size="sm" variant="outline-neon" asChild>
+                <Link href="/season/objectives">Obiettivi</Link>
+              </Button>
+              <Button size="sm" variant="outline-neon" asChild>
+                <Link href="/badges">Badge</Link>
+              </Button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {PERIOD_OPTIONS.map((option) => (
+              <Button
+                key={option.value}
+                size="sm"
+                variant={period === option.value ? "default" : "secondary"}
+                onClick={() => setPeriod(option.value)}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
         </div>
 
-        {/* Period Filter */}
-        <div className="flex gap-2 mt-4 overflow-x-auto scrollbar-hide pb-2">
-          {PERIOD_OPTIONS.map((option) => (
-            <button
-              key={option.value}
-              onClick={() => setPeriod(option.value)}
-              className={`px-4 py-2 rounded-lg whitespace-nowrap transition-colors ${
-                period === option.value
-                  ? "bg-[oklch(0.55_0.20_220)] text-white"
-                  : "bg-[oklch(0.20_0.03_250_/_0.55)] text-[oklch(0.70_0.05_250)] hover:bg-[oklch(0.25_0.03_250)]"
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="p-4 space-y-6 max-w-full overflow-x-hidden">
+        <div className="space-y-6 lg:space-y-3">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 space-y-4">
             <div className="relative w-16 h-16">
-              <div className="absolute inset-0 border-4 border-[oklch(0.30_0.04_250)] rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-[oklch(0.70_0.18_220)] border-t-transparent rounded-full animate-spin"></div>
+              <div className="absolute inset-0 border-4 border-border rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
             </div>
             <div className="text-center space-y-2">
-              <p className="text-lg font-semibold text-[oklch(0.85_0.05_220)]">Caricamento statistiche...</p>
-              <p className="text-sm text-[oklch(0.65_0.03_220)]">Analisi dati in corso</p>
+              <p className="text-lg font-semibold text-foreground">Caricamento statistiche...</p>
+              <p className="text-sm text-muted-foreground">Analisi dati in corso</p>
             </div>
           </div>
         ) : (
-          <>
-            {/* Progress Timeline */}
-            <motion.section 
+          <Accordion
+            type="single"
+            collapsible
+            defaultValue="timeline"
+            className="space-y-3"
+          >
+            <AccordionItem value="timeline" className="border-0">
+              <AccordionTrigger className="rounded-xl border border-border/70 bg-card/60 px-4 py-3 text-left font-medium hover:no-underline">
+                <span className="inline-flex items-center gap-2">
+                  <BarChart3 className="size-4 text-primary" />
+                  Progress Timeline
+                </span>
+              </AccordionTrigger>
+              <AccordionContent>
+                {/* Progress Timeline */}
+                <motion.section 
               className="space-y-3"
               initial={{ opacity: 0, y: 30, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
             >
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[oklch(0.70_0.08_220)]">
-                  Progress Timeline
-                </h2>
-                <div className="group relative">
-                  <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)] cursor-help" />
-                  <div className="absolute left-0 top-6 w-64 p-2 bg-[oklch(0.20_0.03_250_/_0.55)] border border-[oklch(0.30_0.03_250)] rounded-lg text-xs text-[oklch(0.85_0.05_220)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                    Visualizza l'andamento della distanza percorsa e del pace medio nel periodo selezionato. Utile per identificare trend e progressi nel tempo.
+              <section className="surface-panel p-6">
+                <div className="pb-2">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-base">Progress Timeline</h3>
+                      <p>
+                        Distanza e ritmo medio nel periodo selezionato.
+                      </p>
+                    </div>
+                    <div className="group relative mt-1">
+                      <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                      <div className="absolute right-0 top-6 w-64 rounded-lg border border-border bg-card/95 p-2 text-xs text-foreground opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none z-50">
+                        Visualizza l'andamento della distanza percorsa e del pace medio nel periodo selezionato. Utile per identificare trend e progressi nel tempo.
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div
-                className="rounded-xl p-4"
-                style={{
-                  background: "oklch(0.18 0.03 250)",
-                  border: "1px solid oklch(0.25 0.03 250)",
-                }}
-              >
-                {timelineChartData && timelineChartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={250}>
-                    <LineChart data={timelineChartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.25 0.03 250)" />
-                      <XAxis dataKey="date" stroke="oklch(0.60 0.05 250)" style={{ fontSize: "12px" }} />
-                      <YAxis stroke="oklch(0.60 0.05 250)" style={{ fontSize: "12px" }} />
-                      <Tooltip
-                        contentStyle={{
-                          background: "oklch(0.20 0.03 250)",
-                          border: "1px solid oklch(0.30 0.03 250)",
-                          borderRadius: "8px",
-                          color: "white",
-                        }}
-                      />
-                      <Legend />
-                      <Line
-                        type="monotone"
-                        dataKey="distanza"
-                        stroke="#3b82f6"
-                        strokeWidth={2}
-                        name="Distanza (km)"
-                        dot={{ fill: "#3b82f6" }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="pace"
-                        stroke="#10b981"
-                        strokeWidth={2}
-                        name="Pace (min/100m)"
-                        dot={{ fill: "#10b981" }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <p className="text-center text-[oklch(0.60_0.05_250)] py-8">
-                    Nessun dato disponibile per questo periodo
-                  </p>
-                )}
-              </div>
+                <div>
+                  {timelineChartData && timelineChartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={250}>
+                      <LineChart data={timelineChartData}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis dataKey="date" stroke="var(--muted-foreground)" style={{ fontSize: "12px" }} />
+                        <YAxis stroke="var(--muted-foreground)" style={{ fontSize: "12px" }} />
+                        <Tooltip
+                          contentStyle={{
+                            background: "var(--card)",
+                            border: "1px solid var(--border)",
+                            borderRadius: "8px",
+                            color: "var(--foreground)",
+                          }}
+                        />
+                        <Legend />
+                        <Line
+                          type="monotone"
+                          dataKey="distanza"
+                          stroke="var(--chart-1)"
+                          strokeWidth={2}
+                          name="Distanza (km)"
+                          dot={{ fill: "var(--chart-1)" }}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="pace"
+                          stroke="var(--chart-2)"
+                          strokeWidth={2}
+                          name="Pace (min/100m)"
+                          dot={{ fill: "var(--chart-2)" }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="text-center text-muted-foreground py-8">
+                      Nessun dato disponibile per questo periodo
+                    </p>
+                  )}
+                </div>
+              </section>
             </motion.section>
+              </AccordionContent>
+            </AccordionItem>
 
-            {/* Analisi Prestazioni */}
-            <motion.section 
+            <AccordionItem value="performance" className="border-0">
+              <AccordionTrigger className="rounded-xl border border-border/70 bg-card/60 px-4 py-3 text-left font-medium hover:no-underline">
+                <span className="inline-flex items-center gap-2">
+                  <Gauge className="size-4 text-primary" />
+                  Analisi prestazioni
+                </span>
+              </AccordionTrigger>
+              <AccordionContent>
+                {/* Analisi Prestazioni */}
+                <motion.section 
               className="space-y-3"
               initial={{ opacity: 0, y: 30, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
             >
-              <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[oklch(0.70_0.08_220)]">
-                Analisi Prestazioni
-              </h2>
-
               {/* HR Zones */}
               {hrZonesData.length > 0 && (
-                <div
-                  className="rounded-xl p-4"
-                  style={{
-                    background: "oklch(0.18 0.03 250)",
-                    border: "1px solid oklch(0.25 0.03 250)",
-                  }}
-                >
-                  <div className="flex items-center gap-2 mb-3">
-                    <h3 className="font-semibold">Zone Frequenza Cardiaca</h3>
-                    <div className="group relative">
-                      <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)] cursor-help" />
-                      <div className="absolute left-0 top-6 w-72 p-2 bg-[oklch(0.20_0.03_250_/_0.55)] border border-[oklch(0.30_0.03_250)] rounded-lg text-xs text-[oklch(0.85_0.05_220)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                        Mostra la distribuzione percentuale del tempo trascorso in ciascuna zona di frequenza cardiaca. Z1: Recupero, Z2: Aerobica, Z3: Soglia, Z4: Anaerobica, Z5: Massima.
+                <section className="surface-panel p-6">
+                  <div className="pb-2">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-base">Zone frequenza cardiaca</h3>
+                        <p>
+                          Distribuzione del tempo nelle diverse zone.
+                        </p>
+                      </div>
+                      <div className="group relative mt-1">
+                        <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                        <div className="absolute right-0 top-6 w-72 rounded-lg border border-border bg-card/95 p-2 text-xs text-foreground opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none z-50">
+                          Mostra la distribuzione percentuale del tempo trascorso in ciascuna zona di frequenza cardiaca. Z1: Recupero, Z2: Aerobica, Z3: Soglia, Z4: Anaerobica, Z5: Massima.
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div className="flex flex-col md:flex-row items-center gap-4">
-                    <ResponsiveContainer width="100%" height={200}>
-                      <PieChart>
-                        <Pie
-                          data={hrZonesData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={80}
-                          paddingAngle={2}
-                          dataKey="value"
-                        >
-                          {hrZonesData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            background: "oklch(0.20 0.03 250)",
-                            border: "1px solid oklch(0.30 0.03 250)",
-                            borderRadius: "8px",
-                            color: "white",
-                          }}
-                          labelStyle={{
-                            color: "white",
-                          }}
-                          itemStyle={{
-                            color: "white",
-                          }}
-                          formatter={(value: number) => `${value}%`}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                    <div className="space-y-2 text-sm">
-                      {hrZonesData.map((zone) => (
-                        <div key={zone.name} className="flex items-center gap-2">
-                          <div
-                            className="w-3 h-3 rounded-full"
-                            style={{ background: zone.color }}
+                  <div>
+                    <div className="flex flex-col md:flex-row items-center gap-4">
+                      <ResponsiveContainer width="100%" height={200}>
+                        <PieChart>
+                          <Pie
+                            data={hrZonesData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={50}
+                            outerRadius={80}
+                            paddingAngle={2}
+                            dataKey="value"
+                          >
+                            {hrZonesData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              background: "var(--card)",
+                              border: "1px solid var(--border)",
+                              borderRadius: "8px",
+                              color: "var(--foreground)",
+                            }}
+                            formatter={(value: number) => `${value}%`}
                           />
-                          <span>
-                            {zone.name}: {zone.value}%
-                          </span>
-                        </div>
-                      ))}
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="space-y-2 text-sm">
+                        {hrZonesData.map((zone) => (
+                          <div key={zone.name} className="flex items-center gap-2">
+                            <div
+                              className="w-3 h-3 rounded-full"
+                              style={{ background: zone.color }}
+                            />
+                            <span>
+                              {zone.name}: {zone.value}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
+                </section>
               )}
 
               {/* Pace Distribution */}
               {performance && performance.paceDistribution.length > 0 && (
-                <div
-                  className="rounded-xl p-4"
-                  style={{
-                    background: "oklch(0.18 0.03 250)",
-                    border: "1px solid oklch(0.25 0.03 250)",
-                  }}
-                >
-                  <div className="flex items-center gap-2 mb-3">
-                    <h3 className="font-semibold">Distribuzione Pace</h3>
-                    <div className="group relative">
-                      <Info className="w-4 h-4 text-[oklch(0.60_0.05_250)] cursor-help" />
-                      <div className="absolute left-0 top-6 w-72 p-2 bg-[oklch(0.20_0.03_250_/_0.55)] border border-[oklch(0.30_0.03_250)] rounded-lg text-xs text-[oklch(0.85_0.05_220)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-                        Mostra quante sessioni hai completato in ciascun range di pace (min/100m). Ti aiuta a capire a quale velocità nuoti più frequentemente.
+                <section className="surface-panel p-6">
+                  <div className="pb-2">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-base">Distribuzione pace</h3>
+                        <p>
+                          Sessioni per fascia di ritmo (min/100m).
+                        </p>
+                      </div>
+                      <div className="group relative mt-1">
+                        <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                        <div className="absolute right-0 top-6 w-72 rounded-lg border border-border bg-card/95 p-2 text-xs text-foreground opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none z-50">
+                          Mostra quante sessioni hai completato in ciascun range di pace (min/100m). Ti aiuta a capire a quale velocità nuoti più frequentemente.
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={performance.paceDistribution}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.25 0.03 250)" />
-                      <XAxis dataKey="range" stroke="oklch(0.60 0.05 250)" style={{ fontSize: "12px" }} />
-                      <YAxis stroke="oklch(0.60 0.05 250)" style={{ fontSize: "12px" }} />
-                      <Tooltip
-                        contentStyle={{
-                          background: "oklch(0.20 0.03 250)",
-                          border: "1px solid oklch(0.30 0.03 250)",
-                          borderRadius: "8px",
-                          color: "white",
-                        }}
-                      />
-                      <Bar dataKey="count" fill="#06b6d4" name="Sessioni" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+                  <div>
+                    <ResponsiveContainer width="100%" height={200}>
+                      <BarChart data={performance.paceDistribution}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                        <XAxis dataKey="range" stroke="var(--muted-foreground)" style={{ fontSize: "12px" }} />
+                        <YAxis stroke="var(--muted-foreground)" style={{ fontSize: "12px" }} />
+                        <Tooltip
+                          contentStyle={{
+                            background: "var(--card)",
+                            border: "1px solid var(--border)",
+                            borderRadius: "8px",
+                            color: "var(--foreground)",
+                          }}
+                        />
+                        <Bar dataKey="count" fill="var(--chart-1)" name="Sessioni" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </section>
               )}
 
               {/* Calories & SWOLF */}
               {performance && (
-                <div className="grid grid-cols-2 gap-3">
-                  <div
-                    className="rounded-xl p-4"
-                    style={{
-                      background: "oklch(0.18 0.03 250)",
-                      border: "1px solid oklch(0.25 0.03 250)",
-                    }}
-                  >
-                    <div className="text-sm text-[oklch(0.70_0.05_250)]">Calorie Totali</div>
-                    <div className="text-2xl font-bold text-[oklch(0.90_0.05_220)]">
-                      {performance.caloriesTotal.toLocaleString()}
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <section className="surface-panel p-6">
+                    <div className="pb-2">
+                      <h3 className="text-base">Calorie totali</h3>
+                      <p>Energia spesa nel periodo</p>
                     </div>
-                    <div className="text-xs text-[oklch(0.60_0.05_250)] mt-1">
-                      Media: {performance.avgCaloriesPerSession}/sessione
+                    <div>
+                      <div className="text-2xl font-bold text-foreground">
+                        {performance.caloriesTotal.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Media: {performance.avgCaloriesPerSession}/sessione
+                      </div>
                     </div>
-                  </div>
+                  </section>
                   {performance.swolfAvg && (
-                    <div
-                      className="rounded-xl p-4"
-                      style={{
-                        background: "oklch(0.18 0.03 250)",
-                        border: "1px solid oklch(0.25 0.03 250)",
-                      }}
-                    >
-                      <div className="text-sm text-[oklch(0.70_0.05_250)]">SWOLF Medio</div>
-                      <div className="text-2xl font-bold text-[oklch(0.90_0.05_220)]">
-                        {performance.swolfAvg}
+                    <section className="surface-panel p-6">
+                      <div className="pb-2">
+                        <h3 className="text-base">SWOLF medio</h3>
+                        <p>Efficienza nuotata</p>
                       </div>
-                      <div className="text-xs text-[oklch(0.60_0.05_250)] mt-1">
-                        Efficienza nuotata
+                      <div>
+                        <div className="text-2xl font-bold text-foreground">
+                          {performance.swolfAvg}
+                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">
+                          Valore più basso = migliore efficienza
+                        </div>
                       </div>
-                    </div>
+                    </section>
                   )}
                 </div>
               )}
               </motion.section>
+              </AccordionContent>
+            </AccordionItem>
 
             {/* Analisi Avanzate */}
             {advanced && (
-              <motion.section 
+              <AccordionItem value="advanced" className="border-0">
+                <AccordionTrigger className="rounded-xl border border-border/70 bg-card/60 px-4 py-3 text-left font-medium hover:no-underline">
+                  <span className="inline-flex items-center gap-2">
+                    <Sparkles className="size-4 text-primary" />
+                    Analisi avanzate
+                  </span>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <motion.section 
                 className="space-y-3"
                 initial={{ opacity: 0, y: 30, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
               >
-                <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-[oklch(0.70_0.08_220)]">
-                  Analisi Avanzate
-                </h2>
-
                 {/* Core Rings */}
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                   <RingMetric
                     label="Performance"
                     value={advanced.performanceIndex}
-                    color="#38bdf8"
+                    color="var(--chart-1)"
                     info={metricsDefinitions.performanceIndex}
                   />
                   <RingMetric
                     label="Consistency"
                     value={advanced.consistencyScore}
-                    color="#22c55e"
+                    color="var(--chart-2)"
                     info={metricsDefinitions.consistencyScore}
                   />
                   <RingMetric
                     label="Recovery"
                     value={advanced.recoveryReadinessScore}
-                    color="#06b6d4"
+                    color="var(--chart-3)"
                     info={metricsDefinitions.rrs}
                   />
                   <StreakRing current={advanced.streak.current} record={advanced.streak.record} />
@@ -643,84 +692,84 @@ export default function Statistics() {
 
                 {/* Advanced Swimming Metrics */}
                 <div className="space-y-3">
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-[oklch(0.70_0.08_220)]">
-                    Metriche Avanzate
+                  <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                    Metriche avanzate
                   </h3>
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                     <RingMetric
                       label="SEI"
                       value={advanced.swimmingEfficiencyIndex}
-                      color="#a855f7"
+                      color="var(--chart-5)"
                       info={metricsDefinitions.sei}
                     />
                     <RingMetric
                       label="TCI"
                       value={advanced.technicalConsistencyIndex}
-                      color="#f59e0b"
+                      color="var(--chart-4)"
                       info={metricsDefinitions.tci}
                     />
                     <RingMetric
                       label="SER"
                       value={advanced.strokeEfficiencyRating}
-                      color="#f97316"
+                      color="var(--chart-3)"
                       info={metricsDefinitions.ser}
                     />
                     <RingMetric
                       label="ACS"
                       value={advanced.aerobicCapacityScore}
-                      color="#84cc16"
+                      color="var(--chart-2)"
                       info={metricsDefinitions.acs}
                     />
                   </div>
                   <div className="grid gap-4 md:grid-cols-2">
                     <GaugeMetric
                       label="Progressive Overload"
-                      value={advanced.progressiveOverloadIndex}
+                      value={progressiveOverloadValue}
                       info={metricsDefinitions.poi}
                     />
                     <GaugeMetric
                       label="Trend"
-                      value={advanced.trendIndicator.percentage}
+                      value={trendValue}
                       min={-50}
                       max={50}
-                      info={metricsDefinitions.performanceIndex}
+                      neutralRange={2}
+                      info={metricsDefinitions.trend}
                     />
                   </div>
                 </div>
 
                 {/* Predictions */}
                 {advanced.predictions && (
-                  <div
-                    className="rounded-xl p-4"
-                    style={{
-                      background: "oklch(0.18 0.03 250)",
-                      border: "1px solid oklch(0.25 0.03 250)",
-                    }}
-                  >
-                    <h3 className="font-semibold mb-2">📈 Previsioni</h3>
-                    <p className="text-sm text-[oklch(0.80_0.05_220)]">
-                      Al ritmo attuale raggiungerai{" "}
-                      <span className="font-bold text-[oklch(0.90_0.05_220)]">
-                        {advanced.predictions.targetKm}km
-                      </span>{" "}
-                      entro il{" "}
-                      <span className="font-bold text-[oklch(0.90_0.05_220)]">
-                        {new Date(advanced.predictions.estimatedDate).toLocaleDateString("it-IT")}
-                      </span>
-                    </p>
-                    <p className="text-xs text-[oklch(0.60_0.05_250)] mt-1">
-                      ({advanced.predictions.daysRemaining} giorni rimasti)
-                    </p>
-                  </div>
+                  <section className="surface-panel p-6">
+                    <div className="pb-2">
+                      <h3 className="text-base">Previsioni</h3>
+                      <p>Stima di obiettivi al ritmo attuale.</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        Al ritmo attuale raggiungerai{" "}
+                        <span className="font-bold text-foreground">
+                          {advanced.predictions.targetKm}km
+                        </span>{" "}
+                        entro il{" "}
+                        <span className="font-bold text-foreground">
+                          {new Date(advanced.predictions.estimatedDate).toLocaleDateString("it-IT")}
+                        </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        ({advanced.predictions.daysRemaining} giorni rimasti)
+                      </p>
+                    </div>
+                  </section>
                 )}
               </motion.section>
+                </AccordionContent>
+              </AccordionItem>
             )}
-          </>
+          </Accordion>
         )}
+        </div>
       </div>
-
-      <MobileNav />
-    </div>
     </AppLayout>
   );
 }
