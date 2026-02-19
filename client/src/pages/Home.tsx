@@ -197,7 +197,10 @@ export default function Home() {
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Link
                 href="/signup"
-                className={cn(buttonVariants({ size: "lg", variant: "neon" }))}
+                className={cn(
+                  buttonVariants({ size: "lg", variant: "neon" }),
+                  "min-h-[48px] w-full sm:w-auto"
+                )}
               >
                 Inizia l&apos;avventura
                 <ArrowRight className="ml-2 size-4" />
@@ -209,7 +212,7 @@ export default function Home() {
 
       <section id="progress" className="border-y border-border bg-card/50 py-16">
         <div className="mx-auto max-w-7xl px-4 md:px-6">
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
             {[
               { ...stats[0], icon: <TrendingUp className="size-4" />, progress: 72, tone: "cyan" as const },
               { ...stats[1], icon: <Trophy className="size-4" />, progress: 82, tone: "lime" as const },
@@ -289,14 +292,20 @@ export default function Home() {
               <div className="mt-8 flex flex-col gap-4 sm:flex-row">
                 <Link
                   href="/signup"
-                  className={cn(buttonVariants({ size: "lg", variant: "neon" }))}
+                  className={cn(
+                    buttonVariants({ size: "lg", variant: "neon" }),
+                    "min-h-[48px] w-full sm:w-auto"
+                  )}
                 >
                   Inizia l&apos;Avventura
                   <ArrowRight className="ml-2 size-4" />
                 </Link>
                 <Link
                   href="/login"
-                  className={cn(buttonVariants({ variant: "outline-neon", size: "lg" }))}
+                  className={cn(
+                    buttonVariants({ variant: "outline-neon", size: "lg" }),
+                    "min-h-[48px] w-full sm:w-auto"
+                  )}
                 >
                   Accedi
                 </Link>

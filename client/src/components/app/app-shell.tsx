@@ -153,7 +153,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
       {/* Desktop Rail */}
       <aside
         data-tour="main-navigation"
-        className="fixed left-0 top-0 z-40 hidden h-screen w-[88px] border-r border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_50%,transparent),color-mix(in_oklch,var(--background)_65%,transparent))] backdrop-blur-xl shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_14%,transparent)] lg:flex"
+        className="fixed left-0 top-0 z-40 hidden h-screen w-[88px] border-r border-border/40 bg-sidebar/95 backdrop-blur-xl shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_14%,transparent)] lg:flex"
       >
         <div className="flex h-full w-full flex-col items-center">
           <div className="flex h-16 items-center justify-center">
@@ -229,7 +229,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
       </aside>
 
       {/* Top Bar */}
-      <header className="fixed left-0 right-0 top-0 z-50 h-16 border-b border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_54%,transparent),color-mix(in_oklch,var(--background)_62%,transparent))] backdrop-blur-xl shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_12%,transparent)] lg:pl-[88px]">
+      <header className="fixed left-0 right-0 top-0 z-50 h-16 border-b border-border/40 bg-background/80 backdrop-blur-xl shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_12%,transparent)] lg:pl-[88px]">
         <div className="flex h-full items-center justify-between gap-3 px-4">
           <div className="flex min-w-0 items-center gap-3">
             {headerSlot}
@@ -313,9 +313,9 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
       {/* Mobile Bottom Nav */}
       <nav
         data-tour="main-navigation"
-        className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/70 bg-[linear-gradient(180deg,color-mix(in_oklch,var(--card)_58%,transparent),color-mix(in_oklch,var(--background)_70%,transparent))] backdrop-blur-xl lg:hidden pb-[env(safe-area-inset-bottom)]"
+        className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/40 bg-background/90 backdrop-blur-xl lg:hidden"
       >
-        <div className="mx-auto flex h-[calc(3.5rem+env(safe-area-inset-bottom))] max-w-3xl items-center justify-between px-2">
+        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-2">
           {[navPrimary[0], navPrimary[1]].map((item) => {
             const isActive = isNavItemActive(item.path, location)
             return (
@@ -323,7 +323,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
                 key={item.path}
                 href={item.path}
                 className={cn(
-                  "flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-2xl text-[10px] font-semibold transition-[transform,box-shadow,background-color,color] active:scale-[0.96]",
+                  "flex min-h-[44px] min-w-[44px] h-12 w-full flex-col items-center justify-center gap-0.5 rounded-2xl text-[10px] font-semibold transition-[transform,box-shadow,background-color,color] active:scale-[0.96]",
                   isActive
                     ? "text-foreground bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_14%,transparent))] shadow-[0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_22%,transparent),0_10px_26px_var(--neon-soft)]"
                     : "text-muted-foreground hover:bg-card/45 hover:text-foreground",
@@ -342,7 +342,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
             type="button"
             onClick={() => setIsCreateOpen(true)}
             data-tour="create-post"
-            className="flex w-full flex-col items-center justify-center active:scale-[0.92] transition-transform"
+            className="flex min-h-[44px] min-w-[44px] w-full flex-col items-center justify-center transition-transform active:scale-[0.92]"
             aria-label="Crea post"
           >
             <span className="flex size-12 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime))] text-background shadow-[0_0_22px_var(--neon-soft)] -mt-3">
@@ -357,7 +357,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
                 key={item.path}
                 href={item.path}
                 className={cn(
-                  "flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-2xl text-[10px] font-semibold transition-[transform,box-shadow,background-color,color] active:scale-[0.96]",
+                  "flex min-h-[44px] min-w-[44px] h-12 w-full flex-col items-center justify-center gap-0.5 rounded-2xl text-[10px] font-semibold transition-[transform,box-shadow,background-color,color] active:scale-[0.96]",
                   isActive
                     ? "text-foreground bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_14%,transparent))] shadow-[0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_22%,transparent),0_10px_26px_var(--neon-soft)]"
                     : "text-muted-foreground hover:bg-card/45 hover:text-foreground",
@@ -374,7 +374,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
       </nav>
 
       {/* Main Content */}
-      <main className="min-h-[calc(100dvh-4rem)] min-w-0 pt-16 pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0 lg:pl-[88px]">
+      <main className="min-h-[calc(100dvh-4rem)] min-w-0 pb-20 pt-16 md:pb-0 lg:pl-[88px]">
         <div className="mx-auto max-w-[1520px] min-w-0 p-4 md:p-5 lg:p-6">
           <AnimatePresence mode="wait" initial={false}>
             <motion.div

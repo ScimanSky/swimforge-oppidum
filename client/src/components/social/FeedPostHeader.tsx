@@ -8,7 +8,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, UserCheck, UserPlus, Flag, EyeOff, Trash2 } from "lucide-react"
+import {
+  MoreHorizontal,
+  UserCheck,
+  UserPlus,
+  Flag,
+  EyeOff,
+  Trash2,
+  Waves,
+  Droplets,
+} from "lucide-react"
 import { formatTimeAgo, getInitials } from "@/lib/format"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
@@ -69,19 +78,21 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
     onError: (err) => toast.error(err.message),
   })
 
-  // Build source line: "Strava · Pool · 2h fa"
   const sourceParts: string[] = []
   if (post.activity_source) sourceParts.push(post.activity_source)
   if (post.activity_is_open_water != null) sourceParts.push(activityType)
   sourceParts.push(formatTimeAgo(post.created_at))
 
   return (
-    <div className="flex items-center gap-3 px-4 pt-3">
+    <div className="flex items-center gap-3 px-4 pb-1 pt-4">
       <Link href={`/u/${post.user_id}`}>
-        <Avatar className="size-11 border-2 border-border/60 cursor-pointer ring-2 ring-transparent hover:ring-[var(--electric-cyan)]/30 transition-all">
-          <AvatarImage src={post.user_avatar || ""} alt={name} />
-          <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
-        </Avatar>
+        <div className="relative">
+          <Avatar className="size-11 cursor-pointer ring-2 ring-[var(--electric-cyan)]/30 transition-all hover:ring-[var(--electric-cyan)]/60">
+            <AvatarImage src={post.user_avatar || ""} alt={name} />
+            <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
+          </Avatar>
+          <span className="absolute -left-0.5 -top-0.5 size-3 rounded-full border-2 border-card bg-emerald-400" />
+        </div>
       </Link>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5">
@@ -92,12 +103,21 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
             {name}
           </Link>
           {post.user_level != null && post.user_level > 0 && (
-            <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-md bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_20%,transparent),color-mix(in_oklch,var(--electric-lime)_16%,transparent))] text-foreground/80">
+            <span className="shrink-0 rounded-md bg-[var(--electric-cyan)]/15 px-1.5 py-0.5 text-[10px] font-bold text-[var(--electric-cyan)]">
               Lv.{post.user_level}
             </span>
           )}
         </div>
-        <p className="text-xs text-muted-foreground truncate">{sourceParts.join(" · ")}</p>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {post.activity_is_open_water != null ? (
+            post.activity_is_open_water ? (
+              <Droplets className="size-3 text-sky-400" />
+            ) : (
+              <Waves className="size-3 text-[var(--electric-cyan)]" />
+            )
+          ) : null}
+          <span className="truncate">{sourceParts.join(" · ")}</span>
+        </div>
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
@@ -112,20 +132,25 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
             {isFollowing ? (
               <>
                 <UserCheck className="h-3.5 w-3.5" />
-                Seguendo
+                <span className="hidden sm:inline">Seguendo</span>
               </>
             ) : (
               <>
                 <UserPlus className="h-3.5 w-3.5" />
-                Segui
+                <span className="hidden sm:inline">Segui</span>
               </>
             )}
           </Button>
         )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="size-8 rounded-full text-muted-foreground hover:text-foreground">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="size-11 rounded-full text-muted-foreground hover:text-foreground"
+            >
               <MoreHorizontal className="size-4" />
+              <span className="sr-only">Menu post</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">

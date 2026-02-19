@@ -772,7 +772,7 @@ export default function Settings() {
 
   return (
     <AppLayout>
-    <div className="space-y-6 lg:space-y-3">
+    <div className="compact-shell space-y-4 lg:space-y-2">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-display font-bold neon-gradient-text">Impostazioni</h1>

@@ -13,21 +13,24 @@ const tabs = [
 
 export default function FeedSubTabs({ tab, onChange }: FeedSubTabsProps) {
   return (
-    <div className="flex items-center gap-1 rounded-2xl border border-border/80 bg-card/50 p-1 w-fit">
+    <div className="flex w-fit items-center gap-1 rounded-2xl border border-border/40 bg-secondary/60 p-1 backdrop-blur-sm">
       {tabs.map((t) => (
         <button
           key={t.key}
+          type="button"
           onClick={() => onChange(t.key)}
           className={cn(
-            "relative rounded-xl px-4 py-2 text-sm font-semibold transition-colors",
-            tab === t.key ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+            "relative min-h-[44px] rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors",
+            tab === t.key
+              ? "text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground",
           )}
         >
           {tab === t.key && (
-            <motion.div
-              layoutId="feed-tab-indicator"
-              className="absolute inset-0 rounded-xl bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_22%,transparent),color-mix(in_oklch,var(--electric-lime)_18%,transparent))] shadow-[0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_28%,transparent)]"
-              transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            <motion.span
+              layoutId="feedSubTab"
+              className="absolute inset-0 rounded-xl bg-gradient-to-r from-[var(--electric-cyan)] to-[var(--electric-lime)]"
+              transition={{ type: "spring", bounce: 0.2, duration: 0.5 }}
             />
           )}
           <span className="relative z-10">{t.label}</span>

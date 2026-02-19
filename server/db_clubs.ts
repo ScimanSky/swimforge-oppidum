@@ -175,6 +175,10 @@ export async function getClubFeed(userId: number, clubId: number, limit = 20) {
       a.activity_date AS activity_date,
       a.activity_source AS activity_source,
       a.stroke_type AS activity_stroke_type,
+      a.is_open_water AS activity_is_open_water,
+      a.calories AS activity_calories,
+      a.avg_heart_rate AS activity_heart_rate,
+      a.swolf_score AS activity_swolf,
       COALESCE((SELECT COUNT(*) FROM social_splashes s WHERE s.post_id = p.id), 0) AS splash_count,
       COALESCE((SELECT COUNT(*) FROM social_comments c WHERE c.post_id = p.id), 0) AS comment_count,
       EXISTS(

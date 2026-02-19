@@ -154,7 +154,7 @@ export default function Login() {
                   <Input
                     type="email"
                     placeholder="nome@esempio.com"
-                    className="bg-secondary border-0"
+                    className="min-h-[44px] rounded-xl border-0 bg-secondary"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     disabled={isLoading || isGoogleLoading}
@@ -163,7 +163,10 @@ export default function Login() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <Label>Password</Label>
-                    <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+                    <Link
+                      href="/forgot-password"
+                      className="inline-flex min-h-[44px] items-center text-sm text-primary hover:underline"
+                    >
                       Password dimenticata?
                     </Link>
                   </div>
@@ -171,7 +174,7 @@ export default function Login() {
                     <Input
                       type={showPassword ? "text" : "password"}
                       placeholder="La tua password"
-                      className="bg-secondary border-0 pr-10"
+                      className="min-h-[44px] rounded-xl border-0 bg-secondary pr-10"
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
                       disabled={isLoading || isGoogleLoading}
@@ -188,7 +191,12 @@ export default function Login() {
                   </div>
                 </div>
 
-                <Button variant="neon" type="submit" className="w-full gap-2" disabled={isLoading || isGoogleLoading}>
+                <Button
+                  variant="neon"
+                  type="submit"
+                  className="min-h-[48px] w-full gap-2 rounded-xl"
+                  disabled={isLoading || isGoogleLoading}
+                >
                   {isLoading ? "Accesso..." : "Accedi"}
                   {!isLoading && <ArrowRight className="w-4 h-4" />}
                 </Button>
@@ -209,7 +217,7 @@ export default function Login() {
                 <Button
                   type="button"
                   variant="outline-neon"
-                  className="gap-2 bg-transparent"
+                  className="min-h-[48px] gap-2 rounded-xl bg-transparent"
                   onClick={handleGoogleLogin}
                   disabled={isLoading || isGoogleLoading}
                 >

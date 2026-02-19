@@ -196,28 +196,26 @@ export default function SocialFeed() {
 
   return (
     <AppLayout headerSlot={headerStoriesSlot}>
-      <div className="compact-shell">
-        {/* Two-column layout: feed + sidebar on xl+ */}
-        <div className="flex gap-6 justify-center">
-          {/* Feed column */}
-          <div className="w-full max-w-2xl min-w-0">
-            {/* Feed scope tabs: static on all breakpoints (never overlays feed) */}
-            <div data-tour="feed-tabs" className="mb-3">
-              {/* Pull-to-refresh indicator */}
+      <div className="compact-shell space-y-4 lg:space-y-2">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="w-full min-w-0 max-w-2xl">
+            <div
+              data-tour="feed-tabs"
+              className="sticky top-16 z-20 mb-3 bg-background/80 py-3 backdrop-blur-lg"
+            >
               {firstPageQuery.isFetching && !isInitialLoading && (
                 <div className="flex justify-center py-1">
-                  <RefreshCw className="size-4 text-muted-foreground animate-spin" />
+                  <RefreshCw className="size-4 animate-spin text-muted-foreground" />
                 </div>
               )}
               <FeedSubTabs tab={tab} onChange={setTab} />
             </div>
 
-            <div className="space-y-3 lg:space-y-4">
+            <div className="flex flex-col gap-4">
               <FollowStarterCard
                 state={followStarterQuery.data}
                 isLoading={followStarterQuery.isLoading}
               />
-              {/* Feed List */}
               {isInitialLoading ? (
                 <FeedSkeleton />
               ) : posts.length === 0 ? (
@@ -227,7 +225,7 @@ export default function SocialFeed() {
                   <EmptyFeedPerTe onCreatePost={() => setCreatePostOpen(true)} />
                 )
               ) : (
-                <div className="space-y-3 lg:space-y-4">
+                <div className="flex flex-col gap-4">
                   {posts.slice(0, visibleCount).map((post: any, index: number) => (
                     <div key={post.id} data-tour={index === 0 ? "feed-first-post" : undefined}>
                       <FeedPost
@@ -238,13 +236,11 @@ export default function SocialFeed() {
                       />
                     </div>
                   ))}
-                  {/* Load more button */}
                   {(visibleCount < posts.length || hasMore) && (
-                    <div className="flex justify-center py-4">
-                      <Button
-                        variant="outline-neon"
-                        size="lg"
-                        className="gap-2"
+                    <div className="py-2">
+                      <button
+                        type="button"
+                        className="w-full rounded-xl py-3 text-sm font-medium text-[var(--electric-cyan)] transition-colors hover:bg-[var(--electric-cyan)]/5"
                         disabled={nextPageQuery.isFetching}
                         onClick={() => {
                           if (visibleCount < posts.length) {
@@ -256,14 +252,14 @@ export default function SocialFeed() {
                         }}
                       >
                         {nextPageQuery.isFetching ? (
-                          <>
+                          <span className="inline-flex items-center gap-2">
                             <Loader2 className="size-4 animate-spin" />
-                            Caricamento…
-                          </>
+                            Caricamento...
+                          </span>
                         ) : (
                           "Carica altri"
                         )}
-                      </Button>
+                      </button>
                     </div>
                   )}
                 </div>
@@ -271,10 +267,11 @@ export default function SocialFeed() {
             </div>
           </div>
 
-          {/* Right sidebar — xl+ only */}
-          <aside className="hidden xl:block w-64 shrink-0 sticky top-20 self-start">
-            <FeedSidebar />
-          </aside>
+          <div className="hidden xl:block">
+            <div className="sticky top-20 flex flex-col gap-4">
+              <FeedSidebar />
+            </div>
+          </div>
         </div>
       </div>
 

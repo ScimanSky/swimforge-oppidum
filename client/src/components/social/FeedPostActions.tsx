@@ -43,30 +43,35 @@ export default function FeedPostActions({
   const commentCount = Number(post.comment_count) || 0
 
   return (
-    <div className="px-4 py-2">
-      {/* Action buttons row */}
-      <div className="flex items-center border-t border-border/40 pt-2 -mx-1">
+    <div className="px-4 pb-3 pt-1">
+      <div className="flex items-center gap-1 border-t border-border/50 pt-2">
         <button
           type="button"
           onClick={onToggleComments}
-          className="flex-1 flex items-center justify-center gap-2 py-1.5 rounded-xl text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/40 active:scale-[0.97]"
+          className={[
+            "flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
+            "active:scale-95",
+            commentsOpen
+              ? "bg-[var(--electric-cyan)]/10 text-[var(--electric-cyan)]"
+              : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
+          ].join(" ")}
         >
-          <MessageCircle className={commentsOpen ? "size-[18px] fill-foreground/20 text-foreground" : "size-[18px]"} />
-          <span className={commentsOpen ? "text-foreground" : ""}>
-            {commentCount > 0 ? `${commentCount}` : "Commenta"}
-          </span>
+          <MessageCircle
+            className={`size-[18px] ${commentsOpen ? "fill-[var(--electric-cyan)]/20" : ""}`}
+          />
+          <span>{commentCount > 0 ? commentCount : "Commenta"}</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleShare(post.id)}
-          className="flex-1 flex items-center justify-center gap-2 py-1.5 rounded-xl text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/40 active:scale-[0.97]"
+          className="flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-muted/40 hover:text-foreground active:scale-95"
         >
           <Share2 className="size-[18px]" />
-          <span>Condividi</span>
+          <span className="hidden sm:inline">Condividi</span>
         </button>
 
-        <div className="shrink-0 ml-auto">
+        <div className="ml-auto shrink-0">
           <PostReactions postId={post.id} />
         </div>
       </div>

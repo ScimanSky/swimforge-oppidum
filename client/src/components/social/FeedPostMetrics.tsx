@@ -1,50 +1,136 @@
-import { Ruler, Clock, Gauge } from "lucide-react"
+import { Ruler, Clock, Gauge, Flame, Heart, Activity, type LucideIcon } from "lucide-react"
 import { formatDistance, formatDuration, formatPace } from "@/lib/format"
+
+interface Metric {
+  icon: LucideIcon
+  label: string
+  value: string
+  color: "cyan" | "emerald" | "amber" | "rose" | "sky" | "violet"
+}
+
+const colorMap = {
+  cyan: {
+    bg: "bg-[var(--chip-cyan)]/12",
+    border: "border-[var(--chip-cyan)]/25",
+    text: "text-[var(--chip-cyan)]",
+    icon: "text-[var(--chip-cyan)]",
+    glow: "shadow-[0_0_12px_rgba(56,189,248,0.15)]",
+  },
+  emerald: {
+    bg: "bg-[var(--chip-emerald)]/12",
+    border: "border-[var(--chip-emerald)]/25",
+    text: "text-[var(--chip-emerald)]",
+    icon: "text-[var(--chip-emerald)]",
+    glow: "shadow-[0_0_12px_rgba(52,211,153,0.15)]",
+  },
+  amber: {
+    bg: "bg-[var(--chip-amber)]/12",
+    border: "border-[var(--chip-amber)]/25",
+    text: "text-[var(--chip-amber)]",
+    icon: "text-[var(--chip-amber)]",
+    glow: "shadow-[0_0_12px_rgba(251,191,36,0.15)]",
+  },
+  rose: {
+    bg: "bg-[var(--chip-rose)]/12",
+    border: "border-[var(--chip-rose)]/25",
+    text: "text-[var(--chip-rose)]",
+    icon: "text-[var(--chip-rose)]",
+    glow: "shadow-[0_0_12px_rgba(251,113,133,0.15)]",
+  },
+  sky: {
+    bg: "bg-[var(--chip-sky)]/12",
+    border: "border-[var(--chip-sky)]/25",
+    text: "text-[var(--chip-sky)]",
+    icon: "text-[var(--chip-sky)]",
+    glow: "shadow-[0_0_12px_rgba(56,189,248,0.15)]",
+  },
+  violet: {
+    bg: "bg-[var(--chip-violet)]/12",
+    border: "border-[var(--chip-violet)]/25",
+    text: "text-[var(--chip-violet)]",
+    icon: "text-[var(--chip-violet)]",
+    glow: "shadow-[0_0_12px_rgba(167,139,250,0.15)]",
+  },
+}
 
 interface FeedPostMetricsProps {
   distanceMeters?: number | null
   durationSeconds?: number | null
+  calories?: number | null
+  heartRate?: number | null
+  swolf?: number | null
 }
 
-export default function FeedPostMetrics({ distanceMeters, durationSeconds }: FeedPostMetricsProps) {
-  if (!distanceMeters && !durationSeconds) return null
+export default function FeedPostMetrics({
+  distanceMeters,
+  durationSeconds,
+  calories,
+  heartRate,
+  swolf,
+}: FeedPostMetricsProps) {
+  const metrics: Metric[] = []
 
   const distance = formatDistance(distanceMeters)
+  if (distance) metrics.push({ icon: Ruler, label: "Distanza", value: distance, color: "cyan" })
+
   const duration = formatDuration(durationSeconds)
+  if (duration) metrics.push({ icon: Clock, label: "Durata", value: duration, color: "emerald" })
+
   const pace = formatPace(distanceMeters, durationSeconds)
+  if (pace) metrics.push({ icon: Gauge, label: "Pace", value: pace, color: "amber" })
+
+  if (calories && calories > 0) {
+    metrics.push({ icon: Flame, label: "Calorie", value: `${calories} kcal`, color: "rose" })
+  }
+
+  if (heartRate && heartRate > 0) {
+    metrics.push({ icon: Heart, label: "HR media", value: `${heartRate} bpm`, color: "sky" })
+  }
+
+  if (swolf && swolf > 0) {
+    metrics.push({ icon: Activity, label: "SWOLF", value: `${swolf}`, color: "violet" })
+  }
+
+  if (metrics.length === 0) return null
 
   return (
-    <div className="mx-4 mt-3">
-      <div className="grid grid-cols-[minmax(0,1fr)_128px] gap-2.5 rounded-2xl border border-white/12 bg-[linear-gradient(120deg,rgba(2,8,23,0.48),rgba(15,23,42,0.22))] p-1.5 backdrop-blur-[2px]">
-        <div className="relative row-span-2 overflow-hidden rounded-[18px] border border-cyan-300/20 bg-[linear-gradient(120deg,rgba(2,6,23,0.9),rgba(6,39,61,0.72))] p-4 shadow-[inset_0_0_0_1px_rgba(56,189,248,0.16)]">
-          <div className="mb-1 inline-flex items-center gap-1 rounded-full border border-cyan-300/25 bg-cyan-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-100/90">
-            <Ruler className="size-3" />
-            Distanza
-          </div>
-          <p className="text-[34px] leading-[1.05] font-display font-bold text-white drop-shadow-sm">{distance}</p>
-          <div className="pointer-events-none absolute -right-4 -bottom-3 h-16 w-16 rounded-full bg-cyan-300/18 blur-xl" />
-          <Ruler className="absolute bottom-2.5 right-2.5 size-8 text-white/15" />
-        </div>
-
-        <div className="relative overflow-hidden rounded-[18px] border border-white/16 bg-[linear-gradient(130deg,rgba(3,16,35,0.86),rgba(14,37,63,0.66))] p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]">
-          <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-200/75">
-            <Clock className="size-3.5 text-emerald-200/80" />
-            Durata
-          </div>
-          <p className="text-lg font-display font-bold leading-tight text-white">{duration}</p>
-          <Clock className="absolute bottom-1.5 right-1.5 size-5 text-white/14" />
-          <div className="pointer-events-none absolute -right-2 -top-2 h-10 w-10 rounded-full bg-emerald-300/15 blur-lg" />
-        </div>
-
-        <div className="relative overflow-hidden rounded-[18px] border border-white/16 bg-[linear-gradient(130deg,rgba(3,16,35,0.86),rgba(14,37,63,0.66))] p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]">
-          <div className="mb-1 flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-200/75">
-            <Gauge className="size-3.5 text-cyan-200/80" />
-            Pace
-          </div>
-          <p className="text-lg font-display font-bold leading-tight text-white">{pace}</p>
-          <Gauge className="absolute bottom-1.5 right-1.5 size-5 text-white/14" />
-          <div className="pointer-events-none absolute -right-2 -top-2 h-10 w-10 rounded-full bg-cyan-300/15 blur-lg" />
-        </div>
+    <div className="px-4 pb-1 pt-2">
+      <div className="flex flex-wrap gap-2">
+        {metrics.map((metric) => {
+          const colors = colorMap[metric.color]
+          const Icon = metric.icon
+          return (
+            <div
+              key={metric.label}
+              className={[
+                "group relative flex items-center gap-2.5 rounded-2xl border px-3.5 py-2.5",
+                "backdrop-blur-sm transition-all duration-200",
+                "hover:scale-[1.03] active:scale-[0.98]",
+                colors.bg,
+                colors.border,
+                colors.glow,
+              ].join(" ")}
+            >
+              <div
+                className={[
+                  "flex size-9 items-center justify-center rounded-xl border",
+                  colors.bg,
+                  colors.border,
+                ].join(" ")}
+              >
+                <Icon className={`size-[18px] ${colors.icon}`} />
+              </div>
+              <div className="flex flex-col">
+                <span
+                  className={`text-[10px] font-semibold uppercase tracking-wider opacity-70 ${colors.text}`}
+                >
+                  {metric.label}
+                </span>
+                <span className="text-base font-bold leading-tight text-white">{metric.value}</span>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

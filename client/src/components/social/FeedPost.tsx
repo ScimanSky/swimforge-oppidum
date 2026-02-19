@@ -104,7 +104,7 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
               src={post.activity_is_open_water ? "/images/open-water.jpg" : "/images/pool-lanes.jpg"}
               alt=""
               aria-hidden="true"
-              className="pointer-events-none !absolute inset-0 h-full w-full object-cover object-center !z-0 opacity-[0.48] saturate-[1.28] contrast-[1.12]"
+              className="pointer-events-none !absolute inset-0 h-full w-full object-cover object-center !z-0 opacity-[0.20] saturate-50 contrast-[1.05]"
               loading="lazy"
             />
             <div className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(106deg,rgba(2,6,23,0.72)_0%,rgba(3,24,45,0.5)_45%,rgba(2,6,23,0.26)_100%)]" />
@@ -119,6 +119,9 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
           <FeedPostMetrics
             distanceMeters={post.activity_distance_meters}
             durationSeconds={post.activity_duration_seconds}
+            calories={post.activity_calories}
+            heartRate={post.activity_heart_rate}
+            swolf={post.activity_swolf}
           />
 
           {post.content && (

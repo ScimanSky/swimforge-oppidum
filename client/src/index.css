@@ -52,6 +52,14 @@ body,
 
   --neon-glow: oklch(0.84 0.190 205 / 0.46);
   --neon-soft: oklch(0.84 0.190 205 / 0.22);
+  --chip-cyan: oklch(0.82 0.14 192);
+  --chip-emerald: oklch(0.78 0.15 160);
+  --chip-amber: oklch(0.82 0.14 75);
+  --chip-rose: oklch(0.72 0.17 15);
+  --chip-sky: oklch(0.76 0.11 230);
+  --chip-violet: oklch(0.7 0.16 300);
+  --card-elevated: oklch(0.92 0.014 232);
+  --surface-glow: oklch(0.78 0.14 192 / 0.06);
 
   --z-base: 1;
   --z-nav: 40;
@@ -114,6 +122,14 @@ body,
 
   --neon-glow: oklch(0.84 0.190 205 / 0.62);
   --neon-soft: oklch(0.84 0.190 205 / 0.26);
+  --chip-cyan: oklch(0.82 0.14 192);
+  --chip-emerald: oklch(0.78 0.15 160);
+  --chip-amber: oklch(0.82 0.14 75);
+  --chip-rose: oklch(0.72 0.17 15);
+  --chip-sky: oklch(0.76 0.11 230);
+  --chip-violet: oklch(0.7 0.16 300);
+  --card-elevated: oklch(0.24 0.025 240);
+  --surface-glow: oklch(0.78 0.14 192 / 0.06);
 
   --sidebar: oklch(0.17 0.024 255);
   --sidebar-foreground: var(--foreground);
@@ -166,6 +182,14 @@ body,
   --color-danger: var(--danger);
   --color-neon-glow: var(--neon-glow);
   --color-neon-soft: var(--neon-soft);
+  --color-chip-cyan: var(--chip-cyan);
+  --color-chip-emerald: var(--chip-emerald);
+  --color-chip-amber: var(--chip-amber);
+  --color-chip-rose: var(--chip-rose);
+  --color-chip-sky: var(--chip-sky);
+  --color-chip-violet: var(--chip-violet);
+  --color-card-elevated: var(--card-elevated);
+  --color-surface-glow: var(--surface-glow);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -229,6 +253,15 @@ body,
   .h-screen {
     height: 100vh;
     height: 100dvh;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 
   .sf-page-root {

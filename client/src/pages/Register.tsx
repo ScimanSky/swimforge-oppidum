@@ -238,7 +238,7 @@ export default function Register() {
                       <Label>Nome</Label>
                       <Input
                         placeholder="Marco"
-                        className="bg-secondary border-0"
+                        className="min-h-[44px] rounded-xl border-0 bg-secondary"
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
                         disabled={isLoading || isGoogleLoading}
@@ -248,7 +248,7 @@ export default function Register() {
                       <Label>Cognome</Label>
                       <Input
                         placeholder="Rossi"
-                        className="bg-secondary border-0"
+                        className="min-h-[44px] rounded-xl border-0 bg-secondary"
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
                         disabled={isLoading || isGoogleLoading}
@@ -260,7 +260,7 @@ export default function Register() {
                     <Input
                       type="email"
                       placeholder="nome@esempio.com"
-                      className="bg-secondary border-0"
+                      className="min-h-[44px] rounded-xl border-0 bg-secondary"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       disabled={isLoading || isGoogleLoading}
@@ -272,7 +272,7 @@ export default function Register() {
                       <Input
                         type={showPassword ? "text" : "password"}
                         placeholder="Minimo 8 caratteri"
-                        className="bg-secondary border-0 pr-10"
+                        className="min-h-[44px] rounded-xl border-0 bg-secondary pr-10"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         disabled={isLoading || isGoogleLoading}
@@ -290,7 +290,7 @@ export default function Register() {
                     </div>
                   </div>
 
-                  <div className="flex items-start gap-2">
+                  <div className="flex min-h-[44px] items-start gap-2">
                     <Checkbox
                       id="terms"
                       className="mt-1"
@@ -310,11 +310,7 @@ export default function Register() {
                     </label>
                   </div>
 
-                  <Button
-                    className="w-full gap-2"
-                    onClick={handleContinue}
-                    disabled={isLoading || isGoogleLoading}
-                  >
+                  <Button className="min-h-[48px] w-full gap-2 rounded-xl" onClick={handleContinue} disabled={isLoading || isGoogleLoading}>
                     Continua
                     <ArrowRight className="w-4 h-4" />
                   </Button>
@@ -324,7 +320,7 @@ export default function Register() {
                   <div className="space-y-2">
                     <Label>Livello Esperienza</Label>
                     <Select>
-                      <SelectTrigger className="bg-secondary border-0">
+                      <SelectTrigger className="min-h-[44px] rounded-xl border-0 bg-secondary">
                         <SelectValue placeholder="Seleziona il tuo livello" />
                       </SelectTrigger>
                       <SelectContent>
@@ -338,7 +334,7 @@ export default function Register() {
                   <div className="space-y-2">
                     <Label>Stile Preferito</Label>
                     <Select>
-                      <SelectTrigger className="bg-secondary border-0">
+                      <SelectTrigger className="min-h-[44px] rounded-xl border-0 bg-secondary">
                         <SelectValue placeholder="Il tuo stile principale" />
                       </SelectTrigger>
                       <SelectContent>
@@ -353,7 +349,7 @@ export default function Register() {
                   <div className="space-y-2">
                     <Label>Obiettivo Principale</Label>
                     <Select>
-                      <SelectTrigger className="bg-secondary border-0">
+                      <SelectTrigger className="min-h-[44px] rounded-xl border-0 bg-secondary">
                         <SelectValue placeholder="Cosa vuoi ottenere?" />
                       </SelectTrigger>
                       <SelectContent>
@@ -369,7 +365,7 @@ export default function Register() {
                   <div className="flex gap-3">
                     <Button
                       variant="outline-neon"
-                      className="flex-1 bg-transparent"
+                      className="min-h-[48px] flex-1 rounded-xl bg-transparent"
                       onClick={() => setStep(1)}
                       disabled={isLoading || isGoogleLoading}
                     >
@@ -377,7 +373,7 @@ export default function Register() {
                     </Button>
                     <Button
                       variant="neon"
-                      className="w-full flex-1 gap-2"
+                      className="min-h-[48px] w-full flex-1 gap-2 rounded-xl"
                       onClick={handleRegister}
                       disabled={isLoading || isGoogleLoading}
                     >
@@ -404,7 +400,7 @@ export default function Register() {
                   <div className="grid grid-cols-1 gap-3">
                     <Button
                       variant="outline-neon"
-                      className="gap-2 bg-transparent"
+                      className="min-h-[48px] gap-2 rounded-xl bg-transparent"
                       onClick={handleGoogleRegister}
                       disabled={isLoading || isGoogleLoading}
                     >
