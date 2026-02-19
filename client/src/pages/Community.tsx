@@ -178,6 +178,18 @@ export default function Community() {
       <div className="compact-shell space-y-4 lg:space-y-2">
         <section className="surface-panel relative mx-auto max-w-5xl overflow-hidden">
           <div className="absolute inset-0">
+            <img
+              src="/images/theme-v3/community-bg.png"
+              alt=""
+              className="h-full w-full object-cover opacity-[0.24]"
+              loading="lazy"
+            />
+            <img
+              src="/images/theme-v3/overlay-caustics.png"
+              alt=""
+              className="absolute inset-0 h-full w-full object-cover opacity-[0.12] mix-blend-screen"
+              loading="lazy"
+            />
             <div className="absolute inset-0 bg-[radial-gradient(70%_80%_at_18%_0%,color-mix(in_oklch,var(--electric-cyan)_34%,transparent)_0%,transparent_70%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_85%_10%,color-mix(in_oklch,var(--electric-lime)_24%,transparent)_0%,transparent_66%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_60%_90%,color-mix(in_oklch,var(--electric-cyan)_16%,transparent)_0%,transparent_72%)]" />
@@ -240,7 +252,7 @@ export default function Community() {
                 <div key={club.id} className="surface-panel overflow-hidden">
                   <div className="relative h-32">
                     <img
-                      src={club.cover_image_url || "/images/pool-lanes.jpg"}
+                      src={club.cover_image_url || "/images/theme-v3/club-hero-bg.png"}
                       alt={club.name}
                       className="h-full w-full object-cover"
                       loading="lazy"

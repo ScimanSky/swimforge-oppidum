@@ -531,7 +531,7 @@ export default function Dashboard() {
     profile?.coverImageUrl ||
     profile?.cover_image_url ||
     null
-  const coverImage = profileCoverImage || "/images/pool-lanes.jpg"
+  const coverImage = profileCoverImage || "/images/theme-v3/dashboard-bg.png"
   const totalXp = profile?.totalXp ?? 0
   const xpProgress = profile?.nextLevelXp
     ? Math.min(100, (totalXp / profile.nextLevelXp) * 100)

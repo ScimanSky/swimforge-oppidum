@@ -12,11 +12,17 @@ export function LandingHero() {
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
         <Image
-          src="/images/hero-swimmer.jpg"
+          src="/images/theme-v3/landing-hero.jpg"
           alt="Swimmer in action"
           fill
           className="object-cover"
           priority
+        />
+        <Image
+          src="/images/theme-v3/overlay-caustics.png"
+          alt=""
+          fill
+          className="object-cover opacity-20 mix-blend-screen"
         />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/40" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/50" />

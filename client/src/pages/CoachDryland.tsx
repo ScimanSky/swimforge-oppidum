@@ -274,7 +274,7 @@ export default function CoachDryland() {
         {/* Background Image with low opacity */}
         <div className="fixed inset-0 opacity-10 pointer-events-none -z-40">
           <img
-            src="/images/ai_coach_digital.webp"
+            src="/images/theme-v3/coach-chat-bg.png"
             alt="Background"
             className="w-full h-full object-cover"
           />

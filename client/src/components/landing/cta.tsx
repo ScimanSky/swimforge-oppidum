@@ -43,10 +43,16 @@ export function LandingCTA() {
 
             <div className="relative aspect-square lg:aspect-auto">
               <Image
-                src="/images/open-water.jpg"
+                src="/images/theme-v3/landing-tour-poster.png"
                 alt="Open water swimming"
                 fill
                 className="object-cover"
+              />
+              <Image
+                src="/images/theme-v3/overlay-energy.png"
+                alt=""
+                fill
+                className="object-cover opacity-[0.15] mix-blend-screen"
               />
               <div className="absolute inset-0 bg-gradient-to-r from-card to-transparent lg:block hidden" />
             </div>

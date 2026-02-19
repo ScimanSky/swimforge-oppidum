@@ -915,9 +915,12 @@ export default function Settings() {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                      Nessuna cover caricata
-                    </div>
+                    <img
+                      src="/images/theme-v3/profile-bg.png"
+                      alt=""
+                      className="h-full w-full object-cover opacity-80"
+                      loading="lazy"
+                    />
                   )}
                 </div>
               </div>

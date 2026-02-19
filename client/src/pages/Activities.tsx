@@ -257,7 +257,7 @@ export default function Activities() {
                           className="stream-card relative isolate overflow-hidden border-l-2 border-l-primary/45 hover:border-l-primary"
                         >
                           <img
-                            src={isOpenWater ? "/images/open-water.jpg" : "/images/pool-lanes.jpg"}
+                            src="/images/theme-v3/feed-activity-bg-day.png"
                             alt=""
                             aria-hidden="true"
                             className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-[0.36] saturate-[1.15]"

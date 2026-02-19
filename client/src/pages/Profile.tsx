@@ -564,9 +564,12 @@ export default function Profile() {
                 className="h-full w-full object-cover"
               />
             ) : (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                Nessuna cover caricata
-              </div>
+              <img
+                src="/images/theme-v3/profile-bg.png"
+                alt=""
+                className="h-full w-full object-cover opacity-80"
+                loading="lazy"
+              />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-card/80 to-transparent" />
           </div>

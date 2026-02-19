@@ -531,7 +531,7 @@ export default function Challenges() {
                       <div className="flex flex-col md:flex-row">
                         <div className="relative h-32 w-full md:h-auto md:w-48">
                           <Image
-                            src={challenge.badge_image_url || "/images/pool-lanes.jpg"}
+                            src={challenge.badge_image_url || "/images/theme-v3/feed-activity-bg-day.png"}
                             alt={challenge.name}
                             fill
                             className="object-cover"

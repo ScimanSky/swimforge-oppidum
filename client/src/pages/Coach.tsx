@@ -509,7 +509,21 @@ export default function Coach() {
 
   return (
     <AppLayout>
-      <div className="compact-shell space-y-4 lg:space-y-2">
+      <div className="compact-shell relative space-y-4 lg:space-y-2">
+        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-3xl">
+          <img
+            src="/images/theme-v3/coach-chat-bg.png"
+            alt=""
+            className="h-full w-full object-cover opacity-[0.16]"
+            loading="lazy"
+          />
+          <img
+            src="/images/theme-v3/overlay-energy.png"
+            alt=""
+            className="absolute inset-0 h-full w-full object-cover opacity-[0.08] mix-blend-screen"
+            loading="lazy"
+          />
+        </div>
         <section className="surface-panel p-6 glass-panel">
           <div className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">

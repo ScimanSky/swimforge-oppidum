@@ -83,7 +83,8 @@ export default function ResetPassword() {
     <div className="min-h-screen bg-background flex relative dark:bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_rgba(15,23,42,0.92)_45%,_rgba(2,6,23,1)_100%)]">
       <ThemeToggleButton className="absolute right-4 top-4 z-20" />
       <div className="hidden lg:flex lg:w-1/2 relative">
-        <Image src="/images/hero-swimmer.jpg" alt="Swimmer" fill className="object-cover" />
+        <Image src="/images/theme-v3/auth-bg.png" alt="Swimmer" fill className="object-cover" />
+        <Image src="/images/theme-v3/overlay-caustics.png" alt="" fill className="object-cover opacity-20 mix-blend-screen" />
         <div className="absolute inset-0 bg-gradient-to-r from-background/80 to-transparent" />
         <div className="absolute bottom-12 left-12 max-w-md">
           <div className="flex items-center gap-2 mb-4">

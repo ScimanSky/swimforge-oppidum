@@ -28,28 +28,28 @@ const features = [
     description:
       "Pace, SWOLF, zone cardio e consistenza: insights chiari su ogni sessione.",
     badge: "Analisi",
-    backgroundImageSrc: "/images/detailed_stats_graph.webp",
+    backgroundImageSrc: "/images/theme-v3/dashboard-bg.png",
   },
   {
     icon: Brain,
     title: "AI Coach",
     description: "Consigli personalizzati e allenamenti mirati per vasca e dryland.",
     badge: "AI",
-    backgroundImageSrc: "/images/ai_coach_digital.webp",
+    backgroundImageSrc: "/images/theme-v3/coach-chat-bg.png",
   },
   {
     icon: Trophy,
     title: "Badge & XP",
     description: "Sblocca traguardi, ottieni XP e scala i livelli nuotando.",
     badge: "Progressi",
-    backgroundImageSrc: "/images/awards_trophies.webp",
+    backgroundImageSrc: "/images/theme-v3/overlay-energy.png",
   },
   {
     icon: Users,
     title: "Community & Club",
     description: "Condividi sessioni, dai splash e partecipa ai club.",
     badge: "Social",
-    backgroundImageSrc: "/images/swimmers_team_community.webp",
+    backgroundImageSrc: "/images/theme-v3/community-bg.png",
   },
   {
     icon: Zap,
@@ -57,14 +57,14 @@ const features = [
     description:
       "Integrazione con Garmin e Strava per importare tutto in un unico profilo.",
     badge: "Integrazioni",
-    backgroundImageSrc: "/images/swimmer_smartwatch_tech.webp",
+    backgroundImageSrc: "/images/theme-v3/landing-tour-poster.png",
   },
   {
     icon: TrendingUp,
     title: "Progressi Chiari",
     description: "Grafici e trend per capire dove migliori e dove spingere.",
     badge: "Trend",
-    backgroundImageSrc: "/images/predictive_analytics_speed.webp",
+    backgroundImageSrc: "/images/theme-v3/profile-bg.png",
   },
 ];
 
@@ -76,10 +76,10 @@ const stats = [
 
 const TOUR_VIDEO_SRC = "/videos/swimforge-tour.mp4";
 const tourFrames = [
-  "/images/community_feed_mockup.png",
-  "/images/ai_insights_data.webp",
-  "/images/community_clubs.png",
-  "/images/detailed_stats_graph.webp",
+  "/images/theme-v3/landing-tour-poster.png",
+  "/images/theme-v3/community-bg.png",
+  "/images/theme-v3/dashboard-bg.png",
+  "/images/theme-v3/coach-chat-bg.png",
 ];
 
 function FeatureCard({
@@ -150,7 +150,21 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_12%_8%,color-mix(in_oklch,var(--electric-cyan)_22%,transparent),transparent_44%),radial-gradient(circle_at_88%_14%,color-mix(in_oklch,var(--electric-lime)_18%,transparent),transparent_52%),linear-gradient(to_bottom,var(--background),color-mix(in_oklch,var(--background)_82%,white_18%))]">
+    <div className="relative min-h-screen bg-[radial-gradient(circle_at_12%_8%,color-mix(in_oklch,var(--electric-cyan)_22%,transparent),transparent_44%),radial-gradient(circle_at_88%_14%,color-mix(in_oklch,var(--electric-lime)_18%,transparent),transparent_52%),linear-gradient(to_bottom,var(--background),color-mix(in_oklch,var(--background)_82%,white_18%))]">
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
+        <img
+          src="/images/theme-v3/landing-hero.jpg"
+          alt=""
+          className="h-full w-full object-cover opacity-[0.18]"
+          loading="lazy"
+        />
+        <img
+          src="/images/theme-v3/overlay-caustics.png"
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover opacity-10 mix-blend-screen"
+          loading="lazy"
+        />
+      </div>
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-border/40 bg-background/62 backdrop-blur-lg">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
           <div className="sf-brand-anchor flex items-center gap-2 rounded-xl px-2.5 py-1.5">
@@ -342,9 +356,15 @@ export default function Home() {
           <div className="relative grid gap-10 overflow-hidden rounded-3xl border border-border/60 bg-card/72 p-10 backdrop-blur lg:grid-cols-[auto_1fr]">
             <div aria-hidden className="pointer-events-none absolute inset-0">
               <img
-                src="/images/swimmer_action_hero.webp"
+                src="/images/theme-v3/landing-tour-poster.png"
                 alt=""
                 className="h-full w-full object-cover opacity-26"
+                loading="lazy"
+              />
+              <img
+                src="/images/theme-v3/overlay-energy.png"
+                alt=""
+                className="absolute inset-0 h-full w-full object-cover opacity-10 mix-blend-screen"
                 loading="lazy"
               />
               <div className="absolute inset-0 bg-gradient-to-br from-background/18 via-background/52 to-background/76" />
