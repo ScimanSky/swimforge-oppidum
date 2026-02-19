@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { Waves, Mail, Lock, User } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
+import { SwimForgeMark, SwimForgeWordmark } from "@/components/brand/SwimForgeBrand";
 import { useAuth } from "@/_core/hooks/useAuth";
 
 export default function Auth() {
@@ -167,10 +168,11 @@ export default function Auth() {
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
       </div>
 
-      <Surface className="relative z-10 w-full max-w-md bg-card/90 border-border/70 backdrop-blur-xl glass-panel">
+        <Surface className="relative z-10 w-full max-w-md bg-card/90 border-border/70 backdrop-blur-xl glass-panel">
         <SurfaceHeader className="text-center space-y-4">
-          <div className="mx-auto">
-            <img src="/swimforge-logo.png" alt="SwimForge" className="h-28 md:h-32 w-auto" />
+          <div className="mx-auto sf-brand-anchor inline-flex min-h-[44px] items-center gap-2 rounded-xl px-3 py-2">
+            <SwimForgeMark className="h-12 w-12 md:h-14 md:w-14" />
+            <SwimForgeWordmark className="text-base md:text-lg" compact />
           </div>
           <SurfaceTitle className="text-2xl font-bold neon-gradient-text">SwimForge</SurfaceTitle>
           <SurfaceDescription className="text-muted-foreground">

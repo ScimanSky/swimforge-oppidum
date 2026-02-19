@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { Link } from "wouter"
+import { ShieldCheck } from "lucide-react"
 import FeedPostHeader from "./FeedPostHeader"
 import FeedPostMetrics from "./FeedPostMetrics"
 import FeedPostActions from "./FeedPostActions"
@@ -70,6 +71,8 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
   const isOwner = !!(currentUserId && post.user_id === currentUserId)
   const isActivityPost =
     Boolean(post.activity_id) ||
+    Boolean(post.activity_source) ||
+    post.activity_is_open_water != null ||
     Number(post.activity_distance_meters ?? 0) > 0 ||
     Number(post.activity_duration_seconds ?? 0) > 0
   const mediaUrls = normalizeArrayField(post.media_urls)
@@ -95,8 +98,8 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
       <div
         className={`surface-panel overflow-hidden p-0 transition-all duration-300 ${
           isActivityPost
-            ? "relative isolate rounded-3xl border border-cyan-300/20 bg-[linear-gradient(142deg,rgba(2,6,23,0.7),rgba(15,23,42,0.52))] shadow-[0_12px_34px_rgba(2,6,23,0.45)] hover:shadow-[0_18px_44px_rgba(2,6,23,0.6)]"
-            : "rounded-2xl"
+            ? "sf-activity-card relative isolate hover:shadow-[0_18px_44px_rgba(2,6,23,0.6)]"
+            : "sf-social-card"
         }`}
       >
         {isActivityPost && (
@@ -116,6 +119,15 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
 
         <div className={isActivityPost ? "relative !z-10" : undefined}>
           <FeedPostHeader post={post} isOwner={isOwner} isFollowing={post.is_following} />
+
+          {isActivityPost ? (
+            <div className="px-4">
+              <span className="sf-activity-badge">
+                <ShieldCheck className="size-3" />
+                Allenamento certificato
+              </span>
+            </div>
+          ) : null}
 
           {isActivityPost ? (
             <FeedPostMetrics

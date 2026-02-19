@@ -23,6 +23,8 @@ body,
   --electric-cyan: oklch(0.84 0.190 205);
   --electric-lime: oklch(0.90 0.235 142);
   --electric-coral: oklch(0.76 0.195 25);
+  --forge-orange: oklch(0.78 0.21 48);
+  --forge-orange-soft: oklch(0.78 0.21 48 / 0.24);
   --electric-violet: oklch(0.78 0.210 315);
   --ink: oklch(0.18 0.040 255);
 
@@ -52,6 +54,7 @@ body,
 
   --neon-glow: oklch(0.84 0.190 205 / 0.46);
   --neon-soft: oklch(0.84 0.190 205 / 0.22);
+  --forge-glow: oklch(0.78 0.21 48 / 0.35);
   --chip-cyan: oklch(0.82 0.14 192);
   --chip-emerald: oklch(0.78 0.15 160);
   --chip-amber: oklch(0.82 0.14 75);
@@ -122,6 +125,7 @@ body,
 
   --neon-glow: oklch(0.84 0.190 205 / 0.62);
   --neon-soft: oklch(0.84 0.190 205 / 0.26);
+  --forge-glow: oklch(0.78 0.21 48 / 0.42);
   --chip-cyan: oklch(0.82 0.14 192);
   --chip-emerald: oklch(0.78 0.15 160);
   --chip-amber: oklch(0.82 0.14 75);
@@ -150,8 +154,8 @@ body,
 }
 
 @theme inline {
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  --font-display: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: "Manrope", "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Rajdhani", "Barlow Condensed", "Manrope", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -382,6 +386,78 @@ body,
     );
     -webkit-background-clip: text;
     color: transparent;
+  }
+
+  .sf-wordmark {
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .sf-brand-anchor {
+    position: relative;
+    isolation: isolate;
+    background:
+      linear-gradient(
+        130deg,
+        color-mix(in oklch, var(--card) 78%, transparent),
+        color-mix(in oklch, var(--card) 64%, transparent)
+      )
+      padding-box,
+      linear-gradient(
+        130deg,
+        color-mix(in oklch, var(--electric-cyan) 78%, transparent),
+        color-mix(in oklch, var(--forge-orange) 52%, transparent)
+      )
+      border-box;
+    border: 1px solid transparent;
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--electric-cyan) 16%, transparent),
+      0 12px 28px color-mix(in oklch, var(--foreground) 14%, transparent);
+  }
+
+  .sf-brand-anchor:hover {
+    box-shadow:
+      0 0 0 1px color-mix(in oklch, var(--electric-cyan) 28%, transparent),
+      0 14px 36px color-mix(in oklch, var(--foreground) 18%, transparent),
+      0 0 26px var(--neon-soft);
+  }
+
+  .sf-activity-card {
+    border-radius: 26px;
+    border: 1px solid color-mix(in oklch, var(--electric-cyan) 26%, transparent);
+    background:
+      linear-gradient(142deg, rgba(2, 6, 23, 0.74), rgba(15, 23, 42, 0.56));
+    box-shadow:
+      0 12px 34px rgba(2, 6, 23, 0.45),
+      0 0 0 1px color-mix(in oklch, var(--electric-cyan) 12%, transparent);
+  }
+
+  .sf-social-card {
+    border-radius: 22px;
+    border: 1px solid color-mix(in oklch, var(--border) 66%, transparent);
+    background:
+      linear-gradient(
+        148deg,
+        color-mix(in oklch, var(--card) 74%, transparent),
+        color-mix(in oklch, var(--card) 58%, transparent)
+      );
+    box-shadow: 0 12px 30px color-mix(in oklch, var(--foreground) 10%, transparent);
+  }
+
+  .sf-activity-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    border: 1px solid color-mix(in oklch, var(--forge-orange) 36%, transparent);
+    background: color-mix(in oklch, var(--forge-orange-soft) 58%, transparent);
+    color: color-mix(in oklch, var(--forge-orange) 72%, white 28%);
+    padding: 0.3rem 0.55rem;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   .glass-panel {

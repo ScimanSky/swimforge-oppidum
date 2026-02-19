@@ -1,5 +1,5 @@
 import Link from "next/link"
-import Image from "next/image"
+import { SwimForgeMark, SwimForgeWordmark } from "@/components/brand/SwimForgeBrand"
 
 const footerLinks = {
   prodotto: {
@@ -35,15 +35,9 @@ export function LandingFooter() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="col-span-2 md:col-span-3 lg:col-span-1 mb-4 lg:mb-0">
-            <Link href="/" className="flex items-center gap-2 mb-4">
-              <Image
-                src="/swimforge-logo.png"
-                alt="SwimForge"
-                width={36}
-                height={36}
-                className="h-9 w-9"
-              />
-              <span className="font-display text-xl font-bold text-foreground">SwimForge</span>
+            <Link href="/" className="sf-brand-anchor mb-4 inline-flex min-h-[44px] items-center gap-2 rounded-xl px-2.5 py-1.5">
+              <SwimForgeMark className="h-8 w-8" />
+              <SwimForgeWordmark compact className="text-sm md:text-base" />
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs">
               La piattaforma per nuotatori che vogliono crescere, competere e divertirsi.

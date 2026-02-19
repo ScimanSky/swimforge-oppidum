@@ -39,6 +39,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import NotificationBell from "@/components/NotificationBell"
 import DirectMessages from "@/components/DirectMessages"
 import { CreatePostSheet } from "@/components/social/CreatePostSheet"
+import { SwimForgeMark, SwimForgeWordmark } from "@/components/brand/SwimForgeBrand"
 
 type NavItem = {
   label: string
@@ -130,6 +131,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
 
   const pageTitle = useMemo(() => titleForPath(location), [location])
   const showPageTitle = !(headerSlot && pageTitle === "Feed")
+  const showBrandWordmark = pageTitle !== "Feed"
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return
@@ -185,14 +187,10 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
           <div className="flex h-16 items-center justify-center">
             <Link
               href="/home"
-              className="group relative flex size-11 items-center justify-center rounded-2xl ei-border-gradient shadow-[0_0_32px_var(--neon-soft)] transition-transform hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
+              className="sf-brand-anchor group relative flex size-11 items-center justify-center rounded-2xl shadow-[0_0_30px_var(--neon-soft)] transition-transform hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
               aria-label="Vai alla Home"
             >
-              <img
-                src="/swimforge-logo.png"
-                alt="SwimForge"
-                className="h-8 w-8 object-contain"
-              />
+              <SwimForgeMark className="h-8 w-8" />
             </Link>
           </div>
 
@@ -258,6 +256,14 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
       <header className="fixed left-0 right-0 top-0 z-50 h-16 border-b border-border/40 bg-background/80 backdrop-blur-xl shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_12%,transparent)] lg:pl-[88px]">
         <div className="flex h-full items-center justify-between gap-3 px-4">
           <div className="flex min-w-0 items-center gap-3">
+            <Link
+              href="/home"
+              className="sf-brand-anchor inline-flex min-h-[44px] items-center gap-2 rounded-xl px-2.5 py-1.5"
+              aria-label="Vai al Feed SwimForge"
+            >
+              <SwimForgeMark className="h-7 w-7" />
+              <SwimForgeWordmark compact className={cn("hidden text-sm md:inline", !showBrandWordmark && "md:hidden")} />
+            </Link>
             {headerSlot}
             {showPageTitle ? (
               <div className="min-w-0">

@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Menu } from "lucide-react"
-import Image from "next/image"
+import { SwimForgeMark, SwimForgeWordmark } from "@/components/brand/SwimForgeBrand"
 
 const navLinks = [
   { href: "#features", label: "Funzionalità" },
@@ -19,16 +19,9 @@ export function LandingNav() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
       <nav className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-3">
-          <Image
-            src="/swimforge-logo.png"
-            alt="SwimForge"
-            width={36}
-            height={36}
-            className="h-9 w-9"
-            priority
-          />
-          <span className="font-display text-xl font-bold text-foreground">SwimForge</span>
+        <Link href="/" className="sf-brand-anchor flex min-h-[44px] items-center gap-2 rounded-xl px-2.5 py-1.5">
+          <SwimForgeMark className="h-8 w-8" />
+          <SwimForgeWordmark className="text-sm md:text-base" compact />
         </Link>
 
         {/* Desktop Navigation */}

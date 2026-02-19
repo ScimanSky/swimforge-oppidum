@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { MetricOrb } from "@/components/metrics/MetricOrb";
+import { SwimForgeMark, SwimForgeWordmark } from "@/components/brand/SwimForgeBrand";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/contexts/ThemeContext";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -152,15 +153,9 @@ export default function Home() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_12%_8%,color-mix(in_oklch,var(--electric-cyan)_22%,transparent),transparent_44%),radial-gradient(circle_at_88%_14%,color-mix(in_oklch,var(--electric-lime)_18%,transparent),transparent_52%),linear-gradient(to_bottom,var(--background),color-mix(in_oklch,var(--background)_82%,white_18%))]">
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-border/40 bg-background/62 backdrop-blur-lg">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
-          <div className="flex items-center gap-3">
-            <img
-              src="/swimforge-logo.png"
-              alt="SwimForge"
-              className="size-12 drop-shadow-sm"
-            />
-            <span className="text-2xl font-semibold text-foreground">
-              SwimForge
-            </span>
+          <div className="sf-brand-anchor flex items-center gap-2 rounded-xl px-2.5 py-1.5">
+            <SwimForgeMark className="size-9 drop-shadow-sm" />
+            <SwimForgeWordmark className="text-sm md:text-base" compact />
           </div>
           <nav className="hidden items-center gap-6 md:flex">
             <a
@@ -204,7 +199,7 @@ export default function Home() {
               <Badge variant="neon" className="mb-5">
                 Analisi AI • Gamification • Community
               </Badge>
-              <h1 className="mb-5 text-balance text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
+              <h1 className="mb-5 text-balance text-4xl font-display font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
                 <span className="neon-gradient-text">SwimForge</span>
                 <span className="block text-primary">Forgia il tuo percorso</span>
               </h1>
@@ -395,15 +390,9 @@ export default function Home() {
         <div className="mx-auto max-w-7xl px-4 py-12 md:px-6 lg:py-16">
           <div className="grid grid-cols-2 gap-8 md:grid-cols-3 lg:grid-cols-4">
             <div className="col-span-2 md:col-span-3 lg:col-span-1">
-              <Link href="/" className="mb-4 flex items-center gap-2">
-                <img
-                  src="/swimforge-logo.png"
-                  alt="SwimForge"
-                  className="size-9"
-                />
-                <span className="text-xl font-bold text-foreground">
-                  SwimForge
-                </span>
+              <Link href="/" className="sf-brand-anchor mb-4 inline-flex min-h-[44px] items-center gap-2 rounded-xl px-2.5 py-1.5">
+                <SwimForgeMark className="size-8" />
+                <SwimForgeWordmark compact className="text-sm md:text-base" />
               </Link>
               <p className="max-w-xs text-sm text-muted-foreground">
                 La piattaforma per nuotatori che vogliono crescere, competere e

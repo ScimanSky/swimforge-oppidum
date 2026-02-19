@@ -33,11 +33,11 @@ function EmptyFeedPerTe({ onCreatePost }: { onCreatePost: () => void }) {
       <div>
         <h3 className="text-lg font-display font-bold text-foreground">Il feed è vuoto</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Condividi la tua prima sessione e inizia a nuotare insieme alla community!
+          Forgia la prima sessione della settimana e accendi il tuo feed.
         </p>
       </div>
       <Button variant="neon" size="lg" className="gap-2 mt-2" onClick={onCreatePost}>
-        Condividi la tua prima sessione
+        Condividi la prima sessione
       </Button>
     </div>
   )
@@ -53,7 +53,7 @@ function EmptyFeedSeguiti() {
       <div>
         <h3 className="text-lg font-display font-bold text-foreground">Segui altri nuotatori</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Inizia a seguire altri nuotatori per vedere i loro allenamenti qui.
+          Costruisci la tua crew e porta nel feed allenamenti, stories e sfide reali.
         </p>
       </div>
       <Button variant="neon" size="lg" className="gap-2 mt-2" asChild>
@@ -174,7 +174,7 @@ export default function SocialFeed() {
   const hasFeedError = Boolean(firstPageQuery.error) && posts.length === 0 && !isInitialLoading
 
   const headerStoriesSlot = (
-    <div className="flex h-12 min-w-0 max-w-[min(68vw,860px)] items-center gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide pr-1">
+    <div className="flex h-12 min-w-0 max-w-[min(62vw,760px)] items-center gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide pr-1 md:max-w-[min(66vw,860px)]">
       {displayStoryGroups.length > 0 ? (
         displayStoryGroups.map((group) => {
           const isCurrent = Number(group.userId) === Number(currentUserId)
@@ -207,7 +207,7 @@ export default function SocialFeed() {
           <div className="w-full min-w-0 max-w-2xl">
             <div
               data-tour="feed-tabs"
-              className="relative z-10 mb-3 bg-background/70 py-2 backdrop-blur-sm"
+              className="sticky top-[4.35rem] z-20 mb-4 rounded-2xl border border-border/45 bg-background/88 px-2 py-2 backdrop-blur-xl shadow-[0_10px_24px_color-mix(in_oklch,var(--foreground)_12%,transparent)]"
             >
               {firstPageQuery.isFetching && !isInitialLoading && (
                 <div className="flex justify-center py-1">

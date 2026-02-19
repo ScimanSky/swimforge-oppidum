@@ -5,7 +5,7 @@ interface Metric {
   icon: LucideIcon
   label: string
   value: string
-  color: "cyan" | "emerald" | "amber" | "rose" | "sky" | "violet"
+  color: "cyan" | "emerald" | "amber" | "forge" | "sky" | "violet"
 }
 
 const colorMap = {
@@ -30,12 +30,12 @@ const colorMap = {
     icon: "text-[var(--chip-amber)]",
     glow: "shadow-[0_0_12px_rgba(251,191,36,0.15)]",
   },
-  rose: {
-    bg: "bg-[var(--chip-rose)]/12",
-    border: "border-[var(--chip-rose)]/25",
-    text: "text-[var(--chip-rose)]",
-    icon: "text-[var(--chip-rose)]",
-    glow: "shadow-[0_0_12px_rgba(251,113,133,0.15)]",
+  forge: {
+    bg: "bg-[var(--forge-orange)]/12",
+    border: "border-[var(--forge-orange)]/26",
+    text: "text-[var(--forge-orange)]",
+    icon: "text-[var(--forge-orange)]",
+    glow: "shadow-[0_0_14px_var(--forge-glow)]",
   },
   sky: {
     bg: "bg-[var(--chip-sky)]/12",
@@ -103,7 +103,7 @@ export default function FeedPostMetrics({
   }
 
   if (caloriesValue > 0) {
-    metrics.push({ icon: Flame, label: "Calorie", value: `${caloriesValue} kcal`, color: "rose" })
+    metrics.push({ icon: Flame, label: "Calorie", value: `${caloriesValue} kcal`, color: "forge" })
   }
 
   if (heartRateValue > 0) {

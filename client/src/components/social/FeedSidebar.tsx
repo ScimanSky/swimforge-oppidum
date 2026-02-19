@@ -84,7 +84,7 @@ export default function FeedSidebar() {
           </div>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Nessun suggerimento al momento.
+            Acqua piatta: nessun suggerimento ora. Torna dopo nuovi follow.
           </p>
         )}
       </div>
