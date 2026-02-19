@@ -37,6 +37,7 @@ import { Link } from "wouter"
 import { trpc } from "@/lib/trpc"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
+import { getSyncPromptDecision, SYNC_PROMPT_SEEN_KEY } from "@/lib/sync-share-prompt"
 
 const formatDistance = (meters: number) => {
   if (!meters) return "—"
@@ -160,39 +161,26 @@ export default function Activities() {
     if (typeof window === "undefined") return
     if (!activities.length) return
 
-    const SYNC_PROMPT_SEEN_KEY = "swimforge:lastPromptedSyncedActivityId"
-    const syncedActivities = [...activities]
-      .filter(
-        (activity) =>
-          (activity.activitySource === "garmin" || activity.activitySource === "strava") &&
-          Number.isInteger(activity.id)
-      )
-      .sort((a, b) => Number(b.id) - Number(a.id))
-
-    if (!syncedActivities.length) return
-    const newest = syncedActivities[0]
     const lastSeenRaw = window.localStorage.getItem(SYNC_PROMPT_SEEN_KEY)
-    const lastSeenId = Number(lastSeenRaw ?? "0")
+    const decision = getSyncPromptDecision({
+      activities: activities as any,
+      lastSeenRaw,
+    })
 
-    if (!lastSeenRaw) {
-      window.localStorage.setItem(SYNC_PROMPT_SEEN_KEY, String(newest.id))
+    if (decision.action === "initialize" || decision.action === "mark_seen") {
+      window.localStorage.setItem(SYNC_PROMPT_SEEN_KEY, String(decision.seenId))
       return
     }
 
-    if (newest.id > lastSeenId && !newest.shareToFeed) {
-      setSyncPromptActivity(newest)
+    if (decision.action === "prompt") {
+      setSyncPromptActivity(decision.activity)
       setSyncPromptOpen(true)
-      return
-    }
-
-    if (newest.id > lastSeenId) {
-      window.localStorage.setItem(SYNC_PROMPT_SEEN_KEY, String(newest.id))
     }
   }, [activities])
 
   const markSyncPromptSeen = (activityId: number | null | undefined) => {
     if (typeof window === "undefined" || !activityId) return
-    window.localStorage.setItem("swimforge:lastPromptedSyncedActivityId", String(activityId))
+    window.localStorage.setItem(SYNC_PROMPT_SEEN_KEY, String(activityId))
   }
 
   const handleCloseSyncPrompt = () => {
