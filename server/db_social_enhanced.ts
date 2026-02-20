@@ -448,16 +448,11 @@ export async function getRecentConversations(userId: number, limit: number = 20)
       l."isRead",
       l."readAt",
       l."createdAt",
-      u.id AS "otherUserId",
-      COALESCE(
-        NULLIF(TRIM(u.name), ''),
-        SPLIT_PART(u.email, '@', 1)
-      ) AS "otherUsername",
-      sp.avatar_url AS "otherProfilePicture",
+      l.other_user_id AS "otherUserId",
+      ('Utente #' || l.other_user_id::text) AS "otherUsername",
+      NULL::text AS "otherProfilePicture",
       COALESCE(unread.unread_count, 0)::int AS "unreadCount"
     FROM latest_per_user l
-    JOIN users u ON u.id = l.other_user_id
-    LEFT JOIN swimmer_profiles sp ON sp.user_id = u.id
     LEFT JOIN unread_per_user unread ON unread.other_user_id = l.other_user_id
     ORDER BY l."createdAt" DESC
     LIMIT ${Math.max(1, Math.min(limit, 50))}
