@@ -716,9 +716,9 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
                     <Link
                       key={`${item.label}-${index}`}
                       href={item.path}
-                    onClick={() => setMobileCreateMenuOpen(false)}
-                    className="flex h-11 items-center justify-between rounded-xl px-3 text-sm text-foreground transition-colors hover:bg-background/60"
-                  >
+                      onClick={() => setMobileCreateMenuOpen(false)}
+                      className="flex h-11 items-center justify-between rounded-xl px-3 text-sm text-foreground transition-colors hover:bg-background/60"
+                    >
                       <span className="whitespace-nowrap">{item.label}</span>
                       <span className="text-[var(--electric-cyan)]">{item.icon}</span>
                     </Link>
