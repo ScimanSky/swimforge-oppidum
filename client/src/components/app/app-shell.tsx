@@ -7,12 +7,15 @@ import {
   Activity,
   Award,
   BarChart3,
+  Bot,
   BrainCircuit,
   ChevronDown,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Orbit,
   Plus,
+  Radio,
   Settings,
   Shield,
   Target,
@@ -42,7 +45,6 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import NotificationBell from "@/components/NotificationBell"
 import DirectMessages from "@/components/DirectMessages"
-import { CreatePostSheet } from "@/components/social/CreatePostSheet"
 
 type NavItem = {
   label: string
@@ -222,12 +224,11 @@ function AthleteDesktopNav({ location }: { location: string }) {
 
 function AthleteSideRail({
   location,
-  onCreatePost,
 }: {
   location: string
-  onCreatePost: () => void
 }) {
   const path = normalizePath(location)
+  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false)
   const railRouteItems = quickAccessItems.filter((item) => item.label !== "Social Feed")
   const postInsertIndex = Math.floor(railRouteItems.length / 2)
   const topRouteItems = railRouteItems.slice(0, postInsertIndex)
@@ -236,6 +237,16 @@ function AthleteSideRail({
     "group/item flex h-11 w-full items-center justify-center rounded-xl text-muted-foreground transition-all duration-200 group-hover/rail:justify-start group-hover/rail:gap-3 group-hover/rail:px-3.5 hover:bg-card/45 hover:text-foreground"
   const railRowActive =
     "text-foreground bg-[linear-gradient(90deg,color-mix(in_oklch,var(--electric-cyan)_14%,transparent),color-mix(in_oklch,var(--electric-lime)_10%,transparent))]"
+  const createMenuItems = [
+    { label: "Post", path: "/home", icon: <Plus className="size-4" /> },
+    { label: "Video in diretta", path: "/home", icon: <Radio className="size-4" /> },
+    { label: "Inserzione", path: "/home/community", icon: <Megaphone className="size-4" /> },
+    { label: "IA", path: "/coach", icon: <Bot className="size-4" /> },
+  ]
+
+  useEffect(() => {
+    setIsCreateMenuOpen(false)
+  }, [path])
 
   return (
     <aside className="group/rail fixed inset-y-0 left-0 z-40 hidden w-[84px] bg-transparent px-2 pb-4 pt-[84px] transition-[width] duration-300 ease-out hover:w-[244px] lg:flex lg:flex-col">
@@ -262,10 +273,11 @@ function AthleteSideRail({
 
         <button
           type="button"
-          onClick={onCreatePost}
+          onClick={() => setIsCreateMenuOpen((prev) => !prev)}
           className={cn(railRowBase, "text-[var(--electric-cyan)] hover:text-[var(--electric-cyan)]")}
           title="Post"
           aria-label="Post"
+          aria-expanded={isCreateMenuOpen}
         >
           <span className="inline-flex transition-transform duration-300 ease-out group-hover/rail:translate-x-0.5 group-hover/item:scale-110">
             <Plus className="size-5" />
@@ -274,6 +286,33 @@ function AthleteSideRail({
             Post
           </span>
         </button>
+
+        <AnimatePresence initial={false}>
+          {isCreateMenuOpen ? (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="overflow-hidden rounded-xl border border-border/70 bg-card/85 backdrop-blur-md"
+            >
+              {createMenuItems.map((item, index) => (
+                <Link
+                  key={item.label}
+                  href={item.path}
+                  onClick={() => setIsCreateMenuOpen(false)}
+                  className={cn(
+                    "flex h-11 items-center justify-between px-3 text-sm text-foreground transition-colors hover:bg-background/55",
+                    index !== createMenuItems.length - 1 && "border-b border-border/60",
+                  )}
+                >
+                  <span>{item.label}</span>
+                  <span className="text-[var(--electric-cyan)]">{item.icon}</span>
+                </Link>
+              ))}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
 
         {bottomRouteItems.map((item) => {
           const active = item.match ? item.match(path) : path.startsWith(item.path)
@@ -323,7 +362,6 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   const path = normalizePath(location)
   const isAdminRoute = path.startsWith("/admin")
   const [isLoggingOut, setIsLoggingOut] = useState(false)
-  const [isCreateOpen, setIsCreateOpen] = useState(false)
   const { theme, toggleTheme, switchable } = useTheme()
   const logoutMutation = trpc.auth.logout.useMutation()
   const heartbeatMutation = trpc.auth.heartbeat.useMutation()
@@ -360,13 +398,6 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
     }
   }, [heartbeatMutation.mutate])
 
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const closeCreatePost = () => setIsCreateOpen(false)
-    window.addEventListener("swimforge:close-create-post", closeCreatePost)
-    return () => window.removeEventListener("swimforge:close-create-post", closeCreatePost)
-  }, [])
-
   const handleLogout = async () => {
     if (isLoggingOut) return
     setIsLoggingOut(true)
@@ -391,7 +422,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
 
   return (
     <div className="min-h-[100dvh] bg-transparent overflow-x-hidden">
-      <AthleteSideRail location={location} onCreatePost={() => setIsCreateOpen(true)} />
+      <AthleteSideRail location={location} />
 
       <header className="fixed left-0 right-0 top-0 z-50 h-[72px] border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="flex h-full w-full items-center gap-3 pl-0 pr-4 md:pr-6">
@@ -509,8 +540,6 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
           </AnimatePresence>
         </div>
       </main>
-
-      <CreatePostSheet open={isCreateOpen} onOpenChange={setIsCreateOpen} />
     </div>
   )
 }
