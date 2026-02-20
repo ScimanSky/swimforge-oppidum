@@ -4,10 +4,13 @@ import React, { useEffect, useMemo, useState } from "react"
 import { Link, useLocation } from "wouter"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import {
+  Award,
   BarChart3,
+  BrainCircuit,
   ChevronDown,
   LayoutDashboard,
   LogOut,
+  Orbit,
   Plus,
   Search,
   Settings,
@@ -18,6 +21,8 @@ import {
   Waves,
   Moon,
   Sun,
+  Swords,
+  UsersRound,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -153,10 +158,10 @@ const quickAccessItems: QuickAccessItem[] = [
   {
     label: "Season Hub",
     path: "/season",
-    icon: <Target className="size-4" />,
+    icon: <Orbit className="size-4" />,
     match: (path) => path === "/season" || path.startsWith("/season/leaderboard") || path.startsWith("/leaderboard"),
   },
-  { label: "Challenges", path: "/season/challenges", icon: <Target className="size-4" />, match: isChallengesPath },
+  { label: "Challenges", path: "/season/challenges", icon: <Swords className="size-4" />, match: isChallengesPath },
   {
     label: "Statistics",
     path: "/profile/performance",
@@ -169,9 +174,9 @@ const quickAccessItems: QuickAccessItem[] = [
     icon: <Target className="size-4" />,
     match: (path) => path.startsWith("/season/objectives") || path.startsWith("/goals"),
   },
-  { label: "Badges", path: "/badges", icon: <Shield className="size-4" />, match: (path) => path.startsWith("/badges") },
-  { label: "AI Coach", path: "/coach", icon: <Waves className="size-4" />, match: (path) => path.startsWith("/coach") },
-  { label: "Club", path: "/home/community", icon: <Users className="size-4" />, match: isClubPath },
+  { label: "Badges", path: "/badges", icon: <Award className="size-4" />, match: (path) => path.startsWith("/badges") },
+  { label: "AI Coach", path: "/coach", icon: <BrainCircuit className="size-4" />, match: (path) => path.startsWith("/coach") },
+  { label: "Club", path: "/home/community", icon: <UsersRound className="size-4" />, match: isClubPath },
 ]
 
 function athleteTitleForPath(path: string) {
@@ -254,50 +259,73 @@ function AthleteSideRail({
   onCreatePost: () => void
 }) {
   const path = normalizePath(location)
-  const railItems = quickAccessItems.filter((item) => item.label !== "Social Feed")
+  const railRouteItems = quickAccessItems.filter((item) => item.label !== "Social Feed")
+  const postInsertIndex = Math.floor(railRouteItems.length / 2)
+  const topRouteItems = railRouteItems.slice(0, postInsertIndex)
+  const bottomRouteItems = railRouteItems.slice(postInsertIndex)
   const adminItem: QuickAccessItem = {
     label: "Admin Reports",
     path: "/admin/reports",
     icon: <Shield className="size-4" />,
     match: (p) => p.startsWith("/admin/reports"),
   }
+  const railRowBase =
+    "group/item flex h-11 w-full items-center justify-center rounded-xl text-muted-foreground transition-all duration-200 group-hover/rail:justify-start group-hover/rail:gap-3 group-hover/rail:px-3.5 hover:bg-card/45 hover:text-foreground"
+  const railRowActive =
+    "text-foreground bg-[linear-gradient(90deg,color-mix(in_oklch,var(--electric-cyan)_14%,transparent),color-mix(in_oklch,var(--electric-lime)_10%,transparent))]"
 
   return (
-    <aside className="group/rail fixed inset-y-0 left-0 z-40 hidden w-[86px] border-r border-border/45 bg-background/78 px-2 pb-4 pt-[84px] backdrop-blur-xl transition-[width] duration-300 ease-out hover:w-[236px] lg:flex lg:flex-col lg:justify-between">
-      <nav className="space-y-2">
-        <Button
-          type="button"
-          variant="neon"
-          className="h-11 w-full justify-center gap-2 px-3 group-hover/rail:justify-start"
-          onClick={onCreatePost}
-        >
-          <span className="inline-flex transition-transform duration-300 ease-out group-hover/rail:translate-x-0.5 group-hover/rail:scale-105">
-            <Plus className="size-4" />
-          </span>
-          <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs opacity-0 transition-all duration-200 group-hover/rail:ml-0.5 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
-            Post
-          </span>
-        </Button>
-
-        {railItems.map((item) => {
+    <aside className="group/rail fixed inset-y-0 left-0 z-40 hidden w-[84px] bg-transparent px-2 pb-4 pt-[84px] transition-[width] duration-300 ease-out hover:w-[244px] lg:flex lg:flex-col">
+      <nav className="flex flex-1 flex-col justify-center space-y-3">
+        {topRouteItems.map((item) => {
           const active = item.match ? item.match(path) : path.startsWith(item.path)
           return (
             <Link
               key={item.path}
               href={item.path}
-              className={cn(
-                "group/item flex h-11 w-full items-center justify-center rounded-xl border text-muted-foreground transition-colors group-hover/rail:justify-start group-hover/rail:gap-2 group-hover/rail:px-3",
-                active
-                  ? "border-[var(--electric-cyan)]/55 bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_10%,transparent))] text-foreground"
-                  : "border-border/55 bg-card/30 hover:border-[var(--electric-cyan)]/45 hover:text-foreground",
-              )}
+              className={cn(railRowBase, active && railRowActive)}
               aria-current={active ? "page" : undefined}
               title={item.label}
             >
-              <span className="inline-flex transition-transform duration-300 ease-out group-hover/rail:translate-x-0.5 group-hover/rail:scale-105 group-hover/item:scale-110">
+              <span className="inline-flex transition-transform duration-300 ease-out group-hover/rail:translate-x-0.5 group-hover/item:scale-110">
                 {item.icon}
               </span>
-              <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 transition-all duration-200 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
+              <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium opacity-0 transition-all duration-200 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
+                {item.label}
+              </span>
+            </Link>
+          )
+        })}
+
+        <button
+          type="button"
+          onClick={onCreatePost}
+          className={cn(railRowBase, "text-[var(--electric-cyan)] hover:text-[var(--electric-cyan)]")}
+          title="Post"
+          aria-label="Post"
+        >
+          <span className="inline-flex transition-transform duration-300 ease-out group-hover/rail:translate-x-0.5 group-hover/item:scale-110">
+            <Plus className="size-5" />
+          </span>
+          <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium opacity-0 transition-all duration-200 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
+            Post
+          </span>
+        </button>
+
+        {bottomRouteItems.map((item) => {
+          const active = item.match ? item.match(path) : path.startsWith(item.path)
+          return (
+            <Link
+              key={item.path}
+              href={item.path}
+              className={cn(railRowBase, active && railRowActive)}
+              aria-current={active ? "page" : undefined}
+              title={item.label}
+            >
+              <span className="inline-flex transition-transform duration-300 ease-out group-hover/rail:translate-x-0.5 group-hover/item:scale-110">
+                {item.icon}
+              </span>
+              <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium opacity-0 transition-all duration-200 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
                 {item.label}
               </span>
             </Link>
@@ -309,19 +337,14 @@ function AthleteSideRail({
         <div className="pt-2">
           <Link
             href={adminItem.path}
-            className={cn(
-              "group/item flex h-11 w-full items-center justify-center rounded-xl border text-muted-foreground transition-colors group-hover/rail:justify-start group-hover/rail:gap-2 group-hover/rail:px-3",
-              adminItem.match?.(path)
-                ? "border-[var(--electric-cyan)]/55 bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_10%,transparent))] text-foreground"
-                : "border-border/55 bg-card/30 hover:border-[var(--electric-cyan)]/45 hover:text-foreground",
-            )}
+            className={cn(railRowBase, adminItem.match?.(path) && railRowActive)}
             aria-current={adminItem.match?.(path) ? "page" : undefined}
             title={adminItem.label}
           >
-            <span className="inline-flex transition-transform duration-300 ease-out group-hover/rail:translate-x-0.5 group-hover/rail:scale-105 group-hover/item:scale-110">
+            <span className="inline-flex transition-transform duration-300 ease-out group-hover/rail:translate-x-0.5 group-hover/item:scale-110">
               {adminItem.icon}
             </span>
-            <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 transition-all duration-200 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
+            <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium opacity-0 transition-all duration-200 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
               {adminItem.label}
             </span>
           </Link>
