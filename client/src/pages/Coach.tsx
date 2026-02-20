@@ -147,6 +147,7 @@ export default function Coach() {
   const [activeInsightIndex, setActiveInsightIndex] = useState(0)
   const [activePoolSectionIndex, setActivePoolSectionIndex] = useState(0)
   const [activeDrySectionIndex, setActiveDrySectionIndex] = useState(0)
+  const [showSessionArchive, setShowSessionArchive] = useState(false)
   const [activeWorkout, setActiveWorkout] = useState<"pool" | "dryland">("pool")
   const [isGenerating, setIsGenerating] = useState(false)
 
@@ -515,43 +516,30 @@ export default function Coach() {
           <div className="absolute inset-0 bg-[radial-gradient(68%_72%_at_20%_10%,rgba(25,151,240,0.12),transparent_72%),radial-gradient(48%_60%_at_84%_22%,rgba(34,211,238,0.10),transparent_76%)]" />
         </div>
         <section className="surface-panel p-6 glass-panel">
-          <div className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-4">
-              <div className="rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 p-3">
-                <Brain className="h-8 w-8 text-primary" />
-              </div>
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-3xl font-display font-bold neon-gradient-text">
-                    AI Coach
-                  </h1>
-                  <Badge variant="neon">Premium</Badge>
+          <div className="p-6 space-y-4">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-center gap-4">
+                <div className="rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 p-3">
+                  <Brain className="h-8 w-8 text-primary" />
                 </div>
-                <p className="text-muted-foreground">
-                  Analisi e allenamenti personalizzati basati sui tuoi dati reali.
-                </p>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="text-3xl font-display font-bold neon-gradient-text">
+                      AI Coach
+                    </h1>
+                    <Badge variant="neon">Premium</Badge>
+                  </div>
+                  <p className="text-muted-foreground">
+                    Analisi e allenamenti personalizzati basati sui tuoi dati reali.
+                  </p>
+                </div>
               </div>
+              <Badge variant="outline" className="text-xs border-primary/40 text-primary">
+                Ultimo sync: {lastSyncLabel}
+              </Badge>
             </div>
-            <Badge variant="outline" className="text-xs border-primary/40 text-primary">
-              Ultimo sync: {lastSyncLabel}
-            </Badge>
-          </div>
-        </section>
 
-        <section className="surface-panel p-6">
-          <div className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex size-12 items-center justify-center rounded-xl bg-primary/10">
-                <Sparkles className="size-6 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Analisi</p>
-                <p className="text-lg font-semibold text-foreground">
-                  {advanced?.insights?.length ? "Analisi completata" : "Analisi in corso"}
-                </p>
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap gap-4 md:justify-end">
               <div className="rounded-lg border border-border bg-background/60 px-4 py-3">
                 <p className="text-xs text-muted-foreground">Focus oggi</p>
                 <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
@@ -929,8 +917,12 @@ export default function Coach() {
                     Analisi dell&apos;ultima sessione sincronizzata
                   </p>
                 </div>
-                <Button variant="outline-neon" size="sm" asChild>
-                  <a href="/coach?tab=session-iq">Apri archivio</a>
+                <Button
+                  variant="outline-neon"
+                  size="sm"
+                  onClick={() => setShowSessionArchive((prev) => !prev)}
+                >
+                  {showSessionArchive ? "Chiudi archivio" : "Apri archivio"}
                 </Button>
               </div>
               <div>
@@ -977,6 +969,52 @@ export default function Coach() {
                   </div>
                 )}
               </div>
+
+              {showSessionArchive ? (
+                <div className="mt-4 rounded-xl border border-border/70 bg-background/40 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-sm font-semibold text-foreground">Archivio Session IQ</h4>
+                    <Badge variant="outline">{sessionEntries.length} sessioni</Badge>
+                  </div>
+
+                  {sessionEntries.length > 0 ? (
+                    <div className="max-h-[42dvh] space-y-2 overflow-y-auto pr-1">
+                      {sessionEntries.map((entry: any) => {
+                        const bullets = parseBullets(entry.bullets).slice(0, 2)
+                        return (
+                          <article key={entry.id} className="rounded-lg border border-border/70 bg-card/40 p-3">
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                              {formatDate(entry.activity_date) && <span>📅 {formatDate(entry.activity_date)}</span>}
+                              {formatDistance(entry.activity_distance_meters) && (
+                                <span>🏊 {formatDistance(entry.activity_distance_meters)}</span>
+                              )}
+                              {formatTime(entry.activity_duration_seconds) && (
+                                <span>⏱ {formatTime(entry.activity_duration_seconds)}</span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-sm font-semibold text-foreground">{entry.title}</p>
+                            <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{entry.summary}</p>
+                            {bullets.length > 0 ? (
+                              <ul className="mt-2 space-y-1 text-xs text-foreground">
+                                {bullets.map((bullet: string, idx: number) => (
+                                  <li key={idx} className="flex items-start gap-2">
+                                    <span className="text-primary">•</span>
+                                    <span className="line-clamp-1">{bullet}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
+                          </article>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Archivio vuoto. Verrà popolato dopo la prima analisi disponibile.
+                    </p>
+                  )}
+                </div>
+              ) : null}
             </section>
           </TabsContent>
 

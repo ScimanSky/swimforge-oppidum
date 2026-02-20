@@ -38,7 +38,6 @@ import {
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
-import { Link } from "wouter"
 
 const formatDate = (date?: string | Date | null) => {
   if (!date) return "—"
@@ -392,17 +391,6 @@ export default function Goals() {
           <div>
             <h1 className="text-2xl font-display font-bold text-foreground">Obiettivi</h1>
             <p className="text-muted-foreground">Definisci e traccia i tuoi obiettivi di nuoto</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="sm" variant="outline-neon" asChild>
-                <Link href="/profile/performance">Statistiche</Link>
-              </Button>
-              <Button size="sm" variant="neon" asChild>
-                <Link href="/season/objectives">Obiettivi</Link>
-              </Button>
-              <Button size="sm" variant="outline-neon" asChild>
-                <Link href="/badges">Badge</Link>
-              </Button>
-            </div>
           </div>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
             <DialogTrigger asChild>
