@@ -62,10 +62,6 @@ const isTrainingPath = (path: string) =>
   path.startsWith("/session-iq")
 
 const isCommunityPath = (path: string) =>
-  path === "/home" ||
-  path.startsWith("/post/") ||
-  path.startsWith("/home/report/") ||
-  path.startsWith("/report/post/") ||
   path.startsWith("/home/community") ||
   path.startsWith("/community") ||
   path.startsWith("/badges")
@@ -104,7 +100,7 @@ const athleteNav: NavItem[] = [
   },
   {
     label: "Community",
-    path: "/home",
+    path: "/home/community",
     icon: <Users className="size-4" />,
     match: (path) => isCommunityPath(path),
   },
