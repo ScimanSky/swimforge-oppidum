@@ -21,7 +21,6 @@ import { metricsDefinitions } from "@/data/metricsDefinitions";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Link } from "wouter";
 
 const PERIOD_OPTIONS = [
   { value: 7, label: "7 giorni" },
@@ -370,17 +369,6 @@ export default function Statistics() {
             <p className="text-sm text-muted-foreground">
               Metriche avanzate e trend sulle tue sessioni recenti.
             </p>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="neon" asChild>
-                <Link href="/profile/performance">Statistiche</Link>
-              </Button>
-              <Button size="sm" variant="outline-neon" asChild>
-                <Link href="/season/objectives">Obiettivi</Link>
-              </Button>
-              <Button size="sm" variant="outline-neon" asChild>
-                <Link href="/badges">Badge</Link>
-              </Button>
-            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {PERIOD_OPTIONS.map((option) => (
