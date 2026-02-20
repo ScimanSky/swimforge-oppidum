@@ -186,7 +186,7 @@ function athleteTitleForPath(path: string) {
   if (path.startsWith("/season/challenges/") || path.startsWith("/challenges/")) return "Challenge Details"
   if (path.startsWith("/season/challenges") || path.startsWith("/challenges")) return "Challenges"
   if (path === "/home") return "Social Home Feed"
-  if (path.startsWith("/track/") || path.startsWith("/activities/")) return "Activity Detail"
+  if (path.startsWith("/track/") || path.startsWith("/activities/")) return "Dettaglio Laps"
   if (path.startsWith("/track") || path.startsWith("/activities")) return "Activity Tracker"
   if (path.startsWith("/season/objectives") || path.startsWith("/goals")) return "Training Objectives"
   if (path.startsWith("/coach")) return "AI Coach"

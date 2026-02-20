@@ -532,7 +532,7 @@ export default function Activities() {
                       <span className="text-xs text-foreground">Condividi nel feed</span>
                     </div>
                     <Button variant="outline-neon" size="sm" asChild>
-                      <Link href={`/track/${selectedActivity.id}`}>Dettaglio completo</Link>
+                      <Link href={`/track/${selectedActivity.id}`}>Dettaglio laps</Link>
                     </Button>
                   </div>
                 </div>
