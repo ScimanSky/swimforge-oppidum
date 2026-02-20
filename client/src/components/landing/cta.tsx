@@ -1,4 +1,3 @@
-import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Waves } from "lucide-react"
@@ -42,18 +41,8 @@ export function LandingCTA() {
             </div>
 
             <div className="relative aspect-square lg:aspect-auto">
-              <Image
-                src="/images/theme-v3/landing-tour-poster.png"
-                alt="Open water swimming"
-                fill
-                className="object-cover"
-              />
-              <Image
-                src="/images/theme-v3/overlay-energy.png"
-                alt=""
-                fill
-                className="object-cover opacity-[0.15] mix-blend-screen"
-              />
+              <div className="h-full w-full bg-[linear-gradient(145deg,#12324a_0%,#1a4669_48%,#102c46_100%)]" />
+              <div className="absolute inset-0 bg-[radial-gradient(72%_82%_at_14%_0%,rgba(14,165,233,0.24),transparent_72%),radial-gradient(58%_70%_at_86%_16%,rgba(34,211,238,0.2),transparent_72%)]" />
               <div className="absolute inset-0 bg-gradient-to-r from-card to-transparent lg:block hidden" />
             </div>
           </div>

@@ -28,28 +28,24 @@ const features = [
     description:
       "Pace, SWOLF, zone cardio e consistenza: insights chiari su ogni sessione.",
     badge: "Analisi",
-    backgroundImageSrc: "/images/theme-v3/dashboard-bg.png",
   },
   {
     icon: Brain,
     title: "AI Coach",
     description: "Consigli personalizzati e allenamenti mirati per vasca e dryland.",
     badge: "AI",
-    backgroundImageSrc: "/images/theme-v3/coach-chat-bg.png",
   },
   {
     icon: Trophy,
     title: "Badge & XP",
     description: "Sblocca traguardi, ottieni XP e scala i livelli nuotando.",
     badge: "Progressi",
-    backgroundImageSrc: "/images/theme-v3/overlay-energy.png",
   },
   {
     icon: Users,
     title: "Community & Club",
     description: "Condividi sessioni, dai splash e partecipa ai club.",
     badge: "Social",
-    backgroundImageSrc: "/images/theme-v3/community-bg.png",
   },
   {
     icon: Zap,
@@ -57,14 +53,12 @@ const features = [
     description:
       "Integrazione con Garmin e Strava per importare tutto in un unico profilo.",
     badge: "Integrazioni",
-    backgroundImageSrc: "/images/theme-v3/landing-tour-poster.png",
   },
   {
     icon: TrendingUp,
     title: "Progressi Chiari",
     description: "Grafici e trend per capire dove migliori e dove spingere.",
     badge: "Trend",
-    backgroundImageSrc: "/images/theme-v3/profile-bg.png",
   },
 ];
 
@@ -76,10 +70,10 @@ const stats = [
 
 const TOUR_VIDEO_SRC = "/videos/swimforge-tour.mp4";
 const tourFrames = [
-  "/images/theme-v3/landing-tour-poster.png",
-  "/images/theme-v3/community-bg.png",
-  "/images/theme-v3/dashboard-bg.png",
-  "/images/theme-v3/coach-chat-bg.png",
+  "bg-[linear-gradient(132deg,#12324a_0%,#164567_48%,#10283f_100%)]",
+  "bg-[linear-gradient(132deg,#0d2c32_0%,#12494f_50%,#0c272d_100%)]",
+  "bg-[linear-gradient(132deg,#1a2135_0%,#22345a_44%,#162845_100%)]",
+  "bg-[linear-gradient(132deg,#1f2333_0%,#2b3559_48%,#18233f_100%)]",
 ];
 
 function FeatureCard({
@@ -87,28 +81,19 @@ function FeatureCard({
   title,
   description,
   badge,
-  backgroundImageSrc,
 }: {
   icon: typeof Activity;
   title: string;
   description: string;
   badge: string;
-  backgroundImageSrc?: string;
 }) {
   const Icon = icon;
   return (
     <Surface className="relative overflow-hidden group transition-all hover:border-primary/60 hover:shadow-[0_8px_30px_var(--neon-soft)] hover:-translate-y-1">
-      {backgroundImageSrc && (
-        <div aria-hidden className="pointer-events-none absolute inset-0">
-          <img
-            src={backgroundImageSrc}
-            alt=""
-            className="h-full w-full object-cover opacity-30 transition-transform duration-700 group-hover:scale-105"
-            loading="lazy"
-          />
-          <div className="absolute inset-0 bg-gradient-to-br from-background/40 via-background/70 to-background/95" />
-        </div>
-      )}
+      <div aria-hidden className="pointer-events-none absolute inset-0">
+        <div className="h-full w-full bg-[linear-gradient(145deg,#111d2a_0%,#15273a_46%,#101b29_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(78%_84%_at_0%_0%,rgba(14,165,233,0.2),transparent_72%),radial-gradient(62%_70%_at_100%_12%,rgba(34,211,238,0.12),transparent_72%)]" />
+      </div>
       <SurfaceContent className="relative pt-6">
         <div className="mb-4 flex size-12 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <Icon className="size-6" />
@@ -152,18 +137,8 @@ export default function Home() {
   return (
     <div className="relative min-h-screen bg-[radial-gradient(circle_at_12%_8%,color-mix(in_oklch,var(--electric-cyan)_22%,transparent),transparent_44%),radial-gradient(circle_at_88%_14%,color-mix(in_oklch,var(--electric-lime)_18%,transparent),transparent_52%),linear-gradient(to_bottom,var(--background),color-mix(in_oklch,var(--background)_82%,white_18%))]">
       <div aria-hidden className="pointer-events-none fixed inset-0 -z-10">
-        <img
-          src="/images/theme-v3/landing-hero.jpg"
-          alt=""
-          className="h-full w-full object-cover opacity-[0.30]"
-          loading="lazy"
-        />
-        <img
-          src="/images/theme-v3/overlay-caustics.png"
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-[0.16] mix-blend-screen"
-          loading="lazy"
-        />
+        <div className="h-full w-full bg-[linear-gradient(160deg,#0c1a26_0%,#102437_42%,#0c1b2c_100%)] opacity-90" />
+        <div className="absolute inset-0 bg-[radial-gradient(72%_82%_at_8%_0%,rgba(14,165,233,0.24),transparent_72%),radial-gradient(56%_66%_at_88%_10%,rgba(34,211,238,0.18),transparent_74%)]" />
       </div>
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-border/40 bg-background/62 backdrop-blur-lg">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
@@ -259,11 +234,7 @@ export default function Home() {
                       onError={() => setHasTourVideo(false)}
                     />
                   ) : (
-                    <img
-                      src={tourFrames[tourIndex]}
-                      alt="Tour SwimForge"
-                      className="h-full w-full object-cover transition-opacity duration-500"
-                    />
+                    <div className={cn("h-full w-full transition-opacity duration-500", tourFrames[tourIndex])} />
                   )}
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/58 via-transparent to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-4">
@@ -355,18 +326,8 @@ export default function Home() {
         <div className="relative mx-auto max-w-7xl px-4 md:px-6">
           <div className="relative grid gap-10 overflow-hidden rounded-3xl border border-border/60 bg-card/72 p-10 backdrop-blur lg:grid-cols-[auto_1fr]">
             <div aria-hidden className="pointer-events-none absolute inset-0">
-              <img
-                src="/images/theme-v3/landing-tour-poster.png"
-                alt=""
-                className="h-full w-full object-cover opacity-26"
-                loading="lazy"
-              />
-              <img
-                src="/images/theme-v3/overlay-energy.png"
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover opacity-10 mix-blend-screen"
-                loading="lazy"
-              />
+              <div className="h-full w-full bg-[linear-gradient(140deg,#12253a_0%,#17304a_48%,#102130_100%)] opacity-70" />
+              <div className="absolute inset-0 bg-[radial-gradient(65%_80%_at_12%_0%,rgba(14,165,233,0.22),transparent_70%),radial-gradient(58%_70%_at_88%_20%,rgba(34,211,238,0.16),transparent_72%)]" />
               <div className="absolute inset-0 bg-gradient-to-br from-background/18 via-background/52 to-background/76" />
             </div>
             <div className="flex size-16 items-center justify-center rounded-2xl bg-primary text-primary-foreground">

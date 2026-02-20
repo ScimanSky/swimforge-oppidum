@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
   Surface,
@@ -82,10 +81,11 @@ export default function ResetPassword() {
   return (
     <div className="min-h-screen bg-background flex relative dark:bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_rgba(15,23,42,0.92)_45%,_rgba(2,6,23,1)_100%)]">
       <ThemeToggleButton className="absolute right-4 top-4 z-20" />
-      <div className="hidden lg:flex lg:w-1/2 relative">
-        <Image src="/images/theme-v3/auth-bg.png" alt="Swimmer" fill className="object-cover" />
-        <Image src="/images/theme-v3/overlay-caustics.png" alt="" fill className="object-cover opacity-[0.28] mix-blend-screen" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/58 to-transparent" />
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden border-r border-border/50 bg-[linear-gradient(146deg,#0e1722_0%,#152839_46%,#0f1b27_100%)]">
+        <div className="absolute inset-0 bg-[radial-gradient(72%_84%_at_12%_0%,rgba(14,165,233,0.26),transparent_70%),radial-gradient(58%_72%_at_84%_18%,rgba(34,211,238,0.2),transparent_72%)]" />
+        <div className="absolute -left-20 bottom-[-2rem] size-80 rounded-full bg-[rgba(6,182,212,0.22)] blur-3xl" />
+        <div className="absolute right-[-4rem] top-[24%] size-72 rounded-full bg-[rgba(59,130,246,0.16)] blur-3xl" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/16 via-background/28 to-background/72" />
         <div className="absolute bottom-12 left-12 max-w-md">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">

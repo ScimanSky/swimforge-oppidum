@@ -13,6 +13,7 @@ interface StoryAvatarProps {
   hasStories?: boolean
   isCurrentUser?: boolean
   size?: "sm" | "default"
+  showLabel?: boolean
   onClick?: () => void
 }
 
@@ -23,17 +24,20 @@ export function StoryAvatar({
   hasStories,
   isCurrentUser,
   size = "default",
+  showLabel,
   onClick,
 }: StoryAvatarProps) {
   const currentUserHasStories = isCurrentUser ? (hasStories ?? hasUnviewed) : hasUnviewed
   const showAddOverlay = isCurrentUser && !currentUserHasStories
   const isSmall = size === "sm"
 
+  const shouldShowLabel = showLabel ?? !isSmall
+
   return (
     <button
       type="button"
       onClick={onClick}
-      className={cn("flex flex-col items-center outline-none group", !isSmall && "gap-1.5")}
+      className={cn("flex flex-col items-center outline-none group", shouldShowLabel && "gap-1")}
     >
       <div className="relative">
         <div
@@ -69,8 +73,11 @@ export function StoryAvatar({
           </span>
         )}
       </div>
-      {!isSmall && (
-        <span className="max-w-[68px] truncate text-xs font-medium leading-tight text-muted-foreground">
+      {shouldShowLabel && (
+        <span className={cn(
+          "truncate font-medium leading-tight text-muted-foreground",
+          isSmall ? "max-w-[56px] text-[10px]" : "max-w-[68px] text-xs",
+        )}>
           {isCurrentUser ? "La tua" : userName.split(" ")[0]}
         </span>
       )}

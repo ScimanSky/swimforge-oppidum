@@ -164,18 +164,8 @@ export default function Auth() {
       <ThemeToggleButton className="absolute right-2 top-2 z-20" />
       {/* Background effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <img
-          src="/images/theme-v3/auth-bg.png"
-          alt=""
-          className="h-full w-full object-cover opacity-[0.30]"
-          loading="lazy"
-        />
-        <img
-          src="/images/theme-v3/overlay-caustics.png"
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-[0.22] mix-blend-screen"
-          loading="lazy"
-        />
+        <div className="absolute inset-0 bg-[linear-gradient(145deg,#0f1723_0%,#142638_44%,#101b29_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(72%_84%_at_12%_0%,rgba(6,182,212,0.28),transparent_70%),radial-gradient(56%_70%_at_82%_18%,rgba(56,189,248,0.2),transparent_72%)]" />
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl" />
       </div>

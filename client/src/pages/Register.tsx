@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
   Surface,
@@ -162,10 +161,11 @@ export default function Register() {
     <div className="min-h-screen bg-background dark:bg-[radial-gradient(circle_at_top,_var(--neon-soft),_transparent_65%)] flex relative">
       <ThemeToggleButton className="absolute right-4 top-4 z-20" />
       {/* Left Side - Image */}
-      <div className="hidden lg:flex lg:w-1/2 relative">
-        <Image src="/images/theme-v3/auth-bg.png" alt="Open water swimmer" fill className="object-cover" />
-        <Image src="/images/theme-v3/overlay-caustics.png" alt="" fill className="object-cover opacity-[0.28] mix-blend-screen" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/58 to-transparent" />
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden border-r border-border/50 bg-[linear-gradient(148deg,#0d1722_0%,#132332_44%,#101b27_100%)]">
+        <div className="absolute inset-0 bg-[radial-gradient(68%_82%_at_16%_0%,rgba(6,182,212,0.3),transparent_70%),radial-gradient(62%_76%_at_86%_16%,rgba(56,189,248,0.2),transparent_72%)]" />
+        <div className="absolute left-[-5rem] bottom-[-2rem] size-80 rounded-full bg-[rgba(20,184,166,0.22)] blur-3xl" />
+        <div className="absolute right-[-4rem] top-[20%] size-72 rounded-full bg-[rgba(59,130,246,0.16)] blur-3xl" />
+        <div className="absolute inset-0 bg-gradient-to-r from-background/12 via-background/24 to-background/72" />
         <div className="absolute bottom-12 left-12 max-w-md">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">

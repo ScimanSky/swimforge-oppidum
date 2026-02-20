@@ -7,10 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { ONBOARDING_CONSENT_TYPE, isOnboardingCompletedLocally } from "@/lib/onboarding";
+import { SwimForgeMark } from "@/components/brand/SwimForgeBrand";
 
 const POPUP_VERSION = "season-launch-s1-v1";
-const PRIMARY_LAUNCH_IMAGE = "/images/season-launch-electric-ice-main.png";
-const FALLBACK_LAUNCH_IMAGE = "/images/season-launch-electric-ice.svg";
 const SEASON_POPUP_DATASET_KEY = "seasonLaunchOpen";
 const SEASON_POPUP_EVENT = "swimforge:season-popup:state";
 
@@ -24,7 +23,6 @@ export default function SeasonLaunchPopup() {
   const userId = user?.id ? String(user.id) : "";
   const [open, setOpen] = useState(false);
   const [bootChecked, setBootChecked] = useState(false);
-  const [launchImageSrc, setLaunchImageSrc] = useState(PRIMARY_LAUNCH_IMAGE);
   const pathname = useMemo(() => location.split("?")[0] || "/", [location]);
   const isProfileSetupPath = pathname === "/settings";
 
@@ -118,17 +116,20 @@ export default function SeasonLaunchPopup() {
 
             <div className="grid gap-0 md:grid-cols-[1.1fr_1fr]">
               <div className="relative min-h-[280px] md:min-h-[460px]">
-                <img
-                  src={launchImageSrc}
-                  alt="Presentazione Electric Ice Season 1"
-                  className="h-full w-full object-cover"
-                  loading="eager"
-                  onError={() => {
-                    if (launchImageSrc !== FALLBACK_LAUNCH_IMAGE) {
-                      setLaunchImageSrc(FALLBACK_LAUNCH_IMAGE);
-                    }
-                  }}
-                />
+                <div className="absolute inset-0 bg-[linear-gradient(150deg,#0f1d2d_0%,#14324a_46%,#0f2337_100%)]" />
+                <div className="absolute inset-0 bg-[radial-gradient(68%_84%_at_14%_0%,rgba(14,165,233,0.34),transparent_70%),radial-gradient(54%_68%_at_84%_18%,rgba(34,211,238,0.24),transparent_74%)]" />
+                <div className="relative z-10 flex h-full flex-col items-start justify-end gap-5 p-8">
+                  <div className="inline-flex items-center gap-3 rounded-2xl border border-border/65 bg-background/45 px-4 py-3 backdrop-blur-md">
+                    <SwimForgeMark className="size-10" />
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Season 1</p>
+                      <p className="font-display text-lg font-semibold text-foreground">Electric Ice</p>
+                    </div>
+                  </div>
+                  <p className="max-w-sm text-sm text-foreground/90">
+                    Nuovo layout attivo: missioni, badge e progressi in un'unica esperienza visuale coerente.
+                  </p>
+                </div>
               </div>
 
               <div className="flex flex-col justify-between p-6 md:p-8">

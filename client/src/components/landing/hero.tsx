@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ArrowRight } from "lucide-react"
-import Image from "next/image"
 import Link from "next/link"
 
 export function LandingHero() {
@@ -11,19 +10,8 @@ export function LandingHero() {
     <section className="relative min-h-screen flex items-center pt-16 overflow-hidden">
       {/* Background Image */}
       <div className="absolute inset-0 z-0">
-        <Image
-          src="/images/theme-v3/landing-hero.jpg"
-          alt="Swimmer in action"
-          fill
-          className="object-cover"
-          priority
-        />
-        <Image
-          src="/images/theme-v3/overlay-caustics.png"
-          alt=""
-          fill
-          className="object-cover opacity-20 mix-blend-screen"
-        />
+        <div className="h-full w-full bg-[linear-gradient(160deg,#0d1b2a_0%,#11283d_44%,#0c1a2b_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(76%_86%_at_8%_0%,rgba(14,165,233,0.28),transparent_70%),radial-gradient(58%_72%_at_88%_12%,rgba(34,211,238,0.22),transparent_74%)]" />
         <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/40" />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent to-background/50" />
       </div>

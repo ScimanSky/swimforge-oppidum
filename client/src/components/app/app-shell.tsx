@@ -157,9 +157,9 @@ const quickAccessItems: QuickAccessItem[] = [
   { label: "Social Feed", path: "/home", icon: <Users className="size-4" /> },
   { label: "Season Hub", path: "/season", icon: <Target className="size-4" /> },
   { label: "Challenges", path: "/season/challenges", icon: <Target className="size-4" /> },
-  { label: "Progressi", path: "/profile/performance", icon: <BarChart3 className="size-4" /> },
+  { label: "Statistics", path: "/profile/performance", icon: <BarChart3 className="size-4" /> },
   { label: "Obiettivi", path: "/season/objectives", icon: <Target className="size-4" /> },
-  { label: "Badge", path: "/badges", icon: <Shield className="size-4" /> },
+  { label: "Badges", path: "/badges", icon: <Shield className="size-4" /> },
   { label: "AI Coach", path: "/coach", icon: <Waves className="size-4" /> },
   { label: "Club", path: "/home/community", icon: <Users className="size-4" /> },
 ]
@@ -290,6 +290,9 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
     [isAdminRoute, path],
   )
   const showHeaderStories = Boolean(headerSlot) && !isAdminRoute
+  const quickAccessMenu = isAdmin
+    ? [...quickAccessItems, { label: "Admin Reports", path: "/admin/reports", icon: <Shield className="size-4" /> }]
+    : quickAccessItems
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return
@@ -422,7 +425,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>Quick Access</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {quickAccessItems.map((item) => (
+                {quickAccessMenu.map((item) => (
                   <DropdownMenuItem key={item.path} asChild>
                     <Link href={item.path} className="flex items-center gap-2">
                       {item.icon}

@@ -174,7 +174,7 @@ export default function SocialFeed() {
   const hasFeedError = Boolean(firstPageQuery.error) && posts.length === 0 && !isInitialLoading
 
   const headerStoriesSlot = (
-    <div className="flex h-12 min-w-0 max-w-[min(62vw,760px)] items-center gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide pr-1 md:max-w-[min(66vw,860px)]">
+    <div className="flex h-14 min-w-0 max-w-[min(62vw,760px)] items-center gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide pr-1 md:max-w-[min(66vw,860px)]">
       {displayStoryGroups.length > 0 ? (
         displayStoryGroups.map((group) => {
           const isCurrent = Number(group.userId) === Number(currentUserId)
@@ -190,6 +190,7 @@ export default function SocialFeed() {
               hasStories={hasStories}
               isCurrentUser={isCurrent}
               size="sm"
+              showLabel
               onClick={() =>
                 isCurrent && !hasStories ? handleCreateStory() : handleViewStory(group.userId)
               }

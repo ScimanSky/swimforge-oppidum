@@ -271,14 +271,11 @@ export default function CoachDryland() {
   return (
     <AppLayout showBubbles={true} bubbleIntensity="medium">
       <div className="overflow-x-hidden font-sans text-foreground relative pb-12 lg:pb-2">
-        {/* Background Image with low opacity */}
-        <div className="fixed inset-0 opacity-10 pointer-events-none -z-40">
-          <img
-            src="/images/theme-v3/coach-chat-bg.png"
-            alt="Background"
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-[var(--navy)]/80 via-[var(--navy)]/50 to-[var(--navy)]" />
+        {/* Background gradients */}
+        <div className="fixed inset-0 pointer-events-none -z-40">
+          <div className="h-full w-full bg-[linear-gradient(150deg,#0e1723_0%,#132535_46%,#101b29_100%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(76%_86%_at_10%_0%,rgba(14,165,233,0.2),transparent_72%),radial-gradient(56%_72%_at_88%_18%,rgba(34,211,238,0.14),transparent_72%)] opacity-80" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[var(--navy)]/74 via-[var(--navy)]/52 to-[var(--navy)]/90" />
         </div>
 
         {/* Animated particles effect */}
