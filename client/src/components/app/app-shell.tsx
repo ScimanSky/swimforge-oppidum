@@ -271,7 +271,9 @@ function AthleteSideRail({
           className="h-11 w-full justify-center gap-2 px-3 group-hover/rail:justify-start"
           onClick={onCreatePost}
         >
-          <Plus className="size-4" />
+          <span className="inline-flex transition-transform duration-300 ease-out group-hover/rail:translate-x-0.5 group-hover/rail:scale-105">
+            <Plus className="size-4" />
+          </span>
           <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs opacity-0 transition-all duration-200 group-hover/rail:ml-0.5 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
             Post
           </span>
@@ -284,7 +286,7 @@ function AthleteSideRail({
               key={item.path}
               href={item.path}
               className={cn(
-                "flex h-11 w-full items-center justify-center rounded-xl border text-muted-foreground transition-colors group-hover/rail:justify-start group-hover/rail:gap-2 group-hover/rail:px-3",
+                "group/item flex h-11 w-full items-center justify-center rounded-xl border text-muted-foreground transition-colors group-hover/rail:justify-start group-hover/rail:gap-2 group-hover/rail:px-3",
                 active
                   ? "border-[var(--electric-cyan)]/55 bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_10%,transparent))] text-foreground"
                   : "border-border/55 bg-card/30 hover:border-[var(--electric-cyan)]/45 hover:text-foreground",
@@ -292,7 +294,9 @@ function AthleteSideRail({
               aria-current={active ? "page" : undefined}
               title={item.label}
             >
-              {item.icon}
+              <span className="inline-flex transition-transform duration-300 ease-out group-hover/rail:translate-x-0.5 group-hover/rail:scale-105 group-hover/item:scale-110">
+                {item.icon}
+              </span>
               <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 transition-all duration-200 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
                 {item.label}
               </span>
@@ -306,7 +310,7 @@ function AthleteSideRail({
           <Link
             href={adminItem.path}
             className={cn(
-              "flex h-11 w-full items-center justify-center rounded-xl border text-muted-foreground transition-colors group-hover/rail:justify-start group-hover/rail:gap-2 group-hover/rail:px-3",
+              "group/item flex h-11 w-full items-center justify-center rounded-xl border text-muted-foreground transition-colors group-hover/rail:justify-start group-hover/rail:gap-2 group-hover/rail:px-3",
               adminItem.match?.(path)
                 ? "border-[var(--electric-cyan)]/55 bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_10%,transparent))] text-foreground"
                 : "border-border/55 bg-card/30 hover:border-[var(--electric-cyan)]/45 hover:text-foreground",
@@ -314,7 +318,9 @@ function AthleteSideRail({
             aria-current={adminItem.match?.(path) ? "page" : undefined}
             title={adminItem.label}
           >
-            {adminItem.icon}
+            <span className="inline-flex transition-transform duration-300 ease-out group-hover/rail:translate-x-0.5 group-hover/rail:scale-105 group-hover/item:scale-110">
+              {adminItem.icon}
+            </span>
             <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 transition-all duration-200 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
               {adminItem.label}
             </span>
