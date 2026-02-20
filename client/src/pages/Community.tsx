@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Dialog,
   DialogContent,
@@ -267,8 +268,14 @@ export default function Community() {
                         In attesa
                       </Badge>
                     ) : null}
+                    <Avatar className="absolute -bottom-5 left-3 h-10 w-10 border-2 border-background shadow-md">
+                      <AvatarImage src={(club.logo_url || club.logoUrl || undefined) as string | undefined} alt={club.name} />
+                      <AvatarFallback className="text-xs font-semibold">
+                        {String(club.name || "C").slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
                   </div>
-                  <div className="p-4">
+                  <div className="p-4 pt-7">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="font-semibold text-foreground truncate">{club.name}</h3>
