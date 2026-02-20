@@ -10,11 +10,10 @@ import {
   Sparkles,
   Orbit,
 } from "lucide-react";
-import { Link, Redirect } from "wouter";
+import { Redirect } from "wouter";
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
 import { getSeasonAssignmentImageUrl } from "@/lib/seasonBadgeImages";
-import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { createPortal } from "react-dom";
 
@@ -99,16 +98,6 @@ export default function Badges() {
     trpc.badges.getAchievementBadgeDefinitions.useQuery(undefined, { enabled: isAuthenticated });
   const { data: userAchievementBadges } =
     trpc.badges.getUserAchievementBadges.useQuery(undefined, { enabled: isAuthenticated });
-  const meQuery = trpc.auth.me.useQuery(undefined, { enabled: isAuthenticated });
-
-  const fixBadgeUrls = trpc.admin.fixBadgeUrls.useMutation({
-    onSuccess: () => {
-      toast.success("Badge profilo aggiornati! Ricarica la pagina.");
-    },
-    onError: () => {
-      toast.error("Errore nell'aggiornamento badge profilo");
-    },
-  });
 
   // Redirect if not authenticated
   if (!authLoading && !isAuthenticated) {
@@ -323,45 +312,35 @@ export default function Badges() {
         .sparkle-particle:nth-child(4) { bottom: 15%; right: 10%; animation-delay: 0.15s; }
         .sparkle-particle:nth-child(5) { top: 50%; left: 5%; animation-delay: 0.25s; }
         .sparkle-particle:nth-child(6) { top: 50%; right: 5%; animation-delay: 0.3s; }
+
+        .xp-bar-container {
+          width: 100%;
+          height: 10px;
+          border-radius: 999px;
+          overflow: hidden;
+          background: color-mix(in oklch, var(--card) 88%, black 12%);
+          border: 1px solid color-mix(in oklch, var(--border) 85%, transparent);
+          box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--border) 60%, transparent);
+        }
+
+        .xp-bar-fill {
+          height: 100%;
+          border-radius: 999px;
+          background:
+            linear-gradient(
+              90deg,
+              color-mix(in oklch, var(--electric-cyan) 90%, white 10%) 0%,
+              color-mix(in oklch, var(--chart-3) 92%, white 8%) 50%,
+              color-mix(in oklch, var(--electric-lime) 90%, white 10%) 100%
+            );
+          box-shadow:
+            0 0 18px color-mix(in oklch, var(--electric-cyan) 45%, transparent),
+            0 0 28px color-mix(in oklch, var(--electric-lime) 35%, transparent);
+          transition: width 0.45s ease;
+        }
       `}</style>
 
-      <section className="surface-panel p-4 sm:p-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-display font-bold neon-gradient-text">Bacheca Badge</h1>
-            <p className="text-sm text-muted-foreground">
-              <span className="text-primary font-medium">{earnedCount}</span> / {totalCount} sbloccati
-            </p>
-          </div>
-          {meQuery.data?.role === "admin" ? (
-            <Button
-              variant="outline-neon"
-              size="sm"
-              onClick={() => fixBadgeUrls.mutate()}
-              disabled={fixBadgeUrls.isPending}
-              className="text-xs"
-            >
-              {fixBadgeUrls.isPending ? "Aggiornamento..." : "Fix Badge Profilo"}
-            </Button>
-          ) : null}
-        </div>
-      </section>
-
       <div className="space-y-5">
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline-neon" asChild>
-            <Link href="/profile/performance">Statistiche</Link>
-          </Button>
-          <Button size="sm" variant="outline-neon" asChild>
-            <Link href="/season">Season</Link>
-          </Button>
-          <Button size="sm" variant="outline-neon" asChild>
-            <Link href="/season/objectives">Obiettivi</Link>
-          </Button>
-          <Button size="sm" variant="neon" asChild>
-            <Link href="/badges">Badge</Link>
-          </Button>
-        </div>
         {/* Progress Overview Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -390,7 +369,7 @@ export default function Badges() {
           animate={{ opacity: 1, y: 0 }}
           className="neon-card p-4"
         >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3">
             <div className="min-w-0">
               <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
                 <Orbit className="size-3.5 text-primary" />
@@ -405,11 +384,6 @@ export default function Badges() {
                 {seasonQuery.data?.season?.remainingDays ?? 0} giorni rimanenti
               </p>
             </div>
-            <Button size="sm" variant="outline-neon" asChild>
-              <Link href="/season">
-                Apri Season Hub
-              </Link>
-            </Button>
           </div>
         </motion.div>
 

@@ -374,11 +374,18 @@ export default function Activities() {
                       type="button"
                       onClick={() => setSelectedActivityId(activity.id)}
                       className={cn(
-                        "group/activity w-full rounded-2xl border bg-[linear-gradient(132deg,#14212b_0%,#152833_56%,#122230_100%)] p-3 text-left transition-all",
+                        "group/activity w-full rounded-2xl border p-3 text-left transition-all",
                         isSelected
                           ? "border-[var(--electric-cyan)]/70 shadow-[0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_55%,transparent),0_0_30px_color-mix(in_oklch,var(--electric-cyan)_20%,transparent)]"
                           : "border-border/70 hover:border-[var(--electric-cyan)]/45",
                       )}
+                      style={{
+                        backgroundImage:
+                          "linear-gradient(132deg, rgba(8,18,27,0.78) 0%, rgba(10,23,34,0.72) 56%, rgba(11,26,39,0.78) 100%), url('/images/theme-v3/feed-activity-bg-day.png')",
+                        backgroundPosition: "center",
+                        backgroundRepeat: "no-repeat",
+                        backgroundSize: "cover",
+                      }}
                     >
                       <div className="mb-3 flex items-start justify-between gap-2">
                         <div className="min-w-0">
