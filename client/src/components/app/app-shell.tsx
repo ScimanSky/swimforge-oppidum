@@ -10,9 +10,11 @@ import {
   Bot,
   BrainCircuit,
   ChevronDown,
+  Grid2x2,
   LayoutDashboard,
   LogOut,
   Megaphone,
+  MessageSquare,
   Orbit,
   Plus,
   Radio,
@@ -22,6 +24,7 @@ import {
   User,
   Users,
   Waves,
+  X,
   Moon,
   Sun,
   Swords,
@@ -362,6 +365,8 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   const path = normalizePath(location)
   const isAdminRoute = path.startsWith("/admin")
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [mobileCreateMenuOpen, setMobileCreateMenuOpen] = useState(false)
+  const [mobileSectionsOpen, setMobileSectionsOpen] = useState(false)
   const { theme, toggleTheme, switchable } = useTheme()
   const logoutMutation = trpc.auth.logout.useMutation()
   const heartbeatMutation = trpc.auth.heartbeat.useMutation()
@@ -372,6 +377,20 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
 
   const pageTitle = useMemo(() => (isAdminRoute ? adminTitleForPath(path) : athleteTitleForPath(path)), [isAdminRoute, path])
   const showHeaderStories = Boolean(headerSlot) && !isAdminRoute
+  const mobileSectionsItems = useMemo(
+    () => quickAccessItems.filter((item) => !["Social Feed", "Attività", "Club"].includes(item.label)),
+    [],
+  )
+  const mobileCreateItems = useMemo(
+    () => [
+      { label: "Post", path: "/home", icon: <Plus className="size-4" /> },
+      { label: "Video in diretta", path: "/home", icon: <Radio className="size-4" /> },
+      { label: "Inserzione", path: "/home/community", icon: <Megaphone className="size-4" /> },
+      { label: "Messaggi", path: "/messages", icon: <MessageSquare className="size-4" /> },
+      { label: "IA", path: "/coach", icon: <Bot className="size-4" /> },
+    ],
+    [],
+  )
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return
@@ -397,6 +416,21 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
       window.removeEventListener("focus", onVisibilityOrFocus)
     }
   }, [heartbeatMutation.mutate])
+
+  useEffect(() => {
+    setMobileCreateMenuOpen(false)
+    setMobileSectionsOpen(false)
+  }, [path])
+
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    const shouldLock = mobileCreateMenuOpen || mobileSectionsOpen
+    const previous = document.body.style.overflow
+    if (shouldLock) document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [mobileCreateMenuOpen, mobileSectionsOpen])
 
   const handleLogout = async () => {
     if (isLoggingOut) return
@@ -496,28 +530,215 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
       ) : null}
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-background/90 backdrop-blur-xl lg:hidden">
-        <div className="mx-auto grid h-16 max-w-3xl grid-cols-4 gap-1 px-2">
-          {athleteNav.map((item) => {
-            const active = item.match(path)
-            return (
-              <Link
-                key={item.path}
-                href={item.path}
-                className={cn(
-                  "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors",
-                  active
-                    ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-card/45",
-                )}
-                aria-current={active ? "page" : undefined}
-              >
-                <span>{item.icon}</span>
-                <span className="leading-none">{item.label}</span>
-              </Link>
-            )
-          })}
+        <div className="mx-auto grid h-16 max-w-3xl grid-cols-5 gap-1 px-2">
+          <Link
+            href="/home"
+            className={cn(
+              "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors",
+              isHomePath(path)
+                ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-card/45",
+            )}
+            aria-current={isHomePath(path) ? "page" : undefined}
+          >
+            <LayoutDashboard className="size-4" />
+            <span className="leading-none">Home</span>
+          </Link>
+
+          <Link
+            href="/track"
+            className={cn(
+              "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors",
+              isTrainingPath(path) || isChallengesPath(path) || isSeasonPath(path)
+                ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-card/45",
+            )}
+            aria-current={isTrainingPath(path) || isChallengesPath(path) || isSeasonPath(path) ? "page" : undefined}
+          >
+            <Waves className="size-4" />
+            <span className="leading-none">Training</span>
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMobileSectionsOpen(false)
+              setMobileCreateMenuOpen((prev) => !prev)
+            }}
+            className={cn(
+              "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors",
+              mobileCreateMenuOpen
+                ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
+                : "text-[var(--electric-cyan)] hover:bg-card/45",
+            )}
+            aria-expanded={mobileCreateMenuOpen}
+            aria-label="Crea"
+          >
+            <Plus className="size-4" />
+            <span className="leading-none">Crea</span>
+          </button>
+
+          <Link
+            href="/home/community"
+            className={cn(
+              "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors",
+              isClubPath(path)
+                ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-card/45",
+            )}
+            aria-current={isClubPath(path) ? "page" : undefined}
+          >
+            <Users className="size-4" />
+            <span className="leading-none">Club</span>
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => {
+              setMobileCreateMenuOpen(false)
+              setMobileSectionsOpen((prev) => !prev)
+            }}
+            className={cn(
+              "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors",
+              mobileSectionsOpen
+                ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
+                : "text-muted-foreground hover:text-foreground hover:bg-card/45",
+            )}
+            aria-expanded={mobileSectionsOpen}
+            aria-label="Sezioni"
+          >
+            <Grid2x2 className="size-4" />
+            <span className="leading-none">Sezioni</span>
+          </button>
         </div>
       </nav>
+
+      <AnimatePresence>
+        {mobileCreateMenuOpen ? (
+          <motion.div
+            className="fixed inset-0 z-[60] bg-black/45 backdrop-blur-[1px] lg:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setMobileCreateMenuOpen(false)}
+          >
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 20, opacity: 0 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="absolute bottom-[76px] left-2 right-2 rounded-2xl border border-border/70 bg-card/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.45)]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="mb-1 flex items-center justify-between px-2 py-1.5">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Crea</span>
+                <button
+                  type="button"
+                  onClick={() => setMobileCreateMenuOpen(false)}
+                  className="rounded-md p-1 text-muted-foreground hover:bg-background/60 hover:text-foreground"
+                  aria-label="Chiudi crea"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+              <div className="space-y-1">
+                {mobileCreateItems.map((item, index) => (
+                  <Link
+                    key={`${item.label}-${index}`}
+                    href={item.path}
+                    onClick={() => setMobileCreateMenuOpen(false)}
+                    className="flex h-11 items-center justify-between rounded-xl px-3 text-sm text-foreground transition-colors hover:bg-background/60"
+                  >
+                    <span>{item.label}</span>
+                    <span className="text-[var(--electric-cyan)]">{item.icon}</span>
+                  </Link>
+                ))}
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {mobileSectionsOpen ? (
+          <motion.div
+            className="fixed inset-0 z-[60] bg-black/45 backdrop-blur-[1px] lg:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setMobileSectionsOpen(false)}
+          >
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 20, opacity: 0 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="absolute bottom-[76px] left-2 right-2 rounded-2xl border border-border/70 bg-card/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.45)]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="mb-1 flex items-center justify-between px-2 py-1.5">
+                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Sezioni</span>
+                <button
+                  type="button"
+                  onClick={() => setMobileSectionsOpen(false)}
+                  className="rounded-md p-1 text-muted-foreground hover:bg-background/60 hover:text-foreground"
+                  aria-label="Chiudi sezioni"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1">
+                {mobileSectionsItems.map((item) => {
+                  const active = item.match ? item.match(path) : path.startsWith(item.path)
+                  return (
+                    <Link
+                      key={item.path}
+                      href={item.path}
+                      onClick={() => setMobileSectionsOpen(false)}
+                      className={cn(
+                        "flex h-11 items-center justify-between rounded-xl border border-border/60 px-3 text-sm transition-colors",
+                        active
+                          ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
+                          : "text-foreground hover:bg-background/60",
+                      )}
+                    >
+                      <span className="truncate">{item.label}</span>
+                      <span className="text-[var(--electric-cyan)]">{item.icon}</span>
+                    </Link>
+                  )
+                })}
+                <Link
+                  href="/profile"
+                  onClick={() => setMobileSectionsOpen(false)}
+                  className={cn(
+                    "flex h-11 items-center justify-between rounded-xl border border-border/60 px-3 text-sm transition-colors",
+                    isProfilePath(path)
+                      ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
+                      : "text-foreground hover:bg-background/60",
+                  )}
+                >
+                  <span>Profile</span>
+                  <User className="size-4 text-[var(--electric-cyan)]" />
+                </Link>
+                <Link
+                  href="/settings"
+                  onClick={() => setMobileSectionsOpen(false)}
+                  className={cn(
+                    "flex h-11 items-center justify-between rounded-xl border border-border/60 px-3 text-sm transition-colors",
+                    path.startsWith("/settings")
+                      ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
+                      : "text-foreground hover:bg-background/60",
+                  )}
+                >
+                  <span>Settings</span>
+                  <Settings className="size-4 text-[var(--electric-cyan)]" />
+                </Link>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
 
       <main
         className={cn(
