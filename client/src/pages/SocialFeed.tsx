@@ -221,10 +221,10 @@ export default function SocialFeed() {
           <div className="w-full min-w-0 max-w-2xl">
             <div
               data-tour="feed-tabs"
-              className="relative z-10 mb-4 rounded-2xl border border-border/45 bg-background/88 px-2 py-2 backdrop-blur-xl shadow-[0_10px_24px_color-mix(in_oklch,var(--foreground)_12%,transparent)]"
+              className="relative z-10 mb-4 w-fit"
             >
               {firstPageQuery.isFetching && !isInitialLoading && (
-                <div className="flex justify-center py-1">
+                <div className="mb-1.5 flex justify-center py-1">
                   <RefreshCw className="size-4 animate-spin text-muted-foreground" />
                 </div>
               )}
