@@ -13,7 +13,6 @@ import {
   Grid2x2,
   LayoutDashboard,
   LogOut,
-  Megaphone,
   MessageSquare,
   Orbit,
   Plus,
@@ -48,6 +47,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import NotificationBell from "@/components/NotificationBell"
 import DirectMessages from "@/components/DirectMessages"
+import { CreatePostSheet } from "@/components/social/CreatePostSheet"
+import { StoryCreator } from "@/components/social/StoryCreator"
 
 type NavItem = {
   label: string
@@ -227,24 +228,37 @@ function AthleteDesktopNav({ location }: { location: string }) {
 
 function AthleteSideRail({
   location,
+  onOpenCreatePost,
+  onOpenStoryCreator,
 }: {
   location: string
+  onOpenCreatePost: (prefill?: string) => void
+  onOpenStoryCreator: () => void
 }) {
   const path = normalizePath(location)
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false)
+  const [isRailHovered, setIsRailHovered] = useState(false)
+  const isRailExpanded = isCreateMenuOpen || isRailHovered
   const railRouteItems = quickAccessItems.filter((item) => item.label !== "Social Feed")
   const postInsertIndex = Math.floor(railRouteItems.length / 2)
   const topRouteItems = railRouteItems.slice(0, postInsertIndex)
   const bottomRouteItems = railRouteItems.slice(postInsertIndex)
-  const railRowBase =
-    "group/item flex h-11 w-full items-center justify-center rounded-xl text-muted-foreground transition-all duration-200 group-hover/rail:justify-start group-hover/rail:gap-3 group-hover/rail:px-3.5 hover:bg-card/45 hover:text-foreground"
+  const railRowBase = cn(
+    "group/item flex h-11 w-full items-center rounded-xl text-muted-foreground transition-all duration-200 hover:bg-card/45 hover:text-foreground",
+    isRailExpanded ? "justify-start gap-3 px-3.5" : "justify-center",
+  )
   const railRowActive =
     "text-foreground bg-[linear-gradient(90deg,color-mix(in_oklch,var(--electric-cyan)_14%,transparent),color-mix(in_oklch,var(--electric-lime)_10%,transparent))]"
-  const createMenuItems = [
-    { label: "Post", path: "/home", icon: <Plus className="size-4" /> },
-    { label: "Video in diretta", path: "/home", icon: <Radio className="size-4" /> },
-    { label: "Inserzione", path: "/home/community", icon: <Megaphone className="size-4" /> },
-    { label: "IA", path: "/coach", icon: <Bot className="size-4" /> },
+  const createMenuItems: Array<{
+    label: string
+    path?: string
+    action?: "create-post" | "create-story" | "create-ai-post"
+    icon: React.ReactNode
+  }> = [
+    { label: "Post nel feed", action: "create-post", icon: <Plus className="size-4" /> },
+    { label: "Crea Story", action: "create-story", icon: <Radio className="size-4" /> },
+    { label: "Messaggio rapido", path: "/messages?new=1", icon: <MessageSquare className="size-4" /> },
+    { label: "Bozza IA post", action: "create-ai-post", icon: <Bot className="size-4" /> },
   ]
 
   useEffect(() => {
@@ -252,7 +266,14 @@ function AthleteSideRail({
   }, [path])
 
   return (
-    <aside className="group/rail fixed inset-y-0 left-0 z-40 hidden w-[84px] bg-transparent px-2 pb-4 pt-[84px] transition-[width] duration-300 ease-out hover:w-[244px] lg:flex lg:flex-col">
+    <aside
+      onMouseEnter={() => setIsRailHovered(true)}
+      onMouseLeave={() => setIsRailHovered(false)}
+      className={cn(
+        "group/rail fixed inset-y-0 left-0 z-40 hidden bg-transparent px-2 pb-4 pt-[84px] transition-[width] duration-300 ease-out lg:flex lg:flex-col",
+        isRailExpanded ? "w-[272px]" : "w-[84px]",
+      )}
+    >
       <nav className="flex flex-1 flex-col justify-center space-y-3">
         {topRouteItems.map((item) => {
           const active = item.match ? item.match(path) : path.startsWith(item.path)
@@ -264,10 +285,15 @@ function AthleteSideRail({
               aria-current={active ? "page" : undefined}
               title={item.label}
             >
-              <span className="inline-flex transition-transform duration-300 ease-out group-hover/rail:translate-x-0.5 group-hover/item:scale-110">
+              <span className="inline-flex transition-transform duration-300 ease-out group-hover/item:scale-110">
                 {item.icon}
               </span>
-              <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium opacity-0 transition-all duration-200 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
+              <span
+                className={cn(
+                  "overflow-hidden whitespace-nowrap text-sm font-medium transition-all duration-200",
+                  isRailExpanded ? "max-w-[160px] opacity-100" : "max-w-0 opacity-0",
+                )}
+              >
                 {item.label}
               </span>
             </Link>
@@ -282,10 +308,15 @@ function AthleteSideRail({
           aria-label="Post"
           aria-expanded={isCreateMenuOpen}
         >
-          <span className="inline-flex transition-transform duration-300 ease-out group-hover/rail:translate-x-0.5 group-hover/item:scale-110">
+          <span className="inline-flex transition-transform duration-300 ease-out group-hover/item:scale-110">
             <Plus className="size-5" />
           </span>
-          <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium opacity-0 transition-all duration-200 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
+          <span
+            className={cn(
+              "overflow-hidden whitespace-nowrap text-sm font-medium transition-all duration-200",
+              isRailExpanded ? "max-w-[160px] opacity-100" : "max-w-0 opacity-0",
+            )}
+          >
             Post
           </span>
         </button>
@@ -297,21 +328,45 @@ function AthleteSideRail({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
-              className="overflow-hidden rounded-xl border border-border/70 bg-card/85 backdrop-blur-md"
+              className="mx-3 overflow-hidden rounded-xl border border-border/70 bg-card/85 backdrop-blur-md"
             >
               {createMenuItems.map((item, index) => (
-                <Link
-                  key={item.label}
-                  href={item.path}
-                  onClick={() => setIsCreateMenuOpen(false)}
-                  className={cn(
-                    "flex h-11 items-center justify-between px-3 text-sm text-foreground transition-colors hover:bg-background/55",
-                    index !== createMenuItems.length - 1 && "border-b border-border/60",
-                  )}
-                >
-                  <span>{item.label}</span>
-                  <span className="text-[var(--electric-cyan)]">{item.icon}</span>
-                </Link>
+                item.path ? (
+                  <Link
+                    key={item.label}
+                    href={item.path}
+                    onClick={() => setIsCreateMenuOpen(false)}
+                    className={cn(
+                      "flex h-11 items-center justify-between px-3 text-sm text-foreground transition-colors hover:bg-background/55",
+                      index !== createMenuItems.length - 1 && "border-b border-border/60",
+                    )}
+                  >
+                    <span className="whitespace-nowrap">{item.label}</span>
+                    <span className="text-[var(--electric-cyan)]">{item.icon}</span>
+                  </Link>
+                ) : (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => {
+                      if (item.action === "create-post") onOpenCreatePost()
+                      if (item.action === "create-story") onOpenStoryCreator()
+                      if (item.action === "create-ai-post") {
+                        onOpenCreatePost(
+                          "Bozza IA:\n\nAllenamento completato oggi. Ecco i punti chiave:\n- Sensazioni in acqua:\n- Metrica migliore:\n- Cosa migliorare nella prossima sessione:\n\n#swimforge #training",
+                        )
+                      }
+                      setIsCreateMenuOpen(false)
+                    }}
+                    className={cn(
+                      "flex h-11 w-full items-center justify-between px-3 text-left text-sm text-foreground transition-colors hover:bg-background/55",
+                      index !== createMenuItems.length - 1 && "border-b border-border/60",
+                    )}
+                  >
+                    <span className="whitespace-nowrap">{item.label}</span>
+                    <span className="text-[var(--electric-cyan)]">{item.icon}</span>
+                  </button>
+                )
               ))}
             </motion.div>
           ) : null}
@@ -327,10 +382,15 @@ function AthleteSideRail({
               aria-current={active ? "page" : undefined}
               title={item.label}
             >
-              <span className="inline-flex transition-transform duration-300 ease-out group-hover/rail:translate-x-0.5 group-hover/item:scale-110">
+              <span className="inline-flex transition-transform duration-300 ease-out group-hover/item:scale-110">
                 {item.icon}
               </span>
-              <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium opacity-0 transition-all duration-200 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
+              <span
+                className={cn(
+                  "overflow-hidden whitespace-nowrap text-sm font-medium transition-all duration-200",
+                  isRailExpanded ? "max-w-[160px] opacity-100" : "max-w-0 opacity-0",
+                )}
+              >
                 {item.label}
               </span>
             </Link>
@@ -365,6 +425,9 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   const path = normalizePath(location)
   const isAdminRoute = path.startsWith("/admin")
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [isCreatePostOpen, setIsCreatePostOpen] = useState(false)
+  const [createPostInitialContent, setCreatePostInitialContent] = useState<string | undefined>(undefined)
+  const [isStoryCreatorOpen, setIsStoryCreatorOpen] = useState(false)
   const [mobileCreateMenuOpen, setMobileCreateMenuOpen] = useState(false)
   const [mobileSectionsOpen, setMobileSectionsOpen] = useState(false)
   const { theme, toggleTheme, switchable } = useTheme()
@@ -383,11 +446,10 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   )
   const mobileCreateItems = useMemo(
     () => [
-      { label: "Post", path: "/home", icon: <Plus className="size-4" /> },
-      { label: "Video in diretta", path: "/home", icon: <Radio className="size-4" /> },
-      { label: "Inserzione", path: "/home/community", icon: <Megaphone className="size-4" /> },
-      { label: "Messaggi", path: "/messages", icon: <MessageSquare className="size-4" /> },
-      { label: "IA", path: "/coach", icon: <Bot className="size-4" /> },
+      { label: "Post nel feed", action: "create-post" as const, icon: <Plus className="size-4" /> },
+      { label: "Crea Story", action: "create-story" as const, icon: <Radio className="size-4" /> },
+      { label: "Messaggio rapido", path: "/messages?new=1", icon: <MessageSquare className="size-4" /> },
+      { label: "Bozza IA post", action: "create-ai-post" as const, icon: <Bot className="size-4" /> },
     ],
     [],
   )
@@ -456,7 +518,14 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
 
   return (
     <div className="min-h-[100dvh] bg-transparent overflow-x-hidden">
-      <AthleteSideRail location={location} />
+      <AthleteSideRail
+        location={location}
+        onOpenCreatePost={(prefill) => {
+          setCreatePostInitialContent(prefill)
+          setIsCreatePostOpen(true)
+        }}
+        onOpenStoryCreator={() => setIsStoryCreatorOpen(true)}
+      />
 
       <header className="fixed left-0 right-0 top-0 z-50 h-[72px] border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="flex h-full w-full items-center gap-3 pl-0 pr-4 md:pr-6">
@@ -643,15 +712,40 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
               </div>
               <div className="space-y-1">
                 {mobileCreateItems.map((item, index) => (
-                  <Link
-                    key={`${item.label}-${index}`}
-                    href={item.path}
+                  item.path ? (
+                    <Link
+                      key={`${item.label}-${index}`}
+                      href={item.path}
                     onClick={() => setMobileCreateMenuOpen(false)}
                     className="flex h-11 items-center justify-between rounded-xl px-3 text-sm text-foreground transition-colors hover:bg-background/60"
                   >
-                    <span>{item.label}</span>
-                    <span className="text-[var(--electric-cyan)]">{item.icon}</span>
-                  </Link>
+                      <span className="whitespace-nowrap">{item.label}</span>
+                      <span className="text-[var(--electric-cyan)]">{item.icon}</span>
+                    </Link>
+                  ) : (
+                    <button
+                      key={`${item.label}-${index}`}
+                      type="button"
+                      onClick={() => {
+                        if (item.action === "create-post") {
+                          setCreatePostInitialContent(undefined)
+                          setIsCreatePostOpen(true)
+                        }
+                        if (item.action === "create-story") setIsStoryCreatorOpen(true)
+                        if (item.action === "create-ai-post") {
+                          setCreatePostInitialContent(
+                            "Bozza IA:\n\nAllenamento completato oggi. Ecco i punti chiave:\n- Sensazioni in acqua:\n- Metrica migliore:\n- Cosa migliorare nella prossima sessione:\n\n#swimforge #training",
+                          )
+                          setIsCreatePostOpen(true)
+                        }
+                        setMobileCreateMenuOpen(false)
+                      }}
+                      className="flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm text-foreground transition-colors hover:bg-background/60"
+                    >
+                      <span className="whitespace-nowrap">{item.label}</span>
+                      <span className="text-[var(--electric-cyan)]">{item.icon}</span>
+                    </button>
+                  )
                 ))}
               </div>
             </motion.div>
@@ -761,6 +855,16 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
           </AnimatePresence>
         </div>
       </main>
+
+      <CreatePostSheet
+        open={isCreatePostOpen}
+        initialContent={createPostInitialContent}
+        onOpenChange={(open) => {
+          setIsCreatePostOpen(open)
+          if (!open) setCreatePostInitialContent(undefined)
+        }}
+      />
+      <StoryCreator open={isStoryCreatorOpen} onOpenChange={setIsStoryCreatorOpen} />
     </div>
   )
 }

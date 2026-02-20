@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { trpc } from "@/lib/trpc"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -31,6 +31,7 @@ import { uploadPostImageWithFallback } from "@/lib/post-image-upload"
 interface CreatePostSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  initialContent?: string
 }
 
 type Mode = "menu" | "text"
@@ -49,7 +50,7 @@ type TaggedUser = {
   avatarUrl: string | null
 }
 
-export function CreatePostSheet({ open, onOpenChange }: CreatePostSheetProps) {
+export function CreatePostSheet({ open, onOpenChange, initialContent }: CreatePostSheetProps) {
   const [mode, setMode] = useState<Mode>("menu")
   const [content, setContent] = useState("")
   const [mediaItems, setMediaItems] = useState<SelectedMedia[]>([])
@@ -221,6 +222,13 @@ export function CreatePostSheet({ open, onOpenChange }: CreatePostSheetProps) {
     imageKitAuth.isPending ||
     postImageUpload.isPending ||
     cloudinaryVideoAuth.isPending
+
+  useEffect(() => {
+    if (!open) return
+    if (!initialContent?.trim()) return
+    setMode("text")
+    setContent(initialContent.trim())
+  }, [initialContent, open])
 
   const openStoryComposer = () => {
     resetAndClose()
