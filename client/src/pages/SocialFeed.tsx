@@ -14,8 +14,7 @@ import FeedSidebar from "@/components/social/FeedSidebar"
 import FollowStarterCard from "@/components/social/FollowStarterCard"
 import type { FeedPostRecord } from "@/components/social/feed-types"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Waves, Users, RefreshCw, Loader2, ChevronRight } from "lucide-react"
+import { Waves, Users, RefreshCw, Loader2 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import {
   buildDisplayStoryGroups,
@@ -61,101 +60,6 @@ function EmptyFeedSeguiti() {
         <Link href="/home/community">Esplora la community</Link>
       </Button>
     </div>
-  )
-}
-
-function ClubHubPreview({
-  clubs,
-  isLoading,
-  hasMyClubs,
-}: {
-  clubs: any[]
-  isLoading: boolean
-  hasMyClubs: boolean
-}) {
-  return (
-    <section className="surface-panel relative overflow-hidden">
-      <div aria-hidden className="pointer-events-none absolute inset-0">
-        <img
-          src="/images/theme-v3/community-bg.png"
-          alt=""
-          className="h-full w-full object-cover opacity-[0.24]"
-          loading="lazy"
-        />
-        <img
-          src="/images/theme-v3/overlay-caustics.png"
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover opacity-[0.12] mix-blend-screen"
-          loading="lazy"
-        />
-        <div className="absolute inset-0 bg-gradient-to-br from-background/44 via-background/70 to-background/90" />
-      </div>
-      <div className="relative space-y-3 p-4">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <Badge variant="outline" className="border-border/70 bg-background/55 text-[11px]">
-              Club Hub
-            </Badge>
-            <h2 className="mt-1 text-base font-display font-bold text-foreground">
-              {hasMyClubs ? "I tuoi club in home" : "Scopri club nel tuo feed"}
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              {hasMyClubs
-                ? "Accesso rapido ai club attivi senza uscire dalla home."
-                : "Entra in un club per avere eventi e conversazioni sempre in evidenza."}
-            </p>
-          </div>
-          <Button variant="outline-neon" size="sm" asChild>
-            <Link href="/home/community">Apri Club</Link>
-          </Button>
-        </div>
-
-        {isLoading ? (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {Array.from({ length: 2 }).map((_, index) => (
-              <div
-                key={`club-hub-skeleton-${index}`}
-                className="h-16 rounded-xl border border-border/60 bg-background/55 animate-pulse"
-              />
-            ))}
-          </div>
-        ) : clubs.length > 0 ? (
-          <div className="grid gap-2 sm:grid-cols-2">
-            {clubs.map((club) => (
-              <Link
-                key={club.id}
-                href={`/community/club/${club.id}`}
-                className="group relative overflow-hidden rounded-xl border border-border/65 bg-background/55 transition-colors hover:border-primary/55"
-              >
-                <div aria-hidden className="pointer-events-none absolute inset-0">
-                  <img
-                    src={club.cover_image_url || "/images/theme-v3/club-hero-bg.png"}
-                    alt=""
-                    className="h-full w-full object-cover opacity-[0.24] transition-transform duration-500 group-hover:scale-105"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-r from-background/82 via-background/70 to-background/68" />
-                </div>
-                <div className="relative flex items-center justify-between gap-3 p-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-foreground">{club.name}</p>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      {Number(club.member_count ?? 0).toLocaleString("it-IT")} membri ·{" "}
-                      {club.is_member ? "Membro" : club.visibility === "public" ? "Pubblico" : "Privato"}
-                    </p>
-                  </div>
-                  <ChevronRight className="size-4 shrink-0 text-primary transition-transform group-hover:translate-x-0.5" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-border/70 bg-background/60 p-3 text-xs text-muted-foreground">
-            Nessun club trovato al momento.
-          </div>
-        )}
-      </div>
-    </section>
   )
 }
 
@@ -218,14 +122,6 @@ export default function SocialFeed() {
     { limit: 20, scope },
     { staleTime: 30_000 }
   )
-  const clubsMineQuery = trpc.community.clubs.list.useQuery(
-    { scope: "mine", limit: 6 },
-    { staleTime: 45_000, refetchOnWindowFocus: true }
-  )
-  const clubsDiscoverQuery = trpc.community.clubs.list.useQuery(
-    { scope: "all", limit: 6 },
-    { staleTime: 60_000, refetchOnWindowFocus: false }
-  )
 
   const nextPageQuery = trpc.community.feed.useQuery(
     { limit: 20, scope, before: cursor },
@@ -276,13 +172,6 @@ export default function SocialFeed() {
 
   const isInitialLoading = firstPageQuery.isLoading && posts.length === 0
   const hasFeedError = Boolean(firstPageQuery.error) && posts.length === 0 && !isInitialLoading
-  const myClubs = ((clubsMineQuery.data as any[] | undefined) ?? [])
-  const discoverClubs = ((clubsDiscoverQuery.data as any[] | undefined) ?? []).filter(
-    (club) => !club.is_member
-  )
-  const hasMyClubs = myClubs.length > 0
-  const clubPreview = hasMyClubs ? myClubs.slice(0, 4) : discoverClubs.slice(0, 4)
-  const clubsLoading = clubsMineQuery.isLoading || (!hasMyClubs && clubsDiscoverQuery.isLoading)
 
   const headerStoriesSlot = (
     <div className="flex h-12 min-w-0 max-w-[min(62vw,760px)] items-center gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide pr-1 md:max-w-[min(66vw,860px)]">
@@ -343,7 +232,6 @@ export default function SocialFeed() {
             </div>
 
             <div className="flex flex-col gap-4">
-              <ClubHubPreview clubs={clubPreview} isLoading={clubsLoading} hasMyClubs={hasMyClubs} />
               <FollowStarterCard
                 state={followStarterQuery.data}
                 isLoading={followStarterQuery.isLoading}
