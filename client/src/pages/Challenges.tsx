@@ -329,12 +329,6 @@ export default function Challenges() {
                   <Badge variant="outline" className="text-xs">
                     {Number(seasonQuery.data?.progress?.seasonXp ?? 0).toLocaleString()} XP
                   </Badge>
-                  <Button variant="outline-neon" size="sm" asChild>
-                    <Link href="/season">
-                      Season Hub
-                      <ChevronRight className="ml-2 size-4" />
-                    </Link>
-                  </Button>
                 </div>
               </div>
               <div className="grid w-full max-w-4xl grid-cols-2 gap-3 sm:grid-cols-4">
