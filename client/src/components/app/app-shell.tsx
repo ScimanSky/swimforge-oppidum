@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react"
 import { Link, useLocation } from "wouter"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import {
+  Activity,
   Award,
   BarChart3,
   BrainCircuit,
@@ -12,7 +13,6 @@ import {
   LogOut,
   Orbit,
   Plus,
-  Search,
   Settings,
   Shield,
   Target,
@@ -31,7 +31,6 @@ import { supabase } from "@/lib/supabase"
 import { useTheme } from "@/contexts/ThemeContext"
 
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,7 +43,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import NotificationBell from "@/components/NotificationBell"
 import DirectMessages from "@/components/DirectMessages"
 import { CreatePostSheet } from "@/components/social/CreatePostSheet"
-import { SwimForgeMark, SwimForgeWordmark } from "@/components/brand/SwimForgeBrand"
 
 type NavItem = {
   label: string
@@ -123,38 +121,12 @@ const athleteNav: NavItem[] = [
 ]
 
 const athleteTopNav: NavItem[] = athleteNav.filter((item) =>
-  item.label === "Home" || item.label === "Training" || item.label === "Club",
+  item.label === "Training",
 )
-
-const adminNav: NavItem[] = [
-  {
-    label: "Reports",
-    path: "/admin/reports",
-    icon: <Shield className="size-4" />,
-    match: (path) => path.startsWith("/admin/reports"),
-  },
-  {
-    label: "Users",
-    path: "/home/community",
-    icon: <Users className="size-4" />,
-    match: (path) => path.startsWith("/home/community"),
-  },
-  {
-    label: "Analytics",
-    path: "/profile/performance",
-    icon: <BarChart3 className="size-4" />,
-    match: (path) => path.startsWith("/profile/performance") || path.startsWith("/statistics"),
-  },
-  {
-    label: "Settings",
-    path: "/settings",
-    icon: <Settings className="size-4" />,
-    match: (path) => path.startsWith("/settings"),
-  },
-]
 
 const quickAccessItems: QuickAccessItem[] = [
   { label: "Social Feed", path: "/home", icon: <Users className="size-4" />, match: isHomePath },
+  { label: "Attività", path: "/track", icon: <Activity className="size-4" />, match: isTrainingPath },
   {
     label: "Season Hub",
     path: "/season",
@@ -251,11 +223,9 @@ function AthleteDesktopNav({ location }: { location: string }) {
 
 function AthleteSideRail({
   location,
-  isAdmin,
   onCreatePost,
 }: {
   location: string
-  isAdmin: boolean
   onCreatePost: () => void
 }) {
   const path = normalizePath(location)
@@ -263,12 +233,6 @@ function AthleteSideRail({
   const postInsertIndex = Math.floor(railRouteItems.length / 2)
   const topRouteItems = railRouteItems.slice(0, postInsertIndex)
   const bottomRouteItems = railRouteItems.slice(postInsertIndex)
-  const adminItem: QuickAccessItem = {
-    label: "Admin Reports",
-    path: "/admin/reports",
-    icon: <Shield className="size-4" />,
-    match: (p) => p.startsWith("/admin/reports"),
-  }
   const railRowBase =
     "group/item flex h-11 w-full items-center justify-center rounded-xl text-muted-foreground transition-all duration-200 group-hover/rail:justify-start group-hover/rail:gap-3 group-hover/rail:px-3.5 hover:bg-card/45 hover:text-foreground"
   const railRowActive =
@@ -333,23 +297,6 @@ function AthleteSideRail({
         })}
       </nav>
 
-      {isAdmin ? (
-        <div className="pt-2">
-          <Link
-            href={adminItem.path}
-            className={cn(railRowBase, adminItem.match?.(path) && railRowActive)}
-            aria-current={adminItem.match?.(path) ? "page" : undefined}
-            title={adminItem.label}
-          >
-            <span className="inline-flex transition-transform duration-300 ease-out group-hover/rail:translate-x-0.5 group-hover/item:scale-110">
-              {adminItem.icon}
-            </span>
-            <span className="max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium opacity-0 transition-all duration-200 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
-              {adminItem.label}
-            </span>
-          </Link>
-        </div>
-      ) : null}
     </aside>
   )
 }
@@ -372,49 +319,12 @@ function AthleteCompactBrand() {
   )
 }
 
-function AdminSidebar({ location }: { location: string }) {
-  const path = normalizePath(location)
-  return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-border/50 bg-sidebar/95 backdrop-blur-xl lg:flex lg:flex-col">
-      <div className="flex h-[72px] items-center gap-3 border-b border-border/50 px-5">
-        <SwimForgeMark className="h-8 w-8" />
-        <SwimForgeWordmark compact className="text-base" />
-      </div>
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        {adminNav.map((item) => {
-          const active = item.match(path)
-          return (
-            <Link
-              key={item.path}
-              href={item.path}
-              className={cn(
-                "flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors",
-                active
-                  ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_8%,transparent))] text-foreground"
-                  : "text-muted-foreground hover:bg-card/45 hover:text-foreground",
-              )}
-              aria-current={active ? "page" : undefined}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </Link>
-          )
-        })}
-      </nav>
-      <div className="border-t border-border/50 p-4">
-        <p className="text-xs text-muted-foreground">Admin Workspace</p>
-      </div>
-    </aside>
-  )
-}
-
 export function AppShell({ children, headerSlot }: { children: React.ReactNode; headerSlot?: React.ReactNode }) {
-  const [location, navigate] = useLocation()
+  const [location] = useLocation()
   const path = normalizePath(location)
   const isAdminRoute = path.startsWith("/admin")
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
-  const [searchText, setSearchText] = useState("")
   const { theme, toggleTheme, switchable } = useTheme()
   const logoutMutation = trpc.auth.logout.useMutation()
   const heartbeatMutation = trpc.auth.heartbeat.useMutation()
@@ -423,10 +333,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   const reduceMotion = useReducedMotion()
   const isAdmin = meQuery.data?.role === "admin"
 
-  const pageTitle = useMemo(
-    () => (isAdminRoute ? adminTitleForPath(path) : athleteTitleForPath(path)),
-    [isAdminRoute, path],
-  )
+  const pageTitle = useMemo(() => (isAdminRoute ? adminTitleForPath(path) : athleteTitleForPath(path)), [isAdminRoute, path])
   const showHeaderStories = Boolean(headerSlot) && !isAdminRoute
 
   useEffect(() => {
@@ -479,74 +386,13 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
     window.location.href = "/"
   }
 
-  const handleGlobalSearch = () => {
-    const trimmed = searchText.trim()
-    if (!trimmed) return
-    navigate(`/home/community?q=${encodeURIComponent(trimmed)}`)
-  }
-
   const profileLabel = meQuery.data?.name || meQuery.data?.email || "Swimmer"
   const profileInitials = initialsFromName(profileLabel)
   const avatarUrl = profileQuery.data?.avatarUrl || undefined
 
-  if (isAdminRoute) {
-    return (
-      <div className="min-h-[100dvh] bg-transparent overflow-x-hidden">
-        <AdminSidebar location={location} />
-
-        <header className="fixed left-0 right-0 top-0 z-50 h-[72px] border-b border-border/50 bg-background/80 backdrop-blur-xl lg:pl-64">
-          <div className="flex h-full items-center justify-between gap-4 px-4 lg:px-6">
-            <div className="flex min-w-0 items-center gap-3">
-              <Link href="/admin/reports" className="inline-flex items-center gap-2 lg:hidden">
-                <SwimForgeMark className="h-7 w-7" />
-                <SwimForgeWordmark compact className="text-sm" />
-              </Link>
-              <h1 className="truncate text-lg font-display font-semibold">{pageTitle}</h1>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <label className="relative hidden md:block">
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={searchText}
-                  onChange={(event) => setSearchText(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") handleGlobalSearch()
-                  }}
-                  placeholder="Search reports, users..."
-                  className="h-10 w-[280px] rounded-xl border-border/60 bg-card/50 pl-10"
-                />
-              </label>
-              <NotificationBell />
-              <Button variant="ghost" size="icon" onClick={() => void handleLogout()} aria-label="Sign out">
-                <LogOut className="size-5" />
-              </Button>
-            </div>
-          </div>
-        </header>
-
-        <main className="min-h-[calc(100dvh-72px)] pt-[72px] lg:pl-64">
-          <div className="mx-auto max-w-[1600px] p-4 md:p-6">
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={location}
-                initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
-                animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
-                exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -6 }}
-                transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: "easeOut" }}
-              >
-                {children}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </main>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-[100dvh] bg-transparent overflow-x-hidden">
-      <AthleteSideRail location={location} isAdmin={isAdmin} onCreatePost={() => setIsCreateOpen(true)} />
+      <AthleteSideRail location={location} onCreatePost={() => setIsCreateOpen(true)} />
 
       <header className="fixed left-0 right-0 top-0 z-50 h-[72px] border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="flex h-full w-full items-center gap-3 pl-0 pr-4 md:pr-6">

@@ -4,7 +4,6 @@ import AppLayout from "@/components/AppLayout"
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Switch } from "@/components/ui/switch"
 import { ShareActivityPicker } from "@/components/social/ShareActivityPicker"
@@ -24,12 +23,9 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  Search,
-  ChevronRight,
   Waves,
   MapPin,
   Orbit,
-  BarChart3,
   Sparkles,
   Clock3,
   Gauge,
@@ -147,7 +143,6 @@ function MiniMetricRing({
 
 export default function Activities() {
   const [filter, setFilter] = useState("all")
-  const [search, setSearch] = useState("")
   const [sort, setSort] = useState("recent")
   const [selectedActivityId, setSelectedActivityId] = useState<number | null>(null)
   const [sharePickerOpen, setSharePickerOpen] = useState(false)
@@ -188,8 +183,6 @@ export default function Activities() {
       .filter((activity) => {
       const activityType = activity.isOpenWater ? "open-water" : "pool"
       if (filter !== "all" && activityType !== filter) return false
-      if (search && !(activity.activityName || "").toLowerCase().includes(search.toLowerCase()))
-        return false
       return true
       })
       .sort((a, b) => {
@@ -198,7 +191,7 @@ export default function Activities() {
       if (sort === "xp") return (b.xpEarned || 0) - (a.xpEarned || 0)
       return new Date(b.activityDate).getTime() - new Date(a.activityDate).getTime()
       })
-  }, [activities, filter, search, sort])
+  }, [activities, filter, sort])
   useEffect(() => {
     if (typeof window === "undefined") return
     const media = window.matchMedia("(min-width: 1280px)")
@@ -217,7 +210,7 @@ export default function Activities() {
 
   useEffect(() => {
     setPage(1)
-  }, [filter, search, sort])
+  }, [filter, sort])
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages)
@@ -317,35 +310,14 @@ export default function Activities() {
                 <Badge variant="outline" className="text-xs">
                   {Number(seasonQuery.data?.progress?.seasonXp ?? 0).toLocaleString()} XP
                 </Badge>
-                <Button variant="outline-neon" size="sm" asChild>
-                  <Link href="/season">
-                    Season Hub
-                    <ChevronRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button variant="outline-neon" size="sm" asChild>
-                  <Link href="/profile/performance">
-                    <BarChart3 className="mr-1 h-3.5 w-3.5" />
-                    Statistiche
-                  </Link>
-                </Button>
               </div>
             </div>
           </div>
         </section>
 
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,0.44fr)_minmax(0,0.56fr)]">
+        <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,0.44fr)_minmax(0,0.56fr)]">
           <section className="surface-panel p-4 sm:p-5 lg:p-4">
-            <div className="mb-3 space-y-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Cerca attività..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="bg-background/60 pl-9"
-                />
-              </div>
+            <div className="mb-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <Tabs value={filter} onValueChange={setFilter}>
                   <TabsList>
