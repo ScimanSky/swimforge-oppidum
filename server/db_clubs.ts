@@ -34,6 +34,7 @@ export async function listClubs(userId: number, options: { search?: string; scop
       c.description,
       c.rules,
       c.cover_image_url,
+      c.logo_url,
       c.website_url,
       c.is_private,
       c.visibility,

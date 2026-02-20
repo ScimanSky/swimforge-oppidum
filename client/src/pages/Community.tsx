@@ -196,9 +196,6 @@ export default function Community() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {createClubDialog}
-                  <Button variant="outline-neon" asChild>
-                    <Link href="/home">Torna al Feed</Link>
-                  </Button>
                 </div>
               </div>
 

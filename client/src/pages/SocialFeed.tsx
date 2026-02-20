@@ -178,7 +178,7 @@ export default function SocialFeed() {
   const hasFeedError = Boolean(firstPageQuery.error) && posts.length === 0 && !isInitialLoading
 
   const headerStoriesSlot = (
-    <div className="flex h-14 min-w-0 max-w-[min(62vw,760px)] items-center gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide pr-1 md:max-w-[min(66vw,860px)]">
+    <div className="flex h-14 w-full min-w-0 items-center gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide">
       {displayStoryGroups.length > 0 ? (
         displayStoryGroups.map((group) => {
           const isCurrent = Number(group.userId) === Number(currentUserId)

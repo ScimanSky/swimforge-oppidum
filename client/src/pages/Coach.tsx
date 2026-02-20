@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AIChatBox, type Message as ChatMessage } from "@/components/AIChatBox"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
@@ -76,6 +77,25 @@ const formatDate = (date?: string | null) => {
     month: "short",
     year: "numeric",
   })
+}
+
+const parseBulletsSafe = (value: any): string[] => {
+  if (!value) return []
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).filter(Boolean)
+  }
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value)
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item)).filter(Boolean)
+      }
+    } catch {
+      // ignore parse errors and fallback to plain string
+    }
+    return value.trim().length > 0 ? [value] : []
+  }
+  return []
 }
 
 const getExerciseDetails = (exercise: WorkoutExercise) =>
@@ -148,6 +168,9 @@ export default function Coach() {
   const [activePoolSectionIndex, setActivePoolSectionIndex] = useState(0)
   const [activeDrySectionIndex, setActiveDrySectionIndex] = useState(0)
   const [showSessionArchive, setShowSessionArchive] = useState(false)
+  const [archiveSearchTerm, setArchiveSearchTerm] = useState("")
+  const [archiveRange, setArchiveRange] = useState<"all" | "7d" | "30d" | "90d">("all")
+  const [archiveSort, setArchiveSort] = useState<"recent" | "oldest" | "distance" | "duration">("recent")
   const [activeWorkout, setActiveWorkout] = useState<"pool" | "dryland">("pool")
   const [isGenerating, setIsGenerating] = useState(false)
 
@@ -328,19 +351,48 @@ export default function Coach() {
 
   const latestSessionInsight = sessionEntries[0] ?? null
 
-  const parseBullets = (value: any) => {
-    if (!value) return []
-    if (Array.isArray(value)) return value
-    try {
-      return JSON.parse(value ?? "[]")
-    } catch {
-      return []
-    }
-  }
+  const filteredArchiveEntries = useMemo(() => {
+    const term = archiveSearchTerm.trim().toLowerCase()
+    const now = Date.now()
+    const rangeMs =
+      archiveRange === "7d"
+        ? 7 * 24 * 60 * 60 * 1000
+        : archiveRange === "30d"
+          ? 30 * 24 * 60 * 60 * 1000
+          : archiveRange === "90d"
+            ? 90 * 24 * 60 * 60 * 1000
+            : null
+
+    const list = sessionEntries.filter((entry: any) => {
+      if (rangeMs !== null) {
+        if (!entry._date) return false
+        if (now - entry._date.getTime() > rangeMs) return false
+      }
+
+      if (!term) return true
+
+      const bulletText = parseBulletsSafe(entry.bullets).join(" ").toLowerCase()
+      const content = `${String(entry.title ?? "")} ${String(entry.summary ?? "")} ${bulletText}`.toLowerCase()
+      return content.includes(term)
+    })
+
+    list.sort((a: any, b: any) => {
+      if (archiveSort === "oldest") return (a._sort ?? 0) - (b._sort ?? 0)
+      if (archiveSort === "distance") {
+        return Number(b.activity_distance_meters ?? 0) - Number(a.activity_distance_meters ?? 0)
+      }
+      if (archiveSort === "duration") {
+        return Number(b.activity_duration_seconds ?? 0) - Number(a.activity_duration_seconds ?? 0)
+      }
+      return (b._sort ?? 0) - (a._sort ?? 0)
+    })
+
+    return list
+  }, [archiveRange, archiveSearchTerm, archiveSort, sessionEntries])
 
   const parsedSessionBullets = useMemo(() => {
     if (!latestSessionInsight) return []
-    return parseBullets(latestSessionInsight.bullets)
+    return parseBulletsSafe(latestSessionInsight.bullets)
   }, [latestSessionInsight])
 
   const activePoolSection = useMemo(() => {
@@ -974,13 +1026,53 @@ export default function Coach() {
                 <div className="mt-4 rounded-xl border border-border/70 bg-background/40 p-4 space-y-3">
                   <div className="flex items-center justify-between gap-2">
                     <h4 className="text-sm font-semibold text-foreground">Archivio Session IQ</h4>
-                    <Badge variant="outline">{sessionEntries.length} sessioni</Badge>
+                    <Badge variant="outline">
+                      {filteredArchiveEntries.length}/{sessionEntries.length} sessioni
+                    </Badge>
                   </div>
 
                   {sessionEntries.length > 0 ? (
+                    <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_170px_170px]">
+                      <Input
+                        value={archiveSearchTerm}
+                        onChange={(event) => setArchiveSearchTerm(event.target.value)}
+                        placeholder="Cerca in titolo, summary o insight..."
+                        className="h-9 bg-background/60"
+                      />
+                      <Select value={archiveRange} onValueChange={(value) => setArchiveRange(value as "all" | "7d" | "30d" | "90d")}>
+                        <SelectTrigger className="h-9 bg-background/60">
+                          <SelectValue placeholder="Periodo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tutto</SelectItem>
+                          <SelectItem value="7d">Ultimi 7 giorni</SelectItem>
+                          <SelectItem value="30d">Ultimi 30 giorni</SelectItem>
+                          <SelectItem value="90d">Ultimi 90 giorni</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={archiveSort}
+                        onValueChange={(value) =>
+                          setArchiveSort(value as "recent" | "oldest" | "distance" | "duration")
+                        }
+                      >
+                        <SelectTrigger className="h-9 bg-background/60">
+                          <SelectValue placeholder="Ordina" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="recent">Più recenti</SelectItem>
+                          <SelectItem value="oldest">Meno recenti</SelectItem>
+                          <SelectItem value="distance">Distanza</SelectItem>
+                          <SelectItem value="duration">Durata</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
+
+                  {filteredArchiveEntries.length > 0 ? (
                     <div className="max-h-[42dvh] space-y-2 overflow-y-auto pr-1">
-                      {sessionEntries.map((entry: any) => {
-                        const bullets = parseBullets(entry.bullets).slice(0, 2)
+                      {filteredArchiveEntries.map((entry: any) => {
+                        const bullets = parseBulletsSafe(entry.bullets).slice(0, 2)
                         return (
                           <article key={entry.id} className="rounded-lg border border-border/70 bg-card/40 p-3">
                             <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
@@ -1010,7 +1102,9 @@ export default function Coach() {
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground">
-                      Archivio vuoto. Verrà popolato dopo la prima analisi disponibile.
+                      {sessionEntries.length === 0
+                        ? "Archivio vuoto. Verrà popolato dopo la prima analisi disponibile."
+                        : "Nessun risultato con i filtri correnti."}
                     </p>
                   )}
                 </div>
