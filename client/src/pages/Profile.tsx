@@ -654,17 +654,6 @@ export default function Profile() {
                     }`
                   : ""}
               </p>
-              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <Button variant="outline-neon" size="sm" asChild>
-                  <Link href="/badges">Badge</Link>
-                </Button>
-                <Button variant="outline-neon" size="sm" asChild>
-                  <Link href="/track">Attività recenti</Link>
-                </Button>
-                <Button variant="outline-neon" size="sm" asChild>
-                  <Link href="/profile/performance">Record e progressi</Link>
-                </Button>
-              </div>
             </div>
           </SurfaceContent>
           </Surface>
