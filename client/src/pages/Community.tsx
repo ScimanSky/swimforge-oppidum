@@ -176,7 +176,7 @@ export default function Community() {
   return (
     <AppLayout>
       <div className="compact-shell space-y-4 lg:space-y-2">
-        <section className="surface-panel relative mx-auto max-w-4xl overflow-hidden">
+        <section className="surface-panel relative w-full overflow-hidden">
           <div className="absolute inset-0">
             <div className="h-full w-full bg-[linear-gradient(132deg,#101820_0%,#15232d_45%,#0f171f_100%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(70%_80%_at_18%_0%,color-mix(in_oklch,var(--electric-cyan)_34%,transparent)_0%,transparent_70%)]" />
