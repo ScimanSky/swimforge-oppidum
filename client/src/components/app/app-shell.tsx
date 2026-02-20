@@ -120,9 +120,7 @@ const athleteNav: NavItem[] = [
   },
 ]
 
-const athleteTopNav: NavItem[] = athleteNav.filter((item) =>
-  item.label === "Training",
-)
+const athleteTopNav: NavItem[] = []
 
 const quickAccessItems: QuickAccessItem[] = [
   { label: "Social Feed", path: "/home", icon: <Users className="size-4" />, match: isHomePath },
@@ -190,6 +188,7 @@ function initialsFromName(nameOrEmail: string | undefined) {
 
 function AthleteDesktopNav({ location }: { location: string }) {
   const path = normalizePath(location)
+  if (athleteTopNav.length === 0) return null
   return (
     <nav className="hidden lg:flex items-center gap-1 rounded-xl border border-border/50 bg-card/30 px-2 py-1">
       {athleteTopNav.map((item) => {
@@ -459,7 +458,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
 
       {showHeaderStories ? (
         <div className="fixed left-0 right-0 top-[72px] z-40 border-b border-border/40 bg-background/75 backdrop-blur-lg">
-          <div className="mx-auto flex h-16 max-w-[1600px] items-center px-4 md:px-6 lg:pl-[102px]">
+          <div className="mx-auto flex h-16 max-w-[1600px] items-center px-4 md:px-6 lg:pl-[92px]">
             <div className="w-full overflow-x-auto overflow-y-hidden scrollbar-hide">{headerSlot}</div>
           </div>
         </div>
