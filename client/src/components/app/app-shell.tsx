@@ -414,21 +414,9 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   return (
     <div className="min-h-[100dvh] bg-transparent overflow-x-hidden">
       <header className="fixed left-0 right-0 top-0 z-50 h-[72px] border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-full max-w-[1600px] items-center gap-3 px-4 md:px-6">
+        <div className="flex h-full w-full items-center gap-3 pl-0 pr-4 md:pr-6">
           <div className="flex min-w-0 items-center gap-3">
             <AthleteCompactBrand />
-            <label className="relative hidden xl:block">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") handleGlobalSearch()
-                }}
-                placeholder="Search swimmers, clubs, events..."
-                className="h-10 w-[340px] rounded-xl border-border/60 bg-card/50 pl-10"
-              />
-            </label>
           </div>
 
           <AthleteDesktopNav location={location} />
