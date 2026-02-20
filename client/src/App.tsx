@@ -29,6 +29,7 @@ const Statistics = lazy(() => import("./pages/Statistics"));
 const Coach = lazy(() => import("./pages/Coach"));
 const SeasonPage = lazy(() => import("./pages/Season"));
 const SocialFeed = lazy(() => import("./pages/SocialFeed"));
+const Messages = lazy(() => import("./pages/Messages"));
 const PostDetail = lazy(() => import("./pages/PostDetail"));
 const ReportPost = lazy(() => import("./pages/ReportPost"));
 const Community = lazy(() => import("./pages/Community"));
@@ -63,6 +64,10 @@ function Router() {
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
       <Route path="/home" component={SocialFeed} />
+      <Route path="/messages" component={Messages} />
+      <Route path="/home/messages">
+        <Redirect to="/messages" />
+      </Route>
       <Route path="/post/:postId" component={PostDetail} />
       <Route path="/home/post/:postId">{(params: { postId: string }) => <Redirect to={`/post/${params.postId}`} />}</Route>
       <Route path="/home/report/post/:postId" component={ReportPost} />

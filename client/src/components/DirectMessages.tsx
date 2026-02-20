@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Link } from "wouter";
-import { MessageCircle, Send, Search, PenSquare } from "lucide-react";
+import { MessageCircle, Send, Search, PenSquare, Phone, Video, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
@@ -21,10 +21,12 @@ import { trpc } from "@/lib/trpc";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { getInitials } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 interface DirectMessagesProps {
   recipientId?: number;
   recipientName?: string;
+  mode?: "dialog" | "page" | "link";
 }
 
 interface Message {
@@ -102,7 +104,7 @@ function getConversationPreview(message: Message) {
   return message.content
 }
 
-export default function DirectMessages({ recipientId, recipientName }: DirectMessagesProps) {
+export default function DirectMessages({ recipientId, recipientName, mode = "dialog" }: DirectMessagesProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [view, setView] = useState<View>(recipientId ? "conversation" : "list");
   const [selectedConversation, setSelectedConversation] = useState<number | null>(
@@ -114,6 +116,9 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const utils = trpc.useUtils();
+  const isPageMode = mode === "page";
+  const isLinkMode = mode === "link";
+  const panelActive = isPageMode ? true : isOpen;
 
   const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 5 * 60_000 });
   const currentUserId = profileQuery.data?.userId;
@@ -127,15 +132,15 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
   // Lista conversazioni recenti
   const conversationsQuery = trpc.community.messages.recent.useQuery(
     { limit: 20 },
-    { enabled: isOpen && !recipientId }
+    { enabled: panelActive && !recipientId }
   );
 
   // Conversazione specifica — poll every 5s when open
   const conversationQuery = trpc.community.messages.conversation.useQuery(
     { otherUserId: selectedConversation || 0, limit: 50 },
     {
-      enabled: !!selectedConversation,
-      refetchInterval: isOpen && view === "conversation" ? 5_000 : false,
+      enabled: !!selectedConversation && (isPageMode || isOpen || !!recipientId),
+      refetchInterval: panelActive && view === "conversation" ? 5_000 : false,
     }
   );
 
@@ -217,6 +222,16 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
       setTimeout(() => searchInputRef.current?.focus(), 100);
     }
   }, [view]);
+
+  useEffect(() => {
+    if (!isPageMode || recipientId) return;
+    if (!selectedConversation && conversationsQuery.data?.length) {
+      const first = conversationsQuery.data[0];
+      setSelectedConversation(first.otherUser.id);
+      setSelectedName(first.otherUser.username);
+      setView("conversation");
+    }
+  }, [isPageMode, recipientId, selectedConversation, conversationsQuery.data]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -537,6 +552,336 @@ export default function DirectMessages({ recipientId, recipientName }: DirectMes
       </div>
     );
   };
+
+  const renderConversationMessages = (isPageLayout: boolean) => {
+    if (!conversationQuery.data) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+        </div>
+      );
+    }
+
+    return (
+      <ScrollArea className="h-full">
+        <div className={cn("space-y-4", isPageLayout ? "p-5 md:p-6" : "p-4")}>
+          {conversationQuery.data.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+              <p className="text-sm">Inizia la conversazione!</p>
+            </div>
+          )}
+          {conversationQuery.data.map((msg) => {
+            const isOwn = msg.message.senderId !== selectedConversation;
+            const forwardMeta = parseForwardMetadata(msg.message.metadata);
+            const isForwarded =
+              (msg.message.messageType === "forward_post" || msg.message.messageType === "forward_story") &&
+              !!forwardMeta;
+            return (
+              <div
+                key={msg.message.id}
+                className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={cn(
+                    "max-w-[72%] rounded-2xl px-4 py-2.5",
+                    isOwn
+                      ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_28%,transparent),color-mix(in_oklch,var(--electric-lime)_16%,transparent))] text-foreground border border-[var(--electric-cyan)]/35"
+                      : "bg-card/80 border border-border/60",
+                  )}
+                >
+                  {isForwarded && forwardMeta ? (
+                    <div className="space-y-2">
+                      <div className="rounded-xl border border-border/60 bg-background/60 p-2.5">
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                          {forwardMeta.targetType === "post" ? "Post inoltrato" : "Story inoltrata"}
+                        </p>
+                        <p className="text-sm font-medium">
+                          {forwardMeta.ownerName
+                            ? `${forwardMeta.ownerName}`
+                            : "Contenuto condiviso"}
+                        </p>
+                        {forwardMeta.previewMediaUrl ? (
+                          <img
+                            src={forwardMeta.previewMediaUrl}
+                            alt="Anteprima inoltro"
+                            className="mt-2 h-24 w-full rounded-md object-cover"
+                          />
+                        ) : null}
+                        {forwardMeta.previewText ? (
+                          <p className="mt-2 text-xs text-muted-foreground line-clamp-2">
+                            {forwardMeta.previewText}
+                          </p>
+                        ) : null}
+                        <div className="mt-2">
+                          {forwardMeta.targetType === "post" ? (
+                            <Link
+                              href={`/post/${forwardMeta.targetId}`}
+                              className="text-xs font-medium text-[var(--electric-cyan)] hover:underline"
+                            >
+                              Apri post
+                            </Link>
+                          ) : (
+                            <Link
+                              href="/home"
+                              className="text-xs font-medium text-[var(--electric-cyan)] hover:underline"
+                            >
+                              Apri feed
+                            </Link>
+                          )}
+                        </div>
+                      </div>
+                      {msg.message.content ? (
+                        <p className="text-sm whitespace-pre-wrap">{msg.message.content}</p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="text-sm whitespace-pre-wrap">{msg.message.content}</p>
+                  )}
+                  <p className={cn("text-xs mt-1", isOwn ? "text-foreground/70" : "text-muted-foreground")}>
+                    {formatTime(msg.message.createdAt)}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+          <div ref={messagesEndRef} />
+        </div>
+      </ScrollArea>
+    );
+  };
+
+  const renderPageList = () => {
+    const tabBase =
+      "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors border border-transparent";
+
+    return (
+      <div className="flex h-full min-h-0 flex-col border-r border-border/60 bg-card/35">
+        <div className="border-b border-border/60 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-lg font-display font-bold text-foreground">Messaggi</h2>
+            <Button
+              variant="ghost-neon"
+              size="icon"
+              className="size-9"
+              onClick={() => setView("search")}
+              aria-label="Nuovo messaggio"
+            >
+              <PenSquare className="size-4" />
+            </Button>
+          </div>
+          <div className="mt-3 flex items-center gap-2">
+            <button type="button" className={cn(tabBase, "bg-background/70 border-border/70 text-foreground")}>
+              Primary
+            </button>
+            <button type="button" className={cn(tabBase, "text-muted-foreground hover:text-foreground")}>
+              General
+            </button>
+            <button type="button" className={cn(tabBase, "text-muted-foreground hover:text-foreground")}>
+              Richieste
+            </button>
+          </div>
+          <div className="relative mt-3">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <Input
+              ref={searchInputRef}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cerca messaggi..."
+              className="h-10 rounded-xl border-border/70 bg-background/55 pl-9"
+            />
+          </div>
+        </div>
+
+        <ScrollArea className="flex-1">
+          {view === "search" && searchQuery.length >= 1 ? (
+            <div className="divide-y divide-border/40">
+              {userSearchQuery.isLoading ? (
+                <div className="flex items-center justify-center h-28">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+                </div>
+              ) : !userSearchQuery.data?.length ? (
+                <div className="p-5 text-sm text-muted-foreground">Nessun utente trovato.</div>
+              ) : (
+                userSearchQuery.data.map((user) => {
+                  const name = user.username || user.name || `#${user.userId}`;
+                  return (
+                    <button
+                      key={user.userId}
+                      onClick={() => openConversation(user.userId, name)}
+                      className="w-full px-4 py-3 text-left transition-colors hover:bg-background/65"
+                    >
+                      <div className="flex items-center gap-3">
+                        <Avatar className="size-10 border border-border/60">
+                          <AvatarImage src={user.avatarUrl || undefined} />
+                          <AvatarFallback className="text-xs">{getInitials(name)}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-foreground">{name}</p>
+                          <p className="text-xs text-muted-foreground">Inizia una nuova chat</p>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          ) : !conversationsQuery.data?.length ? (
+            <div className="flex h-40 flex-col items-center justify-center px-4 text-center text-muted-foreground">
+              <MessageCircle className="size-8 opacity-60" />
+              <p className="mt-2 text-sm">Nessun messaggio disponibile.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border/40">
+              {conversationsQuery.data
+                .filter((conv) => {
+                  if (!searchQuery.trim()) return true;
+                  const name = conv.otherUser.username ?? "";
+                  return name.toLowerCase().includes(searchQuery.trim().toLowerCase());
+                })
+                .map((conv) => {
+                  const isActive = selectedConversation === conv.otherUser.id;
+                  return (
+                    <button
+                      key={conv.lastMessage.id}
+                      onClick={() => openConversation(conv.otherUser.id, conv.otherUser.username)}
+                      className={cn(
+                        "w-full px-4 py-3 text-left transition-colors hover:bg-background/65",
+                        isActive && "bg-[linear-gradient(90deg,color-mix(in_oklch,var(--electric-cyan)_14%,transparent),transparent)]",
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Avatar className="size-11 border border-border/60">
+                          <AvatarImage src={conv.otherUser.profilePicture || undefined} />
+                          <AvatarFallback>{getInitials(conv.otherUser.username || "U")}</AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-sm font-semibold text-foreground">{conv.otherUser.username}</p>
+                            <span className="text-[11px] text-muted-foreground">
+                              {formatTime(conv.lastMessage.createdAt)}
+                            </span>
+                          </div>
+                          <div className="mt-0.5 flex items-center justify-between gap-2">
+                            <p className="truncate text-xs text-muted-foreground">
+                              {getConversationPreview(conv.lastMessage)}
+                            </p>
+                            {conv.unreadCount > 0 ? (
+                              <Badge className="h-5 min-w-5 rounded-full px-1.5 text-[10px]" variant="destructive">
+                                {conv.unreadCount > 9 ? "9+" : conv.unreadCount}
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+            </div>
+          )}
+        </ScrollArea>
+      </div>
+    );
+  };
+
+  const renderPageConversation = () => {
+    if (!selectedConversation) {
+      return (
+        <div className="flex h-full items-center justify-center text-muted-foreground">
+          <div className="text-center">
+            <MessageCircle className="mx-auto size-10 opacity-50" />
+            <p className="mt-2 text-sm">Seleziona una conversazione per iniziare.</p>
+          </div>
+        </div>
+      );
+    }
+
+    const otherUserName =
+      selectedName ||
+      recipientName ||
+      conversationQuery.data?.[0]?.sender?.username ||
+      "Utente";
+
+    const otherAvatar = conversationQuery.data?.[0]?.sender?.profilePicture || undefined;
+
+    return (
+      <div className="flex h-full min-h-0 flex-col">
+        <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3 md:px-5">
+          <div className="flex items-center gap-3 min-w-0">
+            <Avatar className="size-10 border border-border/60">
+              <AvatarImage src={otherAvatar} />
+              <AvatarFallback className="text-xs">{getInitials(otherUserName)}</AvatarFallback>
+            </Avatar>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-foreground">{otherUserName}</p>
+              <p className="text-xs text-muted-foreground">Conversazione privata</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" className="size-8 rounded-lg" aria-label="Chiama">
+              <Phone className="size-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="size-8 rounded-lg" aria-label="Videochiamata">
+              <Video className="size-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="size-8 rounded-lg" aria-label="Info">
+              <Info className="size-4" />
+            </Button>
+          </div>
+        </div>
+
+        <div className="flex-1 min-h-0">{renderConversationMessages(true)}</div>
+
+        <div className="border-t border-border/60 p-4">
+          <div className="flex items-center gap-2">
+            <Input
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Scrivi un messaggio..."
+              className="h-11 rounded-xl border-border/70 bg-background/55"
+            />
+            <Button
+              onClick={handleSend}
+              disabled={!messageText.trim() || sendMutation.isPending}
+              className="h-11 rounded-xl px-4"
+            >
+              <Send className="mr-1 size-4" />
+              Invia
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (isLinkMode) {
+    return (
+      <Link href="/messages" className="inline-flex">
+        <Button variant="ghost" size="icon" className="relative min-h-[44px] min-w-[44px]">
+          <MessageCircle className="h-5 w-5" />
+          {!recipientId && unreadCount > 0 && (
+            <Badge
+              variant="destructive"
+              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+            >
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </Badge>
+          )}
+        </Button>
+      </Link>
+    );
+  }
+
+  if (isPageMode) {
+    return (
+      <section className="surface-panel overflow-hidden h-[calc(100dvh-178px)] min-h-[620px]">
+        <div className="grid h-full grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)]">
+          {renderPageList()}
+          {renderPageConversation()}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {

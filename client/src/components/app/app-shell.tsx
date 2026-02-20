@@ -404,7 +404,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
 
           <div className="ml-auto flex items-center gap-2">
             <NotificationBell />
-            <DirectMessages />
+            <DirectMessages mode="link" />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
