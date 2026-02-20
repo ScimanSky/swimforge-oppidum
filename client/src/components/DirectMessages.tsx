@@ -119,7 +119,7 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
   const isPageMode = mode === "page";
   const isLinkMode = mode === "link";
   const panelActive = isPageMode ? true : isOpen;
-  const conversationLimit = isPageMode ? 200 : 50;
+  const conversationLimit = isPageMode ? 100 : 50;
 
   const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 5 * 60_000 });
   const currentUserId = profileQuery.data?.userId;
@@ -445,6 +445,14 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
   };
 
   const renderConversation = () => {
+    if (conversationQuery.error) {
+      return (
+        <div className="flex h-full items-center justify-center p-4 text-center text-sm text-muted-foreground">
+          Impossibile caricare la conversazione. Riprova tra pochi secondi.
+        </div>
+      );
+    }
+
     if (!conversationQuery.data) {
       return (
         <div className="flex items-center justify-center h-full">
@@ -588,6 +596,14 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
   };
 
   const renderConversationMessages = (isPageLayout: boolean) => {
+    if (conversationQuery.error) {
+      return (
+        <div className="flex h-full items-center justify-center p-4 text-center text-sm text-muted-foreground">
+          Impossibile caricare i messaggi della chat.
+        </div>
+      );
+    }
+
     if (!conversationQuery.data) {
       return (
         <div className="flex items-center justify-center h-full">
@@ -758,6 +774,11 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
                   );
                 })
               )}
+            </div>
+          ) : conversationsQuery.error ? (
+            <div className="flex h-40 flex-col items-center justify-center px-4 text-center text-muted-foreground">
+              <MessageCircle className="size-8 opacity-60" />
+              <p className="mt-2 text-sm">Errore caricamento conversazioni.</p>
             </div>
           ) : !normalizedConversations.length ? (
             <div className="flex h-40 flex-col items-center justify-center px-4 text-center text-muted-foreground">

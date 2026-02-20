@@ -341,7 +341,12 @@ export async function getConversation(params: {
       message: directMessages,
       sender: {
         id: users.id,
-        username: swimmerProfiles.username,
+        username: sql<string | null>`
+          COALESCE(
+            NULLIF(TRIM(${users.name}), ''),
+            SPLIT_PART(${users.email}, '@', 1)
+          )
+        `,
         profilePicture: swimmerProfiles.avatarUrl,
       },
     })
@@ -444,7 +449,10 @@ export async function getRecentConversations(userId: number, limit: number = 20)
       l."readAt",
       l."createdAt",
       u.id AS "otherUserId",
-      sp.username AS "otherUsername",
+      COALESCE(
+        NULLIF(TRIM(u.name), ''),
+        SPLIT_PART(u.email, '@', 1)
+      ) AS "otherUsername",
       sp.avatar_url AS "otherProfilePicture",
       COALESCE(unread.unread_count, 0)::int AS "unreadCount"
     FROM latest_per_user l
