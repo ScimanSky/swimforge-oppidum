@@ -68,7 +68,7 @@ function Router() {
       <Route path="/home/post/:postId">{(params: { postId: string }) => <Redirect to={`/post/${params.postId}`} />}</Route>
       <Route path="/home/report/post/:postId" component={ReportPost} />
       <Route path="/dashboard">
-        <Redirect to="/home" />
+        <Redirect to="/home/dashboard" />
       </Route>
       <Route path="/report/post/:postId">{(params: { postId: string }) => <Redirect to={`/home/report/post/${params.postId}`} />}</Route>
       <Route path="/admin/reports" component={AdminReports} />

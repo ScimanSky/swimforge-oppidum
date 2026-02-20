@@ -6,7 +6,15 @@ interface SwimForgeMarkProps {
 }
 
 export function SwimForgeMark({ className, alt = "SwimForge" }: SwimForgeMarkProps) {
-  return null;
+  return (
+    <img
+      src="/brand/swimforge-mark.svg"
+      alt={alt}
+      className={cn("h-8 w-8 object-contain", className)}
+      loading="lazy"
+      decoding="async"
+    />
+  )
 }
 
 interface SwimForgeWordmarkProps {

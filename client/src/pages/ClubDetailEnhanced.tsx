@@ -331,8 +331,8 @@ export default function ClubDetailEnhanced() {
   if (!match || !Number.isFinite(clubId)) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center py-12 lg:py-4">
-          <p className="text-muted-foreground">Club non trovato</p>
+        <div className="compact-shell max-w-5xl mx-auto">
+          <section className="surface-panel p-6 text-center text-muted-foreground">Club non trovato</section>
         </div>
       </AppLayout>
     );
@@ -341,7 +341,7 @@ export default function ClubDetailEnhanced() {
   if (clubQuery.isLoading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center py-12 lg:py-4">
+        <div className="compact-shell max-w-5xl mx-auto flex items-center justify-center py-8 lg:py-4">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
         </div>
       </AppLayout>
@@ -351,7 +351,7 @@ export default function ClubDetailEnhanced() {
   if (!club) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center py-12 lg:py-4">
+        <div className="compact-shell max-w-5xl mx-auto flex items-center justify-center py-8 lg:py-4">
           <div className="text-center">
             <p className="text-muted-foreground mb-4">Club non trovato</p>
             <Link href="/home/community">
@@ -483,7 +483,7 @@ export default function ClubDetailEnhanced() {
           document.body
         )}
 
-      <div className="mx-auto max-w-5xl space-y-3 pb-24 px-3 sm:space-y-4 sm:px-4" style={{ paddingTop: contentOffset }}>
+      <div className="compact-shell max-w-5xl mx-auto space-y-3 pb-24 px-3 sm:space-y-4 sm:px-4" style={{ paddingTop: contentOffset }}>
         {/* Spacer managed by contentOffset (fixed header above) */}
         <div className="h-0" />
 

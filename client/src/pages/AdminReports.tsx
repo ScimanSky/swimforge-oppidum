@@ -5,6 +5,9 @@ import AppLayout from "@/components/AppLayout"
 import { Surface, SurfaceContent } from "@/components/ui/surface"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { trpc } from "@/lib/trpc"
 import { formatTimeAgo } from "@/lib/format"
 import { toast } from "sonner"
@@ -125,29 +128,30 @@ export default function AdminReports() {
     <AppLayout>
       <div className="compact-shell max-w-5xl mx-auto space-y-4 lg:space-y-3">
         <Surface>
-          <SurfaceContent className="p-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <SurfaceContent className="p-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1 className="text-2xl font-display font-bold text-foreground">Moderazione Segnalazioni</h1>
               <p className="text-sm text-muted-foreground">
                 Totale: {reportsQuery.data?.total ?? 0}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <label htmlFor="report-status" className="text-sm text-muted-foreground">
-                Stato:
-              </label>
-              <select
-                id="report-status"
+            <div className="min-w-[180px] space-y-1">
+              <p className="text-xs font-medium text-muted-foreground">Filtro stato</p>
+              <Select
                 value={status}
-                onChange={(event) => setStatus(event.target.value as ReportStatus)}
-                className="h-9 rounded-md border border-border bg-background px-3 text-sm"
+                onValueChange={(value) => setStatus(value as ReportStatus)}
               >
-                {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="h-9">
+                  <SelectValue placeholder="Seleziona stato" />
+                </SelectTrigger>
+                <SelectContent>
+                  {statusOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </SurfaceContent>
         </Surface>
@@ -165,14 +169,14 @@ export default function AdminReports() {
                 <label htmlFor="cleanup-limit" className="text-xs text-muted-foreground">
                   Limit run
                 </label>
-                <input
+                <Input
                   id="cleanup-limit"
                   type="number"
                   min={1}
                   max={2000}
                   value={cleanupLimit}
                   onChange={(event) => setCleanupLimit(event.target.value)}
-                  className="h-9 w-24 rounded-md border border-border bg-background px-2 text-sm"
+                  className="h-9 w-24"
                 />
                 <Button
                   size="sm"
@@ -249,8 +253,11 @@ export default function AdminReports() {
                         <span className="font-semibold">Report #{item.id}</span>
                         <span className="text-muted-foreground"> · Post #{item.post_id}</span>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        {statusText} · {formatTimeAgo(item.created_at)}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="border-primary/30 text-primary">
+                          {statusText}
+                        </Badge>
+                        <span>{formatTimeAgo(item.created_at)}</span>
                       </div>
                     </div>
 

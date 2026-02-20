@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Trophy,
   Lock,
-  ChevronLeft,
   X,
   Sparkles,
   Orbit,
@@ -258,7 +257,7 @@ export default function Badges() {
 
   return (
     <AppLayout showBubbles={true} bubbleIntensity="low">
-      <div className="dark bg-background pb-20 lg:pb-4">
+      <div className="compact-shell dark space-y-4 lg:space-y-3 pb-20 lg:pb-4">
       {/* Hidden audio element for badge sounds (dynamic source) */}
       <audio ref={audioRef} preload="auto" />
 
@@ -326,37 +325,29 @@ export default function Badges() {
         .sparkle-particle:nth-child(6) { top: 50%; right: 5%; animation-delay: 0.3s; }
       `}</style>
 
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-[var(--navy)]/95 backdrop-blur-lg border-b border-border/60">
-        <div className="container py-4">
-          <div className="flex items-center gap-3">
-            <Link href="/home">
-              <Button variant="ghost" size="icon" className="text-primary hover:bg-primary/10">
-                <ChevronLeft className="h-5 w-5" />
-              </Button>
-            </Link>
-            <div className="flex-1">
-              <h1 className="font-bold text-lg text-foreground">Bacheca Badge</h1>
-              <p className="text-sm text-muted-foreground">
-                <span className="text-primary">{earnedCount}</span> / {totalCount} sbloccati
-              </p>
-            </div>
-            {meQuery.data?.role === "admin" ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => fixBadgeUrls.mutate()}
-                disabled={fixBadgeUrls.isPending}
-                className="text-xs"
-              >
-                {fixBadgeUrls.isPending ? "Aggiornamento..." : "Fix Badge Profilo"}
-              </Button>
-            ) : null}
+      <section className="surface-panel p-4 sm:p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-display font-bold neon-gradient-text">Bacheca Badge</h1>
+            <p className="text-sm text-muted-foreground">
+              <span className="text-primary font-medium">{earnedCount}</span> / {totalCount} sbloccati
+            </p>
           </div>
+          {meQuery.data?.role === "admin" ? (
+            <Button
+              variant="outline-neon"
+              size="sm"
+              onClick={() => fixBadgeUrls.mutate()}
+              disabled={fixBadgeUrls.isPending}
+              className="text-xs"
+            >
+              {fixBadgeUrls.isPending ? "Aggiornamento..." : "Fix Badge Profilo"}
+            </Button>
+          ) : null}
         </div>
-      </header>
+      </section>
 
-      <main className="container py-6 space-y-6">
+      <div className="space-y-5">
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline-neon" asChild>
             <Link href="/profile/performance">Statistiche</Link>
@@ -717,7 +708,7 @@ export default function Badges() {
             </AnimatePresence>,
             document.body
           )}
-      </main>
+      </div>
 
       </div>
     </AppLayout>

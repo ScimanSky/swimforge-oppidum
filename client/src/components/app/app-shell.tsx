@@ -5,20 +5,19 @@ import { Link, useLocation } from "wouter"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import {
   BarChart3,
-  Bot,
-  Home,
+  ChevronDown,
+  LayoutDashboard,
   LogOut,
-  Trophy,
-  Orbit,
-  Moon,
-  MoreHorizontal,
   Plus,
+  Search,
   Settings,
   Shield,
-  Sun,
+  Target,
   User,
   Users,
   Waves,
+  Moon,
+  Sun,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -27,6 +26,7 @@ import { supabase } from "@/lib/supabase"
 import { useTheme } from "@/contexts/ThemeContext"
 
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +35,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import NotificationBell from "@/components/NotificationBell"
 import DirectMessages from "@/components/DirectMessages"
 import { CreatePostSheet } from "@/components/social/CreatePostSheet"
@@ -45,93 +45,236 @@ type NavItem = {
   label: string
   path: string
   icon: React.ReactNode
+  match: (path: string) => boolean
 }
 
-const navPrimary: NavItem[] = [
-  { label: "Feed", path: "/home", icon: <Home className="size-5" /> },
-  { label: "Club", path: "/home/community", icon: <Users className="size-5" /> },
-  { label: "Season", path: "/season", icon: <Orbit className="size-5" /> },
+const normalizePath = (location: string) => location.split("?")[0].split("#")[0] || "/"
+
+const isChallengesPath = (path: string) =>
+  path.startsWith("/season/challenges") || path.startsWith("/challenges")
+
+const isTrainingPath = (path: string) =>
+  path.startsWith("/track") ||
+  path.startsWith("/activities") ||
+  path.startsWith("/coach") ||
+  path.startsWith("/season/objectives") ||
+  path.startsWith("/goals") ||
+  path.startsWith("/session-iq")
+
+const isCommunityPath = (path: string) =>
+  path === "/home" ||
+  path.startsWith("/post/") ||
+  path.startsWith("/home/report/") ||
+  path.startsWith("/report/post/") ||
+  path.startsWith("/home/community") ||
+  path.startsWith("/community") ||
+  path.startsWith("/badges")
+
+const isProfilePath = (path: string) =>
+  path.startsWith("/profile") ||
+  path.startsWith("/settings") ||
+  path.startsWith("/statistics") ||
+  path.startsWith("/u/")
+
+const isDashboardPath = (path: string) =>
+  path === "/dashboard" ||
+  path.startsWith("/home/dashboard") ||
+  path === "/season" ||
+  path.startsWith("/season/leaderboard") ||
+  path.startsWith("/leaderboard")
+
+const athleteNav: NavItem[] = [
+  {
+    label: "Dashboard",
+    path: "/home/dashboard",
+    icon: <LayoutDashboard className="size-4" />,
+    match: (path) => isDashboardPath(path) && !isChallengesPath(path) && !isTrainingPath(path),
+  },
+  {
+    label: "Training",
+    path: "/track",
+    icon: <Waves className="size-4" />,
+    match: (path) => isTrainingPath(path),
+  },
+  {
+    label: "Challenges",
+    path: "/season/challenges",
+    icon: <Target className="size-4" />,
+    match: (path) => isChallengesPath(path),
+  },
+  {
+    label: "Community",
+    path: "/home",
+    icon: <Users className="size-4" />,
+    match: (path) => isCommunityPath(path),
+  },
+  {
+    label: "Profile",
+    path: "/profile",
+    icon: <User className="size-4" />,
+    match: (path) => isProfilePath(path),
+  },
 ]
 
-const navSecondary: NavItem[] = [
-  { label: "Coach", path: "/coach", icon: <Bot className="size-5" /> },
-  { label: "Track", path: "/track", icon: <Waves className="size-5" /> },
-  { label: "Profilo", path: "/profile", icon: <User className="size-5" /> },
+const adminNav: NavItem[] = [
+  {
+    label: "Dashboard",
+    path: "/home/dashboard",
+    icon: <LayoutDashboard className="size-4" />,
+    match: (path) => path.startsWith("/home/dashboard"),
+  },
+  {
+    label: "Reports",
+    path: "/admin/reports",
+    icon: <Shield className="size-4" />,
+    match: (path) => path.startsWith("/admin/reports"),
+  },
+  {
+    label: "Users",
+    path: "/home/community",
+    icon: <Users className="size-4" />,
+    match: (path) => path.startsWith("/home/community"),
+  },
+  {
+    label: "Analytics",
+    path: "/profile/performance",
+    icon: <BarChart3 className="size-4" />,
+    match: (path) => path.startsWith("/profile/performance") || path.startsWith("/statistics"),
+  },
+  {
+    label: "Settings",
+    path: "/settings",
+    icon: <Settings className="size-4" />,
+    match: (path) => path.startsWith("/settings"),
+  },
 ]
 
-function titleForPath(path: string) {
-  if (path.startsWith("/community/club") && path.includes("/event/")) return "Evento Club"
-  if (path.startsWith("/community/club")) return "Club"
-  if (path.startsWith("/home/community") || path.startsWith("/community")) return "Club"
-  if (path.startsWith("/season/challenges") || path.startsWith("/challenges")) return "Sfide"
-  if (path === "/" || path === "/home" || path.startsWith("/dashboard")) return "Feed"
-  if (path.startsWith("/track") || path.startsWith("/activities")) return "Track"
-  if (path.startsWith("/season")) return "Season"
-  if (path.startsWith("/profile/performance") || path.startsWith("/statistics")) return "Progressi"
-  if (path.startsWith("/coach")) return "Coach"
-  if (path.startsWith("/profile")) return "Profilo"
-  if (path.startsWith("/settings")) return "Impostazioni"
+function athleteTitleForPath(path: string) {
+  if (path.startsWith("/community/club") && path.includes("/event/")) return "Club Event"
+  if (path.startsWith("/community/club")) return "Club Details"
+  if (path.startsWith("/home/community") || path === "/community") return "Club Directory"
+  if (path.startsWith("/season/challenges/") || path.startsWith("/challenges/")) return "Challenge Details"
+  if (path.startsWith("/season/challenges") || path.startsWith("/challenges")) return "Challenges"
+  if (path === "/home") return "Social Home Feed"
+  if (path.startsWith("/track/") || path.startsWith("/activities/")) return "Activity Detail"
+  if (path.startsWith("/track") || path.startsWith("/activities")) return "Activity Tracker"
+  if (path.startsWith("/season/objectives") || path.startsWith("/goals")) return "Training Objectives"
+  if (path.startsWith("/coach")) return "AI Coach"
+  if (path.startsWith("/badges")) return "Badges"
+  if (path.startsWith("/home/dashboard") || path === "/season" || path === "/dashboard") return "Dashboard"
+  if (path.startsWith("/season/leaderboard") || path.startsWith("/leaderboard")) return "Season Leaderboard"
+  if (path.startsWith("/profile/performance") || path.startsWith("/statistics")) return "Performance Profile"
+  if (path.startsWith("/settings")) return "Settings"
+  if (path.startsWith("/profile")) return "Profile"
+  if (path.startsWith("/post/")) return "Post"
   return "SwimForge"
 }
 
-function isNavItemActive(path: string, location: string) {
-  const normalized = location.split("?")[0].split("#")[0]
-  if (path === "/home" && normalized.startsWith("/home/community")) {
-    return false
-  }
-  return normalized === path || normalized.startsWith(path + "/")
+function adminTitleForPath(path: string) {
+  if (path.startsWith("/admin/reports")) return "Moderation Queue"
+  return "Admin"
 }
 
-function RailLink({ item, location }: { item: NavItem; location: string }) {
-  const isActive = isNavItemActive(item.path, location)
+function initialsFromName(nameOrEmail: string | undefined) {
+  if (!nameOrEmail) return "SF"
+  const parts = nameOrEmail
+    .split(" ")
+    .map((part) => part.trim())
+    .filter(Boolean)
+  if (parts.length === 0) return "SF"
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase()
+}
 
+function AthleteDesktopNav({ location }: { location: string }) {
+  const path = normalizePath(location)
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Link
-          href={item.path}
-          className={cn(
-            [
-              "group relative flex size-11 items-center justify-center rounded-2xl",
-              "transition-[transform,box-shadow,background-color,color] duration-200 will-change-transform",
-              "hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]",
-            ].join(" "),
-            isActive
-              ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_22%,transparent),color-mix(in_oklch,var(--electric-lime)_18%,transparent))] text-foreground shadow-[0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_28%,transparent),0_18px_55px_color-mix(in_oklch,var(--foreground)_14%,transparent),0_0_34px_var(--neon-soft)]"
-              : "text-muted-foreground hover:text-foreground hover:bg-card/45 hover:shadow-[0_16px_44px_color-mix(in_oklch,var(--foreground)_12%,transparent)]",
-          )}
-          aria-current={isActive ? "page" : undefined}
-        >
-          {item.icon}
-          <span
+    <nav className="hidden lg:flex items-center gap-1 rounded-xl border border-border/50 bg-card/30 px-2 py-1">
+      {athleteNav.map((item) => {
+        const active = item.match(path)
+        return (
+          <Link
+            key={item.path}
+            href={item.path}
             className={cn(
-              "pointer-events-none absolute -right-2 top-1/2 hidden h-6 w-1 -translate-y-1/2 rounded-full bg-[linear-gradient(to_bottom,var(--electric-cyan),var(--electric-lime))] opacity-0 transition-opacity lg:block",
-              isActive && "opacity-100",
+              "relative inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
+              active
+                ? "text-foreground bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))]"
+                : "text-muted-foreground hover:text-foreground hover:bg-card/50",
             )}
-          />
-        </Link>
-      </TooltipTrigger>
-      <TooltipContent side="right" sideOffset={10}>
-        {item.label}
-      </TooltipContent>
-    </Tooltip>
+            aria-current={active ? "page" : undefined}
+          >
+            <span className="hidden xl:inline-flex">{item.icon}</span>
+            <span>{item.label}</span>
+            <span
+              className={cn(
+                "pointer-events-none absolute bottom-1 left-2 right-2 h-0.5 rounded-full bg-[linear-gradient(90deg,var(--electric-cyan),var(--electric-lime))] transition-opacity",
+                active ? "opacity-100" : "opacity-0",
+              )}
+            />
+          </Link>
+        )
+      })}
+    </nav>
+  )
+}
+
+function AdminSidebar({ location }: { location: string }) {
+  const path = normalizePath(location)
+  return (
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r border-border/50 bg-sidebar/95 backdrop-blur-xl lg:flex lg:flex-col">
+      <div className="flex h-[72px] items-center gap-3 border-b border-border/50 px-5">
+        <SwimForgeMark className="h-8 w-8" />
+        <SwimForgeWordmark compact className="text-base" />
+      </div>
+      <nav className="flex-1 space-y-1 px-3 py-4">
+        {adminNav.map((item) => {
+          const active = item.match(path)
+          return (
+            <Link
+              key={item.path}
+              href={item.path}
+              className={cn(
+                "flex min-h-[44px] items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors",
+                active
+                  ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_8%,transparent))] text-foreground"
+                  : "text-muted-foreground hover:bg-card/45 hover:text-foreground",
+              )}
+              aria-current={active ? "page" : undefined}
+            >
+              {item.icon}
+              <span>{item.label}</span>
+            </Link>
+          )
+        })}
+      </nav>
+      <div className="border-t border-border/50 p-4">
+        <p className="text-xs text-muted-foreground">Admin Workspace</p>
+      </div>
+    </aside>
   )
 }
 
 export function AppShell({ children, headerSlot }: { children: React.ReactNode; headerSlot?: React.ReactNode }) {
-  const [location] = useLocation()
+  const [location, navigate] = useLocation()
+  const path = normalizePath(location)
+  const isAdminRoute = path.startsWith("/admin")
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [searchText, setSearchText] = useState("")
   const { theme, toggleTheme, switchable } = useTheme()
   const logoutMutation = trpc.auth.logout.useMutation()
   const heartbeatMutation = trpc.auth.heartbeat.useMutation()
   const meQuery = trpc.auth.me.useQuery()
+  const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 120_000 })
   const reduceMotion = useReducedMotion()
   const isAdmin = meQuery.data?.role === "admin"
 
-  const pageTitle = useMemo(() => titleForPath(location), [location])
-  const showPageTitle = !(headerSlot && pageTitle === "Feed")
-  const showBrandWordmark = pageTitle !== "Feed"
+  const pageTitle = useMemo(
+    () => (isAdminRoute ? adminTitleForPath(path) : athleteTitleForPath(path)),
+    [isAdminRoute, path],
+  )
+  const showHeaderStories = Boolean(headerSlot) && !isAdminRoute
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return
@@ -140,7 +283,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
       if (document.visibilityState !== "visible") return
       heartbeatMutation.mutate(undefined, {
         onError: () => {
-          // Presence updates are best-effort and should not affect UX.
+          // Presence updates are best-effort.
         },
       })
     }
@@ -176,165 +319,155 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
     window.location.href = "/"
   }
 
-  return (
-    <div className="min-h-[100dvh] bg-transparent overflow-x-hidden">
-      {/* Desktop Rail */}
-      <aside
-        data-tour="main-navigation"
-        className="fixed left-0 top-0 z-40 hidden h-screen w-[88px] border-r border-border/40 bg-sidebar/95 backdrop-blur-xl shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_14%,transparent)] lg:flex"
-      >
-        <div className="flex h-full w-full flex-col items-center">
-          <div className="flex h-16 items-center justify-center">
-            <Link
-              href="/home"
-              className="sf-brand-anchor group relative flex size-11 items-center justify-center rounded-2xl shadow-[0_0_30px_var(--neon-soft)] transition-transform hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
-              aria-label="Vai alla Home"
-            >
-              <SwimForgeMark className="h-8 w-8" />
-            </Link>
-          </div>
+  const handleGlobalSearch = () => {
+    const trimmed = searchText.trim()
+    if (!trimmed) return
+    navigate(`/home/community?q=${encodeURIComponent(trimmed)}`)
+  }
 
-          <nav className="flex w-full flex-col items-center gap-2 px-3 py-4">
-            {navPrimary.map((item) => (
-              <RailLink key={item.path} item={item} location={location} />
-            ))}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  type="button"
-                  onClick={() => setIsCreateOpen(true)}
-                  data-tour="create-post"
-                  className="group relative my-1 flex size-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime))] text-background shadow-[0_0_22px_var(--neon-soft)] transition-[transform,box-shadow] duration-200 hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
-                  aria-label="Crea post"
-                >
-                  <Plus className="size-5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={10}>
-                Crea
-              </TooltipContent>
-            </Tooltip>
-            <div className="my-2 h-px w-full bg-border/70" />
-            {navSecondary.map((item) => (
-              <RailLink key={item.path} item={item} location={location} />
-            ))}
-          </nav>
+  const profileLabel = meQuery.data?.name || meQuery.data?.email || "Swimmer"
+  const profileInitials = initialsFromName(profileLabel)
+  const avatarUrl = profileQuery.data?.avatarUrl || undefined
 
-          <div className="mt-auto w-full border-t border-border/70 px-3 py-3">
-            <div className="flex items-center justify-center gap-2">
-              <NotificationBell />
-              <DirectMessages />
+  if (isAdminRoute) {
+    return (
+      <div className="min-h-[100dvh] bg-transparent overflow-x-hidden">
+        <AdminSidebar location={location} />
+
+        <header className="fixed left-0 right-0 top-0 z-50 h-[72px] border-b border-border/50 bg-background/80 backdrop-blur-xl lg:pl-64">
+          <div className="flex h-full items-center justify-between gap-4 px-4 lg:px-6">
+            <div className="flex min-w-0 items-center gap-3">
+              <Link href="/admin/reports" className="inline-flex items-center gap-2 lg:hidden">
+                <SwimForgeMark className="h-7 w-7" />
+                <SwimForgeWordmark compact className="text-sm" />
+              </Link>
+              <h1 className="truncate text-lg font-display font-semibold">{pageTitle}</h1>
             </div>
-            <div className="mt-3 flex items-center justify-center gap-2">
-              {switchable && toggleTheme && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => toggleTheme()}
-                  aria-label={theme === "dark" ? "Passa al tema chiaro" : "Passa al tema scuro"}
-                  className="rounded-2xl hover:shadow-[0_0_22px_var(--neon-soft)]"
-                >
-                  {theme === "dark" ? <Moon className="size-4" /> : <Sun className="size-4" />}
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                onClick={() => void handleLogout()}
-                disabled={isLoggingOut}
-                aria-label="Logout"
-                className="rounded-2xl hover:shadow-[0_0_22px_var(--neon-soft)]"
-              >
-                <LogOut className="size-4" />
+
+            <div className="flex items-center gap-2">
+              <label className="relative hidden md:block">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") handleGlobalSearch()
+                  }}
+                  placeholder="Search reports, users..."
+                  className="h-10 w-[280px] rounded-xl border-border/60 bg-card/50 pl-10"
+                />
+              </label>
+              <NotificationBell />
+              <Button variant="ghost" size="icon" onClick={() => void handleLogout()} aria-label="Sign out">
+                <LogOut className="size-5" />
               </Button>
             </div>
           </div>
-        </div>
-      </aside>
+        </header>
 
-      {/* Top Bar */}
-      <header className="fixed left-0 right-0 top-0 z-50 h-16 border-b border-border/40 bg-background/80 backdrop-blur-xl shadow-[0_18px_55px_color-mix(in_oklch,var(--foreground)_12%,transparent)] lg:pl-[88px]">
-        <div className="flex h-full items-center justify-between gap-3 px-4">
+        <main className="min-h-[calc(100dvh-72px)] pt-[72px] lg:pl-64">
+          <div className="mx-auto max-w-[1600px] p-4 md:p-6">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={location}
+                initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
+                animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+                exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -6 }}
+                transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: "easeOut" }}
+              >
+                {children}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-[100dvh] bg-transparent overflow-x-hidden">
+      <header className="fixed left-0 right-0 top-0 z-50 h-[72px] border-b border-border/50 bg-background/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-full max-w-[1600px] items-center justify-between gap-3 px-4 md:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <Link
-              href="/home"
-              className="sf-brand-anchor inline-flex min-h-[44px] items-center gap-2 rounded-xl px-2.5 py-1.5"
-              aria-label="Vai al Feed SwimForge"
-            >
-              <SwimForgeMark className="h-7 w-7" />
-              <SwimForgeWordmark compact className={cn("hidden text-sm md:inline", !showBrandWordmark && "md:hidden")} />
+            <Link href="/home" className="sf-brand-anchor inline-flex min-h-[44px] items-center gap-2 rounded-xl px-2 py-1.5">
+              <SwimForgeMark className="h-8 w-8" />
+              <SwimForgeWordmark compact className="hidden text-base md:inline" />
             </Link>
-            {headerSlot}
-            {showPageTitle ? (
-              <div className="min-w-0">
-                <div className="truncate text-lg font-display font-semibold tracking-wide">
-                  {pageTitle}
-                </div>
-              </div>
-            ) : null}
+            <AthleteDesktopNav location={location} />
           </div>
 
-          <div data-tour="top-actions" className="flex items-center gap-2 lg:hidden">
+          <div className="flex items-center gap-2">
+            <label className="relative hidden xl:block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") handleGlobalSearch()
+                }}
+                placeholder="Search swimmers, clubs, events..."
+                className="h-10 w-[320px] rounded-xl border-border/60 bg-card/50 pl-10"
+              />
+            </label>
+
             <NotificationBell />
             <DirectMessages />
 
+            <Button
+              type="button"
+              variant="neon"
+              size="sm"
+              className="hidden md:inline-flex"
+              onClick={() => setIsCreateOpen(true)}
+            >
+              <Plus className="size-4" />
+              Post
+            </Button>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline-neon" size="icon" aria-label="Menu">
-                  <MoreHorizontal className="size-5" />
+                <Button variant="ghost" className="min-h-[44px] gap-2 rounded-xl px-2">
+                  <Avatar className="h-8 w-8 border border-border/50">
+                    <AvatarImage src={avatarUrl} alt={profileLabel} />
+                    <AvatarFallback>{profileInitials}</AvatarFallback>
+                  </Avatar>
+                  <span className="hidden max-w-[140px] truncate text-sm md:inline">{profileLabel}</span>
+                  <ChevronDown className="hidden size-4 text-muted-foreground md:inline" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Menu</DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-60">
+                <DropdownMenuLabel>{profileLabel}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/season/challenges" className="flex items-center gap-2">
-                    <Trophy className="size-4" />
-                    Sfide
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/profile/performance" className="flex items-center gap-2">
-                    <BarChart3 className="size-4" />
-                    Progressi
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/track" className="flex items-center gap-2">
-                    <Waves className="size-4" />
-                    Attività
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/coach" className="flex items-center gap-2">
-                    <Bot className="size-4" />
-                    Coach
+                  <Link href="/profile" className="flex items-center gap-2">
+                    <User className="size-4" />
+                    Profile
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/settings" className="flex items-center gap-2">
                     <Settings className="size-4" />
-                    Impostazioni
+                    Settings
                   </Link>
                 </DropdownMenuItem>
                 {isAdmin && (
                   <DropdownMenuItem asChild>
                     <Link href="/admin/reports" className="flex items-center gap-2">
                       <Shield className="size-4" />
-                      Moderazione
+                      Moderation
                     </Link>
                   </DropdownMenuItem>
                 )}
                 {switchable && toggleTheme && (
                   <DropdownMenuItem onClick={() => toggleTheme()}>
                     {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-                    Tema: {theme === "dark" ? "Scuro" : "Chiaro"}
+                    Theme: {theme === "dark" ? "Dark" : "Light"}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onClick={() => void handleLogout()}>
                   <LogOut className="size-4" />
-                  {isLoggingOut ? "Logout..." : "Logout"}
+                  {isLoggingOut ? "Signing out..." : "Sign out"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -342,62 +475,31 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
         </div>
       </header>
 
-      {/* Mobile Bottom Nav */}
-      <nav
-        data-tour="main-navigation"
-        className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/40 bg-background/90 backdrop-blur-xl lg:hidden"
-      >
-        <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-2">
-          {[navPrimary[0], navPrimary[1]].map((item) => {
-            const isActive = isNavItemActive(item.path, location)
+      {showHeaderStories ? (
+        <div className="fixed left-0 right-0 top-[72px] z-40 border-b border-border/40 bg-background/75 backdrop-blur-lg">
+          <div className="mx-auto flex h-16 max-w-[1600px] items-center px-4 md:px-6">
+            <div className="w-full overflow-x-auto overflow-y-hidden scrollbar-hide">{headerSlot}</div>
+          </div>
+        </div>
+      ) : null}
+
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-background/90 backdrop-blur-xl lg:hidden">
+        <div className="mx-auto grid h-16 max-w-3xl grid-cols-5 gap-1 px-2">
+          {athleteNav.map((item) => {
+            const active = item.match(path)
             return (
               <Link
                 key={item.path}
                 href={item.path}
                 className={cn(
-                  "flex min-h-[44px] min-w-[44px] h-12 w-full flex-col items-center justify-center gap-0.5 rounded-2xl text-[10px] font-semibold transition-[transform,box-shadow,background-color,color] active:scale-[0.96]",
-                  isActive
-                    ? "text-foreground bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_14%,transparent))] shadow-[0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_22%,transparent),0_10px_26px_var(--neon-soft)]"
-                    : "text-muted-foreground hover:bg-card/45 hover:text-foreground",
+                  "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors",
+                  active
+                    ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
+                    : "text-muted-foreground hover:text-foreground hover:bg-card/45",
                 )}
+                aria-current={active ? "page" : undefined}
               >
-                <span className={cn("transition-colors", isActive && "text-foreground")}>
-                  {item.icon}
-                </span>
-                <span className="leading-none">{item.label}</span>
-              </Link>
-            )
-          })}
-
-          {/* Create button - prominent */}
-          <button
-            type="button"
-            onClick={() => setIsCreateOpen(true)}
-            data-tour="create-post"
-            className="flex min-h-[44px] min-w-[44px] w-full flex-col items-center justify-center transition-transform active:scale-[0.92]"
-            aria-label="Crea post"
-          >
-            <span className="flex size-12 items-center justify-center rounded-full bg-[linear-gradient(135deg,var(--electric-cyan),var(--electric-lime))] text-background shadow-[0_0_22px_var(--neon-soft)] -mt-3">
-              <Plus className="size-6" />
-            </span>
-          </button>
-
-          {[navPrimary[2], navSecondary[2]].map((item) => {
-            const isActive = isNavItemActive(item.path, location)
-            return (
-              <Link
-                key={item.path}
-                href={item.path}
-                className={cn(
-                  "flex min-h-[44px] min-w-[44px] h-12 w-full flex-col items-center justify-center gap-0.5 rounded-2xl text-[10px] font-semibold transition-[transform,box-shadow,background-color,color] active:scale-[0.96]",
-                  isActive
-                    ? "text-foreground bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_14%,transparent))] shadow-[0_0_0_1px_color-mix(in_oklch,var(--electric-cyan)_22%,transparent),0_10px_26px_var(--neon-soft)]"
-                    : "text-muted-foreground hover:bg-card/45 hover:text-foreground",
-                )}
-              >
-                <span className={cn("transition-colors", isActive && "text-foreground")}>
-                  {item.icon}
-                </span>
+                <span>{item.icon}</span>
                 <span className="leading-none">{item.label}</span>
               </Link>
             )
@@ -405,22 +507,28 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
         </div>
       </nav>
 
-      {/* Main Content */}
-      <main className="min-h-[calc(100dvh-4rem)] min-w-0 pb-20 pt-16 lg:pb-0 lg:pl-[88px]">
-        <div className="mx-auto max-w-[1520px] min-w-0 p-4 md:p-5 lg:p-6">
+      <main
+        className={cn(
+          "min-h-[calc(100dvh-72px)] pb-20 lg:pb-0",
+          showHeaderStories ? "pt-[136px]" : "pt-[84px]",
+        )}
+      >
+        <div className="mx-auto max-w-[1600px] p-4 md:p-6">
+          <div className="mb-2 text-xs uppercase tracking-[0.14em] text-muted-foreground/80 lg:hidden">{pageTitle}</div>
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={location}
-              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 10, filter: "blur(4px)" }}
+              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8, filter: "blur(2px)" }}
               animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: "blur(0px)" }}
-              exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -8, filter: "blur(4px)" }}
-              transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: "easeOut" }}
+              exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -6, filter: "blur(2px)" }}
+              transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: "easeOut" }}
             >
               {children}
             </motion.div>
           </AnimatePresence>
         </div>
       </main>
+
       <CreatePostSheet open={isCreateOpen} onOpenChange={setIsCreateOpen} />
     </div>
   )
