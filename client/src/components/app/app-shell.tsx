@@ -85,9 +85,7 @@ const isProfilePath = (path: string) =>
   path.startsWith("/u/") ||
   path.startsWith("/badges")
 
-const isDashboardPath = (path: string) =>
-  path === "/dashboard" ||
-  path.startsWith("/home/dashboard") ||
+const isSeasonPath = (path: string) =>
   path === "/season" ||
   path.startsWith("/season/leaderboard") ||
   path.startsWith("/leaderboard")
@@ -103,7 +101,7 @@ const athleteNav: NavItem[] = [
     label: "Training",
     path: "/track",
     icon: <Waves className="size-4" />,
-    match: (path) => isTrainingPath(path) || isChallengesPath(path) || isDashboardPath(path),
+    match: (path) => isTrainingPath(path) || isChallengesPath(path) || isSeasonPath(path),
   },
   {
     label: "Club",
@@ -120,12 +118,6 @@ const athleteNav: NavItem[] = [
 ]
 
 const adminNav: NavItem[] = [
-  {
-    label: "Dashboard",
-    path: "/home/dashboard",
-    icon: <LayoutDashboard className="size-4" />,
-    match: (path) => path.startsWith("/home/dashboard"),
-  },
   {
     label: "Reports",
     path: "/admin/reports",
@@ -153,7 +145,6 @@ const adminNav: NavItem[] = [
 ]
 
 const quickAccessItems: QuickAccessItem[] = [
-  { label: "Dashboard", path: "/home/dashboard", icon: <LayoutDashboard className="size-4" /> },
   { label: "Social Feed", path: "/home", icon: <Users className="size-4" /> },
   { label: "Season Hub", path: "/season", icon: <Target className="size-4" /> },
   { label: "Challenges", path: "/season/challenges", icon: <Target className="size-4" /> },
@@ -176,7 +167,7 @@ function athleteTitleForPath(path: string) {
   if (path.startsWith("/season/objectives") || path.startsWith("/goals")) return "Training Objectives"
   if (path.startsWith("/coach")) return "AI Coach"
   if (path.startsWith("/badges")) return "Badges"
-  if (path.startsWith("/home/dashboard") || path === "/season" || path === "/dashboard") return "Dashboard"
+  if (path === "/season") return "Season Dashboard"
   if (path.startsWith("/season/leaderboard") || path.startsWith("/leaderboard")) return "Season Leaderboard"
   if (path.startsWith("/profile/performance") || path.startsWith("/statistics")) return "Performance Profile"
   if (path.startsWith("/settings")) return "Settings"
@@ -231,6 +222,24 @@ function AthleteDesktopNav({ location }: { location: string }) {
         )
       })}
     </nav>
+  )
+}
+
+function AthleteCompactBrand() {
+  return (
+    <Link
+      href="/home"
+      className="inline-flex min-h-[44px] items-center rounded-xl border border-border/60 bg-card/35 px-2.5 py-1.5 transition-colors hover:border-[var(--electric-cyan)]/55 hover:bg-card/55"
+      aria-label="Go to Home"
+    >
+      <img
+        src="/brand/swimforge-navbar-logo.png"
+        alt="SwimForge"
+        className="h-7 w-auto object-contain"
+        loading="lazy"
+        decoding="async"
+      />
+    </Link>
   )
 }
 
@@ -405,16 +414,26 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   return (
     <div className="min-h-[100dvh] bg-transparent overflow-x-hidden">
       <header className="fixed left-0 right-0 top-0 z-50 h-[72px] border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex h-full max-w-[1600px] items-center justify-between gap-3 px-4 md:px-6">
+        <div className="mx-auto flex h-full max-w-[1600px] items-center gap-3 px-4 md:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <Link href="/home" className="sf-brand-anchor inline-flex min-h-[44px] items-center gap-2 rounded-xl px-2 py-1.5">
-              <SwimForgeMark className="h-8 w-8" />
-              <SwimForgeWordmark compact className="hidden text-base md:inline" />
-            </Link>
-            <AthleteDesktopNav location={location} />
+            <AthleteCompactBrand />
+            <label className="relative hidden xl:block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") handleGlobalSearch()
+                }}
+                placeholder="Search swimmers, clubs, events..."
+                className="h-10 w-[340px] rounded-xl border-border/60 bg-card/50 pl-10"
+              />
+            </label>
           </div>
 
-          <div className="flex items-center gap-2">
+          <AthleteDesktopNav location={location} />
+
+          <div className="ml-auto flex items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline-neon" size="sm" className="gap-2">
@@ -435,19 +454,6 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-
-            <label className="relative hidden xl:block">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchText}
-                onChange={(event) => setSearchText(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") handleGlobalSearch()
-                }}
-                placeholder="Search swimmers, clubs, events..."
-                className="h-10 w-[320px] rounded-xl border-border/60 bg-card/50 pl-10"
-              />
-            </label>
 
             <NotificationBell />
             <DirectMessages />

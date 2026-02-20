@@ -19,7 +19,7 @@ export function AutoSync() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    if (location === "/home" || location === "/dashboard") {
+    if (location === "/home" || location === "/season" || location === "/dashboard") {
       localStorage.setItem(DASHBOARD_READY_KEY, "1");
       setIsReady(true);
       return;

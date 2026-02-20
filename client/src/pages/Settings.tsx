@@ -830,7 +830,7 @@ export default function Settings() {
                 </Button>
               )}
               <Button variant="outline-neon" onClick={() => (window.location.href = "/home")}>
-                Vai alla Dashboard
+                Vai alla Home
               </Button>
             </div>
           </div>

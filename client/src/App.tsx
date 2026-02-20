@@ -16,7 +16,6 @@ import CookieBanner from "./components/CookieBanner";
 import OnboardingFlow from "./components/onboarding/OnboardingFlow";
 
 const Home = lazy(() => import("./pages/Home"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Badges = lazy(() => import("./pages/Badges"));
 const Challenges = lazy(() => import("./pages/Challenges"));
 const ChallengeDetail = lazy(() => import("./pages/ChallengeDetail"));
@@ -68,14 +67,16 @@ function Router() {
       <Route path="/home/post/:postId">{(params: { postId: string }) => <Redirect to={`/post/${params.postId}`} />}</Route>
       <Route path="/home/report/post/:postId" component={ReportPost} />
       <Route path="/dashboard">
-        <Redirect to="/home/dashboard" />
+        <Redirect to="/season" />
       </Route>
       <Route path="/report/post/:postId">{(params: { postId: string }) => <Redirect to={`/home/report/post/${params.postId}`} />}</Route>
       <Route path="/admin/reports" component={AdminReports} />
       <Route path="/home/admin/reports">
         <Redirect to="/admin/reports" />
       </Route>
-      <Route path="/home/dashboard" component={Dashboard} />
+      <Route path="/home/dashboard">
+        <Redirect to="/season" />
+      </Route>
       <Route path="/badges" component={Badges} />
       <Route path="/season/challenges" component={Challenges} />
       <Route path="/challenges">

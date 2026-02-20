@@ -203,16 +203,12 @@ export default function SocialFeed() {
 
   return (
     <AppLayout headerSlot={headerStoriesSlot}>
-      <div className="compact-shell relative space-y-4 lg:space-y-2">
-        <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-3xl">
-          <div className="h-full w-full bg-[linear-gradient(135deg,#0f1419_0%,#151f27_42%,#111a20_100%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(68%_72%_at_18%_0%,rgba(25,151,240,0.16),transparent_68%),radial-gradient(60%_66%_at_94%_12%,rgba(34,211,238,0.12),transparent_72%)]" />
-        </div>
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
-          <div className="w-full min-w-0 max-w-2xl">
+      <div className="compact-shell mx-auto w-full max-w-[1240px] space-y-3 lg:space-y-2">
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="w-full min-w-0">
             <div
               data-tour="feed-tabs"
-              className="relative z-10 mb-4 w-fit"
+              className="relative z-10 mb-3 w-full"
             >
               {firstPageQuery.isFetching && !isInitialLoading && (
                 <div className="mb-1.5 flex justify-center py-1">
@@ -293,7 +289,7 @@ export default function SocialFeed() {
           </div>
 
           <div className="hidden xl:block">
-            <div className="sticky top-20 flex flex-col gap-4">
+            <div className="sticky top-24 flex flex-col gap-3">
               <FeedSidebar />
             </div>
           </div>
