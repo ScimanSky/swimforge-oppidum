@@ -564,12 +564,7 @@ export default function Profile() {
                 className="h-full w-full object-cover"
               />
             ) : (
-              <img
-                src="/images/theme-v3/profile-bg.png"
-                alt=""
-                className="h-full w-full object-cover opacity-80"
-                loading="lazy"
-              />
+              <div className="h-full w-full bg-[linear-gradient(132deg,#122636_0%,#1f3d54_52%,#102334_100%)]" />
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-card/80 to-transparent" />
           </div>

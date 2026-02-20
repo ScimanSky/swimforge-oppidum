@@ -6,6 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import {
   BarChart3,
   ChevronDown,
+  Compass,
   LayoutDashboard,
   LogOut,
   Plus,
@@ -48,6 +49,12 @@ type NavItem = {
   match: (path: string) => boolean
 }
 
+type QuickAccessItem = {
+  label: string
+  path: string
+  icon: React.ReactNode
+}
+
 const normalizePath = (location: string) => location.split("?")[0].split("#")[0] || "/"
 
 const isChallengesPath = (path: string) =>
@@ -61,16 +68,22 @@ const isTrainingPath = (path: string) =>
   path.startsWith("/goals") ||
   path.startsWith("/session-iq")
 
-const isCommunityPath = (path: string) =>
+const isHomePath = (path: string) =>
+  path === "/home" ||
+  path.startsWith("/post/") ||
+  path.startsWith("/home/report/") ||
+  path.startsWith("/report/post/")
+
+const isClubPath = (path: string) =>
   path.startsWith("/home/community") ||
-  path.startsWith("/community") ||
-  path.startsWith("/badges")
+  path.startsWith("/community")
 
 const isProfilePath = (path: string) =>
   path.startsWith("/profile") ||
   path.startsWith("/settings") ||
   path.startsWith("/statistics") ||
-  path.startsWith("/u/")
+  path.startsWith("/u/") ||
+  path.startsWith("/badges")
 
 const isDashboardPath = (path: string) =>
   path === "/dashboard" ||
@@ -81,28 +94,22 @@ const isDashboardPath = (path: string) =>
 
 const athleteNav: NavItem[] = [
   {
-    label: "Dashboard",
-    path: "/home/dashboard",
+    label: "Home",
+    path: "/home",
     icon: <LayoutDashboard className="size-4" />,
-    match: (path) => isDashboardPath(path) && !isChallengesPath(path) && !isTrainingPath(path),
+    match: (path) => isHomePath(path),
   },
   {
     label: "Training",
     path: "/track",
     icon: <Waves className="size-4" />,
-    match: (path) => isTrainingPath(path),
+    match: (path) => isTrainingPath(path) || isChallengesPath(path) || isDashboardPath(path),
   },
   {
-    label: "Challenges",
-    path: "/season/challenges",
-    icon: <Target className="size-4" />,
-    match: (path) => isChallengesPath(path),
-  },
-  {
-    label: "Community",
+    label: "Club",
     path: "/home/community",
     icon: <Users className="size-4" />,
-    match: (path) => isCommunityPath(path),
+    match: (path) => isClubPath(path),
   },
   {
     label: "Profile",
@@ -143,6 +150,18 @@ const adminNav: NavItem[] = [
     icon: <Settings className="size-4" />,
     match: (path) => path.startsWith("/settings"),
   },
+]
+
+const quickAccessItems: QuickAccessItem[] = [
+  { label: "Dashboard", path: "/home/dashboard", icon: <LayoutDashboard className="size-4" /> },
+  { label: "Social Feed", path: "/home", icon: <Users className="size-4" /> },
+  { label: "Season Hub", path: "/season", icon: <Target className="size-4" /> },
+  { label: "Challenges", path: "/season/challenges", icon: <Target className="size-4" /> },
+  { label: "Progressi", path: "/profile/performance", icon: <BarChart3 className="size-4" /> },
+  { label: "Obiettivi", path: "/season/objectives", icon: <Target className="size-4" /> },
+  { label: "Badge", path: "/badges", icon: <Shield className="size-4" /> },
+  { label: "AI Coach", path: "/coach", icon: <Waves className="size-4" /> },
+  { label: "Club", path: "/home/community", icon: <Users className="size-4" /> },
 ]
 
 function athleteTitleForPath(path: string) {
@@ -393,6 +412,27 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
           </div>
 
           <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline-neon" size="sm" className="gap-2">
+                  <Compass className="size-4" />
+                  <span className="hidden md:inline">Sezioni</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Quick Access</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {quickAccessItems.map((item) => (
+                  <DropdownMenuItem key={item.path} asChild>
+                    <Link href={item.path} className="flex items-center gap-2">
+                      {item.icon}
+                      {item.label}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <label className="relative hidden xl:block">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -480,7 +520,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
       ) : null}
 
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-background/90 backdrop-blur-xl lg:hidden">
-        <div className="mx-auto grid h-16 max-w-3xl grid-cols-5 gap-1 px-2">
+        <div className="mx-auto grid h-16 max-w-3xl grid-cols-4 gap-1 px-2">
           {athleteNav.map((item) => {
             const active = item.match(path)
             return (

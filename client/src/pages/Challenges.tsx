@@ -530,12 +530,16 @@ export default function Challenges() {
                     <Surface key={challenge.id} className="bg-card border-border overflow-hidden">
                       <div className="flex flex-col md:flex-row">
                         <div className="relative h-32 w-full md:h-auto md:w-48">
-                          <Image
-                            src={challenge.badge_image_url || "/images/theme-v3/feed-activity-bg-day.png"}
-                            alt={challenge.name}
-                            fill
-                            className="object-cover"
-                          />
+                          {challenge.badge_image_url ? (
+                            <Image
+                              src={challenge.badge_image_url}
+                              alt={challenge.name}
+                              fill
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="h-full w-full bg-[linear-gradient(135deg,#132230_0%,#1b2e3c_56%,#142432_100%)]" />
+                          )}
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-card md:bg-gradient-to-t md:from-transparent md:to-card/50" />
                         </div>
                         <SurfaceContent className="flex-1 p-4">

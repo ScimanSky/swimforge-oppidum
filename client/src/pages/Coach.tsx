@@ -511,18 +511,8 @@ export default function Coach() {
     <AppLayout>
       <div className="compact-shell relative space-y-4 lg:space-y-2">
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-3xl">
-          <img
-            src="/images/theme-v3/coach-chat-bg.png"
-            alt=""
-            className="h-full w-full object-cover opacity-[0.28]"
-            loading="lazy"
-          />
-          <img
-            src="/images/theme-v3/overlay-energy.png"
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover opacity-[0.15] mix-blend-screen"
-            loading="lazy"
-          />
+          <div className="h-full w-full bg-[linear-gradient(132deg,#101820_0%,#182733_46%,#101a22_100%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(68%_72%_at_20%_10%,rgba(25,151,240,0.12),transparent_72%),radial-gradient(48%_60%_at_84%_22%,rgba(34,211,238,0.10),transparent_76%)]" />
         </div>
         <section className="surface-panel p-6 glass-panel">
           <div className="p-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">

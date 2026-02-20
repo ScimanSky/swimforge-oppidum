@@ -256,12 +256,9 @@ export default function Activities() {
                           key={activity.id}
                           className="stream-card relative isolate overflow-hidden border-l-2 border-l-primary/45 hover:border-l-primary"
                         >
-                          <img
-                            src="/images/theme-v3/feed-activity-bg-day.png"
-                            alt=""
+                          <div
                             aria-hidden="true"
-                            className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-[0.36] saturate-[1.15]"
-                            loading="lazy"
+                            className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,#15222c_0%,#1b2d3a_52%,#15222c_100%)]"
                           />
                           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(112deg,color-mix(in_oklch,var(--background)_80%,transparent)_0%,color-mix(in_oklch,var(--background)_60%,transparent)_42%,color-mix(in_oklch,var(--background)_34%,transparent)_100%)]" />
                           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_18%,color-mix(in_oklch,var(--electric-cyan)_26%,transparent),transparent_36%),radial-gradient(circle_at_92%_12%,color-mix(in_oklch,var(--electric-lime)_18%,transparent),transparent_44%)]" />

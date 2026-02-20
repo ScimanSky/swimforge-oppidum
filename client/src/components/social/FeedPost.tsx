@@ -104,12 +104,9 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
       >
         {isActivityPost && (
           <>
-            <img
-              src="/images/theme-v3/feed-activity-bg-day.png"
-              alt=""
+            <div
               aria-hidden="true"
-              className="pointer-events-none !absolute inset-0 h-full w-full object-cover object-center !z-0 opacity-[0.32] saturate-75 contrast-[1.06]"
-              loading="lazy"
+              className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(135deg,#132230_0%,#1b2e3c_54%,#122130_100%)]"
             />
             <div className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(106deg,rgba(2,6,23,0.72)_0%,rgba(3,24,45,0.5)_45%,rgba(2,6,23,0.26)_100%)]" />
             <div className="pointer-events-none !absolute inset-0 !z-0 bg-[radial-gradient(circle_at_14%_14%,color-mix(in_oklch,var(--electric-cyan)_24%,transparent),transparent_40%),radial-gradient(circle_at_88%_10%,color-mix(in_oklch,var(--electric-lime)_19%,transparent),transparent_45%)]" />
@@ -118,12 +115,9 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
         )}
         {!isActivityPost && (
           <>
-            <img
-              src="/images/theme-v3/feed-social-bg.png"
-              alt=""
+            <div
               aria-hidden="true"
-              className="pointer-events-none !absolute inset-0 h-full w-full object-cover object-center !z-0 opacity-[0.24] saturate-[1.1]"
-              loading="lazy"
+              className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(132deg,#101820_0%,#182733_52%,#101920_100%)]"
             />
             <div className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(124deg,color-mix(in_oklch,var(--background)_74%,transparent)_0%,color-mix(in_oklch,var(--background)_52%,transparent)_44%,color-mix(in_oklch,var(--background)_66%,transparent)_100%)]" />
             <div className="pointer-events-none !absolute inset-0 !z-0 bg-[radial-gradient(circle_at_92%_8%,color-mix(in_oklch,var(--electric-cyan)_14%,transparent),transparent_40%),radial-gradient(circle_at_14%_84%,color-mix(in_oklch,var(--forge-orange)_10%,transparent),transparent_38%)]" />

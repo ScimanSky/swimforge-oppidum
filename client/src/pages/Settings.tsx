@@ -915,12 +915,7 @@ export default function Settings() {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <img
-                      src="/images/theme-v3/profile-bg.png"
-                      alt=""
-                      className="h-full w-full object-cover opacity-80"
-                      loading="lazy"
-                    />
+                    <div className="h-full w-full bg-[linear-gradient(132deg,#122636_0%,#1f3d54_52%,#102334_100%)]" />
                   )}
                 </div>
               </div>

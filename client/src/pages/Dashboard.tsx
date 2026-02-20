@@ -531,7 +531,7 @@ export default function Dashboard() {
     profile?.coverImageUrl ||
     profile?.cover_image_url ||
     null
-  const coverImage = profileCoverImage || "/images/theme-v3/dashboard-bg.png"
+  const coverImage = profileCoverImage || null
   const totalXp = profile?.totalXp ?? 0
   const xpProgress = profile?.nextLevelXp
     ? Math.min(100, (totalXp / profile.nextLevelXp) * 100)
@@ -596,7 +596,11 @@ export default function Dashboard() {
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-background/88 via-background/72 to-background/55" />
               </div>
-            ) : null}
+            ) : (
+              <div className="absolute inset-0 bg-[linear-gradient(132deg,#101820_0%,#182733_52%,#101a21_100%)]">
+                <div className="absolute inset-0 bg-[radial-gradient(68%_70%_at_16%_0%,rgba(25,151,240,0.16),transparent_72%),radial-gradient(48%_60%_at_86%_14%,rgba(34,211,238,0.12),transparent_76%)]" />
+              </div>
+            )}
             <SurfaceContent className="relative z-10 flex flex-col gap-3 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
