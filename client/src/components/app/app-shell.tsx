@@ -6,7 +6,6 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import {
   BarChart3,
   ChevronDown,
-  Compass,
   LayoutDashboard,
   LogOut,
   Plus,
@@ -53,6 +52,7 @@ type QuickAccessItem = {
   label: string
   path: string
   icon: React.ReactNode
+  match?: (path: string) => boolean
 }
 
 const normalizePath = (location: string) => location.split("?")[0].split("#")[0] || "/"
@@ -117,6 +117,10 @@ const athleteNav: NavItem[] = [
   },
 ]
 
+const athleteTopNav: NavItem[] = athleteNav.filter((item) =>
+  item.label === "Home" || item.label === "Training" || item.label === "Club",
+)
+
 const adminNav: NavItem[] = [
   {
     label: "Reports",
@@ -145,14 +149,29 @@ const adminNav: NavItem[] = [
 ]
 
 const quickAccessItems: QuickAccessItem[] = [
-  { label: "Social Feed", path: "/home", icon: <Users className="size-4" /> },
-  { label: "Season Hub", path: "/season", icon: <Target className="size-4" /> },
-  { label: "Challenges", path: "/season/challenges", icon: <Target className="size-4" /> },
-  { label: "Statistics", path: "/profile/performance", icon: <BarChart3 className="size-4" /> },
-  { label: "Obiettivi", path: "/season/objectives", icon: <Target className="size-4" /> },
-  { label: "Badges", path: "/badges", icon: <Shield className="size-4" /> },
-  { label: "AI Coach", path: "/coach", icon: <Waves className="size-4" /> },
-  { label: "Club", path: "/home/community", icon: <Users className="size-4" /> },
+  { label: "Social Feed", path: "/home", icon: <Users className="size-4" />, match: isHomePath },
+  {
+    label: "Season Hub",
+    path: "/season",
+    icon: <Target className="size-4" />,
+    match: (path) => path === "/season" || path.startsWith("/season/leaderboard") || path.startsWith("/leaderboard"),
+  },
+  { label: "Challenges", path: "/season/challenges", icon: <Target className="size-4" />, match: isChallengesPath },
+  {
+    label: "Statistics",
+    path: "/profile/performance",
+    icon: <BarChart3 className="size-4" />,
+    match: (path) => path.startsWith("/profile/performance") || path.startsWith("/statistics"),
+  },
+  {
+    label: "Obiettivi",
+    path: "/season/objectives",
+    icon: <Target className="size-4" />,
+    match: (path) => path.startsWith("/season/objectives") || path.startsWith("/goals"),
+  },
+  { label: "Badges", path: "/badges", icon: <Shield className="size-4" />, match: (path) => path.startsWith("/badges") },
+  { label: "AI Coach", path: "/coach", icon: <Waves className="size-4" />, match: (path) => path.startsWith("/coach") },
+  { label: "Club", path: "/home/community", icon: <Users className="size-4" />, match: isClubPath },
 ]
 
 function athleteTitleForPath(path: string) {
@@ -196,7 +215,7 @@ function AthleteDesktopNav({ location }: { location: string }) {
   const path = normalizePath(location)
   return (
     <nav className="hidden lg:flex items-center gap-1 rounded-xl border border-border/50 bg-card/30 px-2 py-1">
-      {athleteNav.map((item) => {
+      {athleteTopNav.map((item) => {
         const active = item.match(path)
         return (
           <Link
@@ -222,6 +241,87 @@ function AthleteDesktopNav({ location }: { location: string }) {
         )
       })}
     </nav>
+  )
+}
+
+function AthleteSideRail({
+  location,
+  isAdmin,
+  onCreatePost,
+}: {
+  location: string
+  isAdmin: boolean
+  onCreatePost: () => void
+}) {
+  const path = normalizePath(location)
+  const railItems = quickAccessItems.filter((item) => item.label !== "Social Feed")
+  const adminItem: QuickAccessItem = {
+    label: "Admin Reports",
+    path: "/admin/reports",
+    icon: <Shield className="size-4" />,
+    match: (p) => p.startsWith("/admin/reports"),
+  }
+
+  return (
+    <aside className="group/rail fixed inset-y-0 left-0 z-40 hidden w-[86px] border-r border-border/45 bg-background/78 px-2 pb-4 pt-[84px] backdrop-blur-xl transition-[width] duration-300 ease-out hover:w-[236px] lg:flex lg:flex-col lg:justify-between">
+      <nav className="space-y-2">
+        <Button
+          type="button"
+          variant="neon"
+          className="h-11 w-full justify-center gap-2 px-3 group-hover/rail:justify-start"
+          onClick={onCreatePost}
+        >
+          <Plus className="size-4" />
+          <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs opacity-0 transition-all duration-200 group-hover/rail:ml-0.5 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
+            Post
+          </span>
+        </Button>
+
+        {railItems.map((item) => {
+          const active = item.match ? item.match(path) : path.startsWith(item.path)
+          return (
+            <Link
+              key={item.path}
+              href={item.path}
+              className={cn(
+                "flex h-11 w-full items-center justify-center rounded-xl border text-muted-foreground transition-colors group-hover/rail:justify-start group-hover/rail:gap-2 group-hover/rail:px-3",
+                active
+                  ? "border-[var(--electric-cyan)]/55 bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_10%,transparent))] text-foreground"
+                  : "border-border/55 bg-card/30 hover:border-[var(--electric-cyan)]/45 hover:text-foreground",
+              )}
+              aria-current={active ? "page" : undefined}
+              title={item.label}
+            >
+              {item.icon}
+              <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 transition-all duration-200 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
+                {item.label}
+              </span>
+            </Link>
+          )
+        })}
+      </nav>
+
+      {isAdmin ? (
+        <div className="pt-2">
+          <Link
+            href={adminItem.path}
+            className={cn(
+              "flex h-11 w-full items-center justify-center rounded-xl border text-muted-foreground transition-colors group-hover/rail:justify-start group-hover/rail:gap-2 group-hover/rail:px-3",
+              adminItem.match?.(path)
+                ? "border-[var(--electric-cyan)]/55 bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_10%,transparent))] text-foreground"
+                : "border-border/55 bg-card/30 hover:border-[var(--electric-cyan)]/45 hover:text-foreground",
+            )}
+            aria-current={adminItem.match?.(path) ? "page" : undefined}
+            title={adminItem.label}
+          >
+            {adminItem.icon}
+            <span className="max-w-0 overflow-hidden whitespace-nowrap text-xs font-medium opacity-0 transition-all duration-200 group-hover/rail:max-w-[140px] group-hover/rail:opacity-100">
+              {adminItem.label}
+            </span>
+          </Link>
+        </div>
+      ) : null}
+    </aside>
   )
 }
 
@@ -299,9 +399,6 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
     [isAdminRoute, path],
   )
   const showHeaderStories = Boolean(headerSlot) && !isAdminRoute
-  const quickAccessMenu = isAdmin
-    ? [...quickAccessItems, { label: "Admin Reports", path: "/admin/reports", icon: <Shield className="size-4" /> }]
-    : quickAccessItems
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return
@@ -420,6 +517,8 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
 
   return (
     <div className="min-h-[100dvh] bg-transparent overflow-x-hidden">
+      <AthleteSideRail location={location} isAdmin={isAdmin} onCreatePost={() => setIsCreateOpen(true)} />
+
       <header className="fixed left-0 right-0 top-0 z-50 h-[72px] border-b border-border/50 bg-background/80 backdrop-blur-xl">
         <div className="flex h-full w-full items-center gap-3 pl-0 pr-4 md:pr-6">
           <div className="flex min-w-0 items-center gap-3">
@@ -429,40 +528,8 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
           <AthleteDesktopNav location={location} />
 
           <div className="ml-auto flex items-center gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline-neon" size="sm" className="gap-2">
-                  <Compass className="size-4" />
-                  <span className="hidden md:inline">Sezioni</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Quick Access</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {quickAccessMenu.map((item) => (
-                  <DropdownMenuItem key={item.path} asChild>
-                    <Link href={item.path} className="flex items-center gap-2">
-                      {item.icon}
-                      {item.label}
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
             <NotificationBell />
             <DirectMessages />
-
-            <Button
-              type="button"
-              variant="neon"
-              size="sm"
-              className="hidden md:inline-flex"
-              onClick={() => setIsCreateOpen(true)}
-            >
-              <Plus className="size-4" />
-              Post
-            </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -517,7 +584,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
 
       {showHeaderStories ? (
         <div className="fixed left-0 right-0 top-[72px] z-40 border-b border-border/40 bg-background/75 backdrop-blur-lg">
-          <div className="mx-auto flex h-16 max-w-[1600px] items-center px-4 md:px-6">
+          <div className="mx-auto flex h-16 max-w-[1600px] items-center px-4 md:px-6 lg:pl-[102px]">
             <div className="w-full overflow-x-auto overflow-y-hidden scrollbar-hide">{headerSlot}</div>
           </div>
         </div>
@@ -549,7 +616,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
 
       <main
         className={cn(
-          "min-h-[calc(100dvh-72px)] pb-20 lg:pb-0",
+          "min-h-[calc(100dvh-72px)] pb-20 lg:pb-0 lg:pl-[92px]",
           showHeaderStories ? "pt-[136px]" : "pt-[84px]",
         )}
       >
