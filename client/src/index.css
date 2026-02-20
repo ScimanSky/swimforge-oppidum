@@ -632,6 +632,11 @@ body,
           color-mix(in oklch, var(--electric-lime) 86%, white));
       box-shadow: 0 0 0 4px color-mix(in oklch, var(--background) 82%, transparent);
     }
+
+    /* Home feed (Stitch layout): no external status dot near cards. */
+    .social-feed-shell .stream-node::before {
+      content: none;
+    }
   }
 
   @media (min-width: 1280px) {

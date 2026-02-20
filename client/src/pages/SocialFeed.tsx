@@ -203,7 +203,7 @@ export default function SocialFeed() {
 
   return (
     <AppLayout headerSlot={headerStoriesSlot}>
-      <div className="compact-shell mx-auto w-full max-w-[1240px] space-y-3 lg:space-y-2">
+      <div className="social-feed-shell compact-shell mx-auto w-full max-w-[1240px] space-y-3 lg:space-y-2">
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="w-full min-w-0">
             <div
