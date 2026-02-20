@@ -109,6 +109,10 @@ export default function SocialFeed() {
   }, [displayStoryGroups])
 
   const handleCreateStory = useCallback(() => {
+    setCreatePostOpen(false)
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("swimforge:close-create-post"))
+    }
     setStoryCreatorOpen(true)
   }, [])
 

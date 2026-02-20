@@ -328,6 +328,13 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
     }
   }, [heartbeatMutation.mutate])
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const closeCreatePost = () => setIsCreateOpen(false)
+    window.addEventListener("swimforge:close-create-post", closeCreatePost)
+    return () => window.removeEventListener("swimforge:close-create-post", closeCreatePost)
+  }, [])
+
   const handleLogout = async () => {
     if (isLoggingOut) return
     setIsLoggingOut(true)

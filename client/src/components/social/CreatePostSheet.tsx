@@ -13,10 +13,11 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet"
-import { Activity, Camera, ChevronLeft, PenLine, X, Hash, AtSign, ImagePlus } from "lucide-react"
+import { Activity, Camera, ChevronLeft, Loader2, PenLine, X, Hash, AtSign, ImagePlus } from "lucide-react"
 import { toast } from "sonner"
 import { ShareActivityPicker } from "./ShareActivityPicker"
 import { StoryCreator } from "./StoryCreator"
+import { UploadStatusPill } from "./UploadStatusPill"
 import {
   extractHashtags,
   isVideoUrl,
@@ -215,11 +216,16 @@ export function CreatePostSheet({ open, onOpenChange }: CreatePostSheetProps) {
     }
   }
 
-  const isPending =
+  const isPostPending =
     createTextPost.isPending ||
     imageKitAuth.isPending ||
     postImageUpload.isPending ||
     cloudinaryVideoAuth.isPending
+
+  const openStoryComposer = () => {
+    resetAndClose()
+    window.setTimeout(() => setStoryCreatorOpen(true), 180)
+  }
 
   return (
     <>
@@ -287,8 +293,7 @@ export function CreatePostSheet({ open, onOpenChange }: CreatePostSheetProps) {
               <button
                 type="button"
                 onClick={() => {
-                  onOpenChange(false)
-                  setTimeout(() => setStoryCreatorOpen(true), 200)
+                  openStoryComposer()
                 }}
                 className="flex items-center gap-4 rounded-2xl border border-border/80 bg-background/60 p-4 text-left transition-colors hover:bg-card/60"
               >
@@ -303,6 +308,7 @@ export function CreatePostSheet({ open, onOpenChange }: CreatePostSheetProps) {
             </div>
           ) : (
             <div className="flex flex-col gap-4 px-4 pb-4">
+              {isPostPending ? <UploadStatusPill label="Upload post in corso" className="w-fit" /> : null}
               <Textarea
                 placeholder="Scrivi qualcosa..."
                 value={content}
@@ -432,9 +438,14 @@ export function CreatePostSheet({ open, onOpenChange }: CreatePostSheetProps) {
                 <Button
                   variant="neon"
                   onClick={() => void handleSubmitText()}
-                  disabled={(!hasContent && !hasMedia) || isPending}
+                  disabled={(!hasContent && !hasMedia) || isPostPending}
                 >
-                  {isPending ? "Pubblicazione..." : "Pubblica"}
+                  {isPostPending ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="size-4 animate-spin" />
+                      Pubblico
+                    </span>
+                  ) : "Pubblica"}
                 </Button>
               </div>
             </div>

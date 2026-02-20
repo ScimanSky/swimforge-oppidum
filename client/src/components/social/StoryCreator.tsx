@@ -11,9 +11,10 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet"
-import { Camera, Type, Video } from "lucide-react"
+import { Camera, Loader2, Type, Video } from "lucide-react"
 import { toast } from "sonner"
 import { uploadVideoToCloudinary } from "@/lib/cloudinary-upload"
+import { UploadStatusPill } from "./UploadStatusPill"
 
 interface StoryCreatorProps {
   open: boolean
@@ -282,7 +283,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     }
   }
 
-  const isPending = createStory.isPending || imageKitAuth.isPending || cloudinaryVideoAuth.isPending
+  const isStoryPending = createStory.isPending || imageKitAuth.isPending || cloudinaryVideoAuth.isPending
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) resetAndClose(); else onOpenChange(o) }}>
@@ -290,6 +291,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
         <SheetHeader>
           <SheetTitle>Nuova Storia</SheetTitle>
           <SheetDescription>Condividi un momento che dura 24 ore</SheetDescription>
+          {isStoryPending ? <UploadStatusPill label="Upload story in corso" className="mt-1 w-fit" /> : null}
         </SheetHeader>
 
         {mode === "pick" && (
@@ -371,10 +373,15 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
             <Button
               variant="neon"
               onClick={() => void handleSubmitImage()}
-              disabled={isPending}
+              disabled={isStoryPending}
               className="w-full"
             >
-              {isPending ? "Pubblicazione..." : "Pubblica storia"}
+              {isStoryPending ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Pubblico
+                </span>
+              ) : "Pubblica storia"}
             </Button>
           </div>
         )}
@@ -403,10 +410,15 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
             <Button
               variant="neon"
               onClick={() => void handleSubmitVideo()}
-              disabled={isPending}
+              disabled={isStoryPending}
               className="w-full"
             >
-              {isPending ? "Pubblicazione..." : "Pubblica video"}
+              {isStoryPending ? (
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" />
+                  Pubblico
+                </span>
+              ) : "Pubblica video"}
             </Button>
           </div>
         )}
@@ -427,9 +439,14 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
               <Button
                 variant="neon"
                 onClick={() => void handleSubmitText()}
-                disabled={!caption.trim() || isPending}
+                disabled={!caption.trim() || isStoryPending}
               >
-                {isPending ? "Pubblicazione..." : "Pubblica storia"}
+                {isStoryPending ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="size-4 animate-spin" />
+                    Pubblico
+                  </span>
+                ) : "Pubblica storia"}
               </Button>
             </div>
           </div>

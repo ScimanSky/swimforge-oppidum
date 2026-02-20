@@ -4,18 +4,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
   Calendar,
-  Image as ImageIcon,
   Trophy,
   UserCheck,
   UserPlus,
   Users,
   UserRoundPlus,
-  Waves,
+  ChevronRight,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
 import { getInitials } from "@/lib/format"
-import { CreatePostSheet } from "@/components/social/CreatePostSheet"
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags"
 import { buildFeedSidebarVm, type FeedSidebarProfileVm } from "@/lib/ui-view-models/feed-sidebar"
 import { cn } from "@/lib/utils"
@@ -99,9 +97,13 @@ export default function FeedSidebar() {
     { limit: 5 },
     { staleTime: 60_000 }
   )
+  const recentClubsQuery = trpc.community.clubs.list.useQuery(
+    { scope: "all", limit: 4 },
+    { staleTime: 60_000 }
+  )
   const profileQuery = trpc.profile.get.useQuery()
-  const [createPostOpen, setCreatePostOpen] = useState(false)
   const suggestedUsers = suggestedQuery.data ?? []
+  const recentClubs = ((recentClubsQuery.data as any[] | undefined) ?? []).slice(0, 3)
   const vm = buildFeedSidebarVm({
     suggestedUsers,
     mockSectionsEnabled: UI_FEATURE_FLAGS.mockSections,
@@ -112,48 +114,47 @@ export default function FeedSidebar() {
   return (
     <div className="space-y-4">
       <div className="surface-panel p-4">
-        <div className="flex items-center gap-2.5">
-          <Avatar className="size-9 border border-border/60 shrink-0">
-            <AvatarImage src={profileAvatar || ""} alt={profileName} />
-            <AvatarFallback className="text-xs font-semibold">
-              {getInitials(profileName)}
-            </AvatarFallback>
-          </Avatar>
-          <button
-            type="button"
-            onClick={() => setCreatePostOpen(true)}
-            className="flex h-10 flex-1 items-center rounded-full border border-border/70 bg-card/60 px-3 text-sm text-muted-foreground transition-colors hover:border-[var(--electric-cyan)]/60 hover:text-foreground"
-          >
-            Share your swim...
-          </button>
-          <Button
-            type="button"
-            variant="neon"
-            size="sm"
-            className="min-h-[40px] px-4"
-            onClick={() => setCreatePostOpen(true)}
-          >
-            Post
-          </Button>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-sm font-display font-semibold text-foreground">Club Recenti</h3>
+          <Link href="/home/community" className="text-xs font-semibold text-[var(--electric-cyan)] hover:underline">
+            View All
+          </Link>
         </div>
-        <div className="mt-3 flex items-center gap-2">
-          <button
-            type="button"
-            aria-label="Add image post"
-            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-border/60 bg-background/35 text-muted-foreground transition-colors hover:text-foreground hover:border-[var(--electric-cyan)]/60"
-            onClick={() => setCreatePostOpen(true)}
-          >
-            <ImageIcon className="size-4" />
-          </button>
-          <button
-            type="button"
-            aria-label="Share swim activity"
-            className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-border/60 bg-background/35 text-muted-foreground transition-colors hover:text-foreground hover:border-[var(--electric-lime)]/60"
-            onClick={() => setCreatePostOpen(true)}
-          >
-            <Waves className="size-4" />
-          </button>
-        </div>
+        {recentClubsQuery.isLoading ? (
+          <p className="text-xs text-muted-foreground">Caricamento club...</p>
+        ) : recentClubs.length === 0 ? (
+          <p className="text-xs text-muted-foreground">Nessun club recente disponibile.</p>
+        ) : (
+          <div className="space-y-2.5">
+            {recentClubs.map((club: any) => (
+              <Link
+                key={club.id}
+                href={`/community/club/${club.id}`}
+                className="flex items-center gap-2.5 rounded-xl border border-border/55 bg-background/35 p-2 transition-colors hover:border-[var(--electric-cyan)]/55"
+              >
+                <div className="size-10 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-card/50">
+                  {club.cover_image_url ? (
+                    <img
+                      src={club.cover_image_url}
+                      alt={club.name}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="h-full w-full bg-[linear-gradient(132deg,#163047_0%,#1f3f5c_50%,#11283b_100%)]" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-foreground">{club.name || "Club"}</p>
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    {club.member_count ?? 0} membri
+                  </p>
+                </div>
+                <ChevronRight className="size-4 text-muted-foreground" />
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {vm.clubHub.length > 0 ? (
@@ -223,8 +224,6 @@ export default function FeedSidebar() {
         </div>
         <p className="mt-1 text-[11px] text-muted-foreground/60">© 2026 SwimForge</p>
       </div>
-
-      <CreatePostSheet open={createPostOpen} onOpenChange={setCreatePostOpen} />
     </div>
   )
 }
