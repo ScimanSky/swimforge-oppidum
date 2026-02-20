@@ -176,7 +176,7 @@ export default function Community() {
   return (
     <AppLayout>
       <div className="compact-shell space-y-4 lg:space-y-2">
-        <section className="surface-panel relative mx-auto max-w-5xl overflow-hidden">
+        <section className="surface-panel relative mx-auto max-w-4xl overflow-hidden">
           <div className="absolute inset-0">
             <img
               src="/images/theme-v3/community-bg.png"
@@ -194,15 +194,15 @@ export default function Community() {
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_85%_10%,color-mix(in_oklch,var(--electric-lime)_24%,transparent)_0%,transparent_66%)]" />
             <div className="absolute inset-0 bg-[radial-gradient(60%_70%_at_60%_90%,color-mix(in_oklch,var(--electric-cyan)_16%,transparent)_0%,transparent_72%)]" />
           </div>
-          <div className="relative p-3 sm:p-4">
-            <div className="flex flex-col gap-2.5">
+          <div className="relative p-2.5 sm:p-3">
+            <div className="flex flex-col gap-2">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-background/60 px-3 py-1 text-xs text-muted-foreground">
                     <Sparkles className="size-4 text-primary" />
                     Club Hub
                   </div>
-                  <h1 className="mt-1.5 text-2xl font-display font-bold neon-gradient-text">Club</h1>
+                  <h1 className="mt-1 text-xl font-display font-bold neon-gradient-text sm:text-2xl">Club</h1>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {createClubDialog}
