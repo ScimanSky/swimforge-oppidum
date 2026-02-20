@@ -2,7 +2,7 @@
  * Direct Messages Component - Chat tra membri
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "wouter";
 import { MessageCircle, Send, Search, PenSquare, Phone, Video, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -119,6 +119,7 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
   const isPageMode = mode === "page";
   const isLinkMode = mode === "link";
   const panelActive = isPageMode ? true : isOpen;
+  const conversationLimit = isPageMode ? 200 : 50;
 
   const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 5 * 60_000 });
   const currentUserId = profileQuery.data?.userId;
@@ -132,17 +133,50 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
   // Lista conversazioni recenti
   const conversationsQuery = trpc.community.messages.recent.useQuery(
     { limit: 20 },
-    { enabled: panelActive && !recipientId }
+    {
+      enabled: panelActive && !recipientId,
+      refetchInterval: isPageMode ? 8_000 : false,
+      refetchOnWindowFocus: true,
+    }
   );
 
   // Conversazione specifica — poll every 5s when open
   const conversationQuery = trpc.community.messages.conversation.useQuery(
-    { otherUserId: selectedConversation || 0, limit: 50 },
+    { otherUserId: selectedConversation || 0, limit: conversationLimit },
     {
       enabled: !!selectedConversation && (isPageMode || isOpen || !!recipientId),
       refetchInterval: panelActive && view === "conversation" ? 5_000 : false,
     }
   );
+
+  const normalizedConversations = useMemo<Conversation[]>(() => {
+    const source = conversationsQuery.data ?? [];
+    const byUserId = new Map<number, Conversation>();
+
+    source.forEach((conv) => {
+      const key = conv.otherUser.id;
+      const existing = byUserId.get(key);
+      if (!existing) {
+        byUserId.set(key, { ...conv, unreadCount: Math.max(0, Number(conv.unreadCount ?? 0)) });
+        return;
+      }
+
+      const currentCreatedAt = new Date(conv.lastMessage.createdAt).getTime();
+      const existingCreatedAt = new Date(existing.lastMessage.createdAt).getTime();
+      const mergedUnread = Math.max(0, Number(existing.unreadCount ?? 0)) + Math.max(0, Number(conv.unreadCount ?? 0));
+
+      if (currentCreatedAt >= existingCreatedAt) {
+        byUserId.set(key, { ...conv, unreadCount: mergedUnread });
+      } else {
+        byUserId.set(key, { ...existing, unreadCount: mergedUnread });
+      }
+    });
+
+    return Array.from(byUserId.values()).sort(
+      (a, b) =>
+        new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
+    );
+  }, [conversationsQuery.data]);
 
   // User search
   const userSearchQuery = trpc.community.users.search.useQuery(
@@ -225,13 +259,13 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
 
   useEffect(() => {
     if (!isPageMode || recipientId) return;
-    if (!selectedConversation && conversationsQuery.data?.length) {
-      const first = conversationsQuery.data[0];
+    if (!selectedConversation && normalizedConversations.length) {
+      const first = normalizedConversations[0];
       setSelectedConversation(first.otherUser.id);
       setSelectedName(first.otherUser.username);
       setView("conversation");
     }
-  }, [isPageMode, recipientId, selectedConversation, conversationsQuery.data]);
+  }, [isPageMode, recipientId, selectedConversation, normalizedConversations]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -352,7 +386,7 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
             Nuovo
           </Button>
         </div>
-        {!conversationsQuery.data || conversationsQuery.data.length === 0 ? (
+        {!normalizedConversations.length ? (
           <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
             <MessageCircle className="h-12 w-12 mb-2" />
             <p className="text-sm">Nessun messaggio</p>
@@ -369,9 +403,9 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
         ) : (
           <ScrollArea className="flex-1">
             <div className="divide-y">
-              {conversationsQuery.data.map((conv) => (
+              {normalizedConversations.map((conv) => (
                 <button
-                  key={conv.lastMessage.id}
+                  key={conv.otherUser.id}
                   onClick={() => openConversation(conv.otherUser.id, conv.otherUser.username)}
                   className={`w-full text-left p-4 hover:bg-accent transition-colors ${
                     selectedConversation === conv.otherUser.id ? "bg-accent" : ""
@@ -725,14 +759,14 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
                 })
               )}
             </div>
-          ) : !conversationsQuery.data?.length ? (
+          ) : !normalizedConversations.length ? (
             <div className="flex h-40 flex-col items-center justify-center px-4 text-center text-muted-foreground">
               <MessageCircle className="size-8 opacity-60" />
               <p className="mt-2 text-sm">Nessun messaggio disponibile.</p>
             </div>
           ) : (
             <div className="divide-y divide-border/40">
-              {conversationsQuery.data
+              {normalizedConversations
                 .filter((conv) => {
                   if (!searchQuery.trim()) return true;
                   const name = conv.otherUser.username ?? "";
@@ -742,7 +776,7 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
                   const isActive = selectedConversation === conv.otherUser.id;
                   return (
                     <button
-                      key={conv.lastMessage.id}
+                      key={conv.otherUser.id}
                       onClick={() => openConversation(conv.otherUser.id, conv.otherUser.username)}
                       className={cn(
                         "w-full px-4 py-3 text-left transition-colors hover:bg-background/65",
@@ -798,10 +832,14 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
     const otherUserName =
       selectedName ||
       recipientName ||
-      conversationQuery.data?.[0]?.sender?.username ||
+      normalizedConversations.find((conv) => conv.otherUser.id === selectedConversation)?.otherUser.username ||
+      conversationQuery.data?.find((msg) => msg.sender.id === selectedConversation)?.sender.username ||
       "Utente";
 
-    const otherAvatar = conversationQuery.data?.[0]?.sender?.profilePicture || undefined;
+    const otherAvatar =
+      normalizedConversations.find((conv) => conv.otherUser.id === selectedConversation)?.otherUser.profilePicture ||
+      conversationQuery.data?.find((msg) => msg.sender.id === selectedConversation)?.sender.profilePicture ||
+      undefined;
 
     return (
       <div className="flex h-full min-h-0 flex-col">

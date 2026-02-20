@@ -393,42 +393,87 @@ export async function markMessagesAsRead(params: {
  */
 export async function getRecentConversations(userId: number, limit: number = 20) {
   const db = await requireDb()
-  
-  // Query per ottenere l'ultimo messaggio per ogni conversazione
-  const conversations = await db
-    .select({
-      lastMessage: directMessages,
-      otherUser: {
-        id: users.id,
-        username: swimmerProfiles.username,
-        profilePicture: swimmerProfiles.avatarUrl,
-      },
-      unreadCount: sql<number>`
-        COUNT(CASE WHEN ${directMessages.receiverId} = ${userId} 
-                   AND ${directMessages.isRead} = false 
-                   THEN 1 END)::int
-      `,
-    })
-    .from(directMessages)
-    .innerJoin(
-      users,
-      sql`${users.id} = CASE 
-        WHEN ${directMessages.senderId} = ${userId} THEN ${directMessages.receiverId}
-        ELSE ${directMessages.senderId}
-      END`
-    )
-    .leftJoin(swimmerProfiles, eq(users.id, swimmerProfiles.userId))
-    .where(
-      or(
-        eq(directMessages.senderId, userId),
-        eq(directMessages.receiverId, userId)
+
+  const result = await db.execute(sql`
+    WITH latest_per_user AS (
+      SELECT DISTINCT ON (
+        CASE
+          WHEN dm.sender_id = ${userId} THEN dm.receiver_id
+          ELSE dm.sender_id
+        END
       )
+        dm.id,
+        dm.sender_id AS "senderId",
+        dm.receiver_id AS "receiverId",
+        dm.content,
+        dm.message_type AS "messageType",
+        dm.metadata,
+        dm.is_read AS "isRead",
+        dm.read_at AS "readAt",
+        dm.created_at AS "createdAt",
+        CASE
+          WHEN dm.sender_id = ${userId} THEN dm.receiver_id
+          ELSE dm.sender_id
+        END AS other_user_id
+      FROM direct_messages dm
+      WHERE dm.sender_id = ${userId} OR dm.receiver_id = ${userId}
+      ORDER BY
+        CASE
+          WHEN dm.sender_id = ${userId} THEN dm.receiver_id
+          ELSE dm.sender_id
+        END,
+        dm.created_at DESC
+    ),
+    unread_per_user AS (
+      SELECT
+        dm.sender_id AS other_user_id,
+        COUNT(*)::int AS unread_count
+      FROM direct_messages dm
+      WHERE dm.receiver_id = ${userId}
+        AND dm.is_read = false
+      GROUP BY dm.sender_id
     )
-    .groupBy(directMessages.id, users.id, swimmerProfiles.userId, swimmerProfiles.username, swimmerProfiles.avatarUrl)
-    .orderBy(desc(directMessages.createdAt))
-    .limit(limit)
-  
-  return conversations
+    SELECT
+      l.id,
+      l."senderId",
+      l."receiverId",
+      l.content,
+      l."messageType",
+      l.metadata,
+      l."isRead",
+      l."readAt",
+      l."createdAt",
+      u.id AS "otherUserId",
+      sp.username AS "otherUsername",
+      sp.avatar_url AS "otherProfilePicture",
+      COALESCE(unread.unread_count, 0)::int AS "unreadCount"
+    FROM latest_per_user l
+    JOIN users u ON u.id = l.other_user_id
+    LEFT JOIN swimmer_profiles sp ON sp.user_id = u.id
+    LEFT JOIN unread_per_user unread ON unread.other_user_id = l.other_user_id
+    ORDER BY l."createdAt" DESC
+    LIMIT ${Math.max(1, Math.min(limit, 50))}
+  `)
+
+  return result.rows.map((row: any) => ({
+    lastMessage: {
+      id: Number(row.id),
+      senderId: Number(row.senderId),
+      receiverId: Number(row.receiverId),
+      content: String(row.content ?? ""),
+      messageType: row.messageType ?? "text",
+      metadata: row.metadata ?? null,
+      isRead: Boolean(row.isRead),
+      readAt: row.readAt ? new Date(row.readAt) : null,
+      createdAt: new Date(row.createdAt),
+    },
+    otherUser: {
+      id: Number(row.otherUserId),
+      username: row.otherUsername ?? null,
+      profilePicture: row.otherProfilePicture ?? null,
+    },
+    unreadCount: Number(row.unreadCount ?? 0),
+  }))
 }
 
 /**

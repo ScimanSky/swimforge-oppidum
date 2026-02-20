@@ -479,7 +479,7 @@ export default function Activities() {
             )}
           </section>
 
-          <section className="surface-panel space-y-3 p-4 xl:-mt-1 xl:sticky xl:top-20 xl:h-fit">
+          <section className="surface-panel space-y-3 p-4 xl:-mt-4 xl:self-start xl:sticky xl:top-20 xl:h-fit">
             {selectedActivity ? (
               <>
                 <div className="flex flex-wrap items-start justify-between gap-3">
