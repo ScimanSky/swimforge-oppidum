@@ -313,17 +313,56 @@ export async function sendDirectMessage(params: {
   metadata?: Record<string, unknown> | null
 }) {
   const db = await requireDb()
-  const [message] = await db
-    .insert(directMessages)
-    .values({
-      senderId: params.senderId,
-      receiverId: params.receiverId,
-      content: params.content,
-      messageType: params.messageType ?? "text",
-      metadata: params.metadata ?? null,
-    })
-    .returning()
-  return message
+  try {
+    const [message] = await db
+      .insert(directMessages)
+      .values({
+        senderId: params.senderId,
+        receiverId: params.receiverId,
+        content: params.content,
+        messageType: params.messageType ?? "text",
+        metadata: params.metadata ?? null,
+      })
+      .returning()
+    return message
+  } catch {
+    // Fallback for environments where DM advanced columns are not migrated yet.
+    const result = await db.execute(sql`
+      INSERT INTO direct_messages (sender_id, receiver_id, content)
+      VALUES (${params.senderId}, ${params.receiverId}, ${params.content})
+      RETURNING
+        id,
+        sender_id AS "senderId",
+        receiver_id AS "receiverId",
+        content,
+        is_read AS "isRead",
+        read_at AS "readAt",
+        created_at AS "createdAt"
+    `)
+    const row = result.rows[0] as
+      | {
+          id: number
+          senderId: number
+          receiverId: number
+          content: string
+          isRead: boolean
+          readAt: Date | null
+          createdAt: Date
+        }
+      | undefined
+    if (!row) throw new Error("Failed to create direct message")
+    return {
+      id: Number(row.id),
+      senderId: Number(row.senderId),
+      receiverId: Number(row.receiverId),
+      content: String(row.content ?? ""),
+      messageType: "text" as "text" | "forward_post" | "forward_story",
+      metadata: null,
+      isRead: Boolean(row.isRead),
+      readAt: row.readAt ? new Date(row.readAt) : null,
+      createdAt: row.createdAt ? new Date(row.createdAt) : new Date(),
+    }
+  }
 }
 
 /**
@@ -336,39 +375,62 @@ export async function getConversation(params: {
   offset?: number
 }) {
   const db = await requireDb()
-  const messages = await db
-    .select({
-      message: directMessages,
-      sender: {
-        id: users.id,
-        username: sql<string | null>`
-          COALESCE(
-            NULLIF(TRIM(${users.name}), ''),
-            SPLIT_PART(${users.email}, '@', 1)
-          )
-        `,
-        profilePicture: swimmerProfiles.avatarUrl,
+  const normalizedLimit = Math.max(1, Math.min(params.limit ?? 50, 100))
+  const normalizedOffset = Math.max(0, params.offset ?? 0)
+
+  // We intentionally avoid selecting advanced DM columns here to keep
+  // conversation loading resilient even if production schema lags behind.
+  const result = await db.execute(sql`
+    SELECT
+      dm.id,
+      dm.sender_id AS "senderId",
+      dm.receiver_id AS "receiverId",
+      dm.content,
+      dm.is_read AS "isRead",
+      dm.read_at AS "readAt",
+      dm.created_at AS "createdAt",
+      u.id AS "userId",
+      u.name AS "userName",
+      u.email AS "userEmail",
+      sp.avatar_url AS "profilePicture"
+    FROM direct_messages dm
+    JOIN users u ON u.id = dm.sender_id
+    LEFT JOIN swimmer_profiles sp ON sp.user_id = u.id
+    WHERE
+      (dm.sender_id = ${params.userId1} AND dm.receiver_id = ${params.userId2})
+      OR
+      (dm.sender_id = ${params.userId2} AND dm.receiver_id = ${params.userId1})
+    ORDER BY dm.created_at DESC
+    LIMIT ${normalizedLimit}
+    OFFSET ${normalizedOffset}
+  `)
+
+  const messages = result.rows.map((row: any) => {
+    const senderDisplayName =
+      (typeof row.userName === "string" && row.userName.trim().length > 0 ? row.userName.trim() : null) ||
+      (typeof row.userEmail === "string" && row.userEmail.includes("@") ? row.userEmail.split("@")[0] : null) ||
+      `Utente #${row.userId}`
+
+    return {
+      message: {
+        id: Number(row.id),
+        senderId: Number(row.senderId),
+        receiverId: Number(row.receiverId),
+        content: String(row.content ?? ""),
+        messageType: "text" as "text" | "forward_post" | "forward_story",
+        metadata: null,
+        isRead: Boolean(row.isRead),
+        readAt: row.readAt ? new Date(row.readAt) : null,
+        createdAt: row.createdAt ? new Date(row.createdAt) : new Date(0),
       },
-    })
-    .from(directMessages)
-    .innerJoin(users, eq(directMessages.senderId, users.id))
-    .leftJoin(swimmerProfiles, eq(users.id, swimmerProfiles.userId))
-    .where(
-      or(
-        and(
-          eq(directMessages.senderId, params.userId1),
-          eq(directMessages.receiverId, params.userId2)
-        ),
-        and(
-          eq(directMessages.senderId, params.userId2),
-          eq(directMessages.receiverId, params.userId1)
-        )
-      )
-    )
-    .orderBy(desc(directMessages.createdAt))
-    .limit(params.limit || 50)
-    .offset(params.offset || 0)
-  
+      sender: {
+        id: Number(row.userId),
+        username: senderDisplayName,
+        profilePicture: row.profilePicture ?? null,
+      },
+    }
+  })
+
   return messages.reverse() // Ordine cronologico
 }
 
@@ -483,7 +545,7 @@ export async function getRecentConversations(userId: number, limit: number = 20)
           senderId: Number(row.senderId),
           receiverId: Number(row.receiverId),
           content: String(row.content ?? ""),
-          messageType: "text" as const,
+          messageType: "text" as "text" | "forward_post" | "forward_story",
           metadata: null,
           isRead: Boolean(row.isRead),
           readAt: row.readAt ? new Date(row.readAt) : null,
