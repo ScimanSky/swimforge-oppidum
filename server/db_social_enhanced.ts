@@ -398,85 +398,107 @@ export async function markMessagesAsRead(params: {
  */
 export async function getRecentConversations(userId: number, limit: number = 20) {
   const db = await requireDb()
+  const normalizedLimit = Math.max(1, Math.min(limit, 50))
+  const scanLimit = Math.max(200, normalizedLimit * 80)
 
-  const result = await db.execute(sql`
-    WITH latest_per_user AS (
-      SELECT DISTINCT ON (
-        CASE
-          WHEN dm.sender_id = ${userId} THEN dm.receiver_id
-          ELSE dm.sender_id
-        END
-      )
-        dm.id,
-        dm.sender_id AS "senderId",
-        dm.receiver_id AS "receiverId",
-        dm.content,
-        dm.message_type AS "messageType",
-        dm.metadata,
-        dm.is_read AS "isRead",
-        dm.read_at AS "readAt",
-        dm.created_at AS "createdAt",
-        CASE
-          WHEN dm.sender_id = ${userId} THEN dm.receiver_id
-          ELSE dm.sender_id
-        END AS other_user_id
-      FROM direct_messages dm
-      WHERE dm.sender_id = ${userId} OR dm.receiver_id = ${userId}
-      ORDER BY
-        CASE
-          WHEN dm.sender_id = ${userId} THEN dm.receiver_id
-          ELSE dm.sender_id
-        END,
-        dm.created_at DESC
-    ),
-    unread_per_user AS (
-      SELECT
-        dm.sender_id AS other_user_id,
-        COUNT(*)::int AS unread_count
-      FROM direct_messages dm
-      WHERE dm.receiver_id = ${userId}
-        AND dm.is_read = false
-      GROUP BY dm.sender_id
-    )
-    SELECT
-      l.id,
-      l."senderId",
-      l."receiverId",
-      l.content,
-      l."messageType",
-      l.metadata,
-      l."isRead",
-      l."readAt",
-      l."createdAt",
-      l.other_user_id AS "otherUserId",
-      ('Utente #' || l.other_user_id::text) AS "otherUsername",
-      NULL::text AS "otherProfilePicture",
-      COALESCE(unread.unread_count, 0)::int AS "unreadCount"
-    FROM latest_per_user l
-    LEFT JOIN unread_per_user unread ON unread.other_user_id = l.other_user_id
-    ORDER BY l."createdAt" DESC
-    LIMIT ${Math.max(1, Math.min(limit, 50))}
-  `)
+  // NOTE:
+  // We intentionally avoid complex DISTINCT ON / CTE SQL here because some
+  // production environments were failing this endpoint with 500.
+  // We fetch recent messages ordered by createdAt and reduce in application code.
+  const recentMessages = await db
+    .select({
+      id: directMessages.id,
+      senderId: directMessages.senderId,
+      receiverId: directMessages.receiverId,
+      content: directMessages.content,
+      isRead: directMessages.isRead,
+      readAt: directMessages.readAt,
+      createdAt: directMessages.createdAt,
+    })
+    .from(directMessages)
+    .where(or(eq(directMessages.senderId, userId), eq(directMessages.receiverId, userId)))
+    .orderBy(desc(directMessages.createdAt))
+    .limit(scanLimit)
 
-  return result.rows.map((row: any) => ({
-    lastMessage: {
-      id: Number(row.id),
-      senderId: Number(row.senderId),
-      receiverId: Number(row.receiverId),
-      content: String(row.content ?? ""),
-      messageType: row.messageType ?? "text",
-      metadata: row.metadata ?? null,
-      isRead: Boolean(row.isRead),
-      readAt: row.readAt ? new Date(row.readAt) : null,
-      createdAt: new Date(row.createdAt),
-    },
-    otherUser: {
-      id: Number(row.otherUserId),
-      username: row.otherUsername ?? null,
-      profilePicture: row.otherProfilePicture ?? null,
-    },
-    unreadCount: Number(row.unreadCount ?? 0),
-  }))
+  const unreadRows = await db
+    .select({
+      otherUserId: directMessages.senderId,
+      unreadCount: sql<number>`count(*)`,
+    })
+    .from(directMessages)
+    .where(and(eq(directMessages.receiverId, userId), eq(directMessages.isRead, false)))
+    .groupBy(directMessages.senderId)
+
+  const unreadByUserId = new Map<number, number>(
+    unreadRows.map((row) => [Number(row.otherUserId), Number(row.unreadCount ?? 0)]),
+  )
+
+  const latestByOtherUser = new Map<number, (typeof recentMessages)[number]>()
+  for (const message of recentMessages) {
+    const otherUserId = Number(message.senderId === userId ? message.receiverId : message.senderId)
+    if (!otherUserId || latestByOtherUser.has(otherUserId)) continue
+    latestByOtherUser.set(otherUserId, message)
+    if (latestByOtherUser.size >= normalizedLimit) break
+  }
+
+  const otherUserIds = Array.from(latestByOtherUser.keys())
+  const userRows =
+    otherUserIds.length > 0
+      ? await db
+          .select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            profilePicture: swimmerProfiles.avatarUrl,
+          })
+          .from(users)
+          .leftJoin(swimmerProfiles, eq(users.id, swimmerProfiles.userId))
+          .where(inArray(users.id, otherUserIds))
+      : []
+
+  const usersById = new Map(
+    userRows.map((row) => [
+      Number(row.id),
+      {
+        name: row.name,
+        email: row.email,
+        profilePicture: row.profilePicture,
+      },
+    ]),
+  )
+
+  return otherUserIds
+    .map((otherUserId) => {
+      const row = latestByOtherUser.get(otherUserId)
+      if (!row) return null
+      const user = usersById.get(otherUserId)
+      const displayName =
+        user?.name?.trim() ||
+        (typeof user?.email === "string" && user.email.includes("@") ? user.email.split("@")[0] : null) ||
+        `Utente #${otherUserId}`
+
+      return {
+        lastMessage: {
+          id: Number(row.id),
+          senderId: Number(row.senderId),
+          receiverId: Number(row.receiverId),
+          content: String(row.content ?? ""),
+          messageType: "text" as const,
+          metadata: null,
+          isRead: Boolean(row.isRead),
+          readAt: row.readAt ? new Date(row.readAt) : null,
+          createdAt: row.createdAt ? new Date(row.createdAt) : new Date(0),
+        },
+        otherUser: {
+          id: Number(otherUserId),
+          username: displayName,
+          profilePicture: user?.profilePicture ?? null,
+        },
+        unreadCount: unreadByUserId.get(otherUserId) ?? 0,
+      }
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null)
+    .sort((a, b) => b.lastMessage.createdAt.getTime() - a.lastMessage.createdAt.getTime())
 }
 
 /**
