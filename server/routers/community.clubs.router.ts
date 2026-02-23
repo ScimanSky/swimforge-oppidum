@@ -1252,8 +1252,6 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                 )
                 .mutation(async ({ ctx, input }) => {
                     await requireClubCoachUploadRole(ctx.user.id, input.clubId);
-                    const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
-                    const admin = getSupabaseAdminClient();
 
                     const MAX_BYTES = 15 * 1024 * 1024;
                     let buffer: Buffer;
@@ -1284,22 +1282,65 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         .replace(/^_+|_+$/g, "")
                         .slice(0, 140) || `documento-${Date.now()}.pdf`;
 
-                    const filePath = `clubs/${input.clubId}/${ctx.user.id}/docs/${Date.now()}-${safeFileName}`;
-                    const { error } = await admin.storage
-                        .from("profile-media")
-                        .upload(filePath, buffer, {
-                            contentType: input.mimeType,
-                            upsert: true,
-                        });
-                    if (error) {
-                        throw new TRPCError({
-                            code: "INTERNAL_SERVER_ERROR",
-                            message: `Upload failed: ${error.message}`,
-                        });
-                    }
+                    let publicUrl: string | null = null;
+                    if (ENV.imagekitPrivateKey) {
+                        const authHeader = `Basic ${Buffer.from(`${ENV.imagekitPrivateKey}:`).toString("base64")}`;
+                        const formData = new FormData();
+                        formData.append("file", new Blob([new Uint8Array(buffer)], { type: input.mimeType }), safeFileName);
+                        formData.append("fileName", safeFileName);
+                        formData.append("folder", `/clubs/${input.clubId}/${ctx.user.id}/docs`);
+                        formData.append("useUniqueFileName", "true");
+                        formData.append("tags", `club,club-${input.clubId},pdf,swimforge`);
 
-                    const { data } = admin.storage.from("profile-media").getPublicUrl(filePath);
-                    const publicUrl = data.publicUrl;
+                        const res = await fetch("https://upload.imagekit.io/api/v1/files/upload", {
+                            method: "POST",
+                            headers: {
+                                Authorization: authHeader,
+                            },
+                            body: formData,
+                        });
+
+                        if (!res.ok) {
+                            let detail = "";
+                            try {
+                                const payload = (await res.json()) as { message?: string; help?: string };
+                                detail = payload.message || payload.help || "";
+                            } catch {
+                                detail = await res.text().catch(() => "");
+                            }
+                            throw new TRPCError({
+                                code: "INTERNAL_SERVER_ERROR",
+                                message: `Upload PDF failed: ${detail || `${res.status} ${res.statusText}`}`,
+                            });
+                        }
+
+                        const payload = (await res.json()) as { url?: string };
+                        if (!payload.url) {
+                            throw new TRPCError({
+                                code: "INTERNAL_SERVER_ERROR",
+                                message: "Upload PDF failed: URL non restituito da ImageKit.",
+                            });
+                        }
+                        publicUrl = payload.url;
+                    } else {
+                        const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
+                        const admin = getSupabaseAdminClient();
+                        const filePath = `clubs/${input.clubId}/${ctx.user.id}/docs/${Date.now()}-${safeFileName}`;
+                        const { error } = await admin.storage
+                            .from("profile-media")
+                            .upload(filePath, buffer, {
+                                contentType: input.mimeType,
+                                upsert: true,
+                            });
+                        if (error) {
+                            throw new TRPCError({
+                                code: "INTERNAL_SERVER_ERROR",
+                                message: `Upload failed: ${error.message}`,
+                            });
+                        }
+                        const { data } = admin.storage.from("profile-media").getPublicUrl(filePath);
+                        publicUrl = data.publicUrl;
+                    }
 
                     const { uploadClubMedia } = await import("../db_social_enhanced");
                     const media = await uploadClubMedia({
