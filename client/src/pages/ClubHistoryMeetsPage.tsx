@@ -143,6 +143,17 @@ export default function ClubHistoryMeetsPage() {
   const meetDetail = meetDetailQuery.data as any;
   const results = (resultsQuery.data as any[]) ?? [];
   const totalMeets = Number((meetsQuery.data as any)?.total ?? meets.length);
+  const meetSummary = useMemo(() => {
+    let recordCount = 0;
+    for (const row of results) {
+      if (String(row?.record_raw ?? "").trim()) recordCount += 1;
+    }
+    return {
+      resultsCount: Number(meetDetail?.stats?.resultsCount ?? results.length),
+      athletesCount: Number(meetDetail?.stats?.athletesCount ?? 0),
+      recordCount,
+    };
+  }, [meetDetail, results]);
 
   const jumpToDetail = () => {
     if (typeof window === "undefined") return;
@@ -170,7 +181,7 @@ export default function ClubHistoryMeetsPage() {
 
   return (
     <AppLayout>
-      <div className="compact-shell mx-auto max-w-6xl space-y-4 px-3 pb-24 sm:px-4">
+      <div className="compact-shell mx-auto max-w-7xl space-y-4 px-3 pb-24 sm:px-4">
         <section className="surface-panel relative overflow-hidden p-4 sm:p-5">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_52%)]" />
           <div className="relative flex flex-wrap items-start justify-between gap-3">
@@ -213,13 +224,13 @@ export default function ClubHistoryMeetsPage() {
           </div>
         </section>
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.5fr)]">
+        <div className="grid gap-4 xl:grid-cols-[minmax(320px,0.88fr)_minmax(0,1.48fr)]">
           <section id="history-meet-list" className="surface-panel scroll-mt-24 p-3 sm:scroll-mt-32 sm:p-4 space-y-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1"><Trophy className="h-3.5 w-3.5" /> Meeting</span>
               <span>{(meetsQuery.data as any)?.total ?? meets.length}</span>
             </div>
-            <p className="text-[11px] text-muted-foreground lg:hidden">Tocca un meeting per aprire i risultati.</p>
+            <p className="text-[11px] text-muted-foreground xl:hidden">Tocca un meeting per aprire i risultati.</p>
             {meetsQuery.isLoading ? (
               <p className="text-sm text-muted-foreground">Caricamento meeting...</p>
             ) : meets.length === 0 ? (
@@ -235,16 +246,40 @@ export default function ClubHistoryMeetsPage() {
                       setSelectedMeetSlug(String(meet.meet_slug));
                       jumpToDetail();
                     }}
-                    className={`w-full rounded-xl border px-3 py-2 text-left transition-colors ${
+                    className={`group relative w-full overflow-hidden rounded-2xl border text-left transition-all ${
                       active
-                        ? "border-primary/60 bg-primary/12 shadow-[0_0_0_1px_rgba(34,211,238,0.22)]"
-                        : "border-border/60 bg-card/25 hover:bg-card/45"
+                        ? "border-primary/70 shadow-[0_0_0_1px_rgba(34,211,238,0.35),0_0_20px_rgba(34,211,238,0.18)]"
+                        : "border-border/60 hover:border-primary/45"
                     }`}
                   >
-                    <p className="text-sm font-semibold truncate">{meet.meet_name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDate(meet.meet_date)} • {Number(meet.results_count ?? 0)} risultati • {Number(meet.athletes_count ?? 0)} atleti
-                    </p>
+                    <img
+                      src="/images/theme-v3/landing-tour-poster.png"
+                      alt=""
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-[0.18]"
+                      loading="lazy"
+                    />
+                    <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(106deg,rgba(2,10,23,0.86)_0%,rgba(5,20,35,0.64)_45%,rgba(2,10,23,0.56)_100%)]" />
+                    <div className="relative z-10 flex flex-wrap items-center justify-between gap-2 p-2.5 sm:p-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{meet.meet_name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{formatDate(meet.meet_date)}</p>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <HistoryMetricCircle
+                          size="sm"
+                          tone="cyan"
+                          label="Ris"
+                          value={String(Number(meet.results_count ?? 0))}
+                        />
+                        <HistoryMetricCircle
+                          size="sm"
+                          tone="lime"
+                          label="Atl"
+                          value={String(Number(meet.athletes_count ?? 0))}
+                        />
+                      </div>
+                    </div>
                   </button>
                 );
               })
@@ -256,20 +291,25 @@ export default function ClubHistoryMeetsPage() {
               <p className="text-sm text-muted-foreground">Seleziona un meeting.</p>
             ) : (
               <>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <h2 className="text-lg font-semibold">{meetDetail?.meet?.meetName ?? "Meeting"}</h2>
-                    <p className="text-xs text-muted-foreground">Data: {formatDate(meetDetail?.meet?.meetDate)}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {meetDetail?.stats ? (
-                      <Badge variant="outline">
-                        {Number(meetDetail.stats.resultsCount ?? 0)} risultati • {Number(meetDetail.stats.athletesCount ?? 0)} atleti
-                      </Badge>
-                    ) : null}
-                    <Button type="button" variant="outline-neon" size="sm" className="lg:hidden" onClick={jumpToList}>
+                <div className="rounded-xl border border-border/60 bg-card/25 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <h2 className="text-xl font-display font-bold">{meetDetail?.meet?.meetName ?? "Meeting"}</h2>
+                      <p className="text-xs text-muted-foreground">Data: {formatDate(meetDetail?.meet?.meetDate)}</p>
+                    </div>
+                    <Button type="button" variant="outline-neon" size="sm" className="xl:hidden" onClick={jumpToList}>
                       Torna all'elenco
                     </Button>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <HistoryMetricCircle label="Risultati" tone="cyan" value={String(meetSummary.resultsCount)} />
+                    <HistoryMetricCircle label="Atleti" tone="lime" value={String(meetSummary.athletesCount)} />
+                    <HistoryMetricCircle
+                      label="Record"
+                      tone="amber"
+                      value={String(meetSummary.recordCount)}
+                      highlight={meetSummary.recordCount > 0}
+                    />
                   </div>
                 </div>
 
@@ -306,51 +346,54 @@ export default function ClubHistoryMeetsPage() {
                     results.map((row: any) => {
                       const hasRecord = Boolean(String(row.record_raw ?? "").trim());
                       return (
-                      <div
-                        key={row.id}
-                        className={`relative overflow-hidden rounded-xl border bg-card/30 px-3 py-2 ${
-                          hasRecord
-                            ? "border-amber-300/70 shadow-[0_0_0_1px_rgba(252,211,77,0.35),0_0_22px_rgba(251,191,36,0.22)]"
-                            : "border-border/60"
-                        }`}
-                      >
-                        <img
-                          src="/images/theme-v3/landing-tour-poster.png"
-                          alt=""
-                          aria-hidden="true"
-                          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-[0.2] saturate-[0.9] contrast-[1.03]"
-                          loading="lazy"
-                        />
-                        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(102deg,color-mix(in_oklch,var(--background)_90%,transparent)_0%,color-mix(in_oklch,var(--background)_74%,transparent)_44%,color-mix(in_oklch,var(--background)_56%,transparent)_100%)]" />
-                        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_10%,color-mix(in_oklch,var(--electric-cyan)_14%,transparent),transparent_40%),radial-gradient(circle_at_88%_12%,color-mix(in_oklch,var(--electric-lime)_12%,transparent),transparent_42%)]" />
-                        <div className="relative z-10">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-semibold break-words">{row.athlete_name} • {row.event_label}</p>
+                        <div
+                          key={row.id}
+                          className={`relative overflow-hidden rounded-2xl border bg-card/30 p-3 ${
+                            hasRecord
+                              ? "border-amber-300/70 shadow-[0_0_0_1px_rgba(252,211,77,0.35),0_0_22px_rgba(251,191,36,0.22)]"
+                              : "border-border/60"
+                          }`}
+                        >
+                          <img
+                            src="/images/theme-v3/landing-tour-poster.png"
+                            alt=""
+                            aria-hidden="true"
+                            className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-[0.2] saturate-[0.9] contrast-[1.03]"
+                            loading="lazy"
+                          />
+                          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(102deg,color-mix(in_oklch,var(--background)_90%,transparent)_0%,color-mix(in_oklch,var(--background)_74%,transparent)_44%,color-mix(in_oklch,var(--background)_56%,transparent)_100%)]" />
+                          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_10%,color-mix(in_oklch,var(--electric-cyan)_14%,transparent),transparent_40%),radial-gradient(circle_at_88%_12%,color-mix(in_oklch,var(--electric-lime)_12%,transparent),transparent_42%)]" />
+                          <div className="relative z-10">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-semibold break-words">{row.athlete_name}</p>
+                              <Badge variant="outline" className="max-w-full truncate">{row.event_label}</Badge>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              <HistoryMetricCircle
+                                size="sm"
+                                tone="cyan"
+                                label="Tempo"
+                                value={formatTime(row.final_time_raw)}
+                              />
+                              <HistoryMetricCircle
+                                size="sm"
+                                tone="amber"
+                                label="Record"
+                                value={hasRecord ? String(row.record_raw) : "-"}
+                                highlight={hasRecord}
+                              />
+                              <HistoryMetricCircle
+                                size="sm"
+                                tone="lime"
+                                label="Punti"
+                                value={formatPoints(row.points)}
+                              />
+                            </div>
+                            {row.notes ? (
+                              <p className="mt-1 text-xs text-muted-foreground break-words">Note: {row.notes}</p>
+                            ) : null}
                           </div>
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <HistoryMetricCircle
-                              label="Tempo"
-                              value={formatTime(row.final_time_raw)}
-                            />
-                            <HistoryMetricCircle
-                              label="Record"
-                              value={hasRecord ? String(row.record_raw) : "-"}
-                              highlight={hasRecord}
-                            />
-                            <HistoryMetricCircle
-                              label="Punti"
-                              value={formatPoints(row.points)}
-                            />
-                          </div>
-                          {row.record_raw || row.notes ? (
-                            <p className="mt-1 text-xs text-muted-foreground break-words">
-                              {row.record_raw ? `Record: ${row.record_raw}` : ""}
-                              {row.record_raw && row.notes ? " • " : ""}
-                              {row.notes ? `Note: ${row.notes}` : ""}
-                            </p>
-                          ) : null}
                         </div>
-                      </div>
                       );
                     })
                   )}
