@@ -420,6 +420,7 @@ export default function ClubDetailEnhanced() {
   const historyAthletesHref = `/community/club/${clubId}/history/athletes`;
   const isHistoryEnabledForClub = Boolean((historyConfigQuery.data as any)?.enabled);
   const historyPageHref = clubHistoryV1Enabled && isMember && isHistoryEnabledForClub ? historyAthletesHref : null;
+  const documentsPageHref = isMember ? `/community/club/${clubId}/documents` : null;
   const hasClubRules = Boolean(club?.rules && String(club.rules).trim().length > 0);
 
   const meetStatusLabel: Record<string, string> = {
@@ -551,6 +552,7 @@ export default function ClubDetailEnhanced() {
                     eventsPageHref={firstAgendaHref}
                     meetsPageHref={meetsPageHref}
                     historyPageHref={historyPageHref}
+                    documentsPageHref={documentsPageHref}
                     hasActiveMeet={hasActiveMeet}
                   />
 
@@ -574,6 +576,7 @@ export default function ClubDetailEnhanced() {
                     eventsPageHref={isMobile ? firstAgendaHref : null}
                     meetsPageHref={isMobile ? meetsPageHref : null}
                     historyPageHref={isMobile ? historyPageHref : null}
+                    documentsPageHref={isMobile ? documentsPageHref : null}
                     hasActiveMeet={isMobile && hasActiveMeet}
                   />
                 </div>

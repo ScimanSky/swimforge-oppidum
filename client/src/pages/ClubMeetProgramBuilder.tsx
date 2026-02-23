@@ -27,6 +27,15 @@ function toSafeNumber(value: unknown, fallback = 0): number {
 }
 
 function inferEventKey(event: ExistingEvent): string | null {
+  const parsed = parseMeetEventLabel(String(event.label ?? ""));
+  const parsedKey = buildMeetProgramKey({
+    distanceMeters: parsed.distanceMeters,
+    stroke: parsed.stroke,
+    gender: parsed.gender,
+    relayLegs: parsed.relayLegs,
+  });
+  if (parsed.relayLegs && parsedKey) return parsedKey;
+
   const direct = buildMeetProgramKey({
     distanceMeters: event.distanceMeters,
     stroke: event.stroke,
@@ -34,12 +43,7 @@ function inferEventKey(event: ExistingEvent): string | null {
   });
   if (direct) return direct;
 
-  const parsed = parseMeetEventLabel(String(event.label ?? ""));
-  return buildMeetProgramKey({
-    distanceMeters: parsed.distanceMeters,
-    stroke: parsed.stroke,
-    gender: parsed.gender,
-  });
+  return parsedKey;
 }
 
 export default function ClubMeetProgramBuilder() {
