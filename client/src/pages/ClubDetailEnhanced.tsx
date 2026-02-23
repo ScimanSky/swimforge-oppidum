@@ -327,7 +327,7 @@ export default function ClubDetailEnhanced() {
   const isMember = Boolean(club?.is_member);
   const contentOffset = stickyHeaderHeight > 0
     ? stickyHeaderHeight + (isDesktop ? 14 : 6)
-    : (isDesktop ? 430 : 144);
+    : (isDesktop ? 430 : 96);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -517,7 +517,7 @@ export default function ClubDetailEnhanced() {
       {typeof document !== "undefined" &&
         createPortal(
           <div className="pointer-events-none fixed left-0 right-0 top-16 z-30 lg:pl-[88px]">
-            <div className="mx-auto max-w-[1520px] px-2.5 py-2.5 sm:p-3 md:p-5 lg:p-6">
+            <div className="mx-auto max-w-[1520px] px-2 py-1.5 sm:p-3 md:p-5 lg:p-6">
               {isDesktop ? (
                 <div
                   ref={desktopStickyRef}

@@ -64,11 +64,14 @@ export default function ClubHero({
   const gareHref = meetsPageHref ?? eventsPageHref ?? null;
 
   if (variant === "compactSticky") {
+    const showEventsButton = Boolean(eventsPageHref && (!meetsPageHref || eventsPageHref !== meetsPageHref));
+    const compactActionClass = "h-6 px-2 text-[10px] whitespace-nowrap";
+
     return (
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="surface-panel w-full overflow-hidden rounded-xl px-2.5 py-2"
+        className="surface-panel w-full overflow-hidden rounded-xl px-2 py-1.5"
         style={{ borderColor: color, borderWidth: "1px" }}
       >
         {club.cover_image_url ? (
@@ -81,72 +84,64 @@ export default function ClubHero({
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-background/44 via-background/72 to-background/88" />
 
         <div className="relative z-10 flex items-start gap-2">
-          <Link href="/home/community">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7 shrink-0 text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-            </Button>
-          </Link>
-
-          <Avatar className="h-10 w-10 border-2 shrink-0" style={{ borderColor: color }}>
+          <Avatar className="h-8 w-8 shrink-0 border-2" style={{ borderColor: color }}>
             <AvatarImage src={club.logo_url ?? undefined} />
-            <AvatarFallback style={{ color }} className="text-sm font-bold font-display">
+            <AvatarFallback style={{ color }} className="text-xs font-bold font-display">
               {club.name.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
 
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-[15px] font-bold font-display leading-tight" style={{ color }}>
+          <div className="min-w-0 flex-1 pt-0.5">
+            <h1 className="truncate text-[13px] font-bold font-display leading-tight" style={{ color }}>
               {club.name}
             </h1>
-            {club.tagline ? (
-              <p className="mt-0.5 hidden truncate text-[11px] text-muted-foreground sm:block">{club.tagline}</p>
-            ) : null}
-            <div className="mt-1.5 flex flex-wrap items-center gap-1">
-              <Badge variant="outline" className="h-4 px-1 text-[9px]" style={{ borderColor: color, color }}>
-                {club.member_count} membri
-              </Badge>
-              <Badge variant="outline" className="h-4 px-1 text-[9px] capitalize">
-                {club.visibility}
-              </Badge>
+            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] text-muted-foreground">
+              <span className="truncate">{club.member_count} membri</span>
               {club.member_role ? (
-                <Badge variant="outline" className="h-4 px-1 text-[9px]" style={{ borderColor: color, color }}>
+                <Badge variant="outline" className="h-4 px-1 text-[9px] capitalize" style={{ borderColor: color, color }}>
                   {club.member_role}
                 </Badge>
               ) : null}
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5">
+            <Link href="/home/community">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+              </Button>
+            </Link>
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              className="h-6 w-6 text-muted-foreground hover:text-foreground"
               onClick={onOpenMembers}
             >
-              <Users className="h-3.5 w-3.5" />
+              <Users className="h-3 w-3" />
             </Button>
             {isStaff ? (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                className="h-6 w-6 text-muted-foreground hover:text-foreground"
                 onClick={onOpenSettings}
               >
-                <Settings className="h-3.5 w-3.5" />
+                <Settings className="h-3 w-3" />
               </Button>
             ) : null}
           </div>
         </div>
 
-        <div className="relative z-10 mt-2 flex flex-wrap items-center gap-2">
-          {eventsPageHref ? (
-            <Link href={eventsPageHref}>
-              <Button className="h-7 text-[11px]" variant="outline-neon" size="sm">
-                <Calendar className="mr-1.5 h-3.5 w-3.5" />
+        <div className="relative z-10 mt-1.5 overflow-x-auto pb-0.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex min-w-max items-center gap-1.5 pr-1">
+          {showEventsButton ? (
+            <Link href={eventsPageHref!}>
+              <Button className={compactActionClass} variant="outline-neon" size="sm">
+                <Calendar className="mr-1 h-3 w-3" />
                 Eventi
               </Button>
             </Link>
@@ -154,49 +149,50 @@ export default function ClubHero({
           {meetsPageHref ? (
             <Link href={meetsPageHref}>
               <Button
-                className={`h-7 text-[11px] ${hasActiveMeet ? "animate-pulse border-amber-400 text-amber-300 shadow-[0_0_16px_rgba(251,191,36,0.45)]" : ""}`}
+                className={`${compactActionClass} ${hasActiveMeet ? "animate-pulse border-amber-400 text-amber-300 shadow-[0_0_16px_rgba(251,191,36,0.45)]" : ""}`}
                 variant="outline-neon"
                 size="sm"
               >
-                <Trophy className="mr-1.5 h-3.5 w-3.5" />
+                <Trophy className="mr-1 h-3 w-3" />
                 Gare
               </Button>
             </Link>
           ) : null}
           {historyPageHref ? (
             <Link href={historyPageHref}>
-              <Button className="h-7 text-[11px]" variant="outline-neon" size="sm">
-                <Database className="mr-1.5 h-3.5 w-3.5" />
+              <Button className={compactActionClass} variant="outline-neon" size="sm">
+                <Database className="mr-1 h-3 w-3" />
                 Storico
               </Button>
             </Link>
           ) : null}
           {documentsPageHref ? (
             <Link href={documentsPageHref}>
-              <Button className="h-7 text-[11px]" variant="outline-neon" size="sm">
-                <FileText className="mr-1.5 h-3.5 w-3.5" />
+              <Button className={compactActionClass} variant="outline-neon" size="sm">
+                <FileText className="mr-1 h-3 w-3" />
                 Documenti
               </Button>
             </Link>
           ) : null}
           {isStaff && coachPageHref ? (
             <Link href={coachPageHref}>
-              <Button className="h-7 text-[11px]" variant="outline-neon" size="sm">
-                <Shield className="mr-1.5 h-3.5 w-3.5" />
-                Area Coach
+              <Button className={compactActionClass} variant="outline-neon" size="sm">
+                <Shield className="mr-1 h-3 w-3" />
+                Coach
               </Button>
             </Link>
           ) : null}
 
           {!club.is_member ? (
-            <Button className="h-7 text-[11px]" variant="neon" onClick={onJoin} disabled={isJoining}>
-              {isJoining ? "Richiesta..." : club.visibility === "public" ? "Unisciti al club" : "Richiedi accesso"}
+            <Button className={compactActionClass} variant="neon" onClick={onJoin} disabled={isJoining}>
+              {isJoining ? "Richiesta..." : club.visibility === "public" ? "Unisciti" : "Richiedi accesso"}
             </Button>
           ) : club.member_role !== "owner" ? (
-            <Button className="h-7 text-[11px]" variant="ghost" size="sm" onClick={onLeave} disabled={isLeaving}>
-              {isLeaving ? "Uscita..." : "Lascia club"}
+            <Button className={compactActionClass} variant="ghost" size="sm" onClick={onLeave} disabled={isLeaving}>
+              {isLeaving ? "Uscita..." : "Esci"}
             </Button>
           ) : null}
+          </div>
         </div>
 
       </motion.div>
