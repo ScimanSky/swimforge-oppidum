@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Users, Settings, ArrowLeft, Calendar, Database, ExternalLink, FileText, Trophy } from "lucide-react";
+import { Users, Settings, ArrowLeft, Calendar, Database, ExternalLink, FileText, Shield, Trophy } from "lucide-react";
 import { Link } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,7 @@ interface ClubHeroProps {
   meetsPageHref?: string | null;
   historyPageHref?: string | null;
   documentsPageHref?: string | null;
+  coachPageHref?: string | null;
   hasActiveMeet?: boolean;
 }
 
@@ -55,6 +56,7 @@ export default function ClubHero({
   meetsPageHref,
   historyPageHref,
   documentsPageHref,
+  coachPageHref,
   hasActiveMeet = false,
 }: ClubHeroProps) {
   const color = themeColorMap[club.theme_color ?? "cyan"] ?? themeColorMap.cyan;
@@ -177,6 +179,14 @@ export default function ClubHero({
               </Button>
             </Link>
           ) : null}
+          {isStaff && coachPageHref ? (
+            <Link href={coachPageHref}>
+              <Button className="h-7 text-[11px]" variant="outline-neon" size="sm">
+                <Shield className="mr-1.5 h-3.5 w-3.5" />
+                Area Coach
+              </Button>
+            </Link>
+          ) : null}
 
           {!club.is_member ? (
             <Button className="h-7 text-[11px]" variant="neon" onClick={onJoin} disabled={isJoining}>
@@ -285,6 +295,14 @@ export default function ClubHero({
               <Button variant="outline-neon" size="sm">
                 <FileText className="mr-1.5 h-3.5 w-3.5" />
                 Documenti
+              </Button>
+            </Link>
+          ) : null}
+          {isStaff && coachPageHref ? (
+            <Link href={coachPageHref}>
+              <Button variant="outline-neon" size="sm">
+                <Shield className="mr-1.5 h-3.5 w-3.5" />
+                Area Coach
               </Button>
             </Link>
           ) : null}

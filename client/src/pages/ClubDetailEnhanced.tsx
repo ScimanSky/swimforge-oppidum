@@ -553,6 +553,7 @@ export default function ClubDetailEnhanced() {
                     meetsPageHref={meetsPageHref}
                     historyPageHref={historyPageHref}
                     documentsPageHref={documentsPageHref}
+                    coachPageHref={coachAreaHref}
                     hasActiveMeet={hasActiveMeet}
                   />
 
@@ -577,6 +578,7 @@ export default function ClubDetailEnhanced() {
                     meetsPageHref={isMobile ? meetsPageHref : null}
                     historyPageHref={isMobile ? historyPageHref : null}
                     documentsPageHref={isMobile ? documentsPageHref : null}
+                    coachPageHref={isMobile ? coachAreaHref : null}
                     hasActiveMeet={isMobile && hasActiveMeet}
                   />
                 </div>
