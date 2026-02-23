@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Users, Settings, ArrowLeft, Calendar, ExternalLink, Trophy } from "lucide-react";
+import { Users, Settings, ArrowLeft, Calendar, Database, ExternalLink, Trophy } from "lucide-react";
 import { Link } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,7 @@ interface ClubHeroProps {
   variant?: "full" | "compactSticky";
   eventsPageHref?: string | null;
   meetsPageHref?: string | null;
+  historyPageHref?: string | null;
   hasActiveMeet?: boolean;
 }
 
@@ -51,6 +52,7 @@ export default function ClubHero({
   variant = "full",
   eventsPageHref,
   meetsPageHref,
+  historyPageHref,
   hasActiveMeet = false,
 }: ClubHeroProps) {
   const color = themeColorMap[club.theme_color ?? "cyan"] ?? themeColorMap.cyan;
@@ -157,6 +159,14 @@ export default function ClubHero({
               </Button>
             </Link>
           ) : null}
+          {historyPageHref ? (
+            <Link href={historyPageHref}>
+              <Button className="h-7 text-[11px]" variant="outline-neon" size="sm">
+                <Database className="mr-1.5 h-3.5 w-3.5" />
+                Storico
+              </Button>
+            </Link>
+          ) : null}
 
           {!club.is_member ? (
             <Button className="h-7 text-[11px]" variant="neon" onClick={onJoin} disabled={isJoining}>
@@ -249,6 +259,14 @@ export default function ClubHero({
               >
                 <Trophy className="mr-1.5 h-3.5 w-3.5" />
                 Gare
+              </Button>
+            </Link>
+          ) : null}
+          {historyPageHref ? (
+            <Link href={historyPageHref}>
+              <Button variant="outline-neon" size="sm">
+                <Database className="mr-1.5 h-3.5 w-3.5" />
+                Storico
               </Button>
             </Link>
           ) : null}

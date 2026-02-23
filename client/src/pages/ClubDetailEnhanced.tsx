@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { Pin, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon, Calendar as CalendarIcon, Database } from "lucide-react";
+import { Pin, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon, Calendar as CalendarIcon } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -418,8 +418,8 @@ export default function ClubDetailEnhanced() {
   const upcomingEvents = (eventsQuery.data as any[]) ?? [];
   const coachAreaHref = `/community/club/${clubId}/coach`;
   const historyAthletesHref = `/community/club/${clubId}/history/athletes`;
-  const historyMeetsHref = `/community/club/${clubId}/history/meets`;
   const isHistoryEnabledForClub = Boolean((historyConfigQuery.data as any)?.enabled);
+  const historyPageHref = clubHistoryV1Enabled && isMember && isHistoryEnabledForClub ? historyAthletesHref : null;
   const hasClubRules = Boolean(club?.rules && String(club.rules).trim().length > 0);
 
   const meetStatusLabel: Record<string, string> = {
@@ -550,6 +550,7 @@ export default function ClubDetailEnhanced() {
                     variant="full"
                     eventsPageHref={firstAgendaHref}
                     meetsPageHref={meetsPageHref}
+                    historyPageHref={historyPageHref}
                     hasActiveMeet={hasActiveMeet}
                   />
 
@@ -572,6 +573,7 @@ export default function ClubDetailEnhanced() {
                     variant="compactSticky"
                     eventsPageHref={isMobile ? firstAgendaHref : null}
                     meetsPageHref={isMobile ? meetsPageHref : null}
+                    historyPageHref={isMobile ? historyPageHref : null}
                     hasActiveMeet={isMobile && hasActiveMeet}
                   />
                 </div>
@@ -611,30 +613,6 @@ export default function ClubDetailEnhanced() {
             themeColor={club.theme_color ?? "cyan"}
             layout="grid"
           />
-        ) : null}
-
-        {clubHistoryV1Enabled && isMember && isHistoryEnabledForClub ? (
-          <section className="surface-panel p-3 sm:p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="inline-flex items-center gap-2 text-xs font-display uppercase tracking-wide text-muted-foreground">
-                  <Database className="h-4 w-4 text-primary" />
-                  Storico Dati Club
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Archivio storico Oppidum per atleti e meeting.
-                </p>
-              </div>
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                <Link href={historyAthletesHref} className="w-full sm:w-auto">
-                  <Button variant="outline-neon" size="sm" className="w-full sm:w-auto">Storico Atleti</Button>
-                </Link>
-                <Link href={historyMeetsHref} className="w-full sm:w-auto">
-                  <Button variant="outline-neon" size="sm" className="w-full sm:w-auto">Storico Meeting</Button>
-                </Link>
-              </div>
-            </div>
-          </section>
         ) : null}
 
         {/* Feed */}
