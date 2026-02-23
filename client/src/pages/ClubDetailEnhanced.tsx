@@ -622,12 +622,12 @@ export default function ClubDetailEnhanced() {
                   Archivio storico Oppidum per atleti e meeting.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <Link href={historyAthletesHref}>
-                  <Button variant="outline-neon" size="sm">Storico Atleti</Button>
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                <Link href={historyAthletesHref} className="w-full sm:w-auto">
+                  <Button variant="outline-neon" size="sm" className="w-full sm:w-auto">Storico Atleti</Button>
                 </Link>
-                <Link href={historyMeetsHref}>
-                  <Button variant="outline-neon" size="sm">Storico Meeting</Button>
+                <Link href={historyMeetsHref} className="w-full sm:w-auto">
+                  <Button variant="outline-neon" size="sm" className="w-full sm:w-auto">Storico Meeting</Button>
                 </Link>
               </div>
             </div>
