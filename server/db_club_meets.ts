@@ -1050,7 +1050,7 @@ export async function getMeetStats(params: {
     LEFT JOIN users u ON u.id = r.user_id
     LEFT JOIN swimmer_profiles sp ON sp.user_id = u.id
     WHERE r.meet_id = ${meet.id}
-    GROUP BY athlete_key, u.id, athlete_name, athlete_email
+    GROUP BY 1, 2, 3, 4
     ORDER BY points_total DESC, gold DESC, silver DESC, bronze DESC, athlete_name ASC
   `);
 
