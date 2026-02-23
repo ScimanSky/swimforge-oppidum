@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { Pin, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon, Calendar as CalendarIcon, Trophy, Flag } from "lucide-react";
+import { Pin, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon, Calendar as CalendarIcon, Trophy, Flag, Database } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -173,6 +173,7 @@ function DateTimePickerField({
 
 export default function ClubDetailEnhanced() {
   const clubMeetsV1Enabled = UI_FEATURE_FLAGS.clubMeetsV1;
+  const clubHistoryV1Enabled = UI_FEATURE_FLAGS.clubHistoryV1;
   const [match, params] = useRoute("/community/club/:id");
   const clubId = Number(params?.id);
   const [eventsFromDateIso] = useState(() => new Date().toISOString());
@@ -234,6 +235,10 @@ export default function ClubDetailEnhanced() {
   const meetsQuery = trpc.community.clubs.meets.list.useQuery(
     { clubId },
     { enabled: clubMeetsV1Enabled && match && Number.isFinite(clubId) && isMemberFromClubQuery }
+  );
+  const historyConfigQuery = trpc.community.clubs.history.config.get.useQuery(
+    { clubId },
+    { enabled: clubHistoryV1Enabled && match && Number.isFinite(clubId) && isMemberFromClubQuery }
   );
   const eventsQuery = trpc.community.clubs.events.list.useQuery(
     { clubId, status: "active", fromDate: eventsFromDateIso, limit: 8 },
@@ -420,6 +425,9 @@ export default function ClubDetailEnhanced() {
     ? `/community/club/${clubId}/event/${firstUpcomingEventId}`
     : null;
   const coachAreaHref = `/community/club/${clubId}/coach`;
+  const historyAthletesHref = `/community/club/${clubId}/history/athletes`;
+  const historyMeetsHref = `/community/club/${clubId}/history/meets`;
+  const isHistoryEnabledForClub = Boolean((historyConfigQuery.data as any)?.enabled);
   const hasClubRules = Boolean(club?.rules && String(club.rules).trim().length > 0);
 
   const meetStatusLabel: Record<string, string> = {
@@ -629,6 +637,30 @@ export default function ClubDetailEnhanced() {
                 })}
               </div>
             )}
+          </section>
+        ) : null}
+
+        {clubHistoryV1Enabled && isMember && isHistoryEnabledForClub ? (
+          <section className="surface-panel p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="inline-flex items-center gap-2 text-xs font-display uppercase tracking-wide text-muted-foreground">
+                  <Database className="h-4 w-4 text-primary" />
+                  Storico Dati Club
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Archivio storico Oppidum per atleti e meeting.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link href={historyAthletesHref}>
+                  <Button variant="outline-neon" size="sm">Storico Atleti</Button>
+                </Link>
+                <Link href={historyMeetsHref}>
+                  <Button variant="outline-neon" size="sm">Storico Meeting</Button>
+                </Link>
+              </div>
+            </div>
           </section>
         ) : null}
 

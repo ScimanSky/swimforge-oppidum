@@ -93,6 +93,7 @@ export const ENV = {
   cloudinaryVideoCreditWarnPercent: parseIntEnv("CLOUDINARY_VIDEO_CREDIT_WARN_PERCENT", 80, { min: 1, max: 100 }),
   cloudinaryVideoCreditBlockPercent: parseIntEnv("CLOUDINARY_VIDEO_CREDIT_BLOCK_PERCENT", 95, { min: 1, max: 100 }),
   clubMeetsV1Enabled: parseBoolEnv("CLUB_MEETS_V1_ENABLED", false),
+  clubHistoryV1Enabled: parseBoolEnv("CLUB_HISTORY_V1_ENABLED", false),
   sessionMaxAgeDays,
   sessionMaxAgeMs: sessionMaxAgeDays * 24 * 60 * 60 * 1000,
 };

@@ -548,6 +548,95 @@ export const clubMeetResults = pgTable("club_meet_results", {
 }));
 
 // ============================================
+// CLUB HISTORICAL DATA (Oppidum import)
+// ============================================
+export const clubHistoricalSources = pgTable("club_historical_sources", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  provider: varchar("provider", { length: 40 }).notNull(), // oppidum_html
+  rootUrl: text("root_url").notNull(),
+  enabled: boolean("enabled").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  clubHistoricalSourcesUnique: unique("club_historical_sources_club_provider_unique").on(table.clubId, table.provider),
+}));
+
+export const clubHistoricalImportRuns = pgTable("club_historical_import_runs", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  provider: varchar("provider", { length: 40 }).notNull(), // oppidum_html
+  mode: varchar("mode", { length: 40 }).notNull(), // oppidum_index_full | oppidum_meet_only | oppidum_athlete_only
+  triggeredBy: integer("triggered_by").notNull(),
+  status: varchar("status", { length: 20 }).notNull(), // running | success | partial | failed
+  sourceUrl: text("source_url").notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  finishedAt: timestamp("finished_at"),
+  processedPages: integer("processed_pages").default(0).notNull(),
+  processedRecords: integer("processed_records").default(0).notNull(),
+  createdRecords: integer("created_records").default(0).notNull(),
+  updatedRecords: integer("updated_records").default(0).notNull(),
+  errorRecords: integer("error_records").default(0).notNull(),
+  errorsJson: json("errors_json"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  clubHistoricalImportRunsClubIdx: index("idx_club_historical_import_runs_club_started").on(table.clubId, table.startedAt),
+}));
+
+export const clubHistoricalAthletes = pgTable("club_historical_athletes", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  provider: varchar("provider", { length: 40 }).notNull(), // oppidum_html
+  athleteSlug: varchar("athlete_slug", { length: 255 }).notNull(),
+  athleteName: varchar("athlete_name", { length: 255 }).notNull(),
+  sourceUrl: text("source_url").notNull(),
+  linkedUserId: integer("linked_user_id"),
+  lastImportRunId: integer("last_import_run_id"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  clubHistoricalAthletesUnique: unique("club_historical_athletes_unique").on(table.clubId, table.provider, table.athleteSlug),
+  clubHistoricalAthletesClubIdx: index("idx_club_historical_athletes_club_name").on(table.clubId, table.athleteName),
+}));
+
+export const clubHistoricalMeets = pgTable("club_historical_meets", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  provider: varchar("provider", { length: 40 }).notNull(), // oppidum_html
+  meetSlug: varchar("meet_slug", { length: 255 }).notNull(),
+  meetName: varchar("meet_name", { length: 255 }).notNull(),
+  meetDate: timestamp("meet_date"),
+  sourceUrl: text("source_url").notNull(),
+  seasonLabel: varchar("season_label", { length: 20 }),
+  lastImportRunId: integer("last_import_run_id"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  clubHistoricalMeetsUnique: unique("club_historical_meets_unique").on(table.clubId, table.provider, table.meetSlug),
+  clubHistoricalMeetsClubDateIdx: index("idx_club_historical_meets_club_date").on(table.clubId, table.meetDate),
+}));
+
+export const clubHistoricalResults = pgTable("club_historical_results", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  provider: varchar("provider", { length: 40 }).notNull(), // oppidum_html
+  meetId: integer("meet_id").notNull(),
+  athleteId: integer("athlete_id").notNull(),
+  eventLabel: varchar("event_label", { length: 255 }).notNull(),
+  eventLabelNorm: varchar("event_label_norm", { length: 255 }).notNull(),
+  finalTimeRaw: varchar("final_time_raw", { length: 64 }),
+  finalTimeCs: integer("final_time_cs"),
+  points: real("points"),
+  recordRaw: text("record_raw"),
+  notes: text("notes"),
+  lastImportRunId: integer("last_import_run_id"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  clubHistoricalResultsUnique: unique("club_historical_results_unique")
+    .on(table.clubId, table.provider, table.meetId, table.athleteId, table.eventLabelNorm),
+  clubHistoricalResultsMeetIdx: index("idx_club_historical_results_meet").on(table.meetId),
+  clubHistoricalResultsAthleteIdx: index("idx_club_historical_results_athlete").on(table.athleteId),
+}));
+
+// ============================================
 // CLUB EVENTS (Allenamenti, gare, eventi sociali)
 // ============================================
 export const clubEvents = pgTable("club_events", {

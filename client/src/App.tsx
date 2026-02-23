@@ -39,6 +39,8 @@ const ClubDetail = lazy(() => import("./pages/ClubDetailEnhanced"));
 const ClubCoachModeration = lazy(() => import("./pages/ClubCoachModeration"));
 const ClubEventDetail = lazy(() => import("./pages/ClubEventDetail"));
 const ClubMeetDetail = lazy(() => import("./pages/ClubMeetDetail"));
+const ClubHistoryAthletesPage = lazy(() => import("./pages/ClubHistoryAthletesPage"));
+const ClubHistoryMeetsPage = lazy(() => import("./pages/ClubHistoryMeetsPage"));
 const AdminReports = lazy(() => import("./pages/AdminReports"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const Login = lazy(() => import("./pages/Login"));
@@ -53,6 +55,7 @@ const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 
 function Router() {
   const clubMeetsV1Enabled = UI_FEATURE_FLAGS.clubMeetsV1;
+  const clubHistoryV1Enabled = UI_FEATURE_FLAGS.clubHistoryV1;
 
   return (
     <Suspense fallback={<div className="flex items-center justify-center h-screen"><Spinner /></div>}>
@@ -124,6 +127,12 @@ function Router() {
       <Route path="/community/club/:clubId/event/:eventId" component={ClubEventDetail} />
       {clubMeetsV1Enabled ? (
         <Route path="/community/club/:clubId/meet/:meetId" component={ClubMeetDetail} />
+      ) : null}
+      {clubHistoryV1Enabled ? (
+        <Route path="/community/club/:clubId/history/athletes" component={ClubHistoryAthletesPage} />
+      ) : null}
+      {clubHistoryV1Enabled ? (
+        <Route path="/community/club/:clubId/history/meets" component={ClubHistoryMeetsPage} />
       ) : null}
       <Route path="/community/club/:id/coach" component={ClubCoachModeration} />
       <Route path="/community/club/:id" component={ClubDetail} />

@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Copy, Flag, Plus, Shield, Users } from "lucide-react";
+import { ArrowLeft, Check, Copy, Database, Flag, Plus, RefreshCw, Shield, Users } from "lucide-react";
 
 type MeetForm = {
   name: string;
@@ -80,6 +80,7 @@ function InviteRow({ invite }: { invite: any }) {
 
 export default function ClubCoachModeration() {
   const clubMeetsV1Enabled = UI_FEATURE_FLAGS.clubMeetsV1;
+  const clubHistoryV1Enabled = UI_FEATURE_FLAGS.clubHistoryV1;
   const [match, params] = useRoute("/community/club/:id/coach");
   const clubId = Number(params?.id);
   const utils = trpc.useUtils();
@@ -113,6 +114,14 @@ export default function ClubCoachModeration() {
   const invitesQuery = trpc.community.clubs.invites.useQuery(
     { clubId },
     { enabled: match && Number.isFinite(clubId) }
+  );
+  const historyConfigQuery = trpc.community.clubs.history.config.get.useQuery(
+    { clubId },
+    { enabled: clubHistoryV1Enabled && match && Number.isFinite(clubId) }
+  );
+  const historyLastRunQuery = trpc.community.clubs.history.import.lastRun.useQuery(
+    { clubId },
+    { enabled: clubHistoryV1Enabled && match && Number.isFinite(clubId) && Boolean((historyConfigQuery.data as any)?.enabled) }
   );
 
   const createMeetMutation = trpc.community.clubs.meets.create.useMutation({
@@ -166,11 +175,26 @@ export default function ClubCoachModeration() {
     },
   });
 
+  const startHistoryImportMutation = trpc.community.clubs.history.import.start.useMutation({
+    onSuccess: () => {
+      toast.success("Import storico completato");
+      historyLastRunQuery.refetch();
+      utils.community.clubs.history.athletes.list.invalidate({ clubId });
+      utils.community.clubs.history.meets.list.invalidate({ clubId });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Import storico non riuscito");
+    },
+  });
+
   const club = clubQuery.data as any | undefined;
   const isMember = Boolean(club?.is_member);
   const role = String(club?.member_role ?? "");
   const isCoachStaff = ["coach", "owner", "admin", "moderator"].includes(role);
   const meetItems = ((meetsQuery.data as any)?.meets as any[]) ?? [];
+  const historyConfig = historyConfigQuery.data as any | undefined;
+  const historyLastRun = historyLastRunQuery.data as any | undefined;
+  const historyEnabled = Boolean(historyConfig?.enabled);
 
   const meetStatusLabel = useMemo(
     () =>
@@ -331,6 +355,59 @@ export default function ClubCoachModeration() {
           </section>
         ) : null}
 
+        {clubHistoryV1Enabled && historyEnabled ? (
+          <section className="surface-panel p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Database className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Storico Oppidum</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <Link href={`/community/club/${clubId}/history/athletes`}>
+                  <Button variant="outline-neon" size="sm">Storico Atleti</Button>
+                </Link>
+                <Link href={`/community/club/${clubId}/history/meets`}>
+                  <Button variant="outline-neon" size="sm">Storico Meeting</Button>
+                </Link>
+                <Button
+                  variant="neon"
+                  size="sm"
+                  disabled={startHistoryImportMutation.isPending}
+                  onClick={() => startHistoryImportMutation.mutate({ clubId, mode: "oppidum_index_full" })}
+                >
+                  <RefreshCw className={`mr-1.5 h-4 w-4 ${startHistoryImportMutation.isPending ? "animate-spin" : ""}`} />
+                  {startHistoryImportMutation.isPending ? "Import in corso..." : "Importa adesso"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-card/35 p-3 text-sm">
+              <p className="text-xs text-muted-foreground">Sorgente</p>
+              <p className="font-medium break-all">{String(historyConfig?.source?.rootUrl ?? "-")}</p>
+            </div>
+
+            <div className="rounded-xl border border-border/60 bg-card/35 p-3 text-sm">
+              {!historyLastRun ? (
+                <p className="text-muted-foreground">Nessun import storico eseguito.</p>
+              ) : (
+                <div className="space-y-1">
+                  <p className="font-medium">
+                    Ultimo run: <span className="uppercase">{String(historyLastRun.status ?? "-")}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Avvio: {formatDate(historyLastRun.startedAt)} • Pagine: {Number(historyLastRun.processedPages ?? 0)} • Record: {Number(historyLastRun.processedRecords ?? 0)} • Errori: {Number(historyLastRun.errorRecords ?? 0)}
+                  </p>
+                  {Array.isArray(historyLastRun.errorsJson) && historyLastRun.errorsJson.length > 0 ? (
+                    <p className="text-xs text-amber-300">
+                      {historyLastRun.errorsJson.slice(0, 2).map((error: any) => String(error?.message ?? error)).join(" | ")}
+                    </p>
+                  ) : null}
+                </div>
+              )}
+            </div>
+          </section>
+        ) : null}
+
         <section className="surface-panel p-4 space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Crea Evento Club</h2>
           <div className="grid gap-2 md:grid-cols-2">
@@ -425,4 +502,3 @@ export default function ClubCoachModeration() {
     </AppLayout>
   );
 }
-

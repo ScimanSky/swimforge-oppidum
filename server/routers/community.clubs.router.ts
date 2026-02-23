@@ -71,6 +71,16 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
     return next();
   });
 
+  const historyProcedure = protectedProcedure.use(async ({ next }) => {
+    if (!ENV.clubHistoryV1Enabled) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "La sezione storico club è disattivata.",
+      });
+    }
+    return next();
+  });
+
   const CLUB_COACH_UPLOAD_ROLES = new Set(["coach", "owner", "admin", "moderator"]);
   const requireClubCoachUploadRole = async (userId: number, clubId: number) => {
     const role = await requireClubMemberRole(userId, clubId);
@@ -850,6 +860,240 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                             const message = error instanceof Error ? error.message : "Impossibile generare link WhatsApp";
                             if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
                             if (message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+            }),
+        }),
+
+        history: router({
+            config: router({
+                get: historyProcedure
+                    .input(z.object({ clubId: z.number() }))
+                    .query(async ({ ctx, input }) => {
+                        const { getClubHistoryConfig } = await import("../db_club_history");
+                        try {
+                            return await getClubHistoryConfig({
+                                userId: ctx.user.id,
+                                clubId: input.clubId,
+                            });
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile leggere configurazione storico";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+
+                upsert: historyProcedure
+                    .input(z.object({
+                        clubId: z.number(),
+                        provider: z.enum(["oppidum_html"]),
+                        rootUrl: z.string().url(),
+                        enabled: z.boolean(),
+                    }))
+                    .mutation(async ({ ctx, input }) => {
+                        const { upsertClubHistoryConfig } = await import("../db_club_history");
+                        try {
+                            const source = await upsertClubHistoryConfig({
+                                actorId: ctx.user.id,
+                                clubId: input.clubId,
+                                provider: input.provider,
+                                rootUrl: input.rootUrl,
+                                enabled: input.enabled,
+                            });
+                            return { success: true, source };
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile aggiornare configurazione storico";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+            }),
+
+            import: router({
+                start: historyProcedure
+                    .input(z.object({
+                        clubId: z.number(),
+                        mode: z.enum(["oppidum_index_full", "oppidum_meet_only", "oppidum_athlete_only"]),
+                        url: z.string().url().optional(),
+                    }))
+                    .mutation(async ({ ctx, input }) => {
+                        const { startClubHistoryImport } = await import("../db_club_history");
+                        try {
+                            return await startClubHistoryImport({
+                                actorId: ctx.user.id,
+                                clubId: input.clubId,
+                                mode: input.mode,
+                                url: input.url,
+                            });
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Import storico non riuscito";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "History not enabled for this club") {
+                                throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Storico non abilitato per questo club." });
+                            }
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+
+                lastRun: historyProcedure
+                    .input(z.object({ clubId: z.number() }))
+                    .query(async ({ ctx, input }) => {
+                        const { getClubHistoryLastRun } = await import("../db_club_history");
+                        try {
+                            return await getClubHistoryLastRun({
+                                userId: ctx.user.id,
+                                clubId: input.clubId,
+                            });
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile leggere ultimo import storico";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "History not enabled for this club") {
+                                throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Storico non abilitato per questo club." });
+                            }
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+            }),
+
+            athletes: router({
+                list: historyProcedure
+                    .input(z.object({
+                        clubId: z.number(),
+                        search: z.string().max(120).optional(),
+                        season: z.number().min(2000).max(2100).optional(),
+                        limit: z.number().min(1).max(100).optional(),
+                        offset: z.number().min(0).optional(),
+                    }))
+                    .query(async ({ ctx, input }) => {
+                        const { listClubHistoryAthletes } = await import("../db_club_history");
+                        try {
+                            return await listClubHistoryAthletes({
+                                userId: ctx.user.id,
+                                clubId: input.clubId,
+                                search: input.search,
+                                season: input.season,
+                                limit: input.limit,
+                                offset: input.offset,
+                            });
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile leggere storico atleti";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "History not enabled for this club") {
+                                throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Storico non abilitato per questo club." });
+                            }
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+
+                get: historyProcedure
+                    .input(z.object({
+                        clubId: z.number(),
+                        athleteSlug: z.string().min(1).max(255),
+                    }))
+                    .query(async ({ ctx, input }) => {
+                        const { getClubHistoryAthlete } = await import("../db_club_history");
+                        try {
+                            const result = await getClubHistoryAthlete({
+                                userId: ctx.user.id,
+                                clubId: input.clubId,
+                                athleteSlug: input.athleteSlug,
+                            });
+                            if (!result) throw new TRPCError({ code: "NOT_FOUND" });
+                            return result;
+                        } catch (error) {
+                            if (error instanceof TRPCError) throw error;
+                            const message = error instanceof Error ? error.message : "Impossibile leggere dettaglio atleta";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "History not enabled for this club") {
+                                throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Storico non abilitato per questo club." });
+                            }
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+            }),
+
+            meets: router({
+                list: historyProcedure
+                    .input(z.object({
+                        clubId: z.number(),
+                        season: z.number().min(2000).max(2100).optional(),
+                        search: z.string().max(120).optional(),
+                        limit: z.number().min(1).max(100).optional(),
+                        offset: z.number().min(0).optional(),
+                    }))
+                    .query(async ({ ctx, input }) => {
+                        const { listClubHistoryMeets } = await import("../db_club_history");
+                        try {
+                            return await listClubHistoryMeets({
+                                userId: ctx.user.id,
+                                clubId: input.clubId,
+                                season: input.season,
+                                search: input.search,
+                                limit: input.limit,
+                                offset: input.offset,
+                            });
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile leggere storico meeting";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "History not enabled for this club") {
+                                throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Storico non abilitato per questo club." });
+                            }
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+
+                get: historyProcedure
+                    .input(z.object({
+                        clubId: z.number(),
+                        meetSlug: z.string().min(1).max(255),
+                    }))
+                    .query(async ({ ctx, input }) => {
+                        const { getClubHistoryMeet } = await import("../db_club_history");
+                        try {
+                            const result = await getClubHistoryMeet({
+                                userId: ctx.user.id,
+                                clubId: input.clubId,
+                                meetSlug: input.meetSlug,
+                            });
+                            if (!result) throw new TRPCError({ code: "NOT_FOUND" });
+                            return result;
+                        } catch (error) {
+                            if (error instanceof TRPCError) throw error;
+                            const message = error instanceof Error ? error.message : "Impossibile leggere dettaglio meeting";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "History not enabled for this club") {
+                                throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Storico non abilitato per questo club." });
+                            }
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+
+                results: historyProcedure
+                    .input(z.object({
+                        clubId: z.number(),
+                        meetSlug: z.string().min(1).max(255),
+                        searchAthlete: z.string().max(120).optional(),
+                        eventLabel: z.string().max(120).optional(),
+                        sort: z.enum(["time_asc", "time_desc", "points_desc", "athlete_asc"]).optional(),
+                    }))
+                    .query(async ({ ctx, input }) => {
+                        const { listClubHistoryMeetResults } = await import("../db_club_history");
+                        try {
+                            return await listClubHistoryMeetResults({
+                                userId: ctx.user.id,
+                                clubId: input.clubId,
+                                meetSlug: input.meetSlug,
+                                searchAthlete: input.searchAthlete,
+                                eventLabel: input.eventLabel,
+                                sort: input.sort,
+                            });
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile leggere risultati meeting";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "History not enabled for this club") {
+                                throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Storico non abilitato per questo club." });
+                            }
                             throw new TRPCError({ code: "BAD_REQUEST", message });
                         }
                     }),
