@@ -325,9 +325,10 @@ export default function ClubDetailEnhanced() {
 
   const club = clubQuery.data as any | undefined;
   const isMember = Boolean(club?.is_member);
+  const useDesktopHero = isDesktop && !isCoarsePointer;
   const contentOffset = stickyHeaderHeight > 0
-    ? stickyHeaderHeight + (isDesktop ? 14 : 6)
-    : (isDesktop ? 430 : 96);
+    ? stickyHeaderHeight + (useDesktopHero ? 14 : 6)
+    : (useDesktopHero ? 430 : 96);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -351,7 +352,7 @@ export default function ClubDetailEnhanced() {
   }, []);
 
   useEffect(() => {
-    const node = isDesktop ? desktopStickyRef.current : mobileStickyRef.current;
+    const node = useDesktopHero ? desktopStickyRef.current : mobileStickyRef.current;
     if (!node) return;
 
     const update = () => {
@@ -368,7 +369,7 @@ export default function ClubDetailEnhanced() {
       observer.disconnect();
       window.removeEventListener("resize", update);
     };
-  }, [isDesktop, isMember, club?.cover_image_url, club?.logo_url, club?.tagline, club?.website_url]);
+  }, [useDesktopHero, isMember, club?.cover_image_url, club?.logo_url, club?.tagline, club?.website_url]);
 
   if (!match || !Number.isFinite(clubId)) {
     return (
@@ -518,7 +519,7 @@ export default function ClubDetailEnhanced() {
         createPortal(
           <div className="pointer-events-none fixed left-0 right-0 top-16 z-30 lg:pl-[88px]">
             <div className="mx-auto max-w-[1520px] px-2 py-1.5 sm:p-3 md:p-5 lg:p-6">
-              {isDesktop ? (
+              {useDesktopHero ? (
                 <div
                   ref={desktopStickyRef}
                   className="pointer-events-auto grid grid-cols-[minmax(0,0.95fr)_minmax(0,1.55fr)_minmax(0,0.95fr)] items-start gap-3"
@@ -612,7 +613,7 @@ export default function ClubDetailEnhanced() {
           </div>
         )}
 
-        {!isDesktop && !isMobile && isMember ? (
+        {!useDesktopHero && !isMobile && isMember ? (
           <PulseBar
             stats={statsQuery.data as any}
             themeColor={club.theme_color ?? "cyan"}
@@ -625,7 +626,7 @@ export default function ClubDetailEnhanced() {
             <ClubFeedTab
               clubId={clubId}
               isMember={isMember}
-              afterComposerSlot={!isDesktop && !isMobile ? (
+              afterComposerSlot={!useDesktopHero && !isMobile ? (
                 <ClubEventsPanel items={agendaItems} variant="inlineFeed" />
               ) : undefined}
             />
