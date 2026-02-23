@@ -518,16 +518,13 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
                 <Surface className={isActivityPost ? "overflow-hidden" : undefined}>
                   {isActivityPost && (
                     <>
-                      <picture className="pointer-events-none !absolute inset-y-0 right-0 w-[66%] !z-0">
-                        <source media="(max-width: 767px)" srcSet="/images/activity-card-overlay-mobile.png" />
-                        <img
-                          src="/images/activity-card-overlay-desktop.png"
-                          alt=""
-                          aria-hidden="true"
-                          className="h-full w-full object-cover object-center opacity-[0.5] saturate-[1.08] contrast-[1.04]"
-                          loading="lazy"
-                        />
-                      </picture>
+                      <img
+                        src="/images/theme-v3/landing-tour-poster.png"
+                        alt=""
+                        aria-hidden="true"
+                        className="pointer-events-none !absolute inset-0 h-full w-full object-cover object-center !z-0 opacity-[0.32] saturate-[0.95] contrast-[1.04]"
+                        loading="lazy"
+                      />
                       <div className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(104deg,color-mix(in_oklch,var(--background)_86%,transparent)_0%,color-mix(in_oklch,var(--background)_72%,transparent)_46%,color-mix(in_oklch,var(--background)_50%,transparent)_100%)]" />
                       <div className="pointer-events-none !absolute inset-0 !z-0 bg-[radial-gradient(circle_at_18%_14%,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),transparent_40%),radial-gradient(circle_at_86%_12%,color-mix(in_oklch,var(--electric-lime)_14%,transparent),transparent_44%)]" />
                       <div className="pointer-events-none !absolute inset-[1px] rounded-[25px] !z-0 border border-white/10" />
