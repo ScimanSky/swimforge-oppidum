@@ -31,6 +31,16 @@ function parseIntEnv(name: string, fallback: number, options: { min?: number; ma
   return parsed;
 }
 
+function parseBoolEnv(name: string, fallback = false): boolean {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
+  const normalized = raw.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+  logger.warn(`[env] WARNING: ${name} is not a valid boolean, using fallback ${String(fallback)}`);
+  return fallback;
+}
+
 function normalizeOrigin(value: string): string | null {
   try {
     return new URL(value).origin;
@@ -82,6 +92,7 @@ export const ENV = {
   cloudinaryApiSecret: process.env.CLOUDINARY_API_SECRET ?? "",
   cloudinaryVideoCreditWarnPercent: parseIntEnv("CLOUDINARY_VIDEO_CREDIT_WARN_PERCENT", 80, { min: 1, max: 100 }),
   cloudinaryVideoCreditBlockPercent: parseIntEnv("CLOUDINARY_VIDEO_CREDIT_BLOCK_PERCENT", 95, { min: 1, max: 100 }),
+  clubMeetsV1Enabled: parseBoolEnv("CLUB_MEETS_V1_ENABLED", false),
   sessionMaxAgeDays,
   sessionMaxAgeMs: sessionMaxAgeDays * 24 * 60 * 60 * 1000,
 };

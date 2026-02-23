@@ -28,6 +28,7 @@ import ClubFeedTab from "@/components/club/ClubFeedTab";
 import ClubMembersTab from "@/components/club/ClubMembersTab";
 import EventMapEditor from "@/components/club/EventMapEditor";
 import { pointsToRouteGeojson, routeDistanceMeters, type RoutePoint } from "@/lib/club-event-map";
+import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
 
 async function geocodeLocation(query: string): Promise<{ lat: number; lng: number; displayName: string } | null> {
   const q = query.trim();
@@ -170,6 +171,7 @@ function DateTimePickerField({
 }
 
 export default function ClubDetailEnhanced() {
+  const clubMeetsV1Enabled = UI_FEATURE_FLAGS.clubMeetsV1;
   const [match, params] = useRoute("/community/club/:id");
   const clubId = Number(params?.id);
   const [eventsFromDateIso] = useState(() => new Date().toISOString());
@@ -230,7 +232,7 @@ export default function ClubDetailEnhanced() {
   );
   const meetsQuery = trpc.community.clubs.meets.list.useQuery(
     { clubId },
-    { enabled: match && Number.isFinite(clubId) && isMemberFromClubQuery }
+    { enabled: clubMeetsV1Enabled && match && Number.isFinite(clubId) && isMemberFromClubQuery }
   );
   const eventsQuery = trpc.community.clubs.events.list.useQuery(
     { clubId, status: "active", fromDate: eventsFromDateIso, limit: 8 },
@@ -562,7 +564,7 @@ export default function ClubDetailEnhanced() {
         ) : null}
 
         {/* Club Meets */}
-        {isMember ? (
+        {clubMeetsV1Enabled && isMember ? (
           <section className="surface-panel p-3 sm:p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
@@ -643,7 +645,7 @@ export default function ClubDetailEnhanced() {
           onPost={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           onOpenEvents={eventsPageHref ? () => { window.location.href = eventsPageHref; } : undefined}
           onCreateEvent={() => setCreateEventOpen(true)}
-          onCreateMeet={isStaff ? () => setCreateMeetOpen(true) : undefined}
+          onCreateMeet={clubMeetsV1Enabled && isStaff ? () => setCreateMeetOpen(true) : undefined}
           onInvite={() => setInviteOpen(true)}
         />
 
@@ -717,7 +719,7 @@ export default function ClubDetailEnhanced() {
         </Dialog>
 
         {/* Create Meet Dialog */}
-        <Dialog open={createMeetOpen} onOpenChange={setCreateMeetOpen}>
+        <Dialog open={clubMeetsV1Enabled ? createMeetOpen : false} onOpenChange={setCreateMeetOpen}>
           <DialogContent className={isMobile ? "w-[calc(100vw-0.75rem)] max-w-none max-h-[92dvh] overflow-y-auto p-4 pb-24" : "sm:max-w-2xl max-h-[90vh] overflow-y-auto"}>
             <DialogHeader>
               <DialogTitle>Nuova convocazione gara</DialogTitle>

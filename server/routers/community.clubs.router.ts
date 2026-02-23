@@ -61,6 +61,16 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
     isClubStaffRole,
   } = deps;
 
+  const meetsProcedure = protectedProcedure.use(async ({ next }) => {
+    if (!ENV.clubMeetsV1Enabled) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "La sezione gare del club è disattivata.",
+      });
+    }
+    return next();
+  });
+
   return router({
         list: protectedProcedure
             .input(z.object({
@@ -389,7 +399,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
 
         // CLUB MEETS (gare/convocazioni)
         meets: router({
-            list: protectedProcedure
+            list: meetsProcedure
                 .input(z.object({
                     clubId: z.number(),
                     season: z.number().min(2000).max(2100).optional(),
@@ -403,7 +413,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                     });
                 }),
 
-            get: protectedProcedure
+            get: meetsProcedure
                 .input(z.object({ meetId: z.number() }))
                 .query(async ({ ctx, input }) => {
                     const { getClubMeetDetail } = await import("../db_club_meets");
@@ -415,7 +425,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                     return detail;
                 }),
 
-            create: protectedProcedure
+            create: meetsProcedure
                 .input(z.object({
                     clubId: z.number(),
                     name: z.string().min(3).max(200),
@@ -448,7 +458,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                     }
                 }),
 
-            update: protectedProcedure
+            update: meetsProcedure
                 .input(z.object({
                     meetId: z.number(),
                     name: z.string().min(3).max(200).optional(),
@@ -482,7 +492,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                     }
                 }),
 
-            publish: protectedProcedure
+            publish: meetsProcedure
                 .input(z.object({ meetId: z.number() }))
                 .mutation(async ({ ctx, input }) => {
                     const { transitionClubMeetStatus, listMeetMemberRecipients } = await import("../db_club_meets");
@@ -515,7 +525,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                     }
                 }),
 
-            openEntries: protectedProcedure
+            openEntries: meetsProcedure
                 .input(z.object({ meetId: z.number() }))
                 .mutation(async ({ ctx, input }) => {
                     const { transitionClubMeetStatus, listMeetMemberRecipients } = await import("../db_club_meets");
@@ -548,7 +558,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                     }
                 }),
 
-            closeEntries: protectedProcedure
+            closeEntries: meetsProcedure
                 .input(z.object({ meetId: z.number() }))
                 .mutation(async ({ ctx, input }) => {
                     const { transitionClubMeetStatus } = await import("../db_club_meets");
@@ -568,7 +578,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                 }),
 
             events: router({
-                upsertBatch: protectedProcedure
+                upsertBatch: meetsProcedure
                     .input(z.object({
                         meetId: z.number(),
                         events: z.array(z.object({
@@ -605,7 +615,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
             }),
 
             entries: router({
-                list: protectedProcedure
+                list: meetsProcedure
                     .input(z.object({ meetId: z.number() }))
                     .query(async ({ ctx, input }) => {
                         const { listClubMeetEntries } = await import("../db_club_meets");
@@ -622,7 +632,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         }
                     }),
 
-                selfSet: protectedProcedure
+                selfSet: meetsProcedure
                     .input(z.object({
                         meetEventId: z.number(),
                         status: z.enum(["pending", "withdrawn"]),
@@ -646,7 +656,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         }
                     }),
 
-                staffSet: protectedProcedure
+                staffSet: meetsProcedure
                     .input(z.object({
                         entryId: z.number(),
                         status: z.enum(ENTRY_STATUS_VALUES),
@@ -670,7 +680,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
             }),
 
             results: router({
-                importCsv: protectedProcedure
+                importCsv: meetsProcedure
                     .input(z.object({
                         meetId: z.number(),
                         csvBase64: z.string().min(1),
@@ -708,7 +718,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         }
                     }),
 
-                importPdfManual: protectedProcedure
+                importPdfManual: meetsProcedure
                     .input(z.object({
                         meetId: z.number(),
                         rows: z.array(z.object({
@@ -745,7 +755,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         }
                     }),
 
-                list: protectedProcedure
+                list: meetsProcedure
                     .input(z.object({ meetId: z.number() }))
                     .query(async ({ ctx, input }) => {
                         const { listMeetResults } = await import("../db_club_meets");
@@ -764,7 +774,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
             }),
 
             stats: router({
-                get: protectedProcedure
+                get: meetsProcedure
                     .input(z.object({ meetId: z.number() }))
                     .query(async ({ ctx, input }) => {
                         const { getMeetStats } = await import("../db_club_meets");
@@ -783,7 +793,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
             }),
 
             communications: router({
-                whatsappLink: protectedProcedure
+                whatsappLink: meetsProcedure
                     .input(z.object({
                         meetId: z.number(),
                         audience: z.enum(["all", "entered", "staff"]),

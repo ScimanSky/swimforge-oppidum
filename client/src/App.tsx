@@ -14,6 +14,7 @@ import AutoSync from "./components/AutoSync";
 import ActivityInsightNotification from "./components/ActivityInsightNotification";
 import CookieBanner from "./components/CookieBanner";
 import OnboardingFlow from "./components/onboarding/OnboardingFlow";
+import { UI_FEATURE_FLAGS } from "./lib/feature-flags";
 
 const Home = lazy(() => import("./pages/Home"));
 const Badges = lazy(() => import("./pages/Badges"));
@@ -50,6 +51,8 @@ const Terms = lazy(() => import("./pages/Terms"));
 const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 
 function Router() {
+  const clubMeetsV1Enabled = UI_FEATURE_FLAGS.clubMeetsV1;
+
   return (
     <Suspense fallback={<div className="flex items-center justify-center h-screen"><Spinner /></div>}>
     <Switch>
@@ -118,7 +121,9 @@ function Router() {
       <Route path="/season" component={SeasonPage} />
       <Route path="/community/invite/:code" component={ClubInvite} />
       <Route path="/community/club/:clubId/event/:eventId" component={ClubEventDetail} />
-      <Route path="/community/club/:clubId/meet/:meetId" component={ClubMeetDetail} />
+      {clubMeetsV1Enabled ? (
+        <Route path="/community/club/:clubId/meet/:meetId" component={ClubMeetDetail} />
+      ) : null}
       <Route path="/community/club/:id" component={ClubDetail} />
       <Route path="/home/community" component={Community} />
       <Route path="/community">

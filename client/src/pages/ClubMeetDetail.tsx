@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { trpc } from "@/lib/trpc";
+import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, Plus, Trash2, MessageCircle } from "lucide-react";
 
@@ -66,6 +67,7 @@ function fileToBase64(file: File) {
 }
 
 export default function ClubMeetDetail() {
+  const clubMeetsV1Enabled = UI_FEATURE_FLAGS.clubMeetsV1;
   const [match, params] = useRoute("/community/club/:clubId/meet/:meetId");
   const clubId = Number(params?.clubId);
   const meetId = Number(params?.meetId);
@@ -216,6 +218,18 @@ export default function ClubMeetDetail() {
 
   if (!match || !Number.isFinite(meetId) || !Number.isFinite(clubId)) {
     return null;
+  }
+
+  if (!clubMeetsV1Enabled) {
+    return (
+      <AppLayout>
+        <div className="container py-6">
+          <div className="surface-panel p-6 text-center text-muted-foreground">
+            Sezione gare disattivata.
+          </div>
+        </div>
+      </AppLayout>
+    );
   }
 
   if (meetQuery.isLoading) {
