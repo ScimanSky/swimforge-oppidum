@@ -112,8 +112,13 @@ export const authRouter = router({
     }),
 
     heartbeat: protectedProcedure.mutation(async ({ ctx }) => {
-        await touchUserPresence(ctx.user.id);
-        return { ok: true } as const;
+        try {
+            await touchUserPresence(ctx.user.id);
+            return { ok: true } as const;
+        } catch {
+            // Presence is best-effort in production; never fail the client request.
+            return { ok: false } as const;
+        }
     }),
 
     // Sync Supabase OAuth user

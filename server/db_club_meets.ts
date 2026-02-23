@@ -243,33 +243,38 @@ export async function listClubMeets(params: {
   }
 
   const meets = await db
-    .select({
-      meet: clubMeets,
-      eventsCount: sql<number>`(
-        SELECT COUNT(*)::int
-        FROM ${clubMeetEvents} e
-        WHERE e.meet_id = ${clubMeets.id}
-      )`,
-      entriesCount: sql<number>`(
-        SELECT COUNT(*)::int
-        FROM ${clubMeetEntries} ce
-        JOIN ${clubMeetEvents} e ON e.id = ce.meet_event_id
-        WHERE e.meet_id = ${clubMeets.id}
-      )`,
-      resultsCount: sql<number>`(
-        SELECT COUNT(*)::int
-        FROM ${clubMeetResults} r
-        WHERE r.meet_id = ${clubMeets.id}
-      )`,
-    })
+    .select()
     .from(clubMeets)
     .where(and(...filters))
     .orderBy(desc(clubMeets.startDate));
 
+  const enrichedMeets = await Promise.all(
+    meets.map(async (meet) => {
+      const countsResult = await db.execute(sql`
+        SELECT
+          (SELECT COUNT(*)::int FROM club_meet_events e WHERE e.meet_id = ${meet.id}) AS events_count,
+          (SELECT COUNT(*)::int FROM club_meet_entries ce JOIN club_meet_events e ON e.id = ce.meet_event_id WHERE e.meet_id = ${meet.id}) AS entries_count,
+          (SELECT COUNT(*)::int FROM club_meet_results r WHERE r.meet_id = ${meet.id}) AS results_count
+      `);
+      const counts = (countsResult.rows?.[0] ?? {}) as {
+        events_count?: number | string;
+        entries_count?: number | string;
+        results_count?: number | string;
+      };
+
+      return {
+        meet,
+        eventsCount: Number(counts?.events_count ?? 0),
+        entriesCount: Number(counts?.entries_count ?? 0),
+        resultsCount: Number(counts?.results_count ?? 0),
+      };
+    }),
+  );
+
   return {
     role,
     isStaff: isStaffRole(role.role),
-    meets,
+    meets: enrichedMeets,
   };
 }
 

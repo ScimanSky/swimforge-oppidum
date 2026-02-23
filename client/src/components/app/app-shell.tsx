@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
 import { Link, useLocation } from "wouter"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import {
@@ -438,6 +438,8 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 120_000 })
   const reduceMotion = useReducedMotion()
   const isAdmin = meQuery.data?.role === "admin"
+  const heartbeatPendingRef = useRef(false)
+  const heartbeatLastSentAtRef = useRef(0)
 
   const pageTitle = useMemo(() => (isAdminRoute ? adminTitleForPath(path) : athleteTitleForPath(path)), [isAdminRoute, path])
   const showHeaderStories = Boolean(headerSlot) && !isAdminRoute
@@ -460,7 +462,16 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
 
     const sendHeartbeat = () => {
       if (document.visibilityState !== "visible") return
+      if (!meQuery.data?.id) return
+      if (heartbeatPendingRef.current) return
+      const now = Date.now()
+      if (now - heartbeatLastSentAtRef.current < 10_000) return
+      heartbeatPendingRef.current = true
+      heartbeatLastSentAtRef.current = now
       heartbeatMutation.mutate(undefined, {
+        onSettled: () => {
+          heartbeatPendingRef.current = false
+        },
         onError: () => {
           // Presence updates are best-effort.
         },
@@ -478,7 +489,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
       document.removeEventListener("visibilitychange", onVisibilityOrFocus)
       window.removeEventListener("focus", onVisibilityOrFocus)
     }
-  }, [heartbeatMutation.mutate])
+  }, [heartbeatMutation.mutate, meQuery.data?.id])
 
   useEffect(() => {
     setMobileCreateMenuOpen(false)
