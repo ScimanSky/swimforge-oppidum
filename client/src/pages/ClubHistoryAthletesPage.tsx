@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import HistoryMetricCircle from "@/components/club/HistoryMetricCircle";
 import { trpc } from "@/lib/trpc";
 import { ArrowLeft, Database, Users } from "lucide-react";
 
@@ -265,7 +266,7 @@ export default function ClubHistoryAthletesPage() {
                         key={row.id}
                         className={`relative overflow-hidden rounded-xl border bg-card/30 px-3 py-2 ${
                           hasRecord
-                            ? "border-amber-300/70 shadow-[0_0_0_1px_rgba(252,211,77,0.35),0_0_22px_rgba(251,191,36,0.22)] animate-pulse"
+                            ? "border-amber-300/70 shadow-[0_0_0_1px_rgba(252,211,77,0.35),0_0_22px_rgba(251,191,36,0.22)]"
                             : "border-border/60"
                         }`}
                       >
@@ -281,15 +282,25 @@ export default function ClubHistoryAthletesPage() {
                         <div className="relative z-10">
                           <div className="flex flex-wrap items-center gap-2">
                             <p className="text-sm font-semibold break-words">{row.meet_name}</p>
-                            {hasRecord ? (
-                              <span className="inline-flex h-5 items-center rounded-full border border-amber-300/80 bg-amber-400/20 px-2 text-[10px] font-semibold uppercase tracking-wide text-amber-200 animate-pulse">
-                                Record
-                              </span>
-                            ) : null}
                           </div>
                           <p className="text-xs text-muted-foreground break-words">
-                            {formatDate(row.meet_date)} • {row.event_label} • Tempo: {formatTime(row.final_time_raw)} • Punti: {formatPoints(row.points)}
+                            {formatDate(row.meet_date)} • {row.event_label}
                           </p>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <HistoryMetricCircle
+                              label="Tempo"
+                              value={formatTime(row.final_time_raw)}
+                            />
+                            <HistoryMetricCircle
+                              label="Record"
+                              value={hasRecord ? String(row.record_raw) : "-"}
+                              highlight={hasRecord}
+                            />
+                            <HistoryMetricCircle
+                              label="Punti"
+                              value={formatPoints(row.points)}
+                            />
+                          </div>
                           {row.record_raw || row.notes ? (
                             <p className="mt-1 text-xs text-muted-foreground break-words">
                               {row.record_raw ? `Record: ${row.record_raw}` : ""}
