@@ -155,6 +155,18 @@ export default function ClubHistoryMeetsPage() {
     }
   };
 
+  const jumpToList = () => {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      window.requestAnimationFrame(() => {
+        document.getElementById("history-meet-list")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
+    }
+  };
+
   return (
     <AppLayout>
       <div className="compact-shell mx-auto max-w-6xl space-y-4 px-3 pb-24 sm:px-4">
@@ -172,8 +184,8 @@ export default function ClubHistoryMeetsPage() {
                 <Badge variant="outline">{totalMeets} meeting</Badge>
               </div>
             </div>
-            <Link href={`/community/club/${clubId}/history/athletes`}>
-              <Button variant="outline-neon" size="sm">Vai a Storico Atleti</Button>
+            <Link href={`/community/club/${clubId}/history/athletes`} className="w-full sm:w-auto">
+              <Button className="w-full sm:w-auto" variant="outline-neon" size="sm">Vai a Storico Atleti</Button>
             </Link>
           </div>
         </section>
@@ -201,11 +213,12 @@ export default function ClubHistoryMeetsPage() {
         </section>
 
         <div className="grid gap-4 lg:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.5fr)]">
-          <section className="surface-panel p-3 sm:p-4 space-y-2">
+          <section id="history-meet-list" className="surface-panel scroll-mt-24 p-3 sm:scroll-mt-32 sm:p-4 space-y-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1"><Trophy className="h-3.5 w-3.5" /> Meeting</span>
               <span>{(meetsQuery.data as any)?.total ?? meets.length}</span>
             </div>
+            <p className="text-[11px] text-muted-foreground lg:hidden">Tocca un meeting per aprire i risultati.</p>
             {meetsQuery.isLoading ? (
               <p className="text-sm text-muted-foreground">Caricamento meeting...</p>
             ) : meets.length === 0 ? (
@@ -237,7 +250,7 @@ export default function ClubHistoryMeetsPage() {
             )}
           </section>
 
-          <section id="history-meet-detail" className="surface-panel p-3 sm:p-4 space-y-3">
+          <section id="history-meet-detail" className="surface-panel scroll-mt-24 p-3 sm:scroll-mt-32 sm:p-4 space-y-3">
             {!selectedMeetSlug ? (
               <p className="text-sm text-muted-foreground">Seleziona un meeting.</p>
             ) : (
@@ -247,11 +260,16 @@ export default function ClubHistoryMeetsPage() {
                     <h2 className="text-lg font-semibold">{meetDetail?.meet?.meetName ?? "Meeting"}</h2>
                     <p className="text-xs text-muted-foreground">Data: {formatDate(meetDetail?.meet?.meetDate)}</p>
                   </div>
-                  {meetDetail?.stats ? (
-                    <Badge variant="outline">
-                      {Number(meetDetail.stats.resultsCount ?? 0)} risultati • {Number(meetDetail.stats.athletesCount ?? 0)} atleti
-                    </Badge>
-                  ) : null}
+                  <div className="flex items-center gap-2">
+                    {meetDetail?.stats ? (
+                      <Badge variant="outline">
+                        {Number(meetDetail.stats.resultsCount ?? 0)} risultati • {Number(meetDetail.stats.athletesCount ?? 0)} atleti
+                      </Badge>
+                    ) : null}
+                    <Button type="button" variant="outline-neon" size="sm" className="lg:hidden" onClick={jumpToList}>
+                      Torna all'elenco
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="grid gap-2 md:grid-cols-3">
@@ -286,12 +304,12 @@ export default function ClubHistoryMeetsPage() {
                   ) : (
                     results.map((row: any) => (
                       <div key={row.id} className="rounded-xl border border-border/60 bg-card/30 px-3 py-2">
-                        <p className="text-sm font-semibold">{row.athlete_name} • {row.event_label}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-sm font-semibold break-words">{row.athlete_name} • {row.event_label}</p>
+                        <p className="text-xs text-muted-foreground break-words">
                           Tempo: {formatTime(row.final_time_raw)} • Punti: {formatPoints(row.points)}
                         </p>
                         {row.record_raw || row.notes ? (
-                          <p className="mt-1 text-xs text-muted-foreground">
+                          <p className="mt-1 text-xs text-muted-foreground break-words">
                             {row.record_raw ? `Record: ${row.record_raw}` : ""}
                             {row.record_raw && row.notes ? " • " : ""}
                             {row.notes ? `Note: ${row.notes}` : ""}

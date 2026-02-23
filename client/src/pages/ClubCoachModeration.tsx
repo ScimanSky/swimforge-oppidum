@@ -164,8 +164,8 @@ function InviteRow({ invite }: { invite: any }) {
   const link = `${origin}/community/invite/${invite.code}`;
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/35 p-2 text-sm">
-      <code className="flex-1 truncate text-xs text-muted-foreground">{link}</code>
+    <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-card/35 p-2 text-sm">
+      <code className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{link}</code>
       <span className="text-xs text-muted-foreground">
         {invite.usedCount}/{invite.maxUses}
       </span>
@@ -411,6 +411,7 @@ export default function ClubCoachModeration() {
               <Textarea rows={3} value={meetForm.notes} onChange={(e) => setMeetForm((p) => ({ ...p, notes: e.target.value }))} />
             </div>
             <Button
+              className="w-full sm:w-auto"
               variant="neon"
               disabled={createMeetMutation.isPending}
               onClick={() => {
@@ -471,14 +472,15 @@ export default function ClubCoachModeration() {
                 <Database className="h-4 w-4 text-primary" />
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Storico Oppidum</h2>
               </div>
-              <div className="flex items-center gap-2">
-                <Link href={`/community/club/${clubId}/history/athletes`}>
-                  <Button variant="outline-neon" size="sm">Storico Atleti</Button>
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                <Link href={`/community/club/${clubId}/history/athletes`} className="w-full sm:w-auto">
+                  <Button className="w-full sm:w-auto" variant="outline-neon" size="sm">Storico Atleti</Button>
                 </Link>
-                <Link href={`/community/club/${clubId}/history/meets`}>
-                  <Button variant="outline-neon" size="sm">Storico Meeting</Button>
+                <Link href={`/community/club/${clubId}/history/meets`} className="w-full sm:w-auto">
+                  <Button className="w-full sm:w-auto" variant="outline-neon" size="sm">Storico Meeting</Button>
                 </Link>
                 <Button
+                  className="w-full sm:w-auto"
                   variant="neon"
                   size="sm"
                   disabled={startHistoryImportMutation.isPending}
@@ -560,6 +562,7 @@ export default function ClubCoachModeration() {
             <Input type="number" value={eventForm.maxAttendees} onChange={(e) => setEventForm((p) => ({ ...p, maxAttendees: e.target.value }))} />
           </div>
           <Button
+            className="w-full sm:w-auto"
             variant="neon"
             disabled={createEventMutation.isPending}
             onClick={() => {
@@ -591,6 +594,7 @@ export default function ClubCoachModeration() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Inviti Club</h2>
           </div>
           <Button
+            className="w-full sm:w-auto"
             variant="neon"
             disabled={createInviteMutation.isPending}
             onClick={() => createInviteMutation.mutate({ clubId, maxUses: 10 })}
