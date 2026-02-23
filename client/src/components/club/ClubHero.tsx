@@ -55,6 +55,7 @@ export default function ClubHero({
 }: ClubHeroProps) {
   const color = themeColorMap[club.theme_color ?? "cyan"] ?? themeColorMap.cyan;
   const isStaff = ["owner", "admin", "moderator"].includes(club.member_role ?? "");
+  const gareHref = meetsPageHref ?? eventsPageHref ?? null;
 
   if (variant === "compactSticky") {
     return (
@@ -237,6 +238,20 @@ export default function ClubHero({
               {club.member_role}
             </Badge>
           )}
+        </div>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {gareHref ? (
+            <Link href={gareHref}>
+              <Button
+                className={`${hasActiveMeet ? "animate-pulse border-amber-400 text-amber-300 shadow-[0_0_16px_rgba(251,191,36,0.45)]" : ""}`}
+                variant="outline-neon"
+                size="sm"
+              >
+                <Trophy className="mr-1.5 h-3.5 w-3.5" />
+                Gare
+              </Button>
+            </Link>
+          ) : null}
         </div>
         {club.website_url ? (
           <a

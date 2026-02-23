@@ -9,7 +9,6 @@ interface QuickActionsFABProps {
   isMember: boolean;
   isStaff: boolean;
   onPost: () => void;
-  onOpenEvents?: () => void;
   onCreateEvent: () => void;
   onCreateMeet?: () => void;
   onInvite: () => void;
@@ -19,7 +18,6 @@ export default function QuickActionsFAB({
   isMember,
   isStaff,
   onPost,
-  onOpenEvents,
   onCreateEvent,
   onCreateMeet,
   onInvite,
@@ -37,7 +35,6 @@ export default function QuickActionsFAB({
 
   const actions = [
     { icon: PenSquare, label: "Posta", onClick: onPost, show: true },
-    { icon: Calendar, label: "Eventi", onClick: onOpenEvents ?? (() => {}), show: Boolean(onOpenEvents) },
     { icon: Calendar, label: "Nuova convocazione", onClick: onCreateMeet ?? (() => {}), show: isStaff && Boolean(onCreateMeet) },
     { icon: Calendar, label: isStaff ? "Nuovo evento" : "Nuovo evento (1/g)", onClick: onCreateEvent, show: true },
     { icon: UserPlus, label: "Invita", onClick: onInvite, show: isStaff },
