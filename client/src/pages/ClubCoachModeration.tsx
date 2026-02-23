@@ -7,10 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { trpc } from "@/lib/trpc";
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
 import { toast } from "sonner";
-import { ArrowLeft, Check, Copy, Database, Flag, Plus, RefreshCw, Shield, Users } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, Check, Copy, Database, Flag, Plus, RefreshCw, Shield, Users } from "lucide-react";
 
 type MeetForm = {
   name: string;
@@ -36,6 +38,111 @@ function parseDateTimeLocal(value: string) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed;
+}
+
+function pad2(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function toDateTimeLocalString(date: Date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}T${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
+function DateTimePickerField({
+  label,
+  value,
+  onChange,
+  required = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  required?: boolean;
+}) {
+  const selected = parseDateTimeLocal(value);
+  const [open, setOpen] = useState(false);
+  const timeInputId = `coach-meet-time-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+
+  const applyDate = (nextDate: Date | undefined) => {
+    if (!nextDate) return;
+    const base = selected ?? new Date();
+    const merged = new Date(nextDate);
+    merged.setHours(base.getHours(), base.getMinutes(), 0, 0);
+    onChange(toDateTimeLocalString(merged));
+  };
+
+  const applyTime = (time: string) => {
+    const [hh, mm] = time.split(":").map((part) => Number(part));
+    if (!Number.isFinite(hh) || !Number.isFinite(mm)) return;
+    const base = selected ?? new Date();
+    const next = new Date(base);
+    next.setHours(hh, mm, 0, 0);
+    onChange(toDateTimeLocalString(next));
+  };
+
+  const formattedLabel = selected
+    ? selected.toLocaleString("it-IT", {
+        weekday: "short",
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "Seleziona data e ora";
+
+  return (
+    <div className="space-y-1">
+      <Label>
+        {label}
+        {required ? " *" : ""}
+      </Label>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button type="button" variant="outline-neon" className="w-full justify-start font-normal">
+            <CalendarIcon className="mr-2 h-4 w-4" />
+            <span className="truncate">{formattedLabel}</span>
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-3" align="start">
+          <div className="space-y-3">
+            <Calendar
+              mode="single"
+              selected={selected ?? undefined}
+              onSelect={applyDate}
+              initialFocus
+            />
+            <div className="space-y-1">
+              <Label htmlFor={timeInputId}>Ora</Label>
+              <Input
+                id={timeInputId}
+                type="time"
+                value={selected ? `${pad2(selected.getHours())}:${pad2(selected.getMinutes())}` : "09:00"}
+                onChange={(e) => applyTime(e.target.value)}
+              />
+            </div>
+            <div className="flex justify-between gap-2">
+              {!required ? (
+                <Button
+                  type="button"
+                  variant="outline-neon"
+                  size="sm"
+                  onClick={() => onChange("")}
+                >
+                  Rimuovi
+                </Button>
+              ) : (
+                <span />
+              )}
+              <Button type="button" variant="neon" size="sm" onClick={() => setOpen(false)}>
+                Conferma
+              </Button>
+            </div>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
 }
 
 function formatDate(value?: string | Date | null) {
@@ -280,22 +387,24 @@ export default function ClubCoachModeration() {
               </div>
             </div>
             <div className="grid gap-2 md:grid-cols-3">
-              <div>
-                <Label>Inizio *</Label>
-                <Input type="datetime-local" value={meetForm.startDate} onChange={(e) => setMeetForm((p) => ({ ...p, startDate: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Fine *</Label>
-                <Input type="datetime-local" value={meetForm.endDate} onChange={(e) => setMeetForm((p) => ({ ...p, endDate: e.target.value }))} />
-              </div>
-              <div>
-                <Label>Deadline iscrizioni *</Label>
-                <Input
-                  type="datetime-local"
-                  value={meetForm.registrationDeadline}
-                  onChange={(e) => setMeetForm((p) => ({ ...p, registrationDeadline: e.target.value }))}
-                />
-              </div>
+              <DateTimePickerField
+                label="Inizio"
+                required
+                value={meetForm.startDate}
+                onChange={(next) => setMeetForm((p) => ({ ...p, startDate: next }))}
+              />
+              <DateTimePickerField
+                label="Fine"
+                required
+                value={meetForm.endDate}
+                onChange={(next) => setMeetForm((p) => ({ ...p, endDate: next }))}
+              />
+              <DateTimePickerField
+                label="Deadline iscrizioni"
+                required
+                value={meetForm.registrationDeadline}
+                onChange={(next) => setMeetForm((p) => ({ ...p, registrationDeadline: next }))}
+              />
             </div>
             <div>
               <Label>Note</Label>
