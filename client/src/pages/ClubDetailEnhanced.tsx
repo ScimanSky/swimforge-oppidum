@@ -634,6 +634,21 @@ export default function ClubDetailEnhanced() {
           </section>
         ) : null}
 
+        {isMember ? (
+          <section className="surface-panel p-3 sm:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-display uppercase tracking-wide text-muted-foreground">Azioni rapide</p>
+                <p className="mt-1 text-sm text-muted-foreground">Crea un nuovo evento del club.</p>
+              </div>
+              <Button variant="outline-neon" size="sm" onClick={() => setCreateEventOpen(true)}>
+                <CalendarIcon className="mr-1.5 h-4 w-4" />
+                Crea evento
+              </Button>
+            </div>
+          </section>
+        ) : null}
+
         {/* Feed */}
         {isMember && (
             <ClubFeedTab
@@ -651,7 +666,7 @@ export default function ClubDetailEnhanced() {
           isStaff={isStaff}
           onPost={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           onOpenEvents={firstAgendaHref ? () => { window.location.href = firstAgendaHref; } : undefined}
-          onCreateEvent={isStaff ? () => { window.location.href = coachAreaHref; } : () => setCreateEventOpen(true)}
+          onCreateEvent={() => setCreateEventOpen(true)}
           onCreateMeet={clubMeetsV1Enabled && isStaff ? () => { window.location.href = coachAreaHref; } : undefined}
           onInvite={isStaff ? () => { window.location.href = coachAreaHref; } : () => {}}
         />
