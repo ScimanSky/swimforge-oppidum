@@ -112,8 +112,12 @@ export default function ClubMeetDetail() {
   );
 
   const publishMutation = trpc.community.clubs.meets.publish.useMutation({
-    onSuccess: () => {
-      toast.success("Convocazione pubblicata");
+    onSuccess: (result: any) => {
+      if (result?.changed === false) {
+        toast.info("Convocazione già pubblicata");
+      } else {
+        toast.success("Convocazione pubblicata");
+      }
       void Promise.all([
         utils.community.clubs.meets.get.invalidate({ meetId }),
         utils.community.clubs.meets.list.invalidate({ clubId }),
@@ -123,8 +127,12 @@ export default function ClubMeetDetail() {
   });
 
   const openEntriesMutation = trpc.community.clubs.meets.openEntries.useMutation({
-    onSuccess: () => {
-      toast.success("Iscrizioni aperte");
+    onSuccess: (result: any) => {
+      if (result?.changed === false) {
+        toast.info("Iscrizioni già aperte");
+      } else {
+        toast.success("Iscrizioni aperte");
+      }
       void Promise.all([
         utils.community.clubs.meets.get.invalidate({ meetId }),
         utils.community.clubs.meets.list.invalidate({ clubId }),
@@ -134,8 +142,12 @@ export default function ClubMeetDetail() {
   });
 
   const closeEntriesMutation = trpc.community.clubs.meets.closeEntries.useMutation({
-    onSuccess: () => {
-      toast.success("Iscrizioni chiuse");
+    onSuccess: (result: any) => {
+      if (result?.changed === false) {
+        toast.info("Iscrizioni già chiuse");
+      } else {
+        toast.success("Iscrizioni chiuse");
+      }
       void Promise.all([
         utils.community.clubs.meets.get.invalidate({ meetId }),
         utils.community.clubs.meets.list.invalidate({ clubId }),
@@ -197,6 +209,11 @@ export default function ClubMeetDetail() {
   const meetPayload = meetQuery.data as any;
   const meet = meetPayload?.meet;
   const isStaff = Boolean(meetPayload?.isStaff);
+  const meetStatus = String(meet?.status ?? "draft");
+  const statusMutationPending = publishMutation.isPending || openEntriesMutation.isPending || closeEntriesMutation.isPending;
+  const canPublish = meetStatus === "draft";
+  const canOpenEntries = meetStatus === "published" || meetStatus === "closed";
+  const canCloseEntries = meetStatus === "open";
 
   const entriesPayload = entriesQuery.data as any;
   const events = (entriesPayload?.events as any[]) ?? (meetPayload?.events as any[]) ?? [];
@@ -278,13 +295,28 @@ export default function ClubMeetDetail() {
           <section className="surface-panel p-3 space-y-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Controlli staff</h2>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline-neon" size="sm" onClick={() => publishMutation.mutate({ meetId })} disabled={publishMutation.isPending}>
+              <Button
+                variant="outline-neon"
+                size="sm"
+                onClick={() => publishMutation.mutate({ meetId })}
+                disabled={!canPublish || statusMutationPending}
+              >
                 Pubblica
               </Button>
-              <Button variant="outline-neon" size="sm" onClick={() => openEntriesMutation.mutate({ meetId })} disabled={openEntriesMutation.isPending}>
+              <Button
+                variant="outline-neon"
+                size="sm"
+                onClick={() => openEntriesMutation.mutate({ meetId })}
+                disabled={!canOpenEntries || statusMutationPending}
+              >
                 Apri iscrizioni
               </Button>
-              <Button variant="outline-neon" size="sm" onClick={() => closeEntriesMutation.mutate({ meetId })} disabled={closeEntriesMutation.isPending}>
+              <Button
+                variant="outline-neon"
+                size="sm"
+                onClick={() => closeEntriesMutation.mutate({ meetId })}
+                disabled={!canCloseEntries || statusMutationPending}
+              >
                 Chiudi iscrizioni
               </Button>
               <Button

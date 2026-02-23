@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lte, ne, sql } from "drizzle-orm";
 import {
   clubMeets,
   clubMeetEvents,
@@ -318,13 +318,36 @@ export async function createClubMeet(params: {
   if (!role || role.status !== "active" || !isStaffRole(role.role)) throw new Error("Forbidden");
 
   const db = await requireDb();
+  const normalizedName = params.name.trim();
+  const normalizedVenue = params.venue?.trim() ?? "";
+
+  const [duplicate] = await db
+    .select()
+    .from(clubMeets)
+    .where(
+      and(
+        eq(clubMeets.clubId, params.clubId),
+        sql`lower(${clubMeets.name}) = lower(${normalizedName})`,
+        sql`coalesce(trim(${clubMeets.venue}), '') = ${normalizedVenue}`,
+        eq(clubMeets.startDate, params.startDate),
+        eq(clubMeets.endDate, params.endDate),
+        eq(clubMeets.registrationDeadline, params.registrationDeadline),
+        ne(clubMeets.status, "cancelled"),
+      ),
+    )
+    .limit(1);
+
+  if (duplicate) {
+    throw new Error("Duplicate meet");
+  }
+
   const [meet] = await db
     .insert(clubMeets)
     .values({
       clubId: params.clubId,
       createdBy: params.actorId,
-      name: params.name,
-      venue: params.venue ?? null,
+      name: normalizedName,
+      venue: normalizedVenue || null,
       startDate: params.startDate,
       endDate: params.endDate,
       registrationDeadline: params.registrationDeadline,
@@ -386,6 +409,10 @@ export async function transitionClubMeetStatus(params: {
   const role = await getClubRole(params.actorId, meet.clubId);
   if (!role || role.status !== "active" || !isStaffRole(role.role)) throw new Error("Forbidden");
 
+  if (meet.status === params.status) {
+    return { meet, changed: false as const };
+  }
+
   const now = new Date();
   const patch: Partial<typeof clubMeets.$inferInsert> = {
     status: params.status,
@@ -402,10 +429,16 @@ export async function transitionClubMeetStatus(params: {
   const [updated] = await db
     .update(clubMeets)
     .set(patch)
-    .where(eq(clubMeets.id, params.meetId))
+    .where(and(eq(clubMeets.id, params.meetId), ne(clubMeets.status, params.status)))
     .returning();
 
-  return updated;
+  if (updated) {
+    return { meet: updated, changed: true as const };
+  }
+
+  // Race-safe fallback: in case another request changed status first, do not fail or re-notify.
+  const latest = await getClubMeetById(params.meetId);
+  return { meet: latest ?? meet, changed: false as const };
 }
 
 export async function upsertClubMeetEvents(params: {

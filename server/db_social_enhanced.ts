@@ -67,7 +67,37 @@ export async function createClubEvent(params: {
   weatherFetchedAt?: Date
 }) {
   const db = await requireDb()
-  const [event] = await db.insert(clubEvents).values(params).returning()
+  const normalizedTitle = params.title.trim()
+  const normalizedLocation = params.location?.trim() ?? ""
+
+  const [duplicate] = await db
+    .select({ id: clubEvents.id })
+    .from(clubEvents)
+    .where(
+      and(
+        eq(clubEvents.clubId, params.clubId),
+        sql`lower(${clubEvents.title}) = lower(${normalizedTitle})`,
+        eq(clubEvents.eventType, params.eventType),
+        sql`coalesce(trim(${clubEvents.location}), '') = ${normalizedLocation}`,
+        eq(clubEvents.startTime, params.startTime),
+        sql`coalesce(${clubEvents.endTime}, '1970-01-01'::timestamp) = coalesce(${params.endTime ?? null}, '1970-01-01'::timestamp)`,
+        sql`${clubEvents.status} <> 'cancelled'`,
+      )
+    )
+    .limit(1)
+
+  if (duplicate) {
+    throw new Error("Duplicate club event")
+  }
+
+  const [event] = await db
+    .insert(clubEvents)
+    .values({
+      ...params,
+      title: normalizedTitle,
+      location: normalizedLocation || undefined,
+    })
+    .returning()
   return event
 }
 

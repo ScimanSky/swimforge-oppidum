@@ -466,6 +466,12 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                     } catch (error) {
                         const message = error instanceof Error ? error.message : "Impossibile creare convocazione";
                         if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                        if (message === "Duplicate meet") {
+                            throw new TRPCError({
+                                code: "CONFLICT",
+                                message: "Esiste già una convocazione identica per questo club.",
+                            });
+                        }
                         throw new TRPCError({ code: "BAD_REQUEST", message });
                     }
                 }),
@@ -510,25 +516,27 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                     const { transitionClubMeetStatus, listMeetMemberRecipients } = await import("../db_club_meets");
                     const { createNotification } = await import("../db_social_enhanced");
                     try {
-                        const meet = await transitionClubMeetStatus({
+                        const { meet, changed } = await transitionClubMeetStatus({
                             actorId: ctx.user.id,
                             meetId: input.meetId,
                             status: "published",
                         });
-                        const recipients = await listMeetMemberRecipients({ meetId: input.meetId, audience: "all" });
-                        await Promise.allSettled(
-                            recipients.map((recipient) =>
-                                createNotification({
-                                    userId: recipient.userId,
-                                    type: "meet_published",
-                                    title: "Nuova convocazione gara",
-                                    message: `Il meeting \"${meet.name}\" è stato pubblicato.`,
-                                    link: `/community/club/${meet.clubId}/meet/${meet.id}`,
-                                    referenceId: meet.id,
-                                }),
-                            ),
-                        );
-                        return { success: true, meet };
+                        if (changed) {
+                            const recipients = await listMeetMemberRecipients({ meetId: input.meetId, audience: "all" });
+                            await Promise.allSettled(
+                                recipients.map((recipient) =>
+                                    createNotification({
+                                        userId: recipient.userId,
+                                        type: "meet_published",
+                                        title: "Nuova convocazione gara",
+                                        message: `Il meeting \"${meet.name}\" è stato pubblicato.`,
+                                        link: `/community/club/${meet.clubId}/meet/${meet.id}`,
+                                        referenceId: meet.id,
+                                    }),
+                                ),
+                            );
+                        }
+                        return { success: true, meet, changed };
                     } catch (error) {
                         const message = error instanceof Error ? error.message : "Impossibile pubblicare convocazione";
                         if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
@@ -543,25 +551,27 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                     const { transitionClubMeetStatus, listMeetMemberRecipients } = await import("../db_club_meets");
                     const { createNotification } = await import("../db_social_enhanced");
                     try {
-                        const meet = await transitionClubMeetStatus({
+                        const { meet, changed } = await transitionClubMeetStatus({
                             actorId: ctx.user.id,
                             meetId: input.meetId,
                             status: "open",
                         });
-                        const recipients = await listMeetMemberRecipients({ meetId: input.meetId, audience: "all" });
-                        await Promise.allSettled(
-                            recipients.map((recipient) =>
-                                createNotification({
-                                    userId: recipient.userId,
-                                    type: "meet_entries_open",
-                                    title: "Iscrizioni aperte",
-                                    message: `Le iscrizioni per \"${meet.name}\" sono aperte.`,
-                                    link: `/community/club/${meet.clubId}/meet/${meet.id}`,
-                                    referenceId: meet.id,
-                                }),
-                            ),
-                        );
-                        return { success: true, meet };
+                        if (changed) {
+                            const recipients = await listMeetMemberRecipients({ meetId: input.meetId, audience: "all" });
+                            await Promise.allSettled(
+                                recipients.map((recipient) =>
+                                    createNotification({
+                                        userId: recipient.userId,
+                                        type: "meet_entries_open",
+                                        title: "Iscrizioni aperte",
+                                        message: `Le iscrizioni per \"${meet.name}\" sono aperte.`,
+                                        link: `/community/club/${meet.clubId}/meet/${meet.id}`,
+                                        referenceId: meet.id,
+                                    }),
+                                ),
+                            );
+                        }
+                        return { success: true, meet, changed };
                     } catch (error) {
                         const message = error instanceof Error ? error.message : "Impossibile aprire iscrizioni";
                         if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
@@ -575,12 +585,12 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                 .mutation(async ({ ctx, input }) => {
                     const { transitionClubMeetStatus } = await import("../db_club_meets");
                     try {
-                        const meet = await transitionClubMeetStatus({
+                        const { meet, changed } = await transitionClubMeetStatus({
                             actorId: ctx.user.id,
                             meetId: input.meetId,
                             status: "closed",
                         });
-                        return { success: true, meet };
+                        return { success: true, meet, changed };
                     } catch (error) {
                         const message = error instanceof Error ? error.message : "Impossibile chiudere iscrizioni";
                         if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
@@ -919,17 +929,28 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         }
                     }
 
-                    const event = await createClubEvent({
-                        ...input,
-                        creatorId: ctx.user.id,
-                        startTime,
-                        endTime,
-                        routeGeojson: input.routeGeojson,
-                        routeDistanceMeters: distanceMeters ?? undefined,
-                        weatherSnapshot,
-                        weatherFetchedAt,
-                    });
-                    return { success: true, event };
+                    try {
+                        const event = await createClubEvent({
+                            ...input,
+                            creatorId: ctx.user.id,
+                            startTime,
+                            endTime,
+                            routeGeojson: input.routeGeojson,
+                            routeDistanceMeters: distanceMeters ?? undefined,
+                            weatherSnapshot,
+                            weatherFetchedAt,
+                        });
+                        return { success: true, event };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "Impossibile creare evento";
+                        if (message === "Duplicate club event") {
+                            throw new TRPCError({
+                                code: "CONFLICT",
+                                message: "Esiste già un evento identico.",
+                            });
+                        }
+                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                    }
                 }),
 
             get: protectedProcedure
