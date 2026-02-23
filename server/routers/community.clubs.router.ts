@@ -71,6 +71,18 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
     return next();
   });
 
+  const CLUB_COACH_UPLOAD_ROLES = new Set(["coach", "owner", "admin", "moderator"]);
+  const requireClubCoachUploadRole = async (userId: number, clubId: number) => {
+    const role = await requireClubMemberRole(userId, clubId);
+    if (!CLUB_COACH_UPLOAD_ROLES.has(role.role)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Solo coach/staff del club possono caricare PDF.",
+      });
+    }
+    return role;
+  };
+
   return router({
         list: protectedProcedure
             .input(z.object({
@@ -1145,7 +1157,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
             list: protectedProcedure
                 .input(z.object({
                     clubId: z.number(),
-                    mediaType: z.enum(["image", "video"]).optional(),
+                    mediaType: z.enum(["image", "video", "pdf"]).optional(),
                     eventId: z.number().optional(),
                     limit: z.number().min(1).max(100).optional(),
                     offset: z.number().min(0).optional(),
@@ -1187,7 +1199,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
             upload: protectedProcedure
                 .input(z.object({
                     clubId: z.number(),
-                    mediaType: z.enum(["image", "video"]),
+                    mediaType: z.enum(["image", "video", "pdf"]),
                     mediaUrl: z.string().url(),
                     thumbnailUrl: z.string().url().optional(),
                     caption: z.string().max(500).optional(),
@@ -1201,6 +1213,90 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         uploaderId: ctx.user.id,
                     });
                     return { success: true, media };
+                }),
+
+            uploadPdfFile: protectedProcedure
+                .input(
+                    z.object({
+                        clubId: z.number(),
+                        caption: z.string().max(500).optional(),
+                        fileName: z.string().min(1).max(180).optional(),
+                        fileBase64: z
+                            .string()
+                            .min(1)
+                            .max(22 * 1024 * 1024, "File troppo grande (max 15MB)")
+                            .regex(/^[A-Za-z0-9+/=]+$/, "Invalid base64"),
+                        mimeType: z.literal("application/pdf"),
+                    })
+                )
+                .mutation(async ({ ctx, input }) => {
+                    await requireClubCoachUploadRole(ctx.user.id, input.clubId);
+                    const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
+                    const admin = getSupabaseAdminClient();
+
+                    const MAX_BYTES = 15 * 1024 * 1024;
+                    let buffer: Buffer;
+                    try {
+                        buffer = Buffer.from(input.fileBase64, "base64");
+                    } catch {
+                        throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid base64 payload" });
+                    }
+
+                    if (buffer.length > MAX_BYTES) {
+                        throw new TRPCError({
+                            code: "PAYLOAD_TOO_LARGE",
+                            message: "File troppo grande (max 15MB)",
+                        });
+                    }
+
+                    if (buffer.length < 5 || buffer.subarray(0, 5).toString("ascii") !== "%PDF-") {
+                        throw new TRPCError({
+                            code: "BAD_REQUEST",
+                            message: "Il file caricato non sembra un PDF valido.",
+                        });
+                    }
+
+                    const rawFileName = (input.fileName ?? "documento-club.pdf").trim();
+                    const withPdfExt = rawFileName.toLowerCase().endsWith(".pdf") ? rawFileName : `${rawFileName}.pdf`;
+                    const safeFileName = withPdfExt
+                        .replace(/[^a-zA-Z0-9._-]/g, "_")
+                        .replace(/^_+|_+$/g, "")
+                        .slice(0, 140) || `documento-${Date.now()}.pdf`;
+
+                    const filePath = `clubs/${input.clubId}/${ctx.user.id}/docs/${Date.now()}-${safeFileName}`;
+                    const { error } = await admin.storage
+                        .from("profile-media")
+                        .upload(filePath, buffer, {
+                            contentType: input.mimeType,
+                            upsert: true,
+                        });
+                    if (error) {
+                        throw new TRPCError({
+                            code: "INTERNAL_SERVER_ERROR",
+                            message: `Upload failed: ${error.message}`,
+                        });
+                    }
+
+                    const { data } = admin.storage.from("profile-media").getPublicUrl(filePath);
+                    const publicUrl = data.publicUrl;
+
+                    const { uploadClubMedia } = await import("../db_social_enhanced");
+                    const media = await uploadClubMedia({
+                        clubId: input.clubId,
+                        uploaderId: ctx.user.id,
+                        mediaType: "pdf",
+                        mediaUrl: publicUrl,
+                        caption: input.caption?.trim() || safeFileName,
+                    });
+
+                    logger.info("club media uploadPdfFile: success", {
+                        event: "club_media:upload_pdf_success",
+                        userId: ctx.user.id,
+                        clubId: input.clubId,
+                        mediaId: media.id,
+                    });
+
+                    return { success: true, media, url: publicUrl };
                 }),
 
             uploadFile: protectedProcedure

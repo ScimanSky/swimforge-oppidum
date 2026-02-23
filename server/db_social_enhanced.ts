@@ -830,7 +830,7 @@ export async function getClubAnnouncementById(announcementId: number) {
 export async function uploadClubMedia(params: {
   clubId: number
   uploaderId: number
-  mediaType: 'image' | 'video'
+  mediaType: 'image' | 'video' | 'pdf'
   mediaUrl: string
   thumbnailUrl?: string
   caption?: string
@@ -846,7 +846,7 @@ export async function uploadClubMedia(params: {
  */
 export async function getClubMediaGallery(params: {
   clubId: number
-  mediaType?: 'image' | 'video'
+  mediaType?: 'image' | 'video' | 'pdf'
   eventId?: number
   limit?: number
   offset?: number

@@ -24,6 +24,7 @@ import ClubHero from "@/components/club/ClubHero";
 import ClubEventsPanel from "@/components/club/ClubEventsPanel";
 import PulseBar from "@/components/club/PulseBar";
 import QuickActionsFAB from "@/components/club/QuickActionsFAB";
+import ClubDocumentsPanel from "@/components/club/ClubDocumentsPanel";
 import ClubFeedTab from "@/components/club/ClubFeedTab";
 import ClubMembersTab from "@/components/club/ClubMembersTab";
 import EventMapEditor from "@/components/club/EventMapEditor";
@@ -405,6 +406,7 @@ export default function ClubDetailEnhanced() {
 
   const memberRole = club.member_role ?? "";
   const isStaff = ["owner", "admin", "moderator"].includes(memberRole);
+  const canUploadClubPdf = ["owner", "admin", "moderator", "coach"].includes(memberRole);
 
   const pinnedAnnouncements = (announcementsQuery.data as any[])?.filter(
     (a: any) => a.announcement?.isPinned
@@ -625,6 +627,10 @@ export default function ClubDetailEnhanced() {
               </div>
             )}
           </section>
+        ) : null}
+
+        {isMember ? (
+          <ClubDocumentsPanel clubId={clubId} isMember={isMember} canUpload={canUploadClubPdf} />
         ) : null}
 
         {/* Feed */}
