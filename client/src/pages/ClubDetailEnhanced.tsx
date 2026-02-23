@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { Pin, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon, Calendar as CalendarIcon, Trophy, Flag, Database } from "lucide-react";
+import { Pin, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon, Calendar as CalendarIcon, Database } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,10 +21,9 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 import ClubHero from "@/components/club/ClubHero";
-import ClubEventsPanel from "@/components/club/ClubEventsPanel";
+import ClubEventsPanel, { type ClubAgendaItem } from "@/components/club/ClubEventsPanel";
 import PulseBar from "@/components/club/PulseBar";
 import QuickActionsFAB from "@/components/club/QuickActionsFAB";
-import ClubDocumentsPanel from "@/components/club/ClubDocumentsPanel";
 import ClubFeedTab from "@/components/club/ClubFeedTab";
 import ClubMembersTab from "@/components/club/ClubMembersTab";
 import EventMapEditor from "@/components/club/EventMapEditor";
@@ -411,19 +410,12 @@ export default function ClubDetailEnhanced() {
 
   const memberRole = club.member_role ?? "";
   const isStaff = ["owner", "admin", "moderator"].includes(memberRole);
-  const canUploadClubPdf = ["owner", "admin", "moderator", "coach"].includes(memberRole);
 
   const pinnedAnnouncements = (announcementsQuery.data as any[])?.filter(
     (a: any) => a.announcement?.isPinned
   ) ?? [];
   const meetItems = ((meetsQuery.data as any)?.meets as any[]) ?? [];
-  const firstMeetId = Number((meetItems[0] as any)?.meet?.id ?? (meetItems[0] as any)?.id);
   const upcomingEvents = (eventsQuery.data as any[]) ?? [];
-  const firstUpcomingEvent = upcomingEvents[0];
-  const firstUpcomingEventId = Number(firstUpcomingEvent?.event?.id ?? firstUpcomingEvent?.id);
-  const eventsPageHref = Number.isFinite(firstUpcomingEventId)
-    ? `/community/club/${clubId}/event/${firstUpcomingEventId}`
-    : null;
   const coachAreaHref = `/community/club/${clubId}/coach`;
   const historyAthletesHref = `/community/club/${clubId}/history/athletes`;
   const historyMeetsHref = `/community/club/${clubId}/history/meets`;
@@ -438,6 +430,49 @@ export default function ClubDetailEnhanced() {
     completed: "Completata",
     cancelled: "Annullata",
   };
+  const visibleMeetStatuses = new Set(["published", "open", "closed", "completed"]);
+
+  const meetAgendaItems: ClubAgendaItem[] = clubMeetsV1Enabled
+    ? meetItems
+        .map((item: any) => item.meet ?? item)
+        .filter((meet: any) => visibleMeetStatuses.has(String(meet.status ?? "draft")))
+        .map((meet: any) => ({
+          id: `meet-${meet.id}`,
+          title: String(meet.name ?? "Meeting"),
+          href: `/community/club/${clubId}/meet/${meet.id}`,
+          startsAtIso: meet.startDate ?? null,
+          location: meet.venue ?? null,
+          kind: "meet" as const,
+          statusLabel: meetStatusLabel[String(meet.status ?? "draft")] ?? String(meet.status ?? "draft"),
+        }))
+    : [];
+
+  const eventAgendaItems: ClubAgendaItem[] = upcomingEvents.map((eventItem: any) => {
+    const event = eventItem.event ?? eventItem;
+    return {
+      id: `event-${event.id}`,
+      title: String(event.title ?? "Evento"),
+      href: `/community/club/${clubId}/event/${event.id}`,
+      startsAtIso: event.startTime ?? null,
+      location: event.location ?? null,
+      kind: "event" as const,
+      statusLabel: null,
+    };
+  });
+
+  const agendaItems = [...meetAgendaItems, ...eventAgendaItems].sort((a, b) => {
+    const aTs = a.startsAtIso ? new Date(a.startsAtIso).getTime() : Number.POSITIVE_INFINITY;
+    const bTs = b.startsAtIso ? new Date(b.startsAtIso).getTime() : Number.POSITIVE_INFINITY;
+    if (aTs !== bTs) return aTs - bTs;
+    return a.title.localeCompare(b.title, "it");
+  });
+  const firstAgendaHref = agendaItems[0]?.href ?? null;
+  const meetsPageHref = meetAgendaItems[0]?.href ?? firstAgendaHref;
+  const hasActiveMeet = clubMeetsV1Enabled && meetItems.some((item: any) => {
+    const meet = item.meet ?? item;
+    const status = String(meet.status ?? "draft");
+    return status === "published" || status === "open";
+  });
 
   const handleJoinClub = () => {
     if (!hasClubRules) {
@@ -489,8 +524,7 @@ export default function ClubDetailEnhanced() {
                 >
                   {isMember ? (
                     <ClubEventsPanel
-                      clubId={clubId}
-                      events={upcomingEvents}
+                      items={agendaItems}
                       variant="stickyDesktop"
                       className="min-h-[186px]"
                     />
@@ -533,7 +567,9 @@ export default function ClubDetailEnhanced() {
                     isJoining={joinMutation.isPending}
                     isLeaving={leaveMutation.isPending}
                     variant="compactSticky"
-                    eventsPageHref={isMobile ? eventsPageHref : null}
+                    eventsPageHref={isMobile ? firstAgendaHref : null}
+                    meetsPageHref={isMobile ? meetsPageHref : null}
+                    hasActiveMeet={isMobile && hasActiveMeet}
                   />
                 </div>
               )}
@@ -574,72 +610,6 @@ export default function ClubDetailEnhanced() {
           />
         ) : null}
 
-        {/* Club Meets */}
-        {clubMeetsV1Enabled && isMember ? (
-          <section className="surface-panel p-3 sm:p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="inline-flex items-center gap-2 text-xs font-display uppercase tracking-wide text-muted-foreground">
-                  <Trophy className="h-4 w-4 text-primary" />
-                  Gare Club
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Convocazioni, iscrizioni e risultati meeting
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {Number.isFinite(firstMeetId) ? (
-                  <Link href={`/community/club/${clubId}/meet/${firstMeetId}`}>
-                    <Button variant="outline-neon" size="sm" className="hidden sm:inline-flex">
-                      Apri sezione gare
-                    </Button>
-                  </Link>
-                ) : null}
-                {isStaff ? (
-                  <Link href={coachAreaHref}>
-                    <Button variant="neon" size="sm">
-                      <Flag className="mr-1.5 h-4 w-4" />
-                      Area Coach
-                    </Button>
-                  </Link>
-                ) : null}
-              </div>
-            </div>
-
-            {meetsQuery.isLoading ? (
-              <div className="mt-3 text-xs text-muted-foreground">Caricamento meeting...</div>
-            ) : meetItems.length === 0 ? (
-              <div className="mt-3 rounded-xl border border-border/60 bg-card/40 p-3 text-sm text-muted-foreground">
-                Nessun meeting creato al momento.
-              </div>
-            ) : (
-              <div className="mt-3 space-y-2">
-                {meetItems.slice(0, 4).map((item: any) => {
-                  const meet = item.meet ?? item;
-                  const status = String(meet.status ?? "draft");
-                  return (
-                    <Link
-                      key={meet.id}
-                      href={`/community/club/${clubId}/meet/${meet.id}`}
-                      className="flex items-center justify-between rounded-xl border border-border/60 bg-card/35 px-3 py-2 transition-colors hover:bg-card/55"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{meet.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(meet.startDate).toLocaleDateString("it-IT")} • {item.eventsCount ?? 0} eventi • {item.entriesCount ?? 0} iscrizioni
-                        </p>
-                      </div>
-                      <span className="shrink-0 rounded-full border border-border/60 px-2 py-0.5 text-[11px] text-muted-foreground">
-                        {meetStatusLabel[status] ?? status}
-                      </span>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </section>
-        ) : null}
-
         {clubHistoryV1Enabled && isMember && isHistoryEnabledForClub ? (
           <section className="surface-panel p-3 sm:p-4">
             <div className="flex items-center justify-between gap-3">
@@ -664,43 +634,23 @@ export default function ClubDetailEnhanced() {
           </section>
         ) : null}
 
-        {isMember ? (
-          <ClubDocumentsPanel clubId={clubId} isMember={isMember} canUpload={canUploadClubPdf} />
-        ) : null}
-
-        {isStaff ? (
-          <section className="surface-panel p-3 sm:p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-display uppercase tracking-wide text-muted-foreground">Moderazione Coach</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Gestisci convocazioni, eventi e inviti in una pagina separata.
-                </p>
-              </div>
-              <Link href={coachAreaHref}>
-                <Button variant="outline-neon" size="sm">Apri Area Coach</Button>
-              </Link>
-            </div>
-          </section>
-        ) : null}
-
         {/* Feed */}
         {isMember && (
-          <ClubFeedTab
-            clubId={clubId}
-            isMember={isMember}
-            afterComposerSlot={!isDesktop && !isMobile ? (
-              <ClubEventsPanel clubId={clubId} events={upcomingEvents} variant="inlineFeed" />
-            ) : undefined}
-          />
-        )}
+            <ClubFeedTab
+              clubId={clubId}
+              isMember={isMember}
+              afterComposerSlot={!isDesktop && !isMobile ? (
+                <ClubEventsPanel items={agendaItems} variant="inlineFeed" />
+              ) : undefined}
+            />
+          )}
 
         {/* Quick Actions FAB */}
         <QuickActionsFAB
           isMember={isMember}
           isStaff={isStaff}
           onPost={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          onOpenEvents={eventsPageHref ? () => { window.location.href = eventsPageHref; } : undefined}
+          onOpenEvents={firstAgendaHref ? () => { window.location.href = firstAgendaHref; } : undefined}
           onCreateEvent={isStaff ? () => { window.location.href = coachAreaHref; } : () => setCreateEventOpen(true)}
           onCreateMeet={clubMeetsV1Enabled && isStaff ? () => { window.location.href = coachAreaHref; } : undefined}
           onInvite={isStaff ? () => { window.location.href = coachAreaHref; } : () => {}}

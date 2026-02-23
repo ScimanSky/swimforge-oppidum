@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Users, Settings, ArrowLeft, Calendar, ExternalLink } from "lucide-react";
+import { Users, Settings, ArrowLeft, Calendar, ExternalLink, Trophy } from "lucide-react";
 import { Link } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,8 @@ interface ClubHeroProps {
   isLeaving?: boolean;
   variant?: "full" | "compactSticky";
   eventsPageHref?: string | null;
+  meetsPageHref?: string | null;
+  hasActiveMeet?: boolean;
 }
 
 const themeColorMap: Record<string, string> = {
@@ -48,6 +50,8 @@ export default function ClubHero({
   isLeaving,
   variant = "full",
   eventsPageHref,
+  meetsPageHref,
+  hasActiveMeet = false,
 }: ClubHeroProps) {
   const color = themeColorMap[club.theme_color ?? "cyan"] ?? themeColorMap.cyan;
   const isStaff = ["owner", "admin", "moderator"].includes(club.member_role ?? "");
@@ -140,13 +144,17 @@ export default function ClubHero({
               </Button>
             </Link>
           ) : null}
-          {club.website_url ? (
-            <a href={club.website_url} target="_blank" rel="noopener noreferrer">
-              <Button className="h-7 text-[11px]" variant="outline-neon" size="sm">
-                <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
-                Sito
+          {meetsPageHref ? (
+            <Link href={meetsPageHref}>
+              <Button
+                className={`h-7 text-[11px] ${hasActiveMeet ? "animate-pulse border-amber-400 text-amber-300 shadow-[0_0_16px_rgba(251,191,36,0.45)]" : ""}`}
+                variant="outline-neon"
+                size="sm"
+              >
+                <Trophy className="mr-1.5 h-3.5 w-3.5" />
+                Gare
               </Button>
-            </a>
+            </Link>
           ) : null}
 
           {!club.is_member ? (

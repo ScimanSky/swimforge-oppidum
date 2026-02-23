@@ -78,14 +78,14 @@ describe("ClubHero", () => {
     expect(onLeave).toHaveBeenCalledOnce();
   });
 
-  it("renders compact variant site button when website is present", () => {
-    renderClubHero({}, { variant: "compactSticky" });
-    const compactSiteLink = screen.getByRole("link", { name: /sito/i });
-    expect(compactSiteLink).toHaveAttribute("href", "https://swimmasters.example.com");
+  it("renders compact variant gare button when meets link is provided", () => {
+    renderClubHero({}, { variant: "compactSticky", meetsPageHref: "/community/club/1/meet/10" });
+    const compactGareLink = screen.getByRole("link", { name: /gare/i });
+    expect(compactGareLink).toHaveAttribute("href", "/community/club/1/meet/10");
   });
 
-  it("hides compact variant site button when website is missing", () => {
-    renderClubHero({ website_url: null }, { variant: "compactSticky" });
-    expect(screen.queryByRole("link", { name: /sito/i })).not.toBeInTheDocument();
+  it("hides compact variant gare button when meets link is missing", () => {
+    renderClubHero({}, { variant: "compactSticky", meetsPageHref: null });
+    expect(screen.queryByRole("link", { name: /gare/i })).not.toBeInTheDocument();
   });
 });
