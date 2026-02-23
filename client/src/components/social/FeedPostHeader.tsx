@@ -26,9 +26,11 @@ interface FeedPostHeaderProps {
   post: {
     id: number
     user_id: number
+    activity_id?: number | null
     user_name?: string | null
     user_email?: string | null
     user_avatar?: string | null
+    user_club_name?: string | null
     activity_source?: string | null
     activity_is_open_water?: boolean | null
     created_at: string
@@ -40,8 +42,14 @@ interface FeedPostHeaderProps {
 }
 
 export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFollowing }: FeedPostHeaderProps) {
-  const name = post.user_name || post.user_email?.split("@")[0] || "Nuotatore"
-  const initials = getInitials(name)
+  const baseName = post.user_name || post.user_email?.split("@")[0] || "Nuotatore"
+  const isActivityPost =
+    Boolean(post.activity_id) ||
+    Boolean(post.activity_source) ||
+    post.activity_is_open_water != null
+  const clubName = String(post.user_club_name ?? "").trim()
+  const displayName = isActivityPost && clubName ? `${baseName} (${clubName})` : baseName
+  const initials = getInitials(baseName)
   const activityType = post.activity_is_open_water ? "Open Water" : "Pool"
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing ?? false)
   const [location, setLocation] = useLocation()
@@ -54,7 +62,7 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
   const toggleFollow = trpc.community.users.toggleFollow.useMutation({
     onSuccess: (result) => {
       setIsFollowing(result.following)
-      toast.success(result.following ? `Segui ${name}` : `Non segui più ${name}`)
+      toast.success(result.following ? `Segui ${baseName}` : `Non segui più ${baseName}`)
       utils.community.feed.invalidate()
       utils.community.users.suggested.invalidate()
     },
@@ -89,7 +97,7 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
       <Link href={`/u/${post.user_id}`}>
         <div className="relative">
           <Avatar className="size-11 cursor-pointer ring-2 ring-[var(--electric-cyan)]/30 transition-all hover:ring-[var(--electric-cyan)]/60">
-            <AvatarImage src={post.user_avatar || ""} alt={name} />
+            <AvatarImage src={post.user_avatar || ""} alt={baseName} />
             <AvatarFallback className="text-xs font-semibold">{initials}</AvatarFallback>
           </Avatar>
           {post.user_is_online ? (
@@ -103,7 +111,7 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
             href={`/u/${post.user_id}`}
             className="font-bold text-sm text-foreground truncate hover:underline"
           >
-            {name}
+            {displayName}
           </Link>
           {post.user_level != null && post.user_level > 0 && (
             <span className="shrink-0 rounded-md bg-[var(--electric-cyan)]/15 px-1.5 py-0.5 text-[10px] font-bold text-[var(--electric-cyan)]">

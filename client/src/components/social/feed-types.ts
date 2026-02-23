@@ -26,6 +26,7 @@ export interface FeedPostRecord {
   user_name?: string | null
   user_email?: string | null
   user_avatar?: string | null
+  user_club_name?: string | null
   user_level?: number | null
   user_is_online?: boolean | null
   activity_source?: string | null
