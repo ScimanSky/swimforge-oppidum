@@ -364,19 +364,20 @@ export default function ClubMeetDetail() {
                 variant="outline-neon"
                 size="sm"
                 onClick={() =>
-                  setEditingEvents((prev) =>
-                    prev.length
-                      ? prev
-                      : events.map((event: any) => ({
-                          id: event.id,
-                          label: event.label,
-                          programOrder: Number(event.programOrder ?? 0),
-                          distanceMeters: event.distanceMeters,
-                          stroke: event.stroke ?? "",
-                          gender: event.gender ?? "",
-                          masterCategory: event.masterCategory ?? "",
-                        })),
-                  )
+                  setEditingEvents((prev) => {
+                    if (prev.length) return prev;
+                    const seeded = events.map((event: any) => ({
+                      id: event.id,
+                      label: event.label,
+                      programOrder: Number(event.programOrder ?? 0),
+                      distanceMeters: event.distanceMeters,
+                      stroke: event.stroke ?? "",
+                      gender: event.gender ?? "",
+                      masterCategory: event.masterCategory ?? "",
+                    }));
+                    if (seeded.length) return seeded;
+                    return [{ label: "", programOrder: 1, distanceMeters: null, stroke: "", gender: "", masterCategory: "" }];
+                  })
                 }
               >
                 Modifica programma
