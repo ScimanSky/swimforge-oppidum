@@ -362,6 +362,33 @@ export async function createClubMeet(params: {
   return meet;
 }
 
+export async function deleteClubMeet(params: {
+  actorId: number;
+  meetId: number;
+}) {
+  const meet = await getClubMeetById(params.meetId);
+  if (!meet) throw new Error("Meet not found");
+
+  const role = await getClubRole(params.actorId, meet.clubId);
+  if (!role || role.status !== "active" || !isStaffRole(role.role)) throw new Error("Forbidden");
+
+  const db = await requireDb();
+
+  // Delete in child-first order to avoid orphan rows.
+  await db.execute(sql`
+    DELETE FROM club_meet_entries
+    WHERE meet_event_id IN (
+      SELECT id FROM club_meet_events WHERE meet_id = ${meet.id}
+    )
+  `);
+  await db.delete(clubMeetResults).where(eq(clubMeetResults.meetId, meet.id));
+  await db.delete(clubMeetResultImportBatches).where(eq(clubMeetResultImportBatches.meetId, meet.id));
+  await db.delete(clubMeetEvents).where(eq(clubMeetEvents.meetId, meet.id));
+  await db.delete(clubMeets).where(eq(clubMeets.id, meet.id));
+
+  return { deleted: true as const, meetId: meet.id, clubId: meet.clubId };
+}
+
 export async function updateClubMeet(params: {
   actorId: number;
   meetId: number;

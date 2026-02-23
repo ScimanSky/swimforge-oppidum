@@ -599,6 +599,24 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                     }
                 }),
 
+            delete: meetsProcedure
+                .input(z.object({ meetId: z.number() }))
+                .mutation(async ({ ctx, input }) => {
+                    const { deleteClubMeet } = await import("../db_club_meets");
+                    try {
+                        const outcome = await deleteClubMeet({
+                            actorId: ctx.user.id,
+                            meetId: input.meetId,
+                        });
+                        return { success: true, outcome };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "Impossibile cancellare convocazione";
+                        if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                        if (message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                    }
+                }),
+
             events: router({
                 upsertBatch: meetsProcedure
                     .input(z.object({

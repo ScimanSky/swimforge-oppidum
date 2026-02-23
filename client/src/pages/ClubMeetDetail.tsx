@@ -156,6 +156,14 @@ export default function ClubMeetDetail() {
     onError: (error) => toast.error(error.message || "Errore chiusura iscrizioni"),
   });
 
+  const deleteMeetMutation = trpc.community.clubs.meets.delete.useMutation({
+    onSuccess: () => {
+      toast.success("Convocazione cancellata");
+      window.location.href = `/community/club/${clubId}`;
+    },
+    onError: (error) => toast.error(error.message || "Errore cancellazione convocazione"),
+  });
+
   const saveEventsMutation = trpc.community.clubs.meets.events.upsertBatch.useMutation({
     onSuccess: () => {
       toast.success("Programma gare aggiornato");
@@ -318,6 +326,18 @@ export default function ClubMeetDetail() {
                 disabled={!canCloseEntries || statusMutationPending}
               >
                 Chiudi iscrizioni
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={deleteMeetMutation.isPending}
+                onClick={() => {
+                  const confirmed = window.confirm("Confermi la cancellazione definitiva della convocazione?");
+                  if (!confirmed) return;
+                  deleteMeetMutation.mutate({ meetId });
+                }}
+              >
+                {deleteMeetMutation.isPending ? "Cancellazione..." : "Cancella convocazione"}
               </Button>
               <Button
                 variant="outline-neon"
