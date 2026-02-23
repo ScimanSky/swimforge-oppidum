@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { trpc } from "@/lib/trpc";
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
 import { toast } from "sonner";
-import { ArrowLeft, Upload, Plus, Trash2, MessageCircle } from "lucide-react";
+import { ArrowLeft, Upload, Plus, Trash2, MessageCircle, Printer } from "lucide-react";
 
 function formatDate(value?: string | Date | null) {
   if (!value) return "-";
@@ -30,6 +30,142 @@ function formatTimeCs(value?: number | null) {
   const seconds = Math.floor((cs % 6000) / 100);
   const centis = cs % 100;
   return `${minutes}:${String(seconds).padStart(2, "0")}.${String(centis).padStart(2, "0")}`;
+}
+
+function escapeHtml(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildMeetEntriesPrintHtml({
+  meet,
+  events,
+  groupedEntries,
+}: {
+  meet: any;
+  events: any[];
+  groupedEntries: Map<number, any[]>;
+}) {
+  const activeStatuses = new Set(["pending", "confirmed", "waitlist"]);
+  const sections = events
+    .map((event) => {
+      const rows = (groupedEntries.get(Number(event.id)) ?? [])
+        .filter((row: any) => activeStatuses.has(String(row?.entry?.status ?? "")))
+        .sort((a: any, b: any) => {
+          const aName = String(a?.user?.name || a?.user?.username || a?.user?.email || "").toLowerCase();
+          const bName = String(b?.user?.name || b?.user?.username || b?.user?.email || "").toLowerCase();
+          return aName.localeCompare(bName, "it");
+        });
+
+      if (rows.length === 0) return "";
+
+      const body = rows
+        .map((row: any, index: number) => {
+          const athlete = row?.user?.name || row?.user?.username || row?.user?.email || "Atleta";
+          const status = String(row?.entry?.status ?? "-");
+          const seed = Number.isFinite(Number(row?.entry?.seedTimeCs))
+            ? formatTimeCs(Number(row.entry.seedTimeCs))
+            : "-";
+          return `
+            <tr>
+              <td>${index + 1}</td>
+              <td>${escapeHtml(athlete)}</td>
+              <td>${escapeHtml(status)}</td>
+              <td>${escapeHtml(seed)}</td>
+            </tr>
+          `;
+        })
+        .join("");
+
+      const eventMeta = `${event.distanceMeters ? `${event.distanceMeters}m` : "distanza n/d"} ${event.stroke ?? ""}`.trim();
+
+      return `
+        <section class="event-section">
+          <h3>${escapeHtml(event.label)} <span class="meta">(${escapeHtml(eventMeta)})</span></h3>
+          <p class="meta">Iscritti attivi: ${rows.length}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Atleta</th>
+                <th>Stato</th>
+                <th>Seed time</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${body}
+            </tbody>
+          </table>
+        </section>
+      `;
+    })
+    .filter(Boolean)
+    .join("");
+
+  return `
+    <!doctype html>
+    <html lang="it">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Lista iscritti - ${escapeHtml(meet?.name ?? "Meeting")}</title>
+        <style>
+          :root { color-scheme: light; }
+          * { box-sizing: border-box; }
+          body {
+            margin: 20px;
+            font-family: Arial, sans-serif;
+            color: #0f172a;
+            line-height: 1.35;
+          }
+          h1, h2, h3 { margin: 0; }
+          .header { margin-bottom: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
+          .header h1 { font-size: 22px; margin-bottom: 4px; }
+          .meta { color: #475569; font-size: 12px; }
+          .event-section { margin-bottom: 18px; page-break-inside: avoid; }
+          .event-section h3 { font-size: 16px; margin-bottom: 6px; }
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+          }
+          th, td {
+            border: 1px solid #cbd5e1;
+            padding: 6px 8px;
+            text-align: left;
+            font-size: 12px;
+          }
+          th { background: #e2e8f0; font-weight: 700; }
+          tbody tr:nth-child(even) { background: #f8fafc; }
+          .footer {
+            margin-top: 16px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 8px;
+            font-size: 11px;
+            color: #64748b;
+          }
+          @media print {
+            body { margin: 12mm; }
+            .event-section { page-break-inside: avoid; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>Lista iscritti gare</h1>
+          <h2>${escapeHtml(meet?.name ?? "Meeting")}</h2>
+          <p class="meta">${escapeHtml(meet?.venue ?? "Impianto n/d")} • ${escapeHtml(formatDate(meet?.startDate))} - ${escapeHtml(formatDate(meet?.endDate))}</p>
+          <p class="meta">Generato il ${escapeHtml(formatDate(new Date()))}</p>
+        </div>
+        ${sections || "<p>Nessun iscritto attivo da stampare.</p>"}
+        <div class="footer">SwimForge Club Suite</div>
+      </body>
+    </html>
+  `;
 }
 
 type ManualResultRow = {
@@ -219,6 +355,37 @@ export default function ClubMeetDetail() {
 
   const myEntries = entries.filter((row: any) => Number(row?.entry?.userId) === myUserId);
 
+  const handlePrintEntries = () => {
+    if (!isStaff) return;
+    const hasActiveEntries = events.some((event: any) => {
+      const eventRows = groupedEntries.get(Number(event.id)) ?? [];
+      return eventRows.some((row: any) => {
+        const status = String(row?.entry?.status ?? "");
+        return status === "pending" || status === "confirmed" || status === "waitlist";
+      });
+    });
+
+    if (!hasActiveEntries) {
+      toast.info("Nessun iscritto attivo da stampare");
+      return;
+    }
+
+    const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1024,height=768");
+    if (!printWindow) {
+      toast.error("Impossibile aprire la finestra di stampa");
+      return;
+    }
+
+    const html = buildMeetEntriesPrintHtml({ meet, events, groupedEntries });
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    window.setTimeout(() => {
+      printWindow.print();
+    }, 160);
+  };
+
   if (!match || !Number.isFinite(meetId) || !Number.isFinite(clubId)) {
     return null;
   }
@@ -304,6 +471,13 @@ export default function ClubMeetDetail() {
                 disabled={!canCloseEntries || statusMutationPending}
               >
                 Chiudi iscrizioni
+              </Button>
+              <Button
+                variant="outline-neon"
+                size="sm"
+                onClick={handlePrintEntries}
+              >
+                <Printer className="mr-1 h-4 w-4" /> Stampa iscritti
               </Button>
               <Button
                 variant="destructive"
