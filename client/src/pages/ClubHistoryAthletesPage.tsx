@@ -123,24 +123,45 @@ export default function ClubHistoryAthletesPage() {
 
   const detail = athleteDetailQuery.data as any;
   const detailResults = (detail?.results as any[]) ?? [];
+  const totalAthletes = Number((athletesQuery.data as any)?.total ?? athletes.length);
+
+  const jumpToDetail = () => {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      window.requestAnimationFrame(() => {
+        document.getElementById("history-athlete-detail")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
+    }
+  };
 
   return (
     <AppLayout>
-      <div className="container py-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <Link href={`/community/club/${clubId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" /> Torna al club
+      <div className="compact-shell mx-auto max-w-6xl space-y-4 px-3 pb-24 sm:px-4">
+        <section className="surface-panel relative overflow-hidden p-4 sm:p-5">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_52%)]" />
+          <div className="relative flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <Link href={`/community/club/${clubId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+                <ArrowLeft className="h-4 w-4" /> Torna al club
+              </Link>
+              <h1 className="mt-1 text-2xl font-display font-bold">Storico Atleti</h1>
+              <p className="text-sm text-muted-foreground">{club?.name ?? "Club"}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge variant="outline">Fonte Oppidum</Badge>
+                <Badge variant="outline">{totalAthletes} atleti</Badge>
+              </div>
+            </div>
+            <Link href={`/community/club/${clubId}/history/meets`}>
+              <Button variant="outline-neon" size="sm">Vai a Storico Meeting</Button>
             </Link>
-            <h1 className="mt-1 text-2xl font-display font-bold">Storico Atleti</h1>
-            <p className="text-sm text-muted-foreground">{club?.name ?? "Club"} • Fonte Oppidum</p>
           </div>
-          <Link href={`/community/club/${clubId}/history/meets`}>
-            <Button variant="outline-neon" size="sm">Vai a Storico Meeting</Button>
-          </Link>
-        </div>
+        </section>
 
         <section className="surface-panel p-4 space-y-3">
+          <p className="text-xs font-display uppercase tracking-wide text-muted-foreground">Filtri</p>
           <div className="grid gap-2 md:grid-cols-[1fr_220px]">
             <Input
               placeholder="Cerca atleta..."
@@ -162,7 +183,7 @@ export default function ClubHistoryAthletesPage() {
         </section>
 
         <div className="grid gap-4 lg:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.4fr)]">
-          <section className="surface-panel p-3 space-y-2">
+          <section className="surface-panel p-3 sm:p-4 space-y-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" /> Atleti</span>
               <span>{(athletesQuery.data as any)?.total ?? athletes.length}</span>
@@ -178,11 +199,14 @@ export default function ClubHistoryAthletesPage() {
                   <button
                     key={athlete.id}
                     type="button"
-                    onClick={() => setSelectedAthleteSlug(String(athlete.athlete_slug))}
+                    onClick={() => {
+                      setSelectedAthleteSlug(String(athlete.athlete_slug));
+                      jumpToDetail();
+                    }}
                     className={`w-full rounded-xl border px-3 py-2 text-left transition-colors ${
                       active
-                        ? "border-primary/60 bg-primary/10"
-                        : "border-border/60 bg-card/30 hover:bg-card/45"
+                        ? "border-primary/60 bg-primary/12 shadow-[0_0_0_1px_rgba(34,211,238,0.22)]"
+                        : "border-border/60 bg-card/25 hover:bg-card/45"
                     }`}
                   >
                     <p className="text-sm font-semibold truncate">{athlete.athlete_name}</p>
@@ -195,7 +219,7 @@ export default function ClubHistoryAthletesPage() {
             )}
           </section>
 
-          <section className="surface-panel p-3 space-y-3">
+          <section id="history-athlete-detail" className="surface-panel p-3 sm:p-4 space-y-3">
             {!selectedAthleteSlug ? (
               <p className="text-sm text-muted-foreground">Seleziona un atleta.</p>
             ) : athleteDetailQuery.isLoading ? (
@@ -212,7 +236,7 @@ export default function ClubHistoryAthletesPage() {
                   {detail.athlete.linkedUserId ? <Badge variant="outline">Utente collegato</Badge> : null}
                 </div>
 
-                <div className="max-h-[540px] overflow-y-auto space-y-2 pr-1">
+                <div className="space-y-2">
                   {detailResults.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Nessun risultato storico disponibile.</p>
                   ) : (

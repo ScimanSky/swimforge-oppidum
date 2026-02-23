@@ -141,24 +141,45 @@ export default function ClubHistoryMeetsPage() {
 
   const meetDetail = meetDetailQuery.data as any;
   const results = (resultsQuery.data as any[]) ?? [];
+  const totalMeets = Number((meetsQuery.data as any)?.total ?? meets.length);
+
+  const jumpToDetail = () => {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      window.requestAnimationFrame(() => {
+        document.getElementById("history-meet-detail")?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
+    }
+  };
 
   return (
     <AppLayout>
-      <div className="container py-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <Link href={`/community/club/${clubId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" /> Torna al club
+      <div className="compact-shell mx-auto max-w-6xl space-y-4 px-3 pb-24 sm:px-4">
+        <section className="surface-panel relative overflow-hidden p-4 sm:p-5">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(34,211,238,0.16),transparent_52%)]" />
+          <div className="relative flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <Link href={`/community/club/${clubId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+                <ArrowLeft className="h-4 w-4" /> Torna al club
+              </Link>
+              <h1 className="mt-1 text-2xl font-display font-bold">Storico Meeting</h1>
+              <p className="text-sm text-muted-foreground">{(clubQuery.data as any)?.name ?? "Club"}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge variant="outline">Fonte Oppidum</Badge>
+                <Badge variant="outline">{totalMeets} meeting</Badge>
+              </div>
+            </div>
+            <Link href={`/community/club/${clubId}/history/athletes`}>
+              <Button variant="outline-neon" size="sm">Vai a Storico Atleti</Button>
             </Link>
-            <h1 className="mt-1 text-2xl font-display font-bold">Storico Meeting</h1>
-            <p className="text-sm text-muted-foreground">{(clubQuery.data as any)?.name ?? "Club"} • Fonte Oppidum</p>
           </div>
-          <Link href={`/community/club/${clubId}/history/athletes`}>
-            <Button variant="outline-neon" size="sm">Vai a Storico Atleti</Button>
-          </Link>
-        </div>
+        </section>
 
         <section className="surface-panel p-4 space-y-3">
+          <p className="text-xs font-display uppercase tracking-wide text-muted-foreground">Filtri</p>
           <div className="grid gap-2 md:grid-cols-[1fr_220px]">
             <Input
               placeholder="Cerca meeting..."
@@ -180,7 +201,7 @@ export default function ClubHistoryMeetsPage() {
         </section>
 
         <div className="grid gap-4 lg:grid-cols-[minmax(320px,0.9fr)_minmax(0,1.5fr)]">
-          <section className="surface-panel p-3 space-y-2">
+          <section className="surface-panel p-3 sm:p-4 space-y-2">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1"><Trophy className="h-3.5 w-3.5" /> Meeting</span>
               <span>{(meetsQuery.data as any)?.total ?? meets.length}</span>
@@ -196,11 +217,14 @@ export default function ClubHistoryMeetsPage() {
                   <button
                     key={meet.id}
                     type="button"
-                    onClick={() => setSelectedMeetSlug(String(meet.meet_slug))}
+                    onClick={() => {
+                      setSelectedMeetSlug(String(meet.meet_slug));
+                      jumpToDetail();
+                    }}
                     className={`w-full rounded-xl border px-3 py-2 text-left transition-colors ${
                       active
-                        ? "border-primary/60 bg-primary/10"
-                        : "border-border/60 bg-card/30 hover:bg-card/45"
+                        ? "border-primary/60 bg-primary/12 shadow-[0_0_0_1px_rgba(34,211,238,0.22)]"
+                        : "border-border/60 bg-card/25 hover:bg-card/45"
                     }`}
                   >
                     <p className="text-sm font-semibold truncate">{meet.meet_name}</p>
@@ -213,7 +237,7 @@ export default function ClubHistoryMeetsPage() {
             )}
           </section>
 
-          <section className="surface-panel p-3 space-y-3">
+          <section id="history-meet-detail" className="surface-panel p-3 sm:p-4 space-y-3">
             {!selectedMeetSlug ? (
               <p className="text-sm text-muted-foreground">Seleziona un meeting.</p>
             ) : (
@@ -254,7 +278,7 @@ export default function ClubHistoryMeetsPage() {
                   </Select>
                 </div>
 
-                <div className="max-h-[540px] overflow-y-auto space-y-2 pr-1">
+                <div className="space-y-2">
                   {resultsQuery.isLoading ? (
                     <p className="text-sm text-muted-foreground">Caricamento risultati...</p>
                   ) : results.length === 0 ? (
