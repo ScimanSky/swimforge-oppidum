@@ -1,0 +1,428 @@
+import { useMemo, useState } from "react";
+import { Link, useRoute } from "wouter";
+import AppLayout from "@/components/AppLayout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { trpc } from "@/lib/trpc";
+import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
+import { toast } from "sonner";
+import { ArrowLeft, Check, Copy, Flag, Plus, Shield, Users } from "lucide-react";
+
+type MeetForm = {
+  name: string;
+  venue: string;
+  startDate: string;
+  endDate: string;
+  registrationDeadline: string;
+  notes: string;
+};
+
+type EventForm = {
+  title: string;
+  description: string;
+  eventType: "training" | "race" | "social" | "meeting";
+  location: string;
+  startTime: string;
+  endTime: string;
+  maxAttendees: string;
+};
+
+function parseDateTimeLocal(value: string) {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function formatDate(value?: string | Date | null) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function InviteRow({ invite }: { invite: any }) {
+  const [copied, setCopied] = useState(false);
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const link = `${origin}/community/invite/${invite.code}`;
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/35 p-2 text-sm">
+      <code className="flex-1 truncate text-xs text-muted-foreground">{link}</code>
+      <span className="text-xs text-muted-foreground">
+        {invite.usedCount}/{invite.maxUses}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 shrink-0"
+        onClick={() => {
+          navigator.clipboard.writeText(link);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        }}
+      >
+        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+      </Button>
+    </div>
+  );
+}
+
+export default function ClubCoachModeration() {
+  const clubMeetsV1Enabled = UI_FEATURE_FLAGS.clubMeetsV1;
+  const [match, params] = useRoute("/community/club/:id/coach");
+  const clubId = Number(params?.id);
+  const utils = trpc.useUtils();
+
+  const [meetForm, setMeetForm] = useState<MeetForm>({
+    name: "",
+    venue: "",
+    startDate: "",
+    endDate: "",
+    registrationDeadline: "",
+    notes: "",
+  });
+  const [eventForm, setEventForm] = useState<EventForm>({
+    title: "",
+    description: "",
+    eventType: "training",
+    location: "",
+    startTime: "",
+    endTime: "",
+    maxAttendees: "",
+  });
+
+  const clubQuery = trpc.community.clubs.get.useQuery(
+    { clubId },
+    { enabled: match && Number.isFinite(clubId) }
+  );
+  const meetsQuery = trpc.community.clubs.meets.list.useQuery(
+    { clubId },
+    { enabled: clubMeetsV1Enabled && match && Number.isFinite(clubId) }
+  );
+  const invitesQuery = trpc.community.clubs.invites.useQuery(
+    { clubId },
+    { enabled: match && Number.isFinite(clubId) }
+  );
+
+  const createMeetMutation = trpc.community.clubs.meets.create.useMutation({
+    onSuccess: (payload: any) => {
+      toast.success("Convocazione gara creata");
+      setMeetForm({
+        name: "",
+        venue: "",
+        startDate: "",
+        endDate: "",
+        registrationDeadline: "",
+        notes: "",
+      });
+      utils.community.clubs.meets.list.invalidate({ clubId });
+      const meetId = Number(payload?.meet?.id);
+      if (Number.isFinite(meetId)) {
+        window.location.href = `/community/club/${clubId}/meet/${meetId}`;
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message || "Errore durante creazione convocazione");
+    },
+  });
+
+  const createEventMutation = trpc.community.clubs.events.create.useMutation({
+    onSuccess: () => {
+      toast.success("Evento creato");
+      setEventForm({
+        title: "",
+        description: "",
+        eventType: "training",
+        location: "",
+        startTime: "",
+        endTime: "",
+        maxAttendees: "",
+      });
+      utils.community.clubs.events.list.invalidate({ clubId, status: "active", fromDate: new Date().toISOString(), limit: 8 });
+    },
+    onError: (error) => {
+      toast.error(error.message || "Errore creazione evento");
+    },
+  });
+
+  const createInviteMutation = trpc.community.clubs.createInvite.useMutation({
+    onSuccess: () => {
+      toast.success("Invito creato");
+      invitesQuery.refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Errore creazione invito");
+    },
+  });
+
+  const club = clubQuery.data as any | undefined;
+  const isMember = Boolean(club?.is_member);
+  const role = String(club?.member_role ?? "");
+  const isCoachStaff = ["coach", "owner", "admin", "moderator"].includes(role);
+  const meetItems = ((meetsQuery.data as any)?.meets as any[]) ?? [];
+
+  const meetStatusLabel = useMemo(
+    () =>
+      ({
+        draft: "Bozza",
+        published: "Pubblicata",
+        open: "Iscrizioni aperte",
+        closed: "Iscrizioni chiuse",
+        completed: "Completata",
+        cancelled: "Annullata",
+      }) as Record<string, string>,
+    []
+  );
+
+  if (!match || !Number.isFinite(clubId)) return null;
+
+  if (clubQuery.isLoading) {
+    return (
+      <AppLayout>
+        <div className="container py-6">
+          <div className="surface-panel p-6 text-center text-muted-foreground">Caricamento area coach...</div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!club || !isMember) {
+    return (
+      <AppLayout>
+        <div className="container py-6">
+          <div className="surface-panel p-6 text-center text-muted-foreground">
+            Devi essere iscritto al club per accedere a questa area.
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  if (!isCoachStaff) {
+    return (
+      <AppLayout>
+        <div className="container py-6 space-y-4">
+          <Link href={`/community/club/${clubId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" /> Torna al club
+          </Link>
+          <div className="surface-panel p-6 text-center">
+            <Shield className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Questa pagina è riservata a coach e staff.</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  return (
+    <AppLayout>
+      <div className="container py-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <Link href={`/community/club/${clubId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" /> Torna al club
+            </Link>
+            <h1 className="mt-1 text-2xl font-display font-bold">Area Coach • {club.name}</h1>
+            <p className="text-sm text-muted-foreground">Moderazione club separata dal feed pubblico.</p>
+          </div>
+          <Badge variant="outline">{role}</Badge>
+        </div>
+
+        {clubMeetsV1Enabled ? (
+          <section className="surface-panel p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <Flag className="h-4 w-4 text-primary" />
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Convocazioni Gare</h2>
+            </div>
+            <div className="grid gap-2 md:grid-cols-2">
+              <div>
+                <Label>Nome meeting *</Label>
+                <Input value={meetForm.name} onChange={(e) => setMeetForm((p) => ({ ...p, name: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Impianto</Label>
+                <Input value={meetForm.venue} onChange={(e) => setMeetForm((p) => ({ ...p, venue: e.target.value }))} />
+              </div>
+            </div>
+            <div className="grid gap-2 md:grid-cols-3">
+              <div>
+                <Label>Inizio *</Label>
+                <Input type="datetime-local" value={meetForm.startDate} onChange={(e) => setMeetForm((p) => ({ ...p, startDate: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Fine *</Label>
+                <Input type="datetime-local" value={meetForm.endDate} onChange={(e) => setMeetForm((p) => ({ ...p, endDate: e.target.value }))} />
+              </div>
+              <div>
+                <Label>Deadline iscrizioni *</Label>
+                <Input
+                  type="datetime-local"
+                  value={meetForm.registrationDeadline}
+                  onChange={(e) => setMeetForm((p) => ({ ...p, registrationDeadline: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Note</Label>
+              <Textarea rows={3} value={meetForm.notes} onChange={(e) => setMeetForm((p) => ({ ...p, notes: e.target.value }))} />
+            </div>
+            <Button
+              variant="neon"
+              disabled={createMeetMutation.isPending}
+              onClick={() => {
+                const start = parseDateTimeLocal(meetForm.startDate);
+                const end = parseDateTimeLocal(meetForm.endDate);
+                const deadline = parseDateTimeLocal(meetForm.registrationDeadline);
+                if (!meetForm.name.trim()) return toast.error("Inserisci nome meeting");
+                if (!start || !end || !deadline) return toast.error("Compila date meeting e deadline");
+                if (end <= start) return toast.error("La fine meeting deve essere dopo l'inizio");
+                if (deadline >= start) return toast.error("La deadline deve essere prima dell'inizio");
+                createMeetMutation.mutate({
+                  clubId,
+                  name: meetForm.name.trim(),
+                  venue: meetForm.venue.trim() || null,
+                  startDate: start.toISOString(),
+                  endDate: end.toISOString(),
+                  registrationDeadline: deadline.toISOString(),
+                  notes: meetForm.notes.trim() || null,
+                  timezone: "Europe/Rome",
+                });
+              }}
+            >
+              <Plus className="mr-1.5 h-4 w-4" />
+              {createMeetMutation.isPending ? "Creazione..." : "Crea convocazione"}
+            </Button>
+
+            {meetItems.length > 0 ? (
+              <div className="space-y-2 pt-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ultime convocazioni</p>
+                {meetItems.slice(0, 5).map((item: any) => {
+                  const meet = item.meet ?? item;
+                  const status = String(meet.status ?? "draft");
+                  return (
+                    <Link
+                      key={meet.id}
+                      href={`/community/club/${clubId}/meet/${meet.id}`}
+                      className="flex items-center justify-between rounded-xl border border-border/60 bg-card/35 px-3 py-2 transition-colors hover:bg-card/55"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{meet.name}</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(meet.startDate)}</p>
+                      </div>
+                      <span className="shrink-0 rounded-full border border-border/60 px-2 py-0.5 text-[11px] text-muted-foreground">
+                        {meetStatusLabel[status] ?? status}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        <section className="surface-panel p-4 space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Crea Evento Club</h2>
+          <div className="grid gap-2 md:grid-cols-2">
+            <div>
+              <Label>Titolo *</Label>
+              <Input value={eventForm.title} onChange={(e) => setEventForm((p) => ({ ...p, title: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Tipo</Label>
+              <Select value={eventForm.eventType} onValueChange={(value) => setEventForm((p) => ({ ...p, eventType: value as EventForm["eventType"] }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="training">Allenamento</SelectItem>
+                  <SelectItem value="race">Gara</SelectItem>
+                  <SelectItem value="social">Evento sociale</SelectItem>
+                  <SelectItem value="meeting">Riunione</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <Label>Descrizione</Label>
+            <Textarea rows={2} value={eventForm.description} onChange={(e) => setEventForm((p) => ({ ...p, description: e.target.value }))} />
+          </div>
+          <div className="grid gap-2 md:grid-cols-3">
+            <div>
+              <Label>Luogo</Label>
+              <Input value={eventForm.location} onChange={(e) => setEventForm((p) => ({ ...p, location: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Inizio *</Label>
+              <Input type="datetime-local" value={eventForm.startTime} onChange={(e) => setEventForm((p) => ({ ...p, startTime: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Fine</Label>
+              <Input type="datetime-local" value={eventForm.endTime} onChange={(e) => setEventForm((p) => ({ ...p, endTime: e.target.value }))} />
+            </div>
+          </div>
+          <div>
+            <Label>Max partecipanti</Label>
+            <Input type="number" value={eventForm.maxAttendees} onChange={(e) => setEventForm((p) => ({ ...p, maxAttendees: e.target.value }))} />
+          </div>
+          <Button
+            variant="neon"
+            disabled={createEventMutation.isPending}
+            onClick={() => {
+              if (!eventForm.title.trim()) return toast.error("Inserisci titolo evento");
+              const start = parseDateTimeLocal(eventForm.startTime);
+              if (!start) return toast.error("Data inizio non valida");
+              const end = parseDateTimeLocal(eventForm.endTime);
+              if (end && end <= start) return toast.error("La fine deve essere dopo l'inizio");
+              createEventMutation.mutate({
+                clubId,
+                title: eventForm.title.trim(),
+                description: eventForm.description.trim() || undefined,
+                eventType: eventForm.eventType,
+                location: eventForm.location.trim() || undefined,
+                startTime: start.toISOString(),
+                endTime: end?.toISOString(),
+                maxAttendees: eventForm.maxAttendees ? Number(eventForm.maxAttendees) : undefined,
+              });
+            }}
+          >
+            <Plus className="mr-1.5 h-4 w-4" />
+            {createEventMutation.isPending ? "Creazione..." : "Crea evento"}
+          </Button>
+        </section>
+
+        <section className="surface-panel p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Inviti Club</h2>
+          </div>
+          <Button
+            variant="neon"
+            disabled={createInviteMutation.isPending}
+            onClick={() => createInviteMutation.mutate({ clubId, maxUses: 10 })}
+          >
+            {createInviteMutation.isPending ? "Generazione..." : "Genera nuovo invito"}
+          </Button>
+          {(invitesQuery.data as any[])?.length ? (
+            <div className="space-y-2">
+              {(invitesQuery.data as any[]).map((inv: any) => (
+                <InviteRow key={inv.id} invite={inv} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-muted-foreground">Nessun invito attivo.</p>
+          )}
+        </section>
+      </div>
+    </AppLayout>
+  );
+}
+

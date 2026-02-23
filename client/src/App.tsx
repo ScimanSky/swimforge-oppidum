@@ -36,6 +36,7 @@ const ReportPost = lazy(() => import("./pages/ReportPost"));
 const Community = lazy(() => import("./pages/Community"));
 const ClubInvite = lazy(() => import("./pages/ClubInvite"));
 const ClubDetail = lazy(() => import("./pages/ClubDetailEnhanced"));
+const ClubCoachModeration = lazy(() => import("./pages/ClubCoachModeration"));
 const ClubEventDetail = lazy(() => import("./pages/ClubEventDetail"));
 const ClubMeetDetail = lazy(() => import("./pages/ClubMeetDetail"));
 const AdminReports = lazy(() => import("./pages/AdminReports"));
@@ -124,6 +125,7 @@ function Router() {
       {clubMeetsV1Enabled ? (
         <Route path="/community/club/:clubId/meet/:meetId" component={ClubMeetDetail} />
       ) : null}
+      <Route path="/community/club/:id/coach" component={ClubCoachModeration} />
       <Route path="/community/club/:id" component={ClubDetail} />
       <Route path="/home/community" component={Community} />
       <Route path="/community">

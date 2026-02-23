@@ -419,6 +419,7 @@ export default function ClubDetailEnhanced() {
   const eventsPageHref = Number.isFinite(firstUpcomingEventId)
     ? `/community/club/${clubId}/event/${firstUpcomingEventId}`
     : null;
+  const coachAreaHref = `/community/club/${clubId}/coach`;
   const hasClubRules = Boolean(club?.rules && String(club.rules).trim().length > 0);
 
   const meetStatusLabel: Record<string, string> = {
@@ -587,10 +588,12 @@ export default function ClubDetailEnhanced() {
                   </Link>
                 ) : null}
                 {isStaff ? (
-                  <Button variant="neon" size="sm" onClick={() => setCreateMeetOpen(true)}>
-                    <Flag className="mr-1.5 h-4 w-4" />
-                    Nuova convocazione
-                  </Button>
+                  <Link href={coachAreaHref}>
+                    <Button variant="neon" size="sm">
+                      <Flag className="mr-1.5 h-4 w-4" />
+                      Area Coach
+                    </Button>
+                  </Link>
                 ) : null}
               </div>
             </div>
@@ -633,6 +636,22 @@ export default function ClubDetailEnhanced() {
           <ClubDocumentsPanel clubId={clubId} isMember={isMember} canUpload={canUploadClubPdf} />
         ) : null}
 
+        {isStaff ? (
+          <section className="surface-panel p-3 sm:p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <p className="text-xs font-display uppercase tracking-wide text-muted-foreground">Moderazione Coach</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Gestisci convocazioni, eventi e inviti in una pagina separata.
+                </p>
+              </div>
+              <Link href={coachAreaHref}>
+                <Button variant="outline-neon" size="sm">Apri Area Coach</Button>
+              </Link>
+            </div>
+          </section>
+        ) : null}
+
         {/* Feed */}
         {isMember && (
           <ClubFeedTab
@@ -650,9 +669,9 @@ export default function ClubDetailEnhanced() {
           isStaff={isStaff}
           onPost={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           onOpenEvents={eventsPageHref ? () => { window.location.href = eventsPageHref; } : undefined}
-          onCreateEvent={() => setCreateEventOpen(true)}
-          onCreateMeet={clubMeetsV1Enabled && isStaff ? () => setCreateMeetOpen(true) : undefined}
-          onInvite={() => setInviteOpen(true)}
+          onCreateEvent={isStaff ? () => { window.location.href = coachAreaHref; } : () => setCreateEventOpen(true)}
+          onCreateMeet={clubMeetsV1Enabled && isStaff ? () => { window.location.href = coachAreaHref; } : undefined}
+          onInvite={isStaff ? () => { window.location.href = coachAreaHref; } : () => {}}
         />
 
         {/* Members Sheet */}
