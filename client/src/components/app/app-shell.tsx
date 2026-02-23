@@ -157,6 +157,7 @@ const quickAccessItems: QuickAccessItem[] = [
 
 function athleteTitleForPath(path: string) {
   if (path.startsWith("/community/club") && path.includes("/event/")) return "Club Event"
+  if (path.startsWith("/community/club") && path.includes("/meet/")) return "Club Meet"
   if (path.startsWith("/community/club")) return "Club Details"
   if (path.startsWith("/home/community") || path === "/community") return "Club Directory"
   if (path.startsWith("/season/challenges/") || path.startsWith("/challenges/")) return "Challenge Details"

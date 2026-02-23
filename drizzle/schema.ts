@@ -449,6 +449,105 @@ export const communityClubInvites = pgTable("community_club_invites", {
 });
 
 // ============================================
+// CLUB MEETS (Società: gare e convocazioni)
+// ============================================
+export const clubMeets = pgTable("club_meets", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  createdBy: integer("created_by").notNull(),
+  name: varchar("name", { length: 200 }).notNull(),
+  venue: text("venue"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  registrationDeadline: timestamp("registration_deadline").notNull(),
+  status: varchar("status", { length: 20 }).default("draft").notNull(), // draft, published, open, closed, completed, cancelled
+  timezone: varchar("timezone", { length: 64 }).default("Europe/Rome").notNull(),
+  notes: text("notes"),
+  publishedAt: timestamp("published_at"),
+  openedAt: timestamp("opened_at"),
+  closedAt: timestamp("closed_at"),
+  completedAt: timestamp("completed_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  clubMeetsClubStatusIdx: index("idx_club_meets_club_status").on(table.clubId, table.status),
+  clubMeetsClubStartDateIdx: index("idx_club_meets_club_start_date").on(table.clubId, table.startDate),
+}));
+
+export const clubMeetEvents = pgTable("club_meet_events", {
+  id: serial("id").primaryKey(),
+  meetId: integer("meet_id").notNull(),
+  label: varchar("label", { length: 120 }).notNull(), // ex: 50 SL
+  programOrder: integer("program_order").default(0).notNull(),
+  distanceMeters: integer("distance_meters"),
+  stroke: varchar("stroke", { length: 32 }),
+  gender: varchar("gender", { length: 16 }),
+  masterCategory: varchar("master_category", { length: 64 }),
+  scheduledAt: timestamp("scheduled_at"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  clubMeetEventsMeetOrderIdx: index("idx_club_meet_events_meet_order").on(table.meetId, table.programOrder, table.id),
+}));
+
+export const clubMeetEntries = pgTable("club_meet_entries", {
+  id: serial("id").primaryKey(),
+  meetEventId: integer("meet_event_id").notNull(),
+  userId: integer("user_id").notNull(),
+  status: varchar("status", { length: 20 }).default("pending").notNull(), // pending, confirmed, waitlist, rejected, withdrawn
+  seedTimeCs: integer("seed_time_cs"),
+  notes: text("notes"),
+  setByStaffId: integer("set_by_staff_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  clubMeetEntriesUnique: unique("club_meet_entries_event_user_unique").on(table.meetEventId, table.userId),
+  clubMeetEntriesEventStatusIdx: index("idx_club_meet_entries_event_status").on(table.meetEventId, table.status),
+  clubMeetEntriesUserIdx: index("idx_club_meet_entries_user").on(table.userId),
+}));
+
+export const clubMeetResultImportBatches = pgTable("club_meet_result_import_batches", {
+  id: serial("id").primaryKey(),
+  meetId: integer("meet_id").notNull(),
+  importedBy: integer("imported_by").notNull(),
+  mode: varchar("mode", { length: 20 }).notNull(), // csv, pdf_manual
+  sourceFilename: varchar("source_filename", { length: 255 }),
+  rawPayload: json("raw_payload"),
+  processedRows: integer("processed_rows").default(0).notNull(),
+  successRows: integer("success_rows").default(0).notNull(),
+  errorRows: integer("error_rows").default(0).notNull(),
+  errors: json("errors"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  clubMeetImportBatchesMeetIdx: index("idx_club_meet_import_batches_meet").on(table.meetId, table.createdAt),
+}));
+
+export const clubMeetResults = pgTable("club_meet_results", {
+  id: serial("id").primaryKey(),
+  meetId: integer("meet_id").notNull(),
+  meetEventId: integer("meet_event_id").notNull(),
+  userId: integer("user_id"),
+  athleteName: varchar("athlete_name", { length: 255 }).notNull(),
+  athleteEmail: varchar("athlete_email", { length: 320 }),
+  clubName: varchar("club_name", { length: 255 }),
+  finalTimeCs: integer("final_time_cs"),
+  rank: integer("rank"),
+  points: real("points"),
+  isDisqualified: boolean("is_disqualified").default(false).notNull(),
+  notes: text("notes"),
+  seedTimeCs: integer("seed_time_cs"),
+  importBatchId: integer("import_batch_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  clubMeetResultsEventRankIdx: index("idx_club_meet_results_event_rank").on(table.meetEventId, table.rank),
+  clubMeetResultsMeetIdx: index("idx_club_meet_results_meet").on(table.meetId),
+  clubMeetResultsEventUserUnique: unique("club_meet_results_event_user_unique").on(table.meetEventId, table.userId),
+}));
+
+// ============================================
 // CLUB EVENTS (Allenamenti, gare, eventi sociali)
 // ============================================
 export const clubEvents = pgTable("club_events", {

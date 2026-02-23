@@ -25,6 +25,8 @@ const ROUTE_GEOJSON_SCHEMA = z.object({
     .max(500),
 });
 
+const ENTRY_STATUS_VALUES = ["pending", "confirmed", "waitlist", "rejected", "withdrawn"] as const;
+
 type NotifyTaggedUsersInput = {
   authorUserId: number;
   taggedUserIds: number[];
@@ -384,6 +386,425 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                 const { updateMemberRole } = await import("../db_clubs");
                 return updateMemberRole(ctx.user.id, input.clubId, input.userId, input.role);
             }),
+
+        // CLUB MEETS (gare/convocazioni)
+        meets: router({
+            list: protectedProcedure
+                .input(z.object({
+                    clubId: z.number(),
+                    season: z.number().min(2000).max(2100).optional(),
+                }))
+                .query(async ({ ctx, input }) => {
+                    const { listClubMeets } = await import("../db_club_meets");
+                    return listClubMeets({
+                        userId: ctx.user.id,
+                        clubId: input.clubId,
+                        season: input.season,
+                    });
+                }),
+
+            get: protectedProcedure
+                .input(z.object({ meetId: z.number() }))
+                .query(async ({ ctx, input }) => {
+                    const { getClubMeetDetail } = await import("../db_club_meets");
+                    const detail = await getClubMeetDetail({
+                        userId: ctx.user.id,
+                        meetId: input.meetId,
+                    });
+                    if (!detail) throw new TRPCError({ code: "NOT_FOUND" });
+                    return detail;
+                }),
+
+            create: protectedProcedure
+                .input(z.object({
+                    clubId: z.number(),
+                    name: z.string().min(3).max(200),
+                    venue: z.string().max(400).optional().nullable(),
+                    startDate: z.string().datetime(),
+                    endDate: z.string().datetime(),
+                    registrationDeadline: z.string().datetime(),
+                    notes: z.string().max(5000).optional().nullable(),
+                    timezone: z.string().max(64).optional(),
+                }))
+                .mutation(async ({ ctx, input }) => {
+                    const { createClubMeet } = await import("../db_club_meets");
+                    try {
+                        const meet = await createClubMeet({
+                            actorId: ctx.user.id,
+                            clubId: input.clubId,
+                            name: input.name,
+                            venue: input.venue ?? null,
+                            startDate: new Date(input.startDate),
+                            endDate: new Date(input.endDate),
+                            registrationDeadline: new Date(input.registrationDeadline),
+                            notes: input.notes ?? null,
+                            timezone: input.timezone ?? "Europe/Rome",
+                        });
+                        return { success: true, meet };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "Impossibile creare convocazione";
+                        if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                    }
+                }),
+
+            update: protectedProcedure
+                .input(z.object({
+                    meetId: z.number(),
+                    name: z.string().min(3).max(200).optional(),
+                    venue: z.string().max(400).optional().nullable(),
+                    startDate: z.string().datetime().optional(),
+                    endDate: z.string().datetime().optional(),
+                    registrationDeadline: z.string().datetime().optional(),
+                    notes: z.string().max(5000).optional().nullable(),
+                    timezone: z.string().max(64).optional(),
+                }))
+                .mutation(async ({ ctx, input }) => {
+                    const { updateClubMeet } = await import("../db_club_meets");
+                    try {
+                        const updated = await updateClubMeet({
+                            actorId: ctx.user.id,
+                            meetId: input.meetId,
+                            name: input.name,
+                            venue: input.venue,
+                            startDate: input.startDate ? new Date(input.startDate) : undefined,
+                            endDate: input.endDate ? new Date(input.endDate) : undefined,
+                            registrationDeadline: input.registrationDeadline ? new Date(input.registrationDeadline) : undefined,
+                            notes: input.notes,
+                            timezone: input.timezone,
+                        });
+                        return { success: true, meet: updated };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "Impossibile aggiornare convocazione";
+                        if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                        if (message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                    }
+                }),
+
+            publish: protectedProcedure
+                .input(z.object({ meetId: z.number() }))
+                .mutation(async ({ ctx, input }) => {
+                    const { transitionClubMeetStatus, listMeetMemberRecipients } = await import("../db_club_meets");
+                    const { createNotification } = await import("../db_social_enhanced");
+                    try {
+                        const meet = await transitionClubMeetStatus({
+                            actorId: ctx.user.id,
+                            meetId: input.meetId,
+                            status: "published",
+                        });
+                        const recipients = await listMeetMemberRecipients({ meetId: input.meetId, audience: "all" });
+                        await Promise.allSettled(
+                            recipients.map((recipient) =>
+                                createNotification({
+                                    userId: recipient.userId,
+                                    type: "meet_published",
+                                    title: "Nuova convocazione gara",
+                                    message: `Il meeting \"${meet.name}\" è stato pubblicato.`,
+                                    link: `/community/club/${meet.clubId}/meet/${meet.id}`,
+                                    referenceId: meet.id,
+                                }),
+                            ),
+                        );
+                        return { success: true, meet };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "Impossibile pubblicare convocazione";
+                        if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                        if (message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                    }
+                }),
+
+            openEntries: protectedProcedure
+                .input(z.object({ meetId: z.number() }))
+                .mutation(async ({ ctx, input }) => {
+                    const { transitionClubMeetStatus, listMeetMemberRecipients } = await import("../db_club_meets");
+                    const { createNotification } = await import("../db_social_enhanced");
+                    try {
+                        const meet = await transitionClubMeetStatus({
+                            actorId: ctx.user.id,
+                            meetId: input.meetId,
+                            status: "open",
+                        });
+                        const recipients = await listMeetMemberRecipients({ meetId: input.meetId, audience: "all" });
+                        await Promise.allSettled(
+                            recipients.map((recipient) =>
+                                createNotification({
+                                    userId: recipient.userId,
+                                    type: "meet_entries_open",
+                                    title: "Iscrizioni aperte",
+                                    message: `Le iscrizioni per \"${meet.name}\" sono aperte.`,
+                                    link: `/community/club/${meet.clubId}/meet/${meet.id}`,
+                                    referenceId: meet.id,
+                                }),
+                            ),
+                        );
+                        return { success: true, meet };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "Impossibile aprire iscrizioni";
+                        if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                        if (message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                    }
+                }),
+
+            closeEntries: protectedProcedure
+                .input(z.object({ meetId: z.number() }))
+                .mutation(async ({ ctx, input }) => {
+                    const { transitionClubMeetStatus } = await import("../db_club_meets");
+                    try {
+                        const meet = await transitionClubMeetStatus({
+                            actorId: ctx.user.id,
+                            meetId: input.meetId,
+                            status: "closed",
+                        });
+                        return { success: true, meet };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "Impossibile chiudere iscrizioni";
+                        if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                        if (message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                    }
+                }),
+
+            events: router({
+                upsertBatch: protectedProcedure
+                    .input(z.object({
+                        meetId: z.number(),
+                        events: z.array(z.object({
+                            id: z.number().optional(),
+                            label: z.string().min(2).max(120),
+                            programOrder: z.number().min(0).max(1000).optional(),
+                            distanceMeters: z.number().min(25).max(20000).optional().nullable(),
+                            stroke: z.string().max(32).optional().nullable(),
+                            gender: z.string().max(16).optional().nullable(),
+                            masterCategory: z.string().max(64).optional().nullable(),
+                            scheduledAt: z.string().datetime().optional().nullable(),
+                            notes: z.string().max(500).optional().nullable(),
+                        })).min(1).max(200),
+                    }))
+                    .mutation(async ({ ctx, input }) => {
+                        const { upsertClubMeetEvents } = await import("../db_club_meets");
+                        try {
+                            const events = await upsertClubMeetEvents({
+                                actorId: ctx.user.id,
+                                meetId: input.meetId,
+                                events: input.events.map((item) => ({
+                                    ...item,
+                                    scheduledAt: item.scheduledAt ? new Date(item.scheduledAt) : null,
+                                })),
+                            });
+                            return { success: true, events };
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile aggiornare programma gare";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+            }),
+
+            entries: router({
+                list: protectedProcedure
+                    .input(z.object({ meetId: z.number() }))
+                    .query(async ({ ctx, input }) => {
+                        const { listClubMeetEntries } = await import("../db_club_meets");
+                        try {
+                            return await listClubMeetEntries({
+                                userId: ctx.user.id,
+                                meetId: input.meetId,
+                            });
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile leggere iscrizioni";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+
+                selfSet: protectedProcedure
+                    .input(z.object({
+                        meetEventId: z.number(),
+                        status: z.enum(["pending", "withdrawn"]),
+                        seedTimeCs: z.number().min(1).max(10_000_000).optional(),
+                    }))
+                    .mutation(async ({ ctx, input }) => {
+                        const { selfSetMeetEntry } = await import("../db_club_meets");
+                        try {
+                            const entry = await selfSetMeetEntry({
+                                userId: ctx.user.id,
+                                meetEventId: input.meetEventId,
+                                status: input.status,
+                                seedTimeCs: input.seedTimeCs,
+                            });
+                            return { success: true, entry };
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile aggiornare iscrizione";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "Event not found" || message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                            throw new TRPCError({ code: "PRECONDITION_FAILED", message });
+                        }
+                    }),
+
+                staffSet: protectedProcedure
+                    .input(z.object({
+                        entryId: z.number(),
+                        status: z.enum(ENTRY_STATUS_VALUES),
+                    }))
+                    .mutation(async ({ ctx, input }) => {
+                        const { staffSetMeetEntryStatus } = await import("../db_club_meets");
+                        try {
+                            const entry = await staffSetMeetEntryStatus({
+                                actorId: ctx.user.id,
+                                entryId: input.entryId,
+                                status: input.status,
+                            });
+                            return { success: true, entry };
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile forzare stato iscrizione";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "Entry not found" || message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+            }),
+
+            results: router({
+                importCsv: protectedProcedure
+                    .input(z.object({
+                        meetId: z.number(),
+                        csvBase64: z.string().min(1),
+                        sourceFilename: z.string().max(255).optional(),
+                    }))
+                    .mutation(async ({ ctx, input }) => {
+                        const { importMeetResultsCsv, listMeetMemberRecipients } = await import("../db_club_meets");
+                        const { createNotification } = await import("../db_social_enhanced");
+                        try {
+                            const outcome = await importMeetResultsCsv({
+                                actorId: ctx.user.id,
+                                meetId: input.meetId,
+                                csvBase64: input.csvBase64,
+                                sourceFilename: input.sourceFilename,
+                            });
+                            const recipients = await listMeetMemberRecipients({ meetId: input.meetId, audience: "all" });
+                            await Promise.allSettled(
+                                recipients.map((recipient) =>
+                                    createNotification({
+                                        userId: recipient.userId,
+                                        type: "meet_results_imported",
+                                        title: "Risultati gara aggiornati",
+                                        message: "Nuovi risultati disponibili per il meeting del club.",
+                                        link: `/community/club`,
+                                        referenceId: input.meetId,
+                                    }),
+                                ),
+                            );
+                            return { success: true, mode: "csv" as const, outcome };
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Import CSV non riuscito";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                            throw new TRPCError({ code: "PRECONDITION_FAILED", message });
+                        }
+                    }),
+
+                importPdfManual: protectedProcedure
+                    .input(z.object({
+                        meetId: z.number(),
+                        rows: z.array(z.object({
+                            meetEventId: z.number().optional(),
+                            eventLabel: z.string().max(120).optional(),
+                            athleteName: z.string().max(255).optional(),
+                            athleteEmail: z.string().email().optional(),
+                            userId: z.number().optional(),
+                            clubName: z.string().max(255).optional(),
+                            finalTime: z.string().max(32).optional(),
+                            finalTimeCs: z.number().min(0).max(100_000_000).optional(),
+                            rank: z.number().min(1).max(10_000).optional(),
+                            points: z.number().min(0).max(100_000).optional(),
+                            dq: z.boolean().optional(),
+                            notes: z.string().max(1000).optional(),
+                            seedTime: z.string().max(32).optional(),
+                            seedTimeCs: z.number().min(0).max(100_000_000).optional(),
+                        })).max(5000),
+                    }))
+                    .mutation(async ({ ctx, input }) => {
+                        const { importMeetResultsPdfManual } = await import("../db_club_meets");
+                        try {
+                            const outcome = await importMeetResultsPdfManual({
+                                actorId: ctx.user.id,
+                                meetId: input.meetId,
+                                rows: input.rows,
+                            });
+                            return { success: true, mode: "pdf_manual" as const, outcome };
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Import manuale risultati non riuscito";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                            throw new TRPCError({ code: "PRECONDITION_FAILED", message });
+                        }
+                    }),
+
+                list: protectedProcedure
+                    .input(z.object({ meetId: z.number() }))
+                    .query(async ({ ctx, input }) => {
+                        const { listMeetResults } = await import("../db_club_meets");
+                        try {
+                            return await listMeetResults({
+                                userId: ctx.user.id,
+                                meetId: input.meetId,
+                            });
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile leggere risultati";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+            }),
+
+            stats: router({
+                get: protectedProcedure
+                    .input(z.object({ meetId: z.number() }))
+                    .query(async ({ ctx, input }) => {
+                        const { getMeetStats } = await import("../db_club_meets");
+                        try {
+                            return await getMeetStats({
+                                userId: ctx.user.id,
+                                meetId: input.meetId,
+                            });
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile caricare statistiche meeting";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+            }),
+
+            communications: router({
+                whatsappLink: protectedProcedure
+                    .input(z.object({
+                        meetId: z.number(),
+                        audience: z.enum(["all", "entered", "staff"]),
+                    }))
+                    .query(async ({ ctx, input }) => {
+                        const { buildMeetWhatsappLink } = await import("../db_club_meets");
+                        try {
+                            return await buildMeetWhatsappLink({
+                                userId: ctx.user.id,
+                                meetId: input.meetId,
+                                audience: input.audience,
+                            });
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile generare link WhatsApp";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+            }),
+        }),
 
         // CLUB EVENTS
         events: router({

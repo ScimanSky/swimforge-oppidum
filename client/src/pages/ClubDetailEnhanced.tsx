@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link, useLocation, useRoute } from "wouter";
 import { motion } from "framer-motion";
-import { Pin, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon, Calendar as CalendarIcon } from "lucide-react";
+import { Pin, ArrowLeft, Copy, Check, Upload, ImageIcon, X as XIcon, Calendar as CalendarIcon, Trophy, Flag } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -177,6 +177,7 @@ export default function ClubDetailEnhanced() {
   const [membersOpen, setMembersOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [createEventOpen, setCreateEventOpen] = useState(false);
+  const [createMeetOpen, setCreateMeetOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [joinRulesOpen, setJoinRulesOpen] = useState(false);
   const [joinRulesAccepted, setJoinRulesAccepted] = useState(false);
@@ -186,6 +187,14 @@ export default function ClubDetailEnhanced() {
     startTime: "", endTime: "", maxAttendees: "",
   });
   const [isGeocodingLocation, setIsGeocodingLocation] = useState(false);
+  const [newMeet, setNewMeet] = useState({
+    name: "",
+    venue: "",
+    startDate: "",
+    endDate: "",
+    registrationDeadline: "",
+    notes: "",
+  });
   const [eventRoutePoints, setEventRoutePoints] = useState<RoutePoint[]>([]);
   const mobileStickyRef = useRef<HTMLDivElement | null>(null);
   const desktopStickyRef = useRef<HTMLDivElement | null>(null);
@@ -216,6 +225,10 @@ export default function ClubDetailEnhanced() {
   );
   const isMemberFromClubQuery = Boolean((clubQuery.data as any | undefined)?.is_member);
   const announcementsQuery = trpc.community.clubs.announcements.list.useQuery(
+    { clubId },
+    { enabled: match && Number.isFinite(clubId) && isMemberFromClubQuery }
+  );
+  const meetsQuery = trpc.community.clubs.meets.list.useQuery(
     { clubId },
     { enabled: match && Number.isFinite(clubId) && isMemberFromClubQuery }
   );
@@ -280,6 +293,28 @@ export default function ClubDetailEnhanced() {
     { clubId },
     { enabled: inviteOpen }
   );
+  const createMeetMutation = trpc.community.clubs.meets.create.useMutation({
+    onSuccess: (payload: any) => {
+      toast.success("Convocazione gara creata");
+      setCreateMeetOpen(false);
+      setNewMeet({
+        name: "",
+        venue: "",
+        startDate: "",
+        endDate: "",
+        registrationDeadline: "",
+        notes: "",
+      });
+      utils.community.clubs.meets.list.invalidate({ clubId });
+      const meetId = Number(payload?.meet?.id);
+      if (Number.isFinite(meetId)) {
+        window.location.href = `/community/club/${clubId}/meet/${meetId}`;
+      }
+    },
+    onError: (error) => {
+      toast.error(error.message || "Errore durante creazione convocazione");
+    },
+  });
 
   const club = clubQuery.data as any | undefined;
   const isMember = Boolean(club?.is_member);
@@ -372,6 +407,8 @@ export default function ClubDetailEnhanced() {
   const pinnedAnnouncements = (announcementsQuery.data as any[])?.filter(
     (a: any) => a.announcement?.isPinned
   ) ?? [];
+  const meetItems = ((meetsQuery.data as any)?.meets as any[]) ?? [];
+  const firstMeetId = Number((meetItems[0] as any)?.meet?.id ?? (meetItems[0] as any)?.id);
   const upcomingEvents = (eventsQuery.data as any[]) ?? [];
   const firstUpcomingEvent = upcomingEvents[0];
   const firstUpcomingEventId = Number(firstUpcomingEvent?.event?.id ?? firstUpcomingEvent?.id);
@@ -379,6 +416,15 @@ export default function ClubDetailEnhanced() {
     ? `/community/club/${clubId}/event/${firstUpcomingEventId}`
     : null;
   const hasClubRules = Boolean(club?.rules && String(club.rules).trim().length > 0);
+
+  const meetStatusLabel: Record<string, string> = {
+    draft: "Bozza",
+    published: "Pubblicata",
+    open: "Iscrizioni aperte",
+    closed: "Iscrizioni chiuse",
+    completed: "Completata",
+    cancelled: "Annullata",
+  };
 
   const handleJoinClub = () => {
     if (!hasClubRules) {
@@ -515,6 +561,70 @@ export default function ClubDetailEnhanced() {
           />
         ) : null}
 
+        {/* Club Meets */}
+        {isMember ? (
+          <section className="surface-panel p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="inline-flex items-center gap-2 text-xs font-display uppercase tracking-wide text-muted-foreground">
+                  <Trophy className="h-4 w-4 text-primary" />
+                  Gare Club
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Convocazioni, iscrizioni e risultati meeting
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {Number.isFinite(firstMeetId) ? (
+                  <Link href={`/community/club/${clubId}/meet/${firstMeetId}`}>
+                    <Button variant="outline-neon" size="sm" className="hidden sm:inline-flex">
+                      Apri sezione gare
+                    </Button>
+                  </Link>
+                ) : null}
+                {isStaff ? (
+                  <Button variant="neon" size="sm" onClick={() => setCreateMeetOpen(true)}>
+                    <Flag className="mr-1.5 h-4 w-4" />
+                    Nuova convocazione
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
+            {meetsQuery.isLoading ? (
+              <div className="mt-3 text-xs text-muted-foreground">Caricamento meeting...</div>
+            ) : meetItems.length === 0 ? (
+              <div className="mt-3 rounded-xl border border-border/60 bg-card/40 p-3 text-sm text-muted-foreground">
+                Nessun meeting creato al momento.
+              </div>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {meetItems.slice(0, 4).map((item: any) => {
+                  const meet = item.meet ?? item;
+                  const status = String(meet.status ?? "draft");
+                  return (
+                    <Link
+                      key={meet.id}
+                      href={`/community/club/${clubId}/meet/${meet.id}`}
+                      className="flex items-center justify-between rounded-xl border border-border/60 bg-card/35 px-3 py-2 transition-colors hover:bg-card/55"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{meet.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(meet.startDate).toLocaleDateString("it-IT")} • {item.eventsCount ?? 0} eventi • {item.entriesCount ?? 0} iscrizioni
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full border border-border/60 px-2 py-0.5 text-[11px] text-muted-foreground">
+                        {meetStatusLabel[status] ?? status}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        ) : null}
+
         {/* Feed */}
         {isMember && (
           <ClubFeedTab
@@ -533,6 +643,7 @@ export default function ClubDetailEnhanced() {
           onPost={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           onOpenEvents={eventsPageHref ? () => { window.location.href = eventsPageHref; } : undefined}
           onCreateEvent={() => setCreateEventOpen(true)}
+          onCreateMeet={isStaff ? () => setCreateMeetOpen(true) : undefined}
           onInvite={() => setInviteOpen(true)}
         />
 
@@ -604,6 +715,108 @@ export default function ClubDetailEnhanced() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Create Meet Dialog */}
+        <Dialog open={createMeetOpen} onOpenChange={setCreateMeetOpen}>
+          <DialogContent className={isMobile ? "w-[calc(100vw-0.75rem)] max-w-none max-h-[92dvh] overflow-y-auto p-4 pb-24" : "sm:max-w-2xl max-h-[90vh] overflow-y-auto"}>
+            <DialogHeader>
+              <DialogTitle>Nuova convocazione gara</DialogTitle>
+              <DialogDescription>
+                Crea il meeting del club con finestra iscrizioni per i tesserati.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Nome meeting *</Label>
+                <Input
+                  value={newMeet.name}
+                  onChange={(e) => setNewMeet((prev) => ({ ...prev, name: e.target.value }))}
+                  placeholder="Es. Trofeo Master Città di Roma"
+                />
+              </div>
+              <div>
+                <Label>Impianto</Label>
+                <Input
+                  value={newMeet.venue}
+                  onChange={(e) => setNewMeet((prev) => ({ ...prev, venue: e.target.value }))}
+                  placeholder="Es. Centro Federale Pietralata"
+                />
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <DateTimePickerField
+                  label="Inizio meeting"
+                  required
+                  value={newMeet.startDate}
+                  onChange={(next) => setNewMeet((prev) => ({ ...prev, startDate: next }))}
+                />
+                <DateTimePickerField
+                  label="Fine meeting"
+                  required
+                  value={newMeet.endDate}
+                  onChange={(next) => setNewMeet((prev) => ({ ...prev, endDate: next }))}
+                />
+              </div>
+              <DateTimePickerField
+                label="Deadline iscrizioni"
+                required
+                value={newMeet.registrationDeadline}
+                onChange={(next) => setNewMeet((prev) => ({ ...prev, registrationDeadline: next }))}
+              />
+              <div>
+                <Label>Note</Label>
+                <Textarea
+                  rows={3}
+                  value={newMeet.notes}
+                  onChange={(e) => setNewMeet((prev) => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Dettagli tecnici, logistica, convocazione..."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setCreateMeetOpen(false)}>
+                Annulla
+              </Button>
+              <Button
+                variant="neon"
+                onClick={() => {
+                  const start = parseDateTimeLocal(newMeet.startDate);
+                  const end = parseDateTimeLocal(newMeet.endDate);
+                  const deadline = parseDateTimeLocal(newMeet.registrationDeadline);
+                  if (!newMeet.name.trim()) {
+                    toast.error("Inserisci nome meeting");
+                    return;
+                  }
+                  if (!start || !end || !deadline) {
+                    toast.error("Compila date meeting e deadline");
+                    return;
+                  }
+                  if (end <= start) {
+                    toast.error("La fine meeting deve essere dopo l'inizio");
+                    return;
+                  }
+                  if (deadline >= start) {
+                    toast.error("La deadline iscrizioni deve essere prima dell'inizio meeting");
+                    return;
+                  }
+                  createMeetMutation.mutate({
+                    clubId,
+                    name: newMeet.name.trim(),
+                    venue: newMeet.venue.trim() || null,
+                    startDate: start.toISOString(),
+                    endDate: end.toISOString(),
+                    registrationDeadline: deadline.toISOString(),
+                    notes: newMeet.notes.trim() || null,
+                    timezone: "Europe/Rome",
+                  });
+                }}
+                disabled={createMeetMutation.isPending}
+              >
+                {createMeetMutation.isPending ? "Creazione..." : "Crea convocazione"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Create Event Dialog */}
         <Dialog open={createEventOpen} onOpenChange={setCreateEventOpen}>
           <DialogContent
