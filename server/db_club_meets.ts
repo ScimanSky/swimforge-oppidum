@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, ne, sql } from "drizzle-orm";
 import {
   clubMeets,
   clubMeetEvents,
@@ -472,6 +472,7 @@ export async function upsertClubMeetEvents(params: {
   actorId: number;
   meetId: number;
   events: MeetEventInput[];
+  replaceAll?: boolean;
 }) {
   const meet = await getClubMeetById(params.meetId);
   if (!meet) throw new Error("Meet not found");
@@ -481,6 +482,22 @@ export async function upsertClubMeetEvents(params: {
 
   const db = await requireDb();
   const out: Array<typeof clubMeetEvents.$inferSelect> = [];
+
+  const dedupeKeys = new Set<string>();
+  for (const item of params.events) {
+    const key = [
+      String(item.label ?? "").trim().toLowerCase(),
+      Number(item.programOrder ?? 0),
+      Number(item.distanceMeters ?? 0),
+      String(item.stroke ?? "").trim().toLowerCase(),
+      String(item.gender ?? "").trim().toLowerCase(),
+      String(item.masterCategory ?? "").trim().toLowerCase(),
+    ].join("|");
+    if (dedupeKeys.has(key)) {
+      throw new Error("Duplicate events in payload");
+    }
+    dedupeKeys.add(key);
+  }
 
   for (const item of params.events) {
     if (item.id) {
@@ -499,7 +516,10 @@ export async function upsertClubMeetEvents(params: {
         })
         .where(and(eq(clubMeetEvents.id, item.id), eq(clubMeetEvents.meetId, params.meetId)))
         .returning();
-      if (updated) out.push(updated);
+      if (!updated) {
+        throw new Error("Event not found");
+      }
+      out.push(updated);
       continue;
     }
 
@@ -520,6 +540,42 @@ export async function upsertClubMeetEvents(params: {
       })
       .returning();
     if (created) out.push(created);
+  }
+
+  if (params.replaceAll) {
+    const existing = await db
+      .select({ id: clubMeetEvents.id })
+      .from(clubMeetEvents)
+      .where(eq(clubMeetEvents.meetId, params.meetId));
+
+    const keepIds = new Set(out.map((event) => event.id));
+    const toDeleteIds = existing
+      .map((row) => row.id)
+      .filter((id) => !keepIds.has(id));
+
+    if (toDeleteIds.length > 0) {
+      const [entryDependency] = await db
+        .select({ id: clubMeetEntries.id })
+        .from(clubMeetEntries)
+        .where(inArray(clubMeetEntries.meetEventId, toDeleteIds))
+        .limit(1);
+      if (entryDependency) {
+        throw new Error("Cannot remove events with entries");
+      }
+
+      const [resultDependency] = await db
+        .select({ id: clubMeetResults.id })
+        .from(clubMeetResults)
+        .where(inArray(clubMeetResults.meetEventId, toDeleteIds))
+        .limit(1);
+      if (resultDependency) {
+        throw new Error("Cannot remove events with results");
+      }
+
+      await db
+        .delete(clubMeetEvents)
+        .where(and(eq(clubMeetEvents.meetId, params.meetId), inArray(clubMeetEvents.id, toDeleteIds)));
+    }
   }
 
   return out;

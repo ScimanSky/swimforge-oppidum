@@ -631,6 +631,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                 upsertBatch: meetsProcedure
                     .input(z.object({
                         meetId: z.number(),
+                        replaceAll: z.boolean().optional(),
                         events: z.array(z.object({
                             id: z.number().optional(),
                             label: z.string().min(2).max(120),
@@ -649,6 +650,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                             const events = await upsertClubMeetEvents({
                                 actorId: ctx.user.id,
                                 meetId: input.meetId,
+                                replaceAll: input.replaceAll,
                                 events: input.events.map((item) => ({
                                     ...item,
                                     scheduledAt: item.scheduledAt ? new Date(item.scheduledAt) : null,
@@ -659,6 +661,13 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                             const message = error instanceof Error ? error.message : "Impossibile aggiornare programma gare";
                             if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
                             if (message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
+                            if (message === "Cannot remove events with entries" || message === "Cannot remove events with results") {
+                                throw new TRPCError({ code: "PRECONDITION_FAILED", message });
+                            }
+                            if (message === "Duplicate events in payload") {
+                                throw new TRPCError({ code: "CONFLICT", message: "Programma contiene eventi duplicati." });
+                            }
+                            if (message === "Event not found") throw new TRPCError({ code: "NOT_FOUND", message });
                             throw new TRPCError({ code: "BAD_REQUEST", message });
                         }
                     }),

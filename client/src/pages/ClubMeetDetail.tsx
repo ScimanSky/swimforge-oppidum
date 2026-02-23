@@ -32,16 +32,6 @@ function formatTimeCs(value?: number | null) {
   return `${minutes}:${String(seconds).padStart(2, "0")}.${String(centis).padStart(2, "0")}`;
 }
 
-type EventDraft = {
-  id?: number;
-  label: string;
-  programOrder: number;
-  distanceMeters?: number | null;
-  stroke?: string;
-  gender?: string;
-  masterCategory?: string;
-};
-
 type ManualResultRow = {
   meetEventId?: number;
   eventLabel?: string;
@@ -73,7 +63,6 @@ export default function ClubMeetDetail() {
   const meetId = Number(params?.meetId);
 
   const [myEntriesOpen, setMyEntriesOpen] = useState(false);
-  const [editingEvents, setEditingEvents] = useState<EventDraft[]>([]);
   const [csvFile, setCsvFile] = useState<File | null>(null);
   const [manualRows, setManualRows] = useState<ManualResultRow[]>([]);
 
@@ -162,17 +151,6 @@ export default function ClubMeetDetail() {
       window.location.href = `/community/club/${clubId}`;
     },
     onError: (error) => toast.error(error.message || "Errore cancellazione convocazione"),
-  });
-
-  const saveEventsMutation = trpc.community.clubs.meets.events.upsertBatch.useMutation({
-    onSuccess: () => {
-      toast.success("Programma gare aggiornato");
-      void Promise.all([
-        utils.community.clubs.meets.get.invalidate({ meetId }),
-        utils.community.clubs.meets.entries.list.invalidate({ meetId }),
-      ]);
-    },
-    onError: (error) => toast.error(error.message || "Errore aggiornamento gare"),
   });
 
   const selfSetEntryMutation = trpc.community.clubs.meets.entries.selfSet.useMutation({
@@ -380,209 +358,89 @@ export default function ClubMeetDetail() {
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Programma gare</h2>
             {isStaff ? (
-              <Button
-                variant="outline-neon"
-                size="sm"
-                onClick={() =>
-                  setEditingEvents((prev) => {
-                    if (prev.length) return prev;
-                    const seeded = events.map((event: any) => ({
-                      id: event.id,
-                      label: event.label,
-                      programOrder: Number(event.programOrder ?? 0),
-                      distanceMeters: event.distanceMeters,
-                      stroke: event.stroke ?? "",
-                      gender: event.gender ?? "",
-                      masterCategory: event.masterCategory ?? "",
-                    }));
-                    if (seeded.length) return seeded;
-                    return [{ label: "", programOrder: 1, distanceMeters: null, stroke: "", gender: "", masterCategory: "" }];
-                  })
-                }
-              >
-                Modifica programma
-              </Button>
+              <Link href={`/community/club/${clubId}/meet/${meetId}/program`}>
+                <Button variant="outline-neon" size="sm">
+                  Modifica programma
+                </Button>
+              </Link>
             ) : null}
           </div>
 
-          {editingEvents.length > 0 ? (
-            <div className="space-y-2">
-              {editingEvents.map((event, index) => (
-                <div key={`${event.id ?? "new"}-${index}`} className="grid gap-2 rounded-xl border border-border/60 bg-card/30 p-2 sm:grid-cols-6">
-                  <Input
-                    className="sm:col-span-2"
-                    value={event.label}
-                    onChange={(e) =>
-                      setEditingEvents((prev) =>
-                        prev.map((row, rowIdx) => (rowIdx === index ? { ...row, label: e.target.value } : row)),
-                      )
-                    }
-                    placeholder="50 SL"
-                  />
-                  <Input
-                    type="number"
-                    value={event.programOrder}
-                    onChange={(e) =>
-                      setEditingEvents((prev) =>
-                        prev.map((row, rowIdx) => (rowIdx === index ? { ...row, programOrder: Number(e.target.value || 0) } : row)),
-                      )
-                    }
-                    placeholder="Ordine"
-                  />
-                  <Input
-                    type="number"
-                    value={event.distanceMeters ?? ""}
-                    onChange={(e) =>
-                      setEditingEvents((prev) =>
-                        prev.map((row, rowIdx) => (
-                          rowIdx === index ? { ...row, distanceMeters: e.target.value ? Number(e.target.value) : null } : row
-                        )),
-                      )
-                    }
-                    placeholder="Distanza"
-                  />
-                  <Input
-                    value={event.stroke ?? ""}
-                    onChange={(e) =>
-                      setEditingEvents((prev) =>
-                        prev.map((row, rowIdx) => (rowIdx === index ? { ...row, stroke: e.target.value } : row)),
-                      )
-                    }
-                    placeholder="Stile"
-                  />
-                  <div className="flex gap-2">
-                    <Input
-                      value={event.masterCategory ?? ""}
-                      onChange={(e) =>
-                        setEditingEvents((prev) =>
-                          prev.map((row, rowIdx) => (rowIdx === index ? { ...row, masterCategory: e.target.value } : row)),
-                        )
-                      }
-                      placeholder="Categoria"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => setEditingEvents((prev) => prev.filter((_, rowIdx) => rowIdx !== index))}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline-neon"
-                  size="sm"
-                  onClick={() =>
-                    setEditingEvents((prev) => [...prev, { label: "", programOrder: prev.length + 1, stroke: "", gender: "", masterCategory: "" }])
-                  }
-                >
-                  <Plus className="mr-1 h-4 w-4" /> Evento
-                </Button>
-                <Button
-                  variant="neon"
-                  size="sm"
-                  disabled={saveEventsMutation.isPending || editingEvents.some((item) => !item.label.trim())}
-                  onClick={() =>
-                    saveEventsMutation.mutate({
-                      meetId,
-                      events: editingEvents.map((item) => ({
-                        id: item.id,
-                        label: item.label.trim(),
-                        programOrder: item.programOrder,
-                        distanceMeters: item.distanceMeters ?? null,
-                        stroke: item.stroke?.trim() || null,
-                        gender: item.gender?.trim() || null,
-                        masterCategory: item.masterCategory?.trim() || null,
-                      })),
-                    })
-                  }
-                >
-                  Salva programma
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setEditingEvents([])}>
-                  Annulla
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {events.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Nessuna gara in programma</p>
-              ) : (
-                events.map((event: any) => {
-                  const eventEntries = groupedEntries.get(Number(event.id)) ?? [];
-                  const myEntry = eventEntries.find((row) => Number(row?.entry?.userId) === myUserId);
-                  return (
-                    <div key={event.id} className="rounded-xl border border-border/60 bg-card/35 p-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <p className="font-semibold">{event.label}</p>
-                          <p className="text-xs text-muted-foreground">
-                            Ordine {event.programOrder} • {event.distanceMeters ? `${event.distanceMeters}m` : "distanza n/d"} {event.stroke ?? ""}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">{eventEntries.length} iscritti</Badge>
-                          {meet.status === "open" ? (
-                            myEntry?.entry?.status === "pending" || myEntry?.entry?.status === "confirmed" ? (
-                              <Button
-                                variant="outline-neon"
-                                size="sm"
-                                onClick={() => selfSetEntryMutation.mutate({ meetEventId: event.id, status: "withdrawn" })}
-                              >
-                                Ritirati
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="neon"
-                                size="sm"
-                                onClick={() => selfSetEntryMutation.mutate({ meetEventId: event.id, status: "pending" })}
-                              >
-                                Iscrivimi
-                              </Button>
-                            )
-                          ) : null}
-                        </div>
+          <div className="space-y-2">
+            {events.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nessuna gara in programma</p>
+            ) : (
+              events.map((event: any) => {
+                const eventEntries = groupedEntries.get(Number(event.id)) ?? [];
+                const myEntry = eventEntries.find((row) => Number(row?.entry?.userId) === myUserId);
+                return (
+                  <div key={event.id} className="rounded-xl border border-border/60 bg-card/35 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="font-semibold">{event.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Ordine {event.programOrder} • {event.distanceMeters ? `${event.distanceMeters}m` : "distanza n/d"} {event.stroke ?? ""}
+                        </p>
                       </div>
-
-                      {eventEntries.length > 0 ? (
-                        <div className="mt-2 space-y-1">
-                          {eventEntries.map((row: any) => (
-                            <div key={row.entry.id} className="flex flex-wrap items-center justify-between rounded-lg border border-border/60 bg-background/30 px-2 py-1.5 text-sm">
-                              <span>
-                                {row.user?.username || row.user?.name || row.user?.email} • {row.entry.status}
-                                {row.entry.seedTimeCs ? ` • seed ${formatTimeCs(row.entry.seedTimeCs)}` : ""}
-                              </span>
-                              {isStaff ? (
-                                <select
-                                  className="rounded border border-border bg-background px-1 py-0.5 text-xs"
-                                  value={row.entry.status}
-                                  onChange={(e) =>
-                                    staffSetEntryMutation.mutate({
-                                      entryId: row.entry.id,
-                                      status: e.target.value as any,
-                                    })
-                                  }
-                                >
-                                  <option value="pending">pending</option>
-                                  <option value="confirmed">confirmed</option>
-                                  <option value="waitlist">waitlist</option>
-                                  <option value="rejected">rejected</option>
-                                  <option value="withdrawn">withdrawn</option>
-                                </select>
-                              ) : null}
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{eventEntries.length} iscritti</Badge>
+                        {meet.status === "open" ? (
+                          myEntry?.entry?.status === "pending" || myEntry?.entry?.status === "confirmed" ? (
+                            <Button
+                              variant="outline-neon"
+                              size="sm"
+                              onClick={() => selfSetEntryMutation.mutate({ meetEventId: event.id, status: "withdrawn" })}
+                            >
+                              Ritirati
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="neon"
+                              size="sm"
+                              onClick={() => selfSetEntryMutation.mutate({ meetEventId: event.id, status: "pending" })}
+                            >
+                              Iscrivimi
+                            </Button>
+                          )
+                        ) : null}
+                      </div>
                     </div>
-                  );
-                })
-              )}
-            </div>
-          )}
+
+                    {eventEntries.length > 0 ? (
+                      <div className="mt-2 space-y-1">
+                        {eventEntries.map((row: any) => (
+                          <div key={row.entry.id} className="flex flex-wrap items-center justify-between rounded-lg border border-border/60 bg-background/30 px-2 py-1.5 text-sm">
+                            <span>
+                              {row.user?.username || row.user?.name || row.user?.email} • {row.entry.status}
+                              {row.entry.seedTimeCs ? ` • seed ${formatTimeCs(row.entry.seedTimeCs)}` : ""}
+                            </span>
+                            {isStaff ? (
+                              <select
+                                className="rounded border border-border bg-background px-1 py-0.5 text-xs"
+                                value={row.entry.status}
+                                onChange={(e) =>
+                                  staffSetEntryMutation.mutate({
+                                    entryId: row.entry.id,
+                                    status: e.target.value as any,
+                                  })
+                                }
+                              >
+                                <option value="pending">pending</option>
+                                <option value="confirmed">confirmed</option>
+                                <option value="waitlist">waitlist</option>
+                                <option value="rejected">rejected</option>
+                                <option value="withdrawn">withdrawn</option>
+                              </select>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })
+            )}
+          </div>
         </section>
 
         {isStaff ? (
