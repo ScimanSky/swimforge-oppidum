@@ -302,21 +302,49 @@ export default function ClubHistoryMeetsPage() {
                   ) : results.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Nessun risultato per i filtri selezionati.</p>
                   ) : (
-                    results.map((row: any) => (
-                      <div key={row.id} className="rounded-xl border border-border/60 bg-card/30 px-3 py-2">
-                        <p className="text-sm font-semibold break-words">{row.athlete_name} • {row.event_label}</p>
-                        <p className="text-xs text-muted-foreground break-words">
-                          Tempo: {formatTime(row.final_time_raw)} • Punti: {formatPoints(row.points)}
-                        </p>
-                        {row.record_raw || row.notes ? (
-                          <p className="mt-1 text-xs text-muted-foreground break-words">
-                            {row.record_raw ? `Record: ${row.record_raw}` : ""}
-                            {row.record_raw && row.notes ? " • " : ""}
-                            {row.notes ? `Note: ${row.notes}` : ""}
+                    results.map((row: any) => {
+                      const hasRecord = Boolean(String(row.record_raw ?? "").trim());
+                      return (
+                      <div
+                        key={row.id}
+                        className={`relative overflow-hidden rounded-xl border bg-card/30 px-3 py-2 ${
+                          hasRecord
+                            ? "border-amber-300/70 shadow-[0_0_0_1px_rgba(252,211,77,0.35),0_0_22px_rgba(251,191,36,0.22)] animate-pulse"
+                            : "border-border/60"
+                        }`}
+                      >
+                        <img
+                          src="/images/theme-v3/landing-tour-poster.png"
+                          alt=""
+                          aria-hidden="true"
+                          className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-[0.2] saturate-[0.9] contrast-[1.03]"
+                          loading="lazy"
+                        />
+                        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(102deg,color-mix(in_oklch,var(--background)_90%,transparent)_0%,color-mix(in_oklch,var(--background)_74%,transparent)_44%,color-mix(in_oklch,var(--background)_56%,transparent)_100%)]" />
+                        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_14%_10%,color-mix(in_oklch,var(--electric-cyan)_14%,transparent),transparent_40%),radial-gradient(circle_at_88%_12%,color-mix(in_oklch,var(--electric-lime)_12%,transparent),transparent_42%)]" />
+                        <div className="relative z-10">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-sm font-semibold break-words">{row.athlete_name} • {row.event_label}</p>
+                            {hasRecord ? (
+                              <span className="inline-flex h-5 items-center rounded-full border border-amber-300/80 bg-amber-400/20 px-2 text-[10px] font-semibold uppercase tracking-wide text-amber-200 animate-pulse">
+                                Record
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="text-xs text-muted-foreground break-words">
+                            Tempo: {formatTime(row.final_time_raw)} • Punti: {formatPoints(row.points)}
                           </p>
-                        ) : null}
+                          {row.record_raw || row.notes ? (
+                            <p className="mt-1 text-xs text-muted-foreground break-words">
+                              {row.record_raw ? `Record: ${row.record_raw}` : ""}
+                              {row.record_raw && row.notes ? " • " : ""}
+                              {row.notes ? `Note: ${row.notes}` : ""}
+                            </p>
+                          ) : null}
+                        </div>
                       </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </>
