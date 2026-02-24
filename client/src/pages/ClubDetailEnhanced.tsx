@@ -214,6 +214,10 @@ export default function ClubDetailEnhanced() {
     if (typeof window === "undefined") return false;
     return window.matchMedia("(pointer: coarse)").matches;
   });
+  const [isMobileUserAgent, setIsMobileUserAgent] = useState(() => {
+    if (typeof navigator === "undefined") return false;
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent);
+  });
 
   const utils = trpc.useUtils();
 
@@ -325,7 +329,8 @@ export default function ClubDetailEnhanced() {
 
   const club = clubQuery.data as any | undefined;
   const isMember = Boolean(club?.is_member);
-  const useDesktopHero = isDesktop && !isCoarsePointer;
+  const isLikelyMobileDevice = isMobile || isCoarsePointer || isMobileUserAgent;
+  const useDesktopHero = isDesktop && !isLikelyMobileDevice;
   const contentOffset = stickyHeaderHeight > 0
     ? stickyHeaderHeight + (useDesktopHero ? 14 : 6)
     : (useDesktopHero ? 430 : 96);
@@ -339,6 +344,9 @@ export default function ClubDetailEnhanced() {
       setIsDesktop(desktopQuery.matches);
       setIsMobile(mobileQuery.matches);
       setIsCoarsePointer(coarsePointerQuery.matches);
+      setIsMobileUserAgent(
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent)
+      );
     };
     handleQueries();
     desktopQuery.addEventListener("change", handleQueries);

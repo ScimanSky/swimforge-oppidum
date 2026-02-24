@@ -65,13 +65,13 @@ export default function ClubHero({
 
   if (variant === "compactSticky") {
     const showEventsButton = Boolean(eventsPageHref && (!meetsPageHref || eventsPageHref !== meetsPageHref));
-    const compactActionClass = "h-6 w-full min-w-0 px-1.5 text-[9px] sm:text-[10px]";
+    const compactActionClass = "h-6 w-full min-w-0 px-1 text-[9px] sm:text-[10px]";
 
     return (
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="surface-panel w-full overflow-hidden rounded-xl px-2 py-1"
+        className="surface-panel w-full overflow-hidden rounded-xl px-2 py-1.5"
         style={{ borderColor: color, borderWidth: "1px" }}
       >
         {club.cover_image_url ? (
@@ -83,22 +83,22 @@ export default function ClubHero({
         ) : null}
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-background/44 via-background/72 to-background/88" />
 
-        <div className="relative z-10 flex items-start gap-1.5">
-          <Avatar className="h-7 w-7 shrink-0 border-2" style={{ borderColor: color }}>
+        <div className="relative z-10 grid grid-cols-[auto_1fr_auto] items-start gap-1.5">
+          <Avatar className="h-8 w-8 shrink-0 self-start border-2" style={{ borderColor: color }}>
             <AvatarImage src={club.logo_url ?? undefined} />
             <AvatarFallback style={{ color }} className="text-xs font-bold font-display">
               {club.name.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
 
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0">
             <h1 className="truncate text-[12px] font-bold font-display leading-tight" style={{ color }}>
               {club.name}
             </h1>
             <p className="truncate text-[9px] text-muted-foreground">{club.member_count} membri</p>
           </div>
 
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center justify-end gap-0.5">
             <Link href="/home/community">
               <Button
                 variant="ghost"
