@@ -108,16 +108,6 @@ const COACH_TOUR_STEPS: TourStep[] = [
     body: "Programma eventi, meet e raduni del club.",
   },
   {
-    selector: '[data-tour="club-meets"]',
-    title: "Risultati gare",
-    body: "Importa e gestisci i risultati delle competizioni.",
-  },
-  {
-    selector: '[data-tour="club-history"]',
-    title: "Storico atleti",
-    body: "Importa dati storici da OppiDUM con un click.",
-  },
-  {
     selector: '[data-tour="club-announcements"]',
     title: "Annunci club",
     body: "Comunica con tutti gli atleti del club in tempo reale.",
@@ -373,7 +363,7 @@ export default function OnboardingFlow() {
       window.removeEventListener("resize", scheduleUpdate);
       window.removeEventListener("scroll", scheduleUpdate, true);
     };
-  }, [currentStep, stage]);
+  }, [currentStep, stage, TOUR_STEPS]);
 
   const completeOnboarding = async () => {
     const targetAfterCompletion = resumePathAfterTour;

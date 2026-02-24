@@ -211,7 +211,6 @@ export default function SocialFeed() {
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="w-full min-w-0">
             <div
-              data-tour="feed-tabs"
               className="relative z-10 mb-3 w-full"
             >
               {firstPageQuery.isFetching && !isInitialLoading && (
@@ -252,7 +251,7 @@ export default function SocialFeed() {
               ) : (
                 <div className="flex flex-col gap-4">
                   {posts.slice(0, visibleCount).map((post, index) => (
-                    <div key={post.id} data-tour={index === 0 ? "feed-first-post" : undefined}>
+                    <div key={post.id}>
                       <FeedPost
                         post={post}
                         currentUserId={currentUserId}
