@@ -524,6 +524,15 @@ export default function ClubCoachModeration() {
     setGeneratedWorkoutPreview(null);
   }, [workoutSessionDate]);
 
+  useEffect(() => {
+    if (!match || !Number.isFinite(clubId)) return;
+    if (clubQuery.isLoading) return;
+    if (!isMember) return;
+    if (isCoachStaff) return;
+    if (typeof window === "undefined") return;
+    window.location.replace(`/community/club/${clubId}`);
+  }, [match, clubId, clubQuery.isLoading, isMember, isCoachStaff]);
+
   const meetStatusLabel = useMemo(
     () =>
       ({
@@ -570,7 +579,7 @@ export default function ClubCoachModeration() {
           </Link>
           <div className="surface-panel p-6 text-center">
             <Shield className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Questa pagina è riservata a coach e staff.</p>
+            <p className="text-sm text-muted-foreground">Accesso riservato a coach e staff. Reindirizzamento in corso...</p>
           </div>
         </div>
       </AppLayout>
