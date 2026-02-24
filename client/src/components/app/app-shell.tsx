@@ -62,6 +62,7 @@ type QuickAccessItem = {
   path: string
   icon: React.ReactNode
   match?: (path: string) => boolean
+  dataTour?: string
 }
 
 const normalizePath = (location: string) => location.split("?")[0].split("#")[0] || "/"
@@ -130,14 +131,15 @@ const athleteTopNav: NavItem[] = []
 
 const quickAccessItems: QuickAccessItem[] = [
   { label: "Social Feed", path: "/home", icon: <Users className="size-4" />, match: isHomePath },
-  { label: "Attività", path: "/track", icon: <Activity className="size-4" />, match: isTrainingPath },
+  { label: "Attività", path: "/track", icon: <Activity className="size-4" />, match: isTrainingPath, dataTour: "track-section" },
   {
     label: "Season Hub",
     path: "/season",
     icon: <Orbit className="size-4" />,
     match: (path) => path === "/season" || path.startsWith("/season/leaderboard") || path.startsWith("/leaderboard"),
+    dataTour: "season-hub",
   },
-  { label: "Challenges", path: "/season/challenges", icon: <Swords className="size-4" />, match: isChallengesPath },
+  { label: "Challenges", path: "/season/challenges", icon: <Swords className="size-4" />, match: isChallengesPath, dataTour: "challenges-list" },
   {
     label: "Statistics",
     path: "/profile/performance",
@@ -150,9 +152,9 @@ const quickAccessItems: QuickAccessItem[] = [
     icon: <Target className="size-4" />,
     match: (path) => path.startsWith("/season/objectives") || path.startsWith("/goals"),
   },
-  { label: "Badges", path: "/badges", icon: <Award className="size-4" />, match: (path) => path.startsWith("/badges") },
-  { label: "AI Coach", path: "/coach", icon: <BrainCircuit className="size-4" />, match: (path) => path.startsWith("/coach") },
-  { label: "Club", path: "/home/community", icon: <UsersRound className="size-4" />, match: isClubPath },
+  { label: "Badges", path: "/badges", icon: <Award className="size-4" />, match: (path) => path.startsWith("/badges"), dataTour: "badges-nav" },
+  { label: "AI Coach", path: "/coach", icon: <BrainCircuit className="size-4" />, match: (path) => path.startsWith("/coach"), dataTour: "ai-coach-btn" },
+  { label: "Club", path: "/home/community", icon: <UsersRound className="size-4" />, match: isClubPath, dataTour: "club-directory" },
 ]
 
 function athleteTitleForPath(path: string) {
@@ -286,6 +288,7 @@ function AthleteSideRail({
               className={cn(railRowBase, active && railRowActive)}
               aria-current={active ? "page" : undefined}
               title={item.label}
+              data-tour={item.dataTour}
             >
               <span className="inline-flex transition-transform duration-300 ease-out group-hover/item:scale-110">
                 {item.icon}
@@ -383,6 +386,7 @@ function AthleteSideRail({
               className={cn(railRowBase, active && railRowActive)}
               aria-current={active ? "page" : undefined}
               title={item.label}
+              data-tour={item.dataTour}
             >
               <span className="inline-flex transition-transform duration-300 ease-out group-hover/item:scale-110">
                 {item.icon}
@@ -611,7 +615,10 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
         </div>
       ) : null}
 
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-background/90 backdrop-blur-xl lg:hidden">
+      <nav
+        data-tour="main-navigation"
+        className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-background/90 backdrop-blur-xl lg:hidden"
+      >
         <div className="mx-auto grid h-16 max-w-3xl grid-cols-5 gap-1 px-2">
           <Link
             href="/home"
@@ -629,6 +636,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
 
           <Link
             href="/track"
+            data-tour="track-section"
             className={cn(
               "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors",
               isTrainingPath(path) || isChallengesPath(path) || isSeasonPath(path)
@@ -643,6 +651,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
 
           <button
             type="button"
+            data-tour="create-post"
             onClick={() => {
               setMobileSectionsOpen(false)
               setMobileCreateMenuOpen((prev) => !prev)
@@ -662,6 +671,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
 
           <Link
             href="/home/community"
+            data-tour="club-directory"
             className={cn(
               "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors",
               isClubPath(path)
@@ -803,6 +813,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
                       key={item.path}
                       href={item.path}
                       onClick={() => setMobileSectionsOpen(false)}
+                      data-tour={item.dataTour}
                       className={cn(
                         "flex h-11 items-center justify-between rounded-xl border border-border/60 px-3 text-sm transition-colors",
                         active
@@ -817,6 +828,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
                 })}
                 <Link
                   href="/profile"
+                  data-tour="profile-stats"
                   onClick={() => setMobileSectionsOpen(false)}
                   className={cn(
                     "flex h-11 items-center justify-between rounded-xl border border-border/60 px-3 text-sm transition-colors",

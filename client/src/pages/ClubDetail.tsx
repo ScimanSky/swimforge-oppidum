@@ -644,11 +644,11 @@ export default function ClubDetail() {
                       <Droplet className="h-4 w-4" />
                       <span className="hidden sm:inline">Feed</span>
                     </TabsTrigger>
-                    <TabsTrigger value="eventi" className="flex-none flex items-center gap-2">
+                    <TabsTrigger value="eventi" data-tour="club-events" className="flex-none flex items-center gap-2">
                       <Calendar className="h-4 w-4" />
                       <span className="hidden sm:inline">Eventi</span>
                     </TabsTrigger>
-                    <TabsTrigger value="membri" className="flex-none flex items-center gap-2">
+                    <TabsTrigger value="membri" data-tour="club-members" className="flex-none flex items-center gap-2">
                       <Users className="h-4 w-4" />
                       <span className="hidden sm:inline">Membri</span>
                     </TabsTrigger>
@@ -656,7 +656,7 @@ export default function ClubDetail() {
                       <ImageIcon className="h-4 w-4" />
                       <span className="hidden sm:inline">Gallery</span>
                     </TabsTrigger>
-                    <TabsTrigger value="annunci" className="flex-none flex items-center gap-2">
+                    <TabsTrigger value="annunci" data-tour="club-announcements" className="flex-none flex items-center gap-2">
                       <Megaphone className="h-4 w-4" />
                       <span className="hidden sm:inline">Annunci</span>
                     </TabsTrigger>
@@ -665,7 +665,7 @@ export default function ClubDetail() {
                       <span className="hidden sm:inline">Stats</span>
                     </TabsTrigger>
                     {isStaff && (
-                      <TabsTrigger value="admin" className="flex-none flex items-center gap-2">
+                      <TabsTrigger value="admin" data-tour="coach-panel" className="flex-none flex items-center gap-2">
                         <Settings className="h-4 w-4" />
                         <span className="hidden sm:inline">Admin</span>
                       </TabsTrigger>

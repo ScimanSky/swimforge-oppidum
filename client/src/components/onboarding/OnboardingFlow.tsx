@@ -33,36 +33,99 @@ type TourStep = {
   body: string;
 };
 
-const TOUR_STEPS: TourStep[] = [
+const ATHLETE_TOUR_STEPS: TourStep[] = [
   {
     selector: '[data-tour="main-navigation"]',
     title: "Navigazione principale",
-    body: "Qui trovi le sezioni core: Feed, Club, Season, Track e Profilo.",
-  },
-  {
-    selector: '[data-tour="top-actions"]',
-    title: "Centro notifiche",
-    body: "Campanella, messaggi e menu rapido: da qui gestisci subito gli aggiornamenti.",
-  },
-  {
-    selector: '[data-tour="create-post"]',
-    title: "Crea contenuti",
-    body: "Usa il pulsante + per pubblicare post, condividere attivita o creare storie.",
+    body: "Quattro sezioni, tutto ciò che ti serve: Feed, Traccia, Club e Profilo.",
   },
   {
     selector: '[data-tour="feed-stories"]',
     title: "Stories",
-    body: "Visualizza le stories recenti della community e aprile con un tap.",
+    body: "Le Stories della community spariscono dopo 24h. Aprile con un tap.",
   },
   {
-    selector: '[data-tour="feed-tabs"]',
-    title: "Per Te / Seguiti",
-    body: "Passa tra feed globale e feed dei profili che segui.",
+    selector: '[data-tour="create-post"]',
+    title: "Crea contenuti",
+    body: "Post, attività condivisa o story — tutto in un tap con il tasto +.",
   },
   {
-    selector: '[data-tour="feed-first-post"]',
-    title: "Card post",
-    body: "Qui trovi media, reaction, commenti e condivisioni. Tocca un'immagine per aprirla.",
+    selector: '[data-tour="track-section"]',
+    title: "Traccia le tue vasche",
+    body: "Log la tua prima vasca manualmente, o connetti Garmin/Strava per il sync automatico.",
+  },
+  {
+    selector: '[data-tour="season-hub"]',
+    title: "Season Hub",
+    body: "La stagione è il tuo campionato personale. XP, livelli e progressi stagione per stagione.",
+  },
+  {
+    selector: '[data-tour="challenges-list"]',
+    title: "Sfide settimanali",
+    body: "Partecipa alle sfide attive e scala la classifica in tempo reale.",
+  },
+  {
+    selector: '[data-tour="ai-coach-btn"]',
+    title: "AI Coach",
+    body: "Il tuo coach AI genera allenamenti personalizzati in secondi. Prova il primo oggi.",
+  },
+  {
+    selector: '[data-tour="badges-nav"]',
+    title: "Badge e Achievement",
+    body: "Ogni milestone sblocca un badge. Già ne hai uno — dai un'occhiata!",
+  },
+  {
+    selector: '[data-tour="club-directory"]',
+    title: "Club e Community",
+    body: "Trova il tuo club, unisciti alla squadra o creane uno nuovo.",
+  },
+  {
+    selector: '[data-tour="profile-stats"]',
+    title: "Il tuo profilo",
+    body: "Stats, badge, attività e follower — tutto il tuo percorso in un posto.",
+  },
+];
+
+const COACH_TOUR_STEPS: TourStep[] = [
+  {
+    selector: '[data-tour="main-navigation"]',
+    title: "Navigazione principale",
+    body: "Come coach hai accesso a sezioni di gestione extra.",
+  },
+  {
+    selector: '[data-tour="club-directory"]',
+    title: "Club",
+    body: "Crea il tuo club o gestisci quelli esistenti da qui.",
+  },
+  {
+    selector: '[data-tour="club-members"]',
+    title: "Roster atleti",
+    body: "Gestisci iscrizioni, ruoli e inviti per il tuo club.",
+  },
+  {
+    selector: '[data-tour="club-events"]',
+    title: "Gare ed eventi",
+    body: "Programma eventi, meet e raduni del club.",
+  },
+  {
+    selector: '[data-tour="club-meets"]',
+    title: "Risultati gare",
+    body: "Importa e gestisci i risultati delle competizioni.",
+  },
+  {
+    selector: '[data-tour="club-history"]',
+    title: "Storico atleti",
+    body: "Importa dati storici da OppiDUM con un click.",
+  },
+  {
+    selector: '[data-tour="club-announcements"]',
+    title: "Annunci club",
+    body: "Comunica con tutti gli atleti del club in tempo reale.",
+  },
+  {
+    selector: '[data-tour="coach-panel"]',
+    title: "Dashboard coach",
+    body: "La panoramica completa: membri, eventi, statistiche del club.",
   },
 ];
 
@@ -128,6 +191,11 @@ export default function OnboardingFlow() {
   const [seasonPopupOpen, setSeasonPopupOpen] = useState(false);
   const [onboardingRole, setOnboardingRole] = useState<OnboardingRole>("athlete");
   const onboardingUserId = meQuery.data?.id ? String(meQuery.data.id) : null;
+
+  const TOUR_STEPS = useMemo(
+    () => (onboardingRole === "coach" ? COACH_TOUR_STEPS : ATHLETE_TOUR_STEPS),
+    [onboardingRole],
+  );
 
   const syncAttemptedRef = useRef(false);
 
