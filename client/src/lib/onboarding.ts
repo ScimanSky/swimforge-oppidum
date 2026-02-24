@@ -66,3 +66,31 @@ export function setOnboardingIdentityLocally(
   const key = `${ONBOARDING_IDENTITY_STORAGE_KEY}:${userId ?? "anon"}`;
   window.localStorage.setItem(key, JSON.stringify(data));
 }
+
+// --- Nudge system ---
+
+export type NudgeId =
+  | "first-season"
+  | "try-coach"
+  | "find-club";
+
+const NUDGE_STORAGE_KEY = "swimforge:onboarding:nudges:v1";
+
+export function getShownNudges(userId?: string | number | null): NudgeId[] {
+  if (typeof window === "undefined") return [];
+  const key = `${NUDGE_STORAGE_KEY}:${userId ?? "anon"}`;
+  try {
+    return JSON.parse(window.localStorage.getItem(key) ?? "[]") as NudgeId[];
+  } catch {
+    return [];
+  }
+}
+
+export function markNudgeShown(nudgeId: NudgeId, userId?: string | number | null): void {
+  if (typeof window === "undefined") return;
+  const key = `${NUDGE_STORAGE_KEY}:${userId ?? "anon"}`;
+  const current = getShownNudges(userId);
+  if (!current.includes(nudgeId)) {
+    window.localStorage.setItem(key, JSON.stringify([...current, nudgeId]));
+  }
+}

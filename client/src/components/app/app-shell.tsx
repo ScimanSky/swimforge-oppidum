@@ -49,6 +49,7 @@ import NotificationBell from "@/components/NotificationBell"
 import DirectMessages from "@/components/DirectMessages"
 import { CreatePostSheet } from "@/components/social/CreatePostSheet"
 import { StoryCreator } from "@/components/social/StoryCreator"
+import { OnboardingNudgeManager } from "@/components/onboarding/OnboardingNudgeManager"
 
 type NavItem = {
   label: string
@@ -890,6 +891,9 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
         }}
       />
       <StoryCreator open={isStoryCreatorOpen} onOpenChange={setIsStoryCreatorOpen} />
+      {meQuery.data?.id && (
+        <OnboardingNudgeManager userId={meQuery.data.id} />
+      )}
     </div>
   )
 }
