@@ -14,7 +14,7 @@ const ESCALATION_MODEL_NAME =
   (process.env.CLUB_WORKOUTS_AI_MODEL_ESCALATION ?? config.CLUB_WORKOUTS_AI_MODEL_ESCALATION).trim() ||
   "gemini-3-pro-preview";
 const QUALITY_THRESHOLD = config.CLUB_WORKOUTS_AI_QUALITY_THRESHOLD;
-const PROMPT_VERSION = "club_pool_workout_v3_quality_gate";
+const PROMPT_VERSION = "club_pool_workout_v3_qgate";
 const REQUEST_TIMEOUT_MS = config.CLUB_WORKOUTS_AI_TIMEOUT_MS;
 const REQUEST_TIMEOUT_SOFT_MS = config.CLUB_WORKOUTS_AI_REQUEST_TIMEOUT_SOFT_MS;
 const PHASE_ORDER: ClubPoolWorkoutBlock["phase"][] = ["warmup", "activation", "main", "cooldown"];
