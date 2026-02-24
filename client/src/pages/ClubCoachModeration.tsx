@@ -44,6 +44,7 @@ type WorkoutDirectivesForm = {
   strokeMix: WorkoutStroke[];
   equipment: WorkoutEquipment[];
   sessionMinutes: 45 | 60 | 75 | 90;
+  targetDistanceMeters: number | null;
   notes: string;
 };
 
@@ -272,6 +273,7 @@ export default function ClubCoachModeration() {
     strokeMix: ["sl"],
     equipment: [],
     sessionMinutes: 60,
+    targetDistanceMeters: null,
     notes: "",
   });
   const [generatedWorkoutPreview, setGeneratedWorkoutPreview] = useState<any | null>(null);
@@ -447,7 +449,11 @@ export default function ClubCoachModeration() {
       `${title}`,
       `Data: ${sessionDate}`,
       `Distanza: ${distance}`,
-      `Apri SwimForge: ${typeof window !== "undefined" ? `${window.location.origin}/community/club/${clubId}` : `/community/club/${clubId}`}`,
+      `Apri SwimForge: ${
+        typeof window !== "undefined"
+          ? `${window.location.origin}/community/club/${clubId}/workouts/${workoutPreview.id}`
+          : `/community/club/${clubId}/workouts/${workoutPreview.id}`
+      }`,
     ].join("\n");
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
   }, [workoutPreview, workoutPreviewPlan?.title, workoutPreviewPlan?.totalDistance, workoutSessionDate, club?.name, clubId]);
@@ -783,7 +789,7 @@ export default function ClubCoachModeration() {
             </div>
           </div>
 
-          <div className="grid gap-2 md:grid-cols-2">
+          <div className="grid gap-2 md:grid-cols-3">
             <div>
               <Label>Attrezzi ammessi</Label>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -816,6 +822,33 @@ export default function ClubCoachModeration() {
                   <SelectItem value="60">60 min</SelectItem>
                   <SelectItem value="75">75 min</SelectItem>
                   <SelectItem value="90">90 min</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Distanza totale target (opzionale)</Label>
+              <Select
+                value={workoutDirectives.targetDistanceMeters ? String(workoutDirectives.targetDistanceMeters) : "auto"}
+                onValueChange={(value) =>
+                  setWorkoutDirectives((prev) => ({
+                    ...prev,
+                    targetDistanceMeters: value === "auto" ? null : Number(value),
+                  }))
+                }
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">Auto</SelectItem>
+                  <SelectItem value="1500">1500m</SelectItem>
+                  <SelectItem value="1800">1800m</SelectItem>
+                  <SelectItem value="2000">2000m</SelectItem>
+                  <SelectItem value="2200">2200m</SelectItem>
+                  <SelectItem value="2500">2500m</SelectItem>
+                  <SelectItem value="2800">2800m</SelectItem>
+                  <SelectItem value="3000">3000m</SelectItem>
+                  <SelectItem value="3200">3200m</SelectItem>
+                  <SelectItem value="3500">3500m</SelectItem>
+                  <SelectItem value="4000">4000m</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -853,6 +886,7 @@ export default function ClubCoachModeration() {
                     strokeMix: workoutDirectives.strokeMix,
                     equipment: workoutDirectives.equipment,
                     sessionMinutes: workoutDirectives.sessionMinutes,
+                    targetDistanceMeters: workoutDirectives.targetDistanceMeters,
                     notes: workoutDirectives.notes.trim() || null,
                   },
                 })

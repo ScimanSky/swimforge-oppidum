@@ -37,6 +37,7 @@ const CLUB_POOL_WORKOUT_DIRECTIVES_SCHEMA = z.object({
     strokeMix: z.array(z.enum(WORKOUT_STROKE_VALUES)).min(1).max(5),
     equipment: z.array(z.enum(WORKOUT_EQUIPMENT_VALUES)).max(5),
     sessionMinutes: z.union([z.literal(45), z.literal(60), z.literal(75), z.literal(90)]),
+    targetDistanceMeters: z.number().min(500).max(10000).optional().nullable(),
     notes: z.string().max(1000).optional().nullable(),
 });
 
@@ -889,6 +890,51 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
         }),
 
         workouts: router({
+            listPublished: protectedProcedure
+                .input(z.object({
+                    clubId: z.number(),
+                    limit: z.number().min(1).max(100).optional(),
+                    offset: z.number().min(0).optional(),
+                }))
+                .query(async ({ ctx, input }) => {
+                    const { listPublishedClubWorkouts } = await import("../db_club_workouts");
+                    try {
+                        const workouts = await listPublishedClubWorkouts({
+                            userId: ctx.user.id,
+                            clubId: input.clubId,
+                            limit: input.limit,
+                            offset: input.offset,
+                        });
+                        return { workouts };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "Impossibile leggere workouts club";
+                        if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                    }
+                }),
+
+            getPublished: protectedProcedure
+                .input(z.object({
+                    clubId: z.number(),
+                    workoutId: z.number(),
+                }))
+                .query(async ({ ctx, input }) => {
+                    const { getPublishedClubWorkoutById } = await import("../db_club_workouts");
+                    try {
+                        const workout = await getPublishedClubWorkoutById({
+                            userId: ctx.user.id,
+                            clubId: input.clubId,
+                            workoutId: input.workoutId,
+                        });
+                        return { workout };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "Impossibile leggere dettaglio workout";
+                        if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                        if (message === "Workout not found") throw new TRPCError({ code: "NOT_FOUND" });
+                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                    }
+                }),
+
             coach: router({
                 generationStatus: protectedProcedure
                     .input(z.object({
@@ -1015,11 +1061,11 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                                 await Promise.allSettled(
                                     members.map((recipient) =>
                                         createNotification({
-                                            userId: recipient.userId,
+                                        userId: recipient.userId,
                                             type: "club_workout_published",
                                             title: "Workout del giorno pubblicato",
                                             message: `Nuovo workout disponibile: ${workout.title}`,
-                                            link: `/community/club/${workout.clubId}`,
+                                            link: `/community/club/${workout.clubId}/workouts/${workout.id}`,
                                             referenceId: workout.id,
                                         }),
                                     ),

@@ -58,10 +58,20 @@ function fallbackBlocksFromDirectives(directives: ClubPoolWorkoutDirective): Clu
 }
 
 function fallbackPlan(sessionDate: string, directives: ClubPoolWorkoutDirective): ClubPoolWorkoutPlan {
+  const fallbackDistance =
+    directives.targetDistanceMeters && directives.targetDistanceMeters > 0
+      ? `${directives.targetDistanceMeters}m`
+      : directives.sessionMinutes >= 90
+        ? "3600m"
+        : directives.sessionMinutes >= 75
+          ? "3200m"
+          : directives.sessionMinutes >= 60
+            ? "2800m"
+            : "2300m";
   return {
     title: `Allenamento vasca ${sessionDate}`,
     description: `Allenamento generale generato in fallback (${directives.sessionMinutes} min).`,
-    totalDistance: directives.sessionMinutes >= 90 ? "3600m" : directives.sessionMinutes >= 75 ? "3200m" : directives.sessionMinutes >= 60 ? "2800m" : "2300m",
+    totalDistance: fallbackDistance,
     estimatedDuration: `${directives.sessionMinutes} min`,
     blocks: fallbackBlocksFromDirectives(directives),
     coachNotes: [
@@ -74,7 +84,7 @@ function fallbackPlan(sessionDate: string, directives: ClubPoolWorkoutDirective)
 function buildPrompt(params: { sessionDate: string; directives: ClubPoolWorkoutDirective }) {
   const { sessionDate, directives } = params;
 
-  return `Sei un coach di nuoto master. Genera SOLO un allenamento generale in vasca per gruppo club (non personalizzato su atleta).\n\nData sessione: ${sessionDate}\nVolume: ${directives.volume}\nIntensità: ${directives.intensity}\nDurata target: ${directives.sessionMinutes} minuti\nFocus: ${directives.focus.join(", ") || "tecnica"}\nStili: ${directives.strokeMix.join(", ") || "sl"}\nAttrezzi consentiti: ${directives.equipment.join(", ") || "nessuno"}\nNota coach: ${directives.notes?.trim() || "nessuna"}\n\nRestituisci ESCLUSIVAMENTE JSON valido in questo schema:\n{\n  "title": "string",\n  "description": "string",\n  "totalDistance": "string",\n  "estimatedDuration": "string",\n  "blocks": [\n    {\n      "phase": "warmup|activation|main|cooldown",\n      "label": "string",\n      "items": [\n        {\n          "label": "string",\n          "distance": "string opzionale",\n          "reps": "string opzionale",\n          "rest": "string opzionale",\n          "intensity": "string opzionale",\n          "notes": "string opzionale"\n        }\n      ]\n    }\n  ],\n  "coachNotes": ["string"]\n}\n\nVincoli:\n- 4 blocchi obbligatori (warmup, activation, main, cooldown)\n- testo in italiano\n- workout realistico per club master`;}
+  return `Sei un coach di nuoto master. Genera SOLO un allenamento generale in vasca per gruppo club (non personalizzato su atleta).\n\nData sessione: ${sessionDate}\nVolume: ${directives.volume}\nIntensità: ${directives.intensity}\nDurata target: ${directives.sessionMinutes} minuti\nDistanza target: ${directives.targetDistanceMeters ? `${directives.targetDistanceMeters}m` : "libera (coerente con durata/volume)"}\nFocus: ${directives.focus.join(", ") || "tecnica"}\nStili: ${directives.strokeMix.join(", ") || "sl"}\nAttrezzi consentiti: ${directives.equipment.join(", ") || "nessuno"}\nNota coach: ${directives.notes?.trim() || "nessuna"}\n\nRestituisci ESCLUSIVAMENTE JSON valido in questo schema:\n{\n  "title": "string",\n  "description": "string",\n  "totalDistance": "string",\n  "estimatedDuration": "string",\n  "blocks": [\n    {\n      "phase": "warmup|activation|main|cooldown",\n      "label": "string",\n      "items": [\n        {\n          "label": "string",\n          "distance": "string opzionale",\n          "reps": "string opzionale",\n          "rest": "string opzionale",\n          "intensity": "string opzionale",\n          "notes": "string opzionale"\n        }\n      ]\n    }\n  ],\n  "coachNotes": ["string"]\n}\n\nVincoli:\n- 4 blocchi obbligatori (warmup, activation, main, cooldown)\n- testo in italiano\n- workout realistico per club master\n- se Distanza target è valorizzata, mantienila il più possibile coerente nel totale`;}
 
 function sanitizePlan(raw: unknown, fallback: ClubPoolWorkoutPlan): ClubPoolWorkoutPlan {
   if (!raw || typeof raw !== "object") return fallback;

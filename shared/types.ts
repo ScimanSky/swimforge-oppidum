@@ -22,6 +22,7 @@ export type ClubPoolWorkoutDirective = {
   strokeMix: ClubPoolWorkoutStroke[];
   equipment: ClubPoolWorkoutEquipment[];
   sessionMinutes: 45 | 60 | 75 | 90;
+  targetDistanceMeters?: number | null;
   notes?: string | null;
 };
 export type ClubPoolWorkoutBlock = {

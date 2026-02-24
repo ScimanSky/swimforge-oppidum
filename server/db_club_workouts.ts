@@ -43,6 +43,24 @@ async function assertCoachRole(userId: number, clubId: number) {
   return membership;
 }
 
+async function assertReadableRole(userId: number, clubId: number) {
+  const db = await requireDb();
+  const [membership] = await db
+    .select({
+      role: communityClubMembers.role,
+      status: communityClubMembers.status,
+    })
+    .from(communityClubMembers)
+    .where(and(eq(communityClubMembers.clubId, clubId), eq(communityClubMembers.userId, userId)))
+    .limit(1);
+
+  if (!membership || membership.status !== "active") {
+    throw new Error("Forbidden");
+  }
+
+  return membership;
+}
+
 export async function getClubWorkoutGenerationStatus(params: {
   userId: number;
   clubId: number;
@@ -241,4 +259,58 @@ export async function listClubWorkoutRecipients(params: {
     );
 
   return rows;
+}
+
+export async function listPublishedClubWorkouts(params: {
+  userId: number;
+  clubId: number;
+  limit?: number;
+  offset?: number;
+}) {
+  await assertReadableRole(params.userId, params.clubId);
+  const db = await requireDb();
+  const limit = Math.max(1, Math.min(100, Number(params.limit ?? 30)));
+  const offset = Math.max(0, Number(params.offset ?? 0));
+
+  const rows = await db
+    .select()
+    .from(clubPoolWorkouts)
+    .where(
+      and(
+        eq(clubPoolWorkouts.clubId, params.clubId),
+        eq(clubPoolWorkouts.status, "published"),
+      ),
+    )
+    .orderBy(desc(clubPoolWorkouts.sessionDate), desc(clubPoolWorkouts.publishedAt), desc(clubPoolWorkouts.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return rows;
+}
+
+export async function getPublishedClubWorkoutById(params: {
+  userId: number;
+  clubId: number;
+  workoutId: number;
+}) {
+  await assertReadableRole(params.userId, params.clubId);
+  const db = await requireDb();
+
+  const [row] = await db
+    .select()
+    .from(clubPoolWorkouts)
+    .where(
+      and(
+        eq(clubPoolWorkouts.id, params.workoutId),
+        eq(clubPoolWorkouts.clubId, params.clubId),
+        eq(clubPoolWorkouts.status, "published"),
+      ),
+    )
+    .limit(1);
+
+  if (!row) {
+    throw new Error("Workout not found");
+  }
+
+  return row;
 }

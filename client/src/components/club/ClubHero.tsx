@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Users, Settings, ArrowLeft, Calendar, Database, ExternalLink, FileText, Shield, Trophy } from "lucide-react";
+import { Users, Settings, ArrowLeft, Calendar, Database, Dumbbell, ExternalLink, FileText, Shield, Trophy } from "lucide-react";
 import { Link } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,7 @@ interface ClubHeroProps {
   meetsPageHref?: string | null;
   historyPageHref?: string | null;
   documentsPageHref?: string | null;
+  workoutsPageHref?: string | null;
   coachPageHref?: string | null;
   hasActiveMeet?: boolean;
 }
@@ -56,6 +57,7 @@ export default function ClubHero({
   meetsPageHref,
   historyPageHref,
   documentsPageHref,
+  workoutsPageHref,
   coachPageHref,
   hasActiveMeet = false,
 }: ClubHeroProps) {
@@ -156,6 +158,14 @@ export default function ClubHero({
               <Button className={compactActionClass} variant="outline-neon" size="sm">
                 <Database className="mr-1 h-2.5 w-2.5" />
                 Storico
+              </Button>
+            </Link>
+          ) : null}
+          {workoutsPageHref ? (
+            <Link href={workoutsPageHref} className="min-w-0">
+              <Button className={compactActionClass} variant="outline-neon" size="sm">
+                <Dumbbell className="mr-1 h-2.5 w-2.5" />
+                Workout
               </Button>
             </Link>
           ) : null}
@@ -293,6 +303,14 @@ export default function ClubHero({
               <Button variant="outline-neon" size="sm">
                 <FileText className="mr-1.5 h-3.5 w-3.5" />
                 Documenti
+              </Button>
+            </Link>
+          ) : null}
+          {workoutsPageHref ? (
+            <Link href={workoutsPageHref}>
+              <Button variant="outline-neon" size="sm">
+                <Dumbbell className="mr-1.5 h-3.5 w-3.5" />
+                Workout
               </Button>
             </Link>
           ) : null}
