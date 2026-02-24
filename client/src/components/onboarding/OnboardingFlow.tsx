@@ -436,8 +436,8 @@ export default function OnboardingFlow() {
 
   const handleNextStep = () => {
     if (currentStep >= TOUR_STEPS.length - 1) {
-      setStage("first-action");
       setHighlightRect(null);
+      setStage("first-action");
       return;
     }
     setCurrentStep((prev) => prev + 1);
