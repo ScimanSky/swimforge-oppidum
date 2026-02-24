@@ -911,6 +911,27 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         }
                     }),
 
+                getByDate: protectedProcedure
+                    .input(z.object({
+                        clubId: z.number(),
+                        sessionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+                    }))
+                    .query(async ({ ctx, input }) => {
+                        await requireClubCoachUploadRole(ctx.user.id, input.clubId);
+                        const { getClubWorkoutBySessionDate } = await import("../db_club_workouts");
+                        try {
+                            return await getClubWorkoutBySessionDate({
+                                userId: ctx.user.id,
+                                clubId: input.clubId,
+                                sessionDate: input.sessionDate,
+                            });
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile leggere workout per data";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+
                 generateDraft: protectedProcedure
                     .input(z.object({
                         clubId: z.number(),
@@ -967,6 +988,56 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                                 model: generation.model,
                             },
                         };
+                    }),
+
+                publish: protectedProcedure
+                    .input(z.object({
+                        workoutId: z.number(),
+                    }))
+                    .mutation(async ({ ctx, input }) => {
+                        const { publishClubWorkout, listClubWorkoutRecipients } = await import("../db_club_workouts");
+                        const { createNotification } = await import("../db_social_enhanced");
+                        try {
+                            const { workout, changed } = await publishClubWorkout({
+                                userId: ctx.user.id,
+                                workoutId: input.workoutId,
+                            });
+
+                            let notifiedCount = 0;
+                            if (changed) {
+                                const recipients = await listClubWorkoutRecipients({
+                                    userId: ctx.user.id,
+                                    clubId: workout.clubId,
+                                });
+                                const members = recipients.filter((r) => Number(r.userId) !== Number(ctx.user.id));
+                                notifiedCount = members.length;
+
+                                await Promise.allSettled(
+                                    members.map((recipient) =>
+                                        createNotification({
+                                            userId: recipient.userId,
+                                            type: "club_workout_published",
+                                            title: "Workout del giorno pubblicato",
+                                            message: `Nuovo workout disponibile: ${workout.title}`,
+                                            link: `/community/club/${workout.clubId}`,
+                                            referenceId: workout.id,
+                                        }),
+                                    ),
+                                );
+                            }
+
+                            return {
+                                success: true,
+                                workout,
+                                changed,
+                                notifiedCount,
+                            };
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile pubblicare workout";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            if (message === "Workout not found") throw new TRPCError({ code: "NOT_FOUND" });
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
                     }),
             }),
         }),

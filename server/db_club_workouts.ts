@@ -157,3 +157,89 @@ export async function createClubWorkoutDraftFromGeneration(params: {
     },
   };
 }
+
+export async function getClubWorkoutBySessionDate(params: {
+  userId: number;
+  clubId: number;
+  sessionDate: string;
+}) {
+  await assertCoachRole(params.userId, params.clubId);
+  const db = await requireDb();
+  const normalizedDate = normalizeSessionDate(params.sessionDate);
+
+  const [workout] = await db
+    .select()
+    .from(clubPoolWorkouts)
+    .where(
+      and(
+        eq(clubPoolWorkouts.clubId, params.clubId),
+        eq(clubPoolWorkouts.sessionDate, normalizedDate),
+      ),
+    )
+    .orderBy(desc(clubPoolWorkouts.createdAt))
+    .limit(1);
+
+  return {
+    sessionDate: normalizedDate,
+    workout: workout ?? null,
+  };
+}
+
+export async function publishClubWorkout(params: {
+  userId: number;
+  workoutId: number;
+}) {
+  const db = await requireDb();
+  const now = new Date();
+
+  const [existing] = await db
+    .select()
+    .from(clubPoolWorkouts)
+    .where(eq(clubPoolWorkouts.id, params.workoutId))
+    .limit(1);
+
+  if (!existing) {
+    throw new Error("Workout not found");
+  }
+
+  await assertCoachRole(params.userId, existing.clubId);
+
+  if (existing.status === "published") {
+    return { workout: existing, changed: false };
+  }
+
+  const [updated] = await db
+    .update(clubPoolWorkouts)
+    .set({
+      status: "published",
+      publishedBy: params.userId,
+      publishedAt: now,
+      updatedAt: now,
+    })
+    .where(eq(clubPoolWorkouts.id, params.workoutId))
+    .returning();
+
+  return { workout: updated ?? existing, changed: true };
+}
+
+export async function listClubWorkoutRecipients(params: {
+  userId: number;
+  clubId: number;
+}) {
+  await assertCoachRole(params.userId, params.clubId);
+  const db = await requireDb();
+
+  const rows = await db
+    .select({
+      userId: communityClubMembers.userId,
+    })
+    .from(communityClubMembers)
+    .where(
+      and(
+        eq(communityClubMembers.clubId, params.clubId),
+        eq(communityClubMembers.status, "active"),
+      ),
+    );
+
+  return rows;
+}

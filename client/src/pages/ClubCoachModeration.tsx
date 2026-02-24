@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useRoute } from "wouter";
 import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -196,6 +196,15 @@ function formatDate(value?: string | Date | null) {
   });
 }
 
+function escapeHtml(input: string) {
+  return input
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function toDateInputValue(date: Date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
@@ -294,6 +303,10 @@ export default function ClubCoachModeration() {
     { clubId, sessionDate: workoutSessionDate },
     { enabled: match && Number.isFinite(clubId) && workoutSessionDate.length === 10 && isCoachStaffFromQuery }
   );
+  const workoutByDateQuery = trpc.community.clubs.workouts.coach.getByDate.useQuery(
+    { clubId, sessionDate: workoutSessionDate },
+    { enabled: match && Number.isFinite(clubId) && workoutSessionDate.length === 10 && isCoachStaffFromQuery }
+  );
 
   const createMeetMutation = trpc.community.clubs.meets.create.useMutation({
     onSuccess: (payload: any) => {
@@ -360,12 +373,26 @@ export default function ClubCoachModeration() {
   const generateWorkoutDraftMutation = trpc.community.clubs.workouts.coach.generateDraft.useMutation({
     onSuccess: (payload: any) => {
       toast.success(payload?.generation?.status === "partial" ? "Allenamento generato (fallback AI)" : "Allenamento generato con AI");
+      toast.info("Bozza salvata. Pubblica il workout per notificare i membri del club.");
       setGeneratedWorkoutPreview(payload?.workout ?? null);
       void workoutGenerationStatusQuery.refetch();
+      void workoutByDateQuery.refetch();
     },
     onError: (error) => {
       toast.error(error.message || "Generazione allenamento non riuscita");
       void workoutGenerationStatusQuery.refetch();
+    },
+  });
+  const publishWorkoutMutation = trpc.community.clubs.workouts.coach.publish.useMutation({
+    onSuccess: (payload: any) => {
+      const changed = Boolean(payload?.changed);
+      const notified = Number(payload?.notifiedCount ?? 0);
+      toast.success(changed ? `Workout pubblicato. Notificati ${notified} membri.` : "Workout già pubblicato.");
+      setGeneratedWorkoutPreview(payload?.workout ?? null);
+      void workoutByDateQuery.refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Pubblicazione workout non riuscita");
     },
   });
 
@@ -378,7 +405,11 @@ export default function ClubCoachModeration() {
   const historyLastRun = historyLastRunQuery.data as any | undefined;
   const historyEnabled = Boolean(historyConfig?.enabled);
   const workoutGenerationStatus = workoutGenerationStatusQuery.data as any | undefined;
-  const workoutCanGenerate = Boolean(workoutGenerationStatus?.canGenerate ?? true);
+  const persistedWorkoutPreview = (workoutByDateQuery.data as any)?.workout ?? null;
+  const workoutPreview = generatedWorkoutPreview ?? persistedWorkoutPreview;
+  const workoutCanGenerate = workoutGenerationStatusQuery.isSuccess
+    ? Boolean(workoutGenerationStatus?.canGenerate)
+    : false;
   const workoutCooldownLabel = useMemo(() => {
     if (workoutCanGenerate) return null;
     const next = workoutGenerationStatus?.nextAvailableAt;
@@ -393,6 +424,76 @@ export default function ClubCoachModeration() {
       minute: "2-digit",
     });
   }, [workoutCanGenerate, workoutGenerationStatus?.nextAvailableAt]);
+  const workoutPreviewPlan = useMemo(() => {
+    const raw = workoutPreview?.workoutJson;
+    if (!raw) return null;
+    if (typeof raw === "string") {
+      try {
+        return JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+    if (typeof raw === "object") return raw;
+    return null;
+  }, [workoutPreview?.workoutJson]);
+  const workoutWhatsappLink = useMemo(() => {
+    if (!workoutPreview) return null;
+    const title = String(workoutPreviewPlan?.title ?? workoutPreview.title ?? "Workout vasca");
+    const sessionDate = String(workoutPreview.sessionDate ?? workoutSessionDate);
+    const distance = String(workoutPreviewPlan?.totalDistance ?? "n/d");
+    const text = [
+      `Workout club ${club?.name ?? ""}`.trim(),
+      `${title}`,
+      `Data: ${sessionDate}`,
+      `Distanza: ${distance}`,
+      `Apri SwimForge: ${typeof window !== "undefined" ? `${window.location.origin}/community/club/${clubId}` : `/community/club/${clubId}`}`,
+    ].join("\n");
+    return `https://wa.me/?text=${encodeURIComponent(text)}`;
+  }, [workoutPreview, workoutPreviewPlan?.title, workoutPreviewPlan?.totalDistance, workoutSessionDate, club?.name, clubId]);
+
+  const handlePrintWorkout = () => {
+    if (!workoutPreview) return;
+    const title = String(workoutPreviewPlan?.title ?? workoutPreview.title ?? "Workout");
+    const description = String(workoutPreviewPlan?.description ?? workoutPreview.description ?? "");
+    const blocks = Array.isArray(workoutPreviewPlan?.blocks) ? workoutPreviewPlan.blocks : [];
+    const notes = Array.isArray(workoutPreviewPlan?.coachNotes) ? workoutPreviewPlan.coachNotes : [];
+    const blockHtml = blocks
+      .map((block: any) => {
+        const items = Array.isArray(block?.items) ? block.items : [];
+        const itemsHtml = items
+          .map((item: any) => {
+            const parts = [
+              item?.distance ? `Distanza ${item.distance}` : null,
+              item?.reps ? `Rip ${item.reps}` : null,
+              item?.rest ? `Rec ${item.rest}` : null,
+              item?.intensity ? `Int ${item.intensity}` : null,
+            ].filter(Boolean);
+            return `<li><strong>${escapeHtml(String(item?.label ?? "Esercizio"))}</strong>${parts.length ? ` — ${escapeHtml(parts.join(" • "))}` : ""}</li>`;
+          })
+          .join("");
+        return `<section><h3>${escapeHtml(String(block?.label ?? "Blocco"))}</h3><ul>${itemsHtml}</ul></section>`;
+      })
+      .join("");
+    const notesHtml = notes.length
+      ? `<section><h3>Note Coach</h3><ul>${notes.map((note: any) => `<li>${escapeHtml(String(note))}</li>`).join("")}</ul></section>`
+      : "";
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111}h1,h2,h3{margin:0 0 8px}section{margin:14px 0}ul{margin:6px 0 0 18px}</style></head><body><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p><p><strong>Data:</strong> ${escapeHtml(String(workoutPreview.sessionDate ?? workoutSessionDate))}</p>${blockHtml}${notesHtml}</body></html>`;
+    const win = window.open("", "_blank", "noopener,noreferrer,width=900,height=700");
+    if (!win) {
+      toast.error("Popup bloccato dal browser: abilita le finestre per stampare.");
+      return;
+    }
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+  };
+
+  useEffect(() => {
+    setGeneratedWorkoutPreview(null);
+  }, [workoutSessionDate]);
 
   const meetStatusLabel = useMemo(
     () =>
@@ -727,6 +828,10 @@ export default function ClubCoachModeration() {
               <p className="text-xs text-amber-300">
                 Generazione disponibile il {workoutCooldownLabel}
               </p>
+            ) : workoutGenerationStatusQuery.error ? (
+              <p className="text-xs text-amber-300">
+                Stato cooldown non disponibile: ricarica la pagina.
+              </p>
             ) : workoutGenerationStatusQuery.isFetching ? (
               <p className="text-xs text-muted-foreground">Verifica cooldown...</p>
             ) : (
@@ -734,14 +839,44 @@ export default function ClubCoachModeration() {
             )}
           </div>
 
-          {generatedWorkoutPreview ? (
+          {workoutPreview ? (
             <div className="rounded-xl border border-border/60 bg-card/35 p-3 space-y-2">
-              <p className="text-sm font-semibold">{generatedWorkoutPreview.title}</p>
-              <p className="text-xs text-muted-foreground">{generatedWorkoutPreview.description}</p>
-              <p className="text-xs text-muted-foreground">
-                {generatedWorkoutPreview.sessionDate ? `Data ${generatedWorkoutPreview.sessionDate} • ` : ""}
-                Stato: {generatedWorkoutPreview.status}
+              <p className="text-sm font-semibold">
+                {String(workoutPreviewPlan?.title ?? workoutPreview.title ?? "Workout")}
               </p>
+              <p className="text-xs text-muted-foreground">
+                {String(workoutPreviewPlan?.description ?? workoutPreview.description ?? "Bozza salvata")}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {workoutPreview.sessionDate ? `Data ${workoutPreview.sessionDate} • ` : ""}
+                Stato: {workoutPreview.status}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Blocchi: {Array.isArray(workoutPreviewPlan?.blocks) ? workoutPreviewPlan.blocks.length : 0} •
+                Distanza: {String(workoutPreviewPlan?.totalDistance ?? "n/d")}
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button
+                  size="sm"
+                  variant={String(workoutPreview.status) === "published" ? "outline-neon" : "neon"}
+                  disabled={publishWorkoutMutation.isPending || String(workoutPreview.status) === "published"}
+                  onClick={() => publishWorkoutMutation.mutate({ workoutId: Number(workoutPreview.id) })}
+                >
+                  {publishWorkoutMutation.isPending
+                    ? "Pubblicazione..."
+                    : String(workoutPreview.status) === "published"
+                      ? "Pubblicato"
+                      : "Pubblica + Notifica membri"}
+                </Button>
+                <Button size="sm" variant="outline-neon" onClick={handlePrintWorkout}>
+                  Stampa
+                </Button>
+                {workoutWhatsappLink ? (
+                  <a href={workoutWhatsappLink} target="_blank" rel="noreferrer" className="inline-flex">
+                    <Button size="sm" variant="outline-neon">Condividi WhatsApp</Button>
+                  </a>
+                ) : null}
+              </div>
             </div>
           ) : null}
         </section>
