@@ -446,7 +446,7 @@ export default function OnboardingFlow() {
         </motion.div>
       )}
 
-      {stage === "identity" && (
+      {stage === "identity" && onboardingUserId && (
         <motion.div
           key="identity"
           className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(2,8,24,0.82)] px-4 py-6"
@@ -466,7 +466,7 @@ export default function OnboardingFlow() {
               <p className="mt-1 text-sm text-muted-foreground">Due minuti per personalizzare SwimForge.</p>
             </div>
             <OnboardingIdentitySetup
-              userId={onboardingUserId!}
+              userId={onboardingUserId}
               onComplete={handleIdentityComplete}
               onSkip={() => void completeOnboarding()}
             />

@@ -4,9 +4,19 @@ import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
 import { type OnboardingRole, setOnboardingIdentityLocally } from "@/lib/onboarding";
 
+const STROKES = [
+  { value: "freestyle", label: "Stile libero" },
+  { value: "backstroke", label: "Dorso" },
+  { value: "breaststroke", label: "Rana" },
+  { value: "butterfly", label: "Farfalla" },
+  { value: "mixed", label: "Misto" },
+] as const;
+
+type StrokeValue = typeof STROKES[number]["value"]; // "freestyle" | "backstroke" | "breaststroke" | "butterfly" | "mixed"
+
 type IdentityData = {
   role: OnboardingRole | null;
-  stroke: string | null;
+  stroke: StrokeValue | null;
   poolLength: number | null;
 };
 
@@ -16,20 +26,12 @@ type Props = {
   onSkip: () => void;
 };
 
-const STROKES = [
-  { value: "freestyle", label: "Stile libero" },
-  { value: "backstroke", label: "Dorso" },
-  { value: "breaststroke", label: "Rana" },
-  { value: "butterfly", label: "Farfalla" },
-  { value: "mixed", label: "Misto" },
-] as const;
-
 const POOL_LENGTHS = [
   { value: 25, label: "25m — vasca corta" },
   { value: 50, label: "50m — vasca lunga" },
 ] as const;
 
-const STEP_LABELS = ["Chi sei?", "Stile preferito", "Tipo di vasca", "Foto profilo"];
+const STEP_LABELS = ["Chi sei?", "Stile preferito", "Tipo di vasca"];
 
 export function OnboardingIdentitySetup({ userId, onComplete, onSkip }: Props) {
   const [currentStep, setCurrentStep] = useState(0);
@@ -47,22 +49,32 @@ export function OnboardingIdentitySetup({ userId, onComplete, onSkip }: Props) {
     setCurrentStep(1);
   };
 
-  const handleStrokeSelect = (stroke: string) => {
+  const handleStrokeSelect = (stroke: StrokeValue) => {
     setData((d) => ({ ...d, stroke }));
     setCurrentStep(2);
   };
 
-  const handlePoolSelect = (poolLength: number) => {
-    setData((d) => ({ ...d, poolLength }));
-    setCurrentStep(3);
+  const handlePoolSelect = async (poolLength: number) => {
+    const updated: IdentityData = { ...data, poolLength };
+    setData(updated);
+    const role = updated.role ?? "athlete";
+    try {
+      await updateProfileMutation.mutateAsync({
+        preferredStroke: updated.stroke ?? undefined,
+        preferredPoolLengthMeters: updated.poolLength ?? undefined,
+      });
+    } catch {
+      // Non-blocking — silent failure is intentional; identity is persisted locally as fallback
+    }
+    setOnboardingIdentityLocally({ role, completed: true }, userId);
+    onComplete(role);
   };
 
-  const handleFinish = async () => {
+  const handleSkipPool = async () => {
     const role = data.role ?? "athlete";
     try {
       await updateProfileMutation.mutateAsync({
-        preferredStroke: (data.stroke as "freestyle" | "backstroke" | "breaststroke" | "butterfly" | "mixed") ?? undefined,
-        preferredPoolLengthMeters: data.poolLength ?? undefined,
+        preferredStroke: data.stroke ?? undefined,
       });
     } catch {
       // Non-blocking
@@ -167,38 +179,20 @@ export function OnboardingIdentitySetup({ userId, onComplete, onSkip }: Props) {
               {POOL_LENGTHS.map((p) => (
                 <button
                   key={p.value}
-                  onClick={() => handlePoolSelect(p.value)}
+                  onClick={() => void handlePoolSelect(p.value)}
                   className="rounded-xl border border-border/60 bg-surface-panel/40 px-4 py-3 text-left text-sm text-foreground transition hover:border-[var(--electric-cyan)]"
                 >
                   {p.label}
                 </button>
               ))}
             </div>
-            <Button variant="ghost-neon" className="mt-1 self-start text-xs" onClick={() => setCurrentStep(3)}>
-              Salta →
-            </Button>
-          </motion.div>
-        )}
-
-        {currentStep === 3 && (
-          <motion.div
-            key="avatar"
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.22 }}
-            className="flex flex-col gap-3"
-          >
-            <h3 className="font-display text-xl font-semibold text-foreground">Foto profilo</h3>
-            <p className="text-sm text-muted-foreground">Opzionale — puoi aggiungerla dopo.</p>
-            <div className="mt-2 flex gap-3">
-              <Button variant="neon" onClick={() => void handleFinish()}>
-                Continua senza foto
-              </Button>
-              <Button variant="outline-neon" asChild>
-                <a href="/settings#avatar" onClick={() => void handleFinish()}>
-                  Vai alle impostazioni
-                </a>
+            <div className="mt-1 flex items-center gap-2">
+              <Button
+                variant="ghost-neon"
+                className="text-xs"
+                onClick={() => void handleSkipPool()}
+              >
+                Salta →
               </Button>
             </div>
           </motion.div>
