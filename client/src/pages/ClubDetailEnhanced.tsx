@@ -218,6 +218,10 @@ export default function ClubDetailEnhanced() {
     if (typeof navigator === "undefined") return false;
     return navigator.maxTouchPoints > 0;
   });
+  const [isCompactViewport, setIsCompactViewport] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return Math.min(window.innerWidth, window.innerHeight) <= 900;
+  });
   const [isMobileUserAgent, setIsMobileUserAgent] = useState(() => {
     if (typeof navigator === "undefined") return false;
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent);
@@ -333,10 +337,7 @@ export default function ClubDetailEnhanced() {
 
   const club = clubQuery.data as any | undefined;
   const isMember = Boolean(club?.is_member);
-  const isPhoneLikeScreen = typeof window !== "undefined"
-    ? Math.min(window.screen.width, window.screen.height) <= 900
-    : false;
-  const isLikelyMobileDevice = isMobile || isCoarsePointer || isMobileUserAgent || (isTouchCapable && isPhoneLikeScreen);
+  const isLikelyMobileDevice = isMobile || isCoarsePointer || isMobileUserAgent || (isTouchCapable && isCompactViewport);
   const useDesktopHero = isDesktop && !isLikelyMobileDevice;
   const contentOffset = stickyHeaderHeight > 0
     ? stickyHeaderHeight + (useDesktopHero ? 14 : 6)
@@ -352,6 +353,7 @@ export default function ClubDetailEnhanced() {
       setIsMobile(mobileQuery.matches);
       setIsCoarsePointer(coarsePointerQuery.matches);
       setIsTouchCapable(typeof navigator !== "undefined" ? navigator.maxTouchPoints > 0 : false);
+      setIsCompactViewport(Math.min(window.innerWidth, window.innerHeight) <= 900);
       setIsMobileUserAgent(
         /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent)
       );
