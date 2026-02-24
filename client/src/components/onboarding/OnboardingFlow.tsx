@@ -24,8 +24,9 @@ import {
   ONBOARDING_WELCOME_WIDTH,
 } from "./OnboardingWelcomeComposition";
 import { OnboardingIdentitySetup } from "./OnboardingIdentitySetup";
+import { OnboardingFirstAction } from "./OnboardingFirstAction";
 
-type Stage = "hidden" | "welcome" | "identity" | "tour";
+type Stage = "hidden" | "welcome" | "identity" | "tour" | "first-action";
 
 type TourStep = {
   selector: string;
@@ -433,9 +434,10 @@ export default function OnboardingFlow() {
     startTour();
   };
 
-  const handleNextStep = async () => {
+  const handleNextStep = () => {
     if (currentStep >= TOUR_STEPS.length - 1) {
-      await completeOnboarding();
+      setStage("first-action");
+      setHighlightRect(null);
       return;
     }
     setCurrentStep((prev) => prev + 1);
@@ -590,11 +592,34 @@ export default function OnboardingFlow() {
                 <Button variant="outline-neon" onClick={handleBackStep} disabled={currentStep === 0}>
                   Indietro
                 </Button>
-                <Button variant="neon" onClick={() => void handleNextStep()}>
+                <Button variant="neon" onClick={handleNextStep}>
                   {currentStep >= TOUR_STEPS.length - 1 ? "Fine" : "Avanti"}
                 </Button>
               </div>
             </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {stage === "first-action" && (
+        <motion.div
+          key="first-action"
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(2,8,24,0.82)] px-4 py-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: 0.24, ease: "easeOut" }}
+            className="w-full max-w-md overflow-hidden rounded-3xl border border-[color-mix(in_oklch,var(--electric-cyan)_26%,transparent)] bg-[color-mix(in_oklch,var(--background)_90%,transparent)] p-6 shadow-[0_0_52px_var(--neon-soft)]"
+          >
+            <OnboardingFirstAction
+              role={onboardingRole}
+              onDismiss={() => void completeOnboarding()}
+            />
           </motion.div>
         </motion.div>
       )}
