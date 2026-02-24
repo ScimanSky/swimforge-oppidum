@@ -1032,6 +1032,8 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                                 status: generation.status,
                                 provider: generation.provider,
                                 model: generation.model,
+                                warnings: generation.warnings ?? [],
+                                quality: generation.quality ?? null,
                             },
                         };
                     }),

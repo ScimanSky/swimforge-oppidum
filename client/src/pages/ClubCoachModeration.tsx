@@ -11,6 +11,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { trpc } from "@/lib/trpc";
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
+import { getWorkoutSeriesDisplay, parseWorkoutPlan } from "@/lib/workout-plan";
 import { toast } from "sonner";
 import { ArrowLeft, Calendar as CalendarIcon, Check, Copy, Database, Flag, Plus, RefreshCw, Shield, Users, Sparkles } from "lucide-react";
 
@@ -376,6 +377,10 @@ export default function ClubCoachModeration() {
     onSuccess: (payload: any) => {
       toast.success(payload?.generation?.status === "partial" ? "Allenamento generato (fallback AI)" : "Allenamento generato con AI");
       toast.info("Bozza salvata. Pubblica il workout per notificare i membri del club.");
+      const warnings = Array.isArray(payload?.generation?.warnings) ? payload.generation.warnings : [];
+      if (warnings.length > 0) {
+        toast.warning(`Quality gate: ${String(warnings[0])}`);
+      }
       setGeneratedWorkoutPreview(payload?.workout ?? null);
       void workoutGenerationStatusQuery.refetch();
       void workoutByDateQuery.refetch();
@@ -434,17 +439,7 @@ export default function ClubCoachModeration() {
     });
   }, [workoutCanGenerate, workoutGenerationStatus?.nextAvailableAt]);
   const workoutPreviewPlan = useMemo(() => {
-    const raw = workoutPreview?.workoutJson;
-    if (!raw) return null;
-    if (typeof raw === "string") {
-      try {
-        return JSON.parse(raw);
-      } catch {
-        return null;
-      }
-    }
-    if (typeof raw === "object") return raw;
-    return null;
+    return parseWorkoutPlan(workoutPreview?.workoutJson ?? null);
   }, [workoutPreview?.workoutJson]);
   const workoutWhatsappLink = useMemo(() => {
     if (!workoutPreview) return null;
@@ -478,13 +473,18 @@ export default function ClubCoachModeration() {
           .map((item: any) => {
             const label = String(item?.label ?? "").trim();
             if (!label) return "";
+            const series = getWorkoutSeriesDisplay(item);
             const parts = [
-              item?.distance ? `Distanza ${item.distance}` : null,
-              item?.reps ? `Rip ${item.reps}` : null,
-              item?.rest ? `Rec ${item.rest}` : null,
-              item?.intensity ? `Int ${item.intensity}` : null,
+              `Serie ${series.reps}`,
+              `Distanza serie ${series.seriesDistance}`,
+              `Ripartenza ${series.sendoff}`,
+              series.betweenSetsRest ? `Recupero prima prossima serie ${series.betweenSetsRest}` : null,
+              series.intensity ? `Intensità ${series.intensity}` : null,
+              series.targetPace ? `Pace ${series.targetPace}` : null,
             ].filter(Boolean);
-            return `<li><strong>${escapeHtml(label)}</strong>${parts.length ? ` — ${escapeHtml(parts.join(" • "))}` : ""}</li>`;
+            return `<li><strong>${escapeHtml(label)}</strong>${parts.length ? ` — ${escapeHtml(parts.join(" • "))}` : ""}${
+              series.notes ? `<br/><span>${escapeHtml(series.notes)}</span>` : ""
+            }</li>`;
           })
           .filter((item: string) => item.length > 0)
           .join("");
@@ -961,6 +961,29 @@ export default function ClubCoachModeration() {
                 Blocchi: {Array.isArray(workoutPreviewPlan?.blocks) ? workoutPreviewPlan.blocks.length : 0} •
                 Distanza: {String(workoutPreviewPlan?.totalDistance ?? "n/d")}
               </p>
+              {Array.isArray(workoutPreviewPlan?.blocks) && workoutPreviewPlan.blocks.length > 0 ? (
+                <div className="space-y-2 rounded-lg border border-border/60 bg-card/25 p-2">
+                  {workoutPreviewPlan.blocks.map((block: any, blockIndex: number) => (
+                    <div key={`coach-preview-${blockIndex}`} className="space-y-1">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{String(block?.label ?? `Blocco ${blockIndex + 1}`)}</p>
+                      <div className="space-y-1">
+                        {Array.isArray(block?.items)
+                          ? block.items.map((item: any, itemIndex: number) => {
+                              const series = getWorkoutSeriesDisplay(item);
+                              return (
+                                <div key={`coach-preview-${blockIndex}-${itemIndex}`} className="rounded-md border border-border/50 bg-background/30 p-2 text-[11px]">
+                                  <p className="font-medium text-foreground/90">{String(item?.label ?? "Serie")}</p>
+                                  <p>Serie: {series.reps} • Distanza serie: {series.seriesDistance} • Ripartenza: {series.sendoff}</p>
+                                  {series.betweenSetsRest ? <p>Recupero prima prossima serie: {series.betweenSetsRest}</p> : null}
+                                </div>
+                              );
+                            })
+                          : null}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
               <div className="flex flex-wrap gap-2 pt-1">
                 <Button
                   size="sm"

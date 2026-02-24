@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { clampLimit } from "@/lib/pagination";
+import { getWorkoutSeriesDisplay, parseWorkoutPlan } from "@/lib/workout-plan";
 import { ArrowLeft, CalendarDays, Dumbbell } from "lucide-react";
 
 function formatSessionDate(value?: string | Date | null) {
@@ -26,19 +27,6 @@ function toSessionKey(value?: string | Date | null) {
   const date = new Date(raw);
   if (Number.isNaN(date.getTime())) return raw.slice(0, 10);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-function parseWorkoutPlan(raw: unknown): any | null {
-  if (!raw) return null;
-  if (typeof raw === "object") return raw;
-  if (typeof raw === "string") {
-    try {
-      return JSON.parse(raw);
-    } catch {
-      return null;
-    }
-  }
-  return null;
 }
 
 export default function ClubWorkoutsPage() {
@@ -171,10 +159,16 @@ export default function ClubWorkoutsPage() {
                       <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
                         {block.items.map((item: any, itemIndex: number) => (
                           <li key={`${detailWorkout.id}-${index}-${itemIndex}`}>
-                            {String(item?.label ?? "Esercizio")}
-                            {item?.distance ? ` • ${item.distance}` : ""}
-                            {item?.reps ? ` • ${item.reps}` : ""}
-                            {item?.rest ? ` • rec ${item.rest}` : ""}
+                            {(() => {
+                              const line = getWorkoutSeriesDisplay(item);
+                              return (
+                                <div className="space-y-0.5">
+                                  <p className="font-medium text-foreground/90">{String(item?.label ?? "Serie")}</p>
+                                  <p>Serie: {line.reps} • Distanza serie: {line.seriesDistance} • Ripartenza: {line.sendoff}</p>
+                                  {line.betweenSetsRest ? <p>Recupero prima prossima serie: {line.betweenSetsRest}</p> : null}
+                                </div>
+                              );
+                            })()}
                           </li>
                         ))}
                       </ul>

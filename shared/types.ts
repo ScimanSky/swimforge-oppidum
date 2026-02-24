@@ -31,13 +31,18 @@ export type ClubPoolWorkoutBlock = {
   items: Array<{
     label: string;
     stroke?: string;
-    distance?: string;
     reps?: string;
+    repsCount?: number;
+    distancePerRepMeters?: number;
+    seriesDistanceMeters?: number;
+    seriesDistanceLabel?: string;
     sendoff?: string;
-    rest?: string;
+    betweenSetsRest?: string;
     intensity?: string;
     targetPace?: string;
     notes?: string;
+    distance?: string;
+    rest?: string;
   }>;
 };
 export type ClubPoolWorkoutPlan = {
