@@ -76,7 +76,7 @@ describe("community.clubs.workouts.coach cooldown", () => {
       canGenerate: true,
       nextAvailableAt: null,
       lastGeneratedAt: null,
-      scope: "club_date",
+      scope: "club_24h",
       sessionDate: "2026-03-03",
     });
 
@@ -95,7 +95,7 @@ describe("community.clubs.workouts.coach cooldown", () => {
       canGenerate: true,
       nextAvailableAt: null,
       lastGeneratedAt: null,
-      scope: "club_date",
+      scope: "club_24h",
       sessionDate: "2026-03-03",
     });
   });
@@ -105,7 +105,7 @@ describe("community.clubs.workouts.coach cooldown", () => {
       canGenerate: true,
       nextAvailableAt: null,
       lastGeneratedAt: null,
-      scope: "club_date",
+      scope: "club_24h",
       sessionDate: "2026-03-03",
     });
 
@@ -138,7 +138,7 @@ describe("community.clubs.workouts.coach cooldown", () => {
         canGenerate: false,
         nextAvailableAt: "2026-03-04T09:00:00.000Z",
         lastGeneratedAt: "2026-03-03T09:00:00.000Z",
-        scope: "club_date",
+        scope: "club_24h",
         sessionDate: "2026-03-03",
       },
     });
@@ -158,7 +158,7 @@ describe("community.clubs.workouts.coach cooldown", () => {
     expect(result.success).toBe(true);
     expect(result.cooldown).toMatchObject({
       canGenerate: false,
-      scope: "club_date",
+      scope: "club_24h",
       sessionDate: "2026-03-03",
     });
   });
@@ -168,7 +168,7 @@ describe("community.clubs.workouts.coach cooldown", () => {
       canGenerate: false,
       nextAvailableAt: "2026-03-04T09:00:00.000Z",
       lastGeneratedAt: "2026-03-03T09:00:00.000Z",
-      scope: "club_date",
+      scope: "club_24h",
       sessionDate: "2026-03-03",
     });
 
@@ -188,73 +188,29 @@ describe("community.clubs.workouts.coach cooldown", () => {
     expect(createClubWorkoutDraftFromGenerationMock).not.toHaveBeenCalled();
   });
 
-  it("generateDraft remains allowed for a different sessionDate in the same club", async () => {
-    getClubWorkoutGenerationStatusMock.mockImplementation(async ({ sessionDate }: { sessionDate: string }) => {
-      if (sessionDate === "2026-03-03") {
-        return {
-          canGenerate: false,
-          nextAvailableAt: "2026-03-04T09:00:00.000Z",
-          lastGeneratedAt: "2026-03-03T09:00:00.000Z",
-          scope: "club_date",
-          sessionDate,
-        };
-      }
-      return {
-        canGenerate: true,
-        nextAvailableAt: null,
-        lastGeneratedAt: null,
-        scope: "club_date",
-        sessionDate,
-      };
-    });
-
-    generateClubPoolWorkoutPlanMock.mockResolvedValue({
-      plan: {
-        title: "Allenamento vasca 2026-03-05",
-        description: "Generato AI",
-        totalDistance: "3000m",
-        estimatedDuration: "60 min",
-        blocks: [
-          { phase: "warmup", label: "Warmup", items: [{ label: "300m sciolti" }] },
-          { phase: "activation", label: "Activation", items: [{ label: "4x50 tecnica" }] },
-          { phase: "main", label: "Main", items: [{ label: "8x100 SL" }] },
-          { phase: "cooldown", label: "Cooldown", items: [{ label: "200m easy" }] },
-        ],
-        coachNotes: [],
-      },
-      status: "success",
-      provider: "gemini",
-      model: "gemini-2.5-flash",
-      promptVersion: "club_pool_workout_v1",
-      rawResponse: "{}",
-      error: null,
-    });
-
-    createClubWorkoutDraftFromGenerationMock.mockResolvedValue({
-      workout: { id: 777, title: "Allenamento vasca 2026-03-05", status: "draft" },
-      run: { id: 888, status: "success" },
-      cooldown: {
-        canGenerate: false,
-        nextAvailableAt: "2026-03-06T09:00:00.000Z",
-        lastGeneratedAt: "2026-03-05T09:00:00.000Z",
-        scope: "club_date",
-        sessionDate: "2026-03-05",
-      },
+  it("generateDraft blocks on a different sessionDate when global cooldown is active", async () => {
+    getClubWorkoutGenerationStatusMock.mockResolvedValue({
+      canGenerate: false,
+      nextAvailableAt: "2026-03-04T09:00:00.000Z",
+      lastGeneratedAt: "2026-03-03T09:00:00.000Z",
+      scope: "club_24h",
+      sessionDate: "2026-03-05",
     });
 
     const caller = communityRouter.createCaller(createAuthContext());
-    const result = await caller.clubs.workouts.coach.generateDraft({
-      clubId: 10,
-      sessionDate: "2026-03-05",
-      directives: baseDirectives(),
+
+    await expect(
+      caller.clubs.workouts.coach.generateDraft({
+        clubId: 10,
+        sessionDate: "2026-03-05",
+        directives: baseDirectives(),
+      })
+    ).rejects.toMatchObject({
+      code: "PRECONDITION_FAILED",
     });
 
-    expect(result.success).toBe(true);
-    expect(result.cooldown).toMatchObject({
-      scope: "club_date",
-      sessionDate: "2026-03-05",
-    });
-    expect(generateClubPoolWorkoutPlanMock).toHaveBeenCalledTimes(1);
+    expect(generateClubPoolWorkoutPlanMock).not.toHaveBeenCalled();
+    expect(createClubWorkoutDraftFromGenerationMock).not.toHaveBeenCalled();
   });
 
   it("generateDraft is allowed again on same sessionDate when cooldown is already expired", async () => {
@@ -262,7 +218,7 @@ describe("community.clubs.workouts.coach cooldown", () => {
       canGenerate: true,
       nextAvailableAt: null,
       lastGeneratedAt: "2026-03-01T09:00:00.000Z",
-      scope: "club_date",
+      scope: "club_24h",
       sessionDate: "2026-03-03",
     });
 
@@ -295,7 +251,7 @@ describe("community.clubs.workouts.coach cooldown", () => {
         canGenerate: false,
         nextAvailableAt: "2026-03-04T09:00:00.000Z",
         lastGeneratedAt: "2026-03-03T09:00:00.000Z",
-        scope: "club_date",
+        scope: "club_24h",
         sessionDate: "2026-03-03",
       },
     });

@@ -60,7 +60,6 @@ export async function getClubWorkoutGenerationStatus(params: {
     .where(
       and(
         eq(clubPoolWorkoutRuns.clubId, params.clubId),
-        eq(clubPoolWorkoutRuns.targetSessionDate, normalizedDate),
         inArray(clubPoolWorkoutRuns.status, COOLDOWN_SOURCE_STATUSES as unknown as string[]),
       ),
     )
@@ -72,7 +71,7 @@ export async function getClubWorkoutGenerationStatus(params: {
       canGenerate: true,
       nextAvailableAt: null,
       lastGeneratedAt: null,
-      scope: "club_date" as const,
+      scope: "club_24h" as const,
       sessionDate: normalizedDate,
     };
   }
@@ -85,7 +84,7 @@ export async function getClubWorkoutGenerationStatus(params: {
     canGenerate,
     nextAvailableAt: canGenerate ? null : nextAvailableAt.toISOString(),
     lastGeneratedAt: lastGeneratedAt.toISOString(),
-    scope: "club_date" as const,
+    scope: "club_24h" as const,
     sessionDate: normalizedDate,
   };
 }
@@ -152,7 +151,7 @@ export async function createClubWorkoutDraftFromGeneration(params: {
       canGenerate: false,
       nextAvailableAt,
       lastGeneratedAt: now.toISOString(),
-      scope: "club_date" as const,
+      scope: "club_24h" as const,
       sessionDate: normalizedDate,
     },
   };
