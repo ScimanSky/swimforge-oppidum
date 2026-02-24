@@ -1050,18 +1050,17 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                             });
 
                             let notifiedCount = 0;
+                            let failedNotificationCount = 0;
                             if (changed) {
                                 const recipients = await listClubWorkoutRecipients({
                                     userId: ctx.user.id,
                                     clubId: workout.clubId,
                                 });
                                 const members = recipients.filter((r) => Number(r.userId) !== Number(ctx.user.id));
-                                notifiedCount = members.length;
-
-                                await Promise.allSettled(
+                                const deliveries = await Promise.allSettled(
                                     members.map((recipient) =>
                                         createNotification({
-                                        userId: recipient.userId,
+                                            userId: recipient.userId,
                                             type: "club_workout_published",
                                             title: "Workout del giorno pubblicato",
                                             message: `Nuovo workout disponibile: ${workout.title}`,
@@ -1070,6 +1069,26 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                                         }),
                                     ),
                                 );
+
+                                const failedDeliveries = deliveries.filter((item) => item.status === "rejected");
+                                notifiedCount = deliveries.length - failedDeliveries.length;
+                                failedNotificationCount = failedDeliveries.length;
+
+                                if (failedDeliveries.length > 0) {
+                                    logger.warn("[club_workouts] notification delivery partial failure", {
+                                        event: "club_workouts:publish_notification_partial_failure",
+                                        clubId: workout.clubId,
+                                        workoutId: workout.id,
+                                        recipientCount: members.length,
+                                        successCount: notifiedCount,
+                                        failedCount: failedDeliveries.length,
+                                        failedReasons: failedDeliveries
+                                            .slice(0, 5)
+                                            .map((item) =>
+                                                item.reason instanceof Error ? item.reason.message : String(item.reason),
+                                            ),
+                                    });
+                                }
                             }
 
                             return {
@@ -1077,6 +1096,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                                 workout,
                                 changed,
                                 notifiedCount,
+                                failedNotificationCount,
                             };
                         } catch (error) {
                             const message = error instanceof Error ? error.message : "Impossibile pubblicare workout";

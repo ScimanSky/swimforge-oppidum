@@ -389,7 +389,14 @@ export default function ClubCoachModeration() {
     onSuccess: (payload: any) => {
       const changed = Boolean(payload?.changed);
       const notified = Number(payload?.notifiedCount ?? 0);
-      toast.success(changed ? `Workout pubblicato. Notificati ${notified} membri.` : "Workout già pubblicato.");
+      const failed = Number(payload?.failedNotificationCount ?? 0);
+      if (!changed) {
+        toast.success("Workout già pubblicato.");
+      } else if (failed > 0) {
+        toast.warning(`Workout pubblicato. Notifiche consegnate: ${notified}, fallite: ${failed}.`);
+      } else {
+        toast.success(`Workout pubblicato. Notificati ${notified} membri.`);
+      }
       setGeneratedWorkoutPreview(payload?.workout ?? null);
       void workoutByDateQuery.refetch();
     },

@@ -626,8 +626,54 @@ export async function createNotification(params: {
   referenceId?: number
 }) {
   const db = await requireDb()
-  const [notification] = await db.insert(userNotifications).values(params).returning()
-  return notification
+  try {
+    const [notification] = await db.insert(userNotifications).values(params).returning()
+    return notification
+  } catch {
+    // Fallback for production environments where optional columns like link/reference_id
+    // might be temporarily out-of-sync with schema/migrations.
+    const result = await db.execute(sql`
+      INSERT INTO user_notifications (user_id, type, title, message)
+      VALUES (${params.userId}, ${params.type}, ${params.title}, ${params.message})
+      RETURNING
+        id,
+        user_id AS "userId",
+        type,
+        title,
+        message,
+        is_read AS "isRead",
+        read_at AS "readAt",
+        created_at AS "createdAt"
+    `)
+
+    const row = result.rows[0] as
+      | {
+          id: number
+          userId: number
+          type: string
+          title: string
+          message: string
+          isRead: boolean
+          readAt: Date | null
+          createdAt: Date
+        }
+      | undefined
+
+    if (!row) throw new Error("Failed to create notification")
+
+    return {
+      id: Number(row.id),
+      userId: Number(row.userId),
+      type: String(row.type ?? params.type),
+      title: String(row.title ?? params.title),
+      message: String(row.message ?? params.message),
+      link: params.link ?? null,
+      referenceId: params.referenceId ?? null,
+      isRead: Boolean(row.isRead),
+      readAt: row.readAt ? new Date(row.readAt) : null,
+      createdAt: row.createdAt ? new Date(row.createdAt) : new Date(),
+    }
+  }
 }
 
 /**

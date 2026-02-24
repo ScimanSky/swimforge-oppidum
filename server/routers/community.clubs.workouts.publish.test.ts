@@ -78,6 +78,33 @@ describe("community.clubs.workouts.coach.publish", () => {
       success: true,
       changed: true,
       notifiedCount: 2,
+      failedNotificationCount: 0,
+    });
+    expect(createNotificationMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns partial notification delivery counts when some sends fail", async () => {
+    publishClubWorkoutMock.mockResolvedValue({
+      changed: true,
+      workout: { id: 33, clubId: 10, title: "Workout martedì", status: "published" },
+    });
+    listClubWorkoutRecipientsMock.mockResolvedValue([
+      { userId: 42 },
+      { userId: 7 },
+      { userId: 9 },
+    ]);
+    createNotificationMock
+      .mockResolvedValueOnce({ ok: true })
+      .mockRejectedValueOnce(new Error("insert failed"));
+
+    const caller = communityRouter.createCaller(createAuthContext());
+    const result = await caller.clubs.workouts.coach.publish({ workoutId: 33 });
+
+    expect(result).toMatchObject({
+      success: true,
+      changed: true,
+      notifiedCount: 1,
+      failedNotificationCount: 1,
     });
     expect(createNotificationMock).toHaveBeenCalledTimes(2);
   });
@@ -95,6 +122,7 @@ describe("community.clubs.workouts.coach.publish", () => {
       success: true,
       changed: false,
       notifiedCount: 0,
+      failedNotificationCount: 0,
     });
     expect(listClubWorkoutRecipientsMock).not.toHaveBeenCalled();
     expect(createNotificationMock).not.toHaveBeenCalled();
