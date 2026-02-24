@@ -469,30 +469,36 @@ export default function ClubCoachModeration() {
         const items = Array.isArray(block?.items) ? block.items : [];
         const itemsHtml = items
           .map((item: any) => {
+            const label = String(item?.label ?? "").trim();
+            if (!label) return "";
             const parts = [
               item?.distance ? `Distanza ${item.distance}` : null,
               item?.reps ? `Rip ${item.reps}` : null,
               item?.rest ? `Rec ${item.rest}` : null,
               item?.intensity ? `Int ${item.intensity}` : null,
             ].filter(Boolean);
-            return `<li><strong>${escapeHtml(String(item?.label ?? "Esercizio"))}</strong>${parts.length ? ` — ${escapeHtml(parts.join(" • "))}` : ""}</li>`;
+            return `<li><strong>${escapeHtml(label)}</strong>${parts.length ? ` — ${escapeHtml(parts.join(" • "))}` : ""}</li>`;
           })
+          .filter((item: string) => item.length > 0)
           .join("");
+        if (!itemsHtml) return "";
         return `<section><h3>${escapeHtml(String(block?.label ?? "Blocco"))}</h3><ul>${itemsHtml}</ul></section>`;
       })
+      .filter((item: string) => item.length > 0)
       .join("");
     const notesHtml = notes.length
       ? `<section><h3>Note Coach</h3><ul>${notes.map((note: any) => `<li>${escapeHtml(String(note))}</li>`).join("")}</ul></section>`
       : "";
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111}h1,h2,h3{margin:0 0 8px}section{margin:14px 0}ul{margin:6px 0 0 18px}</style></head><body><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p><p><strong>Data:</strong> ${escapeHtml(String(workoutPreview.sessionDate ?? workoutSessionDate))}</p>${blockHtml}${notesHtml}</body></html>`;
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>@page{size:A4;margin:12mm}html,body{margin:0;padding:0;color:#111;font-family:Arial,sans-serif;font-size:13px;line-height:1.35}.sheet{max-width:760px;margin:0 auto}h1,h2,h3{margin:0 0 6px}h1{font-size:20px}h3{font-size:14px}p{margin:0 0 8px}section{margin:10px 0;break-inside:avoid-page;page-break-inside:avoid}ul{margin:4px 0 0 18px;padding:0}li{margin:2px 0}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><main class="sheet"><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p><p><strong>Data:</strong> ${escapeHtml(String(workoutPreview.sessionDate ?? workoutSessionDate))}</p>${blockHtml || "<p>Nessun blocco disponibile.</p>"}${notesHtml}</main></body></html>`;
 
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
-    iframe.style.right = "0";
-    iframe.style.bottom = "0";
-    iframe.style.width = "0";
-    iframe.style.height = "0";
+    iframe.style.left = "-9999px";
+    iframe.style.top = "0";
+    iframe.style.width = "794px";
+    iframe.style.height = "1123px";
     iframe.style.border = "0";
+    iframe.style.opacity = "0";
     iframe.setAttribute("aria-hidden", "true");
     document.body.appendChild(iframe);
 
@@ -504,26 +510,47 @@ export default function ClubCoachModeration() {
       return;
     }
 
-    frameDocument.open();
-    frameDocument.write(html);
-    frameDocument.close();
-
     const cleanup = () => {
       if (iframe.parentNode) {
         iframe.parentNode.removeChild(iframe);
       }
     };
 
-    frameWindow.onafterprint = cleanup;
-    setTimeout(() => {
+    iframe.onload = () => {
+      frameWindow.onafterprint = cleanup;
+      setTimeout(() => {
+        try {
+          frameWindow.focus();
+          frameWindow.print();
+        } catch {
+          cleanup();
+          toast.error("Stampa non disponibile su questo browser.");
+        }
+      }, 350);
+    };
+
+    try {
+      iframe.srcdoc = html;
+    } catch {
       try {
-        frameWindow.focus();
-        frameWindow.print();
+        frameDocument.open();
+        frameDocument.write(html);
+        frameDocument.close();
+        frameWindow.onafterprint = cleanup;
+        setTimeout(() => {
+          try {
+            frameWindow.focus();
+            frameWindow.print();
+          } catch {
+            cleanup();
+            toast.error("Stampa non disponibile su questo browser.");
+          }
+        }, 500);
       } catch {
         cleanup();
         toast.error("Stampa non disponibile su questo browser.");
       }
-    }, 120);
+    }
   };
 
   useEffect(() => {
