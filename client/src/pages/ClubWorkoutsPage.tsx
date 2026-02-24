@@ -4,6 +4,7 @@ import AppLayout from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
+import { clampLimit } from "@/lib/pagination";
 import { ArrowLeft, CalendarDays, Dumbbell } from "lucide-react";
 
 function formatSessionDate(value?: string | Date | null) {
@@ -48,13 +49,18 @@ export default function ClubWorkoutsPage() {
   const routeWorkoutId = Number(detailParams?.workoutId ?? 0);
   const selectedWorkoutId = Number.isFinite(routeWorkoutId) && routeWorkoutId > 0 ? routeWorkoutId : null;
 
+  const publishedWorkoutsLimit = clampLimit(120);
   const clubQuery = trpc.community.clubs.get.useQuery(
     { clubId },
     { enabled: match && Number.isFinite(clubId) }
   );
   const workoutsQuery = trpc.community.clubs.workouts.listPublished.useQuery(
-    { clubId, limit: 120, offset: 0 },
-    { enabled: match && Number.isFinite(clubId) }
+    { clubId, limit: publishedWorkoutsLimit, offset: 0 },
+    {
+      enabled: match && Number.isFinite(clubId),
+      retry: 1,
+      refetchOnWindowFocus: false,
+    }
   );
   const workoutDetailQuery = trpc.community.clubs.workouts.getPublished.useQuery(
     { clubId, workoutId: selectedWorkoutId ?? 0 },
@@ -217,4 +223,3 @@ export default function ClubWorkoutsPage() {
     </AppLayout>
   );
 }
-

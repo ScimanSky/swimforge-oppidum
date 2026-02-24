@@ -1,10 +1,14 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { ClubPoolWorkoutDirective, ClubPoolWorkoutPlan, ClubPoolWorkoutBlock } from "@shared/types";
 import { logger } from "./middleware/logger";
+import { config } from "./config";
 
-const MODEL_NAME = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash";
+const MODEL_NAME =
+  (process.env.CLUB_WORKOUTS_AI_MODEL ?? process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() ||
+  "gemini-2.5-flash";
 const PROMPT_VERSION = "club_pool_workout_v2";
-const REQUEST_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MS = config.CLUB_WORKOUTS_AI_TIMEOUT_MS;
+const REQUEST_TIMEOUT_SOFT_MS = config.CLUB_WORKOUTS_AI_REQUEST_TIMEOUT_SOFT_MS;
 const PHASE_ORDER: ClubPoolWorkoutBlock["phase"][] = ["warmup", "activation", "main", "cooldown"];
 
 function titleCaseStroke(stroke: string) {
@@ -409,31 +413,67 @@ export async function generateClubPoolWorkoutPlan(params: {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: MODEL_NAME });
     const prompt = buildPrompt(params);
+    const startedAt = Date.now();
+    const softTimeoutMs =
+      REQUEST_TIMEOUT_SOFT_MS > 0 && REQUEST_TIMEOUT_SOFT_MS < REQUEST_TIMEOUT_MS
+        ? REQUEST_TIMEOUT_SOFT_MS
+        : null;
+    let softTimeoutHandle: NodeJS.Timeout | null = null;
 
-    const result = (await Promise.race([
-      model.generateContent(prompt),
-      new Promise((_, reject) => setTimeout(() => reject(new Error(`AI timeout after ${REQUEST_TIMEOUT_MS}ms`)), REQUEST_TIMEOUT_MS)),
-    ])) as { response?: { text?: () => string } };
+    if (softTimeoutMs) {
+      softTimeoutHandle = setTimeout(() => {
+        logger.warn("[club_workouts_ai] generation still running after soft timeout", {
+          event: "club_workouts_ai:slow_generation",
+          model: MODEL_NAME,
+          softTimeoutMs,
+          hardTimeoutMs: REQUEST_TIMEOUT_MS,
+          elapsedMs: Date.now() - startedAt,
+        });
+      }, softTimeoutMs);
+    }
 
-    const text = String(result?.response?.text?.() ?? "").trim();
-    const clean = text.replace(/^```json\s*/i, "").replace(/^```/i, "").replace(/```$/i, "").trim();
-    const parsed = JSON.parse(clean);
-    const plan = ensureDetailedPlan(sanitizePlan(parsed, fallback), params.directives);
+    try {
+      const result = (await Promise.race([
+        model.generateContent(prompt),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`AI timeout after ${REQUEST_TIMEOUT_MS}ms`)), REQUEST_TIMEOUT_MS),
+        ),
+      ])) as { response?: { text?: () => string } };
 
-    return {
-      plan,
-      status: "success" as const,
-      provider: "gemini",
-      model: MODEL_NAME,
-      promptVersion: PROMPT_VERSION,
-      rawResponse: clean.slice(0, 12000),
-      error: null,
-    };
+      const text = String(result?.response?.text?.() ?? "").trim();
+      const clean = text.replace(/^```json\s*/i, "").replace(/^```/i, "").replace(/```$/i, "").trim();
+      const parsed = JSON.parse(clean);
+      const plan = ensureDetailedPlan(sanitizePlan(parsed, fallback), params.directives);
+      const elapsedMs = Date.now() - startedAt;
+
+      logger.info("[club_workouts_ai] generation completed", {
+        event: "club_workouts_ai:success",
+        model: MODEL_NAME,
+        timeoutMs: REQUEST_TIMEOUT_MS,
+        elapsedMs,
+      });
+
+      return {
+        plan,
+        status: "success" as const,
+        provider: "gemini",
+        model: MODEL_NAME,
+        promptVersion: PROMPT_VERSION,
+        rawResponse: clean.slice(0, 12000),
+        error: null,
+      };
+    } finally {
+      if (softTimeoutHandle) {
+        clearTimeout(softTimeoutHandle);
+      }
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.warn(`[club_workouts_ai] fallback used: ${message}`, {
       event: "club_workouts_ai:fallback",
       message,
+      model: MODEL_NAME,
+      timeoutMs: REQUEST_TIMEOUT_MS,
     });
 
     return {

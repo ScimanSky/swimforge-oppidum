@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import HistoryMetricCircle from "@/components/club/HistoryMetricCircle";
 import { trpc } from "@/lib/trpc";
+import { clampLimit } from "@/lib/pagination";
 import { ArrowLeft, Database, Trophy } from "lucide-react";
 
 function formatDate(value: unknown): string {
@@ -44,6 +45,7 @@ export default function ClubHistoryMeetsPage() {
 
   const seasonNumber = selectedSeason === "all" ? undefined : Number(selectedSeason);
 
+  const meetsPageLimit = clampLimit(80);
   const clubQuery = trpc.community.clubs.get.useQuery(
     { clubId },
     { enabled: match && Number.isFinite(clubId) },
@@ -59,7 +61,7 @@ export default function ClubHistoryMeetsPage() {
       clubId,
       season: seasonNumber,
       search: search.trim() || undefined,
-      limit: 80,
+      limit: meetsPageLimit,
       offset: 0,
     },
     {
