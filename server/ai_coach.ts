@@ -19,7 +19,8 @@ import {
 } from "./advanced_metrics";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+const GEMINI_MODEL = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash";
+const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
 interface WorkoutSection {
   title: string;

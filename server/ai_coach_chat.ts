@@ -139,7 +139,7 @@ function normalizeAssistantContent(content: unknown): string {
     .trim();
 }
 
-const GEMINI_MODEL = "gemini-2.5-flash";
+const GEMINI_MODEL = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash";
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY ?? "").trim();
 const geminiModel = GEMINI_API_KEY
   ? new GoogleGenerativeAI(GEMINI_API_KEY).getGenerativeModel({ model: GEMINI_MODEL })

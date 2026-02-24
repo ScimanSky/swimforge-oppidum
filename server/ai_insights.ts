@@ -8,6 +8,7 @@ import { logger } from "./middleware/logger";
 let genAI: GoogleGenerativeAI | null = null;
 const log = logger.child({ component: "ai_insights" });
 const INSIGHT_EMOJI_REGEX = /^[🔥⚡💪🎯📈🏊🔄🌟🚀💯🏆❤️📊🎉👍💬🤯😂😢🌊]/;
+const GEMINI_MODEL = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash";
 
 function getGeminiClient() {
   if (!genAI && process.env.GEMINI_API_KEY) {
@@ -229,7 +230,7 @@ export async function generateAIInsights(
   }
 
   try {
-    const model = client.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = client.getGenerativeModel({ model: GEMINI_MODEL });
 
     const prompt = `Sei un analista di performance di nuoto esperto. Analizza questi dati di un nuotatore e genera 6-8 insights analitici, identificando TENDENZE, PATTERN e AREE DI MIGLIORAMENTO in italiano, CATEGORIZZATI per argomento.
 

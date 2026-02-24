@@ -14,6 +14,7 @@ const log = logger.child({ component: "ai_activity_insights" });
 const inFlightActivityInsightKeys = new Set<string>();
 const userBackgroundGenerationThrottle = new Map<number, number>();
 const BACKGROUND_THROTTLE_MS = 15_000;
+const GEMINI_MODEL = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -363,7 +364,7 @@ export async function generateActivityInsight(activity: Record<string, unknown>)
   const client = getGeminiClient();
   if (!client) return null;
 
-  const model = client.getGenerativeModel({ model: "gemini-2.5-flash" });
+  const model = client.getGenerativeModel({ model: GEMINI_MODEL });
   const normalized = normalizeActivity(activity);
   const activityId = toNumber(activity["id"]);
   const segmentContext = activityId ? await buildSegmentContext(activityId) : null;
