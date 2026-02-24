@@ -196,28 +196,37 @@ export default function ClubHero({
     <motion.div
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative w-full overflow-hidden rounded-[26px]"
+      className="relative w-full overflow-hidden rounded-2xl sm:rounded-[26px]"
       style={{ borderColor: color, borderWidth: "1px" }}
     >
       {/* Cover image */}
-      <div className="relative h-36 bg-gradient-to-br from-surface-panel to-black/60 sm:h-48">
+      <div className="relative h-20 bg-gradient-to-br from-surface-panel to-black/60 sm:h-48">
         {club.cover_image_url && (
           <img src={club.cover_image_url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-60" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
+        {/* Mobile logo (top-left) */}
+        <div className="absolute left-2 top-2 sm:hidden">
+          <Avatar className="h-9 w-9 border-2" style={{ borderColor: color }}>
+            <AvatarImage src={club.logo_url ?? undefined} />
+            <AvatarFallback style={{ color }} className="text-[10px] font-bold font-display">
+              {club.name.slice(0, 2).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        </div>
         {/* Back button */}
         <Link href="/home/community">
-          <Button variant="ghost" size="icon" className="absolute top-3 left-3 text-white/80 hover:text-white">
+          <Button variant="ghost" size="icon" className="absolute top-2 right-12 h-8 w-8 text-white/80 hover:text-white sm:top-3 sm:left-3 sm:right-auto sm:h-10 sm:w-10">
             <ArrowLeft className="h-5 w-5" />
           </Button>
         </Link>
         {/* Action icons */}
-        <div className="absolute top-3 right-3 flex gap-2">
-          <Button variant="ghost" size="icon" className="text-white/80 hover:text-white" onClick={onOpenMembers}>
+        <div className="absolute right-2 top-2 flex gap-1 sm:top-3 sm:right-3 sm:gap-2">
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white sm:h-10 sm:w-10" onClick={onOpenMembers}>
             <Users className="h-5 w-5" />
           </Button>
           {isStaff && (
-            <Button variant="ghost" size="icon" className="text-white/80 hover:text-white" onClick={onOpenSettings}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-white/80 hover:text-white sm:h-10 sm:w-10" onClick={onOpenSettings}>
               <Settings className="h-5 w-5" />
             </Button>
           )}
@@ -225,27 +234,27 @@ export default function ClubHero({
       </div>
 
       {/* Club info overlay */}
-      <div className="relative -mt-10 px-5 pb-5">
-        <div className="flex items-end gap-3">
+      <div className="relative px-3 pb-3 sm:-mt-10 sm:px-5 sm:pb-5">
+        <div className="flex items-start gap-2 sm:items-end sm:gap-3">
           {/* Logo */}
-          <Avatar className="h-16 w-16 border-2" style={{ borderColor: color }}>
+          <Avatar className="hidden h-16 w-16 border-2 sm:flex" style={{ borderColor: color }}>
             <AvatarImage src={club.logo_url ?? undefined} />
             <AvatarFallback style={{ color }} className="text-xl font-bold font-display">
               {club.name.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold font-display truncate" style={{ color }}>
+            <h1 className="truncate pl-11 text-base font-bold font-display sm:pl-0 sm:text-xl" style={{ color }}>
               {club.name}
             </h1>
             {club.tagline && (
-              <p className="text-sm text-muted-foreground truncate">{club.tagline}</p>
+              <p className="truncate pl-11 text-xs text-muted-foreground sm:pl-0 sm:text-sm">{club.tagline}</p>
             )}
           </div>
         </div>
 
         {/* Meta row */}
-        <div className="flex items-center gap-3 mt-3">
+        <div className="mt-2 flex items-center gap-2 sm:mt-3 sm:gap-3">
           <Badge variant="outline" className="text-xs" style={{ borderColor: color, color }}>
             {club.member_count} membri
           </Badge>
@@ -258,7 +267,7 @@ export default function ClubHero({
             </Badge>
           )}
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 sm:gap-2">
           {gareHref ? (
             <Link href={gareHref}>
               <Button

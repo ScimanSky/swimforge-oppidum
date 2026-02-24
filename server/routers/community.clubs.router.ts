@@ -367,7 +367,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                 return updateClub(ctx.user.id, input.clubId, {
                     name: input.name,
                     description: input.description ?? undefined,
-                    coverImageUrl: input.coverImageUrl ?? undefined,
+                    coverImageUrl: input.coverImageUrl,
                     rules: input.rules ?? undefined,
                     visibility: input.visibility,
                     themeColor: input.themeColor,

@@ -148,6 +148,20 @@ describe("community.clubs websiteUrl normalization", () => {
     }));
   });
 
+  it("passes coverImageUrl null on clubs.update when cover is removed", async () => {
+    const caller = communityRouter.createCaller(createAuthContext());
+
+    await caller.clubs.update({
+      clubId: 77,
+      coverImageUrl: null,
+    });
+
+    expect(updateClubMock).toHaveBeenCalledTimes(1);
+    expect(updateClubMock).toHaveBeenCalledWith(42, 77, expect.objectContaining({
+      coverImageUrl: null,
+    }));
+  });
+
   it("rejects invalid websiteUrl on clubs.update", async () => {
     const caller = communityRouter.createCaller(createAuthContext());
 
@@ -162,4 +176,3 @@ describe("community.clubs websiteUrl normalization", () => {
     expect(updateClubMock).not.toHaveBeenCalled();
   });
 });
-
