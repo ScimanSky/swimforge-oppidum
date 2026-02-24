@@ -740,6 +740,46 @@ export const clubMedia = pgTable("club_media", {
 });
 
 // ============================================
+// CLUB POOL WORKOUTS (Coach generated)
+// ============================================
+export const clubPoolWorkouts = pgTable("club_pool_workouts", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  sessionDate: date("session_date").notNull(),
+  status: varchar("status", { length: 20 }).default("draft").notNull(), // draft, published, archived, cancelled
+  workoutType: varchar("workout_type", { length: 20 }).default("pool").notNull(), // pool (v1)
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  directivesJson: json("directives_json").notNull(),
+  workoutJson: json("workout_json").notNull(),
+  generatedBy: integer("generated_by").notNull(),
+  publishedBy: integer("published_by"),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  clubPoolWorkoutsClubDateStatusIdx: index("idx_club_pool_workouts_club_date_status").on(table.clubId, table.sessionDate, table.status),
+}));
+
+export const clubPoolWorkoutRuns = pgTable("club_pool_workout_runs", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  workoutId: integer("workout_id"),
+  targetSessionDate: date("target_session_date").notNull(),
+  triggeredBy: integer("triggered_by").notNull(),
+  status: varchar("status", { length: 20 }).notNull(), // running, success, partial, failed
+  provider: varchar("provider", { length: 40 }).default("gemini").notNull(),
+  model: varchar("model", { length: 80 }),
+  promptVersion: varchar("prompt_version", { length: 32 }),
+  directivesJson: json("directives_json").notNull(),
+  rawResponse: text("raw_response"),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  clubPoolWorkoutRunsClubDateCreatedIdx: index("idx_club_pool_workout_runs_club_date_created").on(table.clubId, table.targetSessionDate, table.createdAt),
+}));
+
+// ============================================
 // POST REACTIONS (Reazioni emotive avanzate)
 // ============================================
 export const postReactions = pgTable("post_reactions", {

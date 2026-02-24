@@ -12,7 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { trpc } from "@/lib/trpc";
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
 import { toast } from "sonner";
-import { ArrowLeft, Calendar as CalendarIcon, Check, Copy, Database, Flag, Plus, RefreshCw, Shield, Users } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, Check, Copy, Database, Flag, Plus, RefreshCw, Shield, Users, Sparkles } from "lucide-react";
 
 type MeetForm = {
   name: string;
@@ -32,6 +32,44 @@ type EventForm = {
   endTime: string;
   maxAttendees: string;
 };
+
+type WorkoutFocus = "tecnica" | "aerobico" | "soglia" | "velocita" | "recupero";
+type WorkoutStroke = "sl" | "do" | "ra" | "de" | "mx";
+type WorkoutEquipment = "pinne" | "palette" | "pull" | "tavoletta" | "snorkel";
+
+type WorkoutDirectivesForm = {
+  focus: WorkoutFocus[];
+  volume: "light" | "medium" | "high" | "very_high";
+  intensity: "easy" | "mixed" | "hard";
+  strokeMix: WorkoutStroke[];
+  equipment: WorkoutEquipment[];
+  sessionMinutes: 45 | 60 | 75 | 90;
+  notes: string;
+};
+
+const WORKOUT_FOCUS_OPTIONS: Array<{ value: WorkoutFocus; label: string }> = [
+  { value: "tecnica", label: "Tecnica" },
+  { value: "aerobico", label: "Aerobico" },
+  { value: "soglia", label: "Soglia" },
+  { value: "velocita", label: "Velocità" },
+  { value: "recupero", label: "Recupero" },
+];
+
+const WORKOUT_STROKE_OPTIONS: Array<{ value: WorkoutStroke; label: string }> = [
+  { value: "sl", label: "Stile Libero" },
+  { value: "do", label: "Dorso" },
+  { value: "ra", label: "Rana" },
+  { value: "de", label: "Delfino" },
+  { value: "mx", label: "Misti" },
+];
+
+const WORKOUT_EQUIPMENT_OPTIONS: Array<{ value: WorkoutEquipment; label: string }> = [
+  { value: "pinne", label: "Pinne" },
+  { value: "palette", label: "Palette" },
+  { value: "pull", label: "Pull buoy" },
+  { value: "tavoletta", label: "Tavoletta" },
+  { value: "snorkel", label: "Snorkel" },
+];
 
 function parseDateTimeLocal(value: string) {
   if (!value) return null;
@@ -158,6 +196,14 @@ function formatDate(value?: string | Date | null) {
   });
 }
 
+function toDateInputValue(date: Date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function toggleMultiSelect<T extends string>(list: T[], value: T) {
+  return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
+}
+
 function InviteRow({ invite }: { invite: any }) {
   const [copied, setCopied] = useState(false);
   const origin = typeof window !== "undefined" ? window.location.origin : "";
@@ -209,10 +255,24 @@ export default function ClubCoachModeration() {
     endTime: "",
     maxAttendees: "",
   });
+  const [workoutSessionDate, setWorkoutSessionDate] = useState(() => toDateInputValue(new Date()));
+  const [workoutDirectives, setWorkoutDirectives] = useState<WorkoutDirectivesForm>({
+    focus: ["tecnica"],
+    volume: "medium",
+    intensity: "mixed",
+    strokeMix: ["sl"],
+    equipment: [],
+    sessionMinutes: 60,
+    notes: "",
+  });
+  const [generatedWorkoutPreview, setGeneratedWorkoutPreview] = useState<any | null>(null);
 
   const clubQuery = trpc.community.clubs.get.useQuery(
     { clubId },
     { enabled: match && Number.isFinite(clubId) }
+  );
+  const isCoachStaffFromQuery = ["coach", "owner", "admin", "moderator"].includes(
+    String((clubQuery.data as any)?.member_role ?? "")
   );
   const meetsQuery = trpc.community.clubs.meets.list.useQuery(
     { clubId },
@@ -229,6 +289,10 @@ export default function ClubCoachModeration() {
   const historyLastRunQuery = trpc.community.clubs.history.import.lastRun.useQuery(
     { clubId },
     { enabled: clubHistoryV1Enabled && match && Number.isFinite(clubId) && Boolean((historyConfigQuery.data as any)?.enabled) }
+  );
+  const workoutGenerationStatusQuery = trpc.community.clubs.workouts.coach.generationStatus.useQuery(
+    { clubId, sessionDate: workoutSessionDate },
+    { enabled: match && Number.isFinite(clubId) && workoutSessionDate.length === 10 && isCoachStaffFromQuery }
   );
 
   const createMeetMutation = trpc.community.clubs.meets.create.useMutation({
@@ -293,6 +357,17 @@ export default function ClubCoachModeration() {
       toast.error(error.message || "Import storico non riuscito");
     },
   });
+  const generateWorkoutDraftMutation = trpc.community.clubs.workouts.coach.generateDraft.useMutation({
+    onSuccess: (payload: any) => {
+      toast.success(payload?.generation?.status === "partial" ? "Allenamento generato (fallback AI)" : "Allenamento generato con AI");
+      setGeneratedWorkoutPreview(payload?.workout ?? null);
+      void workoutGenerationStatusQuery.refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Generazione allenamento non riuscita");
+      void workoutGenerationStatusQuery.refetch();
+    },
+  });
 
   const club = clubQuery.data as any | undefined;
   const isMember = Boolean(club?.is_member);
@@ -302,6 +377,22 @@ export default function ClubCoachModeration() {
   const historyConfig = historyConfigQuery.data as any | undefined;
   const historyLastRun = historyLastRunQuery.data as any | undefined;
   const historyEnabled = Boolean(historyConfig?.enabled);
+  const workoutGenerationStatus = workoutGenerationStatusQuery.data as any | undefined;
+  const workoutCanGenerate = Boolean(workoutGenerationStatus?.canGenerate ?? true);
+  const workoutCooldownLabel = useMemo(() => {
+    if (workoutCanGenerate) return null;
+    const next = workoutGenerationStatus?.nextAvailableAt;
+    if (!next) return null;
+    const parsed = new Date(next);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.toLocaleString("it-IT", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }, [workoutCanGenerate, workoutGenerationStatus?.nextAvailableAt]);
 
   const meetStatusLabel = useMemo(
     () =>
@@ -464,6 +555,196 @@ export default function ClubCoachModeration() {
             ) : null}
           </section>
         ) : null}
+
+        <section className="surface-panel p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Allenamenti in vasca (AI)</h2>
+          </div>
+
+          <div className="grid gap-2 md:grid-cols-3">
+            <div>
+              <Label>Data allenamento *</Label>
+              <Input
+                type="date"
+                value={workoutSessionDate}
+                onChange={(e) => setWorkoutSessionDate(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Volume</Label>
+              <Select
+                value={workoutDirectives.volume}
+                onValueChange={(value) => setWorkoutDirectives((prev) => ({ ...prev, volume: value as WorkoutDirectivesForm["volume"] }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="light">Leggero</SelectItem>
+                  <SelectItem value="medium">Medio</SelectItem>
+                  <SelectItem value="high">Alto</SelectItem>
+                  <SelectItem value="very_high">Molto alto</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Intensità</Label>
+              <Select
+                value={workoutDirectives.intensity}
+                onValueChange={(value) => setWorkoutDirectives((prev) => ({ ...prev, intensity: value as WorkoutDirectivesForm["intensity"] }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="easy">Facile</SelectItem>
+                  <SelectItem value="mixed">Mista</SelectItem>
+                  <SelectItem value="hard">Dura</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label>Focus</Label>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+              {WORKOUT_FOCUS_OPTIONS.map((option) => (
+                <label key={option.value} className="inline-flex items-center gap-2 rounded-lg border border-border/60 bg-card/25 px-2 py-1.5 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={workoutDirectives.focus.includes(option.value)}
+                    onChange={() =>
+                      setWorkoutDirectives((prev) => ({
+                        ...prev,
+                        focus: toggleMultiSelect(prev.focus, option.value),
+                      }))
+                    }
+                  />
+                  <span>{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <Label>Mix stili</Label>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+              {WORKOUT_STROKE_OPTIONS.map((option) => (
+                <label key={option.value} className="inline-flex items-center gap-2 rounded-lg border border-border/60 bg-card/25 px-2 py-1.5 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={workoutDirectives.strokeMix.includes(option.value)}
+                    onChange={() =>
+                      setWorkoutDirectives((prev) => ({
+                        ...prev,
+                        strokeMix: toggleMultiSelect(prev.strokeMix, option.value),
+                      }))
+                    }
+                  />
+                  <span>{option.label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-2 md:grid-cols-2">
+            <div>
+              <Label>Attrezzi ammessi</Label>
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                {WORKOUT_EQUIPMENT_OPTIONS.map((option) => (
+                  <label key={option.value} className="inline-flex items-center gap-2 rounded-lg border border-border/60 bg-card/25 px-2 py-1.5 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={workoutDirectives.equipment.includes(option.value)}
+                      onChange={() =>
+                        setWorkoutDirectives((prev) => ({
+                          ...prev,
+                          equipment: toggleMultiSelect(prev.equipment, option.value),
+                        }))
+                      }
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label>Durata sessione</Label>
+              <Select
+                value={String(workoutDirectives.sessionMinutes)}
+                onValueChange={(value) => setWorkoutDirectives((prev) => ({ ...prev, sessionMinutes: Number(value) as WorkoutDirectivesForm["sessionMinutes"] }))}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="45">45 min</SelectItem>
+                  <SelectItem value="60">60 min</SelectItem>
+                  <SelectItem value="75">75 min</SelectItem>
+                  <SelectItem value="90">90 min</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label>Nota coach (opzionale)</Label>
+            <Textarea
+              rows={2}
+              value={workoutDirectives.notes}
+              onChange={(e) => setWorkoutDirectives((prev) => ({ ...prev, notes: e.target.value }))}
+              placeholder="Es. gruppo numeroso, priorità tecnica virate"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              className="w-full sm:w-auto"
+              variant="neon"
+              disabled={
+                generateWorkoutDraftMutation.isPending ||
+                !workoutCanGenerate ||
+                !workoutSessionDate ||
+                workoutDirectives.focus.length === 0 ||
+                workoutDirectives.strokeMix.length === 0
+              }
+              onClick={() =>
+                generateWorkoutDraftMutation.mutate({
+                  clubId,
+                  sessionDate: workoutSessionDate,
+                  directives: {
+                    focus: workoutDirectives.focus,
+                    volume: workoutDirectives.volume,
+                    intensity: workoutDirectives.intensity,
+                    strokeMix: workoutDirectives.strokeMix,
+                    equipment: workoutDirectives.equipment,
+                    sessionMinutes: workoutDirectives.sessionMinutes,
+                    notes: workoutDirectives.notes.trim() || null,
+                  },
+                })
+              }
+            >
+              <Sparkles className="mr-1.5 h-4 w-4" />
+              {generateWorkoutDraftMutation.isPending ? "Generazione..." : "Genera workout"}
+            </Button>
+
+            {workoutCooldownLabel ? (
+              <p className="text-xs text-amber-300">
+                Generazione disponibile il {workoutCooldownLabel}
+              </p>
+            ) : workoutGenerationStatusQuery.isFetching ? (
+              <p className="text-xs text-muted-foreground">Verifica cooldown...</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">Cooldown: 1 generazione ogni 24h per data allenamento.</p>
+            )}
+          </div>
+
+          {generatedWorkoutPreview ? (
+            <div className="rounded-xl border border-border/60 bg-card/35 p-3 space-y-2">
+              <p className="text-sm font-semibold">{generatedWorkoutPreview.title}</p>
+              <p className="text-xs text-muted-foreground">{generatedWorkoutPreview.description}</p>
+              <p className="text-xs text-muted-foreground">
+                {generatedWorkoutPreview.sessionDate ? `Data ${generatedWorkoutPreview.sessionDate} • ` : ""}
+                Stato: {generatedWorkoutPreview.status}
+              </p>
+            </div>
+          ) : null}
+        </section>
 
         {clubHistoryV1Enabled && historyEnabled ? (
           <section className="surface-panel p-4 space-y-3">

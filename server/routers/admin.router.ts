@@ -239,7 +239,18 @@ export const aiCoachRouter = router({
     generateWorkouts: protectedProcedure
         .mutation(async ({ ctx }) => {
             const { generateBothWorkouts } = await import("../ai_coach");
-            return await generateBothWorkouts(ctx.user.id);
+            try {
+                return await generateBothWorkouts(ctx.user.id);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : "Generazione workout non riuscita";
+                if (
+                    message.includes("almeno 3 attività di nuoto sincronizzate") ||
+                    message.includes("cooldown")
+                ) {
+                    throw new TRPCError({ code: "PRECONDITION_FAILED", message });
+                }
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+            }
         }),
 
     // Conversational coach chat

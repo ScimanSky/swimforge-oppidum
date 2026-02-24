@@ -11,5 +11,39 @@ export type HistoricalImportStatus = "running" | "success" | "partial" | "failed
 export type HistoricalEntityType = "athlete_profile" | "meet_result";
 export type HistoricalImportMode = "oppidum_index_full" | "oppidum_meet_only" | "oppidum_athlete_only";
 
+export type ClubPoolWorkoutStatus = "draft" | "published" | "archived" | "cancelled";
+export type ClubPoolWorkoutFocus = "tecnica" | "aerobico" | "soglia" | "velocita" | "recupero";
+export type ClubPoolWorkoutStroke = "sl" | "do" | "ra" | "de" | "mx";
+export type ClubPoolWorkoutEquipment = "pinne" | "palette" | "pull" | "tavoletta" | "snorkel";
+export type ClubPoolWorkoutDirective = {
+  focus: ClubPoolWorkoutFocus[];
+  volume: "light" | "medium" | "high" | "very_high";
+  intensity: "easy" | "mixed" | "hard";
+  strokeMix: ClubPoolWorkoutStroke[];
+  equipment: ClubPoolWorkoutEquipment[];
+  sessionMinutes: 45 | 60 | 75 | 90;
+  notes?: string | null;
+};
+export type ClubPoolWorkoutBlock = {
+  phase: "warmup" | "activation" | "main" | "cooldown";
+  label: string;
+  items: Array<{
+    label: string;
+    distance?: string;
+    reps?: string;
+    rest?: string;
+    intensity?: string;
+    notes?: string;
+  }>;
+};
+export type ClubPoolWorkoutPlan = {
+  title: string;
+  description: string;
+  totalDistance: string;
+  estimatedDuration: string;
+  blocks: ClubPoolWorkoutBlock[];
+  coachNotes: string[];
+};
+
 export type * from "../drizzle/schema";
 export * from "./_core/errors";

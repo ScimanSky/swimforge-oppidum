@@ -6,7 +6,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getDb } from "./db";
 import { aiCoachWorkouts, swimmerProfiles, swimmingActivities } from "../drizzle/schema";
-import { eq, and, gt, gte, desc } from "drizzle-orm";
+import { eq, and, gt, gte, desc, sql } from "drizzle-orm";
 import { logger } from "./middleware/logger";
 import { withErrorHandling } from "./lib/withErrorHandling";
 import { config } from "./config";
@@ -195,6 +195,7 @@ async function getLatestCachedWorkout(
 }
 
 const COOLDOWN_DAYS = 7;
+const MIN_SWIMMING_ACTIVITIES_FOR_GENERATION = 3;
 
 export interface WorkoutsResponse {
   pool: GeneratedWorkout | null;
@@ -202,6 +203,25 @@ export interface WorkoutsResponse {
   generatedAt: string | null;
   nextAvailableAt: string | null;
   canGenerate: boolean;
+  generationBlockedReason: string | null;
+  minActivitiesRequired: number;
+  activityCount: number;
+}
+
+async function getUserSwimmingActivityCount(userId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const result = await db
+    .select({
+      count: sql<number>`count(*)::int`,
+    })
+    .from(swimmingActivities)
+    .where(eq(swimmingActivities.userId, userId));
+
+  return Number(result[0]?.count ?? 0);
 }
 
 /**
@@ -212,6 +232,11 @@ export async function getExistingWorkouts(userId: number): Promise<WorkoutsRespo
   if (!db) {
     throw new Error("Database not available");
   }
+  const activityCount = await getUserSwimmingActivityCount(userId);
+  const hasMinimumActivities = activityCount >= MIN_SWIMMING_ACTIVITIES_FOR_GENERATION;
+  const generationBlockedReason = hasMinimumActivities
+    ? null
+    : `Servono almeno ${MIN_SWIMMING_ACTIVITIES_FOR_GENERATION} attività di nuoto sincronizzate per generare i workout AI.`;
 
   const cached = await db
     .select()
@@ -239,7 +264,7 @@ export async function getExistingWorkouts(userId: number): Promise<WorkoutsRespo
   const nextAvailableAt = latestGeneratedAt
     ? new Date(latestGeneratedAt.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000)
     : null;
-  const canGenerate = !nextAvailableAt || nextAvailableAt <= new Date();
+  const canGenerate = hasMinimumActivities && (!nextAvailableAt || nextAvailableAt <= new Date());
 
   return {
     pool,
@@ -247,6 +272,9 @@ export async function getExistingWorkouts(userId: number): Promise<WorkoutsRespo
     generatedAt: latestGeneratedAt?.toISOString() ?? null,
     nextAvailableAt: nextAvailableAt?.toISOString() ?? null,
     canGenerate,
+    generationBlockedReason,
+    minActivitiesRequired: MIN_SWIMMING_ACTIVITIES_FOR_GENERATION,
+    activityCount,
   };
 }
 
@@ -257,6 +285,10 @@ export async function generateBothWorkouts(userId: number): Promise<WorkoutsResp
   const db = await getDb();
   if (!db) {
     throw new Error("Database not available");
+  }
+  const activityCount = await getUserSwimmingActivityCount(userId);
+  if (activityCount < MIN_SWIMMING_ACTIVITIES_FOR_GENERATION) {
+    throw new Error(`Servono almeno ${MIN_SWIMMING_ACTIVITIES_FOR_GENERATION} attività di nuoto sincronizzate per generare i workout AI.`);
   }
 
   // Check cooldown: find the most recent generation
@@ -356,6 +388,9 @@ export async function generateBothWorkouts(userId: number): Promise<WorkoutsResp
     generatedAt: now.toISOString(),
     nextAvailableAt: nextAvailableAt.toISOString(),
     canGenerate: false,
+    generationBlockedReason: null,
+    minActivitiesRequired: MIN_SWIMMING_ACTIVITIES_FOR_GENERATION,
+    activityCount,
   };
 }
 

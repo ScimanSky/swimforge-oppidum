@@ -26,6 +26,19 @@ const ROUTE_GEOJSON_SCHEMA = z.object({
 });
 
 const ENTRY_STATUS_VALUES = ["pending", "confirmed", "waitlist", "rejected", "withdrawn"] as const;
+const WORKOUT_FOCUS_VALUES = ["tecnica", "aerobico", "soglia", "velocita", "recupero"] as const;
+const WORKOUT_STROKE_VALUES = ["sl", "do", "ra", "de", "mx"] as const;
+const WORKOUT_EQUIPMENT_VALUES = ["pinne", "palette", "pull", "tavoletta", "snorkel"] as const;
+
+const CLUB_POOL_WORKOUT_DIRECTIVES_SCHEMA = z.object({
+    focus: z.array(z.enum(WORKOUT_FOCUS_VALUES)).min(1).max(5),
+    volume: z.enum(["light", "medium", "high", "very_high"]),
+    intensity: z.enum(["easy", "mixed", "hard"]),
+    strokeMix: z.array(z.enum(WORKOUT_STROKE_VALUES)).min(1).max(5),
+    equipment: z.array(z.enum(WORKOUT_EQUIPMENT_VALUES)).max(5),
+    sessionMinutes: z.union([z.literal(45), z.literal(60), z.literal(75), z.literal(90)]),
+    notes: z.string().max(1000).optional().nullable(),
+});
 
 type NotifyTaggedUsersInput = {
   authorUserId: number;
@@ -871,6 +884,89 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                             if (message === "Meet not found") throw new TRPCError({ code: "NOT_FOUND" });
                             throw new TRPCError({ code: "BAD_REQUEST", message });
                         }
+                    }),
+            }),
+        }),
+
+        workouts: router({
+            coach: router({
+                generationStatus: protectedProcedure
+                    .input(z.object({
+                        clubId: z.number(),
+                        sessionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+                    }))
+                    .query(async ({ ctx, input }) => {
+                        await requireClubCoachUploadRole(ctx.user.id, input.clubId);
+                        const { getClubWorkoutGenerationStatus } = await import("../db_club_workouts");
+                        try {
+                            return await getClubWorkoutGenerationStatus({
+                                userId: ctx.user.id,
+                                clubId: input.clubId,
+                                sessionDate: input.sessionDate,
+                            });
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : "Impossibile leggere stato generazione workout";
+                            if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                            throw new TRPCError({ code: "BAD_REQUEST", message });
+                        }
+                    }),
+
+                generateDraft: protectedProcedure
+                    .input(z.object({
+                        clubId: z.number(),
+                        sessionDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+                        directives: CLUB_POOL_WORKOUT_DIRECTIVES_SCHEMA,
+                    }))
+                    .mutation(async ({ ctx, input }) => {
+                        await requireClubCoachUploadRole(ctx.user.id, input.clubId);
+                        const { getClubWorkoutGenerationStatus, createClubWorkoutDraftFromGeneration } = await import("../db_club_workouts");
+                        const { generateClubPoolWorkoutPlan } = await import("../club_workouts_ai");
+
+                        const status = await getClubWorkoutGenerationStatus({
+                            userId: ctx.user.id,
+                            clubId: input.clubId,
+                            sessionDate: input.sessionDate,
+                        });
+
+                        if (!status.canGenerate && status.nextAvailableAt) {
+                            const nextLabel = new Date(status.nextAvailableAt).toLocaleString("it-IT");
+                            throw new TRPCError({
+                                code: "PRECONDITION_FAILED",
+                                message: `Cooldown attivo: nuova generazione disponibile il ${nextLabel}`,
+                                cause: { nextAvailableAt: status.nextAvailableAt },
+                            });
+                        }
+
+                        const generation = await generateClubPoolWorkoutPlan({
+                            sessionDate: input.sessionDate,
+                            directives: input.directives,
+                        });
+
+                        const saved = await createClubWorkoutDraftFromGeneration({
+                            userId: ctx.user.id,
+                            clubId: input.clubId,
+                            sessionDate: input.sessionDate,
+                            directives: input.directives,
+                            workout: generation.plan,
+                            runStatus: generation.status,
+                            provider: generation.provider,
+                            model: generation.model,
+                            promptVersion: generation.promptVersion,
+                            rawResponse: generation.rawResponse,
+                            error: generation.error,
+                        });
+
+                        return {
+                            success: true,
+                            workout: saved.workout,
+                            run: saved.run,
+                            cooldown: saved.cooldown,
+                            generation: {
+                                status: generation.status,
+                                provider: generation.provider,
+                                model: generation.model,
+                            },
+                        };
                     }),
             }),
         }),

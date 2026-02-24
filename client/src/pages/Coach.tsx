@@ -135,9 +135,9 @@ const getFocusLabel = (
   return candidates[0].label
 }
 
-const CHAT_STORAGE_KEY = "coach_chat_history_v1"
-const CHAT_GOAL_STORAGE_KEY = "coach_chat_goal_v1"
-const CHAT_CONSTRAINTS_STORAGE_KEY = "coach_chat_constraints_v1"
+const CHAT_STORAGE_KEY_BASE = "coach_chat_history_v1"
+const CHAT_GOAL_STORAGE_KEY_BASE = "coach_chat_goal_v1"
+const CHAT_CONSTRAINTS_STORAGE_KEY_BASE = "coach_chat_constraints_v1"
 const CHAT_MAX_MESSAGE_CHARS = 2000
 const CHAT_MAX_HISTORY = 20
 
@@ -156,6 +156,8 @@ const sanitizeChatMessages = (messages: ChatMessage[]): ChatMessage[] =>
     .filter((item) => item.content.length > 0)
     .slice(-CHAT_MAX_HISTORY)
 
+const scopedStorageKey = (baseKey: string, userId: number) => `${baseKey}:u:${userId}`
+
 export default function Coach() {
   const [location] = useLocation()
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
@@ -173,6 +175,21 @@ export default function Coach() {
   const [archiveSort, setArchiveSort] = useState<"recent" | "oldest" | "distance" | "duration">("recent")
   const [activeWorkout, setActiveWorkout] = useState<"pool" | "dryland">("pool")
   const [isGenerating, setIsGenerating] = useState(false)
+  const meQuery = trpc.auth.me.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  })
+  const authUserId = Number((meQuery.data as any)?.id)
+  const isScopedStorageReady = Number.isFinite(authUserId) && authUserId > 0
+
+  const chatStorageKeys = useMemo(() => {
+    if (!isScopedStorageReady) return null
+    return {
+      history: scopedStorageKey(CHAT_STORAGE_KEY_BASE, authUserId),
+      goal: scopedStorageKey(CHAT_GOAL_STORAGE_KEY_BASE, authUserId),
+      constraints: scopedStorageKey(CHAT_CONSTRAINTS_STORAGE_KEY_BASE, authUserId),
+    }
+  }, [authUserId, isScopedStorageReady])
 
   const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
@@ -200,6 +217,8 @@ export default function Coach() {
       // Also refetch to ensure consistency
       await utils.aiCoach.getWorkouts.refetch()
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Generazione workout non riuscita."
+      toast.error(message)
       console.error("Generation failed:", error)
     } finally {
       setIsGenerating(false)
@@ -210,6 +229,7 @@ export default function Coach() {
   const poolWorkout = workoutsData?.pool as GeneratedWorkout | undefined
   const drylandWorkout = workoutsData?.dryland as GeneratedWorkout | undefined
   const canGenerate = workoutsData?.canGenerate ?? true
+  const generationBlockedReason = workoutsData?.generationBlockedReason ?? null
 
   const cooldownLabel = useMemo(() => {
     if (canGenerate) return null
@@ -456,54 +476,73 @@ export default function Coach() {
 
   useEffect(() => {
     if (typeof window === "undefined") return
+    if (!chatStorageKeys) return
+
+    // Reset in-memory state whenever account scope changes, then load scoped data.
+    setChatMessages([])
+    setChatGoal("")
+    setChatConstraints("")
+    setChatProvider(null)
+
     try {
-      const raw = window.localStorage.getItem(CHAT_STORAGE_KEY)
-      if (!raw) return
-      const parsed = JSON.parse(raw)
-      if (!Array.isArray(parsed)) return
-      const safeMessages: ChatMessage[] = parsed
-        .filter((item) =>
-          item &&
-          typeof item === "object" &&
-          (item.role === "user" || item.role === "assistant") &&
-          typeof item.content === "string"
-        )
-        .map((item): ChatMessage => ({
-          role: item.role === "assistant" ? "assistant" : "user",
-          content: clampChatContent(item.content as string),
-        }))
-        .filter((item) => item.content.length > 0)
-        .slice(-CHAT_MAX_HISTORY)
-      if (safeMessages.length > 0) {
-        setChatMessages(safeMessages)
+      const raw = window.localStorage.getItem(chatStorageKeys.history)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (Array.isArray(parsed)) {
+          const safeMessages: ChatMessage[] = parsed
+            .filter((item) =>
+              item &&
+              typeof item === "object" &&
+              (item.role === "user" || item.role === "assistant") &&
+              typeof item.content === "string"
+            )
+            .map((item): ChatMessage => ({
+              role: item.role === "assistant" ? "assistant" : "user",
+              content: clampChatContent(item.content as string),
+            }))
+            .filter((item) => item.content.length > 0)
+            .slice(-CHAT_MAX_HISTORY)
+          if (safeMessages.length > 0) {
+            setChatMessages(safeMessages)
+          }
+        }
       }
     } catch {
       // Ignore corrupted local chat storage
     }
-    const storedGoal = window.localStorage.getItem(CHAT_GOAL_STORAGE_KEY)
-    const storedConstraints = window.localStorage.getItem(CHAT_CONSTRAINTS_STORAGE_KEY)
+
+    const storedGoal = window.localStorage.getItem(chatStorageKeys.goal)
+    const storedConstraints = window.localStorage.getItem(chatStorageKeys.constraints)
     if (storedGoal) setChatGoal(storedGoal)
     if (storedConstraints) setChatConstraints(storedConstraints)
-  }, [])
+
+    // Cleanup legacy non-scoped keys to prevent accidental cross-account reuse.
+    window.localStorage.removeItem(CHAT_STORAGE_KEY_BASE)
+    window.localStorage.removeItem(CHAT_GOAL_STORAGE_KEY_BASE)
+    window.localStorage.removeItem(CHAT_CONSTRAINTS_STORAGE_KEY_BASE)
+  }, [chatStorageKeys])
 
   useEffect(() => {
     if (typeof window === "undefined") return
+    if (!chatStorageKeys) return
     try {
-      window.localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(sanitizeChatMessages(chatMessages)))
+      window.localStorage.setItem(chatStorageKeys.history, JSON.stringify(sanitizeChatMessages(chatMessages)))
     } catch {
       // Best-effort persistence
     }
-  }, [chatMessages])
+  }, [chatMessages, chatStorageKeys])
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    window.localStorage.setItem(CHAT_GOAL_STORAGE_KEY, chatGoal)
-  }, [chatGoal])
+    if (!chatStorageKeys) return
+    window.localStorage.setItem(chatStorageKeys.goal, chatGoal)
+  }, [chatGoal, chatStorageKeys])
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    window.localStorage.setItem(CHAT_CONSTRAINTS_STORAGE_KEY, chatConstraints)
-  }, [chatConstraints])
+    if (!chatStorageKeys) return
+    window.localStorage.setItem(chatStorageKeys.constraints, chatConstraints)
+  }, [chatConstraints, chatStorageKeys])
 
   const handleSendChatMessage = async (content: string) => {
     if (chatMutation.isPending) return
@@ -555,8 +594,8 @@ export default function Coach() {
   const clearChat = () => {
     setChatMessages([])
     setChatProvider(null)
-    if (typeof window !== "undefined") {
-      window.localStorage.removeItem(CHAT_STORAGE_KEY)
+    if (typeof window !== "undefined" && chatStorageKeys) {
+      window.localStorage.removeItem(chatStorageKeys.history)
     }
   }
 
@@ -768,6 +807,9 @@ export default function Coach() {
                     </Button>
                     {cooldownLabel && (
                       <span className="text-xs text-muted-foreground">{cooldownLabel}</span>
+                    )}
+                    {!canGenerate && !cooldownLabel && generationBlockedReason && (
+                      <span className="text-xs text-muted-foreground">{generationBlockedReason}</span>
                     )}
                   </div>
                 </div>
