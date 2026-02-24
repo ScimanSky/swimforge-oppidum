@@ -88,4 +88,39 @@ describe("ClubHero", () => {
     renderClubHero({}, { variant: "compactSticky", meetsPageHref: null });
     expect(screen.queryByRole("link", { name: /gare/i })).not.toBeInTheDocument();
   });
+
+  it("renders coach link in compact variant only for staff", () => {
+    renderClubHero(
+      { is_member: true, member_role: "admin" },
+      { variant: "compactSticky", coachPageHref: "/community/club/1/coach" }
+    );
+    const coachLink = screen.getByRole("link", { name: /coach/i });
+    expect(coachLink).toHaveAttribute("href", "/community/club/1/coach");
+  });
+
+  it("does not render duplicate eventi button when events and meets route is the same", () => {
+    renderClubHero(
+      {},
+      {
+        variant: "compactSticky",
+        meetsPageHref: "/community/club/1/meet/10",
+        eventsPageHref: "/community/club/1/meet/10",
+      }
+    );
+    expect(screen.queryByRole("link", { name: /eventi/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /gare/i })).toBeInTheDocument();
+  });
+
+  it("adds pulse class to compact gare button when there is an active meet", () => {
+    renderClubHero(
+      {},
+      {
+        variant: "compactSticky",
+        meetsPageHref: "/community/club/1/meet/10",
+        hasActiveMeet: true,
+      }
+    );
+    const gareButton = screen.getByRole("button", { name: /gare/i });
+    expect(gareButton.className).toContain("animate-pulse");
+  });
 });
