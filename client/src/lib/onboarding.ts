@@ -40,3 +40,29 @@ export function stripOnboardingParams(rawLocation: string): string {
   const nextQuery = params.toString();
   return nextQuery ? `${path}?${nextQuery}` : path;
 }
+
+export type OnboardingRole = "athlete" | "coach";
+
+export const ONBOARDING_IDENTITY_STORAGE_KEY = "swimforge:onboarding:identity:v1";
+
+export function getOnboardingIdentityLocally(userId?: string | number | null): {
+  role?: OnboardingRole;
+  completed?: boolean;
+} {
+  if (typeof window === "undefined") return {};
+  const key = `${ONBOARDING_IDENTITY_STORAGE_KEY}:${userId ?? "anon"}`;
+  try {
+    return JSON.parse(window.localStorage.getItem(key) ?? "{}");
+  } catch {
+    return {};
+  }
+}
+
+export function setOnboardingIdentityLocally(
+  data: { role?: OnboardingRole; completed?: boolean },
+  userId?: string | number | null
+): void {
+  if (typeof window === "undefined") return;
+  const key = `${ONBOARDING_IDENTITY_STORAGE_KEY}:${userId ?? "anon"}`;
+  window.localStorage.setItem(key, JSON.stringify(data));
+}

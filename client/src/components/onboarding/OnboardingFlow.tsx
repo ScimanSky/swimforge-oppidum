@@ -12,6 +12,8 @@ import {
   isOnboardingCompletedLocally,
   setOnboardingCompletedLocally,
   stripOnboardingParams,
+  getOnboardingIdentityLocally,
+  type OnboardingRole,
 } from "@/lib/onboarding";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,8 +23,9 @@ import {
   ONBOARDING_WELCOME_HEIGHT,
   ONBOARDING_WELCOME_WIDTH,
 } from "./OnboardingWelcomeComposition";
+import { OnboardingIdentitySetup } from "./OnboardingIdentitySetup";
 
-type Stage = "hidden" | "welcome" | "tour";
+type Stage = "hidden" | "welcome" | "identity" | "tour";
 
 type TourStep = {
   selector: string;
@@ -123,6 +126,7 @@ export default function OnboardingFlow() {
   const [welcomeCompleted, setWelcomeCompleted] = useState(false);
   const [resumePathAfterTour, setResumePathAfterTour] = useState<string | null>(null);
   const [seasonPopupOpen, setSeasonPopupOpen] = useState(false);
+  const [onboardingRole, setOnboardingRole] = useState<OnboardingRole>("athlete");
   const onboardingUserId = meQuery.data?.id ? String(meQuery.data.id) : null;
 
   const syncAttemptedRef = useRef(false);
@@ -356,6 +360,21 @@ export default function OnboardingFlow() {
     await completeOnboarding();
   };
 
+  const handleWelcomeContinue = () => {
+    const identity = getOnboardingIdentityLocally(onboardingUserId);
+    if (identity.completed) {
+      setOnboardingRole(identity.role ?? "athlete");
+      startTour();
+    } else {
+      setStage("identity");
+    }
+  };
+
+  const handleIdentityComplete = (role: OnboardingRole) => {
+    setOnboardingRole(role);
+    startTour();
+  };
+
   const handleNextStep = async () => {
     if (currentStep >= TOUR_STEPS.length - 1) {
       await completeOnboarding();
@@ -419,10 +438,38 @@ export default function OnboardingFlow() {
               <Button variant="ghost-neon" onClick={() => void skipWelcome()}>
                 Salta tour
               </Button>
-              <Button variant="neon" onClick={startTour} disabled={!welcomeCompleted}>
+              <Button variant="neon" onClick={handleWelcomeContinue} disabled={!welcomeCompleted}>
                 {welcomeCompleted ? "Inizia tour interattivo" : "Attendi fine intro..."}
               </Button>
             </div>
+          </motion.div>
+        </motion.div>
+      )}
+
+      {stage === "identity" && (
+        <motion.div
+          key="identity"
+          className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(2,8,24,0.82)] px-4 py-6"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: 0.24, ease: "easeOut" }}
+            className="w-full max-w-lg overflow-hidden rounded-3xl border border-[color-mix(in_oklch,var(--electric-cyan)_26%,transparent)] bg-[color-mix(in_oklch,var(--background)_90%,transparent)] p-6 shadow-[0_0_52px_var(--neon-soft)]"
+          >
+            <div className="mb-4 border-b border-border/70 pb-4">
+              <h2 className="font-display text-xl font-bold text-foreground">Configura il tuo profilo</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Due minuti per personalizzare SwimForge.</p>
+            </div>
+            <OnboardingIdentitySetup
+              userId={onboardingUserId!}
+              onComplete={handleIdentityComplete}
+              onSkip={() => void completeOnboarding()}
+            />
           </motion.div>
         </motion.div>
       )}
