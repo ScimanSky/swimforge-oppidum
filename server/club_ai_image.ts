@@ -17,7 +17,9 @@ type GenerateClubAiImageViaGeminiResult = {
 };
 
 const log = logger.child({ component: "club_ai_image" });
-const DEFAULT_IMAGE_MODEL = "nano-banana-pro";
+const DEFAULT_IMAGE_MODEL = "gemini-2.5-flash-image";
+const LEGACY_NANO_BANANA_ALIASES = new Set(["nano-banana", "nano-banana-pro", "nanobanana", "nanobanana-pro"]);
+const IMAGE_MODEL_FALLBACKS = ["gemini-2.5-flash-image", "gemini-3-pro-image-preview"];
 
 function sanitizeSlug(input: string): string {
   const compact = input
@@ -66,12 +68,13 @@ function extractInlineData(response: GenerateContentResponse): { data: string; m
 export async function generateClubAiImageViaGemini(
   params: GenerateClubAiImageViaGeminiParams,
 ): Promise<GenerateClubAiImageViaGeminiResult> {
-  const model = params.model?.trim() || ENV.clubAiPostImageModel || DEFAULT_IMAGE_MODEL;
+  const requestedModel = params.model?.trim() || ENV.clubAiPostImageModel || DEFAULT_IMAGE_MODEL;
+  const normalizedRequestedModel = requestedModel.toLowerCase();
 
   if (!ENV.clubAiPostImageEnabled) {
     return {
       provider: "gemini",
-      model,
+      model: requestedModel,
       error: "CLUB_AI_POST_IMAGE_ENABLED is false",
     };
   }
@@ -80,76 +83,94 @@ export async function generateClubAiImageViaGemini(
   if (!apiKey) {
     return {
       provider: "gemini",
-      model,
+      model: requestedModel,
       error: "GEMINI_API_KEY is not configured",
     };
   }
 
-  try {
-    const ai = new GoogleGenAI({ apiKey });
-    const response = await ai.models.generateContent({
-      model,
-      contents: params.prompt,
-      config: {
-        responseModalities: [Modality.IMAGE],
-      },
-    });
+  const modelCandidates = [
+    requestedModel,
+    ...(LEGACY_NANO_BANANA_ALIASES.has(normalizedRequestedModel) ? IMAGE_MODEL_FALLBACKS : []),
+    ...IMAGE_MODEL_FALLBACKS,
+  ].filter((value, index, arr) => Boolean(value) && arr.indexOf(value) === index);
 
-    const inlineData = extractInlineData(response);
-    if (!inlineData?.data) {
+  const ai = new GoogleGenAI({ apiKey });
+  let lastError = "Unknown image generation failure";
+
+  for (const model of modelCandidates) {
+    try {
+      const response = await ai.models.generateContent({
+        model,
+        contents: params.prompt,
+        config: {
+          responseModalities: [Modality.IMAGE],
+        },
+      });
+
+      const inlineData = extractInlineData(response);
+      if (!inlineData?.data) {
+        lastError = "Model response did not include inline image data";
+        continue;
+      }
+
+      const mimeType = inlineData.mimeType || "image/png";
+      const extension = extensionFromMimeType(mimeType);
+      const fileSlug = sanitizeSlug(params.prompt);
+      const filePath = `clubs/${params.clubId}/ai-posts/${Date.now()}-${fileSlug}.${extension}`;
+
+      const buffer = Buffer.from(inlineData.data, "base64");
+      const admin = getSupabaseAdminClient();
+      const { error: uploadError } = await admin.storage.from("profile-media").upload(filePath, buffer, {
+        contentType: mimeType,
+        upsert: true,
+      });
+      if (uploadError) {
+        return {
+          provider: "gemini",
+          model,
+          error: `Supabase upload failed: ${uploadError.message}`,
+        };
+      }
+
+      const { data } = admin.storage.from("profile-media").getPublicUrl(filePath);
+      const imageUrl = data.publicUrl?.trim();
+      if (!imageUrl) {
+        return {
+          provider: "gemini",
+          model,
+          error: "Supabase public URL is empty",
+        };
+      }
+
+      if (model !== requestedModel) {
+        log.warn("[club_ai] requested image model unavailable, fallback model used", {
+          event: "club_ai:image_model_fallback_used",
+          clubId: params.clubId,
+          requestedModel,
+          usedModel: model,
+        });
+      }
+
       return {
         provider: "gemini",
         model,
-        error: "Model response did not include inline image data",
+        imageUrl,
       };
-    }
-
-    const mimeType = inlineData.mimeType || "image/png";
-    const extension = extensionFromMimeType(mimeType);
-    const fileSlug = sanitizeSlug(params.prompt);
-    const filePath = `clubs/${params.clubId}/ai-posts/${Date.now()}-${fileSlug}.${extension}`;
-
-    const buffer = Buffer.from(inlineData.data, "base64");
-    const admin = getSupabaseAdminClient();
-    const { error: uploadError } = await admin.storage.from("profile-media").upload(filePath, buffer, {
-      contentType: mimeType,
-      upsert: true,
-    });
-    if (uploadError) {
-      return {
-        provider: "gemini",
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+      log.warn("[club_ai] image generation failed", {
+        event: "club_ai:image_generation_failed",
+        clubId: params.clubId,
         model,
-        error: `Supabase upload failed: ${uploadError.message}`,
-      };
+        message: lastError,
+      });
+      // Keep trying fallback models.
     }
-
-    const { data } = admin.storage.from("profile-media").getPublicUrl(filePath);
-    const imageUrl = data.publicUrl?.trim();
-    if (!imageUrl) {
-      return {
-        provider: "gemini",
-        model,
-        error: "Supabase public URL is empty",
-      };
-    }
-
-    return {
-      provider: "gemini",
-      model,
-      imageUrl,
-    };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    log.warn("[club_ai] image generation failed", {
-      event: "club_ai:image_generation_failed",
-      clubId: params.clubId,
-      model,
-      message,
-    });
-    return {
-      provider: "gemini",
-      model,
-      error: message,
-    };
   }
+
+  return {
+    provider: "gemini",
+    model: requestedModel,
+    error: lastError,
+  };
 }
