@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import HistoryMetricCircle from "@/components/club/HistoryMetricCircle";
 import { trpc } from "@/lib/trpc";
 import { clampLimit } from "@/lib/pagination";
+import { getSessionTimeCs, parseSwimTimeToCentiseconds } from "@/lib/swimTime";
 import { ArrowLeft, Database, Users } from "lucide-react";
 
 function formatDate(value: unknown): string {
@@ -42,6 +43,15 @@ function normalizePb(value: unknown): string {
 function isNewRecordNote(value: unknown): boolean {
   const normalized = String(value ?? "").toLowerCase();
   return normalized.split(",").some((item) => item.trim() === "new");
+}
+
+function isNewPersonalBest(row: any): boolean {
+  const sessionCs = getSessionTimeCs(row?.final_time_cs, row?.final_time_raw);
+  const pbCs = parseSwimTimeToCentiseconds(row?.record_raw);
+  if (sessionCs !== null && pbCs !== null) {
+    return sessionCs < pbCs;
+  }
+  return isNewRecordNote(row?.notes);
 }
 
 export default function ClubHistoryAthletesPage() {
@@ -145,7 +155,7 @@ export default function ClubHistoryAthletesPage() {
     for (const row of detailResults) {
       const points = Number(row?.points ?? NaN);
       if (Number.isFinite(points)) pointsTotal += points;
-      if (isNewRecordNote(row?.notes)) newRecordsCount += 1;
+      if (isNewPersonalBest(row)) newRecordsCount += 1;
     }
     return {
       resultsCount: detailResults.length,
@@ -326,7 +336,7 @@ export default function ClubHistoryAthletesPage() {
                     detailResults.map((row) => {
                       const pbValue = normalizePb(row.record_raw);
                       const hasPb = Boolean(pbValue);
-                      const hasNewRecord = isNewRecordNote(row.notes);
+                      const hasNewRecord = isNewPersonalBest(row);
                       return (
                         <div
                           key={row.id}
@@ -360,13 +370,13 @@ export default function ClubHistoryAthletesPage() {
                                 tone="cyan"
                                 label="Tempo"
                                 value={formatTime(row.final_time_raw)}
+                                highlight={hasNewRecord}
                               />
                               <HistoryMetricCircle
                                 size="sm"
                                 tone="violet"
                                 label="PB"
                                 value={hasPb ? pbValue : "-"}
-                                highlight={hasNewRecord}
                               />
                               <HistoryMetricCircle
                                 size="sm"
