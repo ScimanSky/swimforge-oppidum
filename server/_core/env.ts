@@ -59,6 +59,16 @@ function parseOriginList(values: Array<string | undefined | null>): string[] {
   return Array.from(new Set(origins));
 }
 
+function parseIntListEnv(name: string): number[] {
+  const raw = process.env[name];
+  if (!raw) return [];
+  const values = raw
+    .split(",")
+    .map((part) => Number.parseInt(part.trim(), 10))
+    .filter((value) => Number.isInteger(value) && value > 0);
+  return Array.from(new Set(values));
+}
+
 const sessionMaxAgeDays = parseIntEnv("SESSION_MAX_AGE_DAYS", 30, { min: 1, max: 365 });
 
 export const ENV = {
@@ -97,6 +107,10 @@ export const ENV = {
   cloudinaryVideoCreditBlockPercent: parseIntEnv("CLOUDINARY_VIDEO_CREDIT_BLOCK_PERCENT", 95, { min: 1, max: 100 }),
   clubMeetsV1Enabled: parseBoolEnv("CLUB_MEETS_V1_ENABLED", false),
   clubHistoryV1Enabled: parseBoolEnv("CLUB_HISTORY_V1_ENABLED", false),
+  clubAiAutomationEnabled: parseBoolEnv("CLUB_AI_AUTOMATION_ENABLED", false),
+  clubAiDefaultClubIds: parseIntListEnv("CLUB_AI_DEFAULT_CLUB_IDS"),
+  clubAiTimezone: (process.env.CLUB_AI_TIMEZONE ?? "Europe/Rome").trim() || "Europe/Rome",
+  clubAiPostImageModel: (process.env.CLUB_AI_POST_IMAGE_MODEL ?? "").trim(),
   sessionMaxAgeDays,
   sessionMaxAgeMs: sessionMaxAgeDays * 24 * 60 * 60 * 1000,
 };

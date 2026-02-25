@@ -261,6 +261,31 @@ async function startServer() {
       return res.status(500).json({ success: false, error: "Cron execution failed" });
     }
   });
+
+  // Club AI automation orchestrator
+  app.post("/api/cron/club-ai/tick", async (req, res) => {
+    if (!authorizeCronRequest(req, res)) return;
+
+    try {
+      const clubIds = Array.isArray(req.body?.clubIds)
+        ? req.body.clubIds
+            .map((value: unknown) => Number(value))
+            .filter((value: number) => Number.isInteger(value) && value > 0)
+        : undefined;
+      const { runClubAiTick } = await import("../club_ai_automation");
+      const result = await runClubAiTick({
+        clubIds,
+      });
+      return res.json({ success: true, ...result });
+    } catch (error: unknown) {
+      log.error("[Cron] Failed to run club AI tick", {
+        event: "cron:club_ai_tick_failed",
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      return res.status(500).json({ success: false, error: "Cron execution failed" });
+    }
+  });
   // tRPC API
   app.use(
     "/api/trpc",

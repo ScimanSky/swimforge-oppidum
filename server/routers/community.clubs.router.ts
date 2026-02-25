@@ -95,6 +95,16 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
     return next();
   });
 
+  const aiCoachAutomationProcedure = protectedProcedure.use(async ({ next }) => {
+    if (!ENV.clubAiAutomationEnabled) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "La gestione automatica Coach AI è disattivata.",
+      });
+    }
+    return next();
+  });
+
   const CLUB_COACH_UPLOAD_ROLES = new Set(["coach", "owner", "admin", "moderator"]);
   const requireClubCoachUploadRole = async (userId: number, clubId: number) => {
     const role = await requireClubMemberRole(userId, clubId);
@@ -1108,6 +1118,118 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         }
                     }),
             }),
+        }),
+
+        aiCoach: router({
+            getConfig: aiCoachAutomationProcedure
+                .input(z.object({ clubId: z.number() }))
+                .query(async ({ ctx, input }) => {
+                    await requireClubStaffRole(ctx.user.id, input.clubId);
+                    const { ensureClubAiBotUser, ensureClubAiConfig, getClubAiConfig, getClubAiSummary } = await import("../db_club_ai_automation");
+                    const bot = await ensureClubAiBotUser(input.clubId);
+                    if (ENV.clubAiDefaultClubIds.includes(input.clubId)) {
+                        const existingConfig = await getClubAiConfig({
+                            userId: ctx.user.id,
+                            clubId: input.clubId,
+                        });
+                        if (!existingConfig) {
+                            await ensureClubAiConfig({
+                                clubId: input.clubId,
+                                enabled: true,
+                                actorUserId: bot.userId,
+                                timezone: ENV.clubAiTimezone,
+                                scanSourceUrl: "https://www.nuotosardegna.it/category/comunicati-master/",
+                                imageModel: ENV.clubAiPostImageModel || null,
+                            });
+                        }
+                    }
+                    const config = await getClubAiConfig({
+                        userId: ctx.user.id,
+                        clubId: input.clubId,
+                    });
+                    const summary = await getClubAiSummary(input.clubId);
+                    return {
+                        mode: config?.enabled ? "enabled" : "disabled",
+                        config,
+                        summary,
+                        actorBot: bot,
+                    };
+                }),
+
+            upsertConfig: aiCoachAutomationProcedure
+                .input(z.object({
+                    clubId: z.number(),
+                    enabled: z.boolean(),
+                    actorUserId: z.number().int().positive(),
+                    imageModel: z.string().max(120).optional().nullable(),
+                    motivationPrompt: z.string().max(2000).optional().nullable(),
+                    scanUrl: z.string().url().optional().nullable(),
+                    timezone: z.string().max(64).optional().nullable(),
+                }))
+                .mutation(async ({ ctx, input }) => {
+                    await requireClubStaffRole(ctx.user.id, input.clubId);
+                    const { upsertClubAiConfig } = await import("../db_club_ai_automation");
+                    try {
+                        const config = await upsertClubAiConfig({
+                            actorId: ctx.user.id,
+                            clubId: input.clubId,
+                            enabled: input.enabled,
+                            actorUserId: input.actorUserId,
+                            imageModel: input.imageModel,
+                            motivationPrompt: input.motivationPrompt,
+                            scanUrl: input.scanUrl,
+                            timezone: input.timezone,
+                        });
+                        return { success: true, config };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "Impossibile aggiornare configurazione Coach AI";
+                        if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                    }
+                }),
+
+            lastRuns: aiCoachAutomationProcedure
+                .input(z.object({
+                    clubId: z.number(),
+                    limit: z.number().min(1).max(100).optional(),
+                }))
+                .query(async ({ ctx, input }) => {
+                    await requireClubStaffRole(ctx.user.id, input.clubId);
+                    const { listClubAiRuns } = await import("../db_club_ai_automation");
+                    try {
+                        const runs = await listClubAiRuns({
+                            userId: ctx.user.id,
+                            clubId: input.clubId,
+                            limit: input.limit,
+                        });
+                        return { runs };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "Impossibile leggere run Coach AI";
+                        if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                    }
+                }),
+
+            manualRun: aiCoachAutomationProcedure
+                .input(z.object({
+                    clubId: z.number(),
+                    jobType: z.enum(["scan_meets_weekly", "generate_workouts_weekly", "publish_workout_daily", "post_motivation_mwf"]),
+                }))
+                .mutation(async ({ ctx, input }) => {
+                    await requireClubStaffRole(ctx.user.id, input.clubId);
+                    const { runClubAiManualJob } = await import("../club_ai_automation");
+                    try {
+                        const run = await runClubAiManualJob({
+                            clubId: input.clubId,
+                            jobType: input.jobType,
+                            requestedBy: ctx.user.id,
+                        });
+                        return { success: true, run };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "Esecuzione manuale Coach AI non riuscita";
+                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                    }
+                }),
         }),
 
         history: router({

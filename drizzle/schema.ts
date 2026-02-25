@@ -780,6 +780,57 @@ export const clubPoolWorkoutRuns = pgTable("club_pool_workout_runs", {
 }));
 
 // ============================================
+// CLUB AI AUTOMATION (Autonomous coach)
+// ============================================
+export const clubAiAutomationConfigs = pgTable("club_ai_automation_configs", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  enabled: boolean("enabled").default(false).notNull(),
+  actorUserId: integer("actor_user_id").notNull(),
+  timezone: varchar("timezone", { length: 64 }).default("Europe/Rome").notNull(),
+  scanSourceUrl: text("scan_source_url").default("https://www.nuotosardegna.it/category/comunicati-master/").notNull(),
+  imageModel: varchar("image_model", { length: 120 }),
+  motivationPrompt: text("motivation_prompt"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  clubAiAutomationConfigClubUnique: unique("club_ai_automation_configs_club_unique").on(table.clubId),
+}));
+
+export const clubAiAutomationRuns = pgTable("club_ai_automation_runs", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  jobType: varchar("job_type", { length: 64 }).notNull(),
+  scheduledKey: varchar("scheduled_key", { length: 120 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull(),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  finishedAt: timestamp("finished_at"),
+  actorUserId: integer("actor_user_id"),
+  payloadJson: json("payload_json"),
+  resultJson: json("result_json"),
+  errorText: text("error_text"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  clubAiAutomationRunUnique: unique("club_ai_automation_runs_unique").on(table.clubId, table.jobType, table.scheduledKey),
+  clubAiAutomationRunClubStartedIdx: index("idx_club_ai_automation_runs_club_started").on(table.clubId, table.startedAt),
+}));
+
+export const clubAiExternalMeetSources = pgTable("club_ai_external_meet_sources", {
+  id: serial("id").primaryKey(),
+  clubId: integer("club_id").notNull(),
+  sourceUrl: text("source_url").notNull(),
+  sourceHash: varchar("source_hash", { length: 80 }).notNull(),
+  sourceDate: timestamp("source_date"),
+  meetId: integer("meet_id"),
+  status: varchar("status", { length: 20 }).default("imported").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  clubAiExternalMeetSourceUnique: unique("club_ai_external_meet_sources_unique").on(table.clubId, table.sourceHash),
+  clubAiExternalMeetSourceClubCreatedIdx: index("idx_club_ai_external_meet_sources_club_created").on(table.clubId, table.createdAt),
+}));
+
+// ============================================
 // POST REACTIONS (Reazioni emotive avanzate)
 // ============================================
 export const postReactions = pgTable("post_reactions", {

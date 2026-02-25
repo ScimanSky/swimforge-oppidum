@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
@@ -13,7 +14,7 @@ import { trpc } from "@/lib/trpc";
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
 import { getWorkoutSeriesDisplay, parseWorkoutPlan } from "@/lib/workout-plan";
 import { toast } from "sonner";
-import { ArrowLeft, Calendar as CalendarIcon, Check, Copy, Database, Flag, Plus, RefreshCw, Shield, Users, Sparkles } from "lucide-react";
+import { ArrowLeft, Bot, Calendar as CalendarIcon, Check, Clock3, Copy, Database, Flag, PlayCircle, Plus, RefreshCw, Shield, Users, Sparkles } from "lucide-react";
 
 type MeetForm = {
   name: string;
@@ -245,6 +246,7 @@ function InviteRow({ invite }: { invite: any }) {
 export default function ClubCoachModeration() {
   const clubMeetsV1Enabled = UI_FEATURE_FLAGS.clubMeetsV1;
   const clubHistoryV1Enabled = UI_FEATURE_FLAGS.clubHistoryV1;
+  const clubAiAutomationV1Enabled = UI_FEATURE_FLAGS.clubAiAutomationV1;
   const [match, params] = useRoute("/community/club/:id/coach");
   const clubId = Number(params?.id);
   const utils = trpc.useUtils();
@@ -278,6 +280,11 @@ export default function ClubCoachModeration() {
     notes: "",
   });
   const [generatedWorkoutPreview, setGeneratedWorkoutPreview] = useState<any | null>(null);
+  const [aiAutomationEnabled, setAiAutomationEnabled] = useState(true);
+  const [aiImageModel, setAiImageModel] = useState("");
+  const [aiMotivationPrompt, setAiMotivationPrompt] = useState("");
+  const [aiScanUrl, setAiScanUrl] = useState("https://www.nuotosardegna.it/category/comunicati-master/");
+  const [aiManualJobType, setAiManualJobType] = useState<"scan_meets_weekly" | "generate_workouts_weekly" | "publish_workout_daily" | "post_motivation_mwf">("scan_meets_weekly");
 
   const clubQuery = trpc.community.clubs.get.useQuery(
     { clubId },
@@ -309,6 +316,14 @@ export default function ClubCoachModeration() {
   const workoutByDateQuery = trpc.community.clubs.workouts.coach.getByDate.useQuery(
     { clubId, sessionDate: workoutSessionDate },
     { enabled: match && Number.isFinite(clubId) && workoutSessionDate.length === 10 && isCoachStaffFromQuery }
+  );
+  const aiCoachConfigQuery = trpc.community.clubs.aiCoach.getConfig.useQuery(
+    { clubId },
+    { enabled: clubAiAutomationV1Enabled && match && Number.isFinite(clubId) && isCoachStaffFromQuery }
+  );
+  const aiCoachRunsQuery = trpc.community.clubs.aiCoach.lastRuns.useQuery(
+    { clubId, limit: 12 },
+    { enabled: clubAiAutomationV1Enabled && match && Number.isFinite(clubId) && isCoachStaffFromQuery }
   );
 
   const createMeetMutation = trpc.community.clubs.meets.create.useMutation({
@@ -409,6 +424,25 @@ export default function ClubCoachModeration() {
       toast.error(error.message || "Pubblicazione workout non riuscita");
     },
   });
+  const upsertAiCoachConfigMutation = trpc.community.clubs.aiCoach.upsertConfig.useMutation({
+    onSuccess: () => {
+      toast.success("Configurazione Coach AI aggiornata");
+      void aiCoachConfigQuery.refetch();
+      void aiCoachRunsQuery.refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Aggiornamento configurazione Coach AI non riuscito");
+    },
+  });
+  const manualAiCoachRunMutation = trpc.community.clubs.aiCoach.manualRun.useMutation({
+    onSuccess: (payload: any) => {
+      toast.success(`Job ${String(payload?.run?.jobType ?? "")} completato (${String(payload?.run?.status ?? "ok")})`);
+      void aiCoachRunsQuery.refetch();
+    },
+    onError: (error) => {
+      toast.error(error.message || "Esecuzione manuale Coach AI non riuscita");
+    },
+  });
 
   const club = clubQuery.data as any | undefined;
   const isMember = Boolean(club?.is_member);
@@ -418,6 +452,13 @@ export default function ClubCoachModeration() {
   const historyConfig = historyConfigQuery.data as any | undefined;
   const historyLastRun = historyLastRunQuery.data as any | undefined;
   const historyEnabled = Boolean(historyConfig?.enabled);
+  const aiCoachData = aiCoachConfigQuery.data as any | undefined;
+  const aiCoachConfig = aiCoachData?.config as any | null | undefined;
+  const aiCoachSummary = aiCoachData?.summary as any | undefined;
+  const aiCoachRuns = ((aiCoachRunsQuery.data as any)?.runs as any[]) ?? [];
+  const aiActorBot = aiCoachData?.actorBot as any | undefined;
+  const aiActorUserId = Number(aiCoachConfig?.actorUserId ?? aiActorBot?.userId ?? 0);
+  const aiSectionEnabledForClub = Boolean(aiCoachConfig?.enabled);
   const workoutGenerationStatus = workoutGenerationStatusQuery.data as any | undefined;
   const persistedWorkoutPreview = (workoutByDateQuery.data as any)?.workout ?? null;
   const workoutPreview = generatedWorkoutPreview ?? persistedWorkoutPreview;
@@ -563,6 +604,22 @@ export default function ClubCoachModeration() {
   useEffect(() => {
     setGeneratedWorkoutPreview(null);
   }, [workoutSessionDate]);
+
+  useEffect(() => {
+    if (!clubAiAutomationV1Enabled) return;
+    if (!aiCoachData) return;
+    setAiAutomationEnabled(Boolean(aiCoachConfig?.enabled));
+    setAiImageModel(String(aiCoachConfig?.imageModel ?? ""));
+    setAiMotivationPrompt(String(aiCoachConfig?.motivationPrompt ?? ""));
+    setAiScanUrl(String(aiCoachConfig?.scanSourceUrl ?? "https://www.nuotosardegna.it/category/comunicati-master/"));
+  }, [
+    clubAiAutomationV1Enabled,
+    aiCoachData,
+    aiCoachConfig?.enabled,
+    aiCoachConfig?.imageModel,
+    aiCoachConfig?.motivationPrompt,
+    aiCoachConfig?.scanSourceUrl,
+  ]);
 
   useEffect(() => {
     if (!match || !Number.isFinite(clubId)) return;
@@ -1009,6 +1066,144 @@ export default function ClubCoachModeration() {
             </div>
           ) : null}
         </section>
+
+        {clubAiAutomationV1Enabled ? (
+          <section className="surface-panel p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Bot className="h-4 w-4 text-primary" />
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Coach AI Autonomo</h2>
+              </div>
+              <Badge variant="outline">{aiSectionEnabledForClub ? "enabled" : "disabled"}</Badge>
+            </div>
+
+            {aiCoachConfigQuery.isLoading ? (
+              <p className="text-xs text-muted-foreground">Caricamento configurazione Coach AI...</p>
+            ) : (
+              <>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <div className="rounded-xl border border-border/60 bg-card/35 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="coach-ai-enabled">Automazione attiva</Label>
+                      <Switch
+                        id="coach-ai-enabled"
+                        checked={aiAutomationEnabled}
+                        onCheckedChange={(checked) => setAiAutomationEnabled(Boolean(checked))}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Actor bot: {aiActorBot?.name ?? "Coach AI"} ({aiActorBot?.email ?? "-"}) • userId {aiActorUserId || "-"}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Timezone: {String(aiCoachConfig?.timezone ?? "Europe/Rome")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Run totali: {Number(aiCoachSummary?.runsCount ?? 0)} • falliti: {Number(aiCoachSummary?.failedCount ?? 0)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Ultimo avvio: {aiCoachSummary?.lastStartedAt ? formatDate(aiCoachSummary.lastStartedAt) : "-"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-border/60 bg-card/35 p-3 space-y-2">
+                    <div>
+                      <Label>Modello immagine (hint)</Label>
+                      <Input
+                        value={aiImageModel}
+                        onChange={(e) => setAiImageModel(e.target.value)}
+                        placeholder="es. nano-banana"
+                      />
+                    </div>
+                    <div>
+                      <Label>URL scansione comunicati</Label>
+                      <Input
+                        value={aiScanUrl}
+                        onChange={(e) => setAiScanUrl(e.target.value)}
+                        placeholder="https://www.nuotosardegna.it/category/comunicati-master/"
+                      />
+                    </div>
+                    <div>
+                      <Label>Prompt motivazionale extra</Label>
+                      <Textarea
+                        rows={2}
+                        value={aiMotivationPrompt}
+                        onChange={(e) => setAiMotivationPrompt(e.target.value)}
+                        placeholder="Indicazioni di tono aggiuntive"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="neon"
+                    disabled={upsertAiCoachConfigMutation.isPending || !Number.isFinite(aiActorUserId) || aiActorUserId <= 0}
+                    onClick={() =>
+                      upsertAiCoachConfigMutation.mutate({
+                        clubId,
+                        enabled: aiAutomationEnabled,
+                        actorUserId: aiActorUserId,
+                        imageModel: aiImageModel.trim() || null,
+                        motivationPrompt: aiMotivationPrompt.trim() || null,
+                        scanUrl: aiScanUrl.trim() || null,
+                        timezone: "Europe/Rome",
+                      })
+                    }
+                  >
+                    {upsertAiCoachConfigMutation.isPending ? "Salvataggio..." : "Salva configurazione"}
+                  </Button>
+
+                  <Select value={aiManualJobType} onValueChange={(value) => setAiManualJobType(value as typeof aiManualJobType)}>
+                    <SelectTrigger className="w-full sm:w-[260px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="scan_meets_weekly">Scan gare settimanale</SelectItem>
+                      <SelectItem value="generate_workouts_weekly">Genera workout settimanali</SelectItem>
+                      <SelectItem value="publish_workout_daily">Pubblica workout giorno</SelectItem>
+                      <SelectItem value="post_motivation_mwf">Post motivazionale</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Button
+                    variant="outline-neon"
+                    disabled={manualAiCoachRunMutation.isPending}
+                    onClick={() =>
+                      manualAiCoachRunMutation.mutate({
+                        clubId,
+                        jobType: aiManualJobType,
+                      })
+                    }
+                  >
+                    <PlayCircle className="mr-1.5 h-4 w-4" />
+                    {manualAiCoachRunMutation.isPending ? "Esecuzione..." : "Esegui job manuale"}
+                  </Button>
+                </div>
+
+                <div className="rounded-xl border border-border/60 bg-card/35 p-3 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ultimi run automation</p>
+                  {aiCoachRuns.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nessun run registrato.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {aiCoachRuns.map((run: any) => (
+                        <div key={run.id} className="rounded-lg border border-border/50 bg-card/20 px-2 py-1.5 text-xs">
+                          <p className="font-medium">
+                            {String(run.jobType)} • <span className="uppercase">{String(run.status)}</span>
+                          </p>
+                          <p className="text-muted-foreground inline-flex items-center gap-1">
+                            <Clock3 className="h-3 w-3" />
+                            {formatDate(run.startedAt)} • key {String(run.scheduledKey)}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </section>
+        ) : null}
 
         {clubHistoryV1Enabled && historyEnabled ? (
           <section className="surface-panel p-4 space-y-3">

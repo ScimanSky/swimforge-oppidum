@@ -10,6 +10,9 @@ export type HistoricalProvider = "oppidum_html";
 export type HistoricalImportStatus = "running" | "success" | "partial" | "failed";
 export type HistoricalEntityType = "athlete_profile" | "meet_result";
 export type HistoricalImportMode = "oppidum_index_full" | "oppidum_meet_only" | "oppidum_athlete_only";
+export type ClubAiJobType = "scan_meets_weekly" | "generate_workouts_weekly" | "publish_workout_daily" | "post_motivation_mwf";
+export type ClubAiRunStatus = "success" | "partial" | "failed" | "skipped";
+export type ClubAiManagedMode = "disabled" | "enabled";
 
 export type ClubPoolWorkoutStatus = "draft" | "published" | "archived" | "cancelled";
 export type ClubPoolWorkoutFocus = "tecnica" | "aerobico" | "soglia" | "velocita" | "recupero";
