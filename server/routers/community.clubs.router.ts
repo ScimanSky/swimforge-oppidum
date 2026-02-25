@@ -1,4 +1,5 @@
 import { ENV } from "../_core/env";
+import { uploadImageToMediaProviders } from "../lib/image_upload";
 import {
   awardActionXp,
   detectImageType,
@@ -2006,8 +2007,6 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                 )
                 .mutation(async ({ ctx, input }) => {
                     await requireClubStaffRole(ctx.user.id, input.clubId);
-                    const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
-                    const admin = getSupabaseAdminClient();
 
                     const MAX_BYTES = 5 * 1024 * 1024;
                     let buffer: Buffer;
@@ -2073,22 +2072,23 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         });
                     }
 
-                    const filePath = `clubs/${input.clubId}/${ctx.user.id}/${Date.now()}.${detected.extension}`;
-                    const { error } = await admin.storage
-                        .from("profile-media")
-                        .upload(filePath, buffer, {
-                            contentType: detected.mimeType,
-                            upsert: true,
+                    let publicUrl = "";
+                    try {
+                        const uploaded = await uploadImageToMediaProviders({
+                            buffer,
+                            mimeType: detected.mimeType,
+                            folder: `clubs/${input.clubId}/${ctx.user.id}`,
+                            fileNamePrefix: "club-media",
+                            tags: ["club", `club-${input.clubId}`, `user-${ctx.user.id}`],
                         });
-                    if (error) {
+                        publicUrl = uploaded.url;
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : String(error);
                         throw new TRPCError({
                             code: "INTERNAL_SERVER_ERROR",
-                            message: `Upload failed: ${error.message}`,
+                            message: `Upload failed: ${message}`,
                         });
                     }
-
-                    const { data } = admin.storage.from("profile-media").getPublicUrl(filePath);
-                    const publicUrl = data.publicUrl;
 
                     const { uploadClubMedia } = await import("../db_social_enhanced");
                     const media = await uploadClubMedia({

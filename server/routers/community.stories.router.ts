@@ -1,5 +1,6 @@
 import { ENV } from "../_core/env";
 import { detectImageType, logger, protectedProcedure, router, TRPCError, z } from "./_shared";
+import { uploadImageToMediaProviders } from "../lib/image_upload";
 import { COMMUNITY_REACTION_EMOJI_MAP, COMMUNITY_REACTION_TYPES } from "./community.reaction-types";
 
 export const communityStoriesRouter = router({
@@ -65,9 +66,6 @@ export const communityStoriesRouter = router({
       }),
     )
     .mutation(async ({ ctx, input }) => {
-      const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
-      const admin = getSupabaseAdminClient();
-
       const MAX_BYTES = 5 * 1024 * 1024;
       let buffer: Buffer;
       try {
@@ -118,17 +116,20 @@ export const communityStoriesRouter = router({
         });
       }
 
-      const filePath = `stories/${ctx.user.id}/${Date.now()}.${detected.extension}`;
-      const { error } = await admin.storage.from("profile-media").upload(filePath, buffer, {
-        contentType: detected.mimeType,
-        upsert: true,
-      });
-      if (error) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Upload failed: ${error.message}` });
+      let publicUrl = "";
+      try {
+        const uploaded = await uploadImageToMediaProviders({
+          buffer,
+          mimeType: detected.mimeType,
+          folder: `stories/${ctx.user.id}`,
+          fileNamePrefix: "story",
+          tags: ["story", `user-${ctx.user.id}`],
+        });
+        publicUrl = uploaded.url;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Upload failed: ${message}` });
       }
-
-      const { data } = admin.storage.from("profile-media").getPublicUrl(filePath);
-      const publicUrl = data.publicUrl;
 
       const { createStory } = await import("../db_stories");
       const story = await createStory(ctx.user.id, {

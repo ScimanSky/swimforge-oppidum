@@ -5,6 +5,7 @@ import {
     logger, getUserPublicProfile,
 } from "./_shared";
 import type { SwimmingActivityInsert } from "./_shared";
+import { uploadImageToMediaProviders } from "../lib/image_upload";
 
 export const profileRouter = router({
     get: protectedProcedure.query(async ({ ctx }) => {
@@ -143,9 +144,6 @@ export const profileRouter = router({
             })
         )
         .mutation(async ({ ctx, input }) => {
-            const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
-            const admin = getSupabaseAdminClient();
-
             const MAX_BYTES = 20 * 1024 * 1024;
             let buffer: Buffer;
             try {
@@ -210,21 +208,22 @@ export const profileRouter = router({
                 });
             }
 
-            const filePath = `profiles/${ctx.user.id}/${input.kind}-${Date.now()}.${detected.extension}`;
-            const { error } = await admin.storage
-                .from("profile-media")
-                .upload(filePath, buffer, {
-                    contentType: detected.mimeType,
-                    upsert: true,
+            try {
+                const uploaded = await uploadImageToMediaProviders({
+                    buffer,
+                    mimeType: detected.mimeType,
+                    folder: `profiles/${ctx.user.id}`,
+                    fileNamePrefix: input.kind,
+                    tags: ["profile", input.kind, `user-${ctx.user.id}`],
                 });
-            if (error) {
+                return { url: uploaded.url };
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
                 throw new TRPCError({
                     code: "INTERNAL_SERVER_ERROR",
-                    message: `Upload failed: ${error.message}`,
+                    message: `Upload failed: ${message}`,
                 });
             }
-            const { data } = admin.storage.from("profile-media").getPublicUrl(filePath);
-            return { url: data.publicUrl };
         }),
 
     refreshStats: protectedProcedure

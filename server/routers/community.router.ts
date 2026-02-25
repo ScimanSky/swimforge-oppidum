@@ -12,6 +12,7 @@ import { createHash } from "crypto";
 import { ENV } from "../_core/env";
 import { socialPosts } from "../../drizzle/schema";
 import { getCloudinaryCreditUsage } from "../lib/cloudinary";
+import { uploadImageToMediaProviders } from "../lib/image_upload";
 import { ensureUserPresenceSchema, getOnlineIntervalSql } from "../user_presence";
 import { createCommunityClubsRouter } from "./community.clubs.router";
 import { communityStoriesRouter } from "./community.stories.router";
@@ -568,9 +569,6 @@ export const communityRouter = router({
             mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
         }))
         .mutation(async ({ ctx, input }) => {
-            const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
-            const admin = getSupabaseAdminClient();
-
             const MAX_BYTES = 20 * 1024 * 1024;
             let buffer: Buffer;
             try {
@@ -623,20 +621,19 @@ export const communityRouter = router({
                 });
             }
 
-            const filePath = `posts/${ctx.user.id}/${Date.now()}.${detected.extension}`;
-            const { error } = await admin.storage
-                .from("profile-media")
-                .upload(filePath, buffer, {
-                    contentType: detected.mimeType,
-                    upsert: true,
+            try {
+                const uploaded = await uploadImageToMediaProviders({
+                    buffer,
+                    mimeType: detected.mimeType,
+                    folder: `posts/${ctx.user.id}`,
+                    fileNamePrefix: "post",
+                    tags: ["post", `user-${ctx.user.id}`],
                 });
-            if (error) {
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Upload failed: ${error.message}` });
+                return { url: uploaded.url };
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Upload failed: ${message}` });
             }
-
-            const { data } = admin.storage.from("profile-media").getPublicUrl(filePath);
-            const publicUrl = data.publicUrl;
-            return { url: publicUrl };
         }),
 
     cloudinaryVideoAuth: protectedProcedure
