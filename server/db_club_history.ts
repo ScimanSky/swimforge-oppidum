@@ -117,6 +117,95 @@ function normalizeHistoryEventLabel(value: string): string {
   return normalizeTextKey(value);
 }
 
+function normalizeHistoryMeetKey(value: string): string {
+  return normalizeTextKey(value)
+    .replace(/\b(\d+)\s+(mt|m)\b/g, "$1$2")
+    .replace(/\s+/g, "");
+}
+
+function toUtcDateKey(value: unknown): string {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function hasMeaningfulRecordRaw(value: unknown): boolean {
+  const raw = String(value ?? "").trim();
+  if (!raw) return false;
+  if (/^[-–—]+$/.test(raw)) return false;
+  if (/^(n\/?d|n\.?a\.?)$/i.test(raw)) return false;
+  return true;
+}
+
+function isNewRecordNote(value: unknown): boolean {
+  const normalized = String(value ?? "").toLowerCase();
+  return normalized.split(",").some((item) => item.trim() === "new");
+}
+
+function scoreAthleteResultRow(row: Record<string, unknown>): number {
+  let score = 0;
+  if (Number.isFinite(Number(row.points ?? NaN))) score += 6;
+  if (hasMeaningfulRecordRaw(row.record_raw)) score += 4;
+  if (Number.isFinite(Number(row.final_time_cs ?? NaN))) score += 2;
+  if (isNewRecordNote(row.notes)) score += 3;
+  if (/^\d{4}-/.test(String(row.meet_slug ?? ""))) score += 1;
+  score += (Number(row.id ?? 0) % 1000) / 1000;
+  return score;
+}
+
+function scoreMeetRow(row: Record<string, unknown>): number {
+  const resultsCount = Number(row.results_count ?? 0);
+  const athletesCount = Number(row.athletes_count ?? 0);
+  let score = resultsCount * 1000 + athletesCount * 10;
+  if (/^\d{4}-/.test(String(row.meet_slug ?? ""))) score += 5;
+  if (/\/\d{4}-/i.test(String(row.source_url ?? ""))) score += 3;
+  score += (Number(row.id ?? 0) % 1000) / 1000;
+  return score;
+}
+
+function dedupeAthleteResultRows(rows: Array<Record<string, unknown>>) {
+  const byKey = new Map<string, Record<string, unknown>>();
+  for (const row of rows) {
+    const eventKey = normalizeHistoryEventLabel(String(row.event_label ?? ""));
+    if (!eventKey) continue;
+    const meetKey = normalizeHistoryMeetKey(String(row.meet_name ?? ""));
+    const dateKey = toUtcDateKey(row.meet_date);
+    const key = `${dateKey}|${meetKey}|${eventKey}`;
+    const existing = byKey.get(key);
+    if (!existing || scoreAthleteResultRow(row) > scoreAthleteResultRow(existing)) {
+      byKey.set(key, row);
+    }
+  }
+  return Array.from(byKey.values()).sort((a, b) => {
+    const aTs = a.meet_date ? new Date(String(a.meet_date)).getTime() : Number.NEGATIVE_INFINITY;
+    const bTs = b.meet_date ? new Date(String(b.meet_date)).getTime() : Number.NEGATIVE_INFINITY;
+    if (aTs !== bTs) return bTs - aTs;
+    const byName = String(a.meet_name ?? "").localeCompare(String(b.meet_name ?? ""), "it");
+    if (byName !== 0) return byName;
+    return String(a.event_label ?? "").localeCompare(String(b.event_label ?? ""), "it");
+  });
+}
+
+function dedupeMeetRows(rows: Array<Record<string, unknown>>) {
+  const byKey = new Map<string, Record<string, unknown>>();
+  for (const row of rows) {
+    const meetKey = normalizeHistoryMeetKey(String(row.meet_name ?? ""));
+    const dateKey = toUtcDateKey(row.meet_date);
+    const key = `${dateKey}|${meetKey}`;
+    const existing = byKey.get(key);
+    if (!existing || scoreMeetRow(row) > scoreMeetRow(existing)) {
+      byKey.set(key, row);
+    }
+  }
+  return Array.from(byKey.values()).sort((a, b) => {
+    const aTs = a.meet_date ? new Date(String(a.meet_date)).getTime() : Number.NEGATIVE_INFINITY;
+    const bTs = b.meet_date ? new Date(String(b.meet_date)).getTime() : Number.NEGATIVE_INFINITY;
+    if (aTs !== bTs) return bTs - aTs;
+    return String(a.meet_name ?? "").localeCompare(String(b.meet_name ?? ""), "it");
+  });
+}
+
 function normalizeRootUrl(raw: string): string {
   const value = raw.trim();
   let url: URL;
@@ -210,7 +299,7 @@ async function upsertHistoricalMeet(db: Awaited<ReturnType<typeof requireDb>>, i
   seasonLabel: string | null;
   lastImportRunId: number;
 }): Promise<{ action: UpsertAction; row: typeof clubHistoricalMeets.$inferSelect }> {
-  const [existing] = await db
+  const [existingBySlug] = await db
     .select()
     .from(clubHistoricalMeets)
     .where(
@@ -221,6 +310,27 @@ async function upsertHistoricalMeet(db: Awaited<ReturnType<typeof requireDb>>, i
       ),
     )
     .limit(1);
+
+  let existing: typeof clubHistoricalMeets.$inferSelect | undefined = existingBySlug;
+  if (!existing && input.meetDate) {
+    const dateKey = toUtcDateKey(input.meetDate);
+    const meetKey = normalizeHistoryMeetKey(input.meetName);
+    const candidates = await db
+      .select()
+      .from(clubHistoricalMeets)
+      .where(
+        and(
+          eq(clubHistoricalMeets.clubId, input.clubId),
+          eq(clubHistoricalMeets.provider, input.provider),
+          sql`DATE(${clubHistoricalMeets.meetDate}) = DATE(${input.meetDate})`,
+        ),
+      )
+      .limit(50);
+    existing = candidates.find((candidate) =>
+      toUtcDateKey(candidate.meetDate) === dateKey
+      && normalizeHistoryMeetKey(candidate.meetName) === meetKey,
+    );
+  }
 
   if (!existing) {
     const [created] = await db
@@ -240,6 +350,7 @@ async function upsertHistoricalMeet(db: Awaited<ReturnType<typeof requireDb>>, i
 
     return { action: "created", row: created };
   }
+  const existingRow = existing;
 
   const [updated] = await db
     .update(clubHistoricalMeets)
@@ -254,7 +365,7 @@ async function upsertHistoricalMeet(db: Awaited<ReturnType<typeof requireDb>>, i
     .where(eq(clubHistoricalMeets.id, existing.id))
     .returning();
 
-  return { action: "updated", row: updated ?? existing };
+  return { action: "updated", row: updated ?? existingRow };
 }
 
 async function upsertHistoricalResult(db: Awaited<ReturnType<typeof requireDb>>, input: {
@@ -933,9 +1044,11 @@ export async function getClubHistoryAthlete(params: {
     ORDER BY m.meet_date DESC NULLS LAST, m.meet_name ASC, r.event_label ASC
   `);
 
+  const dedupedRows = dedupeAthleteResultRows(results.rows as Array<Record<string, unknown>>);
+
   return {
     athlete,
-    results: results.rows,
+    results: dedupedRows,
   };
 }
 
@@ -984,12 +1097,6 @@ export async function listClubHistoryMeets(params: {
     OFFSET ${offset}
   `);
 
-  const countResult = await db.execute(sql`
-    SELECT COUNT(*)::int AS total
-    FROM club_historical_meets m
-    WHERE ${whereSql}
-  `);
-
   const seasonsResult = await db.execute(sql`
     SELECT DISTINCT season_label
     FROM club_historical_meets
@@ -999,9 +1106,11 @@ export async function listClubHistoryMeets(params: {
     ORDER BY season_label DESC
   `);
 
+  const dedupedRows = dedupeMeetRows(rowsResult.rows as Array<Record<string, unknown>>);
+
   return {
-    items: rowsResult.rows,
-    total: asInt((countResult.rows[0] as any)?.total),
+    items: dedupedRows,
+    total: dedupedRows.length,
     limit,
     offset,
     seasons: seasonsResult.rows.map((row: any) => String(row.season_label)).filter(Boolean),
