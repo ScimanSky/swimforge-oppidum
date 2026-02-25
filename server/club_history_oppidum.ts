@@ -122,7 +122,10 @@ function cleanMeasurement(value: string | null | undefined): string | null {
     .replace(/-\s*new\s*-/gi, "")
     .replace(/\s+/g, " ")
     .trim();
-  return cleaned || null;
+  if (!cleaned) return null;
+  if (/^[-–—]+$/.test(cleaned)) return null;
+  if (/^(n\/?d|n\.?a\.?)$/i.test(cleaned)) return null;
+  return cleaned;
 }
 
 function extractNotes(parts: Array<string | null | undefined>): string | null {

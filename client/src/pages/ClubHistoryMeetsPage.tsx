@@ -32,6 +32,18 @@ function formatTime(raw: unknown): string {
   return value || "-";
 }
 
+function normalizePb(value: unknown): string {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return "";
+  if (/^[-–—]+$/.test(normalized)) return "";
+  return normalized;
+}
+
+function isNewRecordNote(value: unknown): boolean {
+  const normalized = String(value ?? "").toLowerCase();
+  return normalized.split(",").some((item) => item.trim() === "new");
+}
+
 export default function ClubHistoryMeetsPage() {
   const [match, params] = useRoute("/community/club/:clubId/history/meets");
   const clubId = Number(params?.clubId);
@@ -146,14 +158,14 @@ export default function ClubHistoryMeetsPage() {
   const results = (resultsQuery.data as any[]) ?? [];
   const totalMeets = Number((meetsQuery.data as any)?.total ?? meets.length);
   const meetSummary = useMemo(() => {
-    let recordCount = 0;
+    let newRecordsCount = 0;
     for (const row of results) {
-      if (String(row?.record_raw ?? "").trim()) recordCount += 1;
+      if (isNewRecordNote(row?.notes)) newRecordsCount += 1;
     }
     return {
       resultsCount: Number(meetDetail?.stats?.resultsCount ?? results.length),
       athletesCount: Number(meetDetail?.stats?.athletesCount ?? 0),
-      recordCount,
+      newRecordsCount,
     };
   }, [meetDetail, results]);
 
@@ -307,10 +319,10 @@ export default function ClubHistoryMeetsPage() {
                     <HistoryMetricCircle label="Risultati" tone="cyan" value={String(meetSummary.resultsCount)} />
                     <HistoryMetricCircle label="Atleti" tone="lime" value={String(meetSummary.athletesCount)} />
                     <HistoryMetricCircle
-                      label="Record"
-                      tone="amber"
-                      value={String(meetSummary.recordCount)}
-                      highlight={meetSummary.recordCount > 0}
+                      label="Nuovi PB"
+                      tone="violet"
+                      value={String(meetSummary.newRecordsCount)}
+                      highlight={meetSummary.newRecordsCount > 0}
                     />
                   </div>
                 </div>
@@ -346,13 +358,15 @@ export default function ClubHistoryMeetsPage() {
                     <p className="text-sm text-muted-foreground">Nessun risultato per i filtri selezionati.</p>
                   ) : (
                     results.map((row: any) => {
-                      const hasRecord = Boolean(String(row.record_raw ?? "").trim());
+                      const pbValue = normalizePb(row.record_raw);
+                      const hasPb = Boolean(pbValue);
+                      const hasNewRecord = isNewRecordNote(row.notes);
                       return (
                         <div
                           key={row.id}
                           className={`relative overflow-hidden rounded-2xl border bg-card/30 p-3 ${
-                            hasRecord
-                              ? "border-amber-300/70 shadow-[0_0_0_1px_rgba(252,211,77,0.35),0_0_22px_rgba(251,191,36,0.22)]"
+                            hasNewRecord
+                              ? "animate-pulse border-fuchsia-300/70 shadow-[0_0_0_1px_rgba(217,70,239,0.36),0_0_24px_rgba(34,211,238,0.2)]"
                               : "border-border/60"
                           }`}
                         >
@@ -370,6 +384,9 @@ export default function ClubHistoryMeetsPage() {
                               <p className="text-sm font-semibold break-words">{row.athlete_name}</p>
                               <Badge variant="outline" className="max-w-full truncate">{row.event_label}</Badge>
                             </div>
+                            {hasNewRecord ? (
+                              <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-fuchsia-300">Nuovo record personale</p>
+                            ) : null}
                             <div className="mt-2 flex flex-wrap gap-2">
                               <HistoryMetricCircle
                                 size="sm"
@@ -379,10 +396,10 @@ export default function ClubHistoryMeetsPage() {
                               />
                               <HistoryMetricCircle
                                 size="sm"
-                                tone="amber"
-                                label="Record"
-                                value={hasRecord ? String(row.record_raw) : "-"}
-                                highlight={hasRecord}
+                                tone="violet"
+                                label="PB"
+                                value={hasPb ? pbValue : "-"}
+                                highlight={hasNewRecord}
                               />
                               <HistoryMetricCircle
                                 size="sm"

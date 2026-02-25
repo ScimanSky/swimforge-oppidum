@@ -106,4 +106,42 @@ describe("club_history_oppidum parsing", () => {
     expect(parsed.rows[0]?.athleteName).toBe("Alessandra Meloni");
     expect(parsed.rows[0]?.points).toBeCloseTo(732.19);
   });
+
+  it("normalizes dash record placeholders to null", () => {
+    const html = `
+      <h1 class="w3-xlarge w3-text-red"><b>29 Marzo 2025 Sardegna Nuota</b></h1>
+      <!-- Inizio Atleta -->
+      <div>
+        <div class="w3-quarter">
+          <ul class="w3-ul">
+            <li class="w3-padding-small w3-red">Atleta Uno</li>
+            <li class="w3-padding-small">100 sl</li>
+          </ul>
+        </div>
+        <div class="w3-quarter">
+          <ul class="w3-ul">
+            <li class="w3-padding-small w3-red">Tempo</li>
+            <li class="w3-padding-small">1'25\"06</li>
+          </ul>
+        </div>
+        <div class="w3-quarter">
+          <ul class="w3-ul">
+            <li class="w3-padding-small w3-red">Punti</li>
+            <li class="w3-padding-small">732,19</li>
+          </ul>
+        </div>
+        <div class="w3-quarter">
+          <ul class="w3-ul">
+            <li class="w3-padding-small w3-red">Record</li>
+            <li class="w3-padding-small">-</li>
+          </ul>
+        </div>
+      </div>
+      <!-- Fine Atleta -->
+    `;
+
+    const parsed = parseOppidumMeetHtml(html, "https://www.oppidumsport.it/2025-Sardegna-Nuota.html");
+    expect(parsed.rows).toHaveLength(1);
+    expect(parsed.rows[0]?.recordRaw).toBeNull();
+  });
 });

@@ -32,6 +32,18 @@ function formatPoints(value: unknown): string {
   return num.toFixed(2);
 }
 
+function normalizePb(value: unknown): string {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return "";
+  if (/^[-–—]+$/.test(normalized)) return "";
+  return normalized;
+}
+
+function isNewRecordNote(value: unknown): boolean {
+  const normalized = String(value ?? "").toLowerCase();
+  return normalized.split(",").some((item) => item.trim() === "new");
+}
+
 export default function ClubHistoryAthletesPage() {
   const [match, params] = useRoute("/community/club/:clubId/history/athletes");
   const clubId = Number(params?.clubId);
@@ -129,16 +141,16 @@ export default function ClubHistoryAthletesPage() {
   const totalAthletes = Number((athletesQuery.data as any)?.total ?? athletes.length);
   const athleteSummary = useMemo(() => {
     let pointsTotal = 0;
-    let recordsCount = 0;
+    let newRecordsCount = 0;
     for (const row of detailResults) {
       const points = Number(row?.points ?? NaN);
       if (Number.isFinite(points)) pointsTotal += points;
-      if (String(row?.record_raw ?? "").trim()) recordsCount += 1;
+      if (isNewRecordNote(row?.notes)) newRecordsCount += 1;
     }
     return {
       resultsCount: detailResults.length,
       pointsTotal: pointsTotal.toFixed(1),
-      recordsCount,
+      newRecordsCount,
     };
   }, [detailResults]);
 
@@ -299,10 +311,10 @@ export default function ClubHistoryAthletesPage() {
                     <HistoryMetricCircle label="Risultati" tone="cyan" value={String(athleteSummary.resultsCount)} />
                     <HistoryMetricCircle label="Punti" tone="lime" value={athleteSummary.pointsTotal} />
                     <HistoryMetricCircle
-                      label="Record"
-                      tone="amber"
-                      value={String(athleteSummary.recordsCount)}
-                      highlight={athleteSummary.recordsCount > 0}
+                      label="Nuovi PB"
+                      tone="violet"
+                      value={String(athleteSummary.newRecordsCount)}
+                      highlight={athleteSummary.newRecordsCount > 0}
                     />
                   </div>
                 </div>
@@ -312,13 +324,15 @@ export default function ClubHistoryAthletesPage() {
                     <p className="text-sm text-muted-foreground">Nessun risultato storico disponibile.</p>
                   ) : (
                     detailResults.map((row) => {
-                      const hasRecord = Boolean(String(row.record_raw ?? "").trim());
+                      const pbValue = normalizePb(row.record_raw);
+                      const hasPb = Boolean(pbValue);
+                      const hasNewRecord = isNewRecordNote(row.notes);
                       return (
                         <div
                           key={row.id}
                           className={`relative overflow-hidden rounded-2xl border bg-card/30 p-3 ${
-                            hasRecord
-                              ? "border-amber-300/70 shadow-[0_0_0_1px_rgba(252,211,77,0.35),0_0_22px_rgba(251,191,36,0.22)]"
+                            hasNewRecord
+                              ? "animate-pulse border-fuchsia-300/70 shadow-[0_0_0_1px_rgba(217,70,239,0.36),0_0_24px_rgba(34,211,238,0.2)]"
                               : "border-border/60"
                           }`}
                         >
@@ -336,6 +350,9 @@ export default function ClubHistoryAthletesPage() {
                               <p className="text-sm font-semibold break-words">{row.meet_name}</p>
                               <Badge variant="outline" className="max-w-full truncate">{row.event_label}</Badge>
                             </div>
+                            {hasNewRecord ? (
+                              <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-fuchsia-300">Nuovo record personale</p>
+                            ) : null}
                             <p className="mt-1 text-xs text-muted-foreground break-words">{formatDate(row.meet_date)}</p>
                             <div className="mt-2 flex flex-wrap gap-2">
                               <HistoryMetricCircle
@@ -346,10 +363,10 @@ export default function ClubHistoryAthletesPage() {
                               />
                               <HistoryMetricCircle
                                 size="sm"
-                                tone="amber"
-                                label="Record"
-                                value={hasRecord ? String(row.record_raw) : "-"}
-                                highlight={hasRecord}
+                                tone="violet"
+                                label="PB"
+                                value={hasPb ? pbValue : "-"}
+                                highlight={hasNewRecord}
                               />
                               <HistoryMetricCircle
                                 size="sm"
