@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { ClubAiJobType, ClubAiRunStatus, ClubPoolWorkoutDirective } from "@shared/types";
 import { ENV } from "./_core/env";
-import { generateImage } from "./_core/imageGeneration";
+import { generateClubAiImageViaGemini } from "./club_ai_image";
 import { generateClubPoolWorkoutPlan } from "./club_workouts_ai";
 import { fetchNuotoSardegnaFutureMeetCandidates } from "./club_meets_nuotosardegna";
 import {
@@ -635,7 +635,7 @@ async function generateMotivationalText(config: ClubAiConfigRecord): Promise<str
 
 async function runPostMotivationMwf(config: ClubAiConfigRecord): Promise<JobExecutionResult> {
   const text = await generateMotivationalText(config);
-  const imageModel = config.imageModel?.trim() || ENV.clubAiPostImageModel || "nano-banana";
+  const imageModel = config.imageModel?.trim() || ENV.clubAiPostImageModel || "nano-banana-pro";
 
   const imagePrompt = [
     "Create a motivational swimming poster for a masters team training in a pool.",
@@ -647,25 +647,41 @@ async function runPostMotivationMwf(config: ClubAiConfigRecord): Promise<JobExec
     .filter(Boolean)
     .join("\n");
 
-  const image = await generateImage({ prompt: imagePrompt });
-  const imageUrl = image.url?.trim() ?? "";
+  const imageResult = await generateClubAiImageViaGemini({
+    clubId: config.clubId,
+    model: imageModel,
+    prompt: imagePrompt,
+  });
+  const imageUrl = imageResult.imageUrl?.trim() ?? "";
 
-  if (!imageUrl) {
-    return {
-      status: "failed",
-      resultJson: {
-        posted: false,
-        reason: "Image generation returned no URL",
-      },
-      errorText: "Image generation returned no URL",
-    };
+  if (imageUrl) {
+    logger.info("[club_ai] image generated", {
+      event: "club_ai:image_generated",
+      clubId: config.clubId,
+      model: imageResult.model,
+    });
+  } else {
+    logger.warn("[club_ai] image generation failed, posting text-only fallback", {
+      event: "club_ai:image_generation_failed_text_fallback",
+      clubId: config.clubId,
+      model: imageResult.model,
+      reason: imageResult.error ?? "unknown",
+    });
   }
 
-  const postId = await createClubPost(config.actorUserId, config.clubId, {
-    content: text,
-    mediaUrl: imageUrl,
-    mediaUrls: [imageUrl],
-  });
+  const postId = await createClubPost(
+    config.actorUserId,
+    config.clubId,
+    imageUrl
+      ? {
+          content: text,
+          mediaUrl: imageUrl,
+          mediaUrls: [imageUrl],
+        }
+      : {
+          content: text,
+        },
+  );
 
   const notification = await notifyClubMembers({
     clubId: config.clubId,
@@ -678,12 +694,14 @@ async function runPostMotivationMwf(config: ClubAiConfigRecord): Promise<JobExec
   });
 
   return {
-    status: "success",
+    status: imageUrl ? "success" : "partial",
     resultJson: {
       posted: true,
+      postedTextOnly: !imageUrl,
       postId: postId ?? null,
       imageModel,
-      imageUrl,
+      imageUrl: imageUrl || null,
+      imageError: imageUrl ? null : imageResult.error ?? "image_generation_failed",
       notification,
     },
   };

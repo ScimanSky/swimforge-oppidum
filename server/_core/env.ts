@@ -110,6 +110,7 @@ export const ENV = {
   clubAiAutomationEnabled: parseBoolEnv("CLUB_AI_AUTOMATION_ENABLED", false),
   clubAiDefaultClubIds: parseIntListEnv("CLUB_AI_DEFAULT_CLUB_IDS"),
   clubAiTimezone: (process.env.CLUB_AI_TIMEZONE ?? "Europe/Rome").trim() || "Europe/Rome",
+  clubAiPostImageEnabled: parseBoolEnv("CLUB_AI_POST_IMAGE_ENABLED", true),
   clubAiPostImageModel: (process.env.CLUB_AI_POST_IMAGE_MODEL ?? "").trim(),
   sessionMaxAgeDays,
   sessionMaxAgeMs: sessionMaxAgeDays * 24 * 60 * 60 * 1000,
