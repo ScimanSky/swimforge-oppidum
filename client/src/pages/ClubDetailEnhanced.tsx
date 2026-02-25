@@ -1102,9 +1102,15 @@ function ClubSettingsForm({
   const [pendingCoverFile, setPendingCoverFile] = useState<File | null>(null);
   const [logoRemoved, setLogoRemoved] = useState(false);
   const [coverRemoved, setCoverRemoved] = useState(false);
+  const [logoAiPrompt, setLogoAiPrompt] = useState("");
+  const [coverAiPrompt, setCoverAiPrompt] = useState("");
+  const [generatingAssetKind, setGeneratingAssetKind] = useState<"logo" | "cover" | null>(null);
   const [saving, setSaving] = useState(false);
 
   const imageKitAuth = trpc.community.clubs.media.imageKitAuth.useMutation();
+  const generateBrandAssetMutation = trpc.community.clubs.media.generateBrandAsset.useMutation({
+    onError: (e) => toast.error(e.message || "Generazione AI non riuscita"),
+  });
   const updateMutation = trpc.community.clubs.update.useMutation({
     onSuccess: () => { toast.success("Club aggiornato!"); onSaved(); },
     onError: (e) => toast.error(e.message),
@@ -1135,6 +1141,44 @@ function ClubSettingsForm({
       setPendingCoverFile(file);
       setCoverPreview(preview);
       setCoverRemoved(false);
+    }
+  };
+
+  const handleGenerateAsset = async (kind: "logo" | "cover") => {
+    if (!isOwner) {
+      toast.error("Solo il proprietario del club può aggiornare logo e copertina.");
+      return;
+    }
+
+    setGeneratingAssetKind(kind);
+    try {
+      const prompt = (kind === "logo" ? logoAiPrompt : coverAiPrompt).trim();
+      const result = await generateBrandAssetMutation.mutateAsync({
+        clubId,
+        kind,
+        prompt: prompt.length > 0 ? prompt : undefined,
+      });
+
+      if (kind === "logo") {
+        setLogoPreview(result.url);
+        setPendingLogoFile(null);
+        setLogoRemoved(false);
+      } else {
+        setCoverPreview(result.url);
+        setPendingCoverFile(null);
+        setCoverRemoved(false);
+      }
+
+      toast.success(
+        kind === "logo"
+          ? "Logo AI generato (512x512, ottimizzato mobile)."
+          : "Cover AI generata (1280x640, taglio mobile-safe).",
+      );
+      onSaved();
+    } catch {
+      // handled by mutation onError
+    } finally {
+      setGeneratingAssetKind(null);
     }
   };
 
@@ -1223,6 +1267,25 @@ function ClubSettingsForm({
             )}
           </div>
         </div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+          <Input
+            value={logoAiPrompt}
+            onChange={(e) => setLogoAiPrompt(e.target.value)}
+            maxLength={300}
+            placeholder="Prompt AI logo (opzionale)"
+          />
+          <Button
+            type="button"
+            variant="outline-neon"
+            disabled={generatingAssetKind !== null || saving || !isOwner}
+            onClick={() => void handleGenerateAsset("logo")}
+          >
+            {generatingAssetKind === "logo" ? "Genero logo..." : "Genera logo AI"}
+          </Button>
+        </div>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Output automatico: logo PNG 512x512, leggibile su mobile e avatar circolare.
+        </p>
       </div>
 
       {/* Cover Image */}
@@ -1256,6 +1319,30 @@ function ClubSettingsForm({
             </label>
           )}
         </div>
+        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_auto]">
+          <Input
+            value={coverAiPrompt}
+            onChange={(e) => setCoverAiPrompt(e.target.value)}
+            maxLength={300}
+            placeholder="Prompt AI cover (opzionale)"
+          />
+          <Button
+            type="button"
+            variant="outline-neon"
+            disabled={generatingAssetKind !== null || saving || !isOwner}
+            onClick={() => void handleGenerateAsset("cover")}
+          >
+            {generatingAssetKind === "cover" ? "Genero cover..." : "Genera cover AI"}
+          </Button>
+        </div>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Output automatico: cover 1280x640 con composizione centrale per evitare card “giganti” su smartphone.
+        </p>
+        {!isOwner ? (
+          <p className="mt-1 text-[11px] text-amber-300">
+            La generazione AI cover/logo è disponibile solo per il proprietario del club.
+          </p>
+        ) : null}
       </div>
 
       {/* Name */}

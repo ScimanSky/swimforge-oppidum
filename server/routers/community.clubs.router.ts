@@ -1846,6 +1846,74 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                     } as const;
                 }),
 
+            generateBrandAsset: protectedProcedure
+                .input(z.object({
+                    clubId: z.number(),
+                    kind: z.enum(["logo", "cover"]),
+                    prompt: z.string().max(500).optional().nullable(),
+                }))
+                .mutation(async ({ ctx, input }) => {
+                    const { getClubById, updateClub } = await import("../db_clubs");
+                    const club = await getClubById(ctx.user.id, input.clubId);
+                    if (!club) {
+                        throw new TRPCError({ code: "NOT_FOUND" });
+                    }
+                    if (Number(club.owner_id) !== ctx.user.id) {
+                        throw new TRPCError({
+                            code: "FORBIDDEN",
+                            message: "Solo il proprietario del club può aggiornare logo/copertina.",
+                        });
+                    }
+
+                    try {
+                        const { generateClubBrandingAsset } = await import("../club_branding_ai");
+                        const generated = await generateClubBrandingAsset({
+                            clubId: input.clubId,
+                            kind: input.kind,
+                            clubName: String(club.name ?? ""),
+                            clubTagline: club.tagline == null ? null : String(club.tagline),
+                            clubDescription: club.description == null ? null : String(club.description),
+                            themeColor: club.theme_color == null ? null : String(club.theme_color),
+                            customPrompt: input.prompt ?? null,
+                            userId: ctx.user.id,
+                        });
+
+                        await updateClub(ctx.user.id, input.clubId, input.kind === "logo"
+                            ? { logoUrl: generated.url }
+                            : { coverImageUrl: generated.url });
+
+                        return {
+                            success: true,
+                            kind: input.kind,
+                            url: generated.url,
+                            model: generated.model,
+                            width: generated.width,
+                            height: generated.height,
+                        };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : String(error);
+                        if (message === "Forbidden") {
+                            throw new TRPCError({
+                                code: "FORBIDDEN",
+                                message: "Solo il proprietario del club può aggiornare logo/copertina.",
+                            });
+                        }
+                        if (
+                            message.includes("OPENAI_API_KEY") ||
+                            message.includes("CLUB_BRANDING_AI_ENABLED")
+                        ) {
+                            throw new TRPCError({
+                                code: "PRECONDITION_FAILED",
+                                message,
+                            });
+                        }
+                        throw new TRPCError({
+                            code: "INTERNAL_SERVER_ERROR",
+                            message: `Generazione immagine fallita: ${message}`,
+                        });
+                    }
+                }),
+
             upload: protectedProcedure
                 .input(z.object({
                     clubId: z.number(),
