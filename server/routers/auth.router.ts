@@ -12,7 +12,7 @@ import { ENV } from "../_core/env";
 import { ensureRequiredLegalConsents } from "../consent";
 import { markUserOffline, touchUserPresence } from "../user_presence";
 
-const DEV_RESET_EMAIL = (process.env.RESET_APP_ALLOWED_EMAIL ?? "shardanu@gmail.com").trim().toLowerCase();
+const DEV_RESET_EMAIL = (process.env.RESET_APP_ALLOWED_EMAIL ?? process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
 const RESET_CONFIRMATION_PHRASE = "RESET APP";
 const REGISTRATION_PASSWORD_SCHEMA = z
     .string()
@@ -241,6 +241,13 @@ export const authRouter = router({
             })
         )
         .mutation(async ({ ctx, input }) => {
+            if (!DEV_RESET_EMAIL) {
+                throw new TRPCError({
+                    code: "PRECONDITION_FAILED",
+                    message: "Configura RESET_APP_ALLOWED_EMAIL o ADMIN_EMAIL per abilitare il reset.",
+                });
+            }
+
             if (process.env.NODE_ENV === "production" && process.env.ENABLE_RESET_APP_FOR_LAUNCH !== "true") {
                 throw new TRPCError({
                     code: "FORBIDDEN",

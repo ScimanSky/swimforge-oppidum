@@ -24,6 +24,36 @@ import { applySecurityMiddleware, applyRateLimiting } from "../middleware/securi
 import { rollbar, captureError } from "../middleware/rollbar-init";
 
 const log = logger.child({ component: "server" });
+let processHandlersInstalled = false;
+
+function toError(value: unknown): Error {
+  return value instanceof Error ? value : new Error(String(value));
+}
+
+function installGlobalProcessHandlers() {
+  if (processHandlersInstalled) return;
+  processHandlersInstalled = true;
+
+  process.on("unhandledRejection", (reason: unknown) => {
+    const error = toError(reason);
+    log.error("Unhandled Promise Rejection", {
+      event: "server:unhandled_rejection",
+      message: error.message,
+      stack: error.stack,
+    });
+    captureError(error, { scope: "process.unhandledRejection" });
+  });
+
+  process.on("uncaughtException", (error: Error) => {
+    log.error("Uncaught Exception", {
+      event: "server:uncaught_exception",
+      message: error.message,
+      stack: error.stack,
+    });
+    captureError(error, { scope: "process.uncaughtException" });
+    setTimeout(() => process.exit(1), 50);
+  });
+}
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -339,6 +369,8 @@ async function startServer() {
 
   // Cron moved to external scheduler via /api/cron/complete-challenges
 }
+
+installGlobalProcessHandlers();
 
 startServer().catch((error: unknown) => {
   log.error("Server failed to start", {
