@@ -26,7 +26,7 @@ describe("HistoryMetricCircle", () => {
 
     expect(ring).not.toBeNull();
     expect(ring?.className).toContain("animate-pulse");
-    expect(ring?.className).toContain("rgba(251,191,36,1)");
+    expect(ring?.className).toContain("rgba(34,211,238,1)");
   });
 
   it("supports compact size", () => {
