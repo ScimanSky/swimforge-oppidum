@@ -49,9 +49,16 @@ Update `.env.oracle`:
 - Configure local text AI:
   - `LLM_PROVIDER=local`
   - `LOCAL_LLM_BASE_URL=http://ollama:11434/v1`
-  - `LOCAL_LLM_MODEL=qwen3:8b`
-  - `LOCAL_LLM_FALLBACK_MODEL=qwen3:4b`
+  - `LOCAL_LLM_MODEL=qwen2.5:7b`
+  - `LOCAL_LLM_FALLBACK_MODEL=qwen2.5:3b`
   - `LOCAL_LLM_API_KEY=ollama`
+  - `LOCAL_LLM_TIMEOUT_MS=90000`
+  - `LOCAL_LLM_MAX_TOKENS=900`
+- Configure cloud fallback for text AI (only when local fails):
+  - `CLOUD_TEXT_FALLBACK_PROVIDER=gemini`
+  - `GEMINI_API_KEY=<your key>`
+  - `GEMINI_TEXT_MODEL=gemini-2.5-flash`
+  - `GEMINI_TEXT_TIMEOUT_MS=30000`
 - Keep `OPENAI_API_KEY` active only for image features (club branding / club AI post images)
 - Set Strava bridge envs:
   - `STRAVA_SERVICE_URL`
@@ -90,8 +97,8 @@ Ollama model data is persisted in Docker volume `ollama_data`.
 ## 6) Pull local LLM models
 Run once after first startup:
 ```bash
-docker compose --env-file .env.oracle -f docker-compose.oracle.yml exec ollama ollama pull qwen3:8b
-docker compose --env-file .env.oracle -f docker-compose.oracle.yml exec ollama ollama pull qwen3:4b
+docker compose --env-file .env.oracle -f docker-compose.oracle.yml exec ollama ollama pull qwen2.5:7b
+docker compose --env-file .env.oracle -f docker-compose.oracle.yml exec ollama ollama pull qwen2.5:3b
 docker compose --env-file .env.oracle -f docker-compose.oracle.yml exec ollama curl -s http://127.0.0.1:11434/api/tags
 ```
 
@@ -128,3 +135,14 @@ docker compose --env-file .env.oracle -f docker-compose.oracle.yml up -d --build
   - if `REDIS_URL` is set, ensure Redis is reachable
 - Garmin disconnected after restarts:
   - ensure `garmin_tokens` volume exists and container starts without mount errors
+- Local LLM timeout in logs:
+  - reduce prompt size / output size (`LOCAL_LLM_MAX_TOKENS`)
+  - verify Ollama models are pulled (`/api/tags`)
+  - monitor fallback event `text_llm:cloud_fallback_used` in app logs
+- Cloud fallback not working:
+  - verify `CLOUD_TEXT_FALLBACK_PROVIDER=gemini`
+  - verify `GEMINI_API_KEY` and `GEMINI_TEXT_MODEL`
+  - check app logs for `text_llm:cloud_fallback_failed`
+- Monitor fallback cloud costs:
+  - track count of `text_llm:cloud_fallback_used` events in app logs
+  - set Gemini project quota/budget alerts in your Google Cloud project

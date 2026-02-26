@@ -410,7 +410,7 @@ FORMAT JSON richiesto:
 
   const llm = await generateText({
     messages: [{ role: "user", content: prompt }],
-    maxTokens: 700,
+    maxTokens: 550,
   });
   const text = llm.text;
   const data = safeJsonParse(text);

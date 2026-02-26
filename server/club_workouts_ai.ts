@@ -9,12 +9,12 @@ const PRIMARY_MODEL_NAME =
     process.env.CLUB_WORKOUTS_AI_MODEL ??
     process.env.LOCAL_LLM_MODEL ??
     config.CLUB_WORKOUTS_AI_MODEL_PRIMARY)
-    .trim() || "qwen3:8b";
+    .trim() || "qwen2.5:7b";
 const ESCALATION_MODEL_NAME =
   (process.env.CLUB_WORKOUTS_AI_MODEL_ESCALATION ??
     process.env.LOCAL_LLM_FALLBACK_MODEL ??
     config.CLUB_WORKOUTS_AI_MODEL_ESCALATION).trim() ||
-  "qwen3:4b";
+  "qwen2.5:3b";
 const QUALITY_THRESHOLD = config.CLUB_WORKOUTS_AI_QUALITY_THRESHOLD;
 const PROMPT_VERSION = "club_pool_workout_v3_qgate";
 const REQUEST_TIMEOUT_MS = config.CLUB_WORKOUTS_AI_TIMEOUT_MS;
@@ -530,7 +530,7 @@ async function generateModelContent(params: {
       messages: [{ role: "user", content: prompt }],
       model: modelName,
       timeoutMs: REQUEST_TIMEOUT_MS,
-      maxTokens: 1_500,
+      maxTokens: 900,
       temperature: 0.2,
     });
     const elapsedMs = Date.now() - startedAt;
