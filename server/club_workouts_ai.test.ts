@@ -5,34 +5,28 @@ const mockState = vi.hoisted(() => ({
   calls: [] as string[],
 }));
 
-vi.mock("@google/generative-ai", () => ({
-  GoogleGenerativeAI: class {
-    constructor(_apiKey: string) {}
-
-    getGenerativeModel({ model }: { model: string }) {
-      return {
-        generateContent: async () => {
-          mockState.calls.push(model);
-          const response = mockState.responses.get(model);
-          if (response instanceof Error) throw response;
-          if (typeof response !== "string") {
-            throw new Error(`Missing mock response for ${model}`);
-          }
-          return {
-            response: {
-              text: () => response,
-            },
-          };
-        },
-      };
+vi.mock("./_core/text_llm", () => ({
+  generateText: async ({ model }: { model?: string }) => {
+    const modelName = model ?? "unknown-model";
+    mockState.calls.push(modelName);
+    const response = mockState.responses.get(modelName);
+    if (response instanceof Error) throw response;
+    if (typeof response !== "string") {
+      throw new Error(`Missing mock response for ${modelName}`);
     }
+    return {
+      text: response,
+      provider: "local",
+      model: modelName,
+      usedFallbackModel: false,
+    };
   },
 }));
 
 function setEnv() {
-  process.env.GEMINI_API_KEY = "test-key";
-  process.env.CLUB_WORKOUTS_AI_MODEL_PRIMARY = "gemini-fast";
-  process.env.CLUB_WORKOUTS_AI_MODEL_ESCALATION = "gemini-pro";
+  process.env.LLM_PROVIDER = "local";
+  process.env.CLUB_WORKOUTS_AI_MODEL_PRIMARY = "qwen3:8b";
+  process.env.CLUB_WORKOUTS_AI_MODEL_ESCALATION = "qwen3:4b";
   process.env.CLUB_WORKOUTS_AI_QUALITY_THRESHOLD = "0.92";
   process.env.CLUB_WORKOUTS_AI_TIMEOUT_MS = "45000";
   process.env.CLUB_WORKOUTS_AI_REQUEST_TIMEOUT_SOFT_MS = "30000";
@@ -122,7 +116,7 @@ describe("club_workouts_ai quality gate", () => {
   });
 
   it("keeps primary model when output quality is valid", async () => {
-    mockState.responses.set("gemini-fast", JSON.stringify(createValidPayload()));
+    mockState.responses.set("qwen3:8b", JSON.stringify(createValidPayload()));
 
     const { generateClubPoolWorkoutPlan } = await import("./club_workouts_ai");
     const result = await generateClubPoolWorkoutPlan({
@@ -140,14 +134,14 @@ describe("club_workouts_ai quality gate", () => {
     });
 
     expect(result.status).toBe("success");
-    expect(result.model).toBe("gemini-fast");
-    expect(mockState.calls).toEqual(["gemini-fast"]);
+    expect(result.model).toBe("qwen3:8b");
+    expect(mockState.calls).toEqual(["qwen3:8b"]);
     expect(result.quality.score).toBeGreaterThanOrEqual(0.92);
   });
 
   it("escalates to pro model when primary output has hard issues", async () => {
-    mockState.responses.set("gemini-fast", JSON.stringify(createInvalidPayload()));
-    mockState.responses.set("gemini-pro", JSON.stringify(createValidPayload()));
+    mockState.responses.set("qwen3:8b", JSON.stringify(createInvalidPayload()));
+    mockState.responses.set("qwen3:4b", JSON.stringify(createValidPayload()));
 
     const { generateClubPoolWorkoutPlan } = await import("./club_workouts_ai");
     const result = await generateClubPoolWorkoutPlan({
@@ -164,16 +158,16 @@ describe("club_workouts_ai quality gate", () => {
       },
     });
 
-    expect(mockState.calls).toEqual(["gemini-fast", "gemini-pro"]);
-    expect(result.model).toBe("gemini-pro");
+    expect(mockState.calls).toEqual(["qwen3:8b", "qwen3:4b"]);
+    expect(result.model).toBe("qwen3:4b");
     expect(result.status).toBe("success");
     expect(result.quality.escalated).toBe(true);
   });
 
   it("returns partial with auto-fix warnings when both models are invalid", async () => {
     const invalid = JSON.stringify(createInvalidPayload());
-    mockState.responses.set("gemini-fast", invalid);
-    mockState.responses.set("gemini-pro", invalid);
+    mockState.responses.set("qwen3:8b", invalid);
+    mockState.responses.set("qwen3:4b", invalid);
 
     const { generateClubPoolWorkoutPlan } = await import("./club_workouts_ai");
     const result = await generateClubPoolWorkoutPlan({
@@ -190,7 +184,7 @@ describe("club_workouts_ai quality gate", () => {
       },
     });
 
-    expect(mockState.calls).toEqual(["gemini-fast", "gemini-pro"]);
+    expect(mockState.calls).toEqual(["qwen3:8b", "qwen3:4b"]);
     expect(result.status).toBe("partial");
     expect(Array.isArray(result.warnings)).toBe(true);
     expect(result.warnings.join(" ")).toContain("Auto-fix");

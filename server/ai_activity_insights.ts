@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateText } from "./_core/text_llm";
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import {
@@ -9,12 +9,10 @@ import {
 } from "../drizzle/schema";
 import { logger } from "./middleware/logger";
 
-let genAI: GoogleGenerativeAI | null = null;
 const log = logger.child({ component: "ai_activity_insights" });
 const inFlightActivityInsightKeys = new Set<string>();
 const userBackgroundGenerationThrottle = new Map<number, number>();
 const BACKGROUND_THROTTLE_MS = 15_000;
-const GEMINI_MODEL = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -24,13 +22,6 @@ function toNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
   const num = Number(value);
   return Number.isFinite(num) ? num : null;
-}
-
-function getGeminiClient() {
-  if (!genAI && process.env.GEMINI_API_KEY) {
-    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  }
-  return genAI;
 }
 
 function formatPace(seconds?: number | null) {
@@ -361,10 +352,6 @@ function normalizeActivity(activity: Record<string, unknown>) {
 }
 
 export async function generateActivityInsight(activity: Record<string, unknown>) {
-  const client = getGeminiClient();
-  if (!client) return null;
-
-  const model = client.getGenerativeModel({ model: GEMINI_MODEL });
   const normalized = normalizeActivity(activity);
   const activityId = toNumber(activity["id"]);
   const segmentContext = activityId ? await buildSegmentContext(activityId) : null;
@@ -421,8 +408,11 @@ FORMAT JSON richiesto:
   "tags": ["Tecnica", "Intensità", "Recupero", "Consiglio"]
 }`;
 
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
+  const llm = await generateText({
+    messages: [{ role: "user", content: prompt }],
+    maxTokens: 700,
+  });
+  const text = llm.text;
   const data = safeJsonParse(text);
   if (!data || !data.title || !data.summary || !Array.isArray(data.bullets)) {
     return null;

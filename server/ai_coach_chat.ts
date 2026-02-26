@@ -1,10 +1,9 @@
-import { invokeLLM } from "./_core/llm";
+import { generateText } from "./_core/text_llm";
 import { getSwimmerProfile, getActivities } from "./db";
 import { getAdvancedMetrics } from "./db_statistics";
 import { getExistingWorkouts } from "./ai_coach";
 import { listActivityInsights } from "./ai_activity_insights";
 import { logger } from "./middleware/logger";
-import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export type CoachChatMessage = {
   role: "user" | "assistant";
@@ -15,7 +14,7 @@ export type CoachChatResult = {
   message: string;
   generatedAt: string;
   fallback: boolean;
-  provider: "forge" | "gemini" | "rule_based";
+  provider: "forge" | "gemini" | "local" | "rule_based";
 };
 
 export type CoachChatPreferences = {
@@ -122,29 +121,6 @@ ${contextToPrompt(ctx)}
   `.trim();
 }
 
-function normalizeAssistantContent(content: unknown): string {
-  if (typeof content === "string") return content.trim();
-  if (!Array.isArray(content)) return "";
-  return content
-    .map((part) => {
-      if (part && typeof part === "object" && "type" in part) {
-        const maybeText = part as { type?: string; text?: string };
-        if (maybeText.type === "text" && typeof maybeText.text === "string") {
-          return maybeText.text;
-        }
-      }
-      return "";
-    })
-    .join("\n")
-    .trim();
-}
-
-const GEMINI_MODEL = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash";
-const GEMINI_API_KEY = (process.env.GEMINI_API_KEY ?? "").trim();
-const geminiModel = GEMINI_API_KEY
-  ? new GoogleGenerativeAI(GEMINI_API_KEY).getGenerativeModel({ model: GEMINI_MODEL })
-  : null;
-
 function extractLastUserMessage(history: CoachChatMessage[]): string {
   for (let i = history.length - 1; i >= 0; i -= 1) {
     if (history[i].role === "user") {
@@ -226,32 +202,6 @@ function fallbackMessage(
   ].join("\n");
 }
 
-function toGeminiPrompt(systemPrompt: string, history: CoachChatMessage[]): string {
-  const transcript = history
-    .slice(-16)
-    .map((message) => `${message.role === "assistant" ? "Coach" : "Atleta"}: ${message.content}`)
-    .join("\n");
-
-  return [
-    systemPrompt,
-    "",
-    "CONVERSAZIONE RECENTE",
-    transcript,
-    "",
-    "Rispondi all'ultimo messaggio dell'atleta seguendo esattamente il formato richiesto.",
-  ].join("\n");
-}
-
-async function generateWithGemini(systemPrompt: string, history: CoachChatMessage[]): Promise<string> {
-  if (!geminiModel) {
-    throw new Error("GEMINI_API_KEY is not configured");
-  }
-  const result = await geminiModel.generateContent(toGeminiPrompt(systemPrompt, history));
-  const text = result.response.text().trim();
-  if (!text) throw new Error("Gemini returned empty content");
-  return text;
-}
-
 export async function generateCoachChatReply(
   userId: number,
   history: CoachChatMessage[],
@@ -292,48 +242,21 @@ export async function generateCoachChatReply(
   }
 
   const systemPrompt = baseSystemPrompt(context, preferences);
-  const hasForgeKey = (process.env.BUILT_IN_FORGE_API_KEY ?? "").trim().length > 0;
-
-  if (hasForgeKey) {
-    try {
-      const result = await invokeLLM({
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt,
-          },
-          ...safeHistory,
-        ],
-      });
-
-      const message = normalizeAssistantContent(result.choices?.[0]?.message?.content);
-      if (!message) {
-        throw new Error("Empty assistant response");
-      }
-
-      return {
-        message,
-        generatedAt: new Date().toISOString(),
-        fallback: false,
-        provider: "forge",
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.warn("[AI Coach Chat] Forge provider failed, trying Gemini fallback", {
-        event: "ai_coach_chat:forge_failed",
-        userId,
-        message,
-      });
-    }
-  }
 
   try {
-    const message = await generateWithGemini(systemPrompt, safeHistory);
+    const llm = await generateText({
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...safeHistory,
+      ],
+      maxTokens: 900,
+    });
+
     return {
-      message,
+      message: llm.text,
       generatedAt: new Date().toISOString(),
       fallback: false,
-      provider: "gemini",
+      provider: llm.provider,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

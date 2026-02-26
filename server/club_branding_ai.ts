@@ -37,6 +37,16 @@ const THEME_COLOR_HINTS: Record<string, string> = {
   violet: "deep violet accents",
 };
 
+function normalizeOpenAiImageError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const code = (error as Error & { code?: string }).code;
+  const message = error.message || "OpenAI image generation failed";
+  if (code === "insufficient_quota" || /insufficient_quota|quota/i.test(message)) {
+    return "OpenAI image quota esaurita. Controlla budget e limiti del progetto API.";
+  }
+  return message;
+}
+
 function sanitizeText(value?: string | null, maxLength = 300): string {
   const trimmed = (value ?? "").trim().replace(/\s+/g, " ");
   if (!trimmed) return "";
@@ -162,15 +172,29 @@ export async function generateClubBrandingAsset(
   });
 
   const startedAt = Date.now();
-  const response = await client.images.generate({
-    model,
-    prompt,
-    size,
-    quality: "medium",
-    output_format: params.kind === "logo" ? "png" : "webp",
-    background: params.kind === "logo" ? "transparent" : "auto",
-    user: `club-${params.clubId}-user-${params.userId}`,
-  });
+  let response;
+  try {
+    response = await client.images.generate({
+      model,
+      prompt,
+      size,
+      quality: "medium",
+      output_format: params.kind === "logo" ? "png" : "webp",
+      background: params.kind === "logo" ? "transparent" : "auto",
+      user: `club-${params.clubId}-user-${params.userId}`,
+    });
+  } catch (error) {
+    const message = normalizeOpenAiImageError(error);
+    log.warn("[club_branding_ai] OpenAI image generation failed", {
+      event: "club_branding_ai:openai_failed",
+      clubId: params.clubId,
+      userId: params.userId,
+      kind: params.kind,
+      model,
+      message,
+    });
+    throw new Error(message);
+  }
 
   const b64 = response.data?.[0]?.b64_json?.trim();
   if (!b64) {

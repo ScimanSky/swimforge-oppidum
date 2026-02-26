@@ -1,0 +1,70 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env.oracle
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      LLM_PROVIDER: ${LLM_PROVIDER:-local}
+      LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-http://ollama:11434/v1}
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-qwen3:8b}
+      LOCAL_LLM_FALLBACK_MODEL: ${LOCAL_LLM_FALLBACK_MODEL:-qwen3:4b}
+      LOCAL_LLM_API_KEY: ${LOCAL_LLM_API_KEY:-ollama}
+      GARMIN_SERVICE_URL: http://garmin:8000
+    depends_on:
+      - garmin
+      - ollama
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  garmin:
+    build:
+      context: ./garmin-service
+      dockerfile: Dockerfile
+    env_file:
+      - .env.oracle
+    environment:
+      MAIN_API_URL: http://app:3000
+      TOKEN_STORE_DIR: /data/tokens
+    volumes:
+      - garmin_tokens:/data/tokens
+    expose:
+      - "8000"
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+    volumes:
+      - ollama_data:/root/.ollama
+    expose:
+      - "11434"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.8
+    env_file:
+      - .env.oracle
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  garmin_tokens:
+  ollama_data:
+  caddy_data:
+  caddy_config:

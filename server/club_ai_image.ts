@@ -1,5 +1,6 @@
 import { GoogleGenAI, Modality, type GenerateContentResponse, type Part } from "@google/genai";
 import { createHash } from "crypto";
+import OpenAI from "openai";
 import { ENV } from "./_core/env";
 import { logger } from "./middleware/logger";
 
@@ -10,7 +11,7 @@ type GenerateClubAiImageViaGeminiParams = {
 };
 
 type GenerateClubAiImageViaGeminiResult = {
-  provider: "gemini";
+  provider: "gemini" | "openai";
   model: string;
   imageUrl?: string;
   error?: string;
@@ -238,6 +239,82 @@ function extractInlineData(response: GenerateContentResponse): { data: string; m
   return null;
 }
 
+async function uploadGeneratedImage(params: {
+  clubId: number;
+  model: string;
+  fileSlug: string;
+  buffer: Buffer;
+  mimeType: string;
+  provider: "gemini" | "openai";
+}): Promise<GenerateClubAiImageViaGeminiResult> {
+  const imageKitResult = await uploadToImageKit({
+    clubId: params.clubId,
+    fileSlug: params.fileSlug,
+    buffer: params.buffer,
+    mimeType: params.mimeType,
+  });
+
+  let imageUrl = imageKitResult.imageUrl?.trim() ?? "";
+  if (!imageUrl && imageKitResult.error) {
+    log.warn("[club_ai] imagekit upload failed, fallback to cloudinary", {
+      event: "club_ai:image_upload_imagekit_failed",
+      clubId: params.clubId,
+      model: params.model,
+      sourceProvider: params.provider,
+      message: imageKitResult.error,
+    });
+  }
+
+  if (!imageUrl) {
+    const cloudinaryResult = await uploadToCloudinary({
+      clubId: params.clubId,
+      fileSlug: params.fileSlug,
+      buffer: params.buffer,
+      mimeType: params.mimeType,
+    });
+    imageUrl = cloudinaryResult.imageUrl?.trim() ?? "";
+    if (!imageUrl) {
+      if (cloudinaryResult.error) {
+        log.warn("[club_ai] cloudinary upload failed", {
+          event: "club_ai:image_upload_cloudinary_failed",
+          clubId: params.clubId,
+          model: params.model,
+          sourceProvider: params.provider,
+          message: cloudinaryResult.error,
+        });
+      }
+      return {
+        provider: params.provider,
+        model: params.model,
+        error: cloudinaryResult.error ?? imageKitResult.error ?? "Image upload failed",
+      };
+    }
+  }
+
+  return {
+    provider: params.provider,
+    model: params.model,
+    imageUrl,
+  };
+}
+
+function resolveOpenAiModel(requestedModel: string): string {
+  if (requestedModel.startsWith("gpt-image")) return requestedModel;
+  const configured = (ENV.clubBrandingAiModel ?? "").trim();
+  if (configured.startsWith("gpt-image")) return configured;
+  return "gpt-image-1";
+}
+
+function normalizeOpenAiError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const details = (error as Error & { code?: string }).code;
+  const message = error.message || "OpenAI image generation failed";
+  if (details === "insufficient_quota" || /insufficient_quota|quota/i.test(message)) {
+    return "OpenAI image quota esaurita. Verifica il budget/progetto API.";
+  }
+  return message;
+}
+
 export async function generateClubAiImageViaGemini(
   params: GenerateClubAiImageViaGeminiParams,
 ): Promise<GenerateClubAiImageViaGeminiResult> {
@@ -252,117 +329,119 @@ export async function generateClubAiImageViaGemini(
     };
   }
 
-  const apiKey = (process.env.GEMINI_API_KEY ?? "").trim();
-  if (!apiKey) {
-    return {
-      provider: "gemini",
-      model: requestedModel,
-      error: "GEMINI_API_KEY is not configured",
-    };
-  }
+  const geminiApiKey = (process.env.GEMINI_API_KEY ?? "").trim();
+  const openAiApiKey = (process.env.OPENAI_API_KEY ?? "").trim();
+  let lastError = "Image generation is not configured";
 
-  const modelCandidates = [
-    requestedModel,
-    ...(LEGACY_NANO_BANANA_ALIASES.has(normalizedRequestedModel) ? IMAGE_MODEL_FALLBACKS : []),
-    ...IMAGE_MODEL_FALLBACKS,
-  ].filter((value, index, arr) => Boolean(value) && arr.indexOf(value) === index);
+  if (geminiApiKey) {
+    const modelCandidates = [
+      requestedModel,
+      ...(LEGACY_NANO_BANANA_ALIASES.has(normalizedRequestedModel) ? IMAGE_MODEL_FALLBACKS : []),
+      ...IMAGE_MODEL_FALLBACKS,
+    ].filter((value, index, arr) => Boolean(value) && arr.indexOf(value) === index);
 
-  const ai = new GoogleGenAI({ apiKey });
-  let lastError = "Unknown image generation failure";
+    const ai = new GoogleGenAI({ apiKey: geminiApiKey });
 
-  for (const model of modelCandidates) {
-    try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: params.prompt,
-        config: {
-          responseModalities: [Modality.IMAGE],
-        },
-      });
+    for (const model of modelCandidates) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: params.prompt,
+          config: {
+            responseModalities: [Modality.IMAGE],
+          },
+        });
 
-      const inlineData = extractInlineData(response);
-      if (!inlineData?.data) {
-        lastError = "Model response did not include inline image data";
-        continue;
-      }
+        const inlineData = extractInlineData(response);
+        if (!inlineData?.data) {
+          lastError = "Model response did not include inline image data";
+          continue;
+        }
 
-      const mimeType = normalizeMimeType(inlineData.mimeType || "image/png");
-      const fileSlug = sanitizeSlug(params.prompt);
-      const rawBuffer = Buffer.from(inlineData.data, "base64");
-      const optimized = await optimizeImageBuffer(rawBuffer, mimeType);
-
-      // Prefer ImageKit for generated images when configured.
-      const imageKitResult = await uploadToImageKit({
-        clubId: params.clubId,
-        fileSlug,
-        buffer: optimized.buffer,
-        mimeType: optimized.mimeType,
-      });
-
-      let imageUrl = imageKitResult.imageUrl?.trim() ?? "";
-      if (!imageUrl && imageKitResult.error) {
-        log.warn("[club_ai] imagekit upload failed, fallback to cloudinary", {
-          event: "club_ai:image_upload_imagekit_failed",
+        const mimeType = normalizeMimeType(inlineData.mimeType || "image/png");
+        const fileSlug = sanitizeSlug(params.prompt);
+        const rawBuffer = Buffer.from(inlineData.data, "base64");
+        const optimized = await optimizeImageBuffer(rawBuffer, mimeType);
+        const upload = await uploadGeneratedImage({
           clubId: params.clubId,
           model,
-          message: imageKitResult.error,
-        });
-      }
-
-      if (!imageUrl) {
-        const cloudinaryResult = await uploadToCloudinary({
-          clubId: params.clubId,
           fileSlug,
           buffer: optimized.buffer,
           mimeType: optimized.mimeType,
+          provider: "gemini",
         });
-        imageUrl = cloudinaryResult.imageUrl?.trim() ?? "";
-        if (!imageUrl) {
-          if (cloudinaryResult.error) {
-            log.warn("[club_ai] cloudinary upload failed", {
-              event: "club_ai:image_upload_cloudinary_failed",
-              clubId: params.clubId,
-              model,
-              message: cloudinaryResult.error,
-            });
-          }
-          return {
-            provider: "gemini",
-            model,
-            error: cloudinaryResult.error ?? imageKitResult.error ?? "Image upload failed",
-          };
+
+        if (!upload.error && model !== requestedModel) {
+          log.warn("[club_ai] requested image model unavailable, fallback model used", {
+            event: "club_ai:image_model_fallback_used",
+            clubId: params.clubId,
+            requestedModel,
+            usedModel: model,
+          });
         }
-      }
-
-      if (model !== requestedModel) {
-        log.warn("[club_ai] requested image model unavailable, fallback model used", {
-          event: "club_ai:image_model_fallback_used",
+        return upload;
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error);
+        log.warn("[club_ai] image generation failed", {
+          event: "club_ai:image_generation_failed",
           clubId: params.clubId,
-          requestedModel,
-          usedModel: model,
+          model,
+          provider: "gemini",
+          message: lastError,
         });
       }
-
-      return {
-        provider: "gemini",
-        model,
-        imageUrl,
-      };
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
-      log.warn("[club_ai] image generation failed", {
-        event: "club_ai:image_generation_failed",
-        clubId: params.clubId,
-        model,
-        message: lastError,
-      });
-      // Keep trying fallback models.
     }
+  } else {
+    lastError = "GEMINI_API_KEY is not configured";
   }
 
-  return {
-    provider: "gemini",
-    model: requestedModel,
-    error: lastError,
-  };
+  if (!openAiApiKey) {
+    return {
+      provider: "openai",
+      model: resolveOpenAiModel(requestedModel),
+      error: lastError,
+    };
+  }
+
+  const openAiModel = resolveOpenAiModel(requestedModel);
+  try {
+    const openai = new OpenAI({ apiKey: openAiApiKey, timeout: 60_000 });
+    const response = await openai.images.generate({
+      model: openAiModel,
+      prompt: params.prompt,
+      size: "1024x1024",
+      quality: "medium",
+      output_format: "png",
+      user: `club-${params.clubId}`,
+    });
+    const b64 = response.data?.[0]?.b64_json?.trim();
+    if (!b64) {
+      throw new Error("OpenAI did not return image data");
+    }
+
+    const rawBuffer = Buffer.from(b64, "base64");
+    const optimized = await optimizeImageBuffer(rawBuffer, "image/png");
+    return await uploadGeneratedImage({
+      clubId: params.clubId,
+      model: openAiModel,
+      fileSlug: sanitizeSlug(params.prompt),
+      buffer: optimized.buffer,
+      mimeType: optimized.mimeType,
+      provider: "openai",
+    });
+  } catch (error) {
+    const message = normalizeOpenAiError(error);
+    log.warn("[club_ai] OpenAI image generation failed", {
+      event: "club_ai:image_generation_failed",
+      clubId: params.clubId,
+      provider: "openai",
+      model: openAiModel,
+      message,
+    });
+    return {
+      provider: "openai",
+      model: openAiModel,
+      error: message,
+    };
+  }
 }

@@ -1,9 +1,9 @@
 /**
  * AI Coach Module
- * Generates personalized swimming workouts (pool and dryland) using Google Gemini AI
+ * Generates personalized swimming workouts (pool and dryland) using local LLM.
  */
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateText } from "./_core/text_llm";
 import { getDb } from "./db";
 import { aiCoachWorkouts, swimmerProfiles, swimmingActivities } from "../drizzle/schema";
 import { eq, and, gt, gte, desc, sql } from "drizzle-orm";
@@ -17,10 +17,6 @@ import {
   calculateACS,
   calculateRRS
 } from "./advanced_metrics";
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const GEMINI_MODEL = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash";
-const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
 interface WorkoutSection {
   title: string;
@@ -414,10 +410,6 @@ async function generateWorkout(
         workoutType,
       });
 
-      if (!process.env.GEMINI_API_KEY) {
-        throw new Error("Gemini not configured (missing GEMINI_API_KEY)");
-      }
-
       const userStats = await fetchUserStats(userId);
 
       const prompt =
@@ -425,24 +417,13 @@ async function generateWorkout(
           ? buildPoolWorkoutPrompt(userStats)
           : buildDrylandWorkoutPrompt(userStats);
 
-      // Call Gemini API with timeout
-      const result = (await Promise.race([
-        model.generateContent(prompt),
-        new Promise((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(`Gemini API timeout after ${config.GEMINI_API_TIMEOUT_MS}ms`)
-              ),
-            config.GEMINI_API_TIMEOUT_MS
-          )
-        ),
-      ])) as any;
+      const llm = await generateText({
+        messages: [{ role: "user", content: prompt }],
+        timeoutMs: config.LOCAL_LLM_TIMEOUT_MS,
+        maxTokens: 1_200,
+      });
 
-      const response = result.response;
-      const text = response.text();
-
-      const workout = parseWorkoutResponse(text, workoutType);
+      const workout = parseWorkoutResponse(llm.text, workoutType);
 
       logger.info(`[AI Coach] Workout generated successfully for user ${userId}`, {
         event: "ai_coach:generate_success",
