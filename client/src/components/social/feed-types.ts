@@ -16,6 +16,7 @@ export interface FeedPostRecord {
   hashtags?: string[] | string | null
   is_following?: boolean
   created_at: string
+  activity_date?: string | null
   activity_distance_meters?: number | null
   activity_duration_seconds?: number | null
   activity_calories?: number | null

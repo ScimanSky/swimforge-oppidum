@@ -33,6 +33,7 @@ interface FeedPostHeaderProps {
     user_club_name?: string | null
     activity_source?: string | null
     activity_is_open_water?: boolean | null
+    activity_date?: string | null
     created_at: string
     user_level?: number | null
     user_is_online?: boolean | null
@@ -90,7 +91,9 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
   const sourceParts: string[] = []
   if (post.activity_source) sourceParts.push(post.activity_source)
   if (post.activity_is_open_water != null) sourceParts.push(activityType)
-  sourceParts.push(formatTimeAgo(post.created_at))
+  const timeReference =
+    isActivityPost && post.activity_date ? post.activity_date : post.created_at
+  sourceParts.push(formatTimeAgo(timeReference))
 
   return (
     <div className="flex items-center gap-3 px-4 pb-1 pt-4">
