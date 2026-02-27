@@ -1159,37 +1159,43 @@ export default function Settings() {
               ].map((account) => (
                 <div
                   key={account.name}
-                  className="flex items-center justify-between rounded-lg border border-border bg-background/60 p-4"
+                  className="flex flex-col gap-3 rounded-lg border border-border bg-background/60 p-4 sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex min-w-0 flex-1 items-center gap-4">
                     <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/40">
                       <Globe className="w-6 h-6 text-muted-foreground" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-medium text-foreground">{account.name}</p>
                       {account.connected ? (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-muted-foreground break-words">
                           Ultimo sync {formatLastSync(account.lastSync)} · {account.activities} attivita
                         </p>
                       ) : (
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-sm text-muted-foreground break-words">
                           {account.disabled ? "Disponibile prossimamente" : "Non connesso"}
                         </p>
                       )}
                     </div>
                   </div>
                   {account.connected ? (
-                    <div className="flex items-center gap-2">
+                    <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
                       <div className="flex items-center gap-2 text-sm text-accent">
                         <Check className="w-4 h-4" />
                         Connesso
                       </div>
-                      <Button variant="outline-neon" size="sm" asChild>
+                      <Button variant="outline-neon" size="sm" className="shrink-0" asChild>
                         <a href="/profile">Gestisci</a>
                       </Button>
                     </div>
                   ) : (
-                    <Button variant="neon" size="sm" disabled={account.disabled} asChild={!account.disabled}>
+                    <Button
+                      variant="neon"
+                      size="sm"
+                      className="w-full sm:w-auto sm:shrink-0"
+                      disabled={account.disabled}
+                      asChild={!account.disabled}
+                    >
                       {account.disabled ? "In arrivo" : <a href="/profile">Connetti</a>}
                     </Button>
                   )}
