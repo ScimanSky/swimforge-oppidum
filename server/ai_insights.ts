@@ -292,7 +292,7 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
 
     const llm = await generateText({
       messages: [{ role: "user", content: prompt }],
-      maxTokens: 700,
+      maxTokens: 900,
     });
     const text = llm.text;
 

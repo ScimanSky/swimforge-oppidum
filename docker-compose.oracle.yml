@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   app:
     build:
@@ -10,12 +12,9 @@ services:
       PORT: 3000
       LLM_PROVIDER: ${LLM_PROVIDER:-local}
       LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-http://ollama:11434/v1}
-      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-qwen2.5:7b}
-      LOCAL_LLM_FALLBACK_MODEL: ${LOCAL_LLM_FALLBACK_MODEL:-qwen2.5:3b}
+      LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-qwen3:8b}
+      LOCAL_LLM_FALLBACK_MODEL: ${LOCAL_LLM_FALLBACK_MODEL:-qwen3:4b}
       LOCAL_LLM_API_KEY: ${LOCAL_LLM_API_KEY:-ollama}
-      CLOUD_TEXT_FALLBACK_PROVIDER: ${CLOUD_TEXT_FALLBACK_PROVIDER:-gemini}
-      GEMINI_TEXT_MODEL: ${GEMINI_TEXT_MODEL:-gemini-2.5-flash}
-      GEMINI_TEXT_TIMEOUT_MS: ${GEMINI_TEXT_TIMEOUT_MS:-30000}
       GARMIN_SERVICE_URL: http://garmin:8000
     depends_on:
       - garmin

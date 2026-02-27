@@ -598,7 +598,7 @@ async function runPublishWorkoutDaily(config: ClubAiConfigRecord, now: Date): Pr
 
 async function generateMotivationalText(config: ClubAiConfigRecord): Promise<string> {
   const fallback = "Ogni vasca conta: qualità oggi, risultati domani. Forza squadra Master.";
-  const modelName = process.env.LOCAL_LLM_MODEL?.trim() || "qwen2.5:7b";
+  const modelName = process.env.LOCAL_LLM_MODEL?.trim() || "qwen3:8b";
 
   const prompt = [
     "Scrivi UNA frase motivazionale breve in italiano per un club nuoto master (35-60 anni).",

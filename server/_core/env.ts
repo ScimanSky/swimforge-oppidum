@@ -76,13 +76,6 @@ function parseLlmProvider(): "local" | "forge" {
   return "local";
 }
 
-function parseCloudTextFallbackProvider(): "none" | "gemini" {
-  const raw = (process.env.CLOUD_TEXT_FALLBACK_PROVIDER ?? "gemini").trim().toLowerCase();
-  if (raw === "none" || raw === "gemini") return raw;
-  logger.warn(`[env] WARNING: CLOUD_TEXT_FALLBACK_PROVIDER '${raw}' is invalid, using 'gemini'`);
-  return "gemini";
-}
-
 const sessionMaxAgeDays = parseIntEnv("SESSION_MAX_AGE_DAYS", 30, { min: 1, max: 365 });
 
 export const ENV = {
@@ -102,21 +95,17 @@ export const ENV = {
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
   isProduction: process.env.NODE_ENV === "production",
   llmProvider: parseLlmProvider(),
-  cloudTextFallbackProvider: parseCloudTextFallbackProvider(),
   localLlmBaseUrl: (process.env.LOCAL_LLM_BASE_URL ?? "http://ollama:11434/v1").trim() || "http://ollama:11434/v1",
-  localLlmModel: (process.env.LOCAL_LLM_MODEL ?? "qwen2.5:7b").trim() || "qwen2.5:7b",
-  localLlmFallbackModel: (process.env.LOCAL_LLM_FALLBACK_MODEL ?? "qwen2.5:3b").trim() || "qwen2.5:3b",
+  localLlmModel: (process.env.LOCAL_LLM_MODEL ?? "qwen3:8b").trim() || "qwen3:8b",
+  localLlmFallbackModel: (process.env.LOCAL_LLM_FALLBACK_MODEL ?? "qwen3:4b").trim() || "qwen3:4b",
   localLlmApiKey: (process.env.LOCAL_LLM_API_KEY ?? "ollama").trim() || "ollama",
-  localLlmTimeoutMs: parseIntEnv("LOCAL_LLM_TIMEOUT_MS", 90_000, { min: 5_000, max: 120_000 }),
-  localLlmMaxTokens: parseIntEnv("LOCAL_LLM_MAX_TOKENS", 900, { min: 64, max: 8_192 }),
-  geminiApiKey: (process.env.GEMINI_API_KEY ?? "").trim(),
-  geminiTextModel: (process.env.GEMINI_TEXT_MODEL ?? process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash",
-  geminiTextTimeoutMs: parseIntEnv("GEMINI_TEXT_TIMEOUT_MS", 30_000, { min: 5_000, max: 120_000 }),
+  localLlmTimeoutMs: parseIntEnv("LOCAL_LLM_TIMEOUT_MS", 45_000, { min: 5_000, max: 120_000 }),
+  localLlmMaxTokens: parseIntEnv("LOCAL_LLM_MAX_TOKENS", 700, { min: 64, max: 8_192 }),
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   forgeLlmModel:
-    (process.env.FORGE_LLM_MODEL ?? process.env.LOCAL_LLM_MODEL ?? process.env.GEMINI_MODEL ?? "qwen2.5:7b").trim() ||
-    "qwen2.5:7b",
+    (process.env.FORGE_LLM_MODEL ?? process.env.LOCAL_LLM_MODEL ?? process.env.GEMINI_MODEL ?? "qwen3:8b").trim() ||
+    "qwen3:8b",
   supabaseUrl: requireEnv("SUPABASE_URL", "VITE_SUPABASE_URL"),
   supabaseAnonKey: requireEnv("SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY"),
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",

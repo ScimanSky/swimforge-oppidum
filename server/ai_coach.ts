@@ -420,7 +420,7 @@ async function generateWorkout(
       const llm = await generateText({
         messages: [{ role: "user", content: prompt }],
         timeoutMs: config.LOCAL_LLM_TIMEOUT_MS,
-        maxTokens: 900,
+        maxTokens: 1_200,
       });
 
       const workout = parseWorkoutResponse(llm.text, workoutType);

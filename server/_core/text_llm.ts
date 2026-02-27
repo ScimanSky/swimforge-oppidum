@@ -1,4 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
 import { config } from "../config";
 import { logger } from "../middleware/logger";
 import { ENV } from "./env";
@@ -18,7 +17,7 @@ export type GenerateTextParams = {
 
 export type GenerateTextResult = {
   text: string;
-  provider: "local" | "gemini";
+  provider: "local";
   model: string;
   usedFallbackModel: boolean;
 };
@@ -86,29 +85,6 @@ function extractJsonObject(text: string): string | null {
   return objectMatch?.[0]?.trim() ?? null;
 }
 
-function buildGeminiPrompt(messages: TextLlmMessage[]): string {
-  return messages
-    .map((entry) => `${entry.role.toUpperCase()}:\n${entry.content}`)
-    .join("\n\n");
-}
-
-async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string): Promise<T> {
-  let timeoutHandle: NodeJS.Timeout | null = null;
-  const timeoutPromise = new Promise<T>((_, reject) => {
-    timeoutHandle = setTimeout(() => {
-      reject(new Error(timeoutMessage));
-    }, timeoutMs);
-  });
-
-  try {
-    return await Promise.race([promise, timeoutPromise]);
-  } finally {
-    if (timeoutHandle) {
-      clearTimeout(timeoutHandle);
-    }
-  }
-}
-
 async function callLocalModel(params: {
   model: string;
   messages: TextLlmMessage[];
@@ -158,38 +134,6 @@ async function callLocalModel(params: {
   } finally {
     clearTimeout(timeout);
   }
-}
-
-async function callGeminiModel(params: {
-  model: string;
-  messages: TextLlmMessage[];
-  maxTokens: number;
-  timeoutMs: number;
-  temperature?: number;
-}): Promise<string> {
-  if (!ENV.geminiApiKey) {
-    throw new Error("GEMINI_API_KEY is not configured");
-  }
-
-  const ai = new GoogleGenAI({ apiKey: ENV.geminiApiKey });
-  const response = await withTimeout(
-    ai.models.generateContent({
-      model: params.model,
-      contents: buildGeminiPrompt(params.messages),
-      config: {
-        maxOutputTokens: params.maxTokens,
-        temperature: params.temperature,
-      },
-    }),
-    params.timeoutMs,
-    `Gemini timeout after ${params.timeoutMs}ms`,
-  );
-
-  const text = String(response.text ?? "").trim();
-  if (!text) {
-    throw new Error("Gemini returned empty content");
-  }
-  return text;
 }
 
 export async function generateText(params: GenerateTextParams): Promise<GenerateTextResult> {
@@ -255,60 +199,19 @@ export async function generateText(params: GenerateTextParams): Promise<Generate
     }
   }
 
-  const cloudFallbackProvider = ENV.cloudTextFallbackProvider;
-  if (cloudFallbackProvider === "gemini") {
-    const cloudModel = ENV.geminiTextModel;
-    const cloudTimeoutMs = ENV.geminiTextTimeoutMs || config.GEMINI_TEXT_TIMEOUT_MS;
-    const reason = errors.join(" | ");
-    const startedAt = Date.now();
-
-    try {
-      const text = await callGeminiModel({
-        model: cloudModel,
-        messages,
-        maxTokens,
-        timeoutMs: cloudTimeoutMs,
-        temperature: params.temperature,
-      });
-
-      log.warn("[text_llm] cloud fallback used", {
-        event: "text_llm:cloud_fallback_used",
-        reason,
-        localModel: models[0],
-        cloudModel,
-        latencyMs: Date.now() - startedAt,
-      });
-
-      return {
-        text,
-        provider: "gemini",
-        model: cloudModel,
-        usedFallbackModel: false,
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push(`gemini:${cloudModel}: ${message}`);
-      log.warn("[text_llm] cloud fallback failed", {
-        event: "text_llm:cloud_fallback_failed",
-        cloudModel,
-        message,
-      });
-    }
-  }
-
-  throw new Error(`All text LLM attempts failed: ${errors.join(" | ")}`);
+  throw new Error(`All local LLM attempts failed: ${errors.join(" | ")}`);
 }
 
 export async function generateJson<T = unknown>(params: GenerateJsonParams<T>): Promise<{
   value: T;
-  provider: "local" | "gemini";
+  provider: "local";
   model: string;
   usedFallbackModel: boolean;
 }> {
   const result = await generateText(params);
   const jsonSource = extractJsonObject(result.text);
   if (!jsonSource) {
-    throw new Error("Text LLM did not return JSON content");
+    throw new Error("Local LLM did not return JSON content");
   }
 
   let parsed: unknown;
