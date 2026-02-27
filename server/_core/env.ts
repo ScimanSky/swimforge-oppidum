@@ -69,18 +69,18 @@ function parseIntListEnv(name: string): number[] {
   return Array.from(new Set(values));
 }
 
-function parseLlmProvider(): "local" | "forge" {
-  const raw = (process.env.LLM_PROVIDER ?? "local").trim().toLowerCase();
-  if (raw === "local" || raw === "forge") return raw;
-  logger.warn(`[env] WARNING: LLM_PROVIDER '${raw}' is invalid, using 'local'`);
-  return "local";
+function parseLlmProvider(): "local" | "forge" | "gemini" {
+  const raw = (process.env.LLM_PROVIDER ?? "gemini").trim().toLowerCase();
+  if (raw === "local" || raw === "forge" || raw === "gemini") return raw;
+  logger.warn(`[env] WARNING: LLM_PROVIDER '${raw}' is invalid, using 'gemini'`);
+  return "gemini";
 }
 
 function parseCloudTextFallbackProvider(): "none" | "gemini" {
-  const raw = (process.env.CLOUD_TEXT_FALLBACK_PROVIDER ?? "gemini").trim().toLowerCase();
+  const raw = (process.env.CLOUD_TEXT_FALLBACK_PROVIDER ?? "none").trim().toLowerCase();
   if (raw === "none" || raw === "gemini") return raw;
-  logger.warn(`[env] WARNING: CLOUD_TEXT_FALLBACK_PROVIDER '${raw}' is invalid, using 'gemini'`);
-  return "gemini";
+  logger.warn(`[env] WARNING: CLOUD_TEXT_FALLBACK_PROVIDER '${raw}' is invalid, using 'none'`);
+  return "none";
 }
 
 const sessionMaxAgeDays = parseIntEnv("SESSION_MAX_AGE_DAYS", 30, { min: 1, max: 365 });

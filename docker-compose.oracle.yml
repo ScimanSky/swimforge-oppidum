@@ -8,18 +8,17 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      LLM_PROVIDER: ${LLM_PROVIDER:-local}
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-http://ollama:11434/v1}
       LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-qwen2.5:7b}
       LOCAL_LLM_FALLBACK_MODEL: ${LOCAL_LLM_FALLBACK_MODEL:-qwen2.5:3b}
       LOCAL_LLM_API_KEY: ${LOCAL_LLM_API_KEY:-ollama}
-      CLOUD_TEXT_FALLBACK_PROVIDER: ${CLOUD_TEXT_FALLBACK_PROVIDER:-gemini}
+      CLOUD_TEXT_FALLBACK_PROVIDER: ${CLOUD_TEXT_FALLBACK_PROVIDER:-none}
       GEMINI_TEXT_MODEL: ${GEMINI_TEXT_MODEL:-gemini-2.5-flash}
       GEMINI_TEXT_TIMEOUT_MS: ${GEMINI_TEXT_TIMEOUT_MS:-30000}
       GARMIN_SERVICE_URL: http://garmin:8000
     depends_on:
       - garmin
-      - ollama
     expose:
       - "3000"
     restart: unless-stopped
@@ -41,6 +40,7 @@ services:
 
   ollama:
     image: ollama/ollama:latest
+    profiles: ["local-llm"]
     environment:
       OLLAMA_HOST: 0.0.0.0
     volumes:

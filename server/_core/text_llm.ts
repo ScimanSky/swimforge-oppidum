@@ -193,10 +193,6 @@ async function callGeminiModel(params: {
 }
 
 export async function generateText(params: GenerateTextParams): Promise<GenerateTextResult> {
-  if (ENV.llmProvider !== "local") {
-    throw new Error(`Unsupported LLM_PROVIDER: ${ENV.llmProvider}`);
-  }
-
   const messages = params.messages
     .map((entry) => ({
       role: entry.role,
@@ -216,6 +212,34 @@ export async function generateText(params: GenerateTextParams): Promise<Generate
   const timeoutMs = params.timeoutMs ?? config.LOCAL_LLM_TIMEOUT_MS;
   const maxTokens = params.maxTokens ?? config.LOCAL_LLM_MAX_TOKENS;
   const errors: string[] = [];
+
+  if (ENV.llmProvider === "gemini") {
+    const cloudModel = params.model?.trim() || ENV.geminiTextModel;
+    const cloudTimeoutMs = params.timeoutMs ?? ENV.geminiTextTimeoutMs ?? config.GEMINI_TEXT_TIMEOUT_MS;
+    const startedAt = Date.now();
+    const text = await callGeminiModel({
+      model: cloudModel,
+      messages,
+      maxTokens,
+      timeoutMs: cloudTimeoutMs,
+      temperature: params.temperature,
+    });
+    log.info("[text_llm] gemini direct provider used", {
+      event: "text_llm:gemini_direct_used",
+      cloudModel,
+      latencyMs: Date.now() - startedAt,
+    });
+    return {
+      text,
+      provider: "gemini",
+      model: cloudModel,
+      usedFallbackModel: false,
+    };
+  }
+
+  if (ENV.llmProvider !== "local") {
+    throw new Error(`Unsupported LLM_PROVIDER: ${ENV.llmProvider}`);
+  }
 
   for (let index = 0; index < models.length; index += 1) {
     const model = models[index];
