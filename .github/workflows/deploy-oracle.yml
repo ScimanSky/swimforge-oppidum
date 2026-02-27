@@ -26,8 +26,22 @@ jobs:
           ORACLE_PORT: ${{ secrets.ORACLE_PORT }}
         run: |
           set -euo pipefail
-          HOST="${ORACLE_HOST:?Missing ORACLE_HOST secret}"
-          PORT="${ORACLE_PORT:-22}"
+          HOST_RAW="${ORACLE_HOST:?Missing ORACLE_HOST secret}"
+          PORT_RAW="${ORACLE_PORT:-22}"
+          HOST="$(printf '%s' "$HOST_RAW" | tr -d '\r' | xargs)"
+          PORT="$(printf '%s' "$PORT_RAW" | tr -d '\r' | xargs)"
+          HOST="${HOST%\"}"
+          HOST="${HOST#\"}"
+          HOST="${HOST%\'}"
+          HOST="${HOST#\'}"
+          if [[ -z "$HOST" ]]; then
+            echo "ORACLE_HOST is empty after normalization"
+            exit 1
+          fi
+          if [[ ! "$PORT" =~ ^[0-9]+$ ]]; then
+            echo "ORACLE_PORT must be numeric"
+            exit 1
+          fi
           mkdir -p ~/.ssh
           ssh-keyscan -p "$PORT" "$HOST" >> ~/.ssh/known_hosts
 
@@ -38,9 +52,28 @@ jobs:
           ORACLE_PORT: ${{ secrets.ORACLE_PORT }}
         run: |
           set -euo pipefail
-          HOST="${ORACLE_HOST:?Missing ORACLE_HOST secret}"
-          USER="${ORACLE_USER:?Missing ORACLE_USER secret}"
-          PORT="${ORACLE_PORT:-22}"
+          HOST_RAW="${ORACLE_HOST:?Missing ORACLE_HOST secret}"
+          USER_RAW="${ORACLE_USER:?Missing ORACLE_USER secret}"
+          PORT_RAW="${ORACLE_PORT:-22}"
+          HOST="$(printf '%s' "$HOST_RAW" | tr -d '\r' | xargs)"
+          USER="$(printf '%s' "$USER_RAW" | tr -d '\r' | xargs)"
+          PORT="$(printf '%s' "$PORT_RAW" | tr -d '\r' | xargs)"
+          HOST="${HOST%\"}"
+          HOST="${HOST#\"}"
+          HOST="${HOST%\'}"
+          HOST="${HOST#\'}"
+          USER="${USER%\"}"
+          USER="${USER#\"}"
+          USER="${USER%\'}"
+          USER="${USER#\'}"
+          if [[ -z "$HOST" || -z "$USER" ]]; then
+            echo "ORACLE_HOST/ORACLE_USER invalid after normalization"
+            exit 1
+          fi
+          if [[ ! "$PORT" =~ ^[0-9]+$ ]]; then
+            echo "ORACLE_PORT must be numeric"
+            exit 1
+          fi
 
           ssh \
             -o BatchMode=yes \
