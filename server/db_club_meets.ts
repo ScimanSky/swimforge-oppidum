@@ -12,7 +12,7 @@ import {
 import { getDb } from "./db";
 import type { EntryStatus, MeetStatus, ResultImportMode } from "@shared/types";
 
-const STAFF_ROLES = new Set(["owner", "admin", "moderator"]);
+const STAFF_ROLES = new Set(["owner", "admin", "moderator", "coach"]);
 const MEMBER_VISIBLE_STATUSES: MeetStatus[] = ["published", "open", "closed", "completed"];
 
 export type MeetEventInput = {
@@ -674,7 +674,14 @@ export async function selfSetMeetEntry(params: {
         updatedAt: new Date(),
       })
       .returning();
-    return created;
+    return {
+      entry: created,
+      meetId: meet.id,
+      clubId: meet.clubId,
+      meetName: String(meet.name ?? ""),
+      eventLabel: String(event.label ?? ""),
+      shouldNotifyStaff: params.status === "pending",
+    };
   }
 
   const [updated] = await db
@@ -688,7 +695,14 @@ export async function selfSetMeetEntry(params: {
     .where(eq(clubMeetEntries.id, existing.id))
     .returning();
 
-  return updated;
+  return {
+    entry: updated,
+    meetId: meet.id,
+    clubId: meet.clubId,
+    meetName: String(meet.name ?? ""),
+    eventLabel: String(event.label ?? ""),
+    shouldNotifyStaff: params.status === "pending" && existing.status !== "pending",
+  };
 }
 
 export async function staffSetMeetEntryStatus(params: {
@@ -1258,7 +1272,7 @@ export async function listMeetMemberRecipients(params: {
       JOIN users u ON u.id = m.user_id
       WHERE m.club_id = ${meet.clubId}
         AND m.status = 'active'
-        AND m.role IN ('owner', 'admin', 'moderator')
+        AND m.role IN ('owner', 'admin', 'moderator', 'coach')
     `);
     return rows.rows.map((row) => ({
       userId: Number((row as any).user_id),

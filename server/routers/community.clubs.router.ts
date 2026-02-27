@@ -723,15 +723,41 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         seedTimeCs: z.number().min(1).max(10_000_000).optional(),
                     }))
                     .mutation(async ({ ctx, input }) => {
-                        const { selfSetMeetEntry } = await import("../db_club_meets");
+                        const { selfSetMeetEntry, listMeetMemberRecipients } = await import("../db_club_meets");
+                        const { createNotification } = await import("../db_social_enhanced");
                         try {
-                            const entry = await selfSetMeetEntry({
+                            const result = await selfSetMeetEntry({
                                 userId: ctx.user.id,
                                 meetEventId: input.meetEventId,
                                 status: input.status,
                                 seedTimeCs: input.seedTimeCs,
                             });
-                            return { success: true, entry };
+
+                            if (result.shouldNotifyStaff) {
+                                const recipients = await listMeetMemberRecipients({
+                                    meetId: result.meetId,
+                                    audience: "staff",
+                                });
+                                const actorName = String(ctx.user.name ?? "").trim()
+                                    || String(ctx.user.email ?? "").split("@")[0]
+                                    || "Un atleta";
+                                await Promise.allSettled(
+                                    recipients
+                                        .filter((recipient) => recipient.userId !== ctx.user.id)
+                                        .map((recipient) =>
+                                            createNotification({
+                                                userId: recipient.userId,
+                                                type: "meet_entry_pending",
+                                                title: "Nuova iscrizione gara da validare",
+                                                message: `${actorName} ha richiesto iscrizione a ${result.eventLabel} (${result.meetName}).`,
+                                                link: `/community/club/${result.clubId}/coach`,
+                                                referenceId: result.meetId,
+                                            }),
+                                        ),
+                                );
+                            }
+
+                            return { success: true, entry: result.entry };
                         } catch (error) {
                             const message = error instanceof Error ? error.message : "Impossibile aggiornare iscrizione";
                             if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
