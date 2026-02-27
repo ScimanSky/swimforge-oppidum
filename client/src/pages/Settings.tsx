@@ -105,6 +105,11 @@ const notificationSettings = [
   },
 ]
 
+const RESET_APP_ALLOWED_EMAIL =
+  String(import.meta.env.VITE_RESET_APP_ALLOWED_EMAIL ?? "admin@swimforge.it")
+    .trim()
+    .toLowerCase()
+
 const defaultNotificationState = notificationSettings.reduce(
   (acc, setting) => ({ ...acc, [setting.id]: setting.enabled }),
   {} as Record<string, boolean>
@@ -221,6 +226,17 @@ export default function Settings() {
     nextParams.set("tab", nextTab)
     setActiveTab(nextTab)
     setLocation(`${basePath}?${nextParams.toString()}`)
+  }
+
+  const scrollToGarminControls = () => {
+    if (activeTab !== "connections") {
+      updateTabInUrl("connections")
+    }
+    if (typeof window === "undefined") return
+    window.setTimeout(() => {
+      const target = document.getElementById("garmin-connection-controls")
+      target?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, 120)
   }
 
   const utils = trpc.useUtils()
@@ -468,7 +484,7 @@ export default function Settings() {
   const [resetDialogOpen, setResetDialogOpen] = useState(false)
   const [resetConfirmationText, setResetConfirmationText] = useState("")
   const [consentState, setConsentState] = useState<Record<string, boolean>>({})
-  const isDevResetAccount = (me?.email ?? "").toLowerCase() === "shardanu@gmail.com"
+  const isDevResetAccount = (me?.email ?? "").toLowerCase() === RESET_APP_ALLOWED_EMAIL
 
   useEffect(() => {
     const next: Record<string, boolean> = {}
@@ -1184,8 +1200,14 @@ export default function Settings() {
                         <Check className="w-4 h-4" />
                         Connesso
                       </div>
-                      <Button variant="outline-neon" size="sm" className="shrink-0" asChild>
-                        <a href="/profile">Gestisci</a>
+                      <Button
+                        variant="outline-neon"
+                        size="sm"
+                        className="shrink-0"
+                        type="button"
+                        onClick={scrollToGarminControls}
+                      >
+                        Gestisci
                       </Button>
                     </div>
                   ) : (
@@ -1204,7 +1226,9 @@ export default function Settings() {
             </div>
           </section>
 
-          <GarminSection garminConnected={garminStatus?.connected ?? false} />
+          <div id="garmin-connection-controls">
+            <GarminSection garminConnected={garminStatus?.connected ?? false} />
+          </div>
         </TabsContent>
 
         {/* Notifications Tab */}
