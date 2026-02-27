@@ -1,0 +1,50 @@
+name: Deploy Oracle
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-oracle-main
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Oracle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.ORACLE_SSH_KEY }}
+
+      - name: Add Oracle host key
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_PORT: ${{ secrets.ORACLE_PORT }}
+        run: |
+          set -euo pipefail
+          HOST="${ORACLE_HOST:?Missing ORACLE_HOST secret}"
+          PORT="${ORACLE_PORT:-22}"
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "$PORT" "$HOST" >> ~/.ssh/known_hosts
+
+      - name: Run remote deploy script
+        env:
+          ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+          ORACLE_USER: ${{ secrets.ORACLE_USER }}
+          ORACLE_PORT: ${{ secrets.ORACLE_PORT }}
+        run: |
+          set -euo pipefail
+          HOST="${ORACLE_HOST:?Missing ORACLE_HOST secret}"
+          USER="${ORACLE_USER:?Missing ORACLE_USER secret}"
+          PORT="${ORACLE_PORT:-22}"
+
+          ssh \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -p "$PORT" \
+            "$USER@$HOST" \
+            '/usr/local/bin/swimforge-deploy.sh'
