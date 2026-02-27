@@ -323,7 +323,7 @@ export default function Statistics() {
 	  const { data: advanced, isLoading: advancedLoading } = trpc.statistics.getAdvanced.useQuery(
 	    { days: period },
 	    { 
-	      staleTime: 24 * 60 * 60 * 1000, // Cache for 24 hours (AI insights)
+	      staleTime: 5 * 60 * 1000, // Server-side insights remain cached; keep client cache short.
 	    }
 	  );
 

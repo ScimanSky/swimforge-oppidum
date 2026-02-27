@@ -193,7 +193,7 @@ export default function Coach() {
 
   const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
-    { staleTime: 24 * 60 * 60 * 1000, refetchOnWindowFocus: false }
+    { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false }
   )
 
   // Read-only: fetch existing workouts (no generation)

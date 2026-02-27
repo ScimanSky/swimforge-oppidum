@@ -74,7 +74,7 @@ export default function CoachDryland() {
 
   const advancedQuery = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
-    { staleTime: 24 * 60 * 60 * 1000 }
+    { staleTime: 5 * 60 * 1000 }
   );
   const timelineQuery = trpc.statistics.getTimeline.useQuery(
     { days: 14 },

@@ -8,6 +8,8 @@ import { logger } from "./middleware/logger";
 let genAI: GoogleGenerativeAI | null = null;
 const log = logger.child({ component: "ai_insights" });
 const INSIGHT_EMOJI_REGEX = /^[🔥⚡💪🎯📈🏊🔄🌟🚀💯🏆❤️📊🎉👍💬🤯😂😢🌊]/;
+const INSIGHT_EMOJIS = ["🔥", "⚡", "💪", "🎯", "📈", "🏊", "🔄", "🌟", "🚀", "💯", "🏆", "❤️", "📊", "🎉", "👍", "💬", "🤯", "😂", "😢", "🌊"] as const;
+const MIN_INSIGHTS_FOR_VALID_CACHE = 6;
 const GEMINI_MODEL = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash";
 
 function getGeminiClient() {
@@ -29,6 +31,7 @@ function cleanupInsightLine(line: string): string {
 }
 
 function parseInsightsFromAiText(text: string): string[] {
+  const normalizedText = text.replace(/\r\n/g, "\n");
   const lines = text
     .replace(/\r\n/g, "\n")
     .split("\n")
@@ -43,6 +46,17 @@ function parseInsightsFromAiText(text: string): string[] {
     seen.add(normalized);
     picked.push(line);
   };
+
+  // Pass 0: extract emoji-starting segments even when the model sends a single long paragraph.
+  const escapedEmojiAlternation = INSIGHT_EMOJIS.map((emoji) => emoji.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  if (escapedEmojiAlternation) {
+    const emojiBlockRegex = new RegExp(`(?:${escapedEmojiAlternation})[\\s\\S]*?(?=(?:${escapedEmojiAlternation})|$)`, "gu");
+    let match: RegExpExecArray | null;
+    while ((match = emojiBlockRegex.exec(normalizedText)) !== null) {
+      const cleaned = cleanupInsightLine(match[0] ?? "");
+      if (cleaned) pushUnique(cleaned);
+    }
+  }
 
   // Pass 1: prefer emoji-prefixed insights (supports markdown bullets too).
   for (const line of lines) {
@@ -64,15 +78,22 @@ function parseInsightsFromAiText(text: string): string[] {
   }
 
   // Pass 3: as last resort, split long paragraphs and extract first statements.
-  if (picked.length === 0) {
+  if (picked.length < MIN_INSIGHTS_FOR_VALID_CACHE) {
     const paragraphCandidates = text
       .replace(/\r\n/g, "\n")
       .split(/\n{2,}/)
       .map((p) => cleanupInsightLine(p))
       .filter((p) => p.length >= 40 && !p.startsWith("---") && !p.startsWith("###"));
     for (const paragraph of paragraphCandidates) {
-      const sentence = paragraph.split(/(?<=[.!?])\s+/)[0]?.trim() ?? "";
-      if (sentence) pushUnique(sentence);
+      const sentences = paragraph
+        .split(/(?<=[.!?])\s+/)
+        .map((sentence) => cleanupInsightLine(sentence))
+        .filter((sentence) => sentence.length >= 24);
+      for (const sentence of sentences) {
+        pushUnique(sentence);
+        if (picked.length >= 8) break;
+      }
+      if (picked.length >= 8) break;
     }
   }
 
@@ -172,12 +193,21 @@ export async function generateAIInsights(
       .limit(1);
 
     if (cached.length > 0 && cached[0].insights.length > 0) {
-      log.debug("[AI Insights] Using valid cached insights", {
-        event: "ai_insights:cache_hit",
+      if (cached[0].insights.length >= MIN_INSIGHTS_FOR_VALID_CACHE) {
+        log.debug("[AI Insights] Using valid cached insights", {
+          event: "ai_insights:cache_hit",
+          userId,
+          expiresAt: cached[0].expiresAt,
+          count: cached[0].insights.length,
+        });
+        return cached[0].insights;
+      }
+
+      log.warn("[AI Insights] Cache hit with incomplete insights, forcing regeneration", {
+        event: "ai_insights:cache_hit_incomplete",
         userId,
-        expiresAt: cached[0].expiresAt,
+        count: cached[0].insights.length,
       });
-      return cached[0].insights;
     }
     
     log.debug("[AI Insights] No valid cache found, generating new insights", {
@@ -417,10 +447,11 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
         )
         .limit(1);
 
-      if (cached.length > 0 && cached[0].insights.length > 0) {
+      if (cached.length > 0 && cached[0].insights.length >= MIN_INSIGHTS_FOR_VALID_CACHE) {
         log.debug("[AI Insights] Using cached insights (parsing failed)", {
           event: "ai_insights:parse_failed_cache_hit",
           userId,
+          count: cached[0].insights.length,
         });
         return cached[0].insights;
       }
