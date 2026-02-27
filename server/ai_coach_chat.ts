@@ -249,7 +249,7 @@ export async function generateCoachChatReply(
         { role: "system", content: systemPrompt },
         ...safeHistory,
       ],
-      maxTokens: 650,
+      maxTokens: 1200,
     });
 
     return {
