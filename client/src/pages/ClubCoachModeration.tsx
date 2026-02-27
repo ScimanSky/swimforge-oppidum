@@ -332,6 +332,27 @@ function buildMeetRosterPrintHtml(meet: any, rows: MeetRosterRow[]) {
 </html>`;
 }
 
+function injectAutoPrintScript(html: string) {
+  const script = `<script>(function(){const run=function(){setTimeout(function(){try{window.focus();window.print();}catch(_err){}},260);};if(document.readyState==="complete"){run();}else{window.addEventListener("load",run,{once:true});}window.addEventListener("afterprint",function(){setTimeout(function(){try{window.close();}catch(_err){}},120);});})();</script>`;
+  return html.includes("</body>") ? html.replace("</body>", `${script}</body>`) : `${html}${script}`;
+}
+
+function openPrintTab(html: string) {
+  try {
+    const blob = new Blob([injectAutoPrintScript(html)], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const popup = window.open(url, "_blank");
+    if (popup) {
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return true;
+    }
+    URL.revokeObjectURL(url);
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 function toDateInputValue(date: Date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
@@ -839,6 +860,8 @@ export default function ClubCoachModeration() {
     }
 
     const html = buildMeetRosterPrintHtml(selectedMeet, rosterRows);
+    if (openPrintTab(html)) return;
+
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
     iframe.style.left = "-9999px";
