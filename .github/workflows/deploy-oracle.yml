@@ -113,6 +113,13 @@ jobs:
               continue
             fi
 
+            if printf '%s' "$SSH_OUTPUT" | grep -qiE 'curl: \(22\)|requested URL returned error: 502|502 bad gateway|status.?502'; then
+              echo "Transient HTTP 502 during post-deploy health check, waiting ${SLEEP_SECONDS}s before retry."
+              ATTEMPT=$((ATTEMPT + 1))
+              sleep "$SLEEP_SECONDS"
+              continue
+            fi
+
             echo "Remote deploy failed for a non-lock reason."
             exit "$SSH_EXIT"
           done
