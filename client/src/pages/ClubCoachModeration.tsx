@@ -813,17 +813,66 @@ export default function ClubCoachModeration() {
       toast.info("Nessun iscritto attivo da stampare.");
       return;
     }
-    const popup = window.open("", "_blank", "noopener,noreferrer,width=1200,height=800");
-    if (!popup) {
-      toast.error("Impossibile aprire la finestra di stampa.");
+
+    const html = buildMeetRosterPrintHtml(selectedMeet, rosterRows);
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.left = "-9999px";
+    iframe.style.top = "0";
+    iframe.style.width = "794px";
+    iframe.style.height = "1123px";
+    iframe.style.border = "0";
+    iframe.style.opacity = "0";
+    iframe.setAttribute("aria-hidden", "true");
+    document.body.appendChild(iframe);
+
+    const frameWindow = iframe.contentWindow;
+    const frameDocument = frameWindow?.document;
+    if (!frameWindow || !frameDocument) {
+      document.body.removeChild(iframe);
+      toast.error("Stampa non disponibile su questo browser.");
       return;
     }
 
-    popup.document.open();
-    popup.document.write(buildMeetRosterPrintHtml(selectedMeet, rosterRows));
-    popup.document.close();
-    popup.focus();
-    window.setTimeout(() => popup.print(), 180);
+    const cleanup = () => {
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    };
+
+    iframe.onload = () => {
+      frameWindow.onafterprint = cleanup;
+      setTimeout(() => {
+        try {
+          frameWindow.focus();
+          frameWindow.print();
+        } catch {
+          cleanup();
+          toast.error("Stampa non disponibile su questo browser.");
+        }
+      }, 350);
+    };
+
+    try {
+      iframe.srcdoc = html;
+    } catch {
+      try {
+        frameDocument.open();
+        frameDocument.write(html);
+        frameDocument.close();
+        frameWindow.onafterprint = cleanup;
+        setTimeout(() => {
+          try {
+            frameWindow.focus();
+            frameWindow.print();
+          } catch {
+            cleanup();
+            toast.error("Stampa non disponibile su questo browser.");
+          }
+        }, 500);
+      } catch {
+        cleanup();
+        toast.error("Stampa non disponibile su questo browser.");
+      }
+    }
   };
 
   if (!match || !Number.isFinite(clubId)) return null;

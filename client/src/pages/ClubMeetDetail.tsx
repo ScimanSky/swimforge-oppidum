@@ -370,20 +370,65 @@ export default function ClubMeetDetail() {
       return;
     }
 
-    const printWindow = window.open("", "_blank", "noopener,noreferrer,width=1024,height=768");
-    if (!printWindow) {
-      toast.error("Impossibile aprire la finestra di stampa");
+    const html = buildMeetEntriesPrintHtml({ meet, events, groupedEntries });
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.left = "-9999px";
+    iframe.style.top = "0";
+    iframe.style.width = "794px";
+    iframe.style.height = "1123px";
+    iframe.style.border = "0";
+    iframe.style.opacity = "0";
+    iframe.setAttribute("aria-hidden", "true");
+    document.body.appendChild(iframe);
+
+    const frameWindow = iframe.contentWindow;
+    const frameDocument = frameWindow?.document;
+    if (!frameWindow || !frameDocument) {
+      document.body.removeChild(iframe);
+      toast.error("Stampa non disponibile su questo browser");
       return;
     }
 
-    const html = buildMeetEntriesPrintHtml({ meet, events, groupedEntries });
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    window.setTimeout(() => {
-      printWindow.print();
-    }, 160);
+    const cleanup = () => {
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    };
+
+    iframe.onload = () => {
+      frameWindow.onafterprint = cleanup;
+      setTimeout(() => {
+        try {
+          frameWindow.focus();
+          frameWindow.print();
+        } catch {
+          cleanup();
+          toast.error("Stampa non disponibile su questo browser");
+        }
+      }, 350);
+    };
+
+    try {
+      iframe.srcdoc = html;
+    } catch {
+      try {
+        frameDocument.open();
+        frameDocument.write(html);
+        frameDocument.close();
+        frameWindow.onafterprint = cleanup;
+        setTimeout(() => {
+          try {
+            frameWindow.focus();
+            frameWindow.print();
+          } catch {
+            cleanup();
+            toast.error("Stampa non disponibile su questo browser");
+          }
+        }, 500);
+      } catch {
+        cleanup();
+        toast.error("Stampa non disponibile su questo browser");
+      }
+    }
   };
 
   if (!match || !Number.isFinite(meetId) || !Number.isFinite(clubId)) {
