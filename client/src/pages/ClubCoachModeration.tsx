@@ -14,7 +14,7 @@ import { trpc } from "@/lib/trpc";
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
 import { getWorkoutSeriesDisplay, parseWorkoutPlan } from "@/lib/workout-plan";
 import { toast } from "sonner";
-import { ArrowLeft, Bot, Calendar as CalendarIcon, Check, Clock3, Copy, Database, Flag, PlayCircle, Plus, RefreshCw, Shield, Users, Sparkles } from "lucide-react";
+import { ArrowLeft, Bot, Calendar as CalendarIcon, Check, Clock3, Copy, Database, Flag, PlayCircle, Plus, Printer, RefreshCw, Shield, Users, Sparkles } from "lucide-react";
 
 type MeetForm = {
   name: string;
@@ -23,16 +23,6 @@ type MeetForm = {
   endDate: string;
   registrationDeadline: string;
   notes: string;
-};
-
-type EventForm = {
-  title: string;
-  description: string;
-  eventType: "training" | "race" | "social" | "meeting";
-  location: string;
-  startTime: string;
-  endTime: string;
-  maxAttendees: string;
 };
 
 type WorkoutFocus = "tecnica" | "aerobico" | "soglia" | "velocita" | "recupero";
@@ -199,6 +189,15 @@ function formatDate(value?: string | Date | null) {
   });
 }
 
+function formatTimeCs(value?: number | null) {
+  if (!Number.isFinite(value ?? null)) return "-";
+  const cs = Number(value);
+  const minutes = Math.floor(cs / 6000);
+  const seconds = Math.floor((cs % 6000) / 100);
+  const centis = cs % 100;
+  return `${minutes}:${String(seconds).padStart(2, "0")}.${String(centis).padStart(2, "0")}`;
+}
+
 function escapeHtml(input: string) {
   return input
     .replaceAll("&", "&amp;")
@@ -206,6 +205,102 @@ function escapeHtml(input: string) {
     .replaceAll(">", "&gt;")
     .replaceAll("\"", "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+const ACTIVE_MEET_ENTRY_STATUSES = new Set(["pending", "confirmed", "waitlist"]);
+
+type MeetRosterRow = {
+  entryId: number;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  email: string;
+  eventLabel: string;
+  stroke: string;
+  distance: string;
+  status: string;
+  seedTime: string;
+};
+
+function splitAthleteName(value: string) {
+  const normalized = value.trim().replace(/\s+/g, " ");
+  if (!normalized) {
+    return { firstName: "-", lastName: "-", fullName: "-" };
+  }
+  const parts = normalized.split(" ");
+  if (parts.length === 1) {
+    return { firstName: normalized, lastName: "-", fullName: normalized };
+  }
+  const firstName = parts.slice(0, -1).join(" ");
+  const lastName = parts[parts.length - 1] ?? "-";
+  return {
+    firstName: firstName || normalized,
+    lastName: lastName || "-",
+    fullName: normalized,
+  };
+}
+
+function buildMeetRosterPrintHtml(meet: any, rows: MeetRosterRow[]) {
+  const rowHtml = rows
+    .map(
+      (row, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${escapeHtml(row.firstName)}</td>
+          <td>${escapeHtml(row.lastName)}</td>
+          <td>${escapeHtml(row.eventLabel)}</td>
+          <td>${escapeHtml(row.stroke)}</td>
+          <td>${escapeHtml(row.distance)}</td>
+          <td>${escapeHtml(row.status)}</td>
+          <td>${escapeHtml(row.seedTime)}</td>
+          <td>${escapeHtml(row.email)}</td>
+        </tr>
+      `
+    )
+    .join("");
+
+  return `<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Iscritti gare - ${escapeHtml(String(meet?.name ?? "Meeting"))}</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 12mm; color: #0f172a; }
+      h1 { margin: 0 0 4px; font-size: 20px; }
+      p { margin: 0 0 4px; color: #475569; font-size: 12px; }
+      table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+      th, td { border: 1px solid #cbd5e1; padding: 6px 7px; text-align: left; font-size: 12px; }
+      th { background: #e2e8f0; font-weight: 700; }
+      tbody tr:nth-child(even) { background: #f8fafc; }
+      @page { size: A4; margin: 12mm; }
+    </style>
+  </head>
+  <body>
+    <h1>Elenco iscritti gare</h1>
+    <p>${escapeHtml(String(meet?.name ?? "Meeting"))}</p>
+    <p>${escapeHtml(String(meet?.venue ?? "Impianto n/d"))} • ${escapeHtml(formatDate(meet?.startDate))} - ${escapeHtml(formatDate(meet?.endDate))}</p>
+    <p>Generato il ${escapeHtml(formatDate(new Date()))}</p>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Nome</th>
+          <th>Cognome</th>
+          <th>Gara</th>
+          <th>Stile</th>
+          <th>Distanza</th>
+          <th>Stato</th>
+          <th>Seed</th>
+          <th>Email</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rowHtml || `<tr><td colspan="9">Nessun iscritto attivo.</td></tr>`}
+      </tbody>
+    </table>
+  </body>
+</html>`;
 }
 
 function toDateInputValue(date: Date) {
@@ -259,15 +354,7 @@ export default function ClubCoachModeration() {
     registrationDeadline: "",
     notes: "",
   });
-  const [eventForm, setEventForm] = useState<EventForm>({
-    title: "",
-    description: "",
-    eventType: "training",
-    location: "",
-    startTime: "",
-    endTime: "",
-    maxAttendees: "",
-  });
+  const [selectedMeetId, setSelectedMeetId] = useState<number | null>(null);
   const [workoutSessionDate, setWorkoutSessionDate] = useState(() => toDateInputValue(new Date()));
   const [workoutDirectives, setWorkoutDirectives] = useState<WorkoutDirectivesForm>({
     focus: ["tecnica"],
@@ -296,6 +383,18 @@ export default function ClubCoachModeration() {
   const meetsQuery = trpc.community.clubs.meets.list.useQuery(
     { clubId },
     { enabled: clubMeetsV1Enabled && match && Number.isFinite(clubId) }
+  );
+  const meetEntriesQuery = trpc.community.clubs.meets.entries.list.useQuery(
+    { meetId: selectedMeetId ?? -1 },
+    {
+      enabled:
+        clubMeetsV1Enabled &&
+        match &&
+        Number.isFinite(clubId) &&
+        selectedMeetId !== null &&
+        selectedMeetId > 0 &&
+        isCoachStaffFromQuery,
+    }
   );
   const invitesQuery = trpc.community.clubs.invites.useQuery(
     { clubId },
@@ -348,22 +447,20 @@ export default function ClubCoachModeration() {
     },
   });
 
-  const createEventMutation = trpc.community.clubs.events.create.useMutation({
-    onSuccess: () => {
-      toast.success("Evento creato");
-      setEventForm({
-        title: "",
-        description: "",
-        eventType: "training",
-        location: "",
-        startTime: "",
-        endTime: "",
-        maxAttendees: "",
-      });
-      utils.community.clubs.events.list.invalidate({ clubId, status: "active", fromDate: new Date().toISOString(), limit: 8 });
+  const publishMeetMutation = trpc.community.clubs.meets.publish.useMutation({
+    onSuccess: (result: any) => {
+      if (result?.changed === false) {
+        toast.info("Convocazione già pubblicata");
+      } else {
+        toast.success("Elenco iscritti pubblicato ai membri del club");
+      }
+      void Promise.all([
+        utils.community.clubs.meets.list.invalidate({ clubId }),
+        meetEntriesQuery.refetch(),
+      ]);
     },
     onError: (error) => {
-      toast.error(error.message || "Errore creazione evento");
+      toast.error(error.message || "Errore pubblicazione elenco iscritti");
     },
   });
 
@@ -449,6 +546,58 @@ export default function ClubCoachModeration() {
   const role = String(club?.member_role ?? "");
   const isCoachStaff = ["coach", "owner", "admin", "moderator"].includes(role);
   const meetItems = ((meetsQuery.data as any)?.meets as any[]) ?? [];
+  const normalizedMeets = useMemo(
+    () =>
+      meetItems
+        .map((item: any) => item?.meet ?? item)
+        .filter((meet: any) => Number.isFinite(Number(meet?.id))),
+    [meetItems]
+  );
+  const selectedMeet = useMemo(
+    () => normalizedMeets.find((meet: any) => Number(meet.id) === Number(selectedMeetId)) ?? null,
+    [normalizedMeets, selectedMeetId]
+  );
+  const selectedMeetStatus = String(selectedMeet?.status ?? "draft");
+  const meetEntriesPayload = meetEntriesQuery.data as any | undefined;
+  const meetEntriesEvents = (meetEntriesPayload?.events as any[]) ?? [];
+  const meetEntriesRows = (meetEntriesPayload?.entries as any[]) ?? [];
+  const rosterRows = useMemo<MeetRosterRow[]>(() => {
+    const eventMap = new Map<number, any>();
+    for (const event of meetEntriesEvents) {
+      const key = Number(event?.id);
+      if (Number.isFinite(key)) eventMap.set(key, event);
+    }
+
+    return meetEntriesRows
+      .filter((row: any) => {
+        const status = String(row?.entry?.status ?? "");
+        return ACTIVE_MEET_ENTRY_STATUSES.has(status);
+      })
+      .map((row: any) => {
+        const eventId = Number(row?.eventId ?? row?.entry?.meetEventId);
+        const event = eventMap.get(eventId);
+        const athleteRaw =
+          String(row?.user?.name ?? "").trim() ||
+          String(row?.user?.username ?? "").trim() ||
+          String(row?.user?.email ?? "").trim() ||
+          "Atleta";
+        const name = splitAthleteName(athleteRaw);
+        const status = String(row?.entry?.status ?? "-");
+        return {
+          entryId: Number(row?.entry?.id ?? 0),
+          firstName: name.firstName,
+          lastName: name.lastName,
+          fullName: name.fullName,
+          email: String(row?.user?.email ?? "-"),
+          eventLabel: String(event?.label ?? row?.eventLabel ?? "Gara"),
+          stroke: String(event?.stroke ?? "-"),
+          distance: event?.distanceMeters ? `${Number(event.distanceMeters)}m` : "-",
+          status: status === "pending" ? "In attesa" : status === "confirmed" ? "Confermata" : status === "waitlist" ? "Lista attesa" : status,
+          seedTime: formatTimeCs(Number(row?.entry?.seedTimeCs)),
+        } satisfies MeetRosterRow;
+      })
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, "it"));
+  }, [meetEntriesEvents, meetEntriesRows]);
   const historyConfig = historyConfigQuery.data as any | undefined;
   const historyLastRun = historyLastRunQuery.data as any | undefined;
   const historyEnabled = Boolean(historyConfig?.enabled);
@@ -630,6 +779,21 @@ export default function ClubCoachModeration() {
     window.location.replace(`/community/club/${clubId}`);
   }, [match, clubId, clubQuery.isLoading, isMember, isCoachStaff]);
 
+  useEffect(() => {
+    if (!clubMeetsV1Enabled) return;
+    if (normalizedMeets.length === 0) {
+      setSelectedMeetId(null);
+      return;
+    }
+    if (selectedMeetId && normalizedMeets.some((meet: any) => Number(meet.id) === selectedMeetId)) {
+      return;
+    }
+    const nextMeetId = Number(normalizedMeets[0]?.id);
+    if (Number.isFinite(nextMeetId) && nextMeetId > 0) {
+      setSelectedMeetId(nextMeetId);
+    }
+  }, [clubMeetsV1Enabled, normalizedMeets, selectedMeetId]);
+
   const meetStatusLabel = useMemo(
     () =>
       ({
@@ -642,6 +806,25 @@ export default function ClubCoachModeration() {
       }) as Record<string, string>,
     []
   );
+
+  const handlePrintMeetRoster = () => {
+    if (!selectedMeet) return;
+    if (rosterRows.length === 0) {
+      toast.info("Nessun iscritto attivo da stampare.");
+      return;
+    }
+    const popup = window.open("", "_blank", "noopener,noreferrer,width=1200,height=800");
+    if (!popup) {
+      toast.error("Impossibile aprire la finestra di stampa.");
+      return;
+    }
+
+    popup.document.open();
+    popup.document.write(buildMeetRosterPrintHtml(selectedMeet, rosterRows));
+    popup.document.close();
+    popup.focus();
+    window.setTimeout(() => popup.print(), 180);
+  };
 
   if (!match || !Number.isFinite(clubId)) return null;
 
@@ -765,11 +948,10 @@ export default function ClubCoachModeration() {
               {createMeetMutation.isPending ? "Creazione..." : "Crea convocazione"}
             </Button>
 
-            {meetItems.length > 0 ? (
+            {normalizedMeets.length > 0 ? (
               <div className="space-y-2 pt-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ultime convocazioni</p>
-                {meetItems.slice(0, 5).map((item: any) => {
-                  const meet = item.meet ?? item;
+                {normalizedMeets.slice(0, 5).map((meet: any) => {
                   const status = String(meet.status ?? "draft");
                   return (
                     <Link
@@ -787,6 +969,135 @@ export default function ClubCoachModeration() {
                     </Link>
                   );
                 })}
+              </div>
+            ) : null}
+
+            {normalizedMeets.length > 0 ? (
+              <div className="space-y-3 rounded-xl border border-border/60 bg-card/30 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Elenco iscritti gare</p>
+                  <span className="text-xs text-muted-foreground">
+                    Solo coach/staff
+                  </span>
+                </div>
+                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                  <div>
+                    <Label>Seleziona convocazione</Label>
+                    <Select
+                      value={selectedMeetId ? String(selectedMeetId) : undefined}
+                      onValueChange={(value) => setSelectedMeetId(Number(value))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleziona convocazione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {normalizedMeets.map((meet: any) => {
+                          const status = String(meet.status ?? "draft");
+                          const label = `${meet.name} • ${meetStatusLabel[status] ?? status}`;
+                          return (
+                            <SelectItem key={meet.id} value={String(meet.id)}>
+                              {label}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex w-full flex-wrap gap-2 md:w-auto">
+                    <Button
+                      className="w-full sm:w-auto"
+                      variant="outline-neon"
+                      disabled={!selectedMeet || publishMeetMutation.isPending || selectedMeetStatus !== "draft"}
+                      onClick={() => {
+                        if (!selectedMeetId) return;
+                        publishMeetMutation.mutate({ meetId: selectedMeetId });
+                      }}
+                    >
+                      {publishMeetMutation.isPending ? "Pubblicazione..." : "Pubblica elenco iscritti"}
+                    </Button>
+                    <Button
+                      className="w-full sm:w-auto"
+                      variant="outline-neon"
+                      disabled={!selectedMeet || rosterRows.length === 0}
+                      onClick={handlePrintMeetRoster}
+                    >
+                      <Printer className="mr-1.5 h-4 w-4" />
+                      Stampa elenco
+                    </Button>
+                    {selectedMeet ? (
+                      <Link href={`/community/club/${clubId}/meet/${selectedMeet.id}`} className="w-full sm:w-auto">
+                        <Button className="w-full sm:w-auto" variant="neon">
+                          Apri dettaglio meeting
+                        </Button>
+                      </Link>
+                    ) : null}
+                  </div>
+                </div>
+
+                {selectedMeet ? (
+                  <div className="rounded-lg border border-border/50 bg-background/25 px-3 py-2 text-xs text-muted-foreground">
+                    <p className="font-medium text-foreground">{selectedMeet.name}</p>
+                    <p>
+                      Stato: {meetStatusLabel[selectedMeetStatus] ?? selectedMeetStatus} • Iscritti attivi: {rosterRows.length}
+                    </p>
+                    {selectedMeetStatus === "draft" ? (
+                      <p>La lista non è ancora visibile ai membri: usa "Pubblica elenco iscritti" quando vuoi renderla disponibile.</p>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {meetEntriesQuery.isLoading ? (
+                  <p className="text-sm text-muted-foreground">Caricamento iscritti...</p>
+                ) : rosterRows.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Nessun iscritto attivo per la convocazione selezionata.</p>
+                ) : (
+                  <>
+                    <div className="space-y-2 md:hidden">
+                      {rosterRows.map((row) => (
+                        <div key={row.entryId} className="rounded-lg border border-border/60 bg-background/30 p-2 text-sm">
+                          <p className="font-semibold">{row.fullName}</p>
+                          <p className="text-xs text-muted-foreground">{row.email}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {row.eventLabel} • {row.distance} {row.stroke !== "-" ? `• ${row.stroke}` : ""}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Stato: {row.status} • Seed: {row.seedTime}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="hidden md:block overflow-x-auto rounded-lg border border-border/60">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-card/50 text-xs uppercase tracking-wide text-muted-foreground">
+                          <tr>
+                            <th className="px-2 py-2 text-left">Nome</th>
+                            <th className="px-2 py-2 text-left">Cognome</th>
+                            <th className="px-2 py-2 text-left">Gara</th>
+                            <th className="px-2 py-2 text-left">Stile</th>
+                            <th className="px-2 py-2 text-left">Distanza</th>
+                            <th className="px-2 py-2 text-left">Stato</th>
+                            <th className="px-2 py-2 text-left">Seed</th>
+                            <th className="px-2 py-2 text-left">Email</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rosterRows.map((row) => (
+                            <tr key={row.entryId} className="border-t border-border/40">
+                              <td className="px-2 py-2">{row.firstName}</td>
+                              <td className="px-2 py-2">{row.lastName}</td>
+                              <td className="px-2 py-2">{row.eventLabel}</td>
+                              <td className="px-2 py-2">{row.stroke}</td>
+                              <td className="px-2 py-2">{row.distance}</td>
+                              <td className="px-2 py-2">{row.status}</td>
+                              <td className="px-2 py-2">{row.seedTime}</td>
+                              <td className="px-2 py-2">{row.email}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
               </div>
             ) : null}
           </section>
@@ -1258,75 +1569,6 @@ export default function ClubCoachModeration() {
             </div>
           </section>
         ) : null}
-
-        <section className="surface-panel p-4 space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Crea Evento Club</h2>
-          <div className="grid gap-2 md:grid-cols-2">
-            <div>
-              <Label>Titolo *</Label>
-              <Input value={eventForm.title} onChange={(e) => setEventForm((p) => ({ ...p, title: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Tipo</Label>
-              <Select value={eventForm.eventType} onValueChange={(value) => setEventForm((p) => ({ ...p, eventType: value as EventForm["eventType"] }))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="training">Allenamento</SelectItem>
-                  <SelectItem value="race">Gara</SelectItem>
-                  <SelectItem value="social">Evento sociale</SelectItem>
-                  <SelectItem value="meeting">Riunione</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div>
-            <Label>Descrizione</Label>
-            <Textarea rows={2} value={eventForm.description} onChange={(e) => setEventForm((p) => ({ ...p, description: e.target.value }))} />
-          </div>
-          <div className="grid gap-2 md:grid-cols-3">
-            <div>
-              <Label>Luogo</Label>
-              <Input value={eventForm.location} onChange={(e) => setEventForm((p) => ({ ...p, location: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Inizio *</Label>
-              <Input type="datetime-local" value={eventForm.startTime} onChange={(e) => setEventForm((p) => ({ ...p, startTime: e.target.value }))} />
-            </div>
-            <div>
-              <Label>Fine</Label>
-              <Input type="datetime-local" value={eventForm.endTime} onChange={(e) => setEventForm((p) => ({ ...p, endTime: e.target.value }))} />
-            </div>
-          </div>
-          <div>
-            <Label>Max partecipanti</Label>
-            <Input type="number" value={eventForm.maxAttendees} onChange={(e) => setEventForm((p) => ({ ...p, maxAttendees: e.target.value }))} />
-          </div>
-          <Button
-            className="w-full sm:w-auto"
-            variant="neon"
-            disabled={createEventMutation.isPending}
-            onClick={() => {
-              if (!eventForm.title.trim()) return toast.error("Inserisci titolo evento");
-              const start = parseDateTimeLocal(eventForm.startTime);
-              if (!start) return toast.error("Data inizio non valida");
-              const end = parseDateTimeLocal(eventForm.endTime);
-              if (end && end <= start) return toast.error("La fine deve essere dopo l'inizio");
-              createEventMutation.mutate({
-                clubId,
-                title: eventForm.title.trim(),
-                description: eventForm.description.trim() || undefined,
-                eventType: eventForm.eventType,
-                location: eventForm.location.trim() || undefined,
-                startTime: start.toISOString(),
-                endTime: end?.toISOString(),
-                maxAttendees: eventForm.maxAttendees ? Number(eventForm.maxAttendees) : undefined,
-              });
-            }}
-          >
-            <Plus className="mr-1.5 h-4 w-4" />
-            {createEventMutation.isPending ? "Creazione..." : "Crea evento"}
-          </Button>
-        </section>
 
         <section className="surface-panel p-4 space-y-3">
           <div className="flex items-center gap-2">
