@@ -150,7 +150,7 @@ export async function createClubWorkoutDraftFromGeneration(params: {
       targetSessionDate: normalizedDate,
       triggeredBy: params.userId,
       status: params.runStatus,
-      provider: params.provider ?? "local",
+      provider: params.provider ?? "gemini",
       model: params.model ?? null,
       promptVersion: params.promptVersion ? String(params.promptVersion).slice(0, 32) : null,
       directivesJson: params.directives,

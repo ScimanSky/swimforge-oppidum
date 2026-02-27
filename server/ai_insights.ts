@@ -1,11 +1,21 @@
-import { generateText } from "./_core/text_llm";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getDb } from "./db";
 import { aiInsightsCache } from "../drizzle/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { logger } from "./middleware/logger";
 
+// Initialize Gemini AI
+let genAI: GoogleGenerativeAI | null = null;
 const log = logger.child({ component: "ai_insights" });
 const INSIGHT_EMOJI_REGEX = /^[🔥⚡💪🎯📈🏊🔄🌟🚀💯🏆❤️📊🎉👍💬🤯😂😢🌊]/;
+const GEMINI_MODEL = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash";
+
+function getGeminiClient() {
+  if (!genAI && process.env.GEMINI_API_KEY) {
+    genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  }
+  return genAI;
+}
 
 function cleanupInsightLine(line: string): string {
   return line
@@ -182,7 +192,46 @@ export async function generateAIInsights(
     });
   }
 
+  const client = getGeminiClient();
+  
+  // If no API key, try to use ANY cache as fallback (even expired)
+  if (!client) {
+    log.warn("[AI Insights] No Gemini API key configured, trying ANY cache fallback", {
+      event: "ai_insights:no_api_key",
+      userId,
+    });
+    try {
+      const anyCached = await db
+        .select()
+        .from(aiInsightsCache)
+        .where(
+          and(
+            eq(aiInsightsCache.userId, userId),
+            eq(aiInsightsCache.periodDays, userData.periodDays)
+          )
+        )
+        .limit(1);
+
+      if (anyCached.length > 0 && anyCached[0].insights.length > 0) {
+        log.debug("[AI Insights] Using ANY cached insights (no API key)", {
+          event: "ai_insights:any_cache_hit",
+          userId,
+        });
+        return anyCached[0].insights;
+      }
+    } catch (cacheError) {
+      log.warn("[AI Insights] Cache table not available", {
+        event: "ai_insights:cache_table_unavailable",
+        userId,
+        message: cacheError instanceof Error ? cacheError.message : String(cacheError),
+      });
+    }
+    return [];
+  }
+
   try {
+    const model = client.getGenerativeModel({ model: GEMINI_MODEL });
+
     const prompt = `Sei un analista di performance di nuoto esperto. Analizza questi dati di un nuotatore e genera 6-8 insights analitici, identificando TENDENZE, PATTERN e AREE DI MIGLIORAMENTO in italiano, CATEGORIZZATI per argomento.
 
 ⚠️ IMPORTANTE: NON fornire allenamenti specifici o workout dettagliati (quello è il ruolo dell'AI Coach). Focus su ANALISI e DIREZIONE GENERALE.
@@ -290,16 +339,13 @@ ESEMPI CATTIVI (DA EVITARE):
 
 Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
 
-    const llm = await generateText({
-      messages: [{ role: "user", content: prompt }],
-      maxTokens: 900,
-    });
-    const text = llm.text;
+    const result = await model.generateContent(prompt);
+    const response = result.response;
+    const text = response.text();
 
-    log.debug("[AI Insights] Raw response from local LLM (first 500 chars)", {
+    log.debug("[AI Insights] Raw response from Gemini (first 500 chars)", {
       event: "ai_insights:raw_response",
       userId,
-      model: llm.model,
       preview: text.substring(0, 500),
     });
 

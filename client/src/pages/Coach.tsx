@@ -163,7 +163,7 @@ export default function Coach() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [chatGoal, setChatGoal] = useState("")
   const [chatConstraints, setChatConstraints] = useState("")
-  const [chatProvider, setChatProvider] = useState<"forge" | "gemini" | "local" | "rule_based" | null>(null)
+  const [chatProvider, setChatProvider] = useState<"forge" | "gemini" | "rule_based" | null>(null)
   const fallbackToastShownRef = useRef(false)
   const [activeTab, setActiveTab] = useState<"insights" | "workouts" | "session-iq" | "chat">("insights")
   const [activeInsightIndex, setActiveInsightIndex] = useState(0)
@@ -576,7 +576,7 @@ export default function Coach() {
         role: "assistant",
         content: assistantContent,
       }
-      setChatProvider((response.provider as "forge" | "gemini" | "local" | "rule_based" | undefined) ?? null)
+      setChatProvider((response.provider as "forge" | "gemini" | "rule_based" | undefined) ?? null)
       if (response.fallback && !fallbackToastShownRef.current) {
         toast.warning("Coach in modalità base: risposte semplificate (controlla la configurazione AI server).")
         fallbackToastShownRef.current = true
@@ -1167,13 +1167,6 @@ export default function Coach() {
                       <div className="mt-1">
                         <Badge variant="outline" className="text-[11px] border-emerald-500/40 text-emerald-300">
                           Provider attivo: Gemini
-                        </Badge>
-                      </div>
-                    )}
-                    {chatProvider === "local" && (
-                      <div className="mt-1">
-                        <Badge variant="outline" className="text-[11px] border-cyan-500/40 text-cyan-300">
-                          Provider attivo: LLM locale
                         </Badge>
                       </div>
                     )}

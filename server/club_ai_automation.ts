@@ -1,6 +1,6 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { ClubAiJobType, ClubAiRunStatus, ClubPoolWorkoutDirective } from "@shared/types";
 import { ENV } from "./_core/env";
-import { generateText } from "./_core/text_llm";
 import { generateClubAiImageViaGemini } from "./club_ai_image";
 import { generateClubPoolWorkoutPlan } from "./club_workouts_ai";
 import { fetchNuotoSardegnaFutureMeetCandidates } from "./club_meets_nuotosardegna";
@@ -598,7 +598,14 @@ async function runPublishWorkoutDaily(config: ClubAiConfigRecord, now: Date): Pr
 
 async function generateMotivationalText(config: ClubAiConfigRecord): Promise<string> {
   const fallback = "Ogni vasca conta: qualità oggi, risultati domani. Forza squadra Master.";
-  const modelName = process.env.LOCAL_LLM_MODEL?.trim() || "qwen3:8b";
+
+  if (!process.env.GEMINI_API_KEY) {
+    return fallback;
+  }
+
+  const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+  const modelName = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+  const model = client.getGenerativeModel({ model: modelName });
 
   const prompt = [
     "Scrivi UNA frase motivazionale breve in italiano per un club nuoto master (35-60 anni).",
@@ -611,13 +618,8 @@ async function generateMotivationalText(config: ClubAiConfigRecord): Promise<str
     .join("\n");
 
   try {
-    const result = await generateText({
-      messages: [{ role: "user", content: prompt }],
-      model: modelName,
-      maxTokens: 80,
-      temperature: 0.7,
-    });
-    const text = result.text.trim();
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim();
     if (!text) return fallback;
     return text.slice(0, 260);
   } catch (error) {

@@ -36,7 +36,6 @@ describe("generateClubAiImageViaGemini", () => {
     process.env.CLOUDINARY_API_KEY = "demo-key";
     process.env.CLOUDINARY_API_SECRET = "demo-secret";
     delete process.env.GEMINI_API_KEY;
-    delete process.env.OPENAI_API_KEY;
 
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);

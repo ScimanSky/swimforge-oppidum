@@ -1,20 +1,18 @@
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { ClubPoolWorkoutDirective, ClubPoolWorkoutPlan, ClubPoolWorkoutBlock } from "@shared/types";
 import { normalizeWorkoutSeriesItem, parseRepsSpec, parseMetersValue, toCanonicalReps, toSeriesDistanceLabel } from "@shared/workout-series";
-import { generateText } from "./_core/text_llm";
 import { logger } from "./middleware/logger";
 import { config } from "./config";
 
 const PRIMARY_MODEL_NAME =
   (process.env.CLUB_WORKOUTS_AI_MODEL_PRIMARY ??
     process.env.CLUB_WORKOUTS_AI_MODEL ??
-    process.env.LOCAL_LLM_MODEL ??
+    process.env.GEMINI_MODEL ??
     config.CLUB_WORKOUTS_AI_MODEL_PRIMARY)
-    .trim() || "qwen3:8b";
+    .trim() || "gemini-2.5-flash";
 const ESCALATION_MODEL_NAME =
-  (process.env.CLUB_WORKOUTS_AI_MODEL_ESCALATION ??
-    process.env.LOCAL_LLM_FALLBACK_MODEL ??
-    config.CLUB_WORKOUTS_AI_MODEL_ESCALATION).trim() ||
-  "qwen3:4b";
+  (process.env.CLUB_WORKOUTS_AI_MODEL_ESCALATION ?? config.CLUB_WORKOUTS_AI_MODEL_ESCALATION).trim() ||
+  "gemini-3-pro-preview";
 const QUALITY_THRESHOLD = config.CLUB_WORKOUTS_AI_QUALITY_THRESHOLD;
 const PROMPT_VERSION = "club_pool_workout_v3_qgate";
 const REQUEST_TIMEOUT_MS = config.CLUB_WORKOUTS_AI_TIMEOUT_MS;
@@ -504,10 +502,12 @@ Vincoli obbligatori:
 }
 
 async function generateModelContent(params: {
+  genAI: GoogleGenerativeAI;
   modelName: string;
   prompt: string;
 }) {
-  const { modelName, prompt } = params;
+  const { genAI, modelName, prompt } = params;
+  const model = genAI.getGenerativeModel({ model: modelName });
   const startedAt = Date.now();
   const softTimeoutMs =
     REQUEST_TIMEOUT_SOFT_MS > 0 && REQUEST_TIMEOUT_SOFT_MS < REQUEST_TIMEOUT_MS ? REQUEST_TIMEOUT_SOFT_MS : null;
@@ -526,15 +526,15 @@ async function generateModelContent(params: {
   }
 
   try {
-    const llm = await generateText({
-      messages: [{ role: "user", content: prompt }],
-      model: modelName,
-      timeoutMs: REQUEST_TIMEOUT_MS,
-      maxTokens: 1_500,
-      temperature: 0.2,
-    });
+    const result = (await Promise.race([
+      model.generateContent(prompt),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`AI timeout after ${REQUEST_TIMEOUT_MS}ms`)), REQUEST_TIMEOUT_MS),
+      ),
+    ])) as { response?: { text?: () => string } };
+
     const elapsedMs = Date.now() - startedAt;
-    const rawText = String(llm.text ?? "").trim();
+    const rawText = String(result?.response?.text?.() ?? "").trim();
     const clean = rawText.replace(/^```json\s*/i, "").replace(/^```/i, "").replace(/```$/i, "").trim();
     return { clean, elapsedMs };
   } finally {
@@ -545,12 +545,14 @@ async function generateModelContent(params: {
 }
 
 async function runModelAttempt(params: {
+  genAI: GoogleGenerativeAI;
   modelName: string;
   prompt: string;
   directives: ClubPoolWorkoutDirective;
   fallback: ClubPoolWorkoutPlan;
 }) {
   const content = await generateModelContent({
+    genAI: params.genAI,
     modelName: params.modelName,
     prompt: params.prompt,
   });
@@ -584,12 +586,35 @@ export async function generateClubPoolWorkoutPlan(params: {
   directives: ClubPoolWorkoutDirective;
 }) {
   const fallback = fallbackPlan(params.sessionDate, params.directives);
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    return {
+      plan: fallback,
+      status: "partial" as const,
+      provider: "gemini",
+      model: PRIMARY_MODEL_NAME,
+      promptVersion: PROMPT_VERSION,
+      rawResponse: null,
+      error: "GEMINI_API_KEY mancante",
+      warnings: ["AI non configurata: usato fallback dettagliato"],
+      quality: {
+        score: 0,
+        threshold: QUALITY_THRESHOLD,
+        escalated: false,
+        autoFixes: 0,
+      },
+    };
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
   const prompt = buildPrompt(params);
 
   let primaryAttempt: ModelAttemptResult | null = null;
   let primaryError: string | null = null;
   try {
     primaryAttempt = await runModelAttempt({
+      genAI,
       modelName: PRIMARY_MODEL_NAME,
       prompt,
       directives: params.directives,
@@ -615,6 +640,7 @@ export async function generateClubPoolWorkoutPlan(params: {
   if (shouldEscalate && ESCALATION_MODEL_NAME !== PRIMARY_MODEL_NAME) {
     try {
       escalationAttempt = await runModelAttempt({
+        genAI,
         modelName: ESCALATION_MODEL_NAME,
         prompt,
         directives: params.directives,
@@ -656,7 +682,7 @@ export async function generateClubPoolWorkoutPlan(params: {
     return {
       plan: fallback,
       status: "partial" as const,
-      provider: "local",
+      provider: "gemini",
       model: PRIMARY_MODEL_NAME,
       promptVersion: PROMPT_VERSION,
       rawResponse: null,
@@ -687,7 +713,7 @@ export async function generateClubPoolWorkoutPlan(params: {
   return {
     plan: finalAttempt.assessment.plan,
     status,
-    provider: "local",
+    provider: "gemini",
     model: finalAttempt.model,
     promptVersion: PROMPT_VERSION,
     rawResponse: finalAttempt.rawResponse.slice(0, 12000),
