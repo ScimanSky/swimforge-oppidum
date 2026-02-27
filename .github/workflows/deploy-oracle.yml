@@ -75,9 +75,44 @@ jobs:
             exit 1
           fi
 
-          ssh \
-            -o BatchMode=yes \
-            -o StrictHostKeyChecking=yes \
-            -p "$PORT" \
-            "$USER@$HOST" \
-            '/usr/local/bin/swimforge-deploy.sh'
+          MAX_ATTEMPTS=30
+          SLEEP_SECONDS=20
+          ATTEMPT=1
+
+          while true; do
+            echo "Remote deploy attempt ${ATTEMPT}/${MAX_ATTEMPTS}"
+
+            set +e
+            SSH_OUTPUT="$(
+              ssh \
+                -o BatchMode=yes \
+                -o StrictHostKeyChecking=yes \
+                -p "$PORT" \
+                "$USER@$HOST" \
+                '/usr/local/bin/swimforge-deploy.sh' 2>&1
+            )"
+            SSH_EXIT=$?
+            set -e
+
+            printf '%s\n' "$SSH_OUTPUT"
+
+            if [[ $SSH_EXIT -eq 0 ]]; then
+              echo "Remote deploy completed."
+              break
+            fi
+
+            if [[ $ATTEMPT -ge $MAX_ATTEMPTS ]]; then
+              echo "Remote deploy failed after ${MAX_ATTEMPTS} attempts."
+              exit "$SSH_EXIT"
+            fi
+
+            if printf '%s' "$SSH_OUTPUT" | grep -qiE 'deploy gia in corso|deploy già in corso|already in progress|flock'; then
+              echo "Deploy lock detected on server, waiting ${SLEEP_SECONDS}s before retry."
+              ATTEMPT=$((ATTEMPT + 1))
+              sleep "$SLEEP_SECONDS"
+              continue
+            fi
+
+            echo "Remote deploy failed for a non-lock reason."
+            exit "$SSH_EXIT"
+          done
