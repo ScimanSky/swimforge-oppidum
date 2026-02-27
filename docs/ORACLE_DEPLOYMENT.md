@@ -46,12 +46,19 @@ Update `.env.oracle`:
 - Set all required app secrets (`DATABASE_URL`, `JWT_SECRET`, `SUPABASE_*`, `CRON_SECRET`, `TOKEN_ENCRYPTION_KEY`, integrations)
 - Set `ALLOWED_ORIGINS=https://<your-domain>`
 - Keep `GARMIN_SERVICE_SECRET` populated (used by both app and garmin service)
-- Configure text AI (cloud-only, recommended):
-  - `LLM_PROVIDER=gemini`
+- Configure local text AI:
+  - `LLM_PROVIDER=local`
+  - `LOCAL_LLM_BASE_URL=http://ollama:11434/v1`
+  - `LOCAL_LLM_MODEL=qwen2.5:7b`
+  - `LOCAL_LLM_FALLBACK_MODEL=qwen2.5:3b`
+  - `LOCAL_LLM_API_KEY=ollama`
+  - `LOCAL_LLM_TIMEOUT_MS=90000`
+  - `LOCAL_LLM_MAX_TOKENS=900`
+- Configure cloud fallback for text AI (only when local fails):
+  - `CLOUD_TEXT_FALLBACK_PROVIDER=gemini`
   - `GEMINI_API_KEY=<your key>`
   - `GEMINI_TEXT_MODEL=gemini-2.5-flash`
   - `GEMINI_TEXT_TIMEOUT_MS=30000`
-- Keep local LLM envs only if you want to enable Ollama later.
 - Keep `OPENAI_API_KEY` active only for image features (club branding / club AI post images)
 - Set Strava bridge envs:
   - `STRAVA_SERVICE_URL`
@@ -81,15 +88,15 @@ docker compose --env-file .env.oracle -f docker-compose.oracle.yml up -d --build
 Services started:
 - `app` on internal port `3000`
 - `garmin` on internal port `8000`
+- `ollama` on internal port `11434` (local text LLM runtime)
 - `caddy` on `80/443` with automatic TLS
 
 Garmin session tokens are persisted in Docker volume `garmin_tokens`.
-Ollama is optional and disabled by default (service profile `local-llm`).
+Ollama model data is persisted in Docker volume `ollama_data`.
 
-## 6) (Optional) enable local LLM models
-Only if you explicitly want Ollama:
+## 6) Pull local LLM models
+Run once after first startup:
 ```bash
-docker compose --profile local-llm --env-file .env.oracle -f docker-compose.oracle.yml up -d ollama
 docker compose --env-file .env.oracle -f docker-compose.oracle.yml exec ollama ollama pull qwen2.5:7b
 docker compose --env-file .env.oracle -f docker-compose.oracle.yml exec ollama ollama pull qwen2.5:3b
 docker compose --env-file .env.oracle -f docker-compose.oracle.yml exec ollama curl -s http://127.0.0.1:11434/api/tags
@@ -128,10 +135,14 @@ docker compose --env-file .env.oracle -f docker-compose.oracle.yml up -d --build
   - if `REDIS_URL` is set, ensure Redis is reachable
 - Garmin disconnected after restarts:
   - ensure `garmin_tokens` volume exists and container starts without mount errors
-- Gemini text issues:
-  - verify `LLM_PROVIDER=gemini`
+- Local LLM timeout in logs:
+  - reduce prompt size / output size (`LOCAL_LLM_MAX_TOKENS`)
+  - verify Ollama models are pulled (`/api/tags`)
+  - monitor fallback event `text_llm:cloud_fallback_used` in app logs
+- Cloud fallback not working:
+  - verify `CLOUD_TEXT_FALLBACK_PROVIDER=gemini`
   - verify `GEMINI_API_KEY` and `GEMINI_TEXT_MODEL`
-  - check app logs for `text_llm:gemini_direct_used`
-- Monitor cloud costs:
-  - track Gemini request volume in app logs
+  - check app logs for `text_llm:cloud_fallback_failed`
+- Monitor fallback cloud costs:
+  - track count of `text_llm:cloud_fallback_used` events in app logs
   - set Gemini project quota/budget alerts in your Google Cloud project
