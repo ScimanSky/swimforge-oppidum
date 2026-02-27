@@ -611,6 +611,7 @@ export async function listClubMeetEntries(params: {
         name: users.name,
         email: users.email,
         username: swimmerProfiles.username,
+        lastName: swimmerProfiles.lastName,
         avatarUrl: swimmerProfiles.avatarUrl,
       },
     })

@@ -240,6 +240,35 @@ function splitAthleteName(value: string) {
   };
 }
 
+function getRosterAthleteName(user: any) {
+  const profileLastName = String(user?.lastName ?? "").trim();
+  const userName = String(user?.name ?? "").trim().replace(/\s+/g, " ");
+  const username = String(user?.username ?? "").trim();
+  const email = String(user?.email ?? "").trim();
+
+  if (profileLastName) {
+    let firstName = userName;
+    if (firstName) {
+      const firstLower = firstName.toLocaleLowerCase("it-IT");
+      const lastLower = profileLastName.toLocaleLowerCase("it-IT");
+      if (firstLower === lastLower) {
+        firstName = "";
+      } else if (firstLower.endsWith(` ${lastLower}`)) {
+        firstName = firstName.slice(0, firstName.length - profileLastName.length).trim();
+      }
+    }
+    if (!firstName) firstName = username || email || "Atleta";
+    return {
+      firstName,
+      lastName: profileLastName,
+      fullName: `${firstName} ${profileLastName}`.trim(),
+    };
+  }
+
+  const athleteRaw = userName || username || email || "Atleta";
+  return splitAthleteName(athleteRaw);
+}
+
 function buildMeetRosterPrintHtml(meet: any, rows: MeetRosterRow[]) {
   const rowHtml = rows
     .map(
@@ -576,12 +605,7 @@ export default function ClubCoachModeration() {
       .map((row: any) => {
         const eventId = Number(row?.eventId ?? row?.entry?.meetEventId);
         const event = eventMap.get(eventId);
-        const athleteRaw =
-          String(row?.user?.name ?? "").trim() ||
-          String(row?.user?.username ?? "").trim() ||
-          String(row?.user?.email ?? "").trim() ||
-          "Atleta";
-        const name = splitAthleteName(athleteRaw);
+        const name = getRosterAthleteName(row?.user);
         const status = String(row?.entry?.status ?? "-");
         return {
           entryId: Number(row?.entry?.id ?? 0),
