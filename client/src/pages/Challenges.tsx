@@ -117,6 +117,32 @@ const objectiveLabel = (objective: string) => {
   }
 }
 
+const getClassicChallengeImage = (challenge: any): string => {
+  const badgeImageUrl =
+    typeof challenge?.badge_image_url === "string" && challenge.badge_image_url.trim().length > 0
+      ? challenge.badge_image_url.trim()
+      : null
+  if (badgeImageUrl) return badgeImageUrl
+
+  if (challenge?.type === "open_water") return "/images/open-water.jpg"
+
+  switch (challenge?.objective) {
+    case "consistency":
+      return "/images/swimmers_team_community.webp"
+    case "avg_pace":
+      return "/images/expert_swimmer_advanced.webp"
+    case "total_time":
+      return "/images/hero-swimmer.jpg"
+    case "longest_session":
+      return "/images/monthly_challenge_target.webp"
+    case "total_sessions":
+      return "/images/swimmer_action_hero.webp"
+    case "total_distance":
+    default:
+      return "/images/pool-lanes.jpg"
+  }
+}
+
 const getStreak = (dates: string[]) => {
   const uniqueDates = Array.from(new Set(dates)).sort()
   if (!uniqueDates.length) return 0
@@ -524,16 +550,12 @@ export default function Challenges() {
                     <Surface key={challenge.id} className="bg-card border-border overflow-hidden">
                       <div className="flex flex-col md:flex-row">
                         <div className="relative h-32 w-full md:h-auto md:w-48">
-                          {challenge.badge_image_url ? (
-                            <Image
-                              src={challenge.badge_image_url}
-                              alt={challenge.name}
-                              fill
-                              className="object-cover"
-                            />
-                          ) : (
-                            <div className="h-full w-full bg-[linear-gradient(135deg,#132230_0%,#1b2e3c_56%,#142432_100%)]" />
-                          )}
+                          <Image
+                            src={getClassicChallengeImage(challenge)}
+                            alt={challenge.name}
+                            fill
+                            className="object-cover"
+                          />
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-card md:bg-gradient-to-t md:from-transparent md:to-card/50" />
                         </div>
                         <SurfaceContent className="flex-1 p-4">

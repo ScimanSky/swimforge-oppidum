@@ -10,6 +10,29 @@ export type ChallengeObjective = "total_distance" | "total_sessions" | "consiste
 export type ChallengeStatus = "pending" | "active" | "completed" | "cancelled";
 export type ChallengeDuration = "3_days" | "1_week" | "2_weeks" | "1_month";
 
+const getDefaultChallengeImageUrl = (
+  type: ChallengeType,
+  objective: ChallengeObjective
+): string => {
+  if (type === "open_water") return "/images/open-water.jpg";
+
+  switch (objective) {
+    case "consistency":
+      return "/images/swimmers_team_community.webp";
+    case "avg_pace":
+      return "/images/expert_swimmer_advanced.webp";
+    case "total_time":
+      return "/images/hero-swimmer.jpg";
+    case "longest_session":
+      return "/images/monthly_challenge_target.webp";
+    case "total_sessions":
+      return "/images/swimmer_action_hero.webp";
+    case "total_distance":
+    default:
+      return "/images/pool-lanes.jpg";
+  }
+};
+
 export interface Challenge {
   id: number;
   name: string;
@@ -65,6 +88,11 @@ export async function createChallenge(data: {
   const db = await getDb();
   if (!db) return null;
 
+  const normalizedBadgeImageUrl =
+    typeof data.badgeImageUrl === "string" && data.badgeImageUrl.trim().length > 0
+      ? data.badgeImageUrl.trim()
+      : getDefaultChallengeImageUrl(data.type, data.objective);
+
   // Calculate end date based on duration
   const endDate = new Date(data.startDate);
   switch (data.duration) {
@@ -92,7 +120,7 @@ export async function createChallenge(data: {
       start_date, end_date, status, badge_image_url, badge_name, prize_description
     ) VALUES (
       ${data.name}, ${data.description || null}, ${data.creatorId}, ${data.type}, ${data.objective},
-      ${data.duration}, ${data.startDate}, ${endDate}, ${initialStatus}::challenge_status, ${data.badgeImageUrl || null},
+      ${data.duration}, ${data.startDate}, ${endDate}, ${initialStatus}::challenge_status, ${normalizedBadgeImageUrl},
       ${data.badgeName || null}, ${data.prizeDescription || null}
     ) RETURNING id
   `);
