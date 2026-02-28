@@ -9,21 +9,21 @@ import { useEffect } from "react";
 const valueProps = [
   {
     title: "AI Coach",
-    body: "L'analisi tecnica evidenzia inefficienze e priorita con indicazioni chiare per la prossima sessione.",
+    body: "Insight pratici su tecnica, ritmo e carico: sai cosa correggere nella prossima sessione.",
     image: "/images/landing-bw/feature-ai.webp",
     alt: "Dettaglio tecnico in piscina per analisi AI",
   },
   {
     title: "Progressi",
-    body: "Trend e metriche essenziali per misurare i miglioramenti nel tempo senza rumore visivo.",
+    body: "Metriche essenziali per misurare miglioramenti settimanali su pace, distanza e continuita.",
     image: "/images/landing-bw/feature-progress.webp",
-    alt: "Corsie piscina viste dall'alto in bianco e nero",
+    alt: "Nuotatore concentrato durante la fase pre-allenamento",
   },
   {
     title: "Community Club",
-    body: "Atleti e coach nello stesso spazio operativo, con convocazioni, comunicazioni e allineamento continuo.",
+    body: "Allenati meglio con feedback, sfide e confronto con altri nuotatori del tuo livello.",
     image: "/images/landing-bw/feature-community.webp",
-    alt: "Team nuoto in bordo vasca durante briefing",
+    alt: "Sessione di squadra con ritmo condiviso a bordo vasca",
   },
 ];
 
@@ -31,35 +31,35 @@ const workflowSteps = [
   {
     step: "01",
     title: "Sync",
-    body: "Connetti le tue attivita e centralizza i dati in un unico profilo operativo.",
+    body: "Connetti attività da Garmin/Strava o inseriscile manualmente in un profilo unico.",
   },
   {
     step: "02",
     title: "Analisi",
-    body: "Ricevi insight leggibili e prioritizzati per capire dove intervenire subito.",
+    body: "Leggi insight prioritizzati: cosa sta funzionando e dove stai perdendo efficienza.",
   },
   {
     step: "03",
     title: "Crescita",
-    body: "Trasforma i feedback in una progressione costante con obiettivi realistici.",
+    body: "Trasforma i dati in obiettivi concreti e verifica i risultati sessione dopo sessione.",
   },
 ];
 
 const galleryShots = [
   {
     src: "/images/landing-bw/gallery-01.webp",
-    alt: "Nuotatore in preparazione prima della gara",
-    caption: "Preparazione",
+    alt: "Nuotatore concentrato durante la fase pre-allenamento",
+    caption: "Pace più stabile",
   },
   {
     src: "/images/landing-bw/gallery-02.webp",
-    alt: "Nuotatori allineati bordo piscina in bianco e nero",
-    caption: "Disciplina",
+    alt: "Sessione di squadra con ritmo condiviso a bordo vasca",
+    caption: "Più continuità",
   },
   {
     src: "/images/landing-bw/gallery-03.webp",
-    alt: "Dettaglio tecnico atleta con smartwatch",
-    caption: "Precisione",
+    alt: "Atleta che analizza i dati post-allenamento",
+    caption: "Decisioni migliori",
   },
 ];
 
@@ -85,9 +85,9 @@ export default function Home() {
             <SwimForgeWordmark compact className="text-sm md:text-base" />
           </Link>
           <nav className="hidden items-center gap-7 text-xs uppercase tracking-[0.16em] text-zinc-300 md:flex">
-            <a href="#value" className="hover:text-[var(--landing-accent)] transition-colors">Value</a>
-            <a href="#workflow" className="hover:text-[var(--landing-accent)] transition-colors">Metodo</a>
-            <a href="#gallery" className="hover:text-[var(--landing-accent)] transition-colors">Galleria</a>
+            <a href="#value" className="hover:text-[var(--landing-accent)] transition-colors">Perché SwimForge</a>
+            <a href="#workflow" className="hover:text-[var(--landing-accent)] transition-colors">Come Funziona</a>
+            <a href="#gallery" className="hover:text-[var(--landing-accent)] transition-colors">Risultati</a>
           </nav>
           <div className="flex items-center gap-2">
             <Link href="/login" className={cn(buttonVariants({ variant: "outline-neon", size: "sm" }), "min-h-[44px] px-4")}>Accedi</Link>
@@ -104,7 +104,7 @@ export default function Home() {
                 Forgia la tua <span className="text-zinc-400 italic">prestazione</span>.
               </h1>
               <p className="max-w-xl border-l border-[var(--landing-accent)] pl-5 text-base text-zinc-300 md:text-lg">
-                Una landing iconica, essenziale e ad alto contrasto per raccontare nuoto, disciplina e progresso.
+                SwimForge ti aiuta a capire cosa migliorare ad ogni sessione: dati chiari, priorita tecniche e progressione misurabile nel tempo.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Link
@@ -132,7 +132,7 @@ export default function Home() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/15 to-transparent" />
               <figcaption className="absolute bottom-0 left-0 right-0 p-4 text-xs uppercase tracking-[0.18em] text-zinc-300">
-                Editorial B/N Collection
+                Allenamento guidato dai dati
               </figcaption>
             </figure>
           </div>
@@ -141,8 +141,8 @@ export default function Home() {
         <section id="value" className="border-b border-white/10 bg-[#0b0b0b] py-16 md:py-20">
           <div className="mx-auto max-w-7xl px-4 md:px-6">
             <div className="landing-reveal mb-10 md:mb-12" style={{ animationDelay: "60ms" }}>
-              <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Value Proposition</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white md:text-5xl">Tre blocchi, un solo standard.</h2>
+              <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Perché SwimForge</p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white md:text-5xl">Meno intuizione. Più progressi reali.</h2>
             </div>
             <div className="grid gap-5 md:grid-cols-3">
               {valueProps.map((item, index) => (
@@ -172,7 +172,7 @@ export default function Home() {
           <div className="mx-auto max-w-7xl px-4 md:px-6">
             <div className="landing-reveal mb-10" style={{ animationDelay: "40ms" }}>
               <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Come Funziona</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white md:text-5xl">Sync. Analisi. Crescita.</h2>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white md:text-5xl">Registra. Capisci. Migliora.</h2>
             </div>
             <div className="grid gap-5 md:grid-cols-3">
               {workflowSteps.map((step, index) => (
@@ -193,8 +193,8 @@ export default function Home() {
         <section id="gallery" className="border-b border-white/10 bg-[#090909] py-16 md:py-20">
           <div className="mx-auto max-w-7xl px-4 md:px-6">
             <div className="landing-reveal mb-10" style={{ animationDelay: "50ms" }}>
-              <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Visual Proof</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white md:text-5xl">Icone in bianco e nero.</h2>
+              <p className="text-xs uppercase tracking-[0.22em] text-zinc-500">Proof di Risultato</p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white md:text-5xl">Quello che cambia quando usi SwimForge.</h2>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               {galleryShots.map((item, index) => (
@@ -231,10 +231,10 @@ export default function Home() {
           <div className="landing-reveal relative z-10 mx-auto max-w-5xl px-4 text-center md:px-6" style={{ animationDelay: "70ms" }}>
             <p className="text-xs uppercase tracking-[0.22em] text-zinc-400">Final CTA</p>
             <h2 className="mt-3 text-balance text-4xl font-semibold leading-tight tracking-tight text-white md:text-6xl">
-              Pronto a portare il club al livello successivo?
+              Inizia a nuotare con un piano chiaro, non a tentativi.
             </h2>
             <p className="mx-auto mt-5 max-w-2xl text-sm leading-relaxed text-zinc-300 md:text-base">
-              Esperienza premium, linguaggio chiaro, conversione pulita. Nessun rumore, solo focus su performance.
+              Traccia le tue sessioni, ricevi indicazioni utili e costruisci progressi misurabili settimana dopo settimana.
             </p>
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <Link href="/signup" className={cn(buttonVariants({ variant: "neon", size: "lg" }), "min-h-[48px] w-full sm:w-auto")}>
