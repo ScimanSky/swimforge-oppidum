@@ -1,5 +1,4 @@
 import { useAuth } from "@/_core/hooks/useAuth";
-import { SwimForgeMark, SwimForgeWordmark } from "@/components/brand/SwimForgeBrand";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Medal, Trophy, Users, Zap } from "lucide-react";
@@ -92,8 +91,13 @@ export default function Home() {
       <header className="fixed inset-x-0 top-0 z-50 border-b border-cyan-100/10 bg-[#04101b]/85 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 md:px-6">
           <Link href="/" className="flex items-center gap-2 rounded-md px-1 py-1">
-            <SwimForgeMark className="size-8" />
-            <SwimForgeWordmark compact className="text-sm md:text-base" />
+            <img
+              src="/brand/swimforge-navbar-logo.png"
+              alt="SwimForge"
+              className="h-7 w-auto object-contain md:h-8"
+              loading="lazy"
+              decoding="async"
+            />
           </Link>
           <nav className="hidden items-center gap-7 text-xs uppercase tracking-[0.16em] text-slate-300 md:flex">
             <a href="#value" className="transition-colors hover:text-cyan-300">
@@ -349,7 +353,13 @@ export default function Home() {
       <footer className="border-t border-cyan-100/10 bg-[#020913]">
         <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-10 md:flex-row md:items-center md:justify-between md:px-6">
           <div className="flex items-center gap-2">
-            <SwimForgeMark className="size-7" />
+            <img
+              src="/brand/swimforge-navbar-logo.png"
+              alt="SwimForge"
+              className="h-7 w-auto object-contain"
+              loading="lazy"
+              decoding="async"
+            />
             <span className="text-sm text-slate-300/80">2026 SwimForge</span>
           </div>
           <div className="flex items-center gap-6 text-sm text-slate-300/80">
