@@ -6,6 +6,9 @@ import { toast } from "sonner";
 import { Waves, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 
+const PKCE_VERIFIER_MISSING_RE = /pkce code verifier not found|code verifier/i;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export default function AuthCallback() {
   const [, navigate] = useLocation();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
@@ -30,6 +33,15 @@ export default function AuthCallback() {
     },
   });
 
+  const waitForSession = async (attempts = 8, delayMs = 250) => {
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) return data.session;
+      await sleep(delayMs);
+    }
+    return null;
+  };
+
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
@@ -50,13 +62,7 @@ export default function AuthCallback() {
 
         console.log('[AuthCallback] Params:', { hasCode: !!code, hasAccessToken: !!accessToken, hasRefreshToken: !!refreshToken });
 
-        if (code) {
-          // PKCE flow: exchange code for session
-          console.log('[AuthCallback] Using PKCE flow (code exchange)');
-          const result = await supabase.auth.exchangeCodeForSession(code);
-          session = result.data.session;
-          error = result.error;
-        } else if (accessToken) {
+        if (accessToken) {
           // Implicit flow: set session from hash tokens
           console.log('[AuthCallback] Using implicit flow (hash tokens)');
           const result = await supabase.auth.setSession({
@@ -66,16 +72,23 @@ export default function AuthCallback() {
           session = result.data.session;
           error = result.error;
         } else {
-          // Supabase with detectSessionInUrl may have already consumed the params.
-          // Wait briefly and check if a session was established automatically.
-          console.log('[AuthCallback] No URL params found, checking existing session...');
-          await new Promise((r) => setTimeout(r, 1000));
-          const { data } = await supabase.auth.getSession();
-          session = data.session;
-          if (!session) {
-            throw new Error("Nessun access token o codice di autorizzazione trovato nell'URL");
+          // With detectSessionInUrl=true, Supabase can auto-complete PKCE on page load.
+          // Give it a moment before attempting manual exchange.
+          session = await waitForSession(8, 250);
+
+          if (!session && code) {
+            console.log('[AuthCallback] Falling back to manual PKCE exchange');
+            const result = await supabase.auth.exchangeCodeForSession(code);
+            session = result.data.session;
+            error = result.error;
+
+            if (error && PKCE_VERIFIER_MISSING_RE.test(error.message || "")) {
+              // Recover from race where auto-detection already consumed the verifier.
+              console.warn('[AuthCallback] PKCE verifier missing, retrying session recovery');
+              error = null;
+              session = await waitForSession(8, 300);
+            }
           }
-          console.log('[AuthCallback] Found existing session from auto-detection');
         }
 
         console.log('[AuthCallback] Session result:', { session: !!session, error });
@@ -86,7 +99,12 @@ export default function AuthCallback() {
 
         if (!session) {
           console.error('[AuthCallback] No session found!');
-          throw new Error("Nessuna sessione trovata");
+          throw new Error("Sessione OAuth non trovata. Riprova il login con Google.");
+        }
+
+        // Prevent accidental re-processing of auth params on refresh/back.
+        if (window.location.search || window.location.hash) {
+          window.history.replaceState({}, document.title, "/auth/callback");
         }
 
         // Sincronizza l'utente con il backend
@@ -107,7 +125,12 @@ export default function AuthCallback() {
         });
       } catch (error: any) {
         setStatus("error");
-        setErrorMessage(error.message || "Errore durante l'autenticazione");
+        const rawMessage = error?.message || "Errore durante l'autenticazione";
+        if (PKCE_VERIFIER_MISSING_RE.test(rawMessage)) {
+          setErrorMessage("Sessione OAuth scaduta o non valida. Riprova ad accedere con Google.");
+        } else {
+          setErrorMessage(rawMessage);
+        }
         toast.error("Errore durante l'accesso con Google");
         console.error(error);
         
