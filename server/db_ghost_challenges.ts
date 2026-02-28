@@ -161,6 +161,17 @@ export async function getGhostChallengeContextFromPost(
     throw new Error("Non puoi sfidare la tua stessa attivita");
   }
 
+  const alreadyChallenged = await db.execute(sql`
+    SELECT 1
+    FROM ghost_challenges
+    WHERE challenger_user_id = ${userId}
+      AND opponent_activity_id = ${post.activity_id}
+    LIMIT 1
+  `);
+  if (alreadyChallenged.rows.length > 0) {
+    throw new Error("Hai gia sfidato questa sessione");
+  }
+
   if (post.club_id) {
     const membership = await db.execute(sql`
       SELECT 1
@@ -425,6 +436,12 @@ export async function listGhostTrackSessions(
     WHERE p.user_id = ${friendUserId}
       AND p.is_deleted = false
       AND p.activity_id IS NOT NULL
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ghost_challenges gc
+        WHERE gc.challenger_user_id = ${userId}
+          AND gc.opponent_activity_id = a.id
+      )
       AND (
         (p.club_id IS NULL AND p.visibility = 'public')
         OR (

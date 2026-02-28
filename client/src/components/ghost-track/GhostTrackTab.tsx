@@ -90,6 +90,7 @@ export default function GhostTrackTab() {
   const [searchTerm, setSearchTerm] = useState("")
   const [sessionSort, setSessionSort] = useState("recent")
   const [challengeContext, setChallengeContext] = useState<any | null>(null)
+  const utils = trpc.useUtils()
 
   const profileQuery = trpc.profile.get.useQuery()
   const currentUserId = profileQuery.data?.userId
@@ -113,6 +114,14 @@ export default function GhostTrackTab() {
   })
 
   const createChallengeMutation = trpc.community.ghostChallenges.createFromPost.useMutation({
+    onSuccess: async () => {
+      await Promise.all([
+        utils.community.ghostTrack.leaderboard.invalidate(),
+        utils.community.ghostTrack.sessions.invalidate(),
+        utils.community.ghostTrack.friends.invalidate(),
+        utils.community.ghostChallenges.list.invalidate(),
+      ])
+    },
     onError: (err) => toast.error(err.message || "Impossibile creare la Ghost Track"),
   })
 
@@ -258,7 +267,7 @@ export default function GhostTrackTab() {
     if (!selectedSession) return
     try {
       await createChallengeMutation.mutateAsync({ postId: selectedSession.post_id })
-      myChallengesQuery.refetch()
+      await myChallengesQuery.refetch()
       setViewMode("results")
     } catch {
       // error handled via mutation onError
