@@ -126,7 +126,7 @@ export default function Home() {
               <img
                 src="/images/landing-bw/hero-main.webp"
                 alt="Due nuotatori concentrati osservano la piscina"
-                className="aspect-[4/5] w-full object-cover object-center grayscale md:aspect-[3/4] lg:aspect-[4/5]"
+                className="aspect-[4/5] w-full object-cover object-center md:aspect-[3/4] lg:aspect-[4/5]"
                 loading="eager"
                 decoding="async"
               />
@@ -154,7 +154,7 @@ export default function Home() {
                   <img
                     src={item.image}
                     alt={item.alt}
-                    className="aspect-[16/10] w-full object-cover grayscale transition-transform duration-500 group-hover:scale-[1.04]"
+                    className="aspect-[16/10] w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
                     loading="lazy"
                     decoding="async"
                   />
@@ -206,7 +206,7 @@ export default function Home() {
                   <img
                     src={item.src}
                     alt={item.alt}
-                    className="aspect-[3/4] w-full object-cover grayscale transition-transform duration-500 group-hover:scale-[1.03]"
+                    className="aspect-[3/4] w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                     loading="lazy"
                     decoding="async"
                   />
@@ -222,8 +222,8 @@ export default function Home() {
         <section className="relative overflow-hidden bg-black py-16 md:py-20">
           <img
             src="/images/landing-bw/cta-banner.webp"
-            alt="Superficie acqua scura in bianco e nero"
-            className="absolute inset-0 h-full w-full object-cover grayscale opacity-30"
+            alt="Nuotatore in corsia durante una sessione intensa"
+            className="absolute inset-0 h-full w-full object-cover opacity-30"
             loading="lazy"
             decoding="async"
           />
