@@ -11,7 +11,7 @@ const featureCards = [
     tag: "AI Coach",
     title: "Correggi prima, non dopo.",
     body: "Insight prioritizzati su tecnica, ritmo e carico per sapere cosa cambiare nella prossima sessione.",
-    image: "/images/landing-v5/feature-ai-v2.webp",
+    image: "/images/landing-v5/feature-ai-v3.webp",
     alt: "Nuotatore in corsia con visual analytics in sovraimpressione",
   },
   {
