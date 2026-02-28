@@ -9,19 +9,19 @@ import { useEffect } from "react";
 const valueProps = [
   {
     title: "AI Coach",
-    body: "Insight pratici su tecnica, ritmo e carico: sai cosa correggere nella prossima sessione.",
+    body: "Insight pratici su tecnica, ritmo e carico: sai cosa correggere subito e come allenarti meglio.",
     image: "/images/landing-outcome/feature-ai.webp",
     alt: "Dettaglio tecnico in piscina per analisi AI",
   },
   {
     title: "Progressi",
-    body: "Metriche essenziali per misurare miglioramenti settimanali su pace, distanza e continuita.",
+    body: "Metriche, XP, badge e streak per misurare i miglioramenti settimanali su pace, distanza e continuita.",
     image: "/images/landing-outcome/feature-progress.webp",
     alt: "Nuotatore concentrato durante la fase pre-allenamento",
   },
   {
     title: "Community Club",
-    body: "Allenati meglio con feedback, sfide e confronto con altri nuotatori del tuo livello.",
+    body: "Feed social, club e sfide con classifica per confrontarti con nuotatori del tuo livello.",
     image: "/images/landing-outcome/feature-community.webp",
     alt: "Sessione di squadra con ritmo condiviso a bordo vasca",
   },
@@ -31,17 +31,17 @@ const workflowSteps = [
   {
     step: "01",
     title: "Sync",
-    body: "Connetti attività da Garmin/Strava o inseriscile manualmente in un profilo unico.",
+    body: "Connetti attività da Garmin/Strava o inseriscile manualmente in un profilo unico atleta+club.",
   },
   {
     step: "02",
     title: "Analisi",
-    body: "Leggi insight prioritizzati: cosa sta funzionando e dove stai perdendo efficienza.",
+    body: "Leggi insight prioritizzati e trend di XP: cosa sta funzionando e dove stai perdendo efficienza.",
   },
   {
     step: "03",
     title: "Crescita",
-    body: "Trasforma i dati in obiettivi concreti e verifica i risultati sessione dopo sessione.",
+    body: "Trasforma i dati in obiettivi concreti, entra nelle sfide e sali in classifica con badge e risultati reali.",
   },
 ];
 
@@ -104,7 +104,7 @@ export default function Home() {
                 Forgia la tua <span className="text-zinc-400 italic">prestazione</span>.
               </h1>
               <p className="max-w-xl border-l border-[var(--landing-accent)] pl-5 text-base text-zinc-300 md:text-lg">
-                SwimForge ti aiuta a capire cosa migliorare ad ogni sessione: dati chiari, priorita tecniche e progressione misurabile nel tempo.
+                SwimForge ti aiuta a capire cosa migliorare ad ogni sessione: dati chiari, priorita tecniche, XP e badge, sfide competitive e crescita con social e club.
               </p>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Link
@@ -234,7 +234,7 @@ export default function Home() {
               Inizia a nuotare con un piano chiaro, non a tentativi.
             </h2>
             <p className="mx-auto mt-5 max-w-2xl text-sm leading-relaxed text-zinc-300 md:text-base">
-              Traccia le tue sessioni, ricevi indicazioni utili e costruisci progressi misurabili settimana dopo settimana.
+              Traccia le sessioni, guadagna XP e badge, partecipa alle sfide e condividi i progressi con il tuo club e la community.
             </p>
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <Link href="/signup" className={cn(buttonVariants({ variant: "neon", size: "lg" }), "min-h-[48px] w-full sm:w-auto")}>
