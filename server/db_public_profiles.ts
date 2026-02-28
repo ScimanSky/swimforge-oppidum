@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { users, swimmerProfiles, socialFollows } from "../drizzle/schema";
 
@@ -111,7 +111,8 @@ export async function getSuggestedUsers(viewerUserId: number, limit = 5) {
   const db = await getDb();
   if (!db) return [];
 
-  // Users the viewer is NOT already following, excluding self, ordered by activity (level desc)
+  // Users the viewer is NOT already following, excluding self.
+  // Prioritize recent signups, then activity level.
   const rows = await db
     .select({
       userId: users.id,
@@ -121,7 +122,7 @@ export async function getSuggestedUsers(viewerUserId: number, limit = 5) {
       level: swimmerProfiles.level,
     })
     .from(users)
-    .innerJoin(swimmerProfiles, eq(swimmerProfiles.userId, users.id))
+    .leftJoin(swimmerProfiles, eq(swimmerProfiles.userId, users.id))
     .where(
       and(
         sql`${users.id} != ${viewerUserId}`,
@@ -131,7 +132,12 @@ export async function getSuggestedUsers(viewerUserId: number, limit = 5) {
         )`,
       )
     )
-    .orderBy(sql`${swimmerProfiles.level} DESC`)
+    .orderBy(
+      sql`CASE WHEN ${users.createdAt} >= NOW() - INTERVAL '30 days' THEN 0 ELSE 1 END`,
+      desc(users.createdAt),
+      sql`COALESCE(${swimmerProfiles.level}, 0) DESC`,
+      desc(users.id)
+    )
     .limit(limit);
 
   return rows;
@@ -226,7 +232,12 @@ export async function searchUsers(viewerUserId: number, query: string, limit = 1
   const db = await getDb();
   if (!db) return [];
 
-  const pattern = `%${query}%`;
+  const normalizedQuery = query.trim();
+  if (!normalizedQuery) return [];
+
+  const pattern = `%${normalizedQuery}%`;
+  const prefixPattern = `${normalizedQuery}%`;
+  const normalizedLower = normalizedQuery.toLowerCase();
   const rows = await db
     .select({
       userId: users.id,
@@ -234,16 +245,40 @@ export async function searchUsers(viewerUserId: number, query: string, limit = 1
       username: swimmerProfiles.username,
       avatarUrl: swimmerProfiles.avatarUrl,
       level: swimmerProfiles.level,
+      isFollowing: sql<boolean>`EXISTS (
+        SELECT 1
+        FROM ${socialFollows}
+        WHERE ${socialFollows.followerId} = ${viewerUserId}
+          AND ${socialFollows.followingId} = ${users.id}
+          AND ${socialFollows.status} = 'accepted'
+      )`,
     })
     .from(users)
-    .innerJoin(swimmerProfiles, eq(swimmerProfiles.userId, users.id))
+    .leftJoin(swimmerProfiles, eq(swimmerProfiles.userId, users.id))
     .where(
       and(
         sql`${users.id} != ${viewerUserId}`,
-        sql`(${users.name} ILIKE ${pattern} OR ${swimmerProfiles.username} ILIKE ${pattern})`,
+        sql`(
+          COALESCE(${users.name}, '') ILIKE ${pattern}
+          OR COALESCE(${swimmerProfiles.username}, '') ILIKE ${pattern}
+          OR ${users.email} ILIKE ${pattern}
+        )`,
       )
     )
-    .orderBy(sql`${swimmerProfiles.level} DESC`)
+    .orderBy(
+      sql`CASE
+        WHEN lower(COALESCE(${swimmerProfiles.username}, '')) = ${normalizedLower} THEN 0
+        WHEN lower(COALESCE(${users.name}, '')) = ${normalizedLower} THEN 1
+        WHEN lower(${users.email}) = ${normalizedLower} THEN 2
+        WHEN lower(COALESCE(${swimmerProfiles.username}, '')) LIKE lower(${prefixPattern}) THEN 3
+        WHEN lower(COALESCE(${users.name}, '')) LIKE lower(${prefixPattern}) THEN 4
+        WHEN lower(${users.email}) LIKE lower(${prefixPattern}) THEN 5
+        ELSE 6
+      END`,
+      desc(users.createdAt),
+      sql`COALESCE(${swimmerProfiles.level}, 0) DESC`,
+      desc(users.id)
+    )
     .limit(limit);
 
   return rows;

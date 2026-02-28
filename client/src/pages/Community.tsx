@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { getInitials } from "@/lib/format"
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,9 @@ import {
   Plus,
   Sparkles,
   ChevronRight,
+  Search,
+  UserCheck,
+  UserPlus,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
@@ -34,8 +38,10 @@ import { toast } from "sonner"
 export default function Community() {
   const [clubScope, setClubScope] = useState<"all" | "mine">("all")
   const [clubSearch, setClubSearch] = useState("")
+  const [userSearch, setUserSearch] = useState("")
   const [clubsPage, setClubsPage] = useState(1)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [pendingFollowUserId, setPendingFollowUserId] = useState<number | null>(null)
   const [createDraft, setCreateDraft] = useState({
     name: "",
     description: "",
@@ -49,6 +55,17 @@ export default function Community() {
     search: clubSearch.trim() || undefined,
     limit: 100,
   })
+  const utils = trpc.useUtils()
+  const normalizedUserSearch = userSearch.trim()
+  const discoverMode = normalizedUserSearch.length > 0
+  const suggestedUsersQuery = trpc.community.users.suggested.useQuery(
+    { limit: 10 },
+    { staleTime: 60_000 }
+  )
+  const userSearchQuery = trpc.community.users.search.useQuery(
+    { query: normalizedUserSearch, limit: 20 },
+    { enabled: discoverMode, staleTime: 30_000 }
+  )
 
   const createClub = trpc.community.clubs.create.useMutation({
     onSuccess: (data) => {
@@ -64,7 +81,45 @@ export default function Community() {
     onError: (err) => toast.error(err.message || "Impossibile creare il club"),
   })
 
+  const followUser = trpc.community.users.toggleFollow.useMutation({
+    onMutate: ({ userId }) => {
+      setPendingFollowUserId(userId)
+    },
+    onSuccess: (result) => {
+      if (result.following) {
+        toast.success("Profilo seguito")
+      } else {
+        toast.info("Follow rimosso")
+      }
+      void Promise.all([
+        utils.community.users.suggested.invalidate(),
+        utils.community.users.search.invalidate(),
+        utils.community.users.followStarter.invalidate(),
+        utils.community.feed.invalidate(),
+      ])
+    },
+    onError: (error) => {
+      toast.error(error.message || "Impossibile seguire questo profilo.")
+    },
+    onSettled: () => {
+      setPendingFollowUserId(null)
+    },
+  })
+
   const clubs = useMemo(() => (clubsQuery.data as any[]) || [], [clubsQuery.data])
+  const discoverUsers = useMemo(() => {
+    const rows = discoverMode
+      ? ((userSearchQuery.data as any[] | undefined) ?? [])
+      : ((suggestedUsersQuery.data as any[] | undefined) ?? []);
+    const seen = new Set<number>();
+    return rows.filter((row) => {
+      const id = Number(row?.userId ?? 0);
+      if (!Number.isFinite(id) || id <= 0 || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }, [discoverMode, suggestedUsersQuery.data, userSearchQuery.data])
+  const isDiscoverLoading = discoverMode ? userSearchQuery.isLoading : suggestedUsersQuery.isLoading
   const clubsPageSize = 6
   const clubsTotalPages = Math.max(1, Math.ceil(clubs.length / clubsPageSize))
   const pagedClubs = useMemo(() => {
@@ -224,6 +279,93 @@ export default function Community() {
                 />
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="surface-panel p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <h2 className="text-base font-display font-semibold text-foreground">Trova nuotatori</h2>
+              <p className="text-xs text-muted-foreground">
+                Cerca per nome, username o email e aggiungi amici al volo.
+              </p>
+            </div>
+            <Badge className="border-border/70 bg-background/70 text-foreground">
+              {discoverMode ? "Ricerca persone" : "Suggeriti"}
+            </Badge>
+          </div>
+
+          <div className="relative mt-3">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={userSearch}
+              onChange={(event) => setUserSearch(event.target.value)}
+              placeholder="Cerca persone..."
+              className="h-10 bg-background/60 pl-9"
+            />
+          </div>
+
+          <div className="mt-3 space-y-2">
+            {isDiscoverLoading ? (
+              <p className="text-sm text-muted-foreground">Caricamento nuotatori...</p>
+            ) : discoverUsers.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {discoverMode ? "Nessun utente trovato." : "Nessun suggerimento disponibile al momento."}
+              </p>
+            ) : (
+              discoverUsers.slice(0, 8).map((user: any) => {
+                const displayName = user.username || user.name || `Utente #${user.userId}`
+                const subtitleParts = [
+                  user.username ? `@${user.username}` : null,
+                  user.level != null ? `Livello ${user.level}` : null,
+                ].filter(Boolean)
+                const isFollowing = Boolean(user.isFollowing)
+                const isPending = pendingFollowUserId === user.userId
+
+                return (
+                  <div
+                    key={user.userId}
+                    className="flex items-center gap-3 rounded-xl border border-border/55 bg-background/35 p-2.5"
+                  >
+                    <Link href={`/u/${user.userId}`}>
+                      <Avatar className="size-10 cursor-pointer border border-border/60">
+                        <AvatarImage src={user.avatarUrl || ""} alt={displayName} />
+                        <AvatarFallback className="text-xs font-semibold">
+                          {getInitials(displayName)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Link>
+                    <div className="min-w-0 flex-1">
+                      <Link href={`/u/${user.userId}`} className="block truncate text-sm font-semibold text-foreground hover:underline">
+                        {displayName}
+                      </Link>
+                      <p className="truncate text-xs text-muted-foreground">
+                        {subtitleParts.length > 0 ? subtitleParts.join(" · ") : "Nuovo nuotatore"}
+                      </p>
+                    </div>
+                    <Button
+                      variant={isFollowing ? "ghost-neon" : "outline-neon"}
+                      size="sm"
+                      className="shrink-0 gap-1"
+                      disabled={isFollowing || isPending || followUser.isPending}
+                      onClick={() => followUser.mutate({ userId: Number(user.userId) })}
+                    >
+                      {isFollowing ? (
+                        <>
+                          <UserCheck className="size-3.5" />
+                          Seguito
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="size-3.5" />
+                          {isPending ? "..." : "Segui"}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )
+              })
+            )}
           </div>
         </section>
 
