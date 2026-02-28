@@ -715,11 +715,12 @@ export default function Challenges() {
                         const absoluteIndex = (leaderboardPage - 1) * leaderboardPageSize + index
                         const profile = entry.profile ?? entry
                         const name = entry.name ?? profile.name ?? "Nuotatore"
-                        return (
-                          <div
-                            key={entry.userId ?? entry.id ?? index}
-                            className="flex items-center gap-4 rounded-lg bg-secondary/30 p-3"
-                          >
+                        const rawUserId = profile.userId ?? entry.userId
+                        const userId = Number(rawUserId)
+                        const hasProfileLink = Number.isFinite(userId) && userId > 0
+
+                        const rowContent = (
+                          <>
                             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
                               {absoluteIndex === 0 ? (
                                 <Crown className="h-4 w-4 text-primary" />
@@ -743,6 +744,23 @@ export default function Challenges() {
                               </p>
                             </div>
                             <Badge className="bg-accent/20 text-accent">{profile.totalXp} XP</Badge>
+                          </>
+                        )
+
+                        return hasProfileLink ? (
+                          <Link
+                            key={entry.userId ?? entry.id ?? index}
+                            href={`/u/${userId}`}
+                            className="flex items-center gap-4 rounded-lg bg-secondary/30 p-3 transition-colors hover:bg-secondary/45"
+                          >
+                            {rowContent}
+                          </Link>
+                        ) : (
+                          <div
+                            key={entry.userId ?? entry.id ?? index}
+                            className="flex items-center gap-4 rounded-lg bg-secondary/30 p-3"
+                          >
+                            {rowContent}
                           </div>
                         )
                       })}

@@ -1,6 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
+import { Link } from "wouter"
 import {
   BarChart,
   Bar,
@@ -414,12 +415,11 @@ export default function GhostTrackTab() {
               ) : leaderboard.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nessuna sfida registrata.</p>
               ) : (
-                leaderboard.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
-                  >
-                    <div className="flex items-center gap-3">
+                leaderboard.map((entry) => {
+                  const entryUserId = Number(entry.id)
+                  const hasProfileLink = Number.isFinite(entryUserId) && entryUserId > 0
+                  const identityContent = (
+                    <>
                       <div className="w-6 text-lg font-semibold text-foreground">
                         {entry.rank === 1 && "🥇"}
                         {entry.rank === 2 && "🥈"}
@@ -434,10 +434,25 @@ export default function GhostTrackTab() {
                           {entry.wins}W · {entry.losses}L · {entry.winRate}%
                         </p>
                       </div>
+                    </>
+                  )
+
+                  return (
+                    <div
+                      key={entry.id}
+                      className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
+                    >
+                      {hasProfileLink ? (
+                        <Link href={`/u/${entryUserId}`} className="flex items-center gap-3 rounded-md px-1 py-1 transition-colors hover:bg-secondary/40">
+                          {identityContent}
+                        </Link>
+                      ) : (
+                        <div className="flex items-center gap-3">{identityContent}</div>
+                      )}
+                      <div className="text-sm font-semibold text-primary">{entry.points} pts</div>
                     </div>
-                    <div className="text-sm font-semibold text-primary">{entry.points} pts</div>
-                  </div>
-                ))
+                  )
+                })
               )}
               <div className="grid gap-3 pt-4 md:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-lg border border-border bg-secondary/30 p-3">
@@ -872,12 +887,11 @@ export default function GhostTrackTab() {
               <SurfaceDescription>Chi domina le sfide 1v1.</SurfaceDescription>
             </SurfaceHeader>
             <SurfaceContent className="space-y-3">
-              {leaderboard.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
-                >
-                  <div className="flex items-center gap-3">
+              {leaderboard.map((entry) => {
+                const entryUserId = Number(entry.id)
+                const hasProfileLink = Number.isFinite(entryUserId) && entryUserId > 0
+                const identityContent = (
+                  <>
                     <div className="w-6 text-lg font-semibold text-foreground">
                       {entry.rank === 1 && "🥇"}
                       {entry.rank === 2 && "🥈"}
@@ -892,10 +906,25 @@ export default function GhostTrackTab() {
                         {entry.wins}W · {entry.losses}L · {entry.winRate}%
                       </p>
                     </div>
+                  </>
+                )
+
+                return (
+                  <div
+                    key={entry.id}
+                    className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
+                  >
+                    {hasProfileLink ? (
+                      <Link href={`/u/${entryUserId}`} className="flex items-center gap-3 rounded-md px-1 py-1 transition-colors hover:bg-secondary/40">
+                        {identityContent}
+                      </Link>
+                    ) : (
+                      <div className="flex items-center gap-3">{identityContent}</div>
+                    )}
+                    <div className="text-sm font-semibold text-primary">{entry.points} pts</div>
                   </div>
-                  <div className="text-sm font-semibold text-primary">{entry.points} pts</div>
-                </div>
-              ))}
+                )
+              })}
             </SurfaceContent>
           </Surface>
           <Button
