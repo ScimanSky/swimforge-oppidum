@@ -20,6 +20,7 @@ import {
   Settings,
   Shield,
   Target,
+  Trophy,
   User,
   Users,
   Waves,
@@ -139,6 +140,13 @@ const quickAccessItems: QuickAccessItem[] = [
     icon: <Orbit className="size-4" />,
     match: (path) => path === "/season" || path.startsWith("/season/leaderboard") || path.startsWith("/leaderboard"),
     dataTour: "season-hub",
+  },
+  {
+    label: "Classifica",
+    path: "/season/leaderboard",
+    icon: <Trophy className="size-4" />,
+    match: (path) => path.startsWith("/season/leaderboard") || path.startsWith("/leaderboard"),
+    dataTour: "global-leaderboard",
   },
   { label: "Challenges", path: "/season/challenges", icon: <Swords className="size-4" />, match: isChallengesPath, dataTour: "challenges-list" },
   {

@@ -28,6 +28,7 @@ import {
   Plus,
   Sparkles,
   ChevronRight,
+  Trophy,
   Search,
   UserCheck,
   UserPlus,
@@ -250,6 +251,12 @@ export default function Community() {
                   <h1 className="mt-1 text-xl font-display font-bold neon-gradient-text sm:text-2xl">Club</h1>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="outline-neon" className="gap-2" asChild>
+                    <Link href="/season/leaderboard">
+                      <Trophy className="h-4 w-4" />
+                      Classifica generale
+                    </Link>
+                  </Button>
                   {createClubDialog}
                 </div>
               </div>
