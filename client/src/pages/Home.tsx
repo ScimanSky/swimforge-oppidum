@@ -10,19 +10,19 @@ const valueProps = [
   {
     title: "AI Coach",
     body: "Insight pratici su tecnica, ritmo e carico: sai cosa correggere nella prossima sessione.",
-    image: "/images/landing-bw/feature-ai.webp",
+    image: "/images/landing-outcome/feature-ai.webp",
     alt: "Dettaglio tecnico in piscina per analisi AI",
   },
   {
     title: "Progressi",
     body: "Metriche essenziali per misurare miglioramenti settimanali su pace, distanza e continuita.",
-    image: "/images/landing-bw/feature-progress.webp",
+    image: "/images/landing-outcome/feature-progress.webp",
     alt: "Nuotatore concentrato durante la fase pre-allenamento",
   },
   {
     title: "Community Club",
     body: "Allenati meglio con feedback, sfide e confronto con altri nuotatori del tuo livello.",
-    image: "/images/landing-bw/feature-community.webp",
+    image: "/images/landing-outcome/feature-community.webp",
     alt: "Sessione di squadra con ritmo condiviso a bordo vasca",
   },
 ];
@@ -47,17 +47,17 @@ const workflowSteps = [
 
 const galleryShots = [
   {
-    src: "/images/landing-bw/gallery-01.webp",
+    src: "/images/landing-outcome/gallery-01.webp",
     alt: "Nuotatore concentrato durante la fase pre-allenamento",
     caption: "Pace più stabile",
   },
   {
-    src: "/images/landing-bw/gallery-02.webp",
+    src: "/images/landing-outcome/gallery-02.webp",
     alt: "Sessione di squadra con ritmo condiviso a bordo vasca",
     caption: "Più continuità",
   },
   {
-    src: "/images/landing-bw/gallery-03.webp",
+    src: "/images/landing-outcome/gallery-03.webp",
     alt: "Atleta che analizza i dati post-allenamento",
     caption: "Decisioni migliori",
   },
@@ -124,7 +124,7 @@ export default function Home() {
 
             <figure className="landing-reveal relative overflow-hidden rounded-sm border border-white/15 bg-black" style={{ animationDelay: "170ms" }}>
               <img
-                src="/images/landing-bw/hero-main.webp"
+                src="/images/landing-outcome/hero-main.webp"
                 alt="Due nuotatori concentrati osservano la piscina"
                 className="aspect-[4/5] w-full object-cover object-center md:aspect-[3/4] lg:aspect-[4/5]"
                 loading="eager"
@@ -221,7 +221,7 @@ export default function Home() {
 
         <section className="relative overflow-hidden bg-black py-16 md:py-20">
           <img
-            src="/images/landing-bw/cta-banner.webp"
+            src="/images/landing-outcome/cta-banner.webp"
             alt="Nuotatore in corsia durante una sessione intensa"
             className="absolute inset-0 h-full w-full object-cover opacity-30"
             loading="lazy"
