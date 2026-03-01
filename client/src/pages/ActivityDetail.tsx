@@ -11,6 +11,8 @@ import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { cn } from "@/lib/utils"
 import {
   ArrowLeft,
+  ChevronDown,
+  ChevronRight,
   Clock3,
   Droplets,
   Gauge,
@@ -54,6 +56,83 @@ type SplitItem = {
   raw: RecordAny
 }
 
+type PersistedGarminLap = {
+  id: number
+  lapIndex: number | null
+  distanceMeters: number | null
+  durationSeconds: number | null
+  movingDurationSeconds: number | null
+  elapsedDurationSeconds: number | null
+  averageSpeedMps: number | null
+  maxSpeedMps: number | null
+  averageMovingSpeedMps: number | null
+  averageSwolf: number | null
+  averageStrokes: number | null
+  totalNumberOfStrokes: number | null
+  averageSwimCadence: number | null
+  calories: number | null
+  avgHeartRate: number | null
+  maxHeartRate: number | null
+  numberOfActiveLengths: number | null
+  strokeType: string | null
+  startTimeGmt: string | Date | null
+}
+
+type PersistedGarminLength = {
+  lapId: number
+  lengthIndex: number | null
+  distanceMeters: number | null
+  durationSeconds: number | null
+  averageSpeedMps: number | null
+  maxSpeedMps: number | null
+  averageSwolf: number | null
+  totalNumberOfStrokes: number | null
+  avgHeartRate: number | null
+  maxHeartRate: number | null
+  strokeType: string | null
+  startTimeGmt: string | Date | null
+}
+
+type LengthRow = {
+  key: string
+  repeatNumber: number
+  lengthNumber: number
+  label: string
+  distance: number
+  duration: number
+  cumulativeSeconds: number
+  pace: number | null
+  bestPace: number | null
+  swolf: number | null
+  avgHr: number | null
+  maxHr: number | null
+  totalStrokes: number | null
+  avgStrokes: number | null
+  calories: number | null
+  stroke: string | null
+}
+
+type RepeatRow = {
+  key: string
+  lapId: number | null
+  repeatNumber: number
+  label: string
+  distance: number
+  duration: number
+  cumulativeSeconds: number
+  pace: number | null
+  bestPace: number | null
+  swolf: number | null
+  avgHr: number | null
+  maxHr: number | null
+  totalStrokes: number | null
+  avgStrokes: number | null
+  calories: number | null
+  stroke: string | null
+  lengthsCount: number
+  lengths: LengthRow[]
+}
+
 const STROKE_LABELS: Record<string, string> = {
   freestyle: "Freestyle",
   backstroke: "Backstroke",
@@ -69,6 +148,12 @@ const formatDistance = (meters?: number | null) => {
   if (!meters && meters !== 0) return "—"
   if (meters === 0) return "0 m"
   return meters >= 1000 ? `${(meters / 1000).toFixed(2)} km` : `${Math.round(meters)} m`
+}
+
+const formatNumber = (value?: number | null, digits = 0) => {
+  if (value === null || value === undefined) return "—"
+  if (!Number.isFinite(value)) return "—"
+  return digits > 0 ? Number(value).toFixed(digits) : String(Math.round(value))
 }
 
 const formatDuration = (seconds?: number | null) => {
@@ -223,9 +308,14 @@ export default function ActivityDetail() {
   const isLoading = activityQuery.isLoading
   const activityStroke = getActivityStrokeKey(activity)
   const garminDetails = (activity?.rawData as any)?.garmin_details ?? null
+  const [detailView, setDetailView] = useState<"laps-splits" | "repeats">("laps-splits")
   const persistedLapSource = useMemo(() => {
-    if (!Array.isArray((activity as any)?.garminLaps)) return [] as unknown[]
-    return (activity as any).garminLaps as unknown[]
+    if (!Array.isArray((activity as any)?.garminLaps)) return [] as PersistedGarminLap[]
+    return (activity as any).garminLaps as PersistedGarminLap[]
+  }, [activity])
+  const persistedLengthSource = useMemo(() => {
+    if (!Array.isArray((activity as any)?.garminLengths)) return [] as PersistedGarminLength[]
+    return (activity as any).garminLengths as PersistedGarminLength[]
   }, [activity])
 
   const lapSource = useMemo(() => {
@@ -245,6 +335,101 @@ export default function ActivityDetail() {
     if (Array.isArray(garminDetails?.split_summaries)) return garminDetails.split_summaries as unknown[]
     return lapSource
   }, [garminDetails, lapSource])
+
+  const repeatRows = useMemo<RepeatRow[]>(() => {
+    if (persistedLapSource.length === 0) return []
+
+    const lengthsByLapId = new Map<number, PersistedGarminLength[]>()
+    for (const length of persistedLengthSource) {
+      const list = lengthsByLapId.get(length.lapId) ?? []
+      list.push(length)
+      lengthsByLapId.set(length.lapId, list)
+    }
+
+    const rows: RepeatRow[] = []
+    let globalCumulative = 0
+
+    persistedLapSource
+      .slice()
+      .sort((a, b) => (a.lapIndex ?? 0) - (b.lapIndex ?? 0))
+      .forEach((lap, index) => {
+        const distance = lap.distanceMeters ?? 0
+        const duration = lap.durationSeconds ?? 0
+        globalCumulative += duration
+        const lapLengths = (lengthsByLapId.get(lap.id) ?? [])
+          .slice()
+          .sort((a, b) => (a.lengthIndex ?? 0) - (b.lengthIndex ?? 0))
+
+        let localCumulative = 0
+        const lengthRows: LengthRow[] = lapLengths.map((length, lengthIdx) => {
+          const lengthDistance = length.distanceMeters ?? 0
+          const lengthDuration = length.durationSeconds ?? 0
+          localCumulative += lengthDuration
+          const parsedStroke = normalizeStrokeKey(length.strokeType) ?? activityStroke
+          const stroke = lengthDistance === 0 ? "recovery" : parsedStroke
+          const pace = lengthDistance > 0 && lengthDuration > 0 ? lengthDuration / (lengthDistance / 100) : null
+          const bestPace = length.maxSpeedMps && length.maxSpeedMps > 0 ? 100 / length.maxSpeedMps : null
+
+          return {
+            key: `${lap.id}-${length.lengthIndex ?? lengthIdx + 1}`,
+            repeatNumber: lap.lapIndex ?? index + 1,
+            lengthNumber: length.lengthIndex ?? lengthIdx + 1,
+            label: `${lap.lapIndex ?? index + 1}.${length.lengthIndex ?? lengthIdx + 1}`,
+            distance: lengthDistance,
+            duration: lengthDuration,
+            cumulativeSeconds: localCumulative,
+            pace,
+            bestPace,
+            swolf: length.averageSwolf ?? null,
+            avgHr: length.avgHeartRate ?? null,
+            maxHr: length.maxHeartRate ?? null,
+            totalStrokes: length.totalNumberOfStrokes ?? null,
+            avgStrokes: null,
+            calories: null,
+            stroke,
+          }
+        })
+
+        const strokeVotes = new Map<string, number>()
+        for (const length of lengthRows) {
+          if (!length.stroke || length.stroke === "recovery") continue
+          strokeVotes.set(length.stroke, (strokeVotes.get(length.stroke) ?? 0) + 1)
+        }
+        const fallbackStrokeFromLengths =
+          strokeVotes.size > 0
+            ? Array.from(strokeVotes.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
+            : null
+        const parsedLapStroke = normalizeStrokeKey(lap.strokeType) ?? fallbackStrokeFromLengths ?? activityStroke
+        const stroke = distance === 0 ? "recovery" : parsedLapStroke
+        const lengthsCount =
+          lap.numberOfActiveLengths ??
+          lengthRows.filter((length) => length.distance > 0).length ??
+          0
+
+        rows.push({
+          key: `repeat-${lap.id}`,
+          lapId: lap.id,
+          repeatNumber: lap.lapIndex ?? index + 1,
+          label: distance === 0 ? "Recovery" : `Ripetuta ${lap.lapIndex ?? index + 1}`,
+          distance,
+          duration,
+          cumulativeSeconds: globalCumulative,
+          pace: distance > 0 && duration > 0 ? duration / (distance / 100) : null,
+          bestPace: lap.maxSpeedMps && lap.maxSpeedMps > 0 ? 100 / lap.maxSpeedMps : null,
+          swolf: lap.averageSwolf ?? null,
+          avgHr: lap.avgHeartRate ?? null,
+          maxHr: lap.maxHeartRate ?? null,
+          totalStrokes: lap.totalNumberOfStrokes ?? null,
+          avgStrokes: lap.averageStrokes ?? null,
+          calories: lap.calories ?? null,
+          stroke,
+          lengthsCount,
+          lengths: lengthRows,
+        })
+      })
+
+    return rows
+  }, [activityStroke, persistedLapSource, persistedLengthSource])
 
   const laps = useMemo<LapItem[]>(() => {
     let cumulative = 0
@@ -328,6 +513,9 @@ export default function ActivityDetail() {
 
   const [selectedLapIdx, setSelectedLapIdx] = useState(0)
   const [selectedSplitIdx, setSelectedSplitIdx] = useState(0)
+  const [expandedRepeatKeys, setExpandedRepeatKeys] = useState<Record<string, boolean>>({})
+  const [selectedRepeatKey, setSelectedRepeatKey] = useState<string | null>(null)
+  const [selectedLengthKey, setSelectedLengthKey] = useState<string | null>(null)
 
   const fallbackSplitRows = useMemo<SplitItem[]>(
     () =>
@@ -359,6 +547,39 @@ export default function ActivityDetail() {
 
   const selectedLap = laps[selectedLapIdx] ?? null
   const selectedEffectiveSplit = effectiveSplits[selectedSplitIdx] ?? null
+
+  useEffect(() => {
+    if (repeatRows.length === 0) {
+      setSelectedRepeatKey(null)
+      setSelectedLengthKey(null)
+      return
+    }
+    if (!selectedRepeatKey) {
+      setSelectedRepeatKey(repeatRows[0].key)
+      setSelectedLengthKey(null)
+      return
+    }
+    if (!repeatRows.some((row) => row.key === selectedRepeatKey)) {
+      setSelectedRepeatKey(repeatRows[0].key)
+      setSelectedLengthKey(null)
+    }
+  }, [repeatRows, selectedRepeatKey])
+
+  const selectedRepeat = useMemo(
+    () => repeatRows.find((row) => row.key === selectedRepeatKey) ?? null,
+    [repeatRows, selectedRepeatKey],
+  )
+
+  const selectedLength = useMemo(
+    () => selectedRepeat?.lengths.find((length) => length.key === selectedLengthKey) ?? null,
+    [selectedRepeat, selectedLengthKey],
+  )
+
+  const selectedRepeatMetricSource = selectedLength ?? selectedRepeat
+
+  const toggleRepeat = (repeatKey: string) => {
+    setExpandedRepeatKeys((prev) => ({ ...prev, [repeatKey]: !prev[repeatKey] }))
+  }
 
   if (!Number.isFinite(activityId)) {
     return (
@@ -420,7 +641,9 @@ export default function ActivityDetail() {
                 </Button>
                 <Badge variant="outline">Dettaglio Laps</Badge>
               </div>
-              <h1 className="mt-2 text-2xl font-display font-bold neon-gradient-text">Laps & Splits</h1>
+              <h1 className="mt-2 text-2xl font-display font-bold neon-gradient-text">
+                {detailView === "repeats" ? "Ripetute Garmin-style" : "Laps & Splits"}
+              </h1>
               <p className="text-sm text-muted-foreground">
                 {activity.activityName || "Swim Session"} · {formatDateTime(activity.activityDate)}
               </p>
@@ -428,10 +651,42 @@ export default function ActivityDetail() {
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="outline">Lap: {laps.length}</Badge>
               <Badge variant="outline">Split: {splits.length}</Badge>
+              <Badge variant="outline">Ripetute: {repeatRows.length}</Badge>
+              <Badge variant="outline">
+                Vasche: {repeatRows.reduce((sum, row) => sum + row.lengths.length, 0)}
+              </Badge>
             </div>
+          </div>
+          <div className="mt-4 inline-flex rounded-lg border border-border/70 bg-card/35 p-1">
+            <button
+              type="button"
+              onClick={() => setDetailView("laps-splits")}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm transition-colors",
+                detailView === "laps-splits"
+                  ? "bg-[color-mix(in_oklch,var(--electric-cyan)_22%,transparent)] text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Laps & Splits
+            </button>
+            <button
+              type="button"
+              onClick={() => setDetailView("repeats")}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm transition-colors",
+                detailView === "repeats"
+                  ? "bg-[color-mix(in_oklch,var(--electric-lime)_22%,transparent)] text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              Ripetute
+            </button>
           </div>
         </section>
 
+        {detailView === "laps-splits" ? (
+        <>
         <div className="grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
           <section className="surface-panel p-4">
             <div className="mb-3 flex items-center justify-between">
@@ -655,6 +910,305 @@ export default function ActivityDetail() {
             Nessun dato laps/splits disponibile in questa attività. Se proviene da sync esterna, verifica che il provider includa i dettagli estesi.
           </section>
         ) : null}
+        </>
+        ) : (
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+            <section className="surface-panel p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-display font-semibold text-foreground">Ripetute</h2>
+                <span className="text-xs text-muted-foreground">
+                  Garmin-like view con dettaglio vasca per vasca
+                </span>
+              </div>
+
+              {repeatRows.length === 0 ? (
+                <div className="rounded-xl border border-border/70 bg-card/40 p-4 text-sm text-muted-foreground">
+                  Nessun dato ripetute disponibile in questa attività.
+                </div>
+              ) : (
+                <>
+                  <div className="hidden xl:block overflow-x-auto">
+                    <table className="min-w-[1350px] w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border/70 text-muted-foreground">
+                          <th className="px-2 py-2 text-left font-medium">Ripetute</th>
+                          <th className="px-2 py-2 text-left font-medium">Stile</th>
+                          <th className="px-2 py-2 text-right font-medium">Vasche</th>
+                          <th className="px-2 py-2 text-right font-medium">Distanza</th>
+                          <th className="px-2 py-2 text-right font-medium">Tempo</th>
+                          <th className="px-2 py-2 text-right font-medium">Tempo cumulato</th>
+                          <th className="px-2 py-2 text-right font-medium">Passo medio</th>
+                          <th className="px-2 py-2 text-right font-medium">Passo migliore</th>
+                          <th className="px-2 py-2 text-right font-medium">SWOLF medio</th>
+                          <th className="px-2 py-2 text-right font-medium">FC media</th>
+                          <th className="px-2 py-2 text-right font-medium">FC max</th>
+                          <th className="px-2 py-2 text-right font-medium">Totale bracciate</th>
+                          <th className="px-2 py-2 text-right font-medium">Bracciate medie</th>
+                          <th className="px-2 py-2 text-right font-medium">Calorie</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {repeatRows.flatMap((repeat) => {
+                          const isRepeatSelected = selectedRepeatKey === repeat.key && !selectedLength
+                          const isExpanded = Boolean(expandedRepeatKeys[repeat.key])
+                          const rows = [
+                            <tr
+                              key={repeat.key}
+                              onClick={() => {
+                                setSelectedRepeatKey(repeat.key)
+                                setSelectedLengthKey(null)
+                              }}
+                              className={cn(
+                                "cursor-pointer border-b border-border/40 transition-colors",
+                                isRepeatSelected
+                                  ? "bg-[color-mix(in_oklch,var(--electric-lime)_22%,transparent)]"
+                                  : "bg-[color-mix(in_oklch,var(--electric-cyan)_8%,transparent)] hover:bg-[color-mix(in_oklch,var(--electric-cyan)_13%,transparent)]",
+                              )}
+                            >
+                              <td className="px-2 py-2">
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation()
+                                    toggleRepeat(repeat.key)
+                                  }}
+                                  className="inline-flex items-center gap-1 font-semibold text-foreground"
+                                >
+                                  {isExpanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
+                                  {repeat.repeatNumber}
+                                </button>
+                              </td>
+                              <td className="px-2 py-2">{getStrokeLabel(repeat.stroke)}</td>
+                              <td className="px-2 py-2 text-right">{repeat.lengthsCount}</td>
+                              <td className="px-2 py-2 text-right">{formatDistance(repeat.distance)}</td>
+                              <td className="px-2 py-2 text-right">{formatSplitDuration(repeat.duration)}</td>
+                              <td className="px-2 py-2 text-right">{formatSplitDuration(repeat.cumulativeSeconds)}</td>
+                              <td className="px-2 py-2 text-right">{formatPace(repeat.pace, repeat.distance, repeat.duration)}</td>
+                              <td className="px-2 py-2 text-right">{formatPace(repeat.bestPace, repeat.distance, repeat.duration)}</td>
+                              <td className="px-2 py-2 text-right">{formatNumber(repeat.swolf)}</td>
+                              <td className="px-2 py-2 text-right">{formatNumber(repeat.avgHr)}</td>
+                              <td className="px-2 py-2 text-right">{formatNumber(repeat.maxHr)}</td>
+                              <td className="px-2 py-2 text-right">{formatNumber(repeat.totalStrokes)}</td>
+                              <td className="px-2 py-2 text-right">{formatNumber(repeat.avgStrokes, 1)}</td>
+                              <td className="px-2 py-2 text-right">{formatNumber(repeat.calories)}</td>
+                            </tr>,
+                          ]
+
+                          if (!isExpanded) return rows
+
+                          return rows.concat(
+                            repeat.lengths.map((length) => {
+                              const isLengthSelected = selectedLength?.key === length.key
+                              return (
+                                <tr
+                                  key={length.key}
+                                  onClick={() => {
+                                    setSelectedRepeatKey(repeat.key)
+                                    setSelectedLengthKey(length.key)
+                                  }}
+                                  className={cn(
+                                    "cursor-pointer border-b border-border/30 bg-card/25 hover:bg-card/40",
+                                    isLengthSelected ? "bg-[color-mix(in_oklch,var(--electric-cyan)_14%,transparent)]" : "",
+                                  )}
+                                >
+                                  <td className="px-2 py-2 pl-6 text-muted-foreground">{length.label}</td>
+                                  <td className="px-2 py-2">{getStrokeLabel(length.stroke)}</td>
+                                  <td className="px-2 py-2 text-right">1</td>
+                                  <td className="px-2 py-2 text-right">{formatDistance(length.distance)}</td>
+                                  <td className="px-2 py-2 text-right">{formatSplitDuration(length.duration)}</td>
+                                  <td className="px-2 py-2 text-right">{formatSplitDuration(length.cumulativeSeconds)}</td>
+                                  <td className="px-2 py-2 text-right">{formatPace(length.pace, length.distance, length.duration)}</td>
+                                  <td className="px-2 py-2 text-right">{formatPace(length.bestPace, length.distance, length.duration)}</td>
+                                  <td className="px-2 py-2 text-right">{formatNumber(length.swolf)}</td>
+                                  <td className="px-2 py-2 text-right">{formatNumber(length.avgHr)}</td>
+                                  <td className="px-2 py-2 text-right">{formatNumber(length.maxHr)}</td>
+                                  <td className="px-2 py-2 text-right">{formatNumber(length.totalStrokes)}</td>
+                                  <td className="px-2 py-2 text-right">{formatNumber(length.avgStrokes, 1)}</td>
+                                  <td className="px-2 py-2 text-right">{formatNumber(length.calories)}</td>
+                                </tr>
+                              )
+                            }),
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div className="xl:hidden space-y-2">
+                    {repeatRows.map((repeat) => {
+                      const isExpanded = Boolean(expandedRepeatKeys[repeat.key])
+                      const rowDetailSource =
+                        selectedRepeatKey === repeat.key
+                          ? (selectedLength?.key && repeat.lengths.some((length) => length.key === selectedLength.key)
+                            ? selectedLength
+                            : repeat)
+                          : repeat
+                      return (
+                        <div key={repeat.key} className="rounded-xl border border-border/70 bg-card/35 p-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedRepeatKey(repeat.key)
+                              setSelectedLengthKey(null)
+                              toggleRepeat(repeat.key)
+                            }}
+                            className="flex w-full items-start justify-between gap-2 text-left"
+                          >
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">
+                                Ripetuta {repeat.repeatNumber}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {getStrokeLabel(repeat.stroke)} · {repeat.lengthsCount} vasche · {formatDistance(repeat.distance)}
+                              </p>
+                            </div>
+                            <div className="inline-flex items-center gap-2">
+                              <Badge variant="outline" className="text-[10px]">{formatSplitDuration(repeat.duration)}</Badge>
+                              {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                            </div>
+                          </button>
+
+                          {isExpanded ? (
+                            <div className="mt-3 space-y-2">
+                              {repeat.lengths.map((length) => (
+                                <button
+                                  key={length.key}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedRepeatKey(repeat.key)
+                                    setSelectedLengthKey(length.key)
+                                  }}
+                                  className={cn(
+                                    "w-full rounded-lg border border-border/60 bg-card/30 p-2 text-left",
+                                    selectedLength?.key === length.key
+                                      ? "border-[var(--electric-cyan)]/60"
+                                      : "",
+                                  )}
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-xs font-medium text-foreground">{length.label}</span>
+                                    <Badge variant="outline" className="text-[10px]">{getStrokeLabel(length.stroke)}</Badge>
+                                  </div>
+                                  <div className="mt-1 grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
+                                    <span>Distanza: {formatDistance(length.distance)}</span>
+                                    <span>Tempo: {formatSplitDuration(length.duration)}</span>
+                                    <span>Passo: {formatPace(length.pace, length.distance, length.duration)}</span>
+                                    <span>FC media: {formatNumber(length.avgHr)}</span>
+                                  </div>
+                                </button>
+                              ))}
+
+                              <div className="rounded-lg border border-border/60 bg-card/30 p-2">
+                                <p className="text-xs font-semibold text-foreground mb-2">
+                                  Metriche selezionato
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <MetricOrb
+                                    label="Distanza"
+                                    value={formatDistance(rowDetailSource?.distance)}
+                                    progress={Math.max(0, Math.min(100, Math.round(((rowDetailSource?.distance ?? 0) / 100) * 100)))}
+                                    helper={selectedLength ? "vasca" : "ripetuta"}
+                                    tone="cyan"
+                                    size="sm"
+                                    icon={<Droplets className="size-3.5" />}
+                                  />
+                                  <MetricOrb
+                                    label="Tempo"
+                                    value={formatSplitDuration(rowDetailSource?.duration)}
+                                    progress={Math.max(0, Math.min(100, Math.round(((rowDetailSource?.duration ?? 0) / 90) * 100)))}
+                                    helper="tempo"
+                                    tone="sky"
+                                    size="sm"
+                                    icon={<Clock3 className="size-3.5" />}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+            </section>
+
+            <section className="surface-panel p-4 hidden xl:block">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-display font-semibold text-foreground">Metriche selezionato</h2>
+                <span className="text-xs text-muted-foreground">
+                  {selectedLength ? `Vasca ${selectedLength.label}` : selectedRepeat ? `Ripetuta ${selectedRepeat.repeatNumber}` : "—"}
+                </span>
+              </div>
+
+              {selectedRepeatMetricSource ? (
+                <div className="space-y-3">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <MetricOrb
+                      label="Distanza"
+                      value={formatDistance(selectedRepeatMetricSource.distance)}
+                      progress={Math.max(0, Math.min(100, Math.round(((selectedRepeatMetricSource.distance ?? 0) / 100) * 100)))}
+                      helper={selectedLength ? "vasca" : "ripetuta"}
+                      tone="cyan"
+                      size="sm"
+                      icon={<Droplets className="size-3.5" />}
+                    />
+                    <MetricOrb
+                      label="Tempo"
+                      value={formatSplitDuration(selectedRepeatMetricSource.duration)}
+                      progress={Math.max(0, Math.min(100, Math.round(((selectedRepeatMetricSource.duration ?? 0) / 90) * 100)))}
+                      helper="tempo"
+                      tone="sky"
+                      size="sm"
+                      icon={<Clock3 className="size-3.5" />}
+                    />
+                    <MetricOrb
+                      label="Passo medio"
+                      value={formatPace(selectedRepeatMetricSource.pace, selectedRepeatMetricSource.distance, selectedRepeatMetricSource.duration)}
+                      progress={
+                        selectedRepeatMetricSource.pace
+                          ? Math.max(0, Math.min(100, Math.round((180 - selectedRepeatMetricSource.pace) / 1.5)))
+                          : 0
+                      }
+                      helper="min/100m"
+                      tone="lime"
+                      size="sm"
+                      icon={<Gauge className="size-3.5" />}
+                    />
+                    <MetricOrb
+                      label="SWOLF"
+                      value={selectedRepeatMetricSource.swolf ?? "—"}
+                      progress={
+                        selectedRepeatMetricSource.swolf
+                          ? Math.max(0, Math.min(100, Math.round((60 - selectedRepeatMetricSource.swolf) * 2.2)))
+                          : 0
+                      }
+                      helper="efficienza"
+                      tone="amber"
+                      size="sm"
+                      icon={<Waves className="size-3.5" />}
+                    />
+                  </div>
+                  <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                    <span>Stile: {getStrokeLabel(selectedRepeatMetricSource.stroke)}</span>
+                    <span>Tempo cumulato: {formatSplitDuration(selectedRepeatMetricSource.cumulativeSeconds)}</span>
+                    <span>Passo migliore: {formatPace(selectedRepeatMetricSource.bestPace, selectedRepeatMetricSource.distance, selectedRepeatMetricSource.duration)}</span>
+                    <span>FC media: {selectedRepeatMetricSource.avgHr ? `${formatNumber(selectedRepeatMetricSource.avgHr)} bpm` : "—"}</span>
+                    <span>FC max: {selectedRepeatMetricSource.maxHr ? `${formatNumber(selectedRepeatMetricSource.maxHr)} bpm` : "—"}</span>
+                    <span>Totale bracciate: {formatNumber(selectedRepeatMetricSource.totalStrokes)}</span>
+                    <span>Bracciate medie: {formatNumber(selectedRepeatMetricSource.avgStrokes, 1)}</span>
+                    <span>Calorie: {formatNumber(selectedRepeatMetricSource.calories)}</span>
+                    {selectedRepeat ? <span>Vasche nella ripetuta: {selectedRepeat.lengthsCount}</span> : null}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-border/70 bg-card/40 p-4 text-sm text-muted-foreground">
+                  Seleziona una ripetuta o una vasca per vedere le metriche.
+                </div>
+              )}
+            </section>
+          </div>
+        )}
       </div>
     </AppLayout>
   )

@@ -49,6 +49,7 @@ export const activitiesRouter = router({
         .query(async ({ ctx, input }) => {
             let activity = await db.getActivityById(input.id);
             let garminLaps: Array<{
+                id: number;
                 lapIndex: number | null;
                 distanceMeters: number | null;
                 durationSeconds: number | null;
@@ -65,6 +66,20 @@ export const activitiesRouter = router({
                 avgHeartRate: number | null;
                 maxHeartRate: number | null;
                 numberOfActiveLengths: number | null;
+                strokeType: string | null;
+                startTimeGmt: Date | null;
+            }> = [];
+            let garminLengths: Array<{
+                lapId: number;
+                lengthIndex: number | null;
+                distanceMeters: number | null;
+                durationSeconds: number | null;
+                averageSpeedMps: number | null;
+                maxSpeedMps: number | null;
+                averageSwolf: number | null;
+                totalNumberOfStrokes: number | null;
+                avgHeartRate: number | null;
+                maxHeartRate: number | null;
                 strokeType: string | null;
                 startTimeGmt: Date | null;
             }> = [];
@@ -199,9 +214,10 @@ export const activitiesRouter = router({
             if (activity.activitySource === "garmin") {
                 const dbInstance = await getDb();
                 if (dbInstance) {
-                    const { garminActivityLaps } = await import("../../drizzle/schema");
+                    const { garminActivityLaps, garminActivityLengths } = await import("../../drizzle/schema");
                     garminLaps = await dbInstance
                         .select({
+                            id: garminActivityLaps.id,
                             lapIndex: garminActivityLaps.lapIndex,
                             distanceMeters: garminActivityLaps.distanceMeters,
                             durationSeconds: garminActivityLaps.durationSeconds,
@@ -224,12 +240,32 @@ export const activitiesRouter = router({
                         .from(garminActivityLaps)
                         .where(eq(garminActivityLaps.activityId, activity.id))
                         .orderBy(garminActivityLaps.lapIndex);
+
+                    garminLengths = await dbInstance
+                        .select({
+                            lapId: garminActivityLengths.lapId,
+                            lengthIndex: garminActivityLengths.lengthIndex,
+                            distanceMeters: garminActivityLengths.distanceMeters,
+                            durationSeconds: garminActivityLengths.durationSeconds,
+                            averageSpeedMps: garminActivityLengths.averageSpeedMps,
+                            maxSpeedMps: garminActivityLengths.maxSpeedMps,
+                            averageSwolf: garminActivityLengths.averageSwolf,
+                            totalNumberOfStrokes: garminActivityLengths.totalNumberOfStrokes,
+                            avgHeartRate: garminActivityLengths.avgHeartRate,
+                            maxHeartRate: garminActivityLengths.maxHeartRate,
+                            strokeType: garminActivityLengths.strokeType,
+                            startTimeGmt: garminActivityLengths.startTimeGmt,
+                        })
+                        .from(garminActivityLengths)
+                        .where(eq(garminActivityLengths.activityId, activity.id))
+                        .orderBy(garminActivityLengths.lapId, garminActivityLengths.lengthIndex);
                 }
             }
 
             return {
                 ...activity,
                 garminLaps,
+                garminLengths,
             };
         }),
 
