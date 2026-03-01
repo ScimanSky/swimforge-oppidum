@@ -89,7 +89,7 @@ jobs:
                 -o StrictHostKeyChecking=yes \
                 -p "$PORT" \
                 "$USER@$HOST" \
-                'if [ -f /home/ubuntu/projects/swimforge-oppidum/deploy/swimforge-deploy.sh ]; then bash /home/ubuntu/projects/swimforge-oppidum/deploy/swimforge-deploy.sh; else /usr/local/bin/swimforge-deploy.sh; fi' 2>&1
+                'REPO=/home/ubuntu/projects/swimforge-oppidum; TS=$(date +%Y%m%d-%H%M%S); if git -C "$REPO" status --porcelain --untracked-files=all -- Dockerfile | grep -q "^?? Dockerfile$"; then mv "$REPO/Dockerfile" "$REPO/Dockerfile.pretracked-$TS"; echo "Moved untracked Dockerfile to Dockerfile.pretracked-$TS"; fi; if git -C "$REPO" status --porcelain --untracked-files=all -- deploy/swimforge-deploy.sh | grep -q "^?? deploy/swimforge-deploy.sh$"; then mkdir -p "$REPO/deploy"; mv "$REPO/deploy/swimforge-deploy.sh" "$REPO/deploy/swimforge-deploy.pretracked-$TS.sh"; echo "Moved untracked deploy/swimforge-deploy.sh to deploy/swimforge-deploy.pretracked-$TS.sh"; fi; if [ -f "$REPO/deploy/swimforge-deploy.sh" ]; then bash "$REPO/deploy/swimforge-deploy.sh"; else /usr/local/bin/swimforge-deploy.sh; fi' 2>&1
             )"
             SSH_EXIT=$?
             set -e
