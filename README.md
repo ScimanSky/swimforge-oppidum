@@ -38,12 +38,14 @@ pnpm test
 
 Database migrations:
 ```bash
+pnpm db:validate
 pnpm db:generate
 pnpm db:migrate
 ```
 
 Migration policy:
 - Canonical migration chain: `drizzle/0000_*.sql` ... `drizzle/00xx_*.sql`
+- Drizzle metadata must stay aligned (`drizzle/meta/_journal.json` + latest `*_snapshot.json`) and is validated via `pnpm db:validate`.
 - Legacy/manual SQL scripts are archived in `db/legacy-sql/` and are **not** part of the default migrate flow.
 
 Optional demo seed:

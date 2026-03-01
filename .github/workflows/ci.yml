@@ -16,6 +16,8 @@ jobs:
       - uses: pnpm/action-setup@v4
       - name: Install deps
         run: pnpm install --frozen-lockfile
+      - name: Validate Drizzle chain
+        run: pnpm db:validate
       - name: Typecheck
         run: pnpm check
       - name: Build

@@ -14,7 +14,8 @@
     "test": "vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "db:validate": "node scripts/validate-drizzle-chain.mjs"
   },
   "dependencies": {
     "@google/genai": "^1.42.0",

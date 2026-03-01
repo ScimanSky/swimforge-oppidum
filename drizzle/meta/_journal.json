@@ -1,26 +1,12 @@
 {
   "version": "7",
-  "dialect": "mysql",
+  "dialect": "postgresql",
   "entries": [
     {
-      "idx": 0,
-      "version": "5",
-      "when": 1769165358223,
-      "tag": "0000_early_thena",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "5",
-      "when": 1769165513956,
-      "tag": "0001_unusual_quasimodo",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "5",
-      "when": 1769166233381,
-      "tag": "0002_gray_human_robot",
+      "idx": 32,
+      "version": "7",
+      "when": 1772384511895,
+      "tag": "0032_add_club_ai_automation",
       "breakpoints": true
     }
   ]

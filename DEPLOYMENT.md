@@ -87,6 +87,7 @@ Migrations are not auto-applied at runtime.
 
 Before/after deploy (depending on your release flow), run:
 ```bash
+pnpm db:validate
 pnpm db:generate
 pnpm db:migrate
 ```
@@ -95,6 +96,7 @@ For production, run migrations against production `DATABASE_URL` from a trusted 
 
 Important:
 - Use only the canonical Drizzle migration chain under `drizzle/`.
+- Keep Drizzle metadata aligned (`drizzle/meta/_journal.json` + latest `*_snapshot.json`) via `pnpm db:validate`.
 - Do not execute scripts from `db/legacy-sql/` unless you are performing a controlled recovery/backfill task.
 
 ## 6. Post-Deploy Smoke Checks
