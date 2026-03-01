@@ -159,7 +159,12 @@ Configura due monitor separati:
 0 2 * * * curl -fsS -X POST "https://<your-domain>/api/cron/evaluate-skill-level" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
 15 2 * * * curl -fsS -X POST "https://<your-domain>/api/cron/cleanup-expired-stories" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
 30 2 * * * curl -fsS -X POST "https://<your-domain>/api/cron/cleanup-social-retention" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
+*/15 6-8 * * 1,3,5 curl -fsS -X POST "https://<your-domain>/api/cron/club-ai/tick" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
 ```
+
+Note `club-ai/tick`:
+- richiede `CLUB_AI_AUTOMATION_ENABLED=true`
+- ritorna `503` se automazione disabilitata o se non ci sono configurazioni club abilitate (per evitare falsi OK operativi)
 
 ## Troubleshooting
 - Certificati TLS non emessi:

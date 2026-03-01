@@ -334,6 +334,47 @@ async function startServer() {
       const result = await runClubAiTick({
         clubIds,
       });
+
+      if (!result.enabled) {
+        const error = new Error("Club AI automation is disabled (CLUB_AI_AUTOMATION_ENABLED=false)");
+        log.warn("[Cron] Club AI tick skipped: automation disabled", {
+          event: "cron:club_ai_tick_disabled",
+          clubIds: clubIds ?? null,
+        });
+        captureError(error, {
+          scope: "cron",
+          cronJob: "club-ai/tick",
+          route: "/api/cron/club-ai/tick",
+          reason: "automation_disabled",
+          clubIds: clubIds ?? null,
+        });
+        return res.status(503).json({
+          success: false,
+          error: "Club AI automation disabled",
+          ...result,
+        });
+      }
+
+      if (result.processedClubs === 0) {
+        const error = new Error("Club AI automation has no enabled club configs");
+        log.warn("[Cron] Club AI tick skipped: no enabled club configs", {
+          event: "cron:club_ai_tick_no_configs",
+          clubIds: clubIds ?? null,
+        });
+        captureError(error, {
+          scope: "cron",
+          cronJob: "club-ai/tick",
+          route: "/api/cron/club-ai/tick",
+          reason: "no_enabled_configs",
+          clubIds: clubIds ?? null,
+        });
+        return res.status(503).json({
+          success: false,
+          error: "No enabled club AI configs",
+          ...result,
+        });
+      }
+
       return res.json({ success: true, ...result });
     } catch (error: unknown) {
       const err = toError(error);

@@ -120,6 +120,11 @@ Available cron endpoints:
 - `POST /api/cron/evaluate-skill-level`
 - `POST /api/cron/cleanup-expired-stories`
 - `POST /api/cron/cleanup-social-retention`
+- `POST /api/cron/club-ai/tick`
+
+`/api/cron/club-ai/tick` operational behavior:
+- Requires `CLUB_AI_AUTOMATION_ENABLED=true`
+- Returns `503` when automation is disabled or no club config is enabled (to surface misconfiguration in monitors)
 
 ## 8. Troubleshooting
 - `401 Unauthorized` on cron: wrong/missing bearer token.
