@@ -35,6 +35,7 @@ type LapItem = {
   avgStrokes: number | null
   calories: number | null
   dominantStroke: string | null
+  displayStroke: string | null
   raw: RecordAny
 }
 
@@ -59,6 +60,7 @@ const STROKE_LABELS: Record<string, string> = {
   breaststroke: "Breaststroke",
   butterfly: "Butterfly",
   mixed: "Mixed",
+  recovery: "Recovery",
   drill: "Drill",
   kick: "Kick",
 }
@@ -190,6 +192,9 @@ const getStrokeLabel = (value: string | null | undefined) => {
 const normalizeStrokeKey = (value: unknown) => {
   if (!value) return null
   const normalized = String(value).toLowerCase()
+  if (normalized.includes("recovery") || normalized.includes("rest") || normalized.includes("recuper")) {
+    return "recovery"
+  }
   if (normalized.includes("free")) return "freestyle"
   if (normalized.includes("back")) return "backstroke"
   if (normalized.includes("breast")) return "breaststroke"
@@ -268,10 +273,12 @@ export default function ActivityDetail() {
         strokeVotes.size > 0
           ? Array.from(strokeVotes.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
           : normalizeStrokeKey(pickFirst(lap, ["swimStrokeType", "strokeType", "stroke"])) ?? activityStroke
+      const isRecovery = distance === 0
+      const displayStroke = isRecovery ? "recovery" : dominantStroke
 
       return {
         index,
-        label: distance === 0 ? "Recovery" : `Lap ${index + 1}`,
+        label: isRecovery ? "Recovery" : `Lap ${index + 1}`,
         distance,
         duration,
         cumulativeSeconds: cumulative,
@@ -284,6 +291,7 @@ export default function ActivityDetail() {
         avgStrokes: toNumber(pickFirst(lap, ["averageStrokes", "avgStrokes"])),
         calories: toNumber(pickFirst(lap, ["calories", "caloriesBurned"])),
         dominantStroke,
+        displayStroke,
         raw: lap,
       }
     })
@@ -295,9 +303,10 @@ export default function ActivityDetail() {
       const distance = getDistanceMeters(split)
       const duration = getDurationSeconds(split)
       const pace = getPacePer100m(split)
-      const stroke = normalizeStrokeKey(
+      const parsedStroke = normalizeStrokeKey(
         pickFirst(split, ["strokeType", "swimStrokeType", "avgStrokeType", "stroke", "type"]),
       ) ?? activityStroke
+      const stroke = (distance ?? 0) === 0 ? "recovery" : parsedStroke
       const strokeLabel = stroke ? STROKE_LABELS[stroke] ?? stroke : null
 
       return {
@@ -324,12 +333,12 @@ export default function ActivityDetail() {
     () =>
       laps.map((lap, index) => ({
         index,
-        label: `${lap.label} · ${getStrokeLabel(lap.dominantStroke)}`,
+        label: lap.displayStroke === "recovery" ? "Recovery" : `${lap.label} · ${getStrokeLabel(lap.displayStroke)}`,
         distance: lap.distance,
         duration: lap.duration,
         pace: lap.pace,
         laps: 1,
-        stroke: lap.dominantStroke,
+        stroke: lap.displayStroke,
         avgHr: lap.avgHr,
         swolf: lap.swolf,
         cadence: null,
@@ -438,8 +447,8 @@ export default function ActivityDetail() {
               <div className="space-y-2">
                 <div className="max-h-[40dvh] space-y-2 overflow-y-auto pr-1">
                   {laps.map((lap, index) => {
-                    const strokeLabel = lap.dominantStroke
-                      ? STROKE_LABELS[lap.dominantStroke] ?? lap.dominantStroke
+                    const strokeLabel = lap.displayStroke
+                      ? STROKE_LABELS[lap.displayStroke] ?? lap.displayStroke
                       : "—"
                     return (
                       <button
@@ -518,7 +527,7 @@ export default function ActivityDetail() {
                       />
                     </div>
                     <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 xl:grid-cols-3">
-                      <span>Stile: {getStrokeLabel(selectedLap.dominantStroke ?? activityStroke)}</span>
+                      <span>Stile: {getStrokeLabel(selectedLap.displayStroke ?? activityStroke)}</span>
                       <span>Cumulato: {formatSplitDuration(selectedLap.cumulativeSeconds)}</span>
                       <span>Pace migliore: {selectedLap.bestPace ? formatPace(selectedLap.bestPace, selectedLap.distance, selectedLap.duration) : "—"}</span>
                       <span>FC media: {selectedLap.avgHr ? `${selectedLap.avgHr} bpm` : "—"}</span>
