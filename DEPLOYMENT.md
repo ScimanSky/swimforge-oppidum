@@ -75,6 +75,8 @@ Security and cron:
 
 Optional but recommended:
 - `REDIS_URL`
+- `REDIS_REQUIRED_FOR_READY` (`true` = Redis critico per `/ready`, `false` = `/ready` dipende solo dal DB)
+- `REDIS_RATE_LIMIT_MODE` (`memory` fail-open distribuito, `block` fail-closed)
 - `ROLLBAR_ACCESS_TOKEN`
 - `DEPLOY_TARGET` (`render` on Render, `oracle` on Oracle)
 - `APP_RELEASE` (commit SHA or release tag)
@@ -125,3 +127,4 @@ Available cron endpoints:
 - Media upload/signature errors: verify ImageKit/Cloudinary env values exactly.
 - AI fallback responses: verify `GEMINI_API_KEY`.
 - DB connection errors: verify `DATABASE_URL` and network access from Render.
+- Redis degraded mode: check logs `redis:policy`, `redis:degraded_mode`, `rate-limit:fail_open_memory_fallback`, `rate-limit:fail_closed_block`.

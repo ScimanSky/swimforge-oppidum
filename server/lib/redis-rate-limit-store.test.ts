@@ -13,6 +13,7 @@ const { mockRedis, mockLogger } = vi.hoisted(() => ({
   },
   mockLogger: {
     debug: vi.fn(),
+    warn: vi.fn(),
     error: vi.fn(),
     info: vi.fn(),
   },
@@ -36,6 +37,7 @@ describe("RedisRateLimitStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRedis.isOpen = true;
+    delete process.env.REDIS_RATE_LIMIT_MODE;
     store = new RedisRateLimitStore({
       prefix: "test:",
       windowMs: 60000, // 1 minute
@@ -112,6 +114,16 @@ describe("RedisRateLimitStore", () => {
       const result = await store.increment("test-key");
 
       expect(result.totalHits).toBe(1);
+      expect(result.resetTime).toBeInstanceOf(Date);
+    });
+
+    it("should fail closed when REDIS_RATE_LIMIT_MODE=block and Redis is unavailable", async () => {
+      process.env.REDIS_RATE_LIMIT_MODE = "block";
+      mockRedis.isOpen = false;
+
+      const result = await store.increment("test-key");
+
+      expect(result.totalHits).toBe(Number.MAX_SAFE_INTEGER);
       expect(result.resetTime).toBeInstanceOf(Date);
     });
   });

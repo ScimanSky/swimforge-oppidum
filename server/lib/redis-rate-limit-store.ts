@@ -7,6 +7,7 @@
 
 import type { Store, IncrementResponse } from 'express-rate-limit';
 import { redis } from './cache';
+import { getRedisPolicy } from './redis-policy';
 import { logger } from '../middleware/logger';
 
 // Cleanup expired local store entries at most once per minute to avoid performance overhead
@@ -19,6 +20,8 @@ export class RedisRateLimitStore implements Store {
   localKeys: boolean;
   private localStore: Map<string, { count: number; resetTime: number }> = new Map();
   private lastCleanup: number = Date.now();
+  private lastFailOpenLogAt = 0;
+  private lastFailClosedLogAt = 0;
 
   constructor(options: { prefix?: string; windowMs: number; resetExpiryOnChange?: boolean }) {
     this.prefix = options.prefix || 'rl:';
@@ -62,17 +65,44 @@ export class RedisRateLimitStore implements Store {
     this.lastCleanup = now;
   }
 
+  private shouldLog(now: number, lastAt: number): boolean {
+    return now - lastAt >= LOCAL_STORE_CLEANUP_INTERVAL_MS;
+  }
+
+  private failOpenMemoryFallback(key: string): IncrementResponse {
+    const now = Date.now();
+    if (this.shouldLog(now, this.lastFailOpenLogAt)) {
+      logger.warn('Redis unavailable, using in-memory rate limit fallback (fail-open distributed)', {
+        event: 'rate-limit:fail_open_memory_fallback',
+        keyPrefix: this.prefix,
+      });
+      this.lastFailOpenLogAt = now;
+    }
+    this.cleanExpiredLocal();
+    return this.incrementLocal(key);
+  }
+
+  private failClosedBlock(): IncrementResponse {
+    const now = Date.now();
+    if (this.shouldLog(now, this.lastFailClosedLogAt)) {
+      logger.error('Redis unavailable with REDIS_RATE_LIMIT_MODE=block, denying requests (fail-closed)', {
+        event: 'rate-limit:fail_closed_block',
+        keyPrefix: this.prefix,
+      });
+      this.lastFailClosedLogAt = now;
+    }
+    return { totalHits: Number.MAX_SAFE_INTEGER, resetTime: new Date(now + this.windowMs) };
+  }
+
   async increment(key: string): Promise<IncrementResponse> {
     const redisKey = this.getKey(key);
+    const policy = getRedisPolicy();
     
     try {
       if (!redis.isOpen) {
-        // Fallback to in-memory store - better than no rate limiting
-        logger.debug('Redis not connected, using in-memory rate limit fallback', {
-          event: 'rate-limit:redis_unavailable',
-        });
-        this.cleanExpiredLocal();
-        return this.incrementLocal(key);
+        return policy.rateLimitMode === 'block'
+          ? this.failClosedBlock()
+          : this.failOpenMemoryFallback(key);
       }
 
       // Use individual commands instead of multi() — pTTL is not available in multi
@@ -92,9 +122,9 @@ export class RedisRateLimitStore implements Store {
       logger.error(`Rate limit increment failed: ${message}`, {
         event: 'rate-limit:increment_failed',
       });
-      // Fallback to in-memory store on Redis errors
-      this.cleanExpiredLocal();
-      return this.incrementLocal(key);
+      return policy.rateLimitMode === 'block'
+        ? this.failClosedBlock()
+        : this.failOpenMemoryFallback(key);
     }
   }
 
@@ -160,10 +190,13 @@ export class RedisRateLimitStore implements Store {
 
   // Optional: Initialize store (called once when store is created)
   init?(): void {
+    const policy = getRedisPolicy();
     const status = redis.isOpen ? 'connected' : 'disconnected';
     logger.info(`Redis rate limit store initialized (Redis: ${status})`, {
       event: 'rate-limit:store_init',
       redisConnected: redis.isOpen,
+      rateLimitMode: policy.rateLimitMode,
+      rateLimitFailOpen: policy.rateLimitFailOpen,
     });
   }
 }

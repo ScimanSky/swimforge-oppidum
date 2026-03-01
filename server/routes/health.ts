@@ -2,6 +2,7 @@ import { Router } from "express";
 import { sql } from "drizzle-orm";
 import { getDb } from "../db";
 import { redis } from "../lib/cache";
+import { getRedisPolicy } from "../lib/redis-policy";
 import { logger } from "../middleware/logger";
 
 export const healthRouter = Router();
@@ -13,10 +14,6 @@ type HealthChecks = {
   storage: boolean;
   timestamp: string;
 };
-
-function isProbablyConfiguredRedisUrl(value: string | undefined): value is string {
-  return Boolean(value && /^rediss?:\/\//i.test(value));
-}
 
 async function fetchOkWithTimeout(url: string, timeoutMs: number): Promise<boolean> {
   const controller = new AbortController();
@@ -169,6 +166,8 @@ healthRouter.get("/health/deep", async (_req, res) => {
 
 // Kubernetes readiness probe: keep it cheap, but reflect critical dependencies.
 healthRouter.get("/ready", async (_req, res) => {
+  const redisPolicy = getRedisPolicy();
+
   let dbOk = false;
   try {
     const db = await getDb();
@@ -180,9 +179,8 @@ healthRouter.get("/ready", async (_req, res) => {
     dbOk = false;
   }
 
-  const redisConfigured = isProbablyConfiguredRedisUrl(process.env.REDIS_URL);
   let redisOk = true;
-  if (redisConfigured) {
+  if (redisPolicy.redisConfigured) {
     try {
       if (redis.isOpen) {
         await redis.ping();
@@ -195,6 +193,12 @@ healthRouter.get("/ready", async (_req, res) => {
     }
   }
 
-  const ready = dbOk && redisOk;
-  res.status(ready ? 200 : 503).json({ ready, database: dbOk, redis: redisOk });
+  const ready = dbOk && (!redisPolicy.redisRequiredForReady || redisOk);
+  res.status(ready ? 200 : 503).json({
+    ready,
+    database: dbOk,
+    redis: redisOk,
+    redisConfigured: redisPolicy.redisConfigured,
+    redisRequiredForReady: redisPolicy.redisRequiredForReady,
+  });
 });

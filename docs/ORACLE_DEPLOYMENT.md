@@ -50,6 +50,7 @@ Aggiorna `.env.oracle` con almeno:
 - Integrations: `GARMIN_SERVICE_SECRET`, `STRAVA_SERVICE_URL`, `STRAVA_SERVICE_SECRET`, `OPENAI_API_KEY` (se usato)
 - Garmin hardening (opzionale, raccomandato): `GARMIN_CORS_ALLOW_ORIGINS`, `GARMIN_CORS_ALLOW_CREDENTIALS=false`
 - Observability (opzionale): `ROLLBAR_ACCESS_TOKEN`, `DEPLOY_TARGET=oracle`, `APP_RELEASE`, `ROLLBAR_SERVER_HOST`
+- Redis policy (raccomandato esplicito): `REDIS_REQUIRED_FOR_READY=true`, `REDIS_RATE_LIMIT_MODE=memory`
 - Oracle ingress: `DOMAIN`, `ACME_EMAIL`
 
 TLS DB raccomandato:
@@ -59,6 +60,11 @@ TLS DB raccomandato:
 Note Garmin service:
 - in Oracle compose il container `garmin` non pubblica porte host (solo `expose: 8000` su rete Docker interna).
 - mantenere `GARMIN_CORS_ALLOW_ORIGINS` vuoto se il microservizio non viene chiamato dal browser.
+
+Policy Redis (produzione):
+- `REDIS_REQUIRED_FOR_READY=true`: se Redis è configurato ma down, `/ready` ritorna `503`.
+- `REDIS_RATE_LIMIT_MODE=memory`: fallback in-memory per rate limiting (fail-open distribuito, consigliato per continuità).
+- alternativa hardening: `REDIS_RATE_LIMIT_MODE=block` (fail-closed, blocca traffico quando Redis non è disponibile).
 
 ## 4) Verifica integrità asset deploy (obbligatorio)
 Esegui prima del primo deploy:
@@ -161,10 +167,12 @@ Configura due monitor separati:
   - verifica aperture `80/443` su Oracle networking
 - `503` su `/ready`:
   - verifica `DATABASE_URL`
-  - se `REDIS_URL` è configurata, verifica raggiungibilità Redis
+  - se `REDIS_URL` è configurata e `REDIS_REQUIRED_FOR_READY=true`, verifica raggiungibilità Redis
 - `503` su `/health/deep` ma `/ready` è `200`:
   - impatto non bloccante sulla disponibilità core
   - verificare integrazioni `GARMIN_SERVICE_URL` e/o storage Supabase
+- Redis degradato:
+  - controlla eventi log: `redis:policy`, `redis:degraded_mode`, `rate-limit:fail_open_memory_fallback`, `rate-limit:fail_closed_block`
 - Garmin disconnesso dopo restart:
   - verifica volume `garmin_tokens`
 - deploy fallisce su lock:

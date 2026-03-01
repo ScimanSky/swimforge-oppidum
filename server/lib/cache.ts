@@ -8,6 +8,7 @@
 import { createClient } from 'redis';
 import { logger } from '../middleware/logger';
 import { randomUUID } from 'node:crypto';
+import { getRedisPolicy } from './redis-policy';
 
 export const redis = createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
@@ -35,6 +36,15 @@ redis.on('connect', () => {
 
 // Connect to Redis (non-blocking)
 export async function connectRedis() {
+  const policy = getRedisPolicy();
+  logger.info('Redis runtime policy initialized', {
+    event: 'redis:policy',
+    redisConfigured: policy.redisConfigured,
+    redisRequiredForReady: policy.redisRequiredForReady,
+    rateLimitMode: policy.rateLimitMode,
+    rateLimitFailOpen: policy.rateLimitFailOpen,
+  });
+
   try {
     // Set a timeout for connection attempt
     const connectionPromise = redis.connect();
@@ -46,8 +56,10 @@ export async function connectRedis() {
     logger.info('Redis connected successfully', { event: 'redis:ready' });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    logger.warn(`Redis connection warning: ${message}. Continuing without Redis cache`, {
-      event: 'redis:connection_warning',
+    logger.warn(`Redis connection warning: ${message}. Running in degraded mode`, {
+      event: 'redis:degraded_mode',
+      redisRequiredForReady: policy.redisRequiredForReady,
+      rateLimitMode: policy.rateLimitMode,
     });
     // Don't throw - allow app to continue without Redis
   }
