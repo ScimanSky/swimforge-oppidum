@@ -211,10 +211,16 @@ async function startServer() {
       const result = await completeChallenges();
       return res.json({ success: true, ...result });
     } catch (error: unknown) {
+      const err = toError(error);
       log.error("[Cron] Failed to complete challenges", {
         event: "cron:complete_challenges_failed",
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+        message: err.message,
+        stack: err.stack,
+      });
+      captureError(err, {
+        scope: "cron",
+        cronJob: "complete-challenges",
+        route: "/api/cron/complete-challenges",
       });
       return res.status(500).json({ success: false, error: "Cron execution failed" });
     }
@@ -228,10 +234,16 @@ async function startServer() {
       const result = await evaluateAllUsersWeekly();
       return res.json({ success: true, ...result });
     } catch (error: unknown) {
+      const err = toError(error);
       log.error("[Cron] Failed to evaluate skill level", {
         event: "cron:evaluate_skill_level_failed",
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+        message: err.message,
+        stack: err.stack,
+      });
+      captureError(err, {
+        scope: "cron",
+        cronJob: "evaluate-skill-level",
+        route: "/api/cron/evaluate-skill-level",
       });
       return res.status(500).json({ success: false, error: "Cron execution failed" });
     }
@@ -248,10 +260,17 @@ async function startServer() {
       const result = await cleanupExpiredStories(limit);
       return res.json({ success: true, ...result });
     } catch (error: unknown) {
+      const err = toError(error);
       log.error("[Cron] Failed to cleanup expired stories", {
         event: "cron:cleanup_expired_stories_failed",
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+        message: err.message,
+        stack: err.stack,
+      });
+      captureError(err, {
+        scope: "cron",
+        cronJob: "cleanup-expired-stories",
+        route: "/api/cron/cleanup-expired-stories",
+        limit,
       });
       return res.status(500).json({ success: false, error: "Cron execution failed" });
     }
@@ -283,10 +302,19 @@ async function startServer() {
       });
       return res.json({ success: true, ...result });
     } catch (error: unknown) {
+      const err = toError(error);
       log.error("[Cron] Failed to cleanup social retention", {
         event: "cron:cleanup_social_retention_failed",
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+        message: err.message,
+        stack: err.stack,
+      });
+      captureError(err, {
+        scope: "cron",
+        cronJob: "cleanup-social-retention",
+        route: "/api/cron/cleanup-social-retention",
+        notificationRetentionDays,
+        dmRetentionDays,
+        limit,
       });
       return res.status(500).json({ success: false, error: "Cron execution failed" });
     }
@@ -308,10 +336,16 @@ async function startServer() {
       });
       return res.json({ success: true, ...result });
     } catch (error: unknown) {
+      const err = toError(error);
       log.error("[Cron] Failed to run club AI tick", {
         event: "cron:club_ai_tick_failed",
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+        message: err.message,
+        stack: err.stack,
+      });
+      captureError(err, {
+        scope: "cron",
+        cronJob: "club-ai/tick",
+        route: "/api/cron/club-ai/tick",
       });
       return res.status(500).json({ success: false, error: "Cron execution failed" });
     }
@@ -373,9 +407,11 @@ async function startServer() {
 installGlobalProcessHandlers();
 
 startServer().catch((error: unknown) => {
+  const err = toError(error);
   log.error("Server failed to start", {
     event: "server:start_failed",
-    message: error instanceof Error ? error.message : String(error),
-    stack: error instanceof Error ? error.stack : undefined,
+    message: err.message,
+    stack: err.stack,
   });
+  captureError(err, { scope: "server.start" });
 });

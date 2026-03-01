@@ -240,7 +240,6 @@ export const helmetConfig = {
         "'self'",
         'https://api.garmin.com',
         'https://api.strava.com',
-        'https://sentry.io',
         'https://nominatim.openstreetmap.org',
         supabaseOrigin,
         'https://*.supabase.co',

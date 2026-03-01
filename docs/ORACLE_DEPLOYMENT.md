@@ -49,6 +49,7 @@ Aggiorna `.env.oracle` con almeno:
 - Security: `CRON_SECRET`, `TOKEN_ENCRYPTION_KEY`, `ALLOWED_ORIGINS`, `OAUTH_ALLOWED_REDIRECT_ORIGINS`
 - Integrations: `GARMIN_SERVICE_SECRET`, `STRAVA_SERVICE_URL`, `STRAVA_SERVICE_SECRET`, `OPENAI_API_KEY` (se usato)
 - Garmin hardening (opzionale, raccomandato): `GARMIN_CORS_ALLOW_ORIGINS`, `GARMIN_CORS_ALLOW_CREDENTIALS=false`
+- Observability (opzionale): `ROLLBAR_ACCESS_TOKEN`, `DEPLOY_TARGET=oracle`, `APP_RELEASE`, `ROLLBAR_SERVER_HOST`
 - Oracle ingress: `DOMAIN`, `ACME_EMAIL`
 
 TLS DB raccomandato:
@@ -104,6 +105,9 @@ Il workflow esegue da remoto:
 ```bash
 bash /home/ubuntu/projects/swimforge-oppidum/deploy/swimforge-deploy.sh
 ```
+
+Nota observability:
+- lo script valorizza automaticamente `APP_RELEASE` (git SHA corto) per arricchire i payload Rollbar.
 
 ## 7) Esecuzione manuale (fallback operativo)
 ```bash

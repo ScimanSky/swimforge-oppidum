@@ -11,6 +11,11 @@ HEALTH_BASE_URL="${DEPLOY_HEALTH_BASE_URL:-https://swimforge.it}"
 
 git -C "$REPO_DIR" pull --ff-only origin main
 
+APP_RELEASE="${APP_RELEASE:-$(git -C "$REPO_DIR" rev-parse --short=12 HEAD)}"
+APP_COMMIT_SHA="${APP_COMMIT_SHA:-$APP_RELEASE}"
+DEPLOY_TARGET="${DEPLOY_TARGET:-oracle}"
+export APP_RELEASE APP_COMMIT_SHA DEPLOY_TARGET
+
 docker compose \
   --env-file "$ENV_FILE" \
   -f "$COMPOSE_FILE" \

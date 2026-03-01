@@ -8,6 +8,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      DEPLOY_TARGET: ${DEPLOY_TARGET:-oracle}
+      APP_RELEASE: ${APP_RELEASE:-unknown}
+      APP_COMMIT_SHA: ${APP_COMMIT_SHA:-unknown}
       LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
       LOCAL_LLM_BASE_URL: ${LOCAL_LLM_BASE_URL:-http://ollama:11434/v1}
       LOCAL_LLM_MODEL: ${LOCAL_LLM_MODEL:-qwen2.5:7b}

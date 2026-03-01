@@ -76,6 +76,9 @@ Security and cron:
 Optional but recommended:
 - `REDIS_URL`
 - `ROLLBAR_ACCESS_TOKEN`
+- `DEPLOY_TARGET` (`render` on Render, `oracle` on Oracle)
+- `APP_RELEASE` (commit SHA or release tag)
+- `ROLLBAR_SERVER_HOST` (override detected host in Rollbar payload)
 - `RESEND_API_KEY`
 - `RESEND_FROM_EMAIL`
 - `ENABLE_SWAGGER=false` (or set true with `SWAGGER_USERNAME` and `SWAGGER_PASSWORD`)

@@ -3,7 +3,7 @@
  * 
  * Implementa:
  * - Winston Logger per file logging
- * - Sentry per error tracking (opzionale)
+ * - Rollbar per error tracking (opzionale)
  * - Audit logging per azioni critiche
  * - Performance monitoring
  */
@@ -196,20 +196,6 @@ export function errorHandler(
     stack: err instanceof Error ? err.stack : (typeof errRec?.["stack"] === "string" ? (errRec["stack"] as string) : undefined),
     ip: req.ip,
   });
-
-  // Rollbar error tracking (if configured)
-  if (process.env.ROLLBAR_ACCESS_TOKEN) {
-    try {
-      // Rollbar will be called by the middleware in index.ts
-    } catch (rollbarError) {
-      const message =
-        rollbarError instanceof Error ? rollbarError.message : String(rollbarError);
-      logger.warn("[Logger] Failed to send error to Rollbar", {
-        event: "rollbar:send_failed",
-        message,
-      });
-    }
-  }
 
   const clientErrorMessage = statusCode >= 500 ? "Internal Server Error" : errorMessage;
 
