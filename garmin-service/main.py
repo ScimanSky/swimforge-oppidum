@@ -43,6 +43,8 @@ if not API_SECRET_KEY:
     raise RuntimeError("GARMIN_SERVICE_SECRET is required")
 MAIN_API_URL = os.getenv("MAIN_API_URL", "http://localhost:3000")
 TOKEN_STORE_DIR = Path(os.getenv("TOKEN_STORE_DIR", "/tmp/garmin_tokens"))
+CORS_ALLOW_ORIGINS_RAW = os.getenv("GARMIN_CORS_ALLOW_ORIGINS", "")
+CORS_ALLOW_CREDENTIALS_RAW = os.getenv("GARMIN_CORS_ALLOW_CREDENTIALS", "false")
 
 # Ensure token store directory exists
 TOKEN_STORE_DIR.mkdir(parents=True, exist_ok=True)
@@ -54,6 +56,22 @@ sessions: Dict[str, Dict[str, Any]] = {}
 # Pending MFA sessions (waiting for MFA code)
 # Structure: {user_id: {"client": Garmin, "mfa_state": Any, "email": str, "created_at": datetime}}
 pending_mfa: Dict[str, Dict[str, Any]] = {}
+
+def parse_csv_origins(value: str) -> List[str]:
+    return [origin.strip() for origin in value.split(",") if origin.strip()]
+
+
+def parse_bool(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+cors_allow_origins = parse_csv_origins(CORS_ALLOW_ORIGINS_RAW)
+cors_allow_credentials = parse_bool(CORS_ALLOW_CREDENTIALS_RAW)
+
+if cors_allow_credentials and "*" in cors_allow_origins:
+    raise RuntimeError(
+        "Invalid CORS config: GARMIN_CORS_ALLOW_CREDENTIALS=true cannot be used with wildcard origin"
+    )
 
 
 # Pydantic models
@@ -150,14 +168,22 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS middleware (disabled by default; enable only with explicit allowlist)
+if cors_allow_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_allow_origins,
+        allow_credentials=cors_allow_credentials,
+        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-API-Key"],
+    )
+    logger.info(
+        "Garmin CORS enabled for %s origin(s), credentials=%s",
+        len(cors_allow_origins),
+        cors_allow_credentials,
+    )
+else:
+    logger.info("Garmin CORS disabled (GARMIN_CORS_ALLOW_ORIGINS not set)")
 
 
 # Authentication dependency

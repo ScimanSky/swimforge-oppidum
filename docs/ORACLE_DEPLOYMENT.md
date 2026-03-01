@@ -48,11 +48,16 @@ Aggiorna `.env.oracle` con almeno:
 - Core: `DATABASE_URL`, `DB_SSL_REJECT_UNAUTHORIZED`, `DB_SSL_ALLOW_INSECURE_FALLBACK`, `DB_SSL_CA_CERT_BASE64`, `JWT_SECRET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - Security: `CRON_SECRET`, `TOKEN_ENCRYPTION_KEY`, `ALLOWED_ORIGINS`, `OAUTH_ALLOWED_REDIRECT_ORIGINS`
 - Integrations: `GARMIN_SERVICE_SECRET`, `STRAVA_SERVICE_URL`, `STRAVA_SERVICE_SECRET`, `OPENAI_API_KEY` (se usato)
+- Garmin hardening (opzionale, raccomandato): `GARMIN_CORS_ALLOW_ORIGINS`, `GARMIN_CORS_ALLOW_CREDENTIALS=false`
 - Oracle ingress: `DOMAIN`, `ACME_EMAIL`
 
 TLS DB raccomandato:
 - target finale: `DB_SSL_REJECT_UNAUTHORIZED=true` con `DB_SSL_CA_CERT_BASE64` valorizzato
 - transitorio anti-downtime: `DB_SSL_ALLOW_INSECURE_FALLBACK=true` (fallback automatico solo su errori certificato)
+
+Note Garmin service:
+- in Oracle compose il container `garmin` non pubblica porte host (solo `expose: 8000` su rete Docker interna).
+- mantenere `GARMIN_CORS_ALLOW_ORIGINS` vuoto se il microservizio non viene chiamato dal browser.
 
 ## 4) Verifica integrità asset deploy (obbligatorio)
 Esegui prima del primo deploy:

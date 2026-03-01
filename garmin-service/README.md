@@ -36,6 +36,8 @@ uvicorn main:app --reload --port 8000
 | `GARMIN_SERVICE_SECRET` | Chiave segreta per autenticazione API | `swimforge-garmin-secret-key` |
 | `MAIN_API_URL` | URL del backend principale SwimForge | `http://localhost:3000` |
 | `PORT` | Porta del servizio | `8000` |
+| `GARMIN_CORS_ALLOW_ORIGINS` | Origini browser consentite (CSV). Se vuoto, CORS disabilitato | *(vuoto)* |
+| `GARMIN_CORS_ALLOW_CREDENTIALS` | Abilita credenziali CORS (`true/false`) | `false` |
 
 ## API Endpoints
 
@@ -87,6 +89,7 @@ Sincronizza le attività con SwimForge.
 - Le credenziali Garmin sono usate solo per l'autenticazione iniziale
 - I token di sessione sono memorizzati in memoria (usa Redis in produzione)
 - Le password non vengono mai salvate
+- CORS è disabilitato di default; abilitalo solo se necessario con allowlist esplicita
 
 ## Struttura Dati Attività
 
