@@ -12,6 +12,7 @@
     "lint": "eslint . --ext .ts,.tsx",
     "format": "prettier --write .",
     "test": "vitest run",
+    "secrets:scan": "node scripts/check-secrets.mjs",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

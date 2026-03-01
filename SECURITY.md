@@ -37,6 +37,7 @@ Older branches/tags are not guaranteed to receive patches.
 
 ## Secrets and Operations Rules
 - Never commit secrets or `.env` files
+- Run `pnpm secrets:scan` before push (CI blocks high-confidence secret patterns)
 - Rotate critical secrets periodically (`JWT_SECRET`, provider keys, cron secret)
 - Use least privilege for DB/API credentials
 - Protect cron endpoints with bearer auth (`CRON_SECRET`)
