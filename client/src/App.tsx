@@ -13,7 +13,6 @@ import { useBadgeNotifications } from "./hooks/useBadgeNotifications";
 import AutoSync from "./components/AutoSync";
 import ActivityInsightNotification from "./components/ActivityInsightNotification";
 import CookieBanner from "./components/CookieBanner";
-import OnboardingFlow from "./components/onboarding/OnboardingFlow";
 import { UI_FEATURE_FLAGS } from "./lib/feature-flags";
 
 const Home = lazy(() => import("./pages/Home"));
@@ -55,6 +54,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
+const OnboardingFlow = lazy(() => import("./components/onboarding/OnboardingFlow"));
 
 function Router() {
   const clubMeetsV1Enabled = UI_FEATURE_FLAGS.clubMeetsV1;
@@ -187,7 +187,9 @@ function App() {
           <Router />
           <ActivityInsightNotification />
           <CookieBanner />
-          <OnboardingFlow />
+          <Suspense fallback={null}>
+            <OnboardingFlow />
+          </Suspense>
           {isShowing && pendingBadges.length > 0 && (
             <BadgeUnlockNotification
               badges={pendingBadges}

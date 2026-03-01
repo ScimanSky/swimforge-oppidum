@@ -175,6 +175,17 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+          if (id.includes("@remotion")) return "vendor-remotion";
+          if (id.includes("framer-motion")) return "vendor-motion";
+          if (id.includes("@trpc") || id.includes("@tanstack/react-query")) return "vendor-data";
+          if (id.includes("recharts") || id.includes("d3-")) return "vendor-charts";
+        },
+      },
+    },
   },
   server: {
     host: true,

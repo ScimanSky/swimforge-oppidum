@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Player } from "@remotion/player";
 import { AnimatePresence, motion } from "framer-motion";
 import { useLocation } from "wouter";
 
@@ -33,6 +32,11 @@ type TourStep = {
   title: string;
   body: string;
 };
+
+const OnboardingPlayer = lazy(async () => {
+  const mod = await import("@remotion/player");
+  return { default: mod.Player };
+});
 
 const ATHLETE_TOUR_STEPS: TourStep[] = [
   {
@@ -476,22 +480,31 @@ export default function OnboardingFlow() {
             </div>
 
             <div className="bg-black/25 p-3 sm:p-4">
-              <Player
-                component={OnboardingWelcomeComposition}
-                durationInFrames={ONBOARDING_WELCOME_DURATION_FRAMES}
-                fps={ONBOARDING_WELCOME_FPS}
-                compositionHeight={ONBOARDING_WELCOME_HEIGHT}
-                compositionWidth={ONBOARDING_WELCOME_WIDTH}
-                controls={false}
-                autoPlay
-                loop={false}
-                inputProps={{ userName: meQuery.data?.name ?? null }}
-                style={{
-                  width: "100%",
-                  borderRadius: 16,
-                  aspectRatio: `${ONBOARDING_WELCOME_WIDTH} / ${ONBOARDING_WELCOME_HEIGHT}`,
-                }}
-              />
+              <Suspense
+                fallback={(
+                  <div
+                    className="w-full animate-pulse rounded-2xl bg-black/40"
+                    style={{ aspectRatio: `${ONBOARDING_WELCOME_WIDTH} / ${ONBOARDING_WELCOME_HEIGHT}` }}
+                  />
+                )}
+              >
+                <OnboardingPlayer
+                  component={OnboardingWelcomeComposition}
+                  durationInFrames={ONBOARDING_WELCOME_DURATION_FRAMES}
+                  fps={ONBOARDING_WELCOME_FPS}
+                  compositionHeight={ONBOARDING_WELCOME_HEIGHT}
+                  compositionWidth={ONBOARDING_WELCOME_WIDTH}
+                  controls={false}
+                  autoPlay
+                  loop={false}
+                  inputProps={{ userName: meQuery.data?.name ?? null }}
+                  style={{
+                    width: "100%",
+                    borderRadius: 16,
+                    aspectRatio: `${ONBOARDING_WELCOME_WIDTH} / ${ONBOARDING_WELCOME_HEIGHT}`,
+                  }}
+                />
+              </Suspense>
             </div>
 
             <div className="flex flex-col gap-2 border-t border-border/70 px-5 py-4 sm:flex-row sm:justify-between sm:px-6">
