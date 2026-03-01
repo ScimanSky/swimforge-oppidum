@@ -11,6 +11,7 @@ import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { cn } from "@/lib/utils"
 import {
   ArrowLeft,
+  ChevronLeft,
   ChevronDown,
   ChevronRight,
   Clock3,
@@ -142,6 +143,27 @@ const STROKE_LABELS: Record<string, string> = {
   recovery: "Recovery",
   drill: "Drill",
   kick: "Kick",
+}
+
+const REPEATS_PER_PAGE = 15
+
+const buildPaginationItems = (currentPage: number, totalPages: number): Array<number | "ellipsis"> => {
+  if (totalPages <= 7) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1)
+  }
+
+  const pages: Array<number | "ellipsis"> = [1]
+  const start = Math.max(2, currentPage - 1)
+  const end = Math.min(totalPages - 1, currentPage + 1)
+
+  if (start > 2) pages.push("ellipsis")
+  for (let page = start; page <= end; page += 1) {
+    pages.push(page)
+  }
+  if (end < totalPages - 1) pages.push("ellipsis")
+
+  pages.push(totalPages)
+  return pages
 }
 
 const formatDistance = (meters?: number | null) => {
@@ -516,6 +538,22 @@ export default function ActivityDetail() {
   const [expandedRepeatKeys, setExpandedRepeatKeys] = useState<Record<string, boolean>>({})
   const [selectedRepeatKey, setSelectedRepeatKey] = useState<string | null>(null)
   const [selectedLengthKey, setSelectedLengthKey] = useState<string | null>(null)
+  const [currentRepeatPage, setCurrentRepeatPage] = useState(1)
+
+  const totalRepeatPages = useMemo(
+    () => Math.max(1, Math.ceil(repeatRows.length / REPEATS_PER_PAGE)),
+    [repeatRows.length],
+  )
+
+  const pagedRepeatRows = useMemo(() => {
+    const start = (currentRepeatPage - 1) * REPEATS_PER_PAGE
+    return repeatRows.slice(start, start + REPEATS_PER_PAGE)
+  }, [currentRepeatPage, repeatRows])
+
+  const repeatPaginationItems = useMemo(
+    () => buildPaginationItems(currentRepeatPage, totalRepeatPages),
+    [currentRepeatPage, totalRepeatPages],
+  )
 
   const fallbackSplitRows = useMemo<SplitItem[]>(
     () =>
@@ -549,21 +587,32 @@ export default function ActivityDetail() {
   const selectedEffectiveSplit = effectiveSplits[selectedSplitIdx] ?? null
 
   useEffect(() => {
-    if (repeatRows.length === 0) {
+    if (repeatRows.length === 0 || pagedRepeatRows.length === 0) {
       setSelectedRepeatKey(null)
       setSelectedLengthKey(null)
       return
     }
     if (!selectedRepeatKey) {
-      setSelectedRepeatKey(repeatRows[0].key)
+      setSelectedRepeatKey(pagedRepeatRows[0].key)
       setSelectedLengthKey(null)
       return
     }
-    if (!repeatRows.some((row) => row.key === selectedRepeatKey)) {
-      setSelectedRepeatKey(repeatRows[0].key)
+    if (!pagedRepeatRows.some((row) => row.key === selectedRepeatKey)) {
+      setSelectedRepeatKey(pagedRepeatRows[0].key)
       setSelectedLengthKey(null)
     }
-  }, [repeatRows, selectedRepeatKey])
+  }, [repeatRows.length, pagedRepeatRows, selectedRepeatKey])
+
+  useEffect(() => {
+    if (currentRepeatPage > totalRepeatPages) {
+      setCurrentRepeatPage(totalRepeatPages)
+    }
+  }, [currentRepeatPage, totalRepeatPages])
+
+  useEffect(() => {
+    setExpandedRepeatKeys({})
+    setSelectedLengthKey(null)
+  }, [currentRepeatPage])
 
   const selectedRepeat = useMemo(
     () => repeatRows.find((row) => row.key === selectedRepeatKey) ?? null,
@@ -579,6 +628,12 @@ export default function ActivityDetail() {
 
   const toggleRepeat = (repeatKey: string) => {
     setExpandedRepeatKeys((prev) => ({ ...prev, [repeatKey]: !prev[repeatKey] }))
+  }
+
+  const goToRepeatPage = (nextPage: number) => {
+    const clampedPage = Math.max(1, Math.min(totalRepeatPages, nextPage))
+    if (clampedPage === currentRepeatPage) return
+    setCurrentRepeatPage(clampedPage)
   }
 
   if (!Number.isFinite(activityId)) {
@@ -948,7 +1003,7 @@ export default function ActivityDetail() {
                         </tr>
                       </thead>
                       <tbody>
-                        {repeatRows.flatMap((repeat) => {
+                        {pagedRepeatRows.flatMap((repeat) => {
                           const isRepeatSelected = selectedRepeatKey === repeat.key && !selectedLength
                           const isExpanded = Boolean(expandedRepeatKeys[repeat.key])
                           const rows = [
@@ -1034,8 +1089,66 @@ export default function ActivityDetail() {
                     </table>
                   </div>
 
+                  {totalRepeatPages > 1 ? (
+                    <div className="mt-3 hidden flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3 xl:flex">
+                      <p className="text-xs text-muted-foreground">
+                        Pagina {currentRepeatPage} di {totalRepeatPages}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => goToRepeatPage(currentRepeatPage - 1)}
+                          disabled={currentRepeatPage === 1}
+                          aria-label="Vai alla pagina precedente delle ripetute"
+                        >
+                          <ChevronLeft className="size-3.5" />
+                          Precedente
+                        </Button>
+                        {repeatPaginationItems.map((item, index) =>
+                          item === "ellipsis" ? (
+                            <span
+                              key={`repeat-page-ellipsis-${index}`}
+                              className="px-1.5 text-xs text-muted-foreground"
+                              aria-hidden="true"
+                            >
+                              ...
+                            </span>
+                          ) : (
+                            <button
+                              key={`repeat-page-${item}`}
+                              type="button"
+                              onClick={() => goToRepeatPage(item)}
+                              aria-label={`Vai alla pagina ${item} delle ripetute`}
+                              className={cn(
+                                "min-w-8 rounded-md border px-2 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--electric-cyan)]/70",
+                                item === currentRepeatPage
+                                  ? "border-[var(--electric-cyan)]/60 bg-[color-mix(in_oklch,var(--electric-cyan)_18%,transparent)] text-foreground"
+                                  : "border-border/70 bg-card/35 text-muted-foreground hover:text-foreground",
+                              )}
+                            >
+                              {item}
+                            </button>
+                          ),
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => goToRepeatPage(currentRepeatPage + 1)}
+                          disabled={currentRepeatPage === totalRepeatPages}
+                          aria-label="Vai alla pagina successiva delle ripetute"
+                        >
+                          Successiva
+                          <ChevronRight className="size-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
+
                   <div className="xl:hidden space-y-2">
-                    {repeatRows.map((repeat) => {
+                    {pagedRepeatRows.map((repeat) => {
                       const isExpanded = Boolean(expandedRepeatKeys[repeat.key])
                       const rowDetailSource =
                         selectedRepeatKey === repeat.key
@@ -1121,6 +1234,52 @@ export default function ActivityDetail() {
                                     size="sm"
                                     icon={<Clock3 className="size-3.5" />}
                                   />
+                                  <MetricOrb
+                                    label="Passo medio"
+                                    value={formatPace(rowDetailSource?.pace, rowDetailSource?.distance, rowDetailSource?.duration)}
+                                    progress={
+                                      rowDetailSource?.pace
+                                        ? Math.max(0, Math.min(100, Math.round((180 - rowDetailSource.pace) / 1.5)))
+                                        : 0
+                                    }
+                                    helper="min/100m"
+                                    tone="lime"
+                                    size="sm"
+                                    icon={<Gauge className="size-3.5" />}
+                                  />
+                                  <MetricOrb
+                                    label="SWOLF"
+                                    value={rowDetailSource?.swolf ?? "—"}
+                                    progress={
+                                      rowDetailSource?.swolf
+                                        ? Math.max(0, Math.min(100, Math.round((60 - rowDetailSource.swolf) * 2.2)))
+                                        : 0
+                                    }
+                                    helper="efficienza"
+                                    tone="amber"
+                                    size="sm"
+                                    icon={<Waves className="size-3.5" />}
+                                  />
+                                </div>
+                                <div className="mt-2 grid grid-cols-2 gap-1.5">
+                                  {[
+                                    { label: "Stile", value: getStrokeLabel(rowDetailSource?.stroke) },
+                                    { label: "Tempo cumulato", value: formatSplitDuration(rowDetailSource?.cumulativeSeconds) },
+                                    { label: "Passo migliore", value: formatPace(rowDetailSource?.bestPace, rowDetailSource?.distance, rowDetailSource?.duration) },
+                                    { label: "FC media", value: rowDetailSource?.avgHr ? `${formatNumber(rowDetailSource.avgHr)} bpm` : "—" },
+                                    { label: "FC max", value: rowDetailSource?.maxHr ? `${formatNumber(rowDetailSource.maxHr)} bpm` : "—" },
+                                    { label: "Bracciate", value: formatNumber(rowDetailSource?.totalStrokes) },
+                                    { label: "Bracciate medie", value: formatNumber(rowDetailSource?.avgStrokes, 1) },
+                                    { label: "Calorie", value: formatNumber(rowDetailSource?.calories) },
+                                  ].map((item) => (
+                                    <div
+                                      key={`${repeat.key}-${item.label}`}
+                                      className="rounded-md border border-border/60 bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_10%,transparent),color-mix(in_oklch,var(--card)_95%,transparent))] px-2 py-1.5"
+                                    >
+                                      <p className="text-[10px] uppercase tracking-[0.11em] text-muted-foreground">{item.label}</p>
+                                      <p className="mt-0.5 text-xs font-semibold text-foreground">{item.value}</p>
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
                             </div>
@@ -1129,6 +1288,64 @@ export default function ActivityDetail() {
                       )
                     })}
                   </div>
+
+                  {totalRepeatPages > 1 ? (
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3 xl:hidden">
+                      <p className="text-xs text-muted-foreground">
+                        Pagina {currentRepeatPage} di {totalRepeatPages}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => goToRepeatPage(currentRepeatPage - 1)}
+                          disabled={currentRepeatPage === 1}
+                          aria-label="Vai alla pagina precedente delle ripetute"
+                        >
+                          <ChevronLeft className="size-3.5" />
+                          Precedente
+                        </Button>
+                        {repeatPaginationItems.map((item, index) =>
+                          item === "ellipsis" ? (
+                            <span
+                              key={`repeat-page-mobile-ellipsis-${index}`}
+                              className="px-1.5 text-xs text-muted-foreground"
+                              aria-hidden="true"
+                            >
+                              ...
+                            </span>
+                          ) : (
+                            <button
+                              key={`repeat-page-mobile-${item}`}
+                              type="button"
+                              onClick={() => goToRepeatPage(item)}
+                              aria-label={`Vai alla pagina ${item} delle ripetute`}
+                              className={cn(
+                                "min-w-8 rounded-md border px-2 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--electric-cyan)]/70",
+                                item === currentRepeatPage
+                                  ? "border-[var(--electric-cyan)]/60 bg-[color-mix(in_oklch,var(--electric-cyan)_18%,transparent)] text-foreground"
+                                  : "border-border/70 bg-card/35 text-muted-foreground hover:text-foreground",
+                              )}
+                            >
+                              {item}
+                            </button>
+                          ),
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => goToRepeatPage(currentRepeatPage + 1)}
+                          disabled={currentRepeatPage === totalRepeatPages}
+                          aria-label="Vai alla pagina successiva delle ripetute"
+                        >
+                          Successiva
+                          <ChevronRight className="size-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
                 </>
               )}
             </section>
@@ -1189,16 +1406,26 @@ export default function ActivityDetail() {
                       icon={<Waves className="size-3.5" />}
                     />
                   </div>
-                  <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-                    <span>Stile: {getStrokeLabel(selectedRepeatMetricSource.stroke)}</span>
-                    <span>Tempo cumulato: {formatSplitDuration(selectedRepeatMetricSource.cumulativeSeconds)}</span>
-                    <span>Passo migliore: {formatPace(selectedRepeatMetricSource.bestPace, selectedRepeatMetricSource.distance, selectedRepeatMetricSource.duration)}</span>
-                    <span>FC media: {selectedRepeatMetricSource.avgHr ? `${formatNumber(selectedRepeatMetricSource.avgHr)} bpm` : "—"}</span>
-                    <span>FC max: {selectedRepeatMetricSource.maxHr ? `${formatNumber(selectedRepeatMetricSource.maxHr)} bpm` : "—"}</span>
-                    <span>Totale bracciate: {formatNumber(selectedRepeatMetricSource.totalStrokes)}</span>
-                    <span>Bracciate medie: {formatNumber(selectedRepeatMetricSource.avgStrokes, 1)}</span>
-                    <span>Calorie: {formatNumber(selectedRepeatMetricSource.calories)}</span>
-                    {selectedRepeat ? <span>Vasche nella ripetuta: {selectedRepeat.lengthsCount}</span> : null}
+                  <div className="grid gap-1.5 sm:grid-cols-2">
+                    {[
+                      { label: "Stile", value: getStrokeLabel(selectedRepeatMetricSource.stroke) },
+                      { label: "Tempo cumulato", value: formatSplitDuration(selectedRepeatMetricSource.cumulativeSeconds) },
+                      { label: "Passo migliore", value: formatPace(selectedRepeatMetricSource.bestPace, selectedRepeatMetricSource.distance, selectedRepeatMetricSource.duration) },
+                      { label: "FC media", value: selectedRepeatMetricSource.avgHr ? `${formatNumber(selectedRepeatMetricSource.avgHr)} bpm` : "—" },
+                      { label: "FC max", value: selectedRepeatMetricSource.maxHr ? `${formatNumber(selectedRepeatMetricSource.maxHr)} bpm` : "—" },
+                      { label: "Totale bracciate", value: formatNumber(selectedRepeatMetricSource.totalStrokes) },
+                      { label: "Bracciate medie", value: formatNumber(selectedRepeatMetricSource.avgStrokes, 1) },
+                      { label: "Calorie", value: formatNumber(selectedRepeatMetricSource.calories) },
+                      ...(selectedRepeat ? [{ label: "Vasche nella ripetuta", value: formatNumber(selectedRepeat.lengthsCount) }] : []),
+                    ].map((item) => (
+                      <div
+                        key={`selected-metric-${item.label}`}
+                        className="rounded-lg border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_10%,transparent),color-mix(in_oklch,var(--card)_95%,transparent))] px-2.5 py-2"
+                      >
+                        <p className="text-[10px] uppercase tracking-[0.11em] text-muted-foreground">{item.label}</p>
+                        <p className="mt-1 text-sm font-semibold text-foreground">{item.value}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ) : (
