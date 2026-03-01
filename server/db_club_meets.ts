@@ -1212,28 +1212,69 @@ export async function buildMeetWhatsappLink(params: {
   if (!role || role.status !== "active") throw new Error("Forbidden");
 
   const audienceLabel = params.audience === "all"
-    ? "tutti i tesserati"
+    ? "Tutti i tesserati"
     : params.audience === "entered"
-      ? "atleti iscritti"
-      : "staff";
+      ? "Atleti iscritti"
+      : "Staff tecnico";
 
-  const startDate = new Date(meet.startDate).toLocaleDateString("it-IT");
-  const endDate = new Date(meet.endDate).toLocaleDateString("it-IT");
-  const deadline = new Date(meet.registrationDeadline).toLocaleDateString("it-IT");
+  const start = new Date(meet.startDate);
+  const end = new Date(meet.endDate);
+  const deadlineDate = new Date(meet.registrationDeadline);
+
+  const formatDate = (value: Date) => value.toLocaleDateString("it-IT");
+  const formatTime = (value: Date) =>
+    value.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+
+  const sameDay = formatDate(start) === formatDate(end);
+  const dateRangeLabel = sameDay
+    ? `${formatDate(start)} (${formatTime(start)} - ${formatTime(end)})`
+    : `${formatDate(start)} ${formatTime(start)} - ${formatDate(end)} ${formatTime(end)}`;
+  const deadlineLabel = formatDate(deadlineDate);
+
+  const publicOrigin = (() => {
+    const raw = process.env.ALLOWED_ORIGINS ?? "";
+    const first = raw
+      .split(",")
+      .map((entry) => entry.trim())
+      .find((entry) => /^https?:\/\//i.test(entry));
+    return first ?? "https://swimforge.it";
+  })();
+  const appPath = `/community/club/${meet.clubId}/meet/${meet.id}`;
+  const appLink = `${publicOrigin}${appPath}`;
+
+  const notesPreview = meet.notes
+    ? String(meet.notes).replace(/\s+/g, " ").trim().slice(0, 220)
+    : null;
 
   let templateLabel = "Convocazione";
   if (meet.status === "open") templateLabel = "Reminder iscrizioni";
   if (meet.status === "closed" || meet.status === "completed") templateLabel = "Risultati meeting";
 
+  const introLine = meet.status === "open"
+    ? "Ciao team, messaggio del coach: ricordati di completare l'iscrizione."
+    : meet.status === "closed" || meet.status === "completed"
+      ? "Ciao team, messaggio del coach: meeting concluso, trovi qui il riepilogo."
+      : "Ciao team, messaggio del coach: convocazione disponibile.";
+
+  const statusHint = meet.status === "open"
+    ? `Termine iscrizioni: ${deadlineLabel}`
+    : meet.status === "closed" || meet.status === "completed"
+      ? "Iscrizioni: chiuse"
+      : `Termine iscrizioni: ${deadlineLabel}`;
+
   const message = [
-    `🏊 ${templateLabel}`,
-    `${meet.name}`,
-    meet.venue ? `📍 ${meet.venue}` : null,
-    `📅 ${startDate}${startDate !== endDate ? ` - ${endDate}` : ""}`,
-    `👥 Audience: ${audienceLabel}`,
-    `⏳ Deadline iscrizioni: ${deadline}`,
-    meet.notes ? `📝 ${String(meet.notes).slice(0, 300)}` : null,
-    `App: /community/club/${meet.clubId}/meet/${meet.id}`,
+    `*${templateLabel}*`,
+    introLine,
+    "",
+    `*${meet.name}*`,
+    `Data gara: ${dateRangeLabel}`,
+    meet.venue ? `Impianto: ${meet.venue}` : null,
+    `Destinatari: ${audienceLabel}`,
+    statusHint,
+    notesPreview ? `Nota coach: ${notesPreview}` : null,
+    "",
+    "Apri in app:",
+    appLink,
   ].filter(Boolean).join("\n");
 
   return {
