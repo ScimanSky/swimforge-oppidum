@@ -17,6 +17,6 @@ docker compose \
   up -d --build app
 
 curl -fsS "$HEALTH_BASE_URL/ready" >/dev/null
-curl -fsS "$HEALTH_BASE_URL/health" >/dev/null || true
+curl -fsS "$HEALTH_BASE_URL/health/deep" >/dev/null || true
 
 echo "Deploy completato"

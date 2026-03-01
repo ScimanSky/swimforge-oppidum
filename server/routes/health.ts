@@ -6,6 +6,14 @@ import { logger } from "../middleware/logger";
 
 export const healthRouter = Router();
 
+type HealthChecks = {
+  database: boolean;
+  redis: boolean;
+  garminService: boolean;
+  storage: boolean;
+  timestamp: string;
+};
+
 function isProbablyConfiguredRedisUrl(value: string | undefined): value is string {
   return Boolean(value && /^rediss?:\/\//i.test(value));
 }
@@ -21,18 +29,16 @@ async function fetchOkWithTimeout(url: string, timeoutMs: number): Promise<boole
   }
 }
 
-healthRouter.get("/health", async (_req, res) => {
-  const checks = {
+async function runHealthChecks(): Promise<{ checks: HealthChecks; details: Record<string, any> }> {
+  const checks: HealthChecks = {
     database: false,
     redis: false,
     garminService: false,
     storage: false,
     timestamp: new Date().toISOString(),
   };
-
   const details: Record<string, any> = {};
 
-  // Check database
   try {
     const db = await getDb();
     if (db) {
@@ -50,7 +56,6 @@ healthRouter.get("/health", async (_req, res) => {
     });
   }
 
-  // Check Redis
   try {
     if (redis.isOpen) {
       await redis.ping();
@@ -67,7 +72,6 @@ healthRouter.get("/health", async (_req, res) => {
     });
   }
 
-  // Check Garmin service (optional)
   try {
     const baseUrl = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
     const url = `${baseUrl.replace(/\/$/, "")}/health`;
@@ -82,7 +86,6 @@ healthRouter.get("/health", async (_req, res) => {
     });
   }
 
-  // Check storage (Supabase) using admin client if configured
   try {
     // Lazy import to avoid forcing Supabase env in all environments.
     const { getSupabaseAdminClient } = await import("../_core/supabase_admin");
@@ -102,13 +105,64 @@ healthRouter.get("/health", async (_req, res) => {
     });
   }
 
-  const isHealthy = Object.values(checks).every(
-    (v) => v === true || typeof v === "string"
-  );
+  return { checks, details };
+}
 
-  res.status(isHealthy ? 200 : 503).json({
-    status: isHealthy ? "healthy" : "unhealthy",
+function summarizeChecks(checks: HealthChecks) {
+  const availabilityFailures: string[] = [];
+  if (!checks.database) availabilityFailures.push("database");
+  if (!checks.redis) availabilityFailures.push("redis");
+
+  const deepFailures: string[] = [...availabilityFailures];
+  if (!checks.garminService) deepFailures.push("garminService");
+  if (!checks.storage) deepFailures.push("storage");
+
+  const availabilityOk = availabilityFailures.length === 0;
+  const deepOk = deepFailures.length === 0;
+
+  return { availabilityOk, deepOk, availabilityFailures, deepFailures };
+}
+
+healthRouter.get("/health", async (_req, res) => {
+  const { checks, details } = await runHealthChecks();
+  const summary = summarizeChecks(checks);
+  const status = summary.availabilityOk
+    ? summary.deepOk
+      ? "healthy"
+      : "degraded"
+    : "unhealthy";
+
+  res.status(summary.availabilityOk ? 200 : 503).json({
+    status,
     checks,
+    availability: {
+      ok: summary.availabilityOk,
+      failures: summary.availabilityFailures,
+    },
+    deep: {
+      ok: summary.deepOk,
+      failures: summary.deepFailures,
+    },
+    details,
+  });
+});
+
+// Deep health endpoint: fails if any optional integration is down.
+healthRouter.get("/health/deep", async (_req, res) => {
+  const { checks, details } = await runHealthChecks();
+  const summary = summarizeChecks(checks);
+
+  res.status(summary.deepOk ? 200 : 503).json({
+    status: summary.deepOk ? "healthy" : "unhealthy",
+    checks,
+    availability: {
+      ok: summary.availabilityOk,
+      failures: summary.availabilityFailures,
+    },
+    deep: {
+      ok: summary.deepOk,
+      failures: summary.deepFailures,
+    },
     details,
   });
 });

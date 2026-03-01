@@ -119,9 +119,26 @@ docker compose --env-file .env.oracle -f docker-compose.oracle.yml ps
 docker compose --env-file .env.oracle -f docker-compose.oracle.yml logs -f app
 curl -I https://<your-domain>/ready
 curl -I https://<your-domain>/health
+curl -I https://<your-domain>/health/deep
 ```
 
-## 10) Cron jobs (VM)
+Interpretazione endpoint:
+- `/ready`: availability primaria (dipendenze critiche: DB + Redis configurato).
+- `/health`: stato operativo con semantica `healthy|degraded|unhealthy` (HTTP 200 se core è up, anche se integrazioni opzionali sono degradate).
+- `/health/deep`: deep-check strict (HTTP 503 se Garmin o Storage sono giù).
+
+## 10) Monitoraggio UptimeRobot (raccomandato)
+Configura due monitor separati:
+1. Primario availability
+   - URL: `https://<your-domain>/ready`
+   - expected status: `200`
+   - severità: alta (incident)
+2. Secondario deep diagnostics
+   - URL: `https://<your-domain>/health/deep`
+   - expected status: `200`
+   - severità: warning/non-blocking
+
+## 11) Cron jobs (VM)
 ```cron
 */10 * * * * curl -fsS -X POST "https://<your-domain>/api/cron/complete-challenges" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
 0 2 * * * curl -fsS -X POST "https://<your-domain>/api/cron/evaluate-skill-level" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
@@ -136,6 +153,9 @@ curl -I https://<your-domain>/health
 - `503` su `/ready`:
   - verifica `DATABASE_URL`
   - se `REDIS_URL` è configurata, verifica raggiungibilità Redis
+- `503` su `/health/deep` ma `/ready` è `200`:
+  - impatto non bloccante sulla disponibilità core
+  - verificare integrazioni `GARMIN_SERVICE_URL` e/o storage Supabase
 - Garmin disconnesso dopo restart:
   - verifica volume `garmin_tokens`
 - deploy fallisce su lock:

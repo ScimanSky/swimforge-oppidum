@@ -125,7 +125,7 @@ export function requestLogger(
   next: NextFunction
 ) {
   // Skip logging per path non significativi
-  const SKIP_PATHS = ['/favicon.ico', '/health', '/ready', '/status', '/robots.txt'];
+  const SKIP_PATHS = ['/favicon.ico', '/health', '/health/deep', '/ready', '/status', '/robots.txt'];
   const SKIP_EXTENSIONS = ['.js', '.css', '.png', '.jpg', '.svg', '.ico', '.woff', '.woff2', '.map'];
   
   if (SKIP_PATHS.includes(req.path) || SKIP_EXTENSIONS.some(ext => req.path.endsWith(ext))) {

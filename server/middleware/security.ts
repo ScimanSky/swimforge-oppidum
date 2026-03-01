@@ -93,7 +93,7 @@ export const apiLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req: Request) => {
-    return req.path === '/health' || req.path === '/ready' || req.path === '/status';
+    return req.path === '/health' || req.path === '/health/deep' || req.path === '/ready' || req.path === '/status';
   },
   store: createRedisStore({ prefix: 'rl:api:', windowMs: 1 * 60 * 1000 }),
 });
