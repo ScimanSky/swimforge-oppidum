@@ -89,7 +89,7 @@ jobs:
                 -o StrictHostKeyChecking=yes \
                 -p "$PORT" \
                 "$USER@$HOST" \
-                '/usr/local/bin/swimforge-deploy.sh' 2>&1
+                'bash /home/ubuntu/projects/swimforge-oppidum/deploy/swimforge-deploy.sh' 2>&1
             )"
             SSH_EXIT=$?
             set -e
@@ -114,7 +114,26 @@ jobs:
             fi
 
             if printf '%s' "$SSH_OUTPUT" | grep -qiE 'curl: \(22\)|requested URL returned error: 502|502 bad gateway|status.?502'; then
-              echo "Transient HTTP 502 during post-deploy health check, waiting ${SLEEP_SECONDS}s before retry."
+              echo "Transient HTTP 502 during post-deploy readiness check; waiting for service readiness."
+              set +e
+              RECOVERY_OUTPUT="$(
+                ssh \
+                  -o BatchMode=yes \
+                  -o StrictHostKeyChecking=yes \
+                  -p "$PORT" \
+                  "$USER@$HOST" \
+                  'for i in $(seq 1 24); do if curl -fsS http://127.0.0.1/ready >/dev/null 2>&1; then echo "ready"; exit 0; fi; sleep 5; done; echo "not-ready"; exit 1' 2>&1
+              )"
+              RECOVERY_EXIT=$?
+              set -e
+              printf '%s\n' "$RECOVERY_OUTPUT"
+
+              if [[ $RECOVERY_EXIT -eq 0 ]]; then
+                echo "Service recovered after transient 502. Marking deploy as successful."
+                break
+              fi
+
+              echo "Service still not ready after wait; retrying full deploy in ${SLEEP_SECONDS}s."
               ATTEMPT=$((ATTEMPT + 1))
               sleep "$SLEEP_SECONDS"
               continue
