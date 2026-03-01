@@ -48,6 +48,27 @@ export const activitiesRouter = router({
         .input(z.object({ id: z.number() }))
         .query(async ({ ctx, input }) => {
             let activity = await db.getActivityById(input.id);
+            let garminLaps: Array<{
+                lapIndex: number | null;
+                distanceMeters: number | null;
+                durationSeconds: number | null;
+                movingDurationSeconds: number | null;
+                elapsedDurationSeconds: number | null;
+                averageSpeedMps: number | null;
+                maxSpeedMps: number | null;
+                averageMovingSpeedMps: number | null;
+                averageSwolf: number | null;
+                averageStrokes: number | null;
+                totalNumberOfStrokes: number | null;
+                averageSwimCadence: number | null;
+                calories: number | null;
+                avgHeartRate: number | null;
+                maxHeartRate: number | null;
+                numberOfActiveLengths: number | null;
+                strokeType: string | null;
+                startTimeGmt: Date | null;
+            }> = [];
+
             if (!activity || activity.userId !== ctx.user.id) {
                 throw new TRPCError({ code: "NOT_FOUND" });
             }
@@ -174,7 +195,42 @@ export const activitiesRouter = router({
                     }
                 }
             }
-            return activity;
+
+            if (activity.activitySource === "garmin") {
+                const dbInstance = await getDb();
+                if (dbInstance) {
+                    const { garminActivityLaps } = await import("../../drizzle/schema");
+                    garminLaps = await dbInstance
+                        .select({
+                            lapIndex: garminActivityLaps.lapIndex,
+                            distanceMeters: garminActivityLaps.distanceMeters,
+                            durationSeconds: garminActivityLaps.durationSeconds,
+                            movingDurationSeconds: garminActivityLaps.movingDurationSeconds,
+                            elapsedDurationSeconds: garminActivityLaps.elapsedDurationSeconds,
+                            averageSpeedMps: garminActivityLaps.averageSpeedMps,
+                            maxSpeedMps: garminActivityLaps.maxSpeedMps,
+                            averageMovingSpeedMps: garminActivityLaps.averageMovingSpeedMps,
+                            averageSwolf: garminActivityLaps.averageSwolf,
+                            averageStrokes: garminActivityLaps.averageStrokes,
+                            totalNumberOfStrokes: garminActivityLaps.totalNumberOfStrokes,
+                            averageSwimCadence: garminActivityLaps.averageSwimCadence,
+                            calories: garminActivityLaps.calories,
+                            avgHeartRate: garminActivityLaps.avgHeartRate,
+                            maxHeartRate: garminActivityLaps.maxHeartRate,
+                            numberOfActiveLengths: garminActivityLaps.numberOfActiveLengths,
+                            strokeType: garminActivityLaps.strokeType,
+                            startTimeGmt: garminActivityLaps.startTimeGmt,
+                        })
+                        .from(garminActivityLaps)
+                        .where(eq(garminActivityLaps.activityId, activity.id))
+                        .orderBy(garminActivityLaps.lapIndex);
+                }
+            }
+
+            return {
+                ...activity,
+                garminLaps,
+            };
         }),
 
     // Manual activity creation disabled to prevent cheating

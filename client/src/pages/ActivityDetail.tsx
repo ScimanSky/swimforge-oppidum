@@ -218,13 +218,18 @@ export default function ActivityDetail() {
   const isLoading = activityQuery.isLoading
   const activityStroke = getActivityStrokeKey(activity)
   const garminDetails = (activity?.rawData as any)?.garmin_details ?? null
+  const persistedLapSource = useMemo(() => {
+    if (!Array.isArray((activity as any)?.garminLaps)) return [] as unknown[]
+    return (activity as any).garminLaps as unknown[]
+  }, [activity])
 
   const lapSource = useMemo(() => {
+    if (persistedLapSource.length > 0) return persistedLapSource
     if (Array.isArray(garminDetails?.splits?.lapDTOs)) return garminDetails.splits.lapDTOs as unknown[]
     if (Array.isArray(garminDetails?.splits)) return garminDetails.splits as unknown[]
     if (Array.isArray(garminDetails?.laps)) return garminDetails.laps as unknown[]
     return [] as unknown[]
-  }, [garminDetails])
+  }, [garminDetails, persistedLapSource])
 
   const splitSource = useMemo(() => {
     if (Array.isArray(garminDetails?.typed_splits?.splits)) return garminDetails.typed_splits.splits as unknown[]
