@@ -49,10 +49,10 @@
     "@sentry/node": "^10.37.0",
     "@supabase/supabase-js": "^2.91.1",
     "@tanstack/react-query": "^5.90.2",
-    "@trpc/client": "^11.6.0",
-    "@trpc/react-query": "^11.6.0",
-    "@trpc/server": "^11.6.0",
-    "axios": "^1.12.0",
+    "@trpc/client": "^11.11.0",
+    "@trpc/react-query": "^11.11.0",
+    "@trpc/server": "^11.11.0",
+    "axios": "^1.13.6",
     "bcryptjs": "^3.0.3",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
@@ -147,7 +147,10 @@
       "wouter@3.7.1": "patches/wouter@3.7.1.patch"
     },
     "overrides": {
-      "tailwindcss>nanoid": "3.3.7"
+      "tailwindcss>nanoid": "3.3.7",
+      "qs@6.13.0": "6.14.1",
+      "minimatch@3.1.2": "3.1.4",
+      "minimatch@9.0.5": "9.0.7"
     }
   }
 }
