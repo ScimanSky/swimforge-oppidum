@@ -24,6 +24,21 @@ let _pool: Pool | null = null;
 let _dbInitPromise: Promise<ReturnType<typeof drizzle> | null> | null = null;
 let _dbCircuitOpenUntil = 0;
 
+function getDbTlsRejectUnauthorized(): boolean {
+  const raw = process.env.DB_SSL_REJECT_UNAUTHORIZED;
+  if (raw === undefined) return true;
+
+  const normalized = raw.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) return true;
+  if (["0", "false", "no", "off"].includes(normalized)) return false;
+
+  logger.warn("[Database] Invalid DB_SSL_REJECT_UNAUTHORIZED value; defaulting to true", {
+    event: "db:tls_reject_unauthorized_invalid",
+    value: raw,
+  });
+  return true;
+}
+
 export async function getDb() {
   if (_db) return _db;
   if (!process.env.DATABASE_URL) return null;
@@ -46,7 +61,7 @@ export async function getDb() {
       try {
         pool = new Pool({
           connectionString: process.env.DATABASE_URL,
-          ssl: { rejectUnauthorized: false },
+          ssl: { rejectUnauthorized: getDbTlsRejectUnauthorized() },
           max: 10,
           min: 1,
           idleTimeoutMillis: 30_000,
