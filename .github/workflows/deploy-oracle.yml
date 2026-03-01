@@ -89,7 +89,7 @@ jobs:
                 -o StrictHostKeyChecking=yes \
                 -p "$PORT" \
                 "$USER@$HOST" \
-                'bash /home/ubuntu/projects/swimforge-oppidum/deploy/swimforge-deploy.sh' 2>&1
+                'if [ -f /home/ubuntu/projects/swimforge-oppidum/deploy/swimforge-deploy.sh ]; then bash /home/ubuntu/projects/swimforge-oppidum/deploy/swimforge-deploy.sh; else /usr/local/bin/swimforge-deploy.sh; fi' 2>&1
             )"
             SSH_EXIT=$?
             set -e
