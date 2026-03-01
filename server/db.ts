@@ -24,19 +24,78 @@ let _pool: Pool | null = null;
 let _dbInitPromise: Promise<ReturnType<typeof drizzle> | null> | null = null;
 let _dbCircuitOpenUntil = 0;
 
-function getDbTlsRejectUnauthorized(): boolean {
-  const raw = process.env.DB_SSL_REJECT_UNAUTHORIZED;
-  if (raw === undefined) return true;
+function parseBoolEnv(name: string, fallback: boolean): boolean {
+  const raw = process.env[name];
+  if (raw === undefined) return fallback;
 
   const normalized = raw.trim().toLowerCase();
   if (["1", "true", "yes", "on"].includes(normalized)) return true;
   if (["0", "false", "no", "off"].includes(normalized)) return false;
 
-  logger.warn("[Database] Invalid DB_SSL_REJECT_UNAUTHORIZED value; defaulting to true", {
-    event: "db:tls_reject_unauthorized_invalid",
+  logger.warn(`[Database] Invalid ${name} value; defaulting to ${String(fallback)}`, {
+    event: "db:env_bool_invalid",
+    name,
     value: raw,
+    fallback,
   });
-  return true;
+  return fallback;
+}
+
+function getDbTlsRejectUnauthorized(): boolean {
+  return parseBoolEnv("DB_SSL_REJECT_UNAUTHORIZED", true);
+}
+
+function getDbTlsAllowInsecureFallback(): boolean {
+  return parseBoolEnv("DB_SSL_ALLOW_INSECURE_FALLBACK", true);
+}
+
+function getDbTlsCa(): string | undefined {
+  const direct = process.env.DB_SSL_CA_CERT?.trim();
+  if (direct) return direct.replace(/\\n/g, "\n");
+
+  const base64 = process.env.DB_SSL_CA_CERT_BASE64?.trim();
+  if (!base64) return undefined;
+
+  try {
+    const decoded = Buffer.from(base64, "base64").toString("utf8").trim();
+    if (!decoded) return undefined;
+    return decoded.replace(/\\n/g, "\n");
+  } catch (error) {
+    const { message } = classifyAsyncError(error);
+    logger.warn(`[Database] Invalid DB_SSL_CA_CERT_BASE64 value: ${message}`, {
+      event: "db:tls_ca_invalid",
+      message,
+    });
+    return undefined;
+  }
+}
+
+function isTlsValidationError(error: unknown): boolean {
+  const { message } = classifyAsyncError(error);
+  return /self-signed certificate|certificate|unable to verify|unable to get local issuer/i.test(message);
+}
+
+async function connectPoolWithSsl(rejectUnauthorized: boolean, ca?: string): Promise<Pool> {
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: ca ? { rejectUnauthorized, ca } : { rejectUnauthorized },
+    max: 10,
+    min: 1,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+  });
+
+  try {
+    await pool.query("SELECT 1");
+    return pool;
+  } catch (error) {
+    try {
+      await pool.end();
+    } catch {
+      // ignore
+    }
+    throw error;
+  }
 }
 
 export async function getDb() {
@@ -54,30 +113,51 @@ export async function getDb() {
   const MAX_RETRIES = 3;
   const BASE_DELAY_MS = 1000;
   const CIRCUIT_BREAKER_MS = 30_000;
+  const rejectUnauthorized = getDbTlsRejectUnauthorized();
+  const allowInsecureFallback = getDbTlsAllowInsecureFallback();
+  const tlsCa = getDbTlsCa();
 
   _dbInitPromise = (async () => {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt += 1) {
-      let pool: Pool | null = null;
       try {
-        pool = new Pool({
-          connectionString: process.env.DATABASE_URL,
-          ssl: { rejectUnauthorized: getDbTlsRejectUnauthorized() },
-          max: 10,
-          min: 1,
-          idleTimeoutMillis: 30_000,
-          connectionTimeoutMillis: 5_000,
-        });
-
-        // Test connection early to fail fast and avoid half-initialized clients.
-        await pool.query("SELECT 1");
-
+        const pool = await connectPoolWithSsl(rejectUnauthorized, tlsCa);
         _pool = pool;
         _db = drizzle(_pool);
         _dbCircuitOpenUntil = 0;
-        logger.info("[Database] Connected", { event: "db:connected" });
+        logger.info("[Database] Connected", {
+          event: "db:connected",
+          tlsRejectUnauthorized: rejectUnauthorized,
+          tlsCaConfigured: Boolean(tlsCa),
+        });
         return _db;
       } catch (error) {
-        const { kind, message } = classifyAsyncError(error);
+        let effectiveError = error;
+
+        if (rejectUnauthorized && allowInsecureFallback && isTlsValidationError(error)) {
+          logger.error("[Database] TLS certificate validation failed; trying temporary insecure fallback", {
+            event: "db:tls_insecure_fallback_attempt",
+          });
+          try {
+            const fallbackPool = await connectPoolWithSsl(false, tlsCa);
+            _pool = fallbackPool;
+            _db = drizzle(_pool);
+            _dbCircuitOpenUntil = 0;
+            logger.warn("[Database] Connected with temporary insecure TLS fallback", {
+              event: "db:connected_insecure_tls_fallback",
+              recommendation: "Configure DB_SSL_CA_CERT_BASE64 and keep DB_SSL_REJECT_UNAUTHORIZED=true",
+            });
+            return _db;
+          } catch (fallbackError) {
+            effectiveError = fallbackError;
+            const { message: fallbackMessage } = classifyAsyncError(fallbackError);
+            logger.error(`[Database] Insecure TLS fallback failed: ${fallbackMessage}`, {
+              event: "db:tls_insecure_fallback_failed",
+              message: fallbackMessage,
+            });
+          }
+        }
+
+        const { kind, message } = classifyAsyncError(effectiveError);
         const retryInMs = BASE_DELAY_MS * attempt;
         logger.warn(`[Database] Connection attempt ${attempt}/${MAX_RETRIES} failed (${kind}): ${message}`, {
           event: "db:connect_retry",
@@ -87,14 +167,6 @@ export async function getDb() {
           kind,
           message,
         });
-
-        if (pool) {
-          try {
-            await pool.end();
-          } catch {
-            // ignore
-          }
-        }
 
         if (attempt >= MAX_RETRIES) {
           _dbCircuitOpenUntil = Date.now() + CIRCUIT_BREAKER_MS;
