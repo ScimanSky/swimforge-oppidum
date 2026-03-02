@@ -61,6 +61,7 @@ Optional demo seed:
 ## Operations
 - Deploy guide: `DEPLOYMENT.md`
 - Self-hosting: `docs/SELF_HOST.md`
+- SwimForge 2.0 guide: `docs/SWIMFORGE_2_0_GUIDE.md`
 - Security policy: `SECURITY.md`
 - Contribution flow: `CONTRIBUTING.md`
 
