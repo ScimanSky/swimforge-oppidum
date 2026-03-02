@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from "react";
+import { Fragment, type ReactNode, useEffect, useState } from "react";
 
 const CONTENT_TOKEN_SPLIT = /(\s+)/g;
 const DOMAIN_LIKE_PATTERN = /^(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,63}(?::\d{2,5})?(?:\/[^\s<>"']*)?$/i;
@@ -131,6 +131,39 @@ type ParsedLinkPreview = {
   pathLabel: string;
 };
 
+type RemoteLinkPreview = {
+  requestedUrl: string;
+  resolvedUrl: string;
+  host: string;
+  siteName: string | null;
+  title: string | null;
+  description: string | null;
+  imageUrl: string | null;
+  imageProxyUrl: string | null;
+};
+
+const linkPreviewCache = new Map<string, RemoteLinkPreview | null>();
+
+function parseRemoteLinkPreview(payload: unknown): RemoteLinkPreview | null {
+  if (!payload || typeof payload !== "object") return null;
+  const source = payload as Record<string, unknown>;
+  const requestedUrl = typeof source.requestedUrl === "string" ? source.requestedUrl : null;
+  const resolvedUrl = typeof source.resolvedUrl === "string" ? source.resolvedUrl : null;
+  const host = typeof source.host === "string" ? source.host : null;
+  if (!requestedUrl || !resolvedUrl || !host) return null;
+
+  return {
+    requestedUrl,
+    resolvedUrl,
+    host,
+    siteName: typeof source.siteName === "string" ? source.siteName : null,
+    title: typeof source.title === "string" ? source.title : null,
+    description: typeof source.description === "string" ? source.description : null,
+    imageUrl: typeof source.imageUrl === "string" ? source.imageUrl : null,
+    imageProxyUrl: typeof source.imageProxyUrl === "string" ? source.imageProxyUrl : null,
+  };
+}
+
 function parseLinkPreview(url: string): ParsedLinkPreview | null {
   if (!isSafeHttpUrl(url)) return null;
   try {
@@ -159,26 +192,80 @@ export function LinkPreviewCard({
 }) {
   const preview = parseLinkPreview(url);
   if (!preview) return null;
+  const [remotePreview, setRemotePreview] = useState<RemoteLinkPreview | null>(() => linkPreviewCache.get(preview.href) ?? null);
+
+  useEffect(() => {
+    const cached = linkPreviewCache.get(preview.href);
+    if (cached !== undefined) {
+      setRemotePreview(cached);
+      return;
+    }
+
+    const controller = new AbortController();
+    fetch(`/api/link-preview?url=${encodeURIComponent(preview.href)}`, {
+      method: "GET",
+      credentials: "include",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          linkPreviewCache.set(preview.href, null);
+          setRemotePreview(null);
+          return;
+        }
+        const data = parseRemoteLinkPreview(await response.json());
+        linkPreviewCache.set(preview.href, data);
+        setRemotePreview(data);
+      })
+      .catch(() => {
+        linkPreviewCache.set(preview.href, null);
+        setRemotePreview(null);
+      });
+
+    return () => controller.abort();
+  }, [preview.href]);
+
+  const href = remotePreview?.resolvedUrl ?? preview.href;
+  const title = remotePreview?.title ?? preview.pathLabel;
+  const description = remotePreview?.description;
+  const siteName = remotePreview?.siteName ?? preview.host;
+  const imageSrc = remotePreview?.imageProxyUrl ?? remotePreview?.imageUrl;
+  const initial = siteName.trim().slice(0, 1).toUpperCase() || preview.host.slice(0, 1).toUpperCase();
 
   return (
     <a
-      href={preview.href}
+      href={href}
       target="_blank"
       rel="noreferrer"
       className={`group block rounded-xl border border-border/70 bg-card/35 p-3 transition-colors hover:bg-card/55 ${className}`}
     >
+      {imageSrc ? (
+        <div className="mb-2 overflow-hidden rounded-lg border border-border/60 bg-black/20">
+          <img
+            src={imageSrc}
+            alt={`Anteprima ${siteName}`}
+            className="h-36 w-full object-cover sm:h-44"
+            loading="lazy"
+          />
+        </div>
+      ) : null}
+
       <div className="flex items-center gap-2">
         <span
           aria-hidden="true"
           className={`inline-flex items-center justify-center rounded-sm border border-border/70 bg-background/70 text-[10px] font-semibold uppercase text-muted-foreground ${compact ? "h-4 w-4" : "h-5 w-5"}`}
         >
-          {preview.host.slice(0, 1)}
+          {initial}
         </span>
         <div className="min-w-0">
-          <p className={`truncate ${compact ? "text-[11px]" : "text-xs"} text-muted-foreground`}>{preview.label}</p>
-          <p className={`truncate ${compact ? "text-xs" : "text-sm"} font-medium text-foreground/90 group-hover:text-foreground`}>
-            {preview.pathLabel}
+          <p className={`truncate ${compact ? "text-[11px]" : "text-xs"} text-muted-foreground`}>{siteName}</p>
+          <p
+            className={`truncate ${compact ? "text-xs" : "text-sm"} font-medium text-foreground/90 group-hover:text-foreground`}
+          >
+            {title}
           </p>
+          {description ? <p className="mt-0.5 text-xs text-muted-foreground">{description}</p> : null}
+          {!description ? <p className="mt-0.5 text-xs text-muted-foreground">{preview.label}</p> : null}
         </div>
       </div>
     </a>
