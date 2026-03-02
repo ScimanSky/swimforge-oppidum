@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { getInitials, formatTimeAgo } from "@/lib/format"
 import { ForwardContentDialog } from "./ForwardContentDialog"
+import { extractFirstUrl, LinkPreviewCard, renderSocialText } from "@/lib/social-content"
 
 interface Story {
   id: number
@@ -97,6 +98,7 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
 
   const group = groups[groupIdx]
   const story = group?.stories[storyIdx]
+  const firstLinkInCaption = story?.caption ? extractFirstUrl(story.caption) : null
   const utils = trpc.useUtils()
   const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 5 * 60_000 })
   const currentUserId = profileQuery.data?.userId
@@ -389,10 +391,19 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
         {/* Content */}
         <div className="flex size-full items-center justify-center">
           {story.type === "text" || !story.mediaUrl ? (
-            <div className="flex items-center justify-center px-8">
-              <p className="text-center text-2xl font-display font-semibold text-white">
-                {story.caption}
-              </p>
+            <div className="flex items-center justify-center px-8" onClick={(e) => e.stopPropagation()}>
+              <div className="max-w-lg space-y-3 text-center">
+                <p className="text-2xl font-display font-semibold text-white whitespace-pre-wrap">
+                  {renderSocialText(story.caption ?? "", {
+                    hashtagClassName: "font-semibold text-[var(--electric-cyan)]",
+                    mentionClassName: "font-semibold text-[var(--electric-lime)]",
+                    linkClassName: "font-semibold text-[var(--electric-cyan)] underline decoration-dotted underline-offset-2",
+                  })}
+                </p>
+                {firstLinkInCaption ? (
+                  <LinkPreviewCard url={firstLinkInCaption} compact className="text-left" />
+                ) : null}
+              </div>
             </div>
           ) : story.type === "video" ? (
             <video
@@ -425,8 +436,18 @@ export function StoryViewer({ groups, initialGroupIndex, onClose }: StoryViewerP
 
         {/* Caption overlay (for media stories with caption) */}
         {story.type !== "text" && story.caption && (
-          <div className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/70 to-transparent px-4 pb-6 pt-12">
-            <p className="text-sm text-white">{story.caption}</p>
+          <div
+            className="absolute bottom-0 left-0 right-0 z-10 bg-gradient-to-t from-black/70 to-transparent px-4 pb-6 pt-12"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm text-white whitespace-pre-wrap">
+              {renderSocialText(story.caption, {
+                hashtagClassName: "font-medium text-[var(--electric-cyan)]",
+                mentionClassName: "font-medium text-[var(--electric-lime)]",
+                linkClassName: "font-medium text-[var(--electric-cyan)] underline decoration-dotted underline-offset-2",
+              })}
+            </p>
+            {firstLinkInCaption ? <LinkPreviewCard url={firstLinkInCaption} compact className="mt-2" /> : null}
           </div>
         )}
 

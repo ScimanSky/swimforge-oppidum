@@ -361,6 +361,7 @@ function normalizeAndScorePlan(
   const warnings: string[] = [];
   const hardIssues: string[] = [];
   let autoFixes = 0;
+  const directiveDefaultStroke = titleCaseStroke(directives.strokeMix[0] ?? "sl");
 
   const blocks = PHASE_ORDER.map((phase) => {
     const sourceBlock = plan.blocks.find((block) => block.phase === phase);
@@ -385,8 +386,17 @@ function normalizeAndScorePlan(
     const normalizedItems = completedItems.map((item, index) => {
       const distancePerRep =
         item.distancePerRepMeters ?? parseRepsSpec(item.reps)?.distancePerRepMeters ?? parseMetersValue(item.distance) ?? 100;
+      const fallbackStroke = [
+        item.stroke,
+        sourceBlock?.items?.[index]?.stroke,
+        sourceBlock?.items?.[0]?.stroke,
+        fallbackItems[index]?.stroke,
+        fallbackItems[0]?.stroke,
+        directiveDefaultStroke,
+      ].find((candidate): candidate is string => typeof candidate === "string" && candidate.trim().length > 0);
       const normalized = normalizeWorkoutSeriesItem(item, {
         isLastInBlock: index === completedItems.length - 1,
+        defaultStroke: fallbackStroke,
         defaultSendoff: defaultSendoffForSeries(distancePerRep, directives.intensity),
         defaultBetweenSetsRest:
           index === completedItems.length - 1 ? undefined : defaultBetweenSetsRest(phase, directives.intensity),
@@ -492,6 +502,7 @@ Rispondi SOLO con JSON valido:
 Vincoli obbligatori:
 - Esattamente 4 blocchi: warmup, activation, main, cooldown.
 - Ogni blocco deve avere almeno 2 serie.
+- Ogni serie deve avere stroke obbligatorio (es. Stile Libero, Dorso, Rana, Delfino, Misti).
 - Ogni serie deve avere reps/repsCount/distancePerRepMeters coerenti.
 - seriesDistanceMeters deve essere uguale a repsCount * distancePerRepMeters.
 - sendoff obbligatorio per ogni serie.

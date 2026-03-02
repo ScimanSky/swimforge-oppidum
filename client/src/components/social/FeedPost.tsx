@@ -8,6 +8,7 @@ import FeedPostActions from "./FeedPostActions"
 import FeedPostComments from "./FeedPostComments"
 import { isVideoUrl } from "@/lib/post-media"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
+import { extractFirstUrl, LinkPreviewCard, renderSocialText } from "@/lib/social-content"
 import type { FeedPostRecord } from "./feed-types"
 
 interface FeedPostProps {
@@ -44,27 +45,6 @@ function parseTaggedUsers(raw: unknown): Array<{ user_id: number; name?: string 
   return []
 }
 
-function renderPostContent(content: string) {
-  const parts = content.split(/(#[A-Za-z0-9_]{2,40}|@[A-Za-z0-9_]{2,40})/g)
-  return parts.map((part, idx) => {
-    if (/^#[A-Za-z0-9_]{2,40}$/.test(part)) {
-      return (
-        <span key={`${part}-${idx}`} className="text-[var(--electric-cyan)] font-medium">
-          {part}
-        </span>
-      )
-    }
-    if (/^@[A-Za-z0-9_]{2,40}$/.test(part)) {
-      return (
-        <span key={`${part}-${idx}`} className="text-[var(--electric-lime)] font-medium">
-          {part}
-        </span>
-      )
-    }
-    return <span key={`${part}-${idx}`}>{part}</span>
-  })
-}
-
 export default function FeedPost({ post, currentUserId, index = 0, autoplayVideos = true }: FeedPostProps) {
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [openMediaUrl, setOpenMediaUrl] = useState<string | null>(null)
@@ -81,6 +61,7 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
     : (post.media_url ? [String(post.media_url)] : [])
   const taggedUsers = parseTaggedUsers(post.tagged_users)
   const hashtags = normalizeArrayField(post.hashtags)
+  const firstLink = post.content ? extractFirstUrl(post.content) : null
 
   return (
     <motion.div
@@ -152,9 +133,14 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
                 isActivityPost ? "text-white/90" : "text-foreground"
               }`}
             >
-              {renderPostContent(post.content)}
+              {renderSocialText(post.content)}
             </p>
           )}
+          {firstLink ? (
+            <div className="mt-2 px-4">
+              <LinkPreviewCard url={firstLink} />
+            </div>
+          ) : null}
 
           {taggedUsers.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2 px-4">

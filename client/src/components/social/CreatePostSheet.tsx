@@ -25,6 +25,7 @@ import {
   validatePostMediaFile,
   type PostMediaKind,
 } from "@/lib/post-media"
+import { extractFirstUrl, LinkPreviewCard, normalizeTagSearchQuery } from "@/lib/social-content"
 import { uploadVideoToCloudinary } from "@/lib/cloudinary-upload"
 import { uploadPostImageWithFallback } from "@/lib/post-image-upload"
 
@@ -66,9 +67,10 @@ export function CreatePostSheet({ open, onOpenChange, initialContent }: CreatePo
   const postImageUpload = trpc.community.postUploadImage.useMutation()
   const cloudinaryVideoAuth = trpc.community.cloudinaryVideoAuth.useMutation()
 
-  const searchEnabled = mode === "text" && tagQuery.trim().length >= 2
+  const normalizedTagQuery = useMemo(() => normalizeTagSearchQuery(tagQuery), [tagQuery])
+  const searchEnabled = mode === "text" && normalizedTagQuery.length >= 2
   const tagSearchQuery = trpc.community.users.search.useQuery(
-    { query: tagQuery.trim(), limit: 8 },
+    { query: normalizedTagQuery, limit: 8 },
     { enabled: searchEnabled }
   )
 
@@ -84,6 +86,7 @@ export function CreatePostSheet({ open, onOpenChange, initialContent }: CreatePo
   })
 
   const hashtags = useMemo(() => extractHashtags(content), [content])
+  const firstLinkInContent = useMemo(() => extractFirstUrl(content), [content])
   const hasContent = content.trim().length > 0
   const hasMedia = mediaItems.length > 0
 
@@ -326,6 +329,7 @@ export function CreatePostSheet({ open, onOpenChange, initialContent }: CreatePo
                 rows={5}
                 autoFocus
               />
+              {firstLinkInContent ? <LinkPreviewCard url={firstLinkInContent} /> : null}
 
               <div className="flex items-center justify-between gap-2">
                 <Button
@@ -386,7 +390,7 @@ export function CreatePostSheet({ open, onOpenChange, initialContent }: CreatePo
                   value={tagQuery}
                   onChange={(e) => setTagQuery(e.target.value)}
                 />
-                {tagSearchQuery.data && tagQuery.trim().length >= 2 ? (
+                {tagSearchQuery.data && normalizedTagQuery.length >= 2 ? (
                   <div className="max-h-36 overflow-y-auto rounded-xl border border-border/70 bg-background/60">
                     {(tagSearchQuery.data as any[]).length === 0 ? (
                       <p className="px-3 py-2 text-xs text-muted-foreground">Nessun utente trovato</p>

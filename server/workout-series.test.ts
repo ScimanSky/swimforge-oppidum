@@ -57,6 +57,24 @@ describe("workout-series helpers", () => {
     expect(last.warnings).toContain("trailing_between_sets_rest_removed");
   });
 
+  it("defaults missing stroke when a fallback stroke is provided", () => {
+    const normalized = normalizeWorkoutSeriesItem(
+      {
+        label: "Serie senza stile",
+        reps: "6x50",
+        sendoff: "1:10",
+      },
+      {
+        isLastInBlock: false,
+        defaultStroke: "Stile Libero",
+        defaultBetweenSetsRest: "20s",
+      },
+    );
+
+    expect(normalized.item.stroke).toBe("Stile Libero");
+    expect(normalized.warnings).toContain("stroke_defaulted");
+  });
+
   it("normalizes legacy workout JSON for render", () => {
     const plan = normalizeWorkoutPlanForRender({
       title: "Test",

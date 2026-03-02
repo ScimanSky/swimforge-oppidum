@@ -112,6 +112,23 @@ function createInvalidPayload() {
   };
 }
 
+function createMissingStrokePayload() {
+  const payload = createValidPayload();
+  return {
+    ...payload,
+    blocks: payload.blocks.map((block) => {
+      if (block.phase !== "activation") return block;
+      return {
+        ...block,
+        items: block.items.map((item) => ({
+          ...item,
+          stroke: undefined,
+        })),
+      };
+    }),
+  };
+}
+
 describe("club_workouts_ai quality gate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -143,6 +160,31 @@ describe("club_workouts_ai quality gate", () => {
     expect(result.model).toBe("gemini-fast");
     expect(mockState.calls).toEqual(["gemini-fast"]);
     expect(result.quality.score).toBeGreaterThanOrEqual(0.92);
+  });
+
+  it("auto-fills missing stroke using fallback directives", async () => {
+    mockState.responses.set("gemini-fast", JSON.stringify(createMissingStrokePayload()));
+
+    const { generateClubPoolWorkoutPlan } = await import("./club_workouts_ai");
+    const result = await generateClubPoolWorkoutPlan({
+      sessionDate: "2026-03-10",
+      directives: {
+        focus: ["tecnica"],
+        volume: "medium",
+        intensity: "mixed",
+        strokeMix: ["do"],
+        equipment: [],
+        sessionMinutes: 60,
+        targetDistanceMeters: 2600,
+        notes: null,
+      },
+    });
+
+    const activationBlock = result.plan.blocks.find((block) => block.phase === "activation");
+    expect(result.status).toBe("success");
+    expect(mockState.calls).toEqual(["gemini-fast"]);
+    expect(activationBlock?.items.every((item) => String(item.stroke ?? "").trim().length > 0)).toBe(true);
+    expect(activationBlock?.items.every((item) => item.stroke === "Dorso")).toBe(true);
   });
 
   it("escalates to pro model when primary output has hard issues", async () => {

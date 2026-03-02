@@ -15,6 +15,7 @@ import { Camera, Loader2, Type, Video } from "lucide-react"
 import { toast } from "sonner"
 import { uploadVideoToCloudinary } from "@/lib/cloudinary-upload"
 import { UploadStatusPill } from "./UploadStatusPill"
+import { extractFirstUrl, LinkPreviewCard } from "@/lib/social-content"
 
 interface StoryCreatorProps {
   open: boolean
@@ -50,6 +51,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
   const cloudinaryVideoAuth = trpc.community.cloudinaryVideoAuth.useMutation()
 
   const createStory = trpc.community.stories.create.useMutation()
+  const firstLinkInCaption = extractFirstUrl(caption)
 
   const clearPreviewUrl = () => {
     if (preview && preview.startsWith("blob:")) {
@@ -370,6 +372,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
               className="resize-none"
               rows={2}
             />
+            {firstLinkInCaption ? <LinkPreviewCard url={firstLinkInCaption} /> : null}
             <Button
               variant="neon"
               onClick={() => void handleSubmitImage()}
@@ -407,6 +410,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
               className="resize-none"
               rows={2}
             />
+            {firstLinkInCaption ? <LinkPreviewCard url={firstLinkInCaption} /> : null}
             <Button
               variant="neon"
               onClick={() => void handleSubmitVideo()}
@@ -434,6 +438,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
               rows={4}
               autoFocus
             />
+            {firstLinkInCaption ? <LinkPreviewCard url={firstLinkInCaption} /> : null}
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">{caption.length}/500</span>
               <Button

@@ -23,6 +23,7 @@ import {
   validatePostMediaFile,
   type PostMediaKind,
 } from "@/lib/post-media"
+import { extractFirstUrl, LinkPreviewCard, normalizeTagSearchQuery } from "@/lib/social-content"
 import { uploadActivityShareMedia } from "@/lib/activity-share-media-upload"
 
 interface ShareActivityPickerProps {
@@ -67,9 +68,10 @@ export function ShareActivityPicker({
   const imageKitAuth = trpc.community.postImageKitAuth.useMutation()
   const postImageUpload = trpc.community.postUploadImage.useMutation()
   const cloudinaryVideoAuth = trpc.community.cloudinaryVideoAuth.useMutation()
-  const tagSearchEnabled = open && !!selectedId && tagQuery.trim().length >= 2
+  const normalizedTagQuery = useMemo(() => normalizeTagSearchQuery(tagQuery), [tagQuery])
+  const tagSearchEnabled = open && !!selectedId && normalizedTagQuery.length >= 2
   const tagSearchQuery = trpc.community.users.search.useQuery(
-    { query: tagQuery.trim(), limit: 8 },
+    { query: normalizedTagQuery, limit: 8 },
     { enabled: tagSearchEnabled }
   )
 
@@ -93,6 +95,7 @@ export function ShareActivityPicker({
 
   const selected = activities?.find((a: any) => a.id === selectedId)
   const hashtags = useMemo(() => extractHashtags(caption), [caption])
+  const firstLinkInCaption = useMemo(() => extractFirstUrl(caption), [caption])
 
   useEffect(() => {
     if (!open || !initialActivityId || !activities?.length) return
@@ -262,6 +265,7 @@ export function ShareActivityPicker({
               className="resize-none"
               rows={3}
             />
+            {firstLinkInCaption ? <LinkPreviewCard url={firstLinkInCaption} /> : null}
 
             <div className="flex items-center justify-between gap-2">
               <Button type="button" variant="outline-neon" size="sm" className="gap-2" onClick={() => mediaInputRef.current?.click()}>
@@ -316,7 +320,7 @@ export function ShareActivityPicker({
                 value={tagQuery}
                 onChange={(e) => setTagQuery(e.target.value)}
               />
-              {tagSearchQuery.data && tagQuery.trim().length >= 2 ? (
+              {tagSearchQuery.data && normalizedTagQuery.length >= 2 ? (
                 <div className="max-h-36 overflow-y-auto rounded-xl border border-border/70 bg-background/60">
                   {(tagSearchQuery.data as any[]).length === 0 ? (
                     <p className="px-3 py-2 text-xs text-muted-foreground">Nessun utente trovato</p>

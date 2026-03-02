@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { clampLimit } from "@/lib/pagination";
-import { getWorkoutSeriesDisplay, parseWorkoutPlan } from "@/lib/workout-plan";
+import { parseWorkoutPlan } from "@/lib/workout-plan";
 import { ArrowLeft, CalendarDays, Dumbbell } from "lucide-react";
 
 function formatSessionDate(value?: string | Date | null) {
@@ -30,12 +30,8 @@ function toSessionKey(value?: string | Date | null) {
 }
 
 export default function ClubWorkoutsPage() {
-  const [detailMatch, detailParams] = useRoute("/community/club/:clubId/workouts/:workoutId");
-  const [listMatch, listParams] = useRoute("/community/club/:clubId/workouts");
-  const match = detailMatch || listMatch;
-  const clubId = Number(detailParams?.clubId ?? listParams?.clubId);
-  const routeWorkoutId = Number(detailParams?.workoutId ?? 0);
-  const selectedWorkoutId = Number.isFinite(routeWorkoutId) && routeWorkoutId > 0 ? routeWorkoutId : null;
+  const [match, params] = useRoute("/community/club/:clubId/workouts");
+  const clubId = Number(params?.clubId);
 
   const publishedWorkoutsLimit = clampLimit(120);
   const clubQuery = trpc.community.clubs.get.useQuery(
@@ -50,28 +46,12 @@ export default function ClubWorkoutsPage() {
       refetchOnWindowFocus: false,
     }
   );
-  const workoutDetailQuery = trpc.community.clubs.workouts.getPublished.useQuery(
-    { clubId, workoutId: selectedWorkoutId ?? 0 },
-    { enabled: match && Number.isFinite(clubId) && Boolean(selectedWorkoutId) }
-  );
 
   const workouts = ((workoutsQuery.data as any)?.workouts as any[]) ?? [];
   const todayKey = toSessionKey(new Date());
-
-  const selectedWorkout = useMemo(() => {
-    if (selectedWorkoutId) {
-      const found = workouts.find((item) => Number(item.id) === selectedWorkoutId);
-      if (found) return found;
-      return (workoutDetailQuery.data as any)?.workout ?? null;
-    }
-    return null;
-  }, [selectedWorkoutId, workoutDetailQuery.data, workouts]);
-
   const todayWorkout = useMemo(() => {
-    const fromSelected = selectedWorkout && toSessionKey(selectedWorkout.sessionDate) === todayKey ? selectedWorkout : null;
-    if (fromSelected) return fromSelected;
     return workouts.find((item) => toSessionKey(item.sessionDate) === todayKey) ?? null;
-  }, [selectedWorkout, todayKey, workouts]);
+  }, [todayKey, workouts]);
 
   const groupedByDate = useMemo(() => {
     const map = new Map<string, any[]>();
@@ -86,7 +66,7 @@ export default function ClubWorkoutsPage() {
 
   if (!match || !Number.isFinite(clubId)) return null;
 
-  if (clubQuery.isLoading || workoutsQuery.isLoading || workoutDetailQuery.isLoading) {
+  if (clubQuery.isLoading || workoutsQuery.isLoading) {
     return (
       <AppLayout>
         <div className="container py-6">
@@ -106,9 +86,6 @@ export default function ClubWorkoutsPage() {
       </AppLayout>
     );
   }
-
-  const detailWorkout = selectedWorkout ?? todayWorkout;
-  const detailPlan = parseWorkoutPlan(detailWorkout?.workoutJson);
 
   return (
     <AppLayout>
@@ -140,45 +117,6 @@ export default function ClubWorkoutsPage() {
                 Apri workout del giorno
               </Button>
             </Link>
-          </section>
-        ) : null}
-
-        {detailWorkout ? (
-          <section className="surface-panel p-4 space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Dettaglio Workout</h2>
-            <p className="text-lg font-semibold">{String(detailPlan?.title ?? detailWorkout.title ?? "Workout")}</p>
-            <p className="text-sm text-muted-foreground">
-              Data: {formatSessionDate(detailWorkout.sessionDate)} • Distanza: {String(detailPlan?.totalDistance ?? "n/d")} • Durata: {String(detailPlan?.estimatedDuration ?? "n/d")}
-            </p>
-            {Array.isArray(detailPlan?.blocks) && detailPlan.blocks.length > 0 ? (
-              <div className="space-y-2">
-                {detailPlan.blocks.map((block: any, index: number) => (
-                  <div key={`${detailWorkout.id}-${index}`} className="rounded-xl border border-border/60 bg-card/35 p-3">
-                    <p className="text-sm font-semibold">{String(block?.label ?? `Blocco ${index + 1}`)}</p>
-                    {Array.isArray(block?.items) && block.items.length > 0 ? (
-                      <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
-                        {block.items.map((item: any, itemIndex: number) => (
-                          <li key={`${detailWorkout.id}-${index}-${itemIndex}`}>
-                            {(() => {
-                              const line = getWorkoutSeriesDisplay(item);
-                              return (
-                                <div className="space-y-0.5">
-                                  <p className="font-medium text-foreground/90">{String(item?.label ?? "Serie")}</p>
-                                  <p>Serie: {line.reps} • Distanza serie: {line.seriesDistance} • Ripartenza: {line.sendoff}</p>
-                                  {line.betweenSetsRest ? <p>Recupero prima prossima serie: {line.betweenSetsRest}</p> : null}
-                                </div>
-                              );
-                            })()}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Dettagli workout non disponibili.</p>
-            )}
           </section>
         ) : null}
 

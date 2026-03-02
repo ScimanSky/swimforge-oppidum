@@ -23,6 +23,7 @@ import {
   type PostMediaKind,
 } from "@/lib/post-media";
 import { uploadVideoToCloudinary } from "@/lib/cloudinary-upload";
+import { extractFirstUrl, LinkPreviewCard, normalizeTagSearchQuery, renderSocialText } from "@/lib/social-content";
 
 interface ClubFeedTabProps {
   clubId: number;
@@ -71,27 +72,6 @@ function parseTaggedUsers(raw: unknown): Array<{ user_id: number; name?: string 
   return [];
 }
 
-function renderPostContent(content: string) {
-  const parts = content.split(/(#[A-Za-z0-9_]{2,40}|@[A-Za-z0-9_]{2,40})/g);
-  return parts.map((part, idx) => {
-    if (/^#[A-Za-z0-9_]{2,40}$/.test(part)) {
-      return (
-        <span key={`${part}-${idx}`} className="font-medium text-[var(--electric-cyan)]">
-          {part}
-        </span>
-      );
-    }
-    if (/^@[A-Za-z0-9_]{2,40}$/.test(part)) {
-      return (
-        <span key={`${part}-${idx}`} className="font-medium text-[var(--electric-lime)]">
-          {part}
-        </span>
-      );
-    }
-    return <span key={`${part}-${idx}`}>{part}</span>;
-  });
-}
-
 export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: ClubFeedTabProps) {
   const [postText, setPostText] = useState("");
   const [openCommentsId, setOpenCommentsId] = useState<number | null>(null);
@@ -103,6 +83,8 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
   const mediaInputRef = useRef<HTMLInputElement | null>(null);
 
   const hashtags = useMemo(() => extractHashtags(postText), [postText]);
+  const postFirstLink = useMemo(() => extractFirstUrl(postText), [postText]);
+  const normalizedTagQuery = useMemo(() => normalizeTagSearchQuery(tagQuery), [tagQuery]);
 
   const utils = trpc.useUtils();
 
@@ -121,9 +103,9 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
 
   const imageKitAuth = trpc.community.postImageKitAuth.useMutation();
   const cloudinaryVideoAuth = trpc.community.cloudinaryVideoAuth.useMutation();
-  const tagSearchEnabled = isMember && tagQuery.trim().length >= 2;
+  const tagSearchEnabled = isMember && normalizedTagQuery.length >= 2;
   const tagSearchQuery = trpc.community.users.search.useQuery(
-    { query: tagQuery.trim(), limit: 8 },
+    { query: normalizedTagQuery, limit: 8 },
     { enabled: !!tagSearchEnabled }
   );
 
@@ -349,6 +331,8 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
             className="min-h-[100px]"
           />
 
+          {postFirstLink ? <LinkPreviewCard url={postFirstLink} className="mb-1" /> : null}
+
           <div className="flex items-center justify-between gap-2">
             <Button type="button" variant="outline-neon" size="sm" className="gap-2" onClick={() => mediaInputRef.current?.click()}>
               <ImagePlus className="size-4" />
@@ -400,7 +384,7 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
               value={tagQuery}
               onChange={(e) => setTagQuery(e.target.value)}
             />
-            {tagSearchQuery.data && tagQuery.trim().length >= 2 ? (
+            {tagSearchQuery.data && normalizedTagQuery.length >= 2 ? (
               <div className="max-h-36 overflow-y-auto rounded-xl border border-border/70 bg-background/60">
                 {(tagSearchQuery.data as any[]).length === 0 ? (
                   <p className="px-3 py-2 text-xs text-muted-foreground">Nessun utente trovato</p>
@@ -507,6 +491,7 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
               : (post.media_url ? [String(post.media_url)] : []);
             const taggedUsersForPost = parseTaggedUsers(post.tagged_users);
             const hashtagsForPost = normalizeArrayField(post.hashtags);
+            const firstLinkForPost = post.content ? extractFirstUrl(post.content) : null;
 
             return (
               <motion.div
@@ -562,8 +547,11 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
                       ) : null}
                     </div>
                     {post.content && (
-                      <p className="text-sm mb-3 whitespace-pre-wrap">{renderPostContent(post.content)}</p>
+                      <p className="text-sm mb-3 whitespace-pre-wrap">{renderSocialText(post.content)}</p>
                     )}
+                    {firstLinkForPost ? (
+                      <LinkPreviewCard url={firstLinkForPost} className="mb-3" />
+                    ) : null}
 
                     {taggedUsersForPost.length > 0 && (
                       <div className="mb-3 flex flex-wrap gap-2">

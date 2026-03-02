@@ -8,6 +8,7 @@ const VALID_PHASES: ClubPoolWorkoutBlock["phase"][] = ["warmup", "activation", "
 
 export type WorkoutSeriesNormalizationOptions = {
   isLastInBlock: boolean;
+  defaultStroke?: string;
   defaultSendoff?: string;
   defaultBetweenSetsRest?: string;
 };
@@ -77,7 +78,14 @@ export function normalizeWorkoutSeriesItem(
   const hardIssues: string[] = [];
 
   const label = normalizeText(rawItem.label) ?? "Serie";
-  const stroke = normalizeText(rawItem.stroke);
+  let stroke = normalizeText(rawItem.stroke);
+  if (!stroke && options.defaultStroke) {
+    const fallbackStroke = normalizeText(options.defaultStroke);
+    if (fallbackStroke) {
+      stroke = fallbackStroke;
+      warnings.push("stroke_defaulted");
+    }
+  }
   const intensity = normalizeText(rawItem.intensity);
   const targetPace = normalizeText(rawItem.targetPace);
   const notes = normalizeText(rawItem.notes);

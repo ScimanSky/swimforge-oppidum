@@ -23,6 +23,7 @@ export function getWorkoutSeriesDisplay(item: WorkoutSeriesItem) {
     "n/d";
 
   return {
+    stroke: item.stroke || null,
     reps,
     seriesDistance,
     sendoff: item.sendoff || "n/d",
