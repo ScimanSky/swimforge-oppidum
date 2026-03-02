@@ -18,6 +18,11 @@ describe("social-content helpers", () => {
     expect(extractFirstUrl(text)).toBe("https://eamasters26.com/eventi");
   });
 
+  it("extracts urls even when pasted text contains invisible chars", () => {
+    const text = `https://eamasters26.com/\u200Beventi`;
+    expect(extractFirstUrl(text)).toBe("https://eamasters26.com/eventi");
+  });
+
   it("renders links as clickable anchors", () => {
     render(<p>{renderSocialText("Link https://swimforge.app ora")}</p>);
     const link = screen.getByRole("link", { name: "https://swimforge.app" });

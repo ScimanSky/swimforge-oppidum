@@ -2,6 +2,11 @@ import { Fragment, type ReactNode } from "react";
 
 const CONTENT_TOKEN_SPLIT = /(\s+)/g;
 const DOMAIN_LIKE_PATTERN = /^(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,63}(?::\d{2,5})?(?:\/[^\s<>"']*)?$/i;
+const INVISIBLE_CHARS_PATTERN = /[\u200B-\u200D\u2060\uFEFF]/g;
+
+function stripInvisibleChars(value: string) {
+  return value.replace(INVISIBLE_CHARS_PATTERN, "");
+}
 
 function trimUrlTrailingPunctuation(value: string) {
   return value.replace(/[),.;!?]+$/g, "");
@@ -21,11 +26,12 @@ function isSafeHttpUrl(value: string) {
 }
 
 export function normalizeTagSearchQuery(value: string) {
-  return value.trim().replace(/^@+/, "").replace(/\s+/g, " ");
+  return stripInvisibleChars(value).trim().replace(/^@+/, "").replace(/\s+/g, " ");
 }
 
 function toNormalizedUrl(rawToken: string) {
-  const strippedLeading = trimUrlLeadingPunctuation(rawToken.trim());
+  const cleanedRaw = stripInvisibleChars(rawToken);
+  const strippedLeading = trimUrlLeadingPunctuation(cleanedRaw.trim());
   const cleanedToken = trimUrlTrailingPunctuation(strippedLeading);
   if (!cleanedToken) return null;
 
@@ -44,7 +50,7 @@ function toNormalizedUrl(rawToken: string) {
 
 export function extractUrls(value: string) {
   const unique = new Set<string>();
-  for (const token of value.split(/\s+/g)) {
+  for (const token of stripInvisibleChars(value).split(/\s+/g)) {
     const normalized = toNormalizedUrl(token);
     if (!normalized) continue;
     unique.add(normalized.href);
