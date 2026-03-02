@@ -122,6 +122,14 @@ function clickOverlayAt(clientX: number) {
   fireEvent.click(overlay, { clientX });
 }
 
+function hasNormalizedText(value: string) {
+  const expected = value.replace(/\s+/g, " ").trim();
+  return (_content: string, node: Element | null) => {
+    const current = node?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+    return current === expected;
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
 });
@@ -177,16 +185,16 @@ describe("StoryViewer", () => {
       textStory({ id: 401, caption: "Seconda story", hasViewed: true }),
     ]);
 
-    expect(screen.getByText("Prima story")).toBeInTheDocument();
+    expect(screen.getByText(hasNormalizedText("Prima story"), { selector: "p" })).toBeInTheDocument();
 
     clickOverlayAt(180);
     await waitFor(() => {
-      expect(screen.getByText("Seconda story")).toBeInTheDocument();
+      expect(screen.getByText(hasNormalizedText("Seconda story"), { selector: "p" })).toBeInTheDocument();
     });
 
     clickOverlayAt(20);
     await waitFor(() => {
-      expect(screen.getByText("Prima story")).toBeInTheDocument();
+      expect(screen.getByText(hasNormalizedText("Prima story"), { selector: "p" })).toBeInTheDocument();
     });
   });
 });
