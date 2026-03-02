@@ -7,6 +7,7 @@ Questo documento rende ufficiale la governance strategica della nuova versione S
 1. Governance canonica: [2026-03-02-unified-strategy.md](/home/scima/projects/swimforge-oppidum-cloud/docs/reports/2026-03-02-unified-strategy.md)
 2. Reference tecnico-strategico: [2026-03-02-product-strategy-analysis.md](/home/scima/projects/swimforge-oppidum-cloud/docs/reports/2026-03-02-product-strategy-analysis.md)
 3. Baseline operativa Fase 0: [2026-03-02-phase-0-baseline-spec.md](/home/scima/projects/swimforge-oppidum-cloud/docs/reports/2026-03-02-phase-0-baseline-spec.md)
+4. Query e runbook baseline: [phase-0-baseline-queries.sql](/home/scima/projects/swimforge-oppidum-cloud/docs/analytics/phase-0-baseline-queries.sql) e [phase-0-dashboard-runbook.md](/home/scima/projects/swimforge-oppidum-cloud/docs/analytics/phase-0-dashboard-runbook.md)
 
 ## Ruoli dei due report
 1. Report unificato canonico:
