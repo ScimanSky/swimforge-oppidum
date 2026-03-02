@@ -1,10 +1,14 @@
 import { Fragment, type ReactNode } from "react";
 
-const URL_TOKEN_PATTERN = /^https?:\/\/[^\s<>"']+$/i;
-const CONTENT_TOKEN_SPLIT = /(https?:\/\/[^\s<>"']+|#[A-Za-z0-9_]{2,40}|@[A-Za-z0-9_]{2,40})/g;
+const CONTENT_TOKEN_SPLIT = /(\s+)/g;
+const DOMAIN_LIKE_PATTERN = /^(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,63}(?::\d{2,5})?(?:\/[^\s<>"']*)?$/i;
 
 function trimUrlTrailingPunctuation(value: string) {
   return value.replace(/[),.;!?]+$/g, "");
+}
+
+function trimUrlLeadingPunctuation(value: string) {
+  return value.replace(/^[([{"']+/g, "");
 }
 
 function isSafeHttpUrl(value: string) {
@@ -20,14 +24,30 @@ export function normalizeTagSearchQuery(value: string) {
   return value.trim().replace(/^@+/, "").replace(/\s+/g, " ");
 }
 
+function toNormalizedUrl(rawToken: string) {
+  const strippedLeading = trimUrlLeadingPunctuation(rawToken.trim());
+  const cleanedToken = trimUrlTrailingPunctuation(strippedLeading);
+  if (!cleanedToken) return null;
+
+  const candidate = /^https?:\/\//i.test(cleanedToken)
+    ? cleanedToken
+    : DOMAIN_LIKE_PATTERN.test(cleanedToken)
+      ? `https://${cleanedToken}`
+      : null;
+  if (!candidate) return null;
+  if (!isSafeHttpUrl(candidate)) return null;
+  return {
+    href: candidate,
+    display: cleanedToken,
+  };
+}
+
 export function extractUrls(value: string) {
-  const matches = value.match(/https?:\/\/[^\s<>"']+/gi) ?? [];
   const unique = new Set<string>();
-  for (const match of matches) {
-    const cleaned = trimUrlTrailingPunctuation(match.trim());
-    if (!cleaned) continue;
-    if (!isSafeHttpUrl(cleaned)) continue;
-    unique.add(cleaned);
+  for (const token of value.split(/\s+/g)) {
+    const normalized = toNormalizedUrl(token);
+    if (!normalized) continue;
+    unique.add(normalized.href);
   }
   return Array.from(unique.values());
 }
@@ -45,43 +65,53 @@ type SocialTextRenderOptions = {
 export function renderSocialText(content: string, options?: SocialTextRenderOptions): ReactNode[] {
   const parts = content.split(CONTENT_TOKEN_SPLIT);
   return parts.map((part, index) => {
-    if (/^#[A-Za-z0-9_]{2,40}$/.test(part)) {
+    if (/^\s+$/.test(part)) {
+      return <span key={`space-${index}`}>{part}</span>;
+    }
+
+    const leading = part.match(/^[([{"']+/)?.[0] ?? "";
+    const trailing = part.match(/[),.;!?]+$/)?.[0] ?? "";
+    const core = trimUrlTrailingPunctuation(trimUrlLeadingPunctuation(part));
+
+    if (/^#[A-Za-z0-9_]{2,40}$/.test(core)) {
       return (
-        <span key={`hash-${part}-${index}`} className={options?.hashtagClassName ?? "font-medium text-[var(--electric-cyan)]"}>
-          {part}
-        </span>
+        <Fragment key={`hash-${core}-${index}`}>
+          {leading}
+          <span className={options?.hashtagClassName ?? "font-medium text-[var(--electric-cyan)]"}>{core}</span>
+          {trailing}
+        </Fragment>
       );
     }
 
-    if (/^@[A-Za-z0-9_]{2,40}$/.test(part)) {
+    if (/^@[A-Za-z0-9_]{2,40}$/.test(core)) {
       return (
-        <span key={`mention-${part}-${index}`} className={options?.mentionClassName ?? "font-medium text-[var(--electric-lime)]"}>
-          {part}
-        </span>
+        <Fragment key={`mention-${core}-${index}`}>
+          {leading}
+          <span className={options?.mentionClassName ?? "font-medium text-[var(--electric-lime)]"}>{core}</span>
+          {trailing}
+        </Fragment>
       );
     }
 
-    if (URL_TOKEN_PATTERN.test(part)) {
-      const cleaned = trimUrlTrailingPunctuation(part);
-      const suffix = part.slice(cleaned.length);
-      if (cleaned && isSafeHttpUrl(cleaned)) {
-        return (
-          <Fragment key={`url-${cleaned}-${index}`}>
-            <a
-              href={cleaned}
-              target="_blank"
-              rel="noreferrer"
-              className={
-                options?.linkClassName ??
-                "font-medium text-[var(--electric-cyan)] underline decoration-dotted underline-offset-2 hover:opacity-85"
-              }
-            >
-              {cleaned}
-            </a>
-            {suffix}
-          </Fragment>
-        );
-      }
+    const normalized = toNormalizedUrl(part);
+    if (normalized) {
+      return (
+        <Fragment key={`url-${normalized.href}-${index}`}>
+          {leading}
+          <a
+            href={normalized.href}
+            target="_blank"
+            rel="noreferrer"
+            className={
+              options?.linkClassName ??
+              "font-medium text-[var(--electric-cyan)] underline decoration-dotted underline-offset-2 hover:opacity-85"
+            }
+          >
+            {normalized.display}
+          </a>
+          {trailing}
+        </Fragment>
+      );
     }
 
     return <span key={`text-${index}`}>{part}</span>;
@@ -93,7 +123,6 @@ type ParsedLinkPreview = {
   host: string;
   label: string;
   pathLabel: string;
-  faviconUrl: string;
 };
 
 function parseLinkPreview(url: string): ParsedLinkPreview | null {
@@ -107,7 +136,6 @@ function parseLinkPreview(url: string): ParsedLinkPreview | null {
       host: parsed.hostname,
       label: `${parsed.protocol.replace(":", "")}://${parsed.hostname}`,
       pathLabel: pathLabel.length > 96 ? `${pathLabel.slice(0, 95)}…` : pathLabel,
-      faviconUrl: `https://www.google.com/s2/favicons?domain=${encodeURIComponent(parsed.hostname)}&sz=64`,
     };
   } catch {
     return null;
@@ -134,13 +162,12 @@ export function LinkPreviewCard({
       className={`group block rounded-xl border border-border/70 bg-card/35 p-3 transition-colors hover:bg-card/55 ${className}`}
     >
       <div className="flex items-center gap-2">
-        <img
-          src={preview.faviconUrl}
-          alt=""
+        <span
           aria-hidden="true"
-          className={`${compact ? "h-4 w-4" : "h-5 w-5"} rounded-sm`}
-          loading="lazy"
-        />
+          className={`inline-flex items-center justify-center rounded-sm border border-border/70 bg-background/70 text-[10px] font-semibold uppercase text-muted-foreground ${compact ? "h-4 w-4" : "h-5 w-5"}`}
+        >
+          {preview.host.slice(0, 1)}
+        </span>
         <div className="min-w-0">
           <p className={`truncate ${compact ? "text-[11px]" : "text-xs"} text-muted-foreground`}>{preview.label}</p>
           <p className={`truncate ${compact ? "text-xs" : "text-sm"} font-medium text-foreground/90 group-hover:text-foreground`}>

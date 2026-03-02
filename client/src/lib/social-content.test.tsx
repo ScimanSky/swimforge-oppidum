@@ -13,9 +13,20 @@ describe("social-content helpers", () => {
     expect(extractFirstUrl(text)).toBe("https://swimforge.app/path/to/page");
   });
 
+  it("extracts bare domains and normalizes them to https", () => {
+    const text = "Link club: eamasters26.com/eventi";
+    expect(extractFirstUrl(text)).toBe("https://eamasters26.com/eventi");
+  });
+
   it("renders links as clickable anchors", () => {
     render(<p>{renderSocialText("Link https://swimforge.app ora")}</p>);
     const link = screen.getByRole("link", { name: "https://swimforge.app" });
     expect(link).toHaveAttribute("href", "https://swimforge.app");
+  });
+
+  it("renders bare-domain links as clickable anchors", () => {
+    render(<p>{renderSocialText("Vai su eamasters26.com ora")}</p>);
+    const link = screen.getByRole("link", { name: "eamasters26.com" });
+    expect(link).toHaveAttribute("href", "https://eamasters26.com");
   });
 });
