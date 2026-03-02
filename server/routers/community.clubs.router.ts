@@ -11,6 +11,7 @@ import {
   TRPCError,
   z,
 } from "./_shared";
+import { trackProductEvent } from "../product_analytics";
 import type { ClubAnnouncementInsert, ClubEventInsert } from "./_shared";
 
 const ROUTE_GEOJSON_SCHEMA = z.object({
@@ -954,6 +955,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                 .input(z.object({
                     clubId: z.number(),
                     workoutId: z.number(),
+                    source: z.string().max(80).optional(),
                 }))
                 .query(async ({ ctx, input }) => {
                     const { getPublishedClubWorkoutById } = await import("../db_club_workouts");
@@ -963,9 +965,53 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                             clubId: input.clubId,
                             workoutId: input.workoutId,
                         });
+                        await trackProductEvent({
+                            userId: ctx.user.id,
+                            eventName: "club_workout_open",
+                            source: input.source ?? "club_workout_detail",
+                            entityType: "club_workout",
+                            entityId: workout.id,
+                            metadata: {
+                                clubId: input.clubId,
+                            },
+                        });
                         return { workout };
                     } catch (error) {
                         const message = error instanceof Error ? error.message : "Impossibile leggere dettaglio workout";
+                        if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
+                        if (message === "Workout not found") throw new TRPCError({ code: "NOT_FOUND" });
+                        throw new TRPCError({ code: "BAD_REQUEST", message });
+                    }
+                }),
+
+            markCompleted: protectedProcedure
+                .input(z.object({
+                    clubId: z.number(),
+                    workoutId: z.number(),
+                    completionStatus: z.enum(["completed", "partial", "skipped"]).optional(),
+                }))
+                .mutation(async ({ ctx, input }) => {
+                    const { getPublishedClubWorkoutById } = await import("../db_club_workouts");
+                    try {
+                        const workout = await getPublishedClubWorkoutById({
+                            userId: ctx.user.id,
+                            clubId: input.clubId,
+                            workoutId: input.workoutId,
+                        });
+                        await trackProductEvent({
+                            userId: ctx.user.id,
+                            eventName: "club_workout_complete",
+                            source: "club_workout_detail",
+                            entityType: "club_workout",
+                            entityId: workout.id,
+                            metadata: {
+                                clubId: input.clubId,
+                                status: input.completionStatus ?? "completed",
+                            },
+                        });
+                        return { success: true, workoutId: workout.id };
+                    } catch (error) {
+                        const message = error instanceof Error ? error.message : "Impossibile registrare completamento workout";
                         if (message === "Forbidden") throw new TRPCError({ code: "FORBIDDEN" });
                         if (message === "Workout not found") throw new TRPCError({ code: "NOT_FOUND" });
                         throw new TRPCError({ code: "BAD_REQUEST", message });

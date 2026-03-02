@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import AppLayout from "@/components/AppLayout"
 import { trpc } from "@/lib/trpc"
 import { Surface, SurfaceContent } from "@/components/ui/surface"
@@ -23,9 +23,11 @@ import {
   Users,
 } from "lucide-react"
 import { Link } from "wouter"
+import { useLocation } from "wouter"
 import { toast } from "sonner"
 import { getSeasonAssignmentImageUrl } from "@/lib/seasonBadgeImages"
 import { SeasonRecapDialog } from "@/components/video/SeasonRecapDialog"
+import { UI_FEATURE_FLAGS } from "@/lib/feature-flags"
 
 type PredictionPreset = {
   id: string
@@ -88,6 +90,9 @@ function formatPaceSeconds(pacePer100m: number | null | undefined) {
 
 export default function SeasonPage() {
   const utils = trpc.useUtils()
+  const [, setLocation] = useLocation()
+  const seasonViewTrackedRef = useRef(false)
+  const trackEventMutation = trpc.community.analytics.track.useMutation()
   const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
     staleTime: 30_000,
     refetchInterval: 60_000,
@@ -203,9 +208,11 @@ export default function SeasonPage() {
   const actionXp = engagement?.actionXp
   const predictions = engagement?.predictions ?? []
   const clubQuests = engagement?.clubQuests ?? []
+  const seasonPredictionsEnabled = UI_FEATURE_FLAGS.seasonPredictionsV1
+  const seasonRecapEnabled = UI_FEATURE_FLAGS.seasonRecapV1
   const pendingPredictions = useMemo(
-    () => predictions.filter((prediction) => prediction.status === "pending"),
-    [predictions],
+    () => (seasonPredictionsEnabled ? predictions.filter((prediction) => prediction.status === "pending") : []),
+    [predictions, seasonPredictionsEnabled],
   )
 
   const currentLevel = Number(seasonData?.progress?.currentLevel ?? 1)
@@ -228,6 +235,7 @@ export default function SeasonPage() {
         title: "Priorità oggi",
         body: `${firstIncompleteDaily.title} · +${firstIncompleteDaily.xpReward} XP`,
         helper: "Completa una missione daily prima del reset.",
+        actionType: "daily" as const,
       }
     }
 
@@ -236,14 +244,16 @@ export default function SeasonPage() {
         title: "Spingi Action XP",
         body: `Hai ancora ${actionXp?.remaining ?? 0} XP disponibili oggi`,
         helper: "Commento, reaction, RSVP e club post aumentano il cap giornaliero.",
+        actionType: "action_xp" as const,
       }
     }
 
-    if (pendingPredictions.length > 0) {
+    if (seasonPredictionsEnabled && pendingPredictions.length > 0) {
       return {
         title: "Valuta la previsione",
         body: `${pendingPredictions.length} previsione in attesa`,
         helper: "Chiudi il loop pre-sessione e sblocca XP precisione.",
+        actionType: "prediction" as const,
       }
     }
 
@@ -252,6 +262,7 @@ export default function SeasonPage() {
         title: "Focus settimanale",
         body: `${firstIncompleteWeekly.title} · +${firstIncompleteWeekly.xpReward} XP`,
         helper: "Consolida i progressi weekly per aumentare il completamento globale.",
+        actionType: "weekly" as const,
       }
     }
 
@@ -259,8 +270,48 @@ export default function SeasonPage() {
       title: "Ottimo ritmo",
       body: "Tutte le priorità completate",
       helper: "Mantieni continuità con attività, community e club quest.",
+      actionType: "explore" as const,
     }
-  }, [actionXp?.remaining, firstIncompleteDaily, firstIncompleteWeekly, pendingPredictions.length])
+  }, [
+    actionXp?.remaining,
+    firstIncompleteDaily,
+    firstIncompleteWeekly,
+    pendingPredictions.length,
+    seasonPredictionsEnabled,
+  ])
+
+  useEffect(() => {
+    if (seasonViewTrackedRef.current) return
+    seasonViewTrackedRef.current = true
+    trackEventMutation.mutate({
+      eventName: "season_view",
+      source: "season_page",
+    })
+  }, [trackEventMutation])
+
+  const handleNextActionClick = () => {
+    trackEventMutation.mutate({
+      eventName: "season_next_action_click",
+      source: "season_page",
+      metadata: {
+        actionType: nextAction.actionType,
+      },
+    })
+
+    if (nextAction.actionType === "prediction") {
+      evaluatePredictionMutation.mutate({})
+      return
+    }
+    if (nextAction.actionType === "action_xp") {
+      setLocation("/home")
+      return
+    }
+    if (nextAction.actionType === "daily" || nextAction.actionType === "weekly") {
+      setLocation("/track")
+      return
+    }
+    setLocation("/season/challenges")
+  }
 
   const handleCreatePrediction = () => {
     const targetDistanceMeters = toOptionalNumber(predictionForm.targetDistanceMeters)
@@ -308,7 +359,7 @@ export default function SeasonPage() {
                     <Sparkles className="size-3 text-primary" />
                     Season Hub
                   </div>
-                  <SeasonRecapDialog triggerLabel="Recap video" />
+                  {seasonRecapEnabled ? <SeasonRecapDialog triggerLabel="Recap video" /> : null}
                 </div>
                 <h1 className="font-display text-xl md:text-2xl font-bold neon-gradient-text">
                   {seasonData?.season?.name ?? "Season Electric Ice"}
@@ -375,6 +426,15 @@ export default function SeasonPage() {
                 <p className="text-sm font-semibold text-foreground">{nextAction.title}</p>
                 <p className="text-sm text-foreground/90">{nextAction.body}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{nextAction.helper}</p>
+                <Button
+                  variant="outline-neon"
+                  size="sm"
+                  className="mt-2 h-7 px-2.5 text-[11px]"
+                  onClick={handleNextActionClick}
+                  disabled={trackEventMutation.isPending}
+                >
+                  Vai all'azione
+                </Button>
               </div>
               <Flame className="size-4 text-primary shrink-0" />
             </div>
@@ -422,82 +482,84 @@ export default function SeasonPage() {
                 </div>
               </div>
 
-              <div className="stream-card">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="text-xs text-muted-foreground">Previsioni</p>
-                  <Button
-                    variant="outline-neon"
-                    size="sm"
-                    className="h-7 px-2 text-[11px]"
-                    disabled={evaluatePredictionMutation.isPending}
-                    onClick={() => evaluatePredictionMutation.mutate({})}
-                  >
-                    Valuta ultima
-                  </Button>
-                </div>
-
-                <div className="mb-2 flex flex-wrap gap-1">
-                  {PREDICTION_PRESETS.map((preset) => (
+              {seasonPredictionsEnabled ? (
+                <div className="stream-card">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">Previsioni</p>
                     <Button
-                      key={preset.id}
-                      variant="ghost"
+                      variant="outline-neon"
                       size="sm"
                       className="h-7 px-2 text-[11px]"
-                      onClick={() => applyPredictionPreset(preset)}
+                      disabled={evaluatePredictionMutation.isPending}
+                      onClick={() => evaluatePredictionMutation.mutate({})}
                     >
-                      {preset.label}
+                      Valuta ultima
                     </Button>
-                  ))}
-                </div>
+                  </div>
 
-                <div className="grid grid-cols-2 gap-1">
+                  <div className="mb-2 flex flex-wrap gap-1">
+                    {PREDICTION_PRESETS.map((preset) => (
+                      <Button
+                        key={preset.id}
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 px-2 text-[11px]"
+                        onClick={() => applyPredictionPreset(preset)}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1">
+                    <Input
+                      type="number"
+                      min={100}
+                      max={50000}
+                      placeholder="Distanza (m)"
+                      value={predictionForm.targetDistanceMeters}
+                      onChange={(e) =>
+                        setPredictionForm((prev) => ({ ...prev, targetDistanceMeters: e.target.value }))
+                      }
+                      className="h-8 bg-background/60 text-xs"
+                    />
+                    <Input
+                      type="number"
+                      min={5}
+                      max={360}
+                      placeholder="Durata (min)"
+                      value={predictionForm.targetDurationMinutes}
+                      onChange={(e) =>
+                        setPredictionForm((prev) => ({ ...prev, targetDurationMinutes: e.target.value }))
+                      }
+                      className="h-8 bg-background/60 text-xs"
+                    />
+                  </div>
+
                   <Input
-                    type="number"
-                    min={100}
-                    max={50000}
-                    placeholder="Distanza (m)"
-                    value={predictionForm.targetDistanceMeters}
+                    className="mt-1 h-8 bg-background/60 text-xs"
+                    placeholder="Nota opzionale"
+                    value={predictionForm.note}
                     onChange={(e) =>
-                      setPredictionForm((prev) => ({ ...prev, targetDistanceMeters: e.target.value }))
+                      setPredictionForm((prev) => ({ ...prev, note: e.target.value }))
                     }
-                    className="h-8 bg-background/60 text-xs"
                   />
-                  <Input
-                    type="number"
-                    min={5}
-                    max={360}
-                    placeholder="Durata (min)"
-                    value={predictionForm.targetDurationMinutes}
-                    onChange={(e) =>
-                      setPredictionForm((prev) => ({ ...prev, targetDurationMinutes: e.target.value }))
-                    }
-                    className="h-8 bg-background/60 text-xs"
-                  />
+
+                  <Button
+                    variant="neon"
+                    size="sm"
+                    className="mt-2 h-8 w-full text-xs"
+                    disabled={createPredictionMutation.isPending}
+                    onClick={handleCreatePrediction}
+                  >
+                    Crea previsione
+                  </Button>
+
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    In attesa: {pendingPredictions.length}
+                  </p>
                 </div>
-
-                <Input
-                  className="mt-1 h-8 bg-background/60 text-xs"
-                  placeholder="Nota opzionale"
-                  value={predictionForm.note}
-                  onChange={(e) =>
-                    setPredictionForm((prev) => ({ ...prev, note: e.target.value }))
-                  }
-                />
-
-                <Button
-                  variant="neon"
-                  size="sm"
-                  className="mt-2 h-8 w-full text-xs"
-                  disabled={createPredictionMutation.isPending}
-                  onClick={handleCreatePrediction}
-                >
-                  Crea previsione
-                </Button>
-
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  In attesa: {pendingPredictions.length}
-                </p>
-              </div>
+              ) : null}
             </div>
           </div>
         </section>

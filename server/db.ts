@@ -763,16 +763,58 @@ export async function upsertPersonalRecord(data: InsertPersonalRecord) {
   const existing = await getPersonalRecord(data.userId, data.recordType, data.strokeType ?? undefined);
   
   if (existing) {
+    const previousValue = Number(existing.value);
+    const currentValue = Number(data.value);
     await db.update(personalRecords).set({
       value: data.value,
       activityId: data.activityId,
       achievedAt: new Date(),
       previousValue: existing.value,
     }).where(eq(personalRecords.id, existing.id));
+    if (Number.isFinite(previousValue) && Number.isFinite(currentValue) && previousValue !== currentValue) {
+      try {
+        const { trackProductEvent } = await import("./product_analytics");
+        await trackProductEvent({
+          userId: data.userId,
+          eventName: "pb_detected",
+          source: "personal_record_upsert",
+          entityType: "personal_record",
+          entityId: existing.id,
+          metadata: {
+            recordType: data.recordType,
+            strokeType: data.strokeType ?? null,
+            previousValue,
+            currentValue,
+          },
+        });
+      } catch {
+        // Best effort analytics
+      }
+    }
     return existing.id;
   } else {
     const result = await db.insert(personalRecords).values(data).returning({ id: personalRecords.id });
-    return result[0]?.id || null;
+    const insertedId = result[0]?.id || null;
+    if (insertedId) {
+      try {
+        const { trackProductEvent } = await import("./product_analytics");
+        await trackProductEvent({
+          userId: data.userId,
+          eventName: "pb_detected",
+          source: "personal_record_insert",
+          entityType: "personal_record",
+          entityId: insertedId,
+          metadata: {
+            recordType: data.recordType,
+            strokeType: data.strokeType ?? null,
+            currentValue: Number(data.value),
+          },
+        });
+      } catch {
+        // Best effort analytics
+      }
+    }
+    return insertedId;
   }
 }
 

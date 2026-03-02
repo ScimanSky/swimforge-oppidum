@@ -20,4 +20,6 @@ export const UI_FEATURE_FLAGS = Object.freeze({
   clubMeetsV1: parseBooleanFlag(env["VITE_CLUB_MEETS_V1_ENABLED"], false),
   clubHistoryV1: parseBooleanFlag(env["VITE_CLUB_HISTORY_V1_ENABLED"], false),
   clubAiAutomationV1: parseBooleanFlag(env["VITE_CLUB_AI_AUTOMATION_V1_ENABLED"], false),
+  seasonRecapV1: parseBooleanFlag(env["VITE_SEASON_RECAP_V1_ENABLED"], false),
+  seasonPredictionsV1: parseBooleanFlag(env["VITE_SEASON_PREDICTIONS_V1_ENABLED"], false),
 })

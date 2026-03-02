@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { trpc } from "@/lib/trpc";
 import { getWorkoutSeriesDisplay, parseWorkoutPlan } from "@/lib/workout-plan";
-import { ArrowLeft, CalendarDays, Clock3, Printer } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, Clock3, Printer } from "lucide-react";
+import { toast } from "sonner";
 
 function formatSessionDate(value?: string | Date | null) {
   if (!value) return "-";
@@ -30,9 +31,17 @@ export default function ClubWorkoutDetailPage() {
     { enabled: match && Number.isFinite(clubId) }
   );
   const workoutDetailQuery = trpc.community.clubs.workouts.getPublished.useQuery(
-    { clubId, workoutId: hasValidWorkoutId ? workoutId : 0 },
+    { clubId, workoutId: hasValidWorkoutId ? workoutId : 0, source: "club_workout_detail_page" },
     { enabled: match && Number.isFinite(clubId) && hasValidWorkoutId, retry: 1, refetchOnWindowFocus: false }
   );
+  const markCompletedMutation = trpc.community.clubs.workouts.markCompleted.useMutation({
+    onSuccess: () => {
+      toast.success("Workout segnato come completato.");
+    },
+    onError: (error) => {
+      toast.error(error.message || "Impossibile registrare completamento workout.");
+    },
+  });
 
   const detailWorkout = (workoutDetailQuery.data as any)?.workout ?? null;
   const detailPlan = useMemo(() => parseWorkoutPlan(detailWorkout?.workoutJson), [detailWorkout?.workoutJson]);
@@ -40,6 +49,15 @@ export default function ClubWorkoutDetailPage() {
   const handlePrintWorkout = () => {
     if (typeof window === "undefined") return;
     window.print();
+  };
+
+  const handleMarkCompleted = () => {
+    if (!hasValidWorkoutId) return;
+    markCompletedMutation.mutate({
+      clubId,
+      workoutId,
+      completionStatus: "completed",
+    });
   };
 
   if (!match || !Number.isFinite(clubId)) return null;
@@ -189,6 +207,16 @@ export default function ClubWorkoutDetailPage() {
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="outline">Membri</Badge>
+            <Button
+              type="button"
+              size="sm"
+              variant="neon"
+              onClick={handleMarkCompleted}
+              disabled={markCompletedMutation.isPending}
+            >
+              <CheckCircle2 className="mr-1.5 h-4 w-4" />
+              {markCompletedMutation.isPending ? "Salvataggio..." : "Segna completato"}
+            </Button>
             <Button type="button" size="sm" variant="outline-neon" onClick={handlePrintWorkout}>
               <Printer className="mr-1.5 h-4 w-4" />
               Stampa workout

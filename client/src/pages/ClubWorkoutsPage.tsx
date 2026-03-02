@@ -32,6 +32,7 @@ function toSessionKey(value?: string | Date | null) {
 export default function ClubWorkoutsPage() {
   const [match, params] = useRoute("/community/club/:clubId/workouts");
   const clubId = Number(params?.clubId);
+  const trackEventMutation = trpc.community.analytics.track.useMutation();
 
   const publishedWorkoutsLimit = clampLimit(120);
   const clubQuery = trpc.community.clubs.get.useQuery(
@@ -65,6 +66,19 @@ export default function ClubWorkoutsPage() {
   }, [workouts]);
 
   if (!match || !Number.isFinite(clubId)) return null;
+
+  const handleOpenWorkoutTracking = (workoutId: number, source: "day_card" | "archive_card") => {
+    trackEventMutation.mutate({
+      eventName: "club_workout_open",
+      source: "club_workouts_page",
+      entityType: "club_workout",
+      entityId: workoutId,
+      metadata: {
+        clubId,
+        entryPoint: source,
+      },
+    });
+  };
 
   if (clubQuery.isLoading || workoutsQuery.isLoading) {
     return (
@@ -112,7 +126,11 @@ export default function ClubWorkoutsPage() {
               Data: {formatSessionDate(todayWorkout.sessionDate)} • Distanza: {String(parseWorkoutPlan(todayWorkout.workoutJson)?.totalDistance ?? "n/d")}
             </p>
             <Link href={`/community/club/${clubId}/workouts/${todayWorkout.id}`}>
-              <Button size="sm" variant="neon">
+              <Button
+                size="sm"
+                variant="neon"
+                onClick={() => handleOpenWorkoutTracking(Number(todayWorkout.id), "day_card")}
+              >
                 <Dumbbell className="mr-1.5 h-4 w-4" />
                 Apri workout del giorno
               </Button>
@@ -137,6 +155,7 @@ export default function ClubWorkoutsPage() {
                           key={workout.id}
                           href={`/community/club/${clubId}/workouts/${workout.id}`}
                           className="rounded-xl border border-border/60 bg-card/35 p-3 transition-colors hover:bg-card/55"
+                          onClick={() => handleOpenWorkoutTracking(Number(workout.id), "archive_card")}
                         >
                           <p className="text-sm font-semibold">{String(plan?.title ?? workout.title ?? "Workout")}</p>
                           <p className="text-xs text-muted-foreground">

@@ -20,6 +20,7 @@ import { createCommunityReactionsRouter } from "./community.reactions.router";
 import { createCommunityMessagesRouter } from "./community.messages.router";
 import { communityNotificationsRouter } from "./community.notifications.router";
 import { communityUsersRouter } from "./community.users.router";
+import { PRODUCT_ANALYTICS_EVENT_NAMES, trackProductEvent } from "../product_analytics";
 
 const CLUB_STAFF_ROLES = new Set(["owner", "admin", "moderator"]);
 const HASHTAG_REGEX = /(^|\s)#([A-Za-z0-9_]{2,40})/g;
@@ -740,6 +741,33 @@ export const communityRouter = router({
 
     users: communityUsersRouter,
 
+    analytics: router({
+        track: protectedProcedure
+            .input(z.object({
+                eventName: z.enum(PRODUCT_ANALYTICS_EVENT_NAMES),
+                source: z.string().max(80).optional(),
+                entityType: z.string().max(80).optional(),
+                entityId: z.number().int().positive().optional(),
+                metadata: z
+                    .record(
+                        z.string().min(1).max(48),
+                        z.union([z.string().max(240), z.number(), z.boolean(), z.null()]),
+                    )
+                    .optional(),
+            }))
+            .mutation(async ({ ctx, input }) => {
+                await trackProductEvent({
+                    userId: ctx.user.id,
+                    eventName: input.eventName,
+                    source: input.source,
+                    entityType: input.entityType,
+                    entityId: input.entityId ?? null,
+                    metadata: input.metadata,
+                });
+                return { success: true };
+            }),
+    }),
+
     ghostChallenges: router({
         list: protectedProcedure
             .input(z.object({ clubId: z.number().optional() }).optional())
@@ -756,6 +784,16 @@ export const communityRouter = router({
                     if (!result) {
                         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Creazione sfida fallita" });
                     }
+                    await trackProductEvent({
+                        userId: ctx.user.id,
+                        eventName: "ghost_duel_create",
+                        source: "ghost_track_tab",
+                        entityType: "ghost_challenge",
+                        entityId: result.id,
+                        metadata: {
+                            postId: input.postId,
+                        },
+                    });
                     return { success: true, id: result.id };
                 } catch (error: unknown) {
                     const message = error instanceof Error ? error.message : undefined;
