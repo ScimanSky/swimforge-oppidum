@@ -248,7 +248,7 @@ export default function Settings() {
   const { data: stravaStatus } = trpc.strava.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 })
   const consentsQuery = trpc.consent.list.useQuery(undefined, { staleTime: 30_000 })
 
-  type GarminSyncResult = { synced?: number; error?: string }
+  type GarminSyncResult = { synced?: number; error?: string; detectedPbs?: unknown[] }
 
   const garminSyncMutation = trpc.garmin.sync.useMutation({
     onSuccess: (data: GarminSyncResult) => {
@@ -257,6 +257,9 @@ export default function Settings() {
         return
       }
       toast.success(`${data?.synced ?? 0} attività sincronizzate!`)
+      if (Array.isArray(data?.detectedPbs) && data.detectedPbs.length > 0) {
+        toast.success(`Nuovi PB rilevati: ${data.detectedPbs.length}`)
+      }
       utils.activities.list.invalidate()
       utils.profile.get.invalidate()
     },

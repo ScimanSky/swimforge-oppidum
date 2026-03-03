@@ -14,7 +14,7 @@
  * - Step 2: completeMfa() - Complete authentication with MFA code
  */
 
-import { getDb } from "./db";
+import { getDb, upsertPersonalRecord } from "./db";
 import {
   garminTokens,
   swimmingActivities,
@@ -24,6 +24,7 @@ import {
   userBadges,
   garminActivityLaps,
   garminActivityLengths,
+  personalRecords,
 } from "../drizzle/schema";
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
@@ -79,6 +80,25 @@ interface GarminServiceResponse {
   activities?: GarminServiceActivity[];
   synced_count?: number;
   mfa_required?: boolean;
+}
+
+type RecordStroke = "freestyle" | "backstroke" | "breaststroke" | "butterfly" | "mixed";
+type PoolLength = 25 | 50;
+
+const SUPPORTED_PB_DISTANCES: Record<RecordStroke, number[]> = {
+  freestyle: [50, 100, 200, 400, 800, 1500],
+  backstroke: [50, 100, 200],
+  breaststroke: [50, 100, 200],
+  butterfly: [50, 100, 200],
+  mixed: [200],
+};
+
+function isSupportedPbEvent(strokeType: RecordStroke, distanceMeters: number) {
+  return SUPPORTED_PB_DISTANCES[strokeType]?.includes(distanceMeters) ?? false;
+}
+
+function buildTrainingRecordType(distanceMeters: number, poolLengthMeters: PoolLength) {
+  return `pb_${distanceMeters}_${poolLengthMeters}_t`;
 }
 
 /**
@@ -296,7 +316,7 @@ const pickFirstFromSources = (sources: Array<Record<string, unknown>>, keys: str
   return null;
 };
 
-const normalizeStrokeType = (value: unknown) => {
+const normalizeStrokeType = (value: unknown): RecordStroke | null => {
   if (!value) return null;
   const raw = String(value).toLowerCase();
   if (raw.includes("free") || raw.includes("stile") || raw.includes("crawl")) return "freestyle";
@@ -570,6 +590,96 @@ export async function persistGarminLapDetails(
   if (lengthRecords.length > 0) {
     await db.insert(garminActivityLengths).values(lengthRecords);
   }
+}
+
+type TrainingPbCandidate = {
+  strokeType: RecordStroke;
+  distanceMeters: number;
+  poolLengthMeters: PoolLength;
+  timeCs: number;
+  achievedAt: Date;
+};
+
+async function collectTrainingPbCandidates(params: {
+  db: NonNullable<Awaited<ReturnType<typeof getDb>>>;
+  activityId: number;
+  activityDate: Date;
+  activityDistanceMeters: number;
+  activityDurationSeconds: number;
+  activityStrokeType: unknown;
+  poolLengthMeters: number;
+  isOpenWater: boolean;
+}): Promise<TrainingPbCandidate[]> {
+  const {
+    db,
+    activityId,
+    activityDate,
+    activityDistanceMeters,
+    activityDurationSeconds,
+    activityStrokeType,
+    poolLengthMeters,
+    isOpenWater,
+  } = params;
+  if (isOpenWater) return [];
+  if (poolLengthMeters !== 25 && poolLengthMeters !== 50) return [];
+
+  const effectivePoolLength = poolLengthMeters as PoolLength;
+  const bestByKey = new Map<string, TrainingPbCandidate>();
+
+  const registerCandidate = (candidate: TrainingPbCandidate) => {
+    const key = `${candidate.strokeType}:${candidate.distanceMeters}`;
+    const previous = bestByKey.get(key);
+    if (!previous || candidate.timeCs < previous.timeCs) {
+      bestByKey.set(key, candidate);
+    }
+  };
+
+  const lapRows = await db
+    .select({
+      distanceMeters: garminActivityLaps.distanceMeters,
+      durationSeconds: garminActivityLaps.durationSeconds,
+      strokeType: garminActivityLaps.strokeType,
+    })
+    .from(garminActivityLaps)
+    .where(eq(garminActivityLaps.activityId, activityId));
+
+  for (const lap of lapRows) {
+    const distanceMeters = Number(lap.distanceMeters ?? 0);
+    const durationSeconds = Number(lap.durationSeconds ?? 0);
+    if (!Number.isFinite(distanceMeters) || !Number.isFinite(durationSeconds)) continue;
+    if (distanceMeters <= 0 || durationSeconds <= 0) continue;
+    const normalizedDistance = Math.round(distanceMeters);
+    const strokeType = normalizeStrokeType(lap.strokeType);
+    if (!strokeType || !isSupportedPbEvent(strokeType, normalizedDistance)) continue;
+    registerCandidate({
+      strokeType,
+      distanceMeters: normalizedDistance,
+      poolLengthMeters: effectivePoolLength,
+      timeCs: Math.round(durationSeconds * 100),
+      achievedAt: activityDate,
+    });
+  }
+
+  const summaryStroke = normalizeStrokeType(activityStrokeType);
+  const summaryDistance = Math.round(activityDistanceMeters);
+  if (
+    summaryStroke &&
+    Number.isFinite(summaryDistance) &&
+    Number.isFinite(activityDurationSeconds) &&
+    summaryDistance > 0 &&
+    activityDurationSeconds > 0 &&
+    isSupportedPbEvent(summaryStroke, summaryDistance)
+  ) {
+    registerCandidate({
+      strokeType: summaryStroke,
+      distanceMeters: summaryDistance,
+      poolLengthMeters: effectivePoolLength,
+      timeCs: Math.round(activityDurationSeconds * 100),
+      achievedAt: activityDate,
+    });
+  }
+
+  return Array.from(bestByKey.values());
 }
 
 /**
@@ -918,10 +1028,23 @@ function calculateActivityXp(activity: GarminServiceActivity): number {
 export async function syncGarminActivities(
   userId: number,
   daysBack: number = 30
-): Promise<{ synced: number; newXp: number; error?: string }> {
+): Promise<{
+  synced: number;
+  newXp: number;
+  detectedPbs: Array<{
+    strokeType: RecordStroke;
+    distanceMeters: number;
+    poolLengthMeters: PoolLength;
+    previousTimeCs: number | null;
+    newTimeCs: number;
+    improvementCs: number | null;
+    achievedAt: Date;
+  }>;
+  error?: string;
+}> {
   const db = await getDb();
   if (!db) {
-    return { synced: 0, newXp: 0, error: "Database not available" };
+    return { synced: 0, newXp: 0, detectedPbs: [], error: "Database not available" };
   }
 
   // Check if user has Garmin connected
@@ -932,7 +1055,7 @@ export async function syncGarminActivities(
     .limit(1);
 
   if (!tokens.length) {
-    return { synced: 0, newXp: 0, error: "Garmin non collegato" };
+    return { synced: 0, newXp: 0, detectedPbs: [], error: "Garmin non collegato" };
   }
 
   try {
@@ -941,6 +1064,7 @@ export async function syncGarminActivities(
       return {
         synced: 0,
         newXp: 0,
+        detectedPbs: [],
         error: "Sessione Garmin non attiva. Ricollega Garmin Connect.",
       };
     }
@@ -951,11 +1075,20 @@ export async function syncGarminActivities(
     });
 
     if (!result.success || !result.activities) {
-      return { synced: 0, newXp: 0, error: result.message || "Sync failed" };
+      return { synced: 0, newXp: 0, detectedPbs: [], error: result.message || "Sync failed" };
     }
 
     let syncedCount = 0;
     let totalNewXp = 0;
+    const detectedPbs: Array<{
+      strokeType: RecordStroke;
+      distanceMeters: number;
+      poolLengthMeters: PoolLength;
+      previousTimeCs: number | null;
+      newTimeCs: number;
+      improvementCs: number | null;
+      achievedAt: Date;
+    }> = [];
 
     // Get user's profile
     const profiles = await db
@@ -966,7 +1099,28 @@ export async function syncGarminActivities(
 
     const profile = profiles[0];
     if (!profile) {
-      return { synced: 0, newXp: 0, error: "Profile not found" };
+      return { synced: 0, newXp: 0, detectedPbs: [], error: "Profile not found" };
+    }
+
+    const existingRecords = await db
+      .select({
+        recordType: personalRecords.recordType,
+        strokeType: personalRecords.strokeType,
+        value: personalRecords.value,
+      })
+      .from(personalRecords)
+      .where(eq(personalRecords.userId, userId));
+
+    const bestPbByKey = new Map<string, number>();
+    for (const row of existingRecords) {
+      const value = Number(row.value);
+      if (!Number.isFinite(value) || value <= 0) continue;
+      const strokeType = (row.strokeType ?? "mixed") as RecordStroke;
+      const key = `${String(row.recordType)}:${strokeType}`;
+      const prev = bestPbByKey.get(key);
+      if (!prev || value < prev) {
+        bestPbByKey.set(key, value);
+      }
     }
 
     const enrichActivityDetails = async (params: {
@@ -1226,6 +1380,64 @@ export async function syncGarminActivities(
             message,
           });
         }
+
+        try {
+          const pbCandidates = await collectTrainingPbCandidates({
+            db,
+            activityId: inserted.id,
+            activityDate,
+            activityDistanceMeters: Number(activity.distance_meters),
+            activityDurationSeconds: Number(activity.duration_seconds),
+            activityStrokeType: activity.stroke_type,
+            poolLengthMeters: Math.round(activity.pool_length || 25),
+            isOpenWater: Boolean(activity.is_open_water),
+          });
+
+          for (const candidate of pbCandidates) {
+            const recordType = buildTrainingRecordType(candidate.distanceMeters, candidate.poolLengthMeters);
+            const key = `${recordType}:${candidate.strokeType}`;
+            const previousTimeCs = bestPbByKey.get(key) ?? null;
+            if (previousTimeCs !== null && candidate.timeCs >= previousTimeCs) {
+              continue;
+            }
+
+            await upsertPersonalRecord({
+              userId,
+              recordType,
+              strokeType: candidate.strokeType,
+              value: candidate.timeCs,
+              activityId: inserted.id,
+              achievedAt: candidate.achievedAt,
+              analyticsSource: "garmin_sync",
+              analyticsMetadata: {
+                source: "training",
+                distanceMeters: candidate.distanceMeters,
+                poolLengthMeters: candidate.poolLengthMeters,
+                activityId: inserted.id,
+                improvementCs: previousTimeCs !== null ? previousTimeCs - candidate.timeCs : null,
+              },
+            });
+
+            bestPbByKey.set(key, candidate.timeCs);
+            detectedPbs.push({
+              strokeType: candidate.strokeType,
+              distanceMeters: candidate.distanceMeters,
+              poolLengthMeters: candidate.poolLengthMeters,
+              previousTimeCs,
+              newTimeCs: candidate.timeCs,
+              improvementCs: previousTimeCs !== null ? previousTimeCs - candidate.timeCs : null,
+              achievedAt: candidate.achievedAt,
+            });
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          logger.warn(`[Garmin] Failed to process PB candidates for activity ${activity.activity_id}: ${message}`, {
+            event: "garmin:pb_detection_failed",
+            userId,
+            garminActivityId: activity.activity_id,
+            message,
+          });
+        }
       }
 
       totalNewXp += activityXp;
@@ -1372,7 +1584,7 @@ export async function syncGarminActivities(
       }
     }
 
-    return { synced: syncedCount, newXp: totalNewXp };
+    return { synced: syncedCount, newXp: totalNewXp, detectedPbs };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`[Garmin] Sync failed: ${message}`, {
@@ -1380,7 +1592,7 @@ export async function syncGarminActivities(
       userId,
       message,
     });
-    return { synced: 0, newXp: 0, error: message || "Sync failed" };
+    return { synced: 0, newXp: 0, detectedPbs: [], error: message || "Sync failed" };
   }
 }
 

@@ -756,58 +756,72 @@ export async function getPersonalRecord(userId: number, recordType: string, stro
   return result.length > 0 ? result[0] : undefined;
 }
 
-export async function upsertPersonalRecord(data: InsertPersonalRecord) {
+type PersonalRecordAnalyticsMetadata = Record<string, string | number | boolean | null>;
+type UpsertPersonalRecordInput = InsertPersonalRecord & {
+  analyticsSource?: string | null;
+  analyticsMetadata?: PersonalRecordAnalyticsMetadata;
+};
+
+export async function upsertPersonalRecord(data: UpsertPersonalRecordInput) {
   const db = await getDb();
   if (!db) return null;
+  const { analyticsSource, analyticsMetadata, ...recordData } = data;
   
-  const existing = await getPersonalRecord(data.userId, data.recordType, data.strokeType ?? undefined);
+  const existing = await getPersonalRecord(recordData.userId, recordData.recordType, recordData.strokeType ?? undefined);
   
   if (existing) {
     const previousValue = Number(existing.value);
-    const currentValue = Number(data.value);
+    const currentValue = Number(recordData.value);
+    if (!Number.isFinite(previousValue) || !Number.isFinite(currentValue)) {
+      return existing.id;
+    }
+    if (currentValue >= previousValue) {
+      return existing.id;
+    }
     await db.update(personalRecords).set({
-      value: data.value,
-      activityId: data.activityId,
-      achievedAt: data.achievedAt ?? new Date(),
+      value: recordData.value,
+      activityId: recordData.activityId,
+      achievedAt: recordData.achievedAt ?? new Date(),
       previousValue: existing.value,
     }).where(eq(personalRecords.id, existing.id));
-    if (Number.isFinite(previousValue) && Number.isFinite(currentValue) && previousValue !== currentValue) {
-      try {
-        const { trackProductEvent } = await import("./product_analytics");
-        await trackProductEvent({
-          userId: data.userId,
-          eventName: "pb_detected",
-          source: "personal_record_upsert",
-          entityType: "personal_record",
-          entityId: existing.id,
-          metadata: {
-            recordType: data.recordType,
-            strokeType: data.strokeType ?? null,
-            previousValue,
-            currentValue,
-          },
-        });
-      } catch {
-        // Best effort analytics
-      }
+    try {
+      const { trackProductEvent } = await import("./product_analytics");
+      await trackProductEvent({
+        userId: recordData.userId,
+        eventName: "pb_detected",
+        source: analyticsSource?.trim() || "personal_record_upsert",
+        entityType: "personal_record",
+        entityId: existing.id,
+        metadata: {
+          recordType: recordData.recordType,
+          strokeType: recordData.strokeType ?? null,
+          previousValue,
+          currentValue,
+          improvementCs: previousValue - currentValue,
+          ...(analyticsMetadata ?? {}),
+        },
+      });
+    } catch {
+      // Best effort analytics
     }
     return existing.id;
   } else {
-    const result = await db.insert(personalRecords).values(data).returning({ id: personalRecords.id });
+    const result = await db.insert(personalRecords).values(recordData).returning({ id: personalRecords.id });
     const insertedId = result[0]?.id || null;
     if (insertedId) {
       try {
         const { trackProductEvent } = await import("./product_analytics");
         await trackProductEvent({
-          userId: data.userId,
+          userId: recordData.userId,
           eventName: "pb_detected",
-          source: "personal_record_insert",
+          source: analyticsSource?.trim() || "personal_record_insert",
           entityType: "personal_record",
           entityId: insertedId,
           metadata: {
-            recordType: data.recordType,
-            strokeType: data.strokeType ?? null,
-            currentValue: Number(data.value),
+            recordType: recordData.recordType,
+            strokeType: recordData.strokeType ?? null,
+            currentValue: Number(recordData.value),
+            ...(analyticsMetadata ?? {}),
           },
         });
       } catch {

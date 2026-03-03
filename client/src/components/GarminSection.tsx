@@ -86,6 +86,9 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
         toast.error(data.error);
       } else {
         toast.success(`${data.synced} attività sincronizzate!`);
+        if (Array.isArray(data.detectedPbs) && data.detectedPbs.length > 0) {
+          toast.success(`Nuovi PB rilevati: ${data.detectedPbs.length}`);
+        }
         utils.activities.list.invalidate();
         utils.profile.get.invalidate();
       }

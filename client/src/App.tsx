@@ -12,6 +12,7 @@ import SeasonLaunchPopup from "./components/SeasonLaunchPopup";
 import { useBadgeNotifications } from "./hooks/useBadgeNotifications";
 import AutoSync from "./components/AutoSync";
 import ActivityInsightNotification from "./components/ActivityInsightNotification";
+import PbCelebrationNotification from "./components/PbCelebrationNotification";
 import CookieBanner from "./components/CookieBanner";
 import { UI_FEATURE_FLAGS } from "./lib/feature-flags";
 
@@ -189,6 +190,7 @@ function App() {
           <ScrollToTop />
           <Router />
           <ActivityInsightNotification />
+          <PbCelebrationNotification />
           <CookieBanner />
           <Suspense fallback={null}>
             <OnboardingFlow />

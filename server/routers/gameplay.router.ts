@@ -489,6 +489,79 @@ export const recordsRouter = router({
                 })),
             };
         }),
+    pendingCelebrations: protectedProcedure
+        .input(
+            z
+                .object({
+                    limit: z.number().int().min(1).max(20).optional(),
+                })
+                .optional()
+        )
+        .query(async ({ ctx, input }) => {
+            const dbClient = await getDb();
+            if (!dbClient) return { events: [] as any[] };
+
+            try {
+                const limit = input?.limit ?? 5;
+                const result = await dbClient.execute(sql`
+                    SELECT id, created_at, metadata
+                    FROM product_engagement_events
+                    WHERE user_id = ${ctx.user.id}
+                      AND event_name = 'pb_detected'
+                      AND source = 'garmin_sync'
+                    ORDER BY id DESC
+                    LIMIT ${limit}
+                `);
+
+                const toNumberOrNull = (value: unknown): number | null => {
+                    const num = Number(value);
+                    return Number.isFinite(num) ? num : null;
+                };
+
+                const rows = (result.rows ?? []) as Array<{
+                    id: number | string;
+                    created_at: string | Date;
+                    metadata: unknown;
+                }>;
+
+                const events = rows
+                    .map((row) => {
+                        const metadata =
+                            row.metadata && typeof row.metadata === "object"
+                                ? (row.metadata as Record<string, unknown>)
+                                : {};
+                        const parsed = parseRecordType(String(metadata.recordType ?? ""));
+                        const strokeTypeRaw = String(metadata.strokeType ?? "mixed").toLowerCase();
+                        const strokeType = RECORD_STROKES.includes(strokeTypeRaw as (typeof RECORD_STROKES)[number])
+                            ? (strokeTypeRaw as (typeof RECORD_STROKES)[number])
+                            : "mixed";
+                        const distanceMeters = toNumberOrNull(metadata.distanceMeters) ?? parsed?.distanceMeters ?? null;
+                        const poolLengthMeters = toNumberOrNull(metadata.poolLengthMeters) ?? parsed?.poolLengthMeters ?? null;
+                        const newTimeCs = toNumberOrNull(metadata.currentValue);
+                        const previousTimeCs = toNumberOrNull(metadata.previousValue);
+                        const improvementCs = toNumberOrNull(metadata.improvementCs);
+
+                        if (!distanceMeters || !poolLengthMeters || !newTimeCs) return null;
+
+                        return {
+                            id: Number(row.id),
+                            createdAt: row.created_at,
+                            strokeType,
+                            distanceMeters,
+                            poolLengthMeters,
+                            source: parsed?.source ?? "training",
+                            newTimeCs,
+                            previousTimeCs,
+                            improvementCs: improvementCs ?? (previousTimeCs ? previousTimeCs - newTimeCs : null),
+                        };
+                    })
+                    .filter((event): event is NonNullable<typeof event> => Boolean(event));
+
+                return { events };
+            } catch {
+                return { events: [] as any[] };
+            }
+        }),
     finaPoints: protectedProcedure
         .input(z.object({
             strokeType: z.enum(RECORD_STROKES),
