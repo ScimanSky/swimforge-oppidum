@@ -94,6 +94,7 @@ export default function SeasonPage() {
   const seasonViewTrackedRef = useRef(false)
   const seasonStepViewTrackedRef = useRef<Set<string>>(new Set())
   const trackEventMutation = trpc.community.analytics.track.useMutation()
+  const markWeeklyActionMutation = trpc.season.markWeeklyAction.useMutation()
   const seasonPredictionsEnabled = UI_FEATURE_FLAGS.seasonPredictionsV1
   const seasonRecapEnabled = UI_FEATURE_FLAGS.seasonRecapV1
   const seasonCoreLoopV2Enabled = UI_FEATURE_FLAGS.seasonCoreLoopV2
@@ -343,6 +344,11 @@ export default function SeasonPage() {
   }
 
   const handleNextActionClick = (sourceCard: "legacy_today" | "season_v2_focus" = "legacy_today") => {
+    markWeeklyActionMutation.mutate({
+      actionType: nextAction.actionType,
+      sourceCard,
+    })
+
     trackEventMutation.mutate({
       eventName: "season_next_action_click",
       source: "season_page",
@@ -368,6 +374,11 @@ export default function SeasonPage() {
   }
 
   const handleClubContributionAction = () => {
+    markWeeklyActionMutation.mutate({
+      actionType: "club_contribution",
+      sourceCard: "season_v2_club",
+    })
+
     const stepType = primaryClubQuest ? "club_quest" : "no_club"
     if (primaryClubQuest && primaryClubQuest.eligibleToClaim && !primaryClubQuest.claimed) {
       trackSeasonStepActionClick({
@@ -387,6 +398,11 @@ export default function SeasonPage() {
   }
 
   const handleSoftComparisonAction = () => {
+    markWeeklyActionMutation.mutate({
+      actionType: "soft_comparison",
+      sourceCard: "season_v2_comparison",
+    })
+
     const stepType = benchmarkRival ? "benchmark" : "leaderboard"
     if (benchmarkRival) {
       trackSeasonStepActionClick({

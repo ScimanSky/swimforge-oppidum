@@ -40,6 +40,16 @@ async function assertHealthAndProviderConsent(userId: number, provider: "garmin_
 
 const RECORD_STROKES = ["freestyle", "backstroke", "breaststroke", "butterfly", "mixed"] as const;
 const RECORD_SOURCES = ["official", "training"] as const;
+const SEASON_WEEKLY_ACTION_TYPES = [
+    "daily",
+    "action_xp",
+    "prediction",
+    "weekly",
+    "explore",
+    "club_contribution",
+    "soft_comparison",
+] as const;
+const SEASON_WEEKLY_ACTION_SOURCES = ["legacy_today", "season_v2_focus", "season_v2_club", "season_v2_comparison"] as const;
 
 function buildRecordType(distanceMeters: number, poolLengthMeters: 25 | 50, source: "official" | "training") {
     const sourceCode = source === "official" ? "o" : "t";
@@ -62,6 +72,14 @@ function parseRecordType(recordType: string): {
         poolLengthMeters: poolLengthMeters as 25 | 50,
         source: sourceCode === "o" ? "official" : "training",
     };
+}
+
+function startOfUtcWeek(date: Date): Date {
+    const weekStart = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
+    const day = weekStart.getUTCDay(); // 0 Sunday
+    const diffFromMonday = (day + 6) % 7;
+    weekStart.setUTCDate(weekStart.getUTCDate() - diffFromMonday);
+    return weekStart;
 }
 
 // Auto sync Garmin + Strava (login/app open)
@@ -128,6 +146,37 @@ export const seasonRouter = router({
                 pendingPredictions,
                 predictionsEnabled: input?.includePredictions ?? true,
             });
+        }),
+    markWeeklyAction: protectedProcedure
+        .input(
+            z.object({
+                actionType: z.enum(SEASON_WEEKLY_ACTION_TYPES),
+                sourceCard: z.enum(SEASON_WEEKLY_ACTION_SOURCES).optional(),
+            }),
+        )
+        .mutation(async ({ ctx, input }) => {
+            const { trackProductEvent } = await import("../product_analytics");
+            const now = new Date();
+            const weekStart = startOfUtcWeek(now).toISOString().slice(0, 10);
+            const dayKey = now.toISOString().slice(0, 10);
+            await trackProductEvent({
+                userId: ctx.user.id,
+                eventName: "season_weekly_action_marked",
+                source: "season_page",
+                metadata: {
+                    actionType: input.actionType,
+                    sourceCard: input.sourceCard ?? null,
+                    weekStart,
+                    dayKey,
+                },
+            });
+            return {
+                success: true as const,
+                actionType: input.actionType,
+                sourceCard: input.sourceCard ?? null,
+                weekStart,
+                dayKey,
+            };
         }),
     actionXpStatus: protectedProcedure.query(async ({ ctx }) => {
         return getActionXpStatus(ctx.user.id);
