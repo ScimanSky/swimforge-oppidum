@@ -1,5 +1,5 @@
 import AppLayout from "@/components/AppLayout";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface";
@@ -285,9 +285,10 @@ function ActivityItem({ type, date, duration, distance, pace }: ActivityItemProp
 
 export default function Profile() {
   const { data: me } = trpc.auth.me.useQuery();
+  const [finaGender, setFinaGender] = useState<"male" | "female">("male");
   const { data: profile } = trpc.profile.get.useQuery();
   const pbBoardQuery = trpc.records.getByUser.useQuery(
-    { userId: Number(me?.id ?? 0) },
+    { userId: Number(me?.id ?? 0), finaGender },
     { enabled: Number(me?.id ?? 0) > 0 }
   );
   const { data: activitiesData } = trpc.activities.list.useQuery({
@@ -639,7 +640,27 @@ export default function Profile() {
 
         <Surface className="bg-card border-border">
           <SurfaceHeader>
-            <SurfaceTitle className="font-display">PB Board</SurfaceTitle>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <SurfaceTitle className="font-display">PB Board</SurfaceTitle>
+              <div className="inline-flex items-center gap-1 rounded-lg border border-border/60 bg-background/40 p-1">
+                <Button
+                  size="sm"
+                  variant={finaGender === "male" ? "neon" : "ghost"}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setFinaGender("male")}
+                >
+                  FINA M
+                </Button>
+                <Button
+                  size="sm"
+                  variant={finaGender === "female" ? "neon" : "ghost"}
+                  className="h-7 px-2 text-xs"
+                  onClick={() => setFinaGender("female")}
+                >
+                  FINA F
+                </Button>
+              </div>
+            </div>
           </SurfaceHeader>
           <SurfaceContent className="space-y-3">
             {pbBoardQuery.isLoading ? (
@@ -667,6 +688,11 @@ export default function Profile() {
                       <span>{sourceLabels[String(row.source)] ?? "PB"}</span>
                       <span>{formatDate(row.achievedAt)}</span>
                     </div>
+                    {Number.isFinite(Number(row.finaPoints)) ? (
+                      <p className="mt-1 text-xs font-semibold text-amber-300">
+                        {Math.round(Number(row.finaPoints))} pt FINA
+                      </p>
+                    ) : null}
                   </div>
                 ))}
               </div>

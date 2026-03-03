@@ -364,6 +364,7 @@ export const recordsRouter = router({
     getByUser: protectedProcedure
         .input(z.object({
             userId: z.number().int().positive(),
+            finaGender: z.enum(["male", "female"]).optional(),
         }))
         .query(async ({ ctx, input }) => {
             const isSelf = ctx.user.id === input.userId;
@@ -385,17 +386,30 @@ export const recordsRouter = router({
                 .map((row) => {
                     const descriptor = parseRecordType(String(row.recordType ?? ""));
                     if (!descriptor) return null;
+                    const strokeType = (row.strokeType ?? "mixed") as (typeof RECORD_STROKES)[number];
+                    const timeCs = Number(row.value);
+                    const finaPoints =
+                        input.finaGender && isSupportedFinaEvent(strokeType, descriptor.distanceMeters)
+                            ? calculateFinaPoints({
+                                  strokeType,
+                                  distanceMeters: descriptor.distanceMeters,
+                                  timeCs,
+                                  gender: input.finaGender,
+                                  poolLengthMeters: descriptor.poolLengthMeters,
+                              })
+                            : null;
                     return {
                         id: row.id,
                         userId: row.userId,
-                        strokeType: row.strokeType ?? "mixed",
+                        strokeType,
                         distanceMeters: descriptor.distanceMeters,
                         poolLengthMeters: descriptor.poolLengthMeters,
                         source: descriptor.source,
-                        timeCs: Number(row.value),
+                        timeCs,
                         previousTimeCs: row.previousValue ? Number(row.previousValue) : null,
                         achievedAt: row.achievedAt,
                         activityId: row.activityId ?? null,
+                        finaPoints,
                     };
                 })
                 .filter((value): value is NonNullable<typeof value> => Boolean(value))
