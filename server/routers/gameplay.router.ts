@@ -576,6 +576,48 @@ export const recordsRouter = router({
                 return { events: [] as any[] };
             }
         }),
+    trackCelebrationAction: protectedProcedure
+        .input(
+            z.object({
+                action: z.enum(["open", "share_click", "share_success"]),
+                celebrationEventId: z.number().int().positive().optional(),
+                strokeType: z.enum(RECORD_STROKES).optional(),
+                distanceMeters: z.number().int().min(25).max(5000).optional(),
+                poolLengthMeters: z.union([z.literal(25), z.literal(50)]).optional(),
+                source: z.enum(RECORD_SOURCES).optional(),
+                newTimeCs: z.number().int().min(1).optional(),
+                previousTimeCs: z.number().int().min(1).optional().nullable(),
+                improvementCs: z.number().int().min(1).optional().nullable(),
+            })
+        )
+        .mutation(async ({ ctx, input }) => {
+            const { trackProductEvent } = await import("../product_analytics");
+            const eventName =
+                input.action === "open"
+                    ? "pb_celebration_open"
+                    : input.action === "share_click"
+                      ? "pb_share_click"
+                      : "pb_share_success";
+
+            await trackProductEvent({
+                userId: ctx.user.id,
+                eventName,
+                source: "pb_celebration",
+                entityType: "personal_record",
+                entityId: input.celebrationEventId ?? null,
+                metadata: {
+                    strokeType: input.strokeType ?? null,
+                    distanceMeters: input.distanceMeters ?? null,
+                    poolLengthMeters: input.poolLengthMeters ?? null,
+                    source: input.source ?? null,
+                    newTimeCs: input.newTimeCs ?? null,
+                    previousTimeCs: input.previousTimeCs ?? null,
+                    improvementCs: input.improvementCs ?? null,
+                },
+            });
+
+            return { success: true } as const;
+        }),
     finaPoints: protectedProcedure
         .input(z.object({
             strokeType: z.enum(RECORD_STROKES),

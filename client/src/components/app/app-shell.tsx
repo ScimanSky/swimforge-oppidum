@@ -48,7 +48,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import NotificationBell from "@/components/NotificationBell"
 import DirectMessages from "@/components/DirectMessages"
-import { CreatePostSheet } from "@/components/social/CreatePostSheet"
+import { CreatePostSheet, type PbShareTrackingContext } from "@/components/social/CreatePostSheet"
 import { StoryCreator } from "@/components/social/StoryCreator"
 import { OnboardingNudgeManager } from "@/components/onboarding/OnboardingNudgeManager"
 
@@ -65,6 +65,11 @@ type QuickAccessItem = {
   icon: React.ReactNode
   match?: (path: string) => boolean
   dataTour?: string
+}
+
+type OpenCreatePostEventDetail = {
+  initialContent?: string
+  pbShareTracking?: PbShareTrackingContext
 }
 
 const normalizePath = (location: string) => location.split("?")[0].split("#")[0] || "/"
@@ -442,6 +447,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false)
   const [createPostInitialContent, setCreatePostInitialContent] = useState<string | undefined>(undefined)
+  const [createPostPbShareTracking, setCreatePostPbShareTracking] = useState<PbShareTrackingContext | undefined>(undefined)
   const [isStoryCreatorOpen, setIsStoryCreatorOpen] = useState(false)
   const [mobileCreateMenuOpen, setMobileCreateMenuOpen] = useState(false)
   const [mobileSectionsOpen, setMobileSectionsOpen] = useState(false)
@@ -520,6 +526,34 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
     }
   }, [mobileCreateMenuOpen, mobileSectionsOpen])
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const handleOpenCreatePost = (event: Event) => {
+      const customEvent = event as CustomEvent<OpenCreatePostEventDetail>
+      const prefill = customEvent.detail?.initialContent?.trim()
+      setCreatePostInitialContent(prefill ? prefill : undefined)
+      setCreatePostPbShareTracking(customEvent.detail?.pbShareTracking)
+      setIsCreatePostOpen(true)
+      setMobileCreateMenuOpen(false)
+      setMobileSectionsOpen(false)
+    }
+
+    const handleCloseCreatePost = () => {
+      setIsCreatePostOpen(false)
+      setCreatePostInitialContent(undefined)
+      setCreatePostPbShareTracking(undefined)
+    }
+
+    window.addEventListener("swimforge:open-create-post", handleOpenCreatePost)
+    window.addEventListener("swimforge:close-create-post", handleCloseCreatePost)
+
+    return () => {
+      window.removeEventListener("swimforge:open-create-post", handleOpenCreatePost)
+      window.removeEventListener("swimforge:close-create-post", handleCloseCreatePost)
+    }
+  }, [])
+
   const handleLogout = async () => {
     if (isLoggingOut) return
     setIsLoggingOut(true)
@@ -548,6 +582,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
         location={location}
         onOpenCreatePost={(prefill) => {
           setCreatePostInitialContent(prefill)
+          setCreatePostPbShareTracking(undefined)
           setIsCreatePostOpen(true)
         }}
         onOpenStoryCreator={() => setIsStoryCreatorOpen(true)}
@@ -761,6 +796,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
                       onClick={() => {
                         if (item.action === "create-post") {
                           setCreatePostInitialContent(undefined)
+                          setCreatePostPbShareTracking(undefined)
                           setIsCreatePostOpen(true)
                         }
                         if (item.action === "create-story") setIsStoryCreatorOpen(true)
@@ -768,6 +804,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
                           setCreatePostInitialContent(
                             "Bozza IA:\n\nAllenamento completato oggi. Ecco i punti chiave:\n- Sensazioni in acqua:\n- Metrica migliore:\n- Cosa migliorare nella prossima sessione:\n\n#swimforge #training",
                           )
+                          setCreatePostPbShareTracking(undefined)
                           setIsCreatePostOpen(true)
                         }
                         setMobileCreateMenuOpen(false)
@@ -893,9 +930,13 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
       <CreatePostSheet
         open={isCreatePostOpen}
         initialContent={createPostInitialContent}
+        initialPbShareContext={createPostPbShareTracking}
         onOpenChange={(open) => {
           setIsCreatePostOpen(open)
-          if (!open) setCreatePostInitialContent(undefined)
+          if (!open) {
+            setCreatePostInitialContent(undefined)
+            setCreatePostPbShareTracking(undefined)
+          }
         }}
       />
       <StoryCreator open={isStoryCreatorOpen} onOpenChange={setIsStoryCreatorOpen} />

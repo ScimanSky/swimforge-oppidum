@@ -33,6 +33,18 @@ interface CreatePostSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialContent?: string
+  initialPbShareContext?: PbShareTrackingContext
+}
+
+export type PbShareTrackingContext = {
+  celebrationEventId?: number
+  strokeType?: "freestyle" | "backstroke" | "breaststroke" | "butterfly" | "mixed"
+  distanceMeters?: number
+  poolLengthMeters?: 25 | 50
+  source?: "official" | "training"
+  newTimeCs?: number
+  previousTimeCs?: number | null
+  improvementCs?: number | null
 }
 
 type Mode = "menu" | "text"
@@ -51,7 +63,7 @@ type TaggedUser = {
   avatarUrl: string | null
 }
 
-export function CreatePostSheet({ open, onOpenChange, initialContent }: CreatePostSheetProps) {
+export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbShareContext }: CreatePostSheetProps) {
   const [mode, setMode] = useState<Mode>("menu")
   const [content, setContent] = useState("")
   const [mediaItems, setMediaItems] = useState<SelectedMedia[]>([])
@@ -66,6 +78,7 @@ export function CreatePostSheet({ open, onOpenChange, initialContent }: CreatePo
   const imageKitAuth = trpc.community.postImageKitAuth.useMutation()
   const postImageUpload = trpc.community.postUploadImage.useMutation()
   const cloudinaryVideoAuth = trpc.community.cloudinaryVideoAuth.useMutation()
+  const trackPbCelebrationAction = trpc.records.trackCelebrationAction.useMutation()
 
   const normalizedTagQuery = useMemo(() => normalizeTagSearchQuery(tagQuery), [tagQuery])
   const searchEnabled = mode === "text" && normalizedTagQuery.length >= 2
@@ -76,6 +89,19 @@ export function CreatePostSheet({ open, onOpenChange, initialContent }: CreatePo
 
   const createTextPost = trpc.community.createTextPost.useMutation({
     onSuccess: () => {
+      if (initialPbShareContext) {
+        trackPbCelebrationAction.mutate({
+          action: "share_success",
+          celebrationEventId: initialPbShareContext.celebrationEventId,
+          strokeType: initialPbShareContext.strokeType,
+          distanceMeters: initialPbShareContext.distanceMeters,
+          poolLengthMeters: initialPbShareContext.poolLengthMeters,
+          source: initialPbShareContext.source,
+          newTimeCs: initialPbShareContext.newTimeCs,
+          previousTimeCs: initialPbShareContext.previousTimeCs,
+          improvementCs: initialPbShareContext.improvementCs,
+        })
+      }
       utils.community.feed.invalidate()
       toast.success("Post pubblicato!")
       resetAndClose()

@@ -1,6 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
-import { Link } from "wouter";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Trophy } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -29,6 +28,16 @@ const strokeLabels: Record<PbCelebrationEvent["strokeType"], string> = {
   mixed: "Misti",
 };
 
+function buildPbSharePrefill(event: PbCelebrationEvent) {
+  const eventLabel = `${strokeLabels[event.strokeType]} ${event.distanceMeters}m`;
+  const improvementLine =
+    event.improvementCs && event.improvementCs > 0
+      ? `Nuovo PB nei ${eventLabel}: ${formatSwimCentiseconds(event.newTimeCs)} (migliorato di ${formatSwimCentiseconds(event.improvementCs)})`
+      : `Nuovo PB nei ${eventLabel}: ${formatSwimCentiseconds(event.newTimeCs)}`;
+  const sourceLine = event.source === "official" ? "Gara ufficiale" : "Allenamento";
+  return `${improvementLine}\nVasca ${event.poolLengthMeters}m · ${sourceLine}\n\n#PB #swimforge #nuoto`;
+}
+
 function getLastSeenId() {
   if (typeof window === "undefined") return 0;
   const parsed = Number(window.localStorage.getItem(LAST_SEEN_KEY) ?? "0");
@@ -45,6 +54,8 @@ function setLastSeenId(nextId: number) {
 export default function PbCelebrationNotification() {
   const { isAuthenticated } = useAuth();
   const [queue, setQueue] = useState<PbCelebrationEvent[]>([]);
+  const openedEventIdsRef = useRef<Set<number>>(new Set());
+  const trackCelebrationAction = trpc.records.trackCelebrationAction.useMutation();
 
   const pendingQuery = trpc.records.pendingCelebrations.useQuery(
     { limit: 8 },
@@ -69,6 +80,24 @@ export default function PbCelebrationNotification() {
 
   const current = queue[0];
 
+  useEffect(() => {
+    if (!current) return;
+    const currentId = Number(current.id);
+    if (openedEventIdsRef.current.has(currentId)) return;
+    openedEventIdsRef.current.add(currentId);
+    trackCelebrationAction.mutate({
+      action: "open",
+      celebrationEventId: currentId,
+      strokeType: current.strokeType,
+      distanceMeters: current.distanceMeters,
+      poolLengthMeters: current.poolLengthMeters,
+      source: current.source,
+      newTimeCs: current.newTimeCs,
+      previousTimeCs: current.previousTimeCs,
+      improvementCs: current.improvementCs,
+    });
+  }, [current, trackCelebrationAction]);
+
   const markCurrentAsSeenAndAdvance = () => {
     if (!current) return;
     setLastSeenId(Number(current.id));
@@ -86,6 +115,39 @@ export default function PbCelebrationNotification() {
     if (!current) return "";
     return `${strokeLabels[current.strokeType]} ${current.distanceMeters}m`;
   }, [current]);
+
+  const handleShareToFeed = () => {
+    if (!current || typeof window === "undefined") return;
+    trackCelebrationAction.mutate({
+      action: "share_click",
+      celebrationEventId: Number(current.id),
+      strokeType: current.strokeType,
+      distanceMeters: current.distanceMeters,
+      poolLengthMeters: current.poolLengthMeters,
+      source: current.source,
+      newTimeCs: current.newTimeCs,
+      previousTimeCs: current.previousTimeCs,
+      improvementCs: current.improvementCs,
+    });
+    window.dispatchEvent(
+      new CustomEvent("swimforge:open-create-post", {
+        detail: {
+          initialContent: buildPbSharePrefill(current),
+          pbShareTracking: {
+            celebrationEventId: Number(current.id),
+            strokeType: current.strokeType,
+            distanceMeters: current.distanceMeters,
+            poolLengthMeters: current.poolLengthMeters,
+            source: current.source,
+            newTimeCs: current.newTimeCs,
+            previousTimeCs: current.previousTimeCs,
+            improvementCs: current.improvementCs,
+          },
+        },
+      })
+    );
+    dismissAll();
+  };
 
   if (!current) return null;
 
@@ -132,11 +194,9 @@ export default function PbCelebrationNotification() {
           </div>
 
           <div className="mt-5 space-y-2">
-            <Link href="/home">
-              <Button className="w-full" variant="neon" onClick={dismissAll}>
-                Condividi nel feed
-              </Button>
-            </Link>
+            <Button className="w-full" variant="neon" onClick={handleShareToFeed}>
+              Condividi nel feed
+            </Button>
             <Button className="w-full" variant="outline-neon" onClick={markCurrentAsSeenAndAdvance}>
               {queue.length > 1 ? "Prossimo PB" : "Chiudi"}
             </Button>

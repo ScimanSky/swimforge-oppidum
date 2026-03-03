@@ -1,5 +1,5 @@
 import AppLayout from "@/components/AppLayout";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface";
@@ -285,10 +285,16 @@ function ActivityItem({ type, date, duration, distance, pace }: ActivityItemProp
 
 export default function Profile() {
   const { data: me } = trpc.auth.me.useQuery();
-  const [finaGender, setFinaGender] = useState<"male" | "female">("male");
   const { data: profile } = trpc.profile.get.useQuery();
+  const profileFinaGender = useMemo<"male" | "female">(() => {
+    const raw = String((profile as any)?.gender ?? (profile as any)?.sex ?? "").trim().toLowerCase();
+    if (raw === "female" || raw === "f" || raw === "woman" || raw === "donna") {
+      return "female";
+    }
+    return "male";
+  }, [profile]);
   const pbBoardQuery = trpc.records.getByUser.useQuery(
-    { userId: Number(me?.id ?? 0), finaGender },
+    { userId: Number(me?.id ?? 0), finaGender: profileFinaGender },
     { enabled: Number(me?.id ?? 0) > 0 }
   );
   const { data: activitiesData } = trpc.activities.list.useQuery({
@@ -642,24 +648,9 @@ export default function Profile() {
           <SurfaceHeader>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <SurfaceTitle className="font-display">PB Board</SurfaceTitle>
-              <div className="inline-flex items-center gap-1 rounded-lg border border-border/60 bg-background/40 p-1">
-                <Button
-                  size="sm"
-                  variant={finaGender === "male" ? "neon" : "ghost"}
-                  className="h-7 px-2 text-xs"
-                  onClick={() => setFinaGender("male")}
-                >
-                  FINA M
-                </Button>
-                <Button
-                  size="sm"
-                  variant={finaGender === "female" ? "neon" : "ghost"}
-                  className="h-7 px-2 text-xs"
-                  onClick={() => setFinaGender("female")}
-                >
-                  FINA F
-                </Button>
-              </div>
+              <Badge variant="outline" className="text-[10px]">
+                FINA {profileFinaGender === "female" ? "F" : "M"}
+              </Badge>
             </div>
           </SurfaceHeader>
           <SurfaceContent className="space-y-3">
