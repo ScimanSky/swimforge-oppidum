@@ -46,8 +46,8 @@ export default function ClubPbLeaderboardPage() {
 
   const [strokeType, setStrokeType] = useState<(typeof STROKES)[number]["value"]>("freestyle");
   const [distanceMeters, setDistanceMeters] = useState<number>(100);
-  const [poolLengthMeters, setPoolLengthMeters] = useState<25 | 50>(50);
-  const [source, setSource] = useState<"official" | "training">("official");
+  const [poolLengthMeters, setPoolLengthMeters] = useState<25 | 50>(25);
+  const [source, setSource] = useState<"official" | "training">("training");
   const [masterCategory, setMasterCategory] = useState("");
 
   const distanceOptions = useMemo(() => DISTANCES_BY_STROKE[strokeType] ?? [100], [strokeType]);
@@ -151,8 +151,8 @@ export default function ClubPbLeaderboardPage() {
                 <SelectValue placeholder="Fonte" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="official">Gara ufficiale</SelectItem>
                 <SelectItem value="training">Allenamento</SelectItem>
+                <SelectItem value="official">Gara ufficiale</SelectItem>
               </SelectContent>
             </Select>
 

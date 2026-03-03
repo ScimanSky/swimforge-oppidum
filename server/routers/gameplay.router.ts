@@ -505,7 +505,7 @@ export const recordsRouter = router({
                 LIMIT ${limit}
             `);
 
-            const rows = (result.rows ?? []) as Array<{
+            let rows = (result.rows ?? []) as Array<{
                 user_id: number;
                 time_cs: number;
                 achieved_at: string | Date;
@@ -514,6 +514,125 @@ export const recordsRouter = router({
                 avatar_url: string | null;
                 master_category: string | null;
             }>;
+
+            if (rows.length === 0 && input.source === "training") {
+                const fallbackResult = await dbClient.execute(sql`
+                    WITH members AS (
+                        SELECT m.user_id
+                        FROM community_club_members m
+                        LEFT JOIN swimmer_profiles sp ON sp.user_id = m.user_id
+                        WHERE m.club_id = ${input.clubId}
+                          AND m.status = 'active'
+                          ${masterCategoryFilter}
+                    ),
+                    candidates AS (
+                        SELECT
+                            a.user_id,
+                            CASE
+                                WHEN lower(coalesce(l.stroke_type, '')) LIKE '%free%'
+                                  OR lower(coalesce(l.stroke_type, '')) LIKE '%stile%'
+                                  OR lower(coalesce(l.stroke_type, '')) LIKE '%crawl%' THEN 'freestyle'
+                                WHEN lower(coalesce(l.stroke_type, '')) LIKE '%back%'
+                                  OR lower(coalesce(l.stroke_type, '')) LIKE '%dorso%' THEN 'backstroke'
+                                WHEN lower(coalesce(l.stroke_type, '')) LIKE '%breast%'
+                                  OR lower(coalesce(l.stroke_type, '')) LIKE '%rana%' THEN 'breaststroke'
+                                WHEN lower(coalesce(l.stroke_type, '')) LIKE '%butter%'
+                                  OR lower(coalesce(l.stroke_type, '')) LIKE '%farf%' THEN 'butterfly'
+                                WHEN lower(coalesce(l.stroke_type, '')) LIKE '%mix%' THEN 'mixed'
+                                ELSE 'mixed'
+                            END AS stroke_type,
+                            round(l.distance_meters)::int AS distance_meters,
+                            round(l.duration_seconds * 100)::int AS time_cs,
+                            a.activity_date AS achieved_at,
+                            CASE
+                                WHEN round(coalesce(a.pool_length_meters, 25))::int = 50 THEN 50
+                                ELSE 25
+                            END AS pool_length_meters
+                        FROM members m
+                        INNER JOIN swimming_activities a ON a.user_id = m.user_id
+                        INNER JOIN garmin_activity_laps l ON l.activity_id = a.id
+                        WHERE coalesce(a.is_open_water, false) = false
+                          AND l.distance_meters IS NOT NULL
+                          AND l.duration_seconds IS NOT NULL
+                          AND l.distance_meters > 0
+                          AND l.duration_seconds > 0
+                        UNION ALL
+                        SELECT
+                            a.user_id,
+                            CASE
+                                WHEN lower(coalesce(a.stroke_type::text, '')) LIKE '%free%'
+                                  OR lower(coalesce(a.stroke_type::text, '')) LIKE '%stile%'
+                                  OR lower(coalesce(a.stroke_type::text, '')) LIKE '%crawl%' THEN 'freestyle'
+                                WHEN lower(coalesce(a.stroke_type::text, '')) LIKE '%back%'
+                                  OR lower(coalesce(a.stroke_type::text, '')) LIKE '%dorso%' THEN 'backstroke'
+                                WHEN lower(coalesce(a.stroke_type::text, '')) LIKE '%breast%'
+                                  OR lower(coalesce(a.stroke_type::text, '')) LIKE '%rana%' THEN 'breaststroke'
+                                WHEN lower(coalesce(a.stroke_type::text, '')) LIKE '%butter%'
+                                  OR lower(coalesce(a.stroke_type::text, '')) LIKE '%farf%' THEN 'butterfly'
+                                WHEN lower(coalesce(a.stroke_type::text, '')) LIKE '%mix%' THEN 'mixed'
+                                ELSE 'mixed'
+                            END AS stroke_type,
+                            round(a.distance_meters)::int AS distance_meters,
+                            round(a.duration_seconds * 100)::int AS time_cs,
+                            a.activity_date AS achieved_at,
+                            CASE
+                                WHEN round(coalesce(a.pool_length_meters, 25))::int = 50 THEN 50
+                                ELSE 25
+                            END AS pool_length_meters
+                        FROM members m
+                        INNER JOIN swimming_activities a ON a.user_id = m.user_id
+                        WHERE coalesce(a.is_open_water, false) = false
+                          AND a.distance_meters IS NOT NULL
+                          AND a.duration_seconds IS NOT NULL
+                          AND a.distance_meters > 0
+                          AND a.duration_seconds > 0
+                    ),
+                    filtered AS (
+                        SELECT
+                            c.user_id,
+                            c.time_cs,
+                            c.achieved_at
+                        FROM candidates c
+                        WHERE c.stroke_type = ${input.strokeType}
+                          AND c.distance_meters = ${input.distanceMeters}
+                          AND c.pool_length_meters = ${input.poolLengthMeters}
+                    ),
+                    best AS (
+                        SELECT
+                            f.user_id,
+                            min(f.time_cs)::int AS best_time_cs
+                        FROM filtered f
+                        GROUP BY f.user_id
+                    )
+                    SELECT
+                        b.user_id,
+                        b.best_time_cs AS time_cs,
+                        min(f.achieved_at) AS achieved_at,
+                        u.name,
+                        sp.username,
+                        sp.avatar_url,
+                        sp.master_category
+                    FROM best b
+                    INNER JOIN filtered f
+                        ON f.user_id = b.user_id
+                        AND f.time_cs = b.best_time_cs
+                    INNER JOIN users u ON u.id = b.user_id
+                    LEFT JOIN swimmer_profiles sp ON sp.user_id = b.user_id
+                    GROUP BY b.user_id, b.best_time_cs, u.name, sp.username, sp.avatar_url, sp.master_category
+                    ORDER BY b.best_time_cs ASC, min(f.achieved_at) ASC
+                    LIMIT ${limit}
+                `);
+
+                rows = (fallbackResult.rows ?? []) as Array<{
+                    user_id: number;
+                    time_cs: number;
+                    achieved_at: string | Date;
+                    name: string | null;
+                    username: string | null;
+                    avatar_url: string | null;
+                    master_category: string | null;
+                }>;
+            }
 
             return {
                 clubId: input.clubId,
