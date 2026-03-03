@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   postImageUploadMutateAsync: vi.fn(),
   cloudinaryMutateAsync: vi.fn(),
   createTextPostMutateAsync: vi.fn(),
+  trackCelebrationMutate: vi.fn(),
 }));
 
 vi.mock("sonner", () => ({
@@ -61,6 +62,13 @@ vi.mock("@/lib/trpc", () => ({
         useMutation: () => ({
           mutateAsync: mocks.createTextPostMutateAsync,
           isPending: false,
+        }),
+      },
+    },
+    records: {
+      trackCelebrationAction: {
+        useMutation: () => ({
+          mutate: mocks.trackCelebrationMutate,
         }),
       },
     },
