@@ -123,4 +123,10 @@ describe("ClubHero", () => {
     const gareButton = screen.getByRole("button", { name: /gare/i });
     expect(gareButton.className).toContain("animate-pulse");
   });
+
+  it("renders pb leaderboard link when provided", () => {
+    renderClubHero({}, { pbLeaderboardHref: "/community/club/1/pb" });
+    const pbLink = screen.getByRole("link", { name: /pb club/i });
+    expect(pbLink).toHaveAttribute("href", "/community/club/1/pb");
+  });
 });

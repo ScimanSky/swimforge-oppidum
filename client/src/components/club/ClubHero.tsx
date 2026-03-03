@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Users, Settings, ArrowLeft, Calendar, Database, Dumbbell, ExternalLink, FileText, Shield, Trophy } from "lucide-react";
+import { Users, Settings, ArrowLeft, Calendar, Database, Dumbbell, ExternalLink, FileText, Medal, Shield, Trophy } from "lucide-react";
 import { Link } from "wouter";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,7 @@ interface ClubHeroProps {
   historyPageHref?: string | null;
   documentsPageHref?: string | null;
   workoutsPageHref?: string | null;
+  pbLeaderboardHref?: string | null;
   coachPageHref?: string | null;
   hasActiveMeet?: boolean;
 }
@@ -58,6 +59,7 @@ export default function ClubHero({
   historyPageHref,
   documentsPageHref,
   workoutsPageHref,
+  pbLeaderboardHref,
   coachPageHref,
   hasActiveMeet = false,
 }: ClubHeroProps) {
@@ -166,6 +168,14 @@ export default function ClubHero({
               <Button className={compactActionClass} variant="outline-neon" size="sm">
                 <Dumbbell className="mr-1 h-2.5 w-2.5" />
                 Workout
+              </Button>
+            </Link>
+          ) : null}
+          {pbLeaderboardHref ? (
+            <Link href={pbLeaderboardHref} className="min-w-0">
+              <Button className={compactActionClass} variant="outline-neon" size="sm">
+                <Medal className="mr-1 h-2.5 w-2.5" />
+                PB Club
               </Button>
             </Link>
           ) : null}
@@ -311,6 +321,14 @@ export default function ClubHero({
               <Button variant="outline-neon" size="sm">
                 <Dumbbell className="mr-1.5 h-3.5 w-3.5" />
                 Workout
+              </Button>
+            </Link>
+          ) : null}
+          {pbLeaderboardHref ? (
+            <Link href={pbLeaderboardHref}>
+              <Button variant="outline-neon" size="sm">
+                <Medal className="mr-1.5 h-3.5 w-3.5" />
+                PB Club
               </Button>
             </Link>
           ) : null}
