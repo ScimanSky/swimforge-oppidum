@@ -9,6 +9,7 @@ import {
   TRPCError,
   z,
 } from "./_shared";
+import { trackProductEvent } from "../product_analytics";
 
 export const communityUsersRouter = router({
         getPublicProfile: protectedProcedure
@@ -25,6 +26,19 @@ export const communityUsersRouter = router({
                 // Enforce profile visibility unless the viewer is the same user.
                 if (!profile.profilePublic && ctx.user.id !== input.userId) {
                     throw new TRPCError({ code: "FORBIDDEN", message: "Questo profilo non è pubblico" });
+                }
+
+                if (ctx.user.id !== input.userId) {
+                    await trackProductEvent({
+                        userId: ctx.user.id,
+                        eventName: "profile_pb_view",
+                        source: "public_profile",
+                        entityType: "user_profile",
+                        entityId: input.userId,
+                        metadata: {
+                            profilePublic: Boolean(profile.profilePublic),
+                        },
+                    });
                 }
 
                 return profile;

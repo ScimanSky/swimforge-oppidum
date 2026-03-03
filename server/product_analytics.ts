@@ -9,8 +9,13 @@ export const PRODUCT_ANALYTICS_EVENT_NAMES = [
   "season_next_action_click",
   "pb_detected",
   "ghost_duel_create",
+  "ghost_track_open",
   "club_workout_open",
   "club_workout_complete",
+  "feed_post_create",
+  "feed_post_view",
+  "activity_synced",
+  "profile_pb_view",
 ] as const;
 
 export type ProductAnalyticsEventName = (typeof PRODUCT_ANALYTICS_EVENT_NAMES)[number];

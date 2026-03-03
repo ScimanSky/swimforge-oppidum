@@ -311,6 +311,16 @@ export const communityRouter = router({
             if (!row) {
                 throw new TRPCError({ code: "NOT_FOUND", message: "Post non trovato" });
             }
+            await trackProductEvent({
+                userId: ctx.user.id,
+                eventName: "feed_post_view",
+                source: "post_detail",
+                entityType: "social_post",
+                entityId: Number((row as { id?: number }).id ?? input.postId),
+                metadata: {
+                    clubId: (row as { club_id?: number | null }).club_id ?? null,
+                },
+            });
             return row;
         }),
 
@@ -358,6 +368,18 @@ export const communityRouter = router({
                     taggedUserIds,
                     postId,
                     clubId: null,
+                });
+                await trackProductEvent({
+                    userId: ctx.user.id,
+                    eventName: "feed_post_create",
+                    source: "community_feed",
+                    entityType: "social_post",
+                    entityId: postId,
+                    metadata: {
+                        hasActivity: true,
+                        hasMedia: mediaUrls.length > 0,
+                        visibility: input.visibility ?? "public",
+                    },
                 });
             }
             return { success: true, postId };
@@ -529,6 +551,18 @@ export const communityRouter = router({
                     taggedUserIds,
                     postId,
                     clubId: null,
+                });
+                await trackProductEvent({
+                    userId: ctx.user.id,
+                    eventName: "feed_post_create",
+                    source: "community_feed",
+                    entityType: "social_post",
+                    entityId: postId,
+                    metadata: {
+                        hasActivity: false,
+                        hasMedia: mediaUrls.length > 0,
+                        visibility: "public",
+                    },
                 });
             }
             return { success: true, postId };
@@ -810,7 +844,17 @@ export const communityRouter = router({
             .input(z.object({ search: z.string().optional() }).optional())
             .query(async ({ ctx, input }) => {
                 const { listGhostTrackFriends } = await import("../db_ghost_challenges");
-                return listGhostTrackFriends(ctx.user.id, input?.search);
+                const friends = await listGhostTrackFriends(ctx.user.id, input?.search);
+                await trackProductEvent({
+                    userId: ctx.user.id,
+                    eventName: "ghost_track_open",
+                    source: "ghost_track_tab",
+                    metadata: {
+                        hasSearch: Boolean(input?.search?.trim()),
+                        resultCount: Array.isArray(friends) ? friends.length : 0,
+                    },
+                });
+                return friends;
             }),
         sessions: protectedProcedure
             .input(z.object({ friendUserId: z.number() }))

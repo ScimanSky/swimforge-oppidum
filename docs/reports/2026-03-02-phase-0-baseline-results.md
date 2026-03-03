@@ -1,38 +1,38 @@
 # Phase 0 Baseline Results
 
-- Data report: 2026-03-02
+- Data report: 2026-03-03
 - Finestra baseline: ultime 12 settimane coorti, ultimi 28 giorni core-loop
-- Stato: da compilare con output SQL produzione
+- Stato: compilato con query su Supabase (snapshot iniziale a basso volume)
 - Query pack: [phase-0-baseline-queries.sql](/home/scima/projects/swimforge-oppidum-cloud/docs/analytics/phase-0-baseline-queries.sql)
 - Runbook: [phase-0-dashboard-runbook.md](/home/scima/projects/swimforge-oppidum-cloud/docs/analytics/phase-0-dashboard-runbook.md)
 
 ## Retention
-- D1 exact: `TBD`
-- D7 exact: `TBD`
-- D28 exact: `TBD`
-- D7 rolling: `TBD`
-- D28 rolling: `TBD`
+- D1 exact: `8.33%`
+- D7 exact: `16.67%`
+- D28 exact: `16.67%`
+- D7 rolling: `41.67%`
+- D28 rolling: `41.67%`
 
-## Core-loop (last completed week)
-- WAU: `TBD`
-- season_view_per_wau: `TBD`
-- season_next_action_ctr_pct: `TBD`
-- pct_users_club_workout_open: `TBD`
-- pct_users_club_workout_complete: `TBD`
-- pct_users_ghost_duel_create: `TBD`
-- pct_users_pb_detected: `TBD`
+## Core-loop (latest available week: 2026-03-02)
+- WAU: `1`
+- season_view_per_wau: `1.000`
+- season_next_action_ctr_pct: `0.00%`
+- pct_users_club_workout_open: `0.00%`
+- pct_users_club_workout_complete: `0.00%`
+- pct_users_ghost_duel_create: `0.00%`
+- pct_users_pb_detected: `0.00%`
 
 ## Segment health
-- all_users active_28d: `TBD`
-- synced_14d active_28d: `TBD`
-- club_members active_28d: `TBD`
-- masters active_28d: `TBD`
-- masters_and_club active_28d: `TBD`
+- all_users active_28d: `8.33%`
+- synced_14d active_28d: `50.00%`
+- club_members active_28d: `14.29%`
+- masters active_28d: `0.00%`
+- masters_and_club active_28d: `0.00%`
 
 ## Data quality
-- unknown events: `TBD`
-- null checks: `TBD`
-- daily event continuity: `TBD`
+- unknown events: `pass` (0)
+- null checks: `pass` (0/0/0)
+- daily event continuity: `fail` (solo `season_view` presente negli ultimi 7 giorni)
 
 ## Output SQL raw da incollare
 
@@ -45,7 +45,13 @@
 Risultato:
 
 ```text
-TBD
+WEIGHTED_SUMMARY
+cohort_size=12
+d1_exact_pct=8.33
+d7_exact_pct=16.67
+d28_exact_pct=16.67
+d7_rolling_pct=41.67
+d28_rolling_pct=41.67
 ```
 
 ### 2) Weekly core-loop (8 weeks)
@@ -57,7 +63,14 @@ TBD
 Risultato:
 
 ```text
-TBD
+week_start=2026-03-02
+wau=1
+season_view_per_wau=1.000
+season_next_action_ctr_pct=0.00
+pct_users_club_workout_open=0.00
+pct_users_club_workout_complete=0.00
+pct_users_ghost_duel_create=0.00
+pct_users_pb_detected=0.00
 ```
 
 ### 3) Segment breakdown
@@ -69,7 +82,11 @@ TBD
 Risultato:
 
 ```text
-TBD
+all_users active_28d_pct=8.33
+synced_14d active_28d_pct=50.00
+club_members active_28d_pct=14.29
+masters active_28d_pct=0.00
+masters_and_club active_28d_pct=0.00
 ```
 
 ### 4) Data quality checks
@@ -81,15 +98,17 @@ TBD
 Risultato:
 
 ```text
-TBD
+unknown_events=[]
+null_checks={null_user_id:0, empty_event_name:0, null_created_at:0}
+last_7d_events=[{day:2026-03-02,event_name:season_view,events:1,users:1}]
 ```
 
 ## Decisioni (review bisettimanale)
-- Keep/remove list: `TBD`
-- Re-prioritizzazione backlog Fase 1: `TBD`
-- Rischi bloccanti per go/no-go: `TBD`
+- Keep/remove list: `predictions/recap mantenute dietro flag (default OFF), nessuna rottura route rilevata`
+- Re-prioritizzazione backlog Fase 1: `PB Board + Club Meets pilot confermati come prossimo stream`
+- Rischi bloccanti per go/no-go: `volumi eventi ancora troppo bassi per interpretazione KPI robusta`
 
 ## Note operative
-1. In questa macchina non è presente `DATABASE_URL`, quindi i KPI non sono stati precompilati automaticamente.
-2. Compilare questo report direttamente dal SQL Editor Supabase usando il query pack linkato sopra.
-3. Dopo compilazione, creare commit dedicato con soli valori baseline (nessuna modifica strutturale).
+1. In questa macchina `DATABASE_URL` non è configurata, ma i KPI sono stati estratti via connessione Supabase MCP.
+2. Snapshot con campione ridotto (12 utenti, 1 evento settimanale core-loop): usare come baseline tecnica iniziale, non come baseline statistica definitiva.
+3. Ripetere il refresh report ogni lunedì con lo stesso query pack; congelare decisioni di prodotto finché `daily event continuity` non passa.

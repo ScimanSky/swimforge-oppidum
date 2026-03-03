@@ -1352,6 +1352,26 @@ export async function syncGarminActivities(
       }
     }
 
+    if (syncedCount > 0) {
+      try {
+        const { trackProductEvent } = await import("./product_analytics");
+        await trackProductEvent({
+          userId,
+          eventName: "activity_synced",
+          source: "garmin_sync",
+          entityType: "sync_session",
+          metadata: {
+            provider: "garmin",
+            syncedCount,
+            daysBack,
+            newXp: totalNewXp,
+          },
+        });
+      } catch {
+        // Best effort analytics
+      }
+    }
+
     return { synced: syncedCount, newXp: totalNewXp };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);

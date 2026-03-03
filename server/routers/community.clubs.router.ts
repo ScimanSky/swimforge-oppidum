@@ -351,6 +351,17 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                         postId,
                         clubId: input.clubId,
                     });
+                    await trackProductEvent({
+                        userId: ctx.user.id,
+                        eventName: "feed_post_create",
+                        source: "club_feed",
+                        entityType: "social_post",
+                        entityId: postId,
+                        metadata: {
+                            clubId: input.clubId,
+                            hasMedia: mediaUrls.length > 0,
+                        },
+                    });
                 }
                 const actionXp = await awardActionXp({
                     userId: ctx.user.id,

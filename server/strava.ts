@@ -663,6 +663,24 @@ export async function syncStravaActivities(
 
       // Invalidate cached data for this user
       await invalidateUserCache(String(userId));
+
+      try {
+        const { trackProductEvent } = await import("./product_analytics");
+        await trackProductEvent({
+          userId,
+          eventName: "activity_synced",
+          source: "strava_sync",
+          entityType: "sync_session",
+          metadata: {
+            provider: "strava",
+            syncedCount: importedCount,
+            daysBack,
+            newXp: totalNewXp,
+          },
+        });
+      } catch {
+        // Best effort analytics
+      }
     }
 
     // Update last sync time

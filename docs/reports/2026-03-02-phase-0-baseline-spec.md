@@ -40,6 +40,13 @@
 - Trigger: azione utente "Segna completato" su workout club.
 - Metadata minima: `clubId`, `status`.
 
+## Eventi estesi (supporto diagnosi loop)
+1. `feed_post_create` — creazione post nel feed globale/club.
+2. `feed_post_view` — apertura dettaglio post.
+3. `activity_synced` — sync con nuove attività importate (Garmin/Strava).
+4. `profile_pb_view` — apertura profilo pubblico altrui con sezione identità/PB.
+5. `ghost_track_open` — ingresso nel tab Ghost Track.
+
 ## Schema evento (server-side)
 - Tabella: `product_engagement_events`
 - Campi: `id`, `user_id`, `event_name`, `source`, `entity_type`, `entity_id`, `metadata`, `created_at`

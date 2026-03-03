@@ -339,8 +339,13 @@ WHERE pe.event_name NOT IN (
   'season_next_action_click',
   'pb_detected',
   'ghost_duel_create',
+  'ghost_track_open',
   'club_workout_open',
-  'club_workout_complete'
+  'club_workout_complete',
+  'feed_post_create',
+  'feed_post_view',
+  'activity_synced',
+  'profile_pb_view'
 )
 GROUP BY pe.event_name
 ORDER BY events DESC;
