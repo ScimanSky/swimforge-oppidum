@@ -1,5 +1,5 @@
 import {
-    protectedProcedure, publicProcedure, router, z, db,
+    protectedProcedure, publicProcedure, router, z, db, getDb, sql,
     TRPCError,
     getOrSetCached, cacheKeys, CACHE_TTL,
     invalidateUserCache, invalidateLeaderboardCache,
@@ -12,9 +12,11 @@ import {
     getCurrentClubQuestStates,
     claimCurrentClubQuestReward,
     runAutoSync,
+    getUserPublicProfile,
     garmin, strava,
 } from "./_shared";
 import { hasGrantedConsent } from "../consent";
+import { calculateFinaPoints, isSupportedFinaEvent } from "../lib/fina_points";
 
 async function assertHealthAndProviderConsent(userId: number, provider: "garmin_sync" | "strava_sync") {
     const [healthAllowed, providerAllowed] = await Promise.all([
@@ -34,6 +36,32 @@ async function assertHealthAndProviderConsent(userId: number, provider: "garmin_
             message: `Devi autorizzare il consenso ${provider === "garmin_sync" ? "Garmin" : "Strava"} in Impostazioni > Privacy.`,
         });
     }
+}
+
+const RECORD_STROKES = ["freestyle", "backstroke", "breaststroke", "butterfly", "mixed"] as const;
+const RECORD_SOURCES = ["official", "training"] as const;
+
+function buildRecordType(distanceMeters: number, poolLengthMeters: 25 | 50, source: "official" | "training") {
+    const sourceCode = source === "official" ? "o" : "t";
+    return `pb_${distanceMeters}_${poolLengthMeters}_${sourceCode}`;
+}
+
+function parseRecordType(recordType: string): {
+    distanceMeters: number;
+    poolLengthMeters: 25 | 50;
+    source: "official" | "training";
+} | null {
+    const match = /^pb_(\d+)_(25|50)_([ot])$/.exec(String(recordType).trim().toLowerCase());
+    if (!match) return null;
+    const distanceMeters = Number(match[1]);
+    const poolLengthMeters = Number(match[2]);
+    const sourceCode = match[3];
+    if (!Number.isFinite(distanceMeters) || ![25, 50].includes(poolLengthMeters)) return null;
+    return {
+        distanceMeters,
+        poolLengthMeters: poolLengthMeters as 25 | 50,
+        source: sourceCode === "o" ? "official" : "training",
+    };
 }
 
 // Auto sync Garmin + Strava (login/app open)
@@ -301,6 +329,199 @@ export const recordsRouter = router({
     list: protectedProcedure.query(async ({ ctx }) => {
         return await db.getPersonalRecords(ctx.user.id);
     }),
+    setManual: protectedProcedure
+        .input(z.object({
+            strokeType: z.enum(RECORD_STROKES),
+            distanceMeters: z.number().int().min(25).max(5000),
+            poolLengthMeters: z.union([z.literal(25), z.literal(50)]),
+            timeCs: z.number().int().min(500).max(3_600_000),
+            source: z.enum(RECORD_SOURCES).default("official"),
+            achievedAt: z.string().datetime().optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            if (!isSupportedFinaEvent(input.strokeType, input.distanceMeters)) {
+                throw new TRPCError({
+                    code: "BAD_REQUEST",
+                    message: "Combinazione stile/distanza non supportata.",
+                });
+            }
+            const recordType = buildRecordType(input.distanceMeters, input.poolLengthMeters, input.source);
+            const achievedAt = input.achievedAt ? new Date(input.achievedAt) : undefined;
+            const recordId = await db.upsertPersonalRecord({
+                userId: ctx.user.id,
+                recordType,
+                value: input.timeCs,
+                strokeType: input.strokeType,
+                activityId: null,
+                achievedAt,
+            });
+            return {
+                success: Boolean(recordId),
+                recordId,
+                recordType,
+            };
+        }),
+    getByUser: protectedProcedure
+        .input(z.object({
+            userId: z.number().int().positive(),
+        }))
+        .query(async ({ ctx, input }) => {
+            const isSelf = ctx.user.id === input.userId;
+            if (!isSelf) {
+                const profile = await getUserPublicProfile({
+                    viewerUserId: ctx.user.id,
+                    targetUserId: input.userId,
+                });
+                if (!profile) {
+                    throw new TRPCError({ code: "NOT_FOUND", message: "Utente non trovato." });
+                }
+                if (!profile.profilePublic) {
+                    throw new TRPCError({ code: "FORBIDDEN", message: "Questo profilo non è pubblico." });
+                }
+            }
+
+            const rows = await db.getPersonalRecords(input.userId);
+            const parsed = rows
+                .map((row) => {
+                    const descriptor = parseRecordType(String(row.recordType ?? ""));
+                    if (!descriptor) return null;
+                    return {
+                        id: row.id,
+                        userId: row.userId,
+                        strokeType: row.strokeType ?? "mixed",
+                        distanceMeters: descriptor.distanceMeters,
+                        poolLengthMeters: descriptor.poolLengthMeters,
+                        source: descriptor.source,
+                        timeCs: Number(row.value),
+                        previousTimeCs: row.previousValue ? Number(row.previousValue) : null,
+                        achievedAt: row.achievedAt,
+                        activityId: row.activityId ?? null,
+                    };
+                })
+                .filter((value): value is NonNullable<typeof value> => Boolean(value))
+                .sort((a, b) => {
+                    if (a.strokeType !== b.strokeType) return String(a.strokeType).localeCompare(String(b.strokeType));
+                    if (a.distanceMeters !== b.distanceMeters) return a.distanceMeters - b.distanceMeters;
+                    if (a.poolLengthMeters !== b.poolLengthMeters) return a.poolLengthMeters - b.poolLengthMeters;
+                    if (a.source !== b.source) return a.source.localeCompare(b.source);
+                    return a.timeCs - b.timeCs;
+                });
+
+            return {
+                userId: input.userId,
+                records: parsed,
+            };
+        }),
+    clubLeaderboard: protectedProcedure
+        .input(z.object({
+            clubId: z.number().int().positive(),
+            strokeType: z.enum(RECORD_STROKES),
+            distanceMeters: z.number().int().min(25).max(5000),
+            poolLengthMeters: z.union([z.literal(25), z.literal(50)]),
+            source: z.enum(RECORD_SOURCES).default("official"),
+            masterCategory: z.string().min(1).max(32).optional(),
+            limit: z.number().int().min(1).max(200).optional(),
+        }))
+        .query(async ({ ctx, input }) => {
+            const { getClubById } = await import("../db_clubs");
+            const club = await getClubById(ctx.user.id, input.clubId);
+            if (!club) throw new TRPCError({ code: "NOT_FOUND", message: "Club non trovato." });
+            if (!club.is_member) {
+                throw new TRPCError({ code: "FORBIDDEN", message: "Devi essere membro del club." });
+            }
+
+            const dbClient = await getDb();
+            if (!dbClient) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database non disponibile." });
+            const recordType = buildRecordType(input.distanceMeters, input.poolLengthMeters, input.source);
+            const limit = input.limit ?? 50;
+            const masterCategoryFilter = input.masterCategory?.trim()
+                ? sql`AND sp.master_category = ${input.masterCategory.trim()}`
+                : sql``;
+
+            const result = await dbClient.execute(sql`
+                SELECT
+                    pr.user_id,
+                    pr.value AS time_cs,
+                    pr.achieved_at,
+                    u.name,
+                    sp.username,
+                    sp.avatar_url,
+                    sp.master_category
+                FROM personal_records pr
+                INNER JOIN community_club_members ccm
+                    ON ccm.user_id = pr.user_id
+                    AND ccm.club_id = ${input.clubId}
+                    AND ccm.status = 'active'
+                INNER JOIN users u ON u.id = pr.user_id
+                LEFT JOIN swimmer_profiles sp ON sp.user_id = pr.user_id
+                WHERE pr.record_type = ${recordType}
+                  AND pr.stroke_type = ${input.strokeType}
+                  ${masterCategoryFilter}
+                ORDER BY pr.value ASC, pr.achieved_at ASC
+                LIMIT ${limit}
+            `);
+
+            const rows = (result.rows ?? []) as Array<{
+                user_id: number;
+                time_cs: number;
+                achieved_at: string | Date;
+                name: string | null;
+                username: string | null;
+                avatar_url: string | null;
+                master_category: string | null;
+            }>;
+
+            return {
+                clubId: input.clubId,
+                strokeType: input.strokeType,
+                distanceMeters: input.distanceMeters,
+                poolLengthMeters: input.poolLengthMeters,
+                source: input.source,
+                leaderboard: rows.map((row, index) => ({
+                    rank: index + 1,
+                    userId: Number(row.user_id),
+                    displayName: row.name ?? row.username ?? `User ${row.user_id}`,
+                    username: row.username,
+                    avatarUrl: row.avatar_url,
+                    masterCategory: row.master_category,
+                    timeCs: Number(row.time_cs),
+                    achievedAt: row.achieved_at,
+                })),
+            };
+        }),
+    finaPoints: protectedProcedure
+        .input(z.object({
+            strokeType: z.enum(RECORD_STROKES),
+            distanceMeters: z.number().int().min(25).max(5000),
+            timeCs: z.number().int().min(500).max(3_600_000),
+            gender: z.enum(["male", "female"]),
+            poolLengthMeters: z.union([z.literal(25), z.literal(50)]).default(50),
+            birthYear: z.number().int().min(1900).max(2100).optional(),
+        }))
+        .query(async ({ input }) => {
+            if (!isSupportedFinaEvent(input.strokeType, input.distanceMeters)) {
+                throw new TRPCError({
+                    code: "BAD_REQUEST",
+                    message: "Evento non supportato per il calcolo FINA.",
+                });
+            }
+            const points = calculateFinaPoints({
+                strokeType: input.strokeType,
+                distanceMeters: input.distanceMeters,
+                timeCs: input.timeCs,
+                gender: input.gender,
+                poolLengthMeters: input.poolLengthMeters,
+            });
+            return {
+                points,
+                strokeType: input.strokeType,
+                distanceMeters: input.distanceMeters,
+                poolLengthMeters: input.poolLengthMeters,
+                timeCs: input.timeCs,
+                gender: input.gender,
+                age: input.birthYear ? new Date().getFullYear() - input.birthYear : null,
+            };
+        }),
 });
 
 // XP History

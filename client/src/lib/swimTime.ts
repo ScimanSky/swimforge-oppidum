@@ -63,3 +63,19 @@ export function getSessionTimeCs(finalTimeCs: unknown, finalTimeRaw: unknown): n
   if (Number.isFinite(numeric) && numeric > 0) return numeric;
   return parseSwimTimeToCentiseconds(finalTimeRaw);
 }
+
+export function formatSwimCentiseconds(value: unknown): string {
+  const cs = Number(value);
+  if (!Number.isFinite(cs) || cs <= 0) return "--";
+
+  const totalCs = Math.round(cs);
+  const totalSeconds = Math.floor(totalCs / 100);
+  const centiseconds = totalCs % 100;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (minutes > 0) {
+    return `${minutes}:${String(seconds).padStart(2, "0")}.${String(centiseconds).padStart(2, "0")}`;
+  }
+  return `${seconds}.${String(centiseconds).padStart(2, "0")}`;
+}

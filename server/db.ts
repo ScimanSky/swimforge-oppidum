@@ -768,7 +768,7 @@ export async function upsertPersonalRecord(data: InsertPersonalRecord) {
     await db.update(personalRecords).set({
       value: data.value,
       activityId: data.activityId,
-      achievedAt: new Date(),
+      achievedAt: data.achievedAt ?? new Date(),
       previousValue: existing.value,
     }).where(eq(personalRecords.id, existing.id));
     if (Number.isFinite(previousValue) && Number.isFinite(currentValue) && previousValue !== currentValue) {

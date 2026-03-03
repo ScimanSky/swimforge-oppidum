@@ -22,6 +22,7 @@ import {
   Waves,
   Zap,
 } from "lucide-react";
+import { formatSwimCentiseconds } from "@/lib/swimTime";
 
 const formatDistance = (meters?: number | null) => {
   if (!meters) return "—";
@@ -169,7 +170,12 @@ const strokeLabels: Record<string, string> = {
   backstroke: "Dorso",
   breaststroke: "Rana",
   butterfly: "Farfalla",
-  mixed: "Misto",
+  mixed: "Misti",
+};
+
+const sourceLabels: Record<string, string> = {
+  official: "Gara",
+  training: "Allenamento",
 };
 
 interface StatItemProps {
@@ -280,6 +286,10 @@ function ActivityItem({ type, date, duration, distance, pace }: ActivityItemProp
 export default function Profile() {
   const { data: me } = trpc.auth.me.useQuery();
   const { data: profile } = trpc.profile.get.useQuery();
+  const pbBoardQuery = trpc.records.getByUser.useQuery(
+    { userId: Number(me?.id ?? 0) },
+    { enabled: Number(me?.id ?? 0) > 0 }
+  );
   const { data: activitiesData } = trpc.activities.list.useQuery({
     limit: 50,
     offset: 0,
@@ -380,64 +390,10 @@ export default function Profile() {
     }));
   }, [activities]);
 
-  const records = useMemo(() => {
-    if (!activities.length) return [] as Array<{ label: string; value: string; date: string }>;
-
-    const longest = activities.reduce(
-      (max: any, activity: any) => {
-        if (!max) return activity;
-        return getActivityDistance(activity) > getActivityDistance(max) ? activity : max;
-      },
-      null
-    );
-
-    const paceCandidates = activities.filter((activity) => getActivityPace(activity) > 0);
-    const fastestPaceActivity = paceCandidates.reduce((min, activity) => {
-      if (!min) return activity;
-      return getActivityPace(activity) < getActivityPace(min)
-        ? activity
-        : min;
-    }, paceCandidates[0] ?? null);
-
-    const swolfCandidates = activities.filter((activity) => getActivityAvgSwolf(activity) > 0);
-    const bestSwolfActivity = swolfCandidates.reduce((min, activity) => {
-      if (!min) return activity;
-      return getActivityAvgSwolf(activity) < getActivityAvgSwolf(min)
-        ? activity
-        : min;
-    }, swolfCandidates[0] ?? null);
-
-    const longestDuration = activities.reduce(
-      (max: any, activity: any) => {
-        if (!max) return activity;
-        return getActivityDuration(activity) > getActivityDuration(max) ? activity : max;
-      },
-      null
-    );
-
-    return [
-      {
-        label: "Sessione più lunga",
-        value: formatDistance(longest ? getActivityDistance(longest) : null),
-        date: formatDate(parseActivityDate(getActivityDateValue(longest))),
-      },
-      {
-        label: "Pace migliore",
-        value: formatPace(fastestPaceActivity ? getActivityPace(fastestPaceActivity) : null),
-        date: formatDate(parseActivityDate(getActivityDateValue(fastestPaceActivity))),
-      },
-      {
-        label: "SWOLF migliore",
-        value: bestSwolfActivity ? `${Math.round(getActivityAvgSwolf(bestSwolfActivity))}` : "—",
-        date: formatDate(parseActivityDate(getActivityDateValue(bestSwolfActivity))),
-      },
-      {
-        label: "Durata record",
-        value: formatTime(longestDuration ? getActivityDuration(longestDuration) : null),
-        date: formatDate(parseActivityDate(getActivityDateValue(longestDuration))),
-      },
-    ];
-  }, [activities]);
+  const pbRows = useMemo(() => {
+    const rows = ((pbBoardQuery.data as any)?.records as Array<any> | undefined) ?? [];
+    return rows.slice(0, 24);
+  }, [pbBoardQuery.data]);
 
   const achievementBadgeSummary = useMemo(() => {
     const total = achievementDefinitions?.length ?? 0;
@@ -680,6 +636,43 @@ export default function Profile() {
             </SurfaceContent>
           </Surface>
         </div>
+
+        <Surface className="bg-card border-border">
+          <SurfaceHeader>
+            <SurfaceTitle className="font-display">PB Board</SurfaceTitle>
+          </SurfaceHeader>
+          <SurfaceContent className="space-y-3">
+            {pbBoardQuery.isLoading ? (
+              <p className="text-sm text-muted-foreground">Caricamento personal best...</p>
+            ) : pbRows.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Nessun personal best disponibile. Inserisci il primo PB dalle prossime schermate record.
+              </p>
+            ) : (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {pbRows.map((row: any) => (
+                  <div key={row.id} className="rounded-xl border border-border/60 bg-background/35 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-foreground">
+                        {strokeLabels[String(row.strokeType)] ?? "Stile"} {Number(row.distanceMeters)}m
+                      </p>
+                      <Badge variant="outline" className="text-[10px]">
+                        {Number(row.poolLengthMeters)}m
+                      </Badge>
+                    </div>
+                    <p className="mt-1 font-display text-lg font-bold text-primary">
+                      {formatSwimCentiseconds(row.timeCs)}
+                    </p>
+                    <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{sourceLabels[String(row.source)] ?? "PB"}</span>
+                      <span>{formatDate(row.achievedAt)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </SurfaceContent>
+        </Surface>
 
       </div>
     </AppLayout>
