@@ -54,6 +54,7 @@ export {
     getCurrentClubQuestStates,
     getSeasonEngagementSnapshot,
     listSeasonActivityPredictions,
+    resolveSeasonWeeklyFocus,
 } from "../season_engagement";
 
 // ─── Type aliases ───────────────────────────────────────────────────

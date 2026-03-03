@@ -20,6 +20,25 @@ type ActionXpRule = {
 };
 
 type PredictionStatus = "pending" | "evaluated" | "expired";
+type SeasonMissionPreview = {
+  title: string;
+  xpReward: number;
+  completed: boolean;
+};
+
+export type SeasonWeeklyFocusActionType =
+  | "daily"
+  | "action_xp"
+  | "prediction"
+  | "weekly"
+  | "explore";
+
+export type SeasonWeeklyFocus = {
+  title: string;
+  body: string;
+  helper: string;
+  actionType: SeasonWeeklyFocusActionType;
+};
 
 const ACTION_XP_RULES: Record<ActionXpType, ActionXpRule> = {
   comment: { xp: 16 },
@@ -37,6 +56,62 @@ let schemaReadyPromise: Promise<void> | null = null;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+export function resolveSeasonWeeklyFocus(input: {
+  dailyMissions: SeasonMissionPreview[];
+  weeklyMissions: SeasonMissionPreview[];
+  actionXpRemaining?: number | null;
+  pendingPredictions?: number | null;
+  predictionsEnabled?: boolean;
+}): SeasonWeeklyFocus {
+  const firstIncompleteDaily = input.dailyMissions.find((mission) => !mission.completed);
+  if (firstIncompleteDaily) {
+    return {
+      title: "Priorità oggi",
+      body: `${firstIncompleteDaily.title} · +${firstIncompleteDaily.xpReward} XP`,
+      helper: "Completa una missione daily prima del reset.",
+      actionType: "daily",
+    };
+  }
+
+  const actionXpRemaining = Number(input.actionXpRemaining ?? 0);
+  if (actionXpRemaining > 0) {
+    return {
+      title: "Spingi Action XP",
+      body: `Hai ancora ${actionXpRemaining} XP disponibili oggi`,
+      helper: "Commento, reaction, RSVP e club post aumentano il cap giornaliero.",
+      actionType: "action_xp",
+    };
+  }
+
+  const predictionsEnabled = input.predictionsEnabled ?? true;
+  const pendingPredictions = Number(input.pendingPredictions ?? 0);
+  if (predictionsEnabled && pendingPredictions > 0) {
+    return {
+      title: "Valuta la previsione",
+      body: `${pendingPredictions} previsione in attesa`,
+      helper: "Chiudi il loop pre-sessione e sblocca XP precisione.",
+      actionType: "prediction",
+    };
+  }
+
+  const firstIncompleteWeekly = input.weeklyMissions.find((mission) => !mission.completed);
+  if (firstIncompleteWeekly) {
+    return {
+      title: "Focus settimanale",
+      body: `${firstIncompleteWeekly.title} · +${firstIncompleteWeekly.xpReward} XP`,
+      helper: "Consolida i progressi weekly per aumentare il completamento globale.",
+      actionType: "weekly",
+    };
+  }
+
+  return {
+    title: "Ottimo ritmo",
+    body: "Tutte le priorità completate",
+    helper: "Mantieni continuità con attività, community e club quest.",
+    actionType: "explore",
+  };
 }
 
 function startOfUtcDay(date: Date): Date {

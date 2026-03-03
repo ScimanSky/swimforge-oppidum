@@ -4,7 +4,7 @@ import {
     getOrSetCached, cacheKeys, CACHE_TTL,
     invalidateUserCache, invalidateLeaderboardCache,
     getCurrentSeasonState, getSeasonLeaderboard, getMySeasonRank,
-    getSeasonEngagementSnapshot, getActionXpStatus,
+    getSeasonEngagementSnapshot, getActionXpStatus, resolveSeasonWeeklyFocus,
     claimSeasonReward,
     listSeasonActivityPredictions,
     createSeasonActivityPrediction,
@@ -99,6 +99,36 @@ export const seasonRouter = router({
     getEngagement: protectedProcedure.query(async ({ ctx }) => {
         return getSeasonEngagementSnapshot(ctx.user.id);
     }),
+    getWeeklyFocus: protectedProcedure
+        .input(
+            z
+                .object({
+                    includePredictions: z.boolean().optional(),
+                })
+                .optional(),
+        )
+        .query(async ({ ctx, input }) => {
+            const [seasonState, engagement] = await Promise.all([
+                getCurrentSeasonState(ctx.user.id),
+                getSeasonEngagementSnapshot(ctx.user.id),
+            ]);
+            const pendingPredictions = engagement.predictions.filter((prediction) => prediction.status === "pending").length;
+            return resolveSeasonWeeklyFocus({
+                dailyMissions: seasonState.missions.daily.map((mission) => ({
+                    title: mission.title,
+                    xpReward: Number(mission.xpReward ?? 0),
+                    completed: Boolean(mission.completed),
+                })),
+                weeklyMissions: seasonState.missions.weekly.map((mission) => ({
+                    title: mission.title,
+                    xpReward: Number(mission.xpReward ?? 0),
+                    completed: Boolean(mission.completed),
+                })),
+                actionXpRemaining: Number(engagement.actionXp.remaining ?? 0),
+                pendingPredictions,
+                predictionsEnabled: input?.includePredictions ?? true,
+            });
+        }),
     actionXpStatus: protectedProcedure.query(async ({ ctx }) => {
         return getActionXpStatus(ctx.user.id);
     }),

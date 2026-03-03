@@ -94,6 +94,9 @@ export default function SeasonPage() {
   const seasonViewTrackedRef = useRef(false)
   const seasonStepViewTrackedRef = useRef<Set<string>>(new Set())
   const trackEventMutation = trpc.community.analytics.track.useMutation()
+  const seasonPredictionsEnabled = UI_FEATURE_FLAGS.seasonPredictionsV1
+  const seasonRecapEnabled = UI_FEATURE_FLAGS.seasonRecapV1
+  const seasonCoreLoopV2Enabled = UI_FEATURE_FLAGS.seasonCoreLoopV2
   const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
     staleTime: 30_000,
     refetchInterval: 60_000,
@@ -117,6 +120,14 @@ export default function SeasonPage() {
     refetchInterval: 45_000,
     refetchOnWindowFocus: true,
   })
+  const weeklyFocusQuery = trpc.season.getWeeklyFocus.useQuery(
+    { includePredictions: seasonPredictionsEnabled },
+    {
+      staleTime: 20_000,
+      refetchInterval: 45_000,
+      refetchOnWindowFocus: true,
+    }
+  )
 
   const [predictionForm, setPredictionForm] = useState({
     targetDistanceMeters: "",
@@ -138,6 +149,7 @@ export default function SeasonPage() {
       })
       await Promise.all([
         utils.season.getEngagement.invalidate(),
+        utils.season.getWeeklyFocus.invalidate(),
         utils.season.predictions.list.invalidate(),
       ])
     },
@@ -159,6 +171,7 @@ export default function SeasonPage() {
       toast.success(`Previsione valutata: ${result.score}/100 · +${result.xpAwarded} XP`)
       await Promise.all([
         utils.season.getEngagement.invalidate(),
+        utils.season.getWeeklyFocus.invalidate(),
         utils.season.getCurrent.invalidate(),
         utils.season.getLeaderboard.invalidate(),
         utils.season.getMyRank.invalidate(),
@@ -191,6 +204,7 @@ export default function SeasonPage() {
       toast.success(`Club Quest riscattata: +${result.xpAwarded} XP`)
       await Promise.all([
         utils.season.getEngagement.invalidate(),
+        utils.season.getWeeklyFocus.invalidate(),
         utils.season.getCurrent.invalidate(),
         utils.season.getMyRank.invalidate(),
         utils.profile.get.invalidate(),
@@ -209,9 +223,6 @@ export default function SeasonPage() {
   const actionXp = engagement?.actionXp
   const predictions = engagement?.predictions ?? []
   const clubQuests = engagement?.clubQuests ?? []
-  const seasonPredictionsEnabled = UI_FEATURE_FLAGS.seasonPredictionsV1
-  const seasonRecapEnabled = UI_FEATURE_FLAGS.seasonRecapV1
-  const seasonCoreLoopV2Enabled = UI_FEATURE_FLAGS.seasonCoreLoopV2
   const pendingPredictions = useMemo(
     () => (seasonPredictionsEnabled ? predictions.filter((prediction) => prediction.status === "pending") : []),
     [predictions, seasonPredictionsEnabled],
@@ -237,7 +248,7 @@ export default function SeasonPage() {
   const firstIncompleteDaily = dailyMissions.find((mission) => !mission.completed)
   const firstIncompleteWeekly = weeklyMissions.find((mission) => !mission.completed)
 
-  const nextAction = useMemo(() => {
+  const fallbackNextAction = useMemo(() => {
     if (firstIncompleteDaily) {
       return {
         title: "Priorità oggi",
@@ -287,6 +298,7 @@ export default function SeasonPage() {
     pendingPredictions.length,
     seasonPredictionsEnabled,
   ])
+  const nextAction = weeklyFocusQuery.data ?? fallbackNextAction
 
   useEffect(() => {
     if (seasonViewTrackedRef.current) return
