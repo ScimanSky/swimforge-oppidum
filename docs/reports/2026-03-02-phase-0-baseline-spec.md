@@ -46,6 +46,9 @@
 3. `activity_synced` — sync con nuove attività importate (Garmin/Strava).
 4. `profile_pb_view` — apertura profilo pubblico altrui con sezione identità/PB.
 5. `ghost_track_open` — ingresso nel tab Ghost Track.
+6. `season_step_view` — visualizzazione step card Season v2.
+7. `season_step_action_click` — click CTA su step card Season v2.
+8. `season_weekly_action_marked` — marcatura azione settimanale eseguita da Season v2.
 
 ## Schema evento (server-side)
 - Tabella: `product_engagement_events`
@@ -68,6 +71,9 @@
 4. `% utenti con >=1 club_workout_complete / settimana`
 5. `% utenti con >=1 ghost_duel_create / settimana`
 6. `% utenti con >=1 pb_detected / settimana`
+7. CTR `season_step_action_click / season_step_view` (solo rollout Season v2)
+8. CTR `season_weekly_action_marked / season_step_action_click` (solo rollout Season v2)
+9. CTR `season_weekly_action_marked / season_step_view` (solo rollout Season v2)
 
 ## 4) Query baseline (specifica)
 

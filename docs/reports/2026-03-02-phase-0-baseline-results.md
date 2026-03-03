@@ -17,6 +17,9 @@
 - WAU: `1`
 - season_view_per_wau: `1.000`
 - season_next_action_ctr_pct: `0.00%`
+- season_step_action_ctr_pct: `n/a` (Season v2 funnel event non ancora presente nello snapshot 2026-03-03)
+- season_weekly_mark_from_click_ctr_pct: `n/a` (evento introdotto dopo baseline snapshot)
+- season_weekly_mark_from_step_view_ctr_pct: `n/a` (evento introdotto dopo baseline snapshot)
 - pct_users_club_workout_open: `0.00%`
 - pct_users_club_workout_complete: `0.00%`
 - pct_users_ghost_duel_create: `0.00%`
@@ -67,6 +70,9 @@ week_start=2026-03-02
 wau=1
 season_view_per_wau=1.000
 season_next_action_ctr_pct=0.00
+season_step_action_ctr_pct=n/a
+season_weekly_mark_from_click_ctr_pct=n/a
+season_weekly_mark_from_step_view_ctr_pct=n/a
 pct_users_club_workout_open=0.00
 pct_users_club_workout_complete=0.00
 pct_users_ghost_duel_create=0.00
