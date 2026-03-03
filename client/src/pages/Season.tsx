@@ -92,6 +92,7 @@ export default function SeasonPage() {
   const utils = trpc.useUtils()
   const [, setLocation] = useLocation()
   const seasonViewTrackedRef = useRef(false)
+  const seasonStepViewTrackedRef = useRef<Set<string>>(new Set())
   const trackEventMutation = trpc.community.analytics.track.useMutation()
   const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
     staleTime: 30_000,
@@ -210,6 +211,7 @@ export default function SeasonPage() {
   const clubQuests = engagement?.clubQuests ?? []
   const seasonPredictionsEnabled = UI_FEATURE_FLAGS.seasonPredictionsV1
   const seasonRecapEnabled = UI_FEATURE_FLAGS.seasonRecapV1
+  const seasonCoreLoopV2Enabled = UI_FEATURE_FLAGS.seasonCoreLoopV2
   const pendingPredictions = useMemo(
     () => (seasonPredictionsEnabled ? predictions.filter((prediction) => prediction.status === "pending") : []),
     [predictions, seasonPredictionsEnabled],
@@ -225,6 +227,12 @@ export default function SeasonPage() {
   const dailyMissions = seasonData?.missions?.daily ?? []
   const weeklyMissions = seasonData?.missions?.weekly ?? []
   const badgeAssignments = seasonData?.badgeAssignments ?? []
+  const primaryClubQuest = clubQuests[0] ?? null
+  const benchmarkRival = myRank?.around?.find((entry) => !entry.isMe) ?? null
+  const benchmarkGapXp =
+    benchmarkRival && myRank?.me
+      ? Math.abs(Number(benchmarkRival.seasonXp ?? 0) - Number(myRank.me.seasonXp ?? 0))
+      : null
 
   const firstIncompleteDaily = dailyMissions.find((mission) => !mission.completed)
   const firstIncompleteWeekly = weeklyMissions.find((mission) => !mission.completed)
@@ -289,12 +297,46 @@ export default function SeasonPage() {
     })
   }, [trackEventMutation])
 
-  const handleNextActionClick = () => {
+  useEffect(() => {
+    if (!seasonCoreLoopV2Enabled) return
+    const steps = [
+      { stepId: "focus_weekly", stepType: String(nextAction.actionType) },
+      { stepId: "club_contribution", stepType: primaryClubQuest ? "club_quest" : "no_club" },
+      { stepId: "soft_comparison", stepType: benchmarkRival ? "benchmark" : "leaderboard" },
+    ]
+    for (const step of steps) {
+      if (seasonStepViewTrackedRef.current.has(step.stepId)) continue
+      seasonStepViewTrackedRef.current.add(step.stepId)
+      trackEventMutation.mutate({
+        eventName: "season_step_view",
+        source: "season_v2",
+        metadata: {
+          stepId: step.stepId,
+          stepType: step.stepType,
+        },
+      })
+    }
+  }, [benchmarkRival, nextAction.actionType, primaryClubQuest, seasonCoreLoopV2Enabled, trackEventMutation])
+
+  const trackSeasonStepActionClick = (params: { stepId: string; stepType: string; action: string }) => {
+    trackEventMutation.mutate({
+      eventName: "season_step_action_click",
+      source: "season_v2",
+      metadata: {
+        stepId: params.stepId,
+        stepType: params.stepType,
+        action: params.action,
+      },
+    })
+  }
+
+  const handleNextActionClick = (sourceCard: "legacy_today" | "season_v2_focus" = "legacy_today") => {
     trackEventMutation.mutate({
       eventName: "season_next_action_click",
       source: "season_page",
       metadata: {
         actionType: nextAction.actionType,
+        sourceCard,
       },
     })
 
@@ -311,6 +353,44 @@ export default function SeasonPage() {
       return
     }
     setLocation("/season/challenges")
+  }
+
+  const handleClubContributionAction = () => {
+    const stepType = primaryClubQuest ? "club_quest" : "no_club"
+    if (primaryClubQuest && primaryClubQuest.eligibleToClaim && !primaryClubQuest.claimed) {
+      trackSeasonStepActionClick({
+        stepId: "club_contribution",
+        stepType,
+        action: "claim_reward",
+      })
+      claimClubQuestMutation.mutate({ clubId: primaryClubQuest.clubId })
+      return
+    }
+    trackSeasonStepActionClick({
+      stepId: "club_contribution",
+      stepType,
+      action: "open_club",
+    })
+    setLocation("/home/community")
+  }
+
+  const handleSoftComparisonAction = () => {
+    const stepType = benchmarkRival ? "benchmark" : "leaderboard"
+    if (benchmarkRival) {
+      trackSeasonStepActionClick({
+        stepId: "soft_comparison",
+        stepType,
+        action: "open_rival_profile",
+      })
+      setLocation(`/u/${benchmarkRival.userId}?from=${encodeURIComponent("/season")}`)
+      return
+    }
+    trackSeasonStepActionClick({
+      stepId: "soft_comparison",
+      stepType,
+      action: "open_leaderboard",
+    })
+    setLocation("/season/leaderboard")
   }
 
   const handleCreatePrediction = () => {
@@ -412,157 +492,268 @@ export default function SeasonPage() {
           </SurfaceContent>
         </Surface>
 
-        <section className="surface-panel p-4 lg:p-5 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="font-display text-base font-semibold text-foreground">Oggi</p>
-            <Badge variant="outline" className="text-xs">
-              Reset daily tra {formatUtcCountdownToNextDay()}
-            </Badge>
-          </div>
+        {seasonCoreLoopV2Enabled ? (
+          <section className="surface-panel p-4 lg:p-5 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-display text-base font-semibold text-foreground">Guida settimanale (v2)</p>
+              <Badge variant="outline" className="text-xs">
+                Reset weekly tra {formatUtcCountdownToNextWeek()}
+              </Badge>
+            </div>
 
-          <div className="stream-card border-primary/35 bg-primary/8">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-foreground">{nextAction.title}</p>
-                <p className="text-sm text-foreground/90">{nextAction.body}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{nextAction.helper}</p>
+            <div className="grid gap-3 lg:grid-cols-3">
+              <div className="stream-card border-primary/35 bg-primary/8">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">1 · Focus personale</p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">{nextAction.title}</p>
+                    <p className="text-sm text-foreground/90">{nextAction.body}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{nextAction.helper}</p>
+                    <Button
+                      variant="outline-neon"
+                      size="sm"
+                      className="mt-2 h-7 px-2.5 text-[11px]"
+                      onClick={() => {
+                        trackSeasonStepActionClick({
+                          stepId: "focus_weekly",
+                          stepType: String(nextAction.actionType),
+                          action: "next_action",
+                        })
+                        handleNextActionClick("season_v2_focus")
+                      }}
+                      disabled={trackEventMutation.isPending}
+                    >
+                      Prossima azione
+                    </Button>
+                  </div>
+                  <Flame className="size-4 text-primary shrink-0" />
+                </div>
+              </div>
+
+              <div className="stream-card">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">2 · Contributo club</p>
+                {primaryClubQuest ? (
+                  <>
+                    <p className="mt-1 text-sm font-semibold text-foreground truncate">{primaryClubQuest.clubName}</p>
+                    <p className="text-sm text-foreground/90">
+                      Progresso squadra: {primaryClubQuest.completion.progressPercent}%
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Membri attivi {primaryClubQuest.progress.engagedMembers}/{primaryClubQuest.targets.engagedMembers} · RSVP {primaryClubQuest.progress.teamRsvps}/{primaryClubQuest.targets.rsvps}
+                    </p>
+                    <Progress value={primaryClubQuest.completion.progressPercent} className="mt-2 h-1.5" />
+                    <Button
+                      variant="outline-neon"
+                      size="sm"
+                      className="mt-2 h-7 px-2.5 text-[11px]"
+                      onClick={handleClubContributionAction}
+                      disabled={claimClubQuestMutation.isPending}
+                    >
+                      {primaryClubQuest.eligibleToClaim && !primaryClubQuest.claimed ? "Riscatta reward" : "Apri club"}
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-1 text-sm font-semibold text-foreground">Nessun club attivo</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Entra in un club per avere obiettivi cooperativi settimanali e reward condivise.
+                    </p>
+                    <Button
+                      variant="outline-neon"
+                      size="sm"
+                      className="mt-2 h-7 px-2.5 text-[11px]"
+                      onClick={handleClubContributionAction}
+                    >
+                      Esplora club
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              <div className="stream-card">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">3 · Confronto soft</p>
+                {benchmarkRival && myRank?.me ? (
+                  <>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
+                      Sei #{myRank.me.rank}, vicino a #{benchmarkRival.rank}
+                    </p>
+                    <p className="text-sm text-foreground/90 truncate">{benchmarkRival.name}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Gap: {benchmarkGapXp?.toLocaleString() ?? 0} XP · confronto amichevole
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-1 text-sm font-semibold text-foreground">Classifica Season</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Apri la classifica per identificare un benchmark e tenere alta la continuità.
+                    </p>
+                  </>
+                )}
                 <Button
                   variant="outline-neon"
                   size="sm"
                   className="mt-2 h-7 px-2.5 text-[11px]"
-                  onClick={handleNextActionClick}
-                  disabled={trackEventMutation.isPending}
+                  onClick={handleSoftComparisonAction}
                 >
-                  Vai all'azione
+                  {benchmarkRival ? "Apri benchmark" : "Apri classifica"}
                 </Button>
               </div>
-              <Flame className="size-4 text-primary shrink-0" />
             </div>
-          </div>
+          </section>
+        ) : (
+          <section className="surface-panel p-4 lg:p-5 space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-display text-base font-semibold text-foreground">Oggi</p>
+              <Badge variant="outline" className="text-xs">
+                Reset daily tra {formatUtcCountdownToNextDay()}
+              </Badge>
+            </div>
 
-          <div className="grid gap-3 md:grid-cols-3">
-            <div className="stream-card md:col-span-2">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-foreground">Missioni daily</p>
-                <Badge variant="outline" className="text-[10px]">Scadenza {formatUtcCountdownToNextDay()}</Badge>
+            <div className="stream-card border-primary/35 bg-primary/8">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{nextAction.title}</p>
+                  <p className="text-sm text-foreground/90">{nextAction.body}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{nextAction.helper}</p>
+                  <Button
+                    variant="outline-neon"
+                    size="sm"
+                    className="mt-2 h-7 px-2.5 text-[11px]"
+                    onClick={() => handleNextActionClick("legacy_today")}
+                    disabled={trackEventMutation.isPending}
+                  >
+                    Vai all'azione
+                  </Button>
+                </div>
+                <Flame className="size-4 text-primary shrink-0" />
               </div>
-              <div className="space-y-2">
-                {dailyMissions.map((mission) => (
-                  <div key={mission.id} className="rounded-xl border border-border/60 bg-background/40 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{mission.title}</p>
-                        <p className="text-xs text-muted-foreground">{mission.description}</p>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="stream-card md:col-span-2">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-foreground">Missioni daily</p>
+                  <Badge variant="outline" className="text-[10px]">Scadenza {formatUtcCountdownToNextDay()}</Badge>
+                </div>
+                <div className="space-y-2">
+                  {dailyMissions.map((mission) => (
+                    <div key={mission.id} className="rounded-xl border border-border/60 bg-background/40 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{mission.title}</p>
+                          <p className="text-xs text-muted-foreground">{mission.description}</p>
+                        </div>
+                        <Badge variant={mission.completed ? "neon" : "outline"} className="text-xs shrink-0">
+                          +{mission.xpReward} XP
+                        </Badge>
                       </div>
-                      <Badge variant={mission.completed ? "neon" : "outline"} className="text-xs shrink-0">
-                        +{mission.xpReward} XP
-                      </Badge>
+                      <Progress value={Number(mission.progress ?? 0)} className="mt-2 h-1.5" />
                     </div>
-                    <Progress value={Number(mission.progress ?? 0)} className="mt-2 h-1.5" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="stream-card">
-                <p className="text-xs text-muted-foreground">Action XP</p>
-                <p className="text-lg font-display font-semibold text-foreground">
-                  {actionXp?.earnedToday ?? 0}/{actionXp?.cap ?? 90}
-                </p>
-                <Progress
-                  value={Math.min(100, ((actionXp?.earnedToday ?? 0) / Math.max(actionXp?.cap ?? 90, 1)) * 100)}
-                  className="mt-2 h-1.5"
-                />
-                <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
-                  <span>Commenti: {actionXp?.byType?.comment ?? 0}</span>
-                  <span>Reaction: {actionXp?.byType?.reaction ?? 0}</span>
-                  <span>Splash: {actionXp?.byType?.splash ?? 0}</span>
-                  <span>RSVP: {actionXp?.byType?.rsvp ?? 0}</span>
+                  ))}
                 </div>
               </div>
 
-              {seasonPredictionsEnabled ? (
+              <div className="space-y-2">
                 <div className="stream-card">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground">Previsioni</p>
-                    <Button
-                      variant="outline-neon"
-                      size="sm"
-                      className="h-7 px-2 text-[11px]"
-                      disabled={evaluatePredictionMutation.isPending}
-                      onClick={() => evaluatePredictionMutation.mutate({})}
-                    >
-                      Valuta ultima
-                    </Button>
+                  <p className="text-xs text-muted-foreground">Action XP</p>
+                  <p className="text-lg font-display font-semibold text-foreground">
+                    {actionXp?.earnedToday ?? 0}/{actionXp?.cap ?? 90}
+                  </p>
+                  <Progress
+                    value={Math.min(100, ((actionXp?.earnedToday ?? 0) / Math.max(actionXp?.cap ?? 90, 1)) * 100)}
+                    className="mt-2 h-1.5"
+                  />
+                  <div className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
+                    <span>Commenti: {actionXp?.byType?.comment ?? 0}</span>
+                    <span>Reaction: {actionXp?.byType?.reaction ?? 0}</span>
+                    <span>Splash: {actionXp?.byType?.splash ?? 0}</span>
+                    <span>RSVP: {actionXp?.byType?.rsvp ?? 0}</span>
                   </div>
+                </div>
 
-                  <div className="mb-2 flex flex-wrap gap-1">
-                    {PREDICTION_PRESETS.map((preset) => (
+                {seasonPredictionsEnabled ? (
+                  <div className="stream-card">
+                    <div className="mb-2 flex items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">Previsioni</p>
                       <Button
-                        key={preset.id}
-                        variant="ghost"
+                        variant="outline-neon"
                         size="sm"
                         className="h-7 px-2 text-[11px]"
-                        onClick={() => applyPredictionPreset(preset)}
+                        disabled={evaluatePredictionMutation.isPending}
+                        onClick={() => evaluatePredictionMutation.mutate({})}
                       >
-                        {preset.label}
+                        Valuta ultima
                       </Button>
-                    ))}
-                  </div>
+                    </div>
 
-                  <div className="grid grid-cols-2 gap-1">
+                    <div className="mb-2 flex flex-wrap gap-1">
+                      {PREDICTION_PRESETS.map((preset) => (
+                        <Button
+                          key={preset.id}
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-[11px]"
+                          onClick={() => applyPredictionPreset(preset)}
+                        >
+                          {preset.label}
+                        </Button>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-1">
+                      <Input
+                        type="number"
+                        min={100}
+                        max={50000}
+                        placeholder="Distanza (m)"
+                        value={predictionForm.targetDistanceMeters}
+                        onChange={(e) =>
+                          setPredictionForm((prev) => ({ ...prev, targetDistanceMeters: e.target.value }))
+                        }
+                        className="h-8 bg-background/60 text-xs"
+                      />
+                      <Input
+                        type="number"
+                        min={5}
+                        max={360}
+                        placeholder="Durata (min)"
+                        value={predictionForm.targetDurationMinutes}
+                        onChange={(e) =>
+                          setPredictionForm((prev) => ({ ...prev, targetDurationMinutes: e.target.value }))
+                        }
+                        className="h-8 bg-background/60 text-xs"
+                      />
+                    </div>
+
                     <Input
-                      type="number"
-                      min={100}
-                      max={50000}
-                      placeholder="Distanza (m)"
-                      value={predictionForm.targetDistanceMeters}
+                      className="mt-1 h-8 bg-background/60 text-xs"
+                      placeholder="Nota opzionale"
+                      value={predictionForm.note}
                       onChange={(e) =>
-                        setPredictionForm((prev) => ({ ...prev, targetDistanceMeters: e.target.value }))
+                        setPredictionForm((prev) => ({ ...prev, note: e.target.value }))
                       }
-                      className="h-8 bg-background/60 text-xs"
                     />
-                    <Input
-                      type="number"
-                      min={5}
-                      max={360}
-                      placeholder="Durata (min)"
-                      value={predictionForm.targetDurationMinutes}
-                      onChange={(e) =>
-                        setPredictionForm((prev) => ({ ...prev, targetDurationMinutes: e.target.value }))
-                      }
-                      className="h-8 bg-background/60 text-xs"
-                    />
+
+                    <Button
+                      variant="neon"
+                      size="sm"
+                      className="mt-2 h-8 w-full text-xs"
+                      disabled={createPredictionMutation.isPending}
+                      onClick={handleCreatePrediction}
+                    >
+                      Crea previsione
+                    </Button>
+
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      In attesa: {pendingPredictions.length}
+                    </p>
                   </div>
-
-                  <Input
-                    className="mt-1 h-8 bg-background/60 text-xs"
-                    placeholder="Nota opzionale"
-                    value={predictionForm.note}
-                    onChange={(e) =>
-                      setPredictionForm((prev) => ({ ...prev, note: e.target.value }))
-                    }
-                  />
-
-                  <Button
-                    variant="neon"
-                    size="sm"
-                    className="mt-2 h-8 w-full text-xs"
-                    disabled={createPredictionMutation.isPending}
-                    onClick={handleCreatePrediction}
-                  >
-                    Crea previsione
-                  </Button>
-
-                  <p className="mt-2 text-[11px] text-muted-foreground">
-                    In attesa: {pendingPredictions.length}
-                  </p>
-                </div>
-              ) : null}
+                ) : null}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         <section className="surface-panel p-4 lg:p-5">
           <Tabs defaultValue="week" className="space-y-3">

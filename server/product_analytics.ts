@@ -11,6 +11,8 @@ export const PRODUCT_ANALYTICS_EVENT_NAMES = [
   "pb_celebration_open",
   "pb_share_click",
   "pb_share_success",
+  "season_step_view",
+  "season_step_action_click",
   "ghost_duel_create",
   "ghost_track_open",
   "club_workout_open",
