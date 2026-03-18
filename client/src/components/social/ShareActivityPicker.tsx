@@ -59,6 +59,9 @@ export function ShareActivityPicker({
   const [tagQuery, setTagQuery] = useState("")
   const [taggedUsers, setTaggedUsers] = useState<TaggedUser[]>([])
   const mediaInputRef = useRef<HTMLInputElement>(null)
+  const shareHistoryEntryActiveRef = useRef(false)
+  const shareCloseFromPopStateRef = useRef(false)
+  const shareHistoryPathRef = useRef<string | null>(null)
 
   const { data: activities, isLoading } = trpc.community.unsharedActivities.useQuery(undefined, {
     enabled: open,
@@ -220,6 +223,44 @@ export function ShareActivityPicker({
 
   const isPending =
     createPost.isPending || imageKitAuth.isPending || postImageUpload.isPending || cloudinaryVideoAuth.isPending
+
+  useEffect(() => {
+    if (!open || typeof window === "undefined") return
+
+    const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    shareHistoryPathRef.current = currentPath
+    window.history.pushState({ ...(window.history.state ?? {}), swimforgeShareActivityOpen: true }, "", window.location.href)
+    shareHistoryEntryActiveRef.current = true
+    shareCloseFromPopStateRef.current = false
+
+    const handlePopState = () => {
+      if (!shareHistoryEntryActiveRef.current) return
+      shareCloseFromPopStateRef.current = true
+      shareHistoryEntryActiveRef.current = false
+      setSelectedId(null)
+      resetComposer()
+      onOpenChange(false)
+    }
+
+    window.addEventListener("popstate", handlePopState)
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState)
+      if (!shareHistoryEntryActiveRef.current) return
+
+      const pathNow = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      const shouldPopSyntheticEntry =
+        !shareCloseFromPopStateRef.current && shareHistoryPathRef.current === pathNow
+
+      shareHistoryEntryActiveRef.current = false
+      shareCloseFromPopStateRef.current = false
+      shareHistoryPathRef.current = null
+
+      if (shouldPopSyntheticEntry) {
+        window.history.back()
+      }
+    }
+  }, [open, onOpenChange])
 
   return (
     <Sheet open={open} onOpenChange={handleClose}>
