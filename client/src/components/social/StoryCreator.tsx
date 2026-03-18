@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { trpc } from "@/lib/trpc"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -14,6 +14,7 @@ import {
 import { Camera, Loader2, Type, Video } from "lucide-react"
 import { toast } from "sonner"
 import { uploadVideoToCloudinary } from "@/lib/cloudinary-upload"
+import { fileToBase64 } from "@/lib/file-base64"
 import { UploadStatusPill } from "./UploadStatusPill"
 import { extractFirstUrl, LinkPreviewCard } from "@/lib/social-content"
 
@@ -33,6 +34,7 @@ const ACCEPTED_VIDEO_EXTENSIONS = [".mp4", ".webm", ".mov", ".m4v"] as const
 
 type ModeWithVideo = "pick" | "image" | "video" | "text"
 type PreviewKind = "image" | "video" | null
+type StoryImageMimeType = "image/jpeg" | "image/png" | "image/webp"
 
 export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
   const [mode, setMode] = useState<ModeWithVideo>("pick")
@@ -44,10 +46,14 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
   const videoDurationRef = useRef<number>(0)
   const imageInputRef = useRef<HTMLInputElement>(null)
   const videoInputRef = useRef<HTMLInputElement>(null)
+  const storyHistoryEntryActiveRef = useRef(false)
+  const storyCloseFromPopStateRef = useRef(false)
+  const storyHistoryPathRef = useRef<string | null>(null)
 
   const utils = trpc.useUtils()
 
   const imageKitAuth = trpc.community.stories.imageKitAuth.useMutation()
+  const postImageUpload = trpc.community.postUploadImage.useMutation()
   const cloudinaryVideoAuth = trpc.community.cloudinaryVideoAuth.useMutation()
 
   const createStory = trpc.community.stories.create.useMutation()
@@ -76,6 +82,42 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     }
     onOpenChange(false)
   }
+
+  useEffect(() => {
+    if (!open || typeof window === "undefined") return
+
+    const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    storyHistoryPathRef.current = currentPath
+    window.history.pushState({ ...(window.history.state ?? {}), swimforgeStoryCreatorOpen: true }, "", window.location.href)
+    storyHistoryEntryActiveRef.current = true
+    storyCloseFromPopStateRef.current = false
+
+    const handlePopState = () => {
+      if (!storyHistoryEntryActiveRef.current) return
+      storyCloseFromPopStateRef.current = true
+      storyHistoryEntryActiveRef.current = false
+      onOpenChange(false)
+    }
+
+    window.addEventListener("popstate", handlePopState)
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState)
+      if (!storyHistoryEntryActiveRef.current) return
+
+      const pathNow = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      const shouldPopSyntheticEntry =
+        !storyCloseFromPopStateRef.current && storyHistoryPathRef.current === pathNow
+
+      storyHistoryEntryActiveRef.current = false
+      storyCloseFromPopStateRef.current = false
+      storyHistoryPathRef.current = null
+
+      if (shouldPopSyntheticEntry) {
+        window.history.back()
+      }
+    }
+  }, [open, onOpenChange])
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -209,6 +251,26 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     return uploadVideoToCloudinary(file, auth)
   }
 
+  const uploadStoryImageWithFallback = async (file: File) => {
+    try {
+      return await uploadMediaToImageKit(file)
+    } catch (imageKitError) {
+      try {
+        const fallbackPayload = await fileToBase64(file)
+        const uploaded = await postImageUpload.mutateAsync({
+          fileBase64: fallbackPayload,
+          mimeType: file.type as StoryImageMimeType,
+        })
+        toast.warning("Upload diretto non riuscito: usato fallback server.")
+        return { url: uploaded.url, fileId: null }
+      } catch (fallbackError) {
+        const primaryMessage = imageKitError instanceof Error ? imageKitError.message : "Upload immagine fallito"
+        const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : "Upload immagine fallito"
+        throw new Error(fallbackMessage || primaryMessage)
+      }
+    }
+  }
+
   const buildVideoStoryUrls = (mediaUrl: string, durationSeconds: number) => {
     const normalizedDuration = Math.min(durationSeconds, MAX_VIDEO_DURATION_SECONDS)
     const segments = Math.min(MAX_VIDEO_SEGMENTS, Math.max(1, Math.ceil(normalizedDuration / STORY_VIDEO_CLIP_SECONDS)))
@@ -232,7 +294,7 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     if (!file) return
 
     try {
-      const uploaded = await uploadMediaToImageKit(file)
+      const uploaded = await uploadStoryImageWithFallback(file)
       await createStory.mutateAsync({
         mediaUrl: uploaded.url,
         imageKitFileId: uploaded.fileId ?? undefined,
@@ -285,7 +347,8 @@ export function StoryCreator({ open, onOpenChange }: StoryCreatorProps) {
     }
   }
 
-  const isStoryPending = createStory.isPending || imageKitAuth.isPending || cloudinaryVideoAuth.isPending
+  const isStoryPending =
+    createStory.isPending || imageKitAuth.isPending || postImageUpload.isPending || cloudinaryVideoAuth.isPending
 
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) resetAndClose(); else onOpenChange(o) }}>
