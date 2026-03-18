@@ -73,6 +73,9 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
   const [storyCreatorOpen, setStoryCreatorOpen] = useState(false)
 
   const mediaInputRef = useRef<HTMLInputElement>(null)
+  const postHistoryEntryActiveRef = useRef(false)
+  const postCloseFromPopStateRef = useRef(false)
+  const postHistoryPathRef = useRef<string | null>(null)
 
   const utils = trpc.useUtils()
   const imageKitAuth = trpc.community.postImageKitAuth.useMutation()
@@ -251,6 +254,42 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
     imageKitAuth.isPending ||
     postImageUpload.isPending ||
     cloudinaryVideoAuth.isPending
+
+  useEffect(() => {
+    if (!open || typeof window === "undefined") return
+
+    const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
+    postHistoryPathRef.current = currentPath
+    window.history.pushState({ ...(window.history.state ?? {}), swimforgeCreatePostOpen: true }, "", window.location.href)
+    postHistoryEntryActiveRef.current = true
+    postCloseFromPopStateRef.current = false
+
+    const handlePopState = () => {
+      if (!postHistoryEntryActiveRef.current) return
+      postCloseFromPopStateRef.current = true
+      postHistoryEntryActiveRef.current = false
+      onOpenChange(false)
+    }
+
+    window.addEventListener("popstate", handlePopState)
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState)
+      if (!postHistoryEntryActiveRef.current) return
+
+      const pathNow = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      const shouldPopSyntheticEntry =
+        !postCloseFromPopStateRef.current && postHistoryPathRef.current === pathNow
+
+      postHistoryEntryActiveRef.current = false
+      postCloseFromPopStateRef.current = false
+      postHistoryPathRef.current = null
+
+      if (shouldPopSyntheticEntry) {
+        window.history.back()
+      }
+    }
+  }, [open, onOpenChange])
 
   useEffect(() => {
     if (!open) return
