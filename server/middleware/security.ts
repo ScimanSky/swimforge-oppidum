@@ -55,7 +55,7 @@ const extraMediaSrc = parseCspList(process.env.CSP_MEDIA_SRC_EXTRA);
  */
 export const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minuti
-  max: 5, // 5 tentativi
+  max: 10, // 10 tentativi
   message: {
     error: 'Too Many Attempts',
     message: 'Troppi tentativi di login. Riprova tra 15 minuti.',
@@ -85,7 +85,7 @@ export const registrationLimiter = rateLimit({
  */
 export const apiLimiter = rateLimit({
   windowMs: 1 * 60 * 1000, // 1 minuto
-  max: 100, // 100 richieste per minuto
+  max: 200, // 200 richieste per minuto
   message: {
     error: 'Rate Limit Exceeded',
     message: 'Hai superato il limite di richieste. Riprova tra 1 minuto.',
@@ -103,7 +103,7 @@ export const apiLimiter = rateLimit({
  */
 export const garminSyncLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 minuti
-  max: 2, // 2 sincronizzazioni ogni 5 minuti
+  max: 5, // 5 sincronizzazioni ogni 5 minuti
   message: {
     error: 'Sync Rate Limit',
     message: 'Troppi tentativi di sincronizzazione. Riprova tra 5 minuti.',
@@ -249,6 +249,7 @@ export const helmetConfig = {
         imagekitEndpointOrigin,
         ...extraConnectSrc,
       ]),
+      workerSrc: ["'self'", "blob:"],
       frameSrc: ["'self'", 'https://www.openstreetmap.org'],
       frameAncestors: ["'none'"],
       formAction: ["'self'"],
