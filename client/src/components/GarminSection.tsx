@@ -24,11 +24,21 @@ type AuthStep = "credentials" | "mfa";
 
 function formatGarminErrorMessage(message: string): string {
   const normalized = message.toLowerCase();
+  const secondsMatch = normalized.match(/attendi\s+(\d+)\s+secondi/);
+  if (secondsMatch?.[1]) {
+    const seconds = Number(secondsMatch[1]);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      const minutes = Math.max(1, Math.ceil(seconds / 60));
+      return `Garmin sta limitando temporaneamente i tentativi di accesso. Riprova tra circa ${minutes} minuti con un solo tentativo.`;
+    }
+  }
   if (
     normalized.includes("429") ||
     normalized.includes("too many requests") ||
     normalized.includes("troppi tentativi") ||
-    normalized.includes("rate limit")
+    normalized.includes("rate limit") ||
+    normalized.includes("limitando temporaneamente") ||
+    normalized.includes("temporaneamente limitato")
   ) {
     return "Garmin sta limitando temporaneamente i tentativi di accesso. Attendi 10-15 minuti e riprova con un solo tentativo.";
   }
@@ -58,7 +68,7 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
         setAuthStep("mfa");
         toast.info("Controlla la tua email per il codice di verifica");
       } else {
-        toast.error(data.error || "Errore nel collegamento");
+        toast.error(formatGarminErrorMessage(data.error || "Errore nel collegamento"));
       }
     },
     onError: (error) => {
@@ -74,7 +84,7 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
         utils.garmin.status.invalidate();
         utils.profile.get.invalidate();
       } else {
-        toast.error(data.error || "Codice MFA non valido");
+        toast.error(formatGarminErrorMessage(data.error || "Codice MFA non valido"));
       }
     },
     onError: (error) => {

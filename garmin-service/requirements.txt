@@ -1,7 +1,9 @@
 fastapi==0.109.0
 uvicorn==0.27.0
 garth==0.5.3
-garminconnect==0.2.26
+# Temporary pin to upstream commit with Garmin SSO 429/login fix:
+# https://github.com/cyberjunky/python-garminconnect/commit/418cc3d0942f7632532c03bb1c3d857f56d85dea
+garminconnect @ git+https://github.com/cyberjunky/python-garminconnect.git@418cc3d0942f7632532c03bb1c3d857f56d85dea
 python-dotenv==1.0.0
 pydantic==2.5.3
 httpx==0.26.0
