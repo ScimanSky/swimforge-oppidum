@@ -451,23 +451,69 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
         
         # Import garminconnect
         try:
-            from garminconnect import Garmin
+            from garminconnect import Garmin, GarminConnectTooManyRequestsError
         except ImportError as e:
             logger.error(f"Failed to import garminconnect: {e}")
             raise HTTPException(
                 status_code=500,
                 detail="Garmin Connect library not available."
             )
-        
-        # Delete any existing invalid tokens
+
         token_path = get_token_path(request.user_id)
+
+        # Try token-based restore first (same pattern used by upstream examples):
+        # this avoids unnecessary credential logins that can trigger Garmin rate limits.
         if token_path.exists():
             try:
-                token_path.unlink()
-                logger.info(f"Deleted existing tokens for user {request.user_id}")
-            except Exception:
-                pass
-        
+                client_from_token = Garmin()
+                client_from_token.login(str(token_path))
+
+                try:
+                    display_name = client_from_token.display_name
+                except Exception:
+                    display_name = request.email
+
+                sessions[request.user_id] = {
+                    "client": client_from_token,
+                    "email": request.email,
+                    "display_name": display_name,
+                    "last_sync": None,
+                    "connected_at": datetime.now().isoformat()
+                }
+
+                token_data = None
+                try:
+                    token_data = token_path.read_text()
+                except Exception as read_err:
+                    logger.warning(f"Could not read token data for user {request.user_id}: {read_err}")
+
+                logger.info(f"Reused stored Garmin tokens for user {request.user_id}")
+                return LoginResponse(
+                    success=True,
+                    message="Connesso a Garmin Connect con token esistente.",
+                    user_id=request.user_id,
+                    mfa_required=False,
+                    token_data=token_data
+                )
+            except GarminConnectTooManyRequestsError as rate_err:
+                retry_after = set_rate_limit_cooldown(request.user_id)
+                logger.warning(f"Token restore rate-limited for user {request.user_id}: {rate_err}")
+                raise HTTPException(
+                    status_code=429,
+                    detail=(
+                        "Garmin sta limitando temporaneamente i tentativi di accesso da questo server. "
+                        "Attendi qualche minuto e riprova."
+                    ),
+                    headers={"Retry-After": str(retry_after)},
+                )
+            except Exception as token_err:
+                logger.warning(f"Stored token restore failed for user {request.user_id}: {token_err}")
+                try:
+                    token_path.unlink()
+                    logger.info(f"Deleted invalid tokens for user {request.user_id}")
+                except Exception:
+                    pass
+
         # Clear any pending MFA for this user
         if request.user_id in pending_mfa:
             del pending_mfa[request.user_id]
@@ -532,6 +578,18 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
                 message="È richiesta l'autenticazione a due fattori (MFA). Controlla la tua email e inserisci il codice ricevuto.",
                 user_id=request.user_id,
                 mfa_required=True
+            )
+        except GarminConnectTooManyRequestsError as rate_err:
+            sys.stdin = old_stdin  # Restore stdin
+            retry_after = set_rate_limit_cooldown(request.user_id)
+            logger.warning(f"Login rate-limited for user {request.user_id}: {rate_err}")
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "Garmin sta limitando temporaneamente i tentativi di accesso da questo server. "
+                    "Attendi qualche minuto e riprova."
+                ),
+                headers={"Retry-After": str(retry_after)},
             )
         except Exception as login_error:
             sys.stdin = old_stdin  # Restore stdin
