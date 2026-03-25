@@ -41,6 +41,15 @@ import { fetchWithTimeout } from "./lib/fetchWithTimeout";
 const GARMIN_SERVICE_URL = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
 const GARMIN_SERVICE_SECRET = process.env.GARMIN_SERVICE_SECRET;
 
+function isGarminRateLimited(message: string): boolean {
+  const normalized = message.toLowerCase();
+  return normalized.includes("429") || normalized.includes("too many requests") || normalized.includes("rate limit");
+}
+
+function getGarminRateLimitMessage(): string {
+  return "Garmin sta limitando temporaneamente i tentativi di accesso. Attendi 10-15 minuti e riprova con un solo tentativo.";
+}
+
 interface GarminServiceActivity {
   activity_id: string;
   activity_name: string;
@@ -834,6 +843,12 @@ export async function connectGarmin(
       userId,
       message,
     });
+    if (isGarminRateLimited(message)) {
+      return {
+        success: false,
+        error: getGarminRateLimitMessage(),
+      };
+    }
     return { 
       success: false, 
       error: message || "Connection failed. Check your credentials." 
@@ -912,6 +927,12 @@ export async function completeMfa(
       userId,
       message,
     });
+    if (isGarminRateLimited(message)) {
+      return {
+        success: false,
+        error: getGarminRateLimitMessage(),
+      };
+    }
     return { 
       success: false, 
       error: message || "MFA verification failed" 

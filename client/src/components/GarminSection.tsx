@@ -22,6 +22,19 @@ interface GarminSectionProps {
 
 type AuthStep = "credentials" | "mfa";
 
+function formatGarminErrorMessage(message: string): string {
+  const normalized = message.toLowerCase();
+  if (
+    normalized.includes("429") ||
+    normalized.includes("too many requests") ||
+    normalized.includes("troppi tentativi") ||
+    normalized.includes("rate limit")
+  ) {
+    return "Garmin sta limitando temporaneamente i tentativi di accesso. Attendi 10-15 minuti e riprova con un solo tentativo.";
+  }
+  return message;
+}
+
 export default function GarminSection({ garminConnected }: GarminSectionProps) {
   const [isConnectDialogOpen, setIsConnectDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
@@ -49,7 +62,7 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
       }
     },
     onError: (error) => {
-      toast.error("Errore: " + error.message);
+      toast.error("Errore: " + formatGarminErrorMessage(error.message));
     },
   });
 
@@ -65,7 +78,7 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
       }
     },
     onError: (error) => {
-      toast.error("Errore: " + error.message);
+      toast.error("Errore: " + formatGarminErrorMessage(error.message));
     },
   });
 

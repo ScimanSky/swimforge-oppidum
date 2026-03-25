@@ -57,6 +57,38 @@ sessions: Dict[str, Dict[str, Any]] = {}
 # Structure: {user_id: {"client": Garmin, "mfa_state": Any, "email": str, "created_at": datetime}}
 pending_mfa: Dict[str, Dict[str, Any]] = {}
 
+# Per-user cooldown after upstream Garmin 429 responses
+login_rate_limited_until: Dict[str, datetime] = {}
+RATE_LIMIT_COOLDOWN_SECONDS = int(os.getenv("GARMIN_RATE_LIMIT_COOLDOWN_SECONDS", "900"))
+
+
+def is_rate_limit_error(error: str) -> bool:
+    lowered = error.lower()
+    return (
+        "429" in lowered
+        or "too many requests" in lowered
+        or "rate limit" in lowered
+    )
+
+
+def set_rate_limit_cooldown(user_id: str) -> int:
+    now = datetime.now()
+    blocked_until = now + timedelta(seconds=RATE_LIMIT_COOLDOWN_SECONDS)
+    login_rate_limited_until[user_id] = blocked_until
+    return RATE_LIMIT_COOLDOWN_SECONDS
+
+
+def get_rate_limit_remaining_seconds(user_id: str) -> int:
+    now = datetime.now()
+    blocked_until = login_rate_limited_until.get(user_id)
+    if not blocked_until:
+        return 0
+    remaining = int((blocked_until - now).total_seconds())
+    if remaining <= 0:
+        login_rate_limited_until.pop(user_id, None)
+        return 0
+    return remaining
+
 def parse_csv_origins(value: str) -> List[str]:
     return [origin.strip() for origin in value.split(",") if origin.strip()]
 
@@ -373,6 +405,13 @@ def cleanup_expired_mfa():
         del pending_mfa[user_id]
         logger.info(f"Cleaned up expired MFA session for user {user_id}")
 
+    expired_rate_limits = []
+    for user_id, blocked_until in login_rate_limited_until.items():
+        if blocked_until <= now:
+            expired_rate_limits.append(user_id)
+    for user_id in expired_rate_limits:
+        del login_rate_limited_until[user_id]
+
 
 # API Endpoints
 @app.get("/")
@@ -399,6 +438,16 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
     try:
         logger.info(f"Attempting login for user {request.user_id}")
         cleanup_expired_mfa()
+        remaining = get_rate_limit_remaining_seconds(request.user_id)
+        if remaining > 0:
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "Garmin ha temporaneamente limitato i tentativi di accesso. "
+                    f"Attendi {remaining} secondi prima di riprovare."
+                ),
+                headers={"Retry-After": str(remaining)},
+            )
         
         # Import garminconnect
         try:
@@ -560,6 +609,16 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
                 status_code=401,
                 detail="Credenziali Garmin non valide. Verifica email e password."
             )
+        elif is_rate_limit_error(error_str):
+            retry_after = set_rate_limit_cooldown(request.user_id)
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    "Garmin sta limitando temporaneamente i tentativi di login da questo IP. "
+                    "Attendi qualche minuto e riprova con un solo tentativo."
+                ),
+                headers={"Retry-After": str(retry_after)},
+            )
         elif "MFA" in error_str.upper() or "needs_mfa" in error_str.lower():
             raise HTTPException(
                 status_code=400,
@@ -568,7 +627,7 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
         else:
             raise HTTPException(
                 status_code=500,
-                detail=f"Errore durante il collegamento: {error_str}"
+                detail="Errore durante il collegamento a Garmin. Riprova tra qualche minuto."
             )
 
 
@@ -621,12 +680,14 @@ async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_ke
                     status_code=401,
                     detail="Codice MFA non valido. Verifica il codice e riprova."
                 )
-            elif "429" in error_str:
+            elif is_rate_limit_error(error_str):
                 # Clean up on rate limit
                 del pending_mfa[request.user_id]
+                retry_after = set_rate_limit_cooldown(request.user_id)
                 raise HTTPException(
                     status_code=429,
-                    detail="Troppi tentativi. Attendi qualche minuto e riprova."
+                    detail="Troppi tentativi. Attendi qualche minuto e riprova.",
+                    headers={"Retry-After": str(retry_after)},
                 )
             else:
                 raise HTTPException(
