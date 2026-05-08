@@ -11,7 +11,7 @@ Microservizio Python per l'integrazione con Garmin Connect.
 
 ## Requisiti
 
-- Python 3.11+
+- Python 3.12+
 - Account Garmin Connect
 
 ## Installazione Locale

@@ -231,6 +231,20 @@ def get_token_path(user_id: str) -> Path:
     return TOKEN_STORE_DIR / f"{user_id}.json"
 
 
+def save_client_tokens(client: Any, token_path: Path) -> Optional[str]:
+    """Persist Garmin tokens and return the serialized token payload."""
+    token_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if hasattr(client, "client") and hasattr(client.client, "dump"):
+        client.client.dump(str(token_path))
+    elif hasattr(client, "garth") and hasattr(client.garth, "dump"):
+        client.garth.dump(str(token_path))
+    else:
+        raise RuntimeError("Garmin client does not expose a supported token dump method")
+
+    return token_path.read_text()
+
+
 def get_garmin_client(user_id: str):
     """Get existing Garmin client for user"""
     session = sessions.get(user_id)
@@ -620,17 +634,12 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
         logger.info(f"Login successful (no MFA) for user {request.user_id}")
         
         # Save tokens
+        token_data = None
         try:
-            client.garth.dump(str(token_path))
+            token_data = save_client_tokens(client, token_path)
             logger.info(f"Saved tokens for user {request.user_id}")
         except Exception as e:
             logger.warning(f"Could not save tokens: {e}")
-        token_data = None
-        try:
-            if token_path.exists():
-                token_data = token_path.read_text()
-        except Exception as e:
-            logger.warning(f"Could not read token data: {e}")
         
         # Get display name
         try:
@@ -758,17 +767,12 @@ async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_ke
         
         # Save tokens
         token_path = get_token_path(request.user_id)
+        token_data = None
         try:
-            client.garth.dump(str(token_path))
+            token_data = save_client_tokens(client, token_path)
             logger.info(f"Saved tokens for user {request.user_id}")
         except Exception as e:
             logger.warning(f"Could not save tokens: {e}")
-        token_data = None
-        try:
-            if token_path.exists():
-                token_data = token_path.read_text()
-        except Exception as e:
-            logger.warning(f"Could not read token data: {e}")
         
         # Get display name
         try:

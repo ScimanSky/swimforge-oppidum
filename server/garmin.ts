@@ -40,6 +40,8 @@ import { fetchWithTimeout } from "./lib/fetchWithTimeout";
 // Garmin microservice configuration
 const GARMIN_SERVICE_URL = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
 const GARMIN_SERVICE_SECRET = process.env.GARMIN_SERVICE_SECRET;
+const GARMIN_TOKEN_PREFIX = "garmin:";
+const LEGACY_GARTH_TOKEN_PREFIX = "garth:";
 
 function isGarminRateLimited(message: string): boolean {
   const normalized = message.toLowerCase();
@@ -89,6 +91,44 @@ interface GarminServiceResponse {
   activities?: GarminServiceActivity[];
   synced_count?: number;
   mfa_required?: boolean;
+}
+
+function decodeStoredGarminToken(
+  stored: string | null | undefined
+): { tokenData: string | null; isLegacy: boolean } {
+  if (!stored) {
+    return { tokenData: null, isLegacy: false };
+  }
+
+  if (stored.startsWith(GARMIN_TOKEN_PREFIX)) {
+    return {
+      tokenData: stored.slice(GARMIN_TOKEN_PREFIX.length) || null,
+      isLegacy: false,
+    };
+  }
+
+  if (stored.startsWith(LEGACY_GARTH_TOKEN_PREFIX)) {
+    return {
+      tokenData: stored.slice(LEGACY_GARTH_TOKEN_PREFIX.length) || null,
+      isLegacy: true,
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(stored) as Record<string, unknown>;
+    if (typeof parsed.di_token === "string") {
+      return { tokenData: stored, isLegacy: false };
+    }
+  } catch {
+    // Ignore non-JSON placeholders.
+  }
+
+  return { tokenData: null, isLegacy: false };
+}
+
+function buildStoredGarminTokenPayload(tokenData?: string | null): string | null {
+  if (!tokenData) return null;
+  return `${GARMIN_TOKEN_PREFIX}${tokenData}`;
 }
 
 type RecordStroke = "freestyle" | "backstroke" | "breaststroke" | "butterfly" | "mixed";
@@ -239,11 +279,17 @@ async function ensureGarminSessionFromDb(userId: number): Promise<boolean> {
   if (!stored) return false;
 
   const decrypted = decryptIfNeeded(stored);
-  if (!decrypted.startsWith("garth:")) {
+  const { tokenData, isLegacy } = decodeStoredGarminToken(decrypted);
+  if (isLegacy) {
+    logger.warn(`[Garmin] Legacy garth token detected for user ${userId}; reconnect required`, {
+      event: "garmin:legacy_token_detected",
+      userId,
+    });
     return false;
   }
-  const tokenData = decrypted.slice("garth:".length);
-  if (!tokenData) return false;
+  if (!tokenData) {
+    return false;
+  }
 
   try {
     const result = await callGarminService("/auth/restore", "POST", {
@@ -798,7 +844,7 @@ export async function connectGarmin(
       return { success: false, error: result.message || "Authentication failed" };
     }
 
-    const tokenPayload = result.token_data ? `garth:${result.token_data}` : null;
+    const tokenPayload = buildStoredGarminTokenPayload(result.token_data);
 
     // Store connection info in local database
     await db.insert(garminTokens).values({
@@ -880,7 +926,7 @@ export async function completeMfa(
       return { success: false, error: result.message || "MFA verification failed" };
     }
 
-    const tokenPayload = result.token_data ? `garth:${result.token_data}` : null;
+    const tokenPayload = buildStoredGarminTokenPayload(result.token_data);
 
     // Store connection info in local database
     await db.insert(garminTokens).values({
