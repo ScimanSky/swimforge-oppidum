@@ -22,7 +22,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Depends, Header
@@ -46,8 +46,10 @@ TOKEN_STORE_DIR = Path(os.getenv("TOKEN_STORE_DIR", "/tmp/garmin_tokens"))
 CORS_ALLOW_ORIGINS_RAW = os.getenv("GARMIN_CORS_ALLOW_ORIGINS", "")
 CORS_ALLOW_CREDENTIALS_RAW = os.getenv("GARMIN_CORS_ALLOW_CREDENTIALS", "false")
 
-# Ensure token store directory exists
-TOKEN_STORE_DIR.mkdir(parents=True, exist_ok=True)
+# Ensure token store directory exists and is owner-only.
+TOKEN_STORE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+with suppress(OSError):
+    TOKEN_STORE_DIR.chmod(0o700)
 
 # In-memory session storage
 # Structure: {user_id: {"client": Garmin, "email": str, "last_sync": datetime, "mfa_state": Any}}
@@ -231,9 +233,37 @@ def get_token_path(user_id: str) -> Path:
     return TOKEN_STORE_DIR / f"{user_id}.json"
 
 
+def secure_token_path(token_path: Path) -> None:
+    """Tighten token directory/file permissions for existing token stores."""
+    token_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    with suppress(OSError):
+        token_path.parent.chmod(0o700)
+    if token_path.exists() and not token_path.is_symlink():
+        with suppress(OSError):
+            token_path.chmod(0o600)
+
+
+def write_token_data_securely(token_path: Path, token_data: str) -> str:
+    """Write token payload with owner-only permissions regardless of umask."""
+    secure_token_path(token_path)
+
+    flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+
+    fd = os.open(token_path, flags, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as token_file:
+        token_file.write(token_data)
+
+    with suppress(OSError):
+        token_path.chmod(0o600)
+
+    return token_path.read_text()
+
+
 def save_client_tokens(client: Any, token_path: Path) -> Optional[str]:
     """Persist Garmin tokens and return the serialized token payload."""
-    token_path.parent.mkdir(parents=True, exist_ok=True)
+    secure_token_path(token_path)
 
     if hasattr(client, "client") and hasattr(client.client, "dump"):
         client.client.dump(str(token_path))
@@ -242,6 +272,7 @@ def save_client_tokens(client: Any, token_path: Path) -> Optional[str]:
     else:
         raise RuntimeError("Garmin client does not expose a supported token dump method")
 
+    secure_token_path(token_path)
     return token_path.read_text()
 
 
@@ -497,6 +528,7 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
 
                 token_data = None
                 try:
+                    secure_token_path(token_path)
                     token_data = token_path.read_text()
                 except Exception as read_err:
                     logger.warning(f"Could not read token data for user {request.user_id}: {read_err}")
@@ -852,7 +884,7 @@ async def restore_session(
     """Restore Garmin session from token data stored in DB."""
     try:
         token_path = get_token_path(request.user_id)
-        token_path.write_text(request.token_data)
+        write_token_data_securely(token_path, request.token_data)
 
         try:
             from garminconnect import Garmin

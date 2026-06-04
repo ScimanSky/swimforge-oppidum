@@ -19,7 +19,12 @@ export APP_RELEASE APP_COMMIT_SHA DEPLOY_TARGET
 docker compose \
   --env-file "$ENV_FILE" \
   -f "$COMPOSE_FILE" \
-  up -d --build app
+  up -d --build app garmin
+
+docker compose \
+  --env-file "$ENV_FILE" \
+  -f "$COMPOSE_FILE" \
+  exec -T garmin sh -lc 'chmod 700 /data/tokens && find /data/tokens -type f -name "*.json" -exec chmod 600 {} \;'
 
 curl -fsS "$HEALTH_BASE_URL/ready" >/dev/null
 curl -fsS "$HEALTH_BASE_URL/health/deep" >/dev/null || true
