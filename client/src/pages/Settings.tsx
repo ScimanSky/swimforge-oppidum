@@ -41,6 +41,7 @@ import {
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { supabase } from "@/lib/supabase"
+import { clearNativeSessionToken } from "@/lib/session-token"
 import { ONBOARDING_FORCE_QUERY_PARAM } from "@/lib/onboarding"
 import { formatDistanceToNow } from "date-fns"
 import { it } from "date-fns/locale"
@@ -437,6 +438,7 @@ export default function Settings() {
       }
       localStorage.removeItem("swimforge:autoSync:dashboardReady")
       localStorage.removeItem("swimforge:autoSync:last")
+      clearNativeSessionToken()
       toast.success("Sei stato disconnesso da tutti i dispositivi.")
       window.location.href = "/login"
     },
@@ -453,6 +455,7 @@ export default function Settings() {
       }
       localStorage.removeItem("swimforge:autoSync:dashboardReady")
       localStorage.removeItem("swimforge:autoSync:last")
+      clearNativeSessionToken()
       if (data.emailSent) {
         toast.success("Account eliminato. Ti abbiamo inviato un'email di conferma.")
       } else {

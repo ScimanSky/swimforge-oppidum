@@ -7,7 +7,7 @@ import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
 import { isNativePlatform } from "@/lib/platform";
-import { getNativeSessionToken } from "@/lib/session-token";
+import { clearNativeSessionToken, getNativeSessionToken } from "@/lib/session-token";
 import { buildTrpcHeaders } from "@/lib/trpc-headers";
 import "./index.css";
 
@@ -21,6 +21,7 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
+  clearNativeSessionToken();
   window.location.href = getLoginUrl();
 };
 

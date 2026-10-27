@@ -1,5 +1,6 @@
 import { NATIVE_CLIENT_HEADER, NATIVE_CLIENT_VALUE } from "@shared/native";
 
+/** Native sends bearer + client header and never the CSRF header (the server exempts bearer requests from CSRF). */
 export function buildTrpcHeaders(
   input: { isNative: boolean; csrfToken: string | null; nativeToken: string | null },
   init?: HeadersInit,
