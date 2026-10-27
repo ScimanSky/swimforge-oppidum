@@ -305,6 +305,7 @@ class SDKServer {
     // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
     const bearerToken = extractBearerToken(req.headers);
+    // A present bearer must never fall back to the cookie: the CSRF middleware exempts bearer requests.
     const sessionCookie = bearerToken ?? cookies.get(COOKIE_NAME);
     const session = await this.verifySession(sessionCookie);
 
