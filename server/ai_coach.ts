@@ -8,6 +8,7 @@ import { getDb } from "./db";
 import { aiCoachWorkouts, swimmerProfiles, swimmingActivities } from "../drizzle/schema";
 import { eq, and, gt, gte, desc, sql } from "drizzle-orm";
 import { logger } from "./middleware/logger";
+import { ENV } from "./_core/env";
 import { withErrorHandling } from "./lib/withErrorHandling";
 import { config } from "./config";
 import {
@@ -19,7 +20,7 @@ import {
 } from "./advanced_metrics";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
-const GEMINI_MODEL = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash";
+const GEMINI_MODEL = ENV.geminiTextModel;
 const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
 interface WorkoutSection {

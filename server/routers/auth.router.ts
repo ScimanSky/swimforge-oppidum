@@ -12,6 +12,7 @@ import { sendAccountDeletionConfirmationEmail } from "../_core/email";
 import { ENV } from "../_core/env";
 import { ensureRequiredLegalConsents } from "../consent";
 import { markUserOffline, touchUserPresence } from "../user_presence";
+import { deleteFromIfExists } from "../lib/relation-exists";
 
 const DEV_RESET_EMAIL = (process.env.RESET_APP_ALLOWED_EMAIL ?? process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
 const RESET_CONFIRMATION_PHRASE = "RESET APP";
@@ -23,11 +24,6 @@ const REGISTRATION_PASSWORD_SCHEMA = z
     .regex(/[a-z]/, "Password must contain at least one lowercase letter")
     .regex(/[0-9]/, "Password must contain at least one number")
     .regex(/[!@#$%^&*]/, "Password must contain at least one special character");
-
-const isUndefinedTableError = (error: unknown) => {
-    if (!error || typeof error !== "object") return false;
-    return (error as { code?: string }).code === "42P01";
-};
 
 export const authRouter = router({
     me: publicProcedure.query(opts => opts.ctx.user),
@@ -300,78 +296,61 @@ export const authRouter = router({
             }
 
             await dbConn.transaction(async (tx) => {
-                const deleteIfExists = async (query: ReturnType<typeof sql>) => {
-                    try {
-                        await tx.execute(query);
-                    } catch (error) {
-                        if (!isUndefinedTableError(error)) {
-                            throw error;
-                        }
-                    }
-                };
-
                 // Global cleanup for launch reset (dynamic/test data only).
-                await deleteIfExists(sql`DELETE FROM story_views`);
-                await deleteIfExists(sql`DELETE FROM story_reactions`);
-                await deleteIfExists(sql`DELETE FROM stories`);
+                await deleteFromIfExists(tx, "public.story_views");
+                await deleteFromIfExists(tx, "public.story_reactions");
+                await deleteFromIfExists(tx, "public.stories");
 
-                await deleteIfExists(sql`DELETE FROM post_reactions`);
-                await deleteIfExists(sql`DELETE FROM social_comments`);
-                await deleteIfExists(sql`DELETE FROM social_splashes`);
-                await deleteIfExists(sql`DELETE FROM social_hidden_posts`);
-                await deleteIfExists(sql`DELETE FROM social_post_reports`);
-                await deleteIfExists(sql`DELETE FROM social_follows`);
-                await deleteIfExists(sql`DELETE FROM social_posts`);
+                await deleteFromIfExists(tx, "public.post_reactions");
+                await deleteFromIfExists(tx, "public.social_comments");
+                await deleteFromIfExists(tx, "public.social_splashes");
+                await deleteFromIfExists(tx, "public.social_hidden_posts");
+                await deleteFromIfExists(tx, "public.social_post_reports");
+                await deleteFromIfExists(tx, "public.social_follows");
+                await deleteFromIfExists(tx, "public.social_posts");
 
-                await deleteIfExists(sql`DELETE FROM direct_messages`);
-                await deleteIfExists(sql`DELETE FROM user_notifications`);
+                await deleteFromIfExists(tx, "public.direct_messages");
+                await deleteFromIfExists(tx, "public.user_notifications");
 
-                await deleteIfExists(sql`DELETE FROM event_attendees`);
-                await deleteIfExists(sql`DELETE FROM club_announcements`);
-                await deleteIfExists(sql`DELETE FROM club_media`);
-                await deleteIfExists(sql`DELETE FROM club_events`);
-                await deleteIfExists(sql`DELETE FROM community_club_invites`);
-                await deleteIfExists(sql`DELETE FROM community_club_members`);
-                await deleteIfExists(sql`DELETE FROM community_clubs`);
+                await deleteFromIfExists(tx, "public.event_attendees");
+                await deleteFromIfExists(tx, "public.club_announcements");
+                await deleteFromIfExists(tx, "public.club_media");
+                await deleteFromIfExists(tx, "public.club_events");
+                await deleteFromIfExists(tx, "public.community_club_invites");
+                await deleteFromIfExists(tx, "public.community_club_members");
+                await deleteFromIfExists(tx, "public.community_clubs");
 
-                await deleteIfExists(sql`DELETE FROM challenge_participants`);
-                await deleteIfExists(sql`DELETE FROM challenge_badges`);
-                await deleteIfExists(sql`DELETE FROM challenge_activity_log`);
-                await deleteIfExists(sql`DELETE FROM challenges`);
+                await deleteFromIfExists(tx, "public.challenge_participants");
+                await deleteFromIfExists(tx, "public.challenge_badges");
+                await deleteFromIfExists(tx, "public.challenge_activity_log");
+                await deleteFromIfExists(tx, "public.challenges");
 
-                // Legacy season engagement tables: created at runtime by the removed
-                // season engine, so they may not exist. A failing DELETE would abort
-                // the transaction, so check for the relation first.
-                for (const table of ["season_activity_predictions", "season_club_quest_claims"]) {
-                    const presence = await tx.execute(
-                        sql`SELECT to_regclass(${`public.${table}`}) IS NOT NULL AS present`
-                    );
-                    if ((presence.rows[0] as { present?: boolean } | undefined)?.present) {
-                        await tx.execute(sql`DELETE FROM ${sql.identifier(table)}`);
-                    }
-                }
+                // Legacy season engagement tables: created at runtime by the removed season
+                // engine, so they may not exist.
+                await deleteFromIfExists(tx, "public.season_activity_predictions");
+                await deleteFromIfExists(tx, "public.season_club_quest_claims");
 
-                await deleteIfExists(sql`DELETE FROM ghost_challenges`);
-                await deleteIfExists(sql`DELETE FROM garmin_activity_lengths`);
-                await deleteIfExists(sql`DELETE FROM garmin_activity_laps`);
-                await deleteIfExists(sql`DELETE FROM swimming_activities`);
+                await deleteFromIfExists(tx, "public.ghost_challenges");
+                await deleteFromIfExists(tx, "public.garmin_activity_lengths");
+                await deleteFromIfExists(tx, "public.garmin_activity_laps");
+                await deleteFromIfExists(tx, "public.swimming_activities");
 
-                await deleteIfExists(sql`DELETE FROM user_badges`);
-                await deleteIfExists(sql`DELETE FROM user_achievement_badges`);
-                await deleteIfExists(sql`DELETE FROM xp_transactions`);
-                await deleteIfExists(sql`DELETE FROM personal_records`);
-                await deleteIfExists(sql`DELETE FROM weekly_stats`);
+                await deleteFromIfExists(tx, "public.user_badges");
+                await deleteFromIfExists(tx, "public.user_achievement_badges");
+                await deleteFromIfExists(tx, "public.xp_transactions");
+                await deleteFromIfExists(tx, "public.personal_records");
+                await deleteFromIfExists(tx, "public.weekly_stats");
 
-                await deleteIfExists(sql`DELETE FROM ai_insights_cache`);
-                await deleteIfExists(sql`DELETE FROM activity_ai_insights`);
-                await deleteIfExists(sql`DELETE FROM ai_coach_workouts`);
+                await deleteFromIfExists(tx, "public.ai_insights_cache");
+                await deleteFromIfExists(tx, "public.activity_ai_insights");
+                await deleteFromIfExists(tx, "public.ai_coach_workouts");
 
-                await deleteIfExists(sql`DELETE FROM garmin_tokens`);
-                await deleteIfExists(sql`DELETE FROM strava_tokens`);
-                await deleteIfExists(sql`DELETE FROM user_consents`);
+                await deleteFromIfExists(tx, "public.garmin_tokens");
+                await deleteFromIfExists(tx, "public.strava_tokens");
+                await deleteFromIfExists(tx, "public.user_consents");
 
                 // Reset and preserve the dev identity only.
-                await deleteIfExists(sql`DELETE FROM swimmer_profiles`);
+                await deleteFromIfExists(tx, "public.swimmer_profiles");
                 await tx.execute(sql`DELETE FROM users WHERE id <> ${preservedUser.id}`);
                 await tx.execute(sql`
                     UPDATE users

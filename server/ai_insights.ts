@@ -3,6 +3,7 @@ import { getDb } from "./db";
 import { aiInsightsCache } from "../drizzle/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { logger } from "./middleware/logger";
+import { ENV } from "./_core/env";
 
 // Initialize Gemini AI
 let genAI: GoogleGenerativeAI | null = null;
@@ -10,7 +11,7 @@ const log = logger.child({ component: "ai_insights" });
 const INSIGHT_EMOJI_REGEX = /^[🔥⚡💪🎯📈🏊🔄🌟🚀💯🏆❤️📊🎉👍💬🤯😂😢🌊]/;
 const INSIGHT_EMOJIS = ["🔥", "⚡", "💪", "🎯", "📈", "🏊", "🔄", "🌟", "🚀", "💯", "🏆", "❤️", "📊", "🎉", "👍", "💬", "🤯", "😂", "😢", "🌊"] as const;
 const MIN_INSIGHTS_FOR_VALID_CACHE = 6;
-const GEMINI_MODEL = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash";
+const GEMINI_MODEL = ENV.geminiTextModel;
 
 function getGeminiClient() {
   if (!genAI && process.env.GEMINI_API_KEY) {

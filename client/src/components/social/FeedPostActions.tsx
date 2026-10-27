@@ -91,7 +91,6 @@ export default function FeedPostActions({
         <ForwardContentDialog
           open={forwardOpen}
           onOpenChange={setForwardOpen}
-          targetType="post"
           targetId={post.id}
         />
       ) : null}

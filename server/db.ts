@@ -18,6 +18,7 @@ import { ENV } from './_core/env';
 import { updateUserProfileBadge } from './db_profile_badges';
 import { logger } from "./middleware/logger";
 import { classifyAsyncError } from "./lib/withErrorHandling";
+import { deleteFromIfExists } from "./lib/relation-exists";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: Pool | null = null;
@@ -1160,103 +1161,111 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
   }
 
   await db.transaction(async (tx) => {
-    const deleteIfExists = async (query: ReturnType<typeof sql>) => {
-      try {
-        await tx.execute(query);
-      } catch (error) {
-        if (!shouldIgnoreMissingRelation(error)) {
-          throw error;
-        }
-      }
-    };
-
-    // Legacy season engagement tables: they were created at runtime by the
-    // removed season engine and may not exist. A failing DELETE would abort the
-    // whole transaction, so check for the relation first instead of catching.
-    for (const table of ["season_activity_predictions", "season_club_quest_claims"]) {
-      const presence = await tx.execute(
-        sql`SELECT to_regclass(${`public.${table}`}) IS NOT NULL AS present`
-      );
-      if ((presence.rows[0] as { present?: boolean } | undefined)?.present) {
-        await tx.execute(sql`DELETE FROM ${sql.identifier(table)} WHERE user_id = ${userId}`);
-      }
-    }
+    // Legacy season engagement tables: created at runtime by the removed season
+    // engine, so they may not exist.
+    await deleteFromIfExists(tx, "public.season_activity_predictions", sql`user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.season_club_quest_claims", sql`user_id = ${userId}`);
 
     // Stories
-    await deleteIfExists(sql`
-      DELETE FROM story_views
-      WHERE viewer_id = ${userId}
-         OR story_id IN (SELECT id FROM stories WHERE user_id = ${userId})
-    `);
-    await deleteIfExists(sql`
-      DELETE FROM story_reactions
-      WHERE user_id = ${userId}
-         OR story_id IN (SELECT id FROM stories WHERE user_id = ${userId})
-    `);
-    await deleteIfExists(sql`DELETE FROM stories WHERE user_id = ${userId}`);
+    await deleteFromIfExists(
+      tx,
+      "public.story_views",
+      sql`
+        viewer_id = ${userId}
+        OR story_id IN (SELECT id FROM stories WHERE user_id = ${userId})
+      `,
+      ["public.stories"]
+    );
+    await deleteFromIfExists(
+      tx,
+      "public.story_reactions",
+      sql`
+        user_id = ${userId}
+        OR story_id IN (SELECT id FROM stories WHERE user_id = ${userId})
+      `,
+      ["public.stories"]
+    );
+    await deleteFromIfExists(tx, "public.stories", sql`user_id = ${userId}`);
 
     // Social graph and feed
-    await deleteIfExists(sql`
-      DELETE FROM post_reactions
-      WHERE user_id = ${userId}
-         OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
-    `);
-    await deleteIfExists(sql`
-      DELETE FROM social_comments
-      WHERE user_id = ${userId}
-         OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
-    `);
-    await deleteIfExists(sql`
-      DELETE FROM social_splashes
-      WHERE user_id = ${userId}
-         OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
-    `);
-    await deleteIfExists(sql`
-      DELETE FROM social_hidden_posts
-      WHERE user_id = ${userId}
-         OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
-    `);
-    await deleteIfExists(sql`
-      DELETE FROM social_post_reports
-      WHERE reporter_user_id = ${userId}
-         OR handled_by = ${userId}
-         OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
-    `);
-    await deleteIfExists(sql`
-      DELETE FROM social_follows
-      WHERE follower_id = ${userId} OR following_id = ${userId}
-    `);
-    await deleteIfExists(sql`DELETE FROM social_posts WHERE user_id = ${userId}`);
+    await deleteFromIfExists(
+      tx,
+      "public.post_reactions",
+      sql`
+        user_id = ${userId}
+        OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
+      `,
+      ["public.social_posts"]
+    );
+    await deleteFromIfExists(
+      tx,
+      "public.social_comments",
+      sql`
+        user_id = ${userId}
+        OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
+      `,
+      ["public.social_posts"]
+    );
+    await deleteFromIfExists(
+      tx,
+      "public.social_splashes",
+      sql`
+        user_id = ${userId}
+        OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
+      `,
+      ["public.social_posts"]
+    );
+    await deleteFromIfExists(
+      tx,
+      "public.social_hidden_posts",
+      sql`
+        user_id = ${userId}
+        OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
+      `,
+      ["public.social_posts"]
+    );
+    await deleteFromIfExists(
+      tx,
+      "public.social_post_reports",
+      sql`
+        reporter_user_id = ${userId}
+        OR handled_by = ${userId}
+        OR post_id IN (SELECT id FROM social_posts WHERE user_id = ${userId})
+      `,
+      ["public.social_posts"]
+    );
+    await deleteFromIfExists(tx, "public.social_follows", sql`follower_id = ${userId} OR following_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.social_posts", sql`user_id = ${userId}`);
 
     // Community and messaging
-    await deleteIfExists(sql`DELETE FROM direct_messages WHERE sender_id = ${userId} OR receiver_id = ${userId}`);
-    await deleteIfExists(sql`DELETE FROM user_notifications WHERE user_id = ${userId}`);
-    await deleteIfExists(sql`DELETE FROM event_attendees WHERE user_id = ${userId}`);
-    await deleteIfExists(sql`DELETE FROM club_announcements WHERE author_id = ${userId}`);
-    await deleteIfExists(sql`DELETE FROM community_club_members WHERE user_id = ${userId}`);
-    await deleteIfExists(sql`DELETE FROM club_media WHERE uploader_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.direct_messages", sql`sender_id = ${userId} OR receiver_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.user_notifications", sql`user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.event_attendees", sql`user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.club_announcements", sql`author_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.community_club_members", sql`user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.club_media", sql`uploader_id = ${userId}`);
 
     // Progression and stats
-    await deleteIfExists(sql`DELETE FROM user_badges WHERE user_id = ${userId}`);
-    await deleteIfExists(sql`DELETE FROM user_achievement_badges WHERE user_id = ${userId}`);
-    await deleteIfExists(sql`DELETE FROM personal_records WHERE user_id = ${userId}`);
-    await deleteIfExists(sql`DELETE FROM weekly_stats WHERE user_id = ${userId}`);
-    await deleteIfExists(sql`DELETE FROM xp_transactions WHERE user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.user_badges", sql`user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.user_achievement_badges", sql`user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.personal_records", sql`user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.weekly_stats", sql`user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.xp_transactions", sql`user_id = ${userId}`);
 
     // AI artifacts
-    await deleteIfExists(sql`DELETE FROM ai_insights_cache WHERE user_id = ${userId}`);
-    await deleteIfExists(sql`DELETE FROM activity_ai_insights WHERE user_id = ${userId}`);
-    await deleteIfExists(sql`DELETE FROM ai_coach_workouts WHERE user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.ai_insights_cache", sql`user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.activity_ai_insights", sql`user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.ai_coach_workouts", sql`user_id = ${userId}`);
 
     // External sync tokens
-    await deleteIfExists(sql`DELETE FROM garmin_tokens WHERE user_id = ${userId}`);
-    await deleteIfExists(sql`DELETE FROM strava_tokens WHERE user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.garmin_tokens", sql`user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.strava_tokens", sql`user_id = ${userId}`);
 
     // Consent audit
-    await deleteIfExists(sql`DELETE FROM user_consents WHERE user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.user_consents", sql`user_id = ${userId}`);
 
     // Final identity rows
-    await deleteIfExists(sql`DELETE FROM swimmer_profiles WHERE user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.swimmer_profiles", sql`user_id = ${userId}`);
     await tx.execute(sql`DELETE FROM users WHERE id = ${userId}`);
   });
 

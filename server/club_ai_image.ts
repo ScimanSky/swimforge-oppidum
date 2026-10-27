@@ -17,9 +17,9 @@ type GenerateClubAiImageViaGeminiResult = {
 };
 
 const log = logger.child({ component: "club_ai_image" });
-const DEFAULT_IMAGE_MODEL = "gemini-2.5-flash-image";
+const DEFAULT_IMAGE_MODEL = ENV.geminiImageModel;
 const LEGACY_NANO_BANANA_ALIASES = new Set(["nano-banana", "nano-banana-pro", "nanobanana", "nanobanana-pro"]);
-const IMAGE_MODEL_FALLBACKS = ["gemini-2.5-flash-image", "gemini-3-pro-image-preview"];
+const IMAGE_MODEL_FALLBACKS = [ENV.geminiImageModel, ENV.geminiImageProModel];
 const TARGET_UPLOAD_MAX_BYTES = 4 * 1024 * 1024;
 
 function sanitizeSlug(input: string): string {

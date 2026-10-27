@@ -3,16 +3,16 @@ import type { ClubPoolWorkoutDirective, ClubPoolWorkoutPlan, ClubPoolWorkoutBloc
 import { normalizeWorkoutSeriesItem, parseRepsSpec, parseMetersValue, toCanonicalReps, toSeriesDistanceLabel } from "@shared/workout-series";
 import { logger } from "./middleware/logger";
 import { config } from "./config";
+import { ENV } from "./_core/env";
 
 const PRIMARY_MODEL_NAME =
   (process.env.CLUB_WORKOUTS_AI_MODEL_PRIMARY ??
     process.env.CLUB_WORKOUTS_AI_MODEL ??
-    process.env.GEMINI_MODEL ??
     config.CLUB_WORKOUTS_AI_MODEL_PRIMARY)
-    .trim() || "gemini-2.5-flash";
+    .trim() || ENV.geminiTextModel;
 const ESCALATION_MODEL_NAME =
   (process.env.CLUB_WORKOUTS_AI_MODEL_ESCALATION ?? config.CLUB_WORKOUTS_AI_MODEL_ESCALATION).trim() ||
-  "gemini-3-pro-preview";
+  ENV.geminiProModel;
 const QUALITY_THRESHOLD = config.CLUB_WORKOUTS_AI_QUALITY_THRESHOLD;
 const PROMPT_VERSION = "club_pool_workout_v3_qgate";
 const REQUEST_TIMEOUT_MS = config.CLUB_WORKOUTS_AI_TIMEOUT_MS;

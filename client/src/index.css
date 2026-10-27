@@ -551,14 +551,6 @@ body,
     min-width: 0;
   }
 
-  .story-ring-animated {
-    background: conic-gradient(from var(--ring-angle),
-        var(--electric-cyan),
-        var(--electric-lime),
-        var(--electric-cyan));
-    animation: story-ring-rotate 3s linear infinite;
-  }
-
   .shimmer-bg {
     background: linear-gradient(90deg,
         transparent 0%,
@@ -649,22 +641,6 @@ body,
       grid-template-columns: repeat(auto-fit, minmax(142px, 1fr));
     }
   }
-}
-
-@keyframes story-ring-rotate {
-  from {
-    --ring-angle: 0deg;
-  }
-
-  to {
-    --ring-angle: 360deg;
-  }
-}
-
-@property --ring-angle {
-  syntax: "<angle>";
-  initial-value: 0deg;
-  inherits: false;
 }
 
 @keyframes shimmer {

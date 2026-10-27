@@ -20,12 +20,9 @@ import { getInitials } from "@/lib/format"
 import { toast } from "sonner"
 import { X } from "lucide-react"
 
-type ForwardTargetType = "post"
-
 interface ForwardContentDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  targetType: ForwardTargetType
   targetId: number
 }
 
@@ -40,7 +37,6 @@ type SearchUser = {
 export function ForwardContentDialog({
   open,
   onOpenChange,
-  targetType,
   targetId,
 }: ForwardContentDialogProps) {
   const [searchQuery, setSearchQuery] = useState("")
@@ -111,7 +107,7 @@ export function ForwardContentDialog({
       return
     }
     forwardMutation.mutate({
-      targetType,
+      targetType: "post",
       targetId,
       recipientIds,
       note: note.trim() || null,
