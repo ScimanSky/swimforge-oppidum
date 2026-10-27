@@ -44,17 +44,7 @@ export { getUserPublicProfile, toggleFollow, getSuggestedUsers, getFollowStarter
 export { getPendingActivityInsights, listActivityInsights, markActivityInsightSeen } from "../ai_activity_insights";
 export { logger } from "../middleware/logger";
 export { sanitizeActivityNotes } from "../lib/sanitize";
-export { claimSeasonReward, getCurrentSeasonState, getSeasonLeaderboard, getMySeasonRank } from "../season";
 export { awardActionXp, getActionXpStatus } from "../xp_actions";
-export {
-    claimCurrentClubQuestReward,
-    createSeasonActivityPrediction,
-    evaluateSeasonPredictionWithActivity,
-    getCurrentClubQuestStates,
-    getSeasonEngagementSnapshot,
-    listSeasonActivityPredictions,
-    resolveSeasonWeeklyFocus,
-} from "../season_engagement";
 
 // ─── Type aliases ───────────────────────────────────────────────────
 import type * as _db from "../db";

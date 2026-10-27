@@ -1,5 +1,5 @@
 // Social-action XP (splash, comment, reaction, rsvp, club post).
-// Standalone module: it does not depend on the season engine and never creates tables.
+// Standalone module: it has no dependency on gameplay engines and never creates tables.
 import { and, eq, lte, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { levelThresholds, swimmerProfiles, xpTransactions } from "../drizzle/schema";

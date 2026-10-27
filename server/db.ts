@@ -1170,9 +1170,17 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
       }
     };
 
-    // Season engagement
-    await deleteIfExists(sql`DELETE FROM season_activity_predictions WHERE user_id = ${userId}`);
-    await deleteIfExists(sql`DELETE FROM season_club_quest_claims WHERE user_id = ${userId}`);
+    // Legacy season engagement tables: they were created at runtime by the
+    // removed season engine and may not exist. A failing DELETE would abort the
+    // whole transaction, so check for the relation first instead of catching.
+    for (const table of ["season_activity_predictions", "season_club_quest_claims"]) {
+      const presence = await tx.execute(
+        sql`SELECT to_regclass(${`public.${table}`}) IS NOT NULL AS present`
+      );
+      if ((presence.rows[0] as { present?: boolean } | undefined)?.present) {
+        await tx.execute(sql`DELETE FROM ${sql.identifier(table)} WHERE user_id = ${userId}`);
+      }
+    }
 
     // Stories
     await deleteIfExists(sql`

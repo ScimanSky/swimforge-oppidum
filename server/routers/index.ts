@@ -12,8 +12,6 @@ import { badgesRouter } from "./badges.router";
 import {
     syncRouter,
     leaderboardRouter,
-    seasonRouter,
-    videoRouter,
     recordsRouter,
     xpRouter,
     levelsRouter,
@@ -42,8 +40,6 @@ export const appRouter = router({
     badges: badgesRouter,
     sync: syncRouter,
     leaderboard: leaderboardRouter,
-    season: seasonRouter,
-    video: videoRouter,
     records: recordsRouter,
     xp: xpRouter,
     levels: levelsRouter,

@@ -331,8 +331,17 @@ export const authRouter = router({
                 await deleteIfExists(sql`DELETE FROM challenge_activity_log`);
                 await deleteIfExists(sql`DELETE FROM challenges`);
 
-                await deleteIfExists(sql`DELETE FROM season_activity_predictions`);
-                await deleteIfExists(sql`DELETE FROM season_club_quest_claims`);
+                // Legacy season engagement tables: created at runtime by the removed
+                // season engine, so they may not exist. A failing DELETE would abort
+                // the transaction, so check for the relation first.
+                for (const table of ["season_activity_predictions", "season_club_quest_claims"]) {
+                    const presence = await tx.execute(
+                        sql`SELECT to_regclass(${`public.${table}`}) IS NOT NULL AS present`
+                    );
+                    if ((presence.rows[0] as { present?: boolean } | undefined)?.present) {
+                        await tx.execute(sql`DELETE FROM ${sql.identifier(table)}`);
+                    }
+                }
 
                 await deleteIfExists(sql`DELETE FROM ghost_challenges`);
                 await deleteIfExists(sql`DELETE FROM garmin_activity_lengths`);
