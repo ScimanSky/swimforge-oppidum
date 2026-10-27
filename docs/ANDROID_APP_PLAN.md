@@ -1,0 +1,170 @@
+# SwimForge Android — piano proposto (27 ottobre 2026)
+
+Stato: **proposta da approvare**. Nasce dal confronto fra l'inventario delle funzionalità
+attuali di SwimForge e l'analisi di un'app Android concorrente orientata all'allenamento
+(report locale in `docs/reports/2026-10-27-swimbox-rea.md`, non versionato).
+
+## 1. Decisione architetturale: Capacitor sul client esistente
+
+L'app concorrente analizzata è esattamente questo: una web app React impacchettata con
+Capacitor, con il nativo usato solo per push, fotocamera, condivisione, schermo acceso,
+lettura vocale e acquisti. SwimForge è già React + Vite + Tailwind con un backend tRPC
+separato, quindi la strada più corta e meno rischiosa è la stessa.
+
+| Opzione | Riuso | Tempo per una prima APK | Note |
+|---|---|---|---|
+| **Capacitor (consigliata)** | ~100% del client | giorni | Plugin nativi per tutto ciò che serve; stessa base per iOS |
+| TWA / Bubblewrap (PWA) | 100% | ore | Niente plugin nativi, serve PWA completa (manifest, SW), push solo web |
+| React Native / Expo | ~0% UI, riuso logica tRPC | settimane/mesi | Riscrittura di tutte le schermate |
+| Kotlin + Compose | 0% | mesi | Riscrittura totale, doppio codice da mantenere |
+
+Implicazioni tecniche da gestire (tutte note, nessuna bloccante):
+- **Auth**: oggi il client usa cookie di sessione + cookie CSRF (`client/src/main.tsx:61`
+  `credentials: "include"`, `server/routers/auth.router.ts`). Nel WebView l'origine è
+  `https://localhost`, quindi i cookie sono cross-site. Soluzione: nel build nativo
+  inviare il token di sessione in header `Authorization` (il server lo accetta già per
+  il token Supabase in fase di login; va esteso al session token) e disattivare il
+  controllo CSRF per le richieste con header. Alternativa: `CapacitorCookies` +
+  `SameSite=None; Secure`.
+- **Login Google**: Google rifiuta OAuth dentro i WebView. Usare il plugin Browser
+  (Custom Tabs) e un deep link di ritorno (`swimforge://auth/callback` o App Link
+  `https://swimforge.it/auth/callback`). Stesso schema per Strava.
+- **CORS**: aggiungere `https://localhost` e `capacitor://localhost` alle origini
+  consentite dal server Express.
+- **Build**: `vite build` → `webDir: dist/public` (o la cartella attuale del client) →
+  `npx cap sync android` → Android Studio/Gradle. JDK 17/21 e Android SDK sono già sul PC.
+- **Bundle incluso nell'APK** (avvio immediato, shell offline) con aggiornamenti via Play.
+  Niente caricamento remoto del sito.
+- **Backend invariato** su Render; valutare un piano senza cold start, perché un'app
+  nativa che resta "a caricare" 30 s al primo avvio viene disinstallata.
+
+## 2. Stato di partenza (sintesi)
+
+- Produzione viva: `https://swimforge.it` risponde; Supabase `swimforge-oppidum` è
+  ACTIVE_HEALTHY (il progetto `SwimForge` più vecchio è INACTIVE e non è quello in uso).
+- Solo web responsive: nessun Capacitor, nessuna PWA, nessuna push notification.
+- Dati: solo Garmin (libreria non ufficiale, con email e password dell'utente) e Strava;
+  inserimento manuale bloccato lato server.
+- Molte funzioni dietro flag spenti o giudicate deboli nei report di marzo 2026:
+  predizioni/scommesse, recap video Remotion, Ghost track, sfide generiche, missioni di
+  stagione, meet e storia dei club, automazioni AI dei club.
+- Codice morto: `Dashboard.tsx`, `SessionInsights.tsx`, `CoachDryland.tsx`, `Map.tsx`,
+  `ClubDetail.tsx`, `ComponentShowcase.tsx`, `components/dashboard/*`,
+  `StatisticsAccordion.tsx`.
+- Obiettivi personalizzati salvati solo in localStorage; FC a riposo fissa a 60 nelle
+  statistiche; club stats API non costruita; sidebar feed con mock.
+
+## 3. Cosa togliere (proposta)
+
+| Elemento | Azione | Perché |
+|---|---|---|
+| Predizioni/scommesse, recap video Remotion, "core loop v2" | rimuovere codice e flag | mai attivati, giudicati da rimuovere o ridimensionare |
+| Ghost track / ghost challenges | rimuovere dall'app Android (parcheggiare il codice) | esecuzione giudicata scarsa; si può ripensare dopo |
+| Stagioni a 56 giorni con battle pass, missioni, club quest | **decisione tua**: proposta = tenere XP, livelli, badge e classifiche; togliere la macchina delle stagioni | missioni "non specifiche per il nuoto"; complessità alta per il valore percepito |
+| Sfide utente generiche | semplificare a 3 tipi (metri totali, sedute, costanza) o rinviare | troppo generiche |
+| Meet, storia club, automazioni AI dei club | fuori dalla prima app Android (flag restano spenti) | 2.300 righe di router per funzioni mai attivate |
+| Codice morto elencato sopra | cancellare | peso del bundle e manutenzione |
+| Obiettivi in localStorage | portare su server o togliere | su mobile si perdono a ogni reinstallazione |
+| Storie 24h | **decisione tua**: tenere solo se le usi davvero | costo di mantenimento (upload mobile instabile da roadmap) |
+| Blocco dell'inserimento manuale | rimuovere il blocco: attività manuale ammessa ma marcata "manuale", senza XP (o XP ridotto) e fuori classifica | sblocca chi non ha Garmin, senza rovinare le classifiche |
+| Login Garmin con email/password | sostituire appena possibile (vedi fase 4) | fragile, MFA problematico, contro i termini Garmin |
+
+## 4. Cosa aggiungere (dal concorrente, adattato a SwimForge)
+
+Priorità P1 = nella prima app pubblicata, P2 = subito dopo, P3 = quando serve.
+
+| # | Funzione | P | Come si innesta in SwimForge |
+|---|---|---|---|
+| 1 | **Sessione di allenamento personale** come oggetto: blocchi (riscaldamento, tecnica, principale, defaticamento), ripetute (n × distanza, stile, zona/andatura, recupero, attrezzo) | P1 | esiste già per i club (`club_workouts_ai`, schema blocchi); generalizzare a utente con libreria personale |
+| 2 | Crea sessione: **Scrivi** (testo libero con parser "8x100 SL Z3 r20"), **Fotografa** (OCR con Gemini vision del foglio a bordo vasca), **Genera con AI** (già c'è il coach Gemini) | P1 | Gemini già integrato; fotocamera via Capacitor |
+| 3 | **Calendario** con sessioni pianificate, "sposta", **"Segna come fatta"** collegando l'attività Garmin sincronizzata lo stesso giorno | P1 | chiude il cerchio piano → esecuzione → analisi |
+| 4 | **Esporta PDF** della sessione da portare a bordo vasca (jsPDF) | P1 | banale e amatissimo |
+| 5 | **Modalità bordo vasca**: schermo acceso (keep-awake), caratteri grandi, avanzamento serie per serie, lettura vocale (TTS) | P2 | plugin Capacitor keep-awake + text-to-speech |
+| 6 | **Velocità critica (CSS)** da test 400/200 o 10', **zone** di passo e HR, **tabella andature** per zona e distanza, scala FIN A1-C3 | P1 | già pianificato come "CSS Hub" nella strategia di marzo |
+| 7 | **Carico interno** (punti = tempo per zona HR pesato; SwimForge ha già il tempo nelle zone 1-5 da Garmin) con grafico 12 settimane; **recupero** (ACWR acuto/cronico) con feedback giornaliero | P2 | dati già nel DB (`time in HR zones`, training effect) |
+| 8 | **Feedback post-seduta**: RPE 1-10, obiettivo raggiunto, nota | P1 | alimenta Session IQ e il coach |
+| 9 | **Check-in settimanale** (30 s) → il coach AI genera la settimana successiva | P2 | estende il piano giornaliero attuale a piano settimanale |
+| 10 | **Home "Oggi"**: sessione di oggi, ultima attività, carico settimana, 4 azioni rapide (Allenati ora, Pianifica, Sincronizza, Chiedi al coach). Il feed social diventa la seconda tab | P1 | **decisione tua**: cambia l'identità feed-first |
+| 11 | **Coach AI contestuale**: la chat sa in che schermata sei (attività, sessione, piano) e propone domande | P2 | la chat Gemini esiste, manca il contesto per schermata |
+| 12 | **Push notifications** (FCM via Capacitor): sync completata, PB, promemoria sessione, DM, commenti, risposte del coach | P1 | server: Firebase Admin SDK su Render; tabella device token |
+| 13 | **Condividi immagine** dell'attività (card con statistiche su foto) verso Instagram/WhatsApp | P2 | plugin Share + canvas |
+| 14 | **Gare** con data, tempo target, passo target, priorità; PB collegati alla gara | P2 | estende Goals + PB Board |
+| 15 | **Import file FIT/TCX/GPX** dal file picker (Garmin Connect, Apple, Coros, Polar esportano tutti FIT) | P1 | copre tutti gli orologi senza nuove integrazioni; libreria `fit-file-parser` |
+| 16 | Garmin **API ufficiale** (Connect Developer Program, gratuita, con approvazione) con webhook push | P2 | sostituisce la libreria non ufficiale; chiedere l'accesso subito perché i tempi sono lunghi |
+| 17 | Classifica **per piscina/città** con opt-in | P3 | SwimForge ha già club e leaderboard: aggiungere "piscina" al profilo basta |
+| 18 | Analisi video: variante "chiedi al coach del club" (upload 60 s, il coach del club risponde) | P3 | nessuno staff centrale; i club sì |
+| 19 | Richiesta recensione in-app, sondaggio di uscita | P3 | plugin pronto |
+
+Fuori scope: abbonamenti/paywall, pacchetti a pagamento, articoli, Polar/Wahoo, speech-to-text.
+
+## 5. Fasi
+
+Ogni fase finisce con: test (`pnpm check`, `pnpm test`), build APK, prova sul Pixel 8a,
+commit e push. Stime in giorni di lavoro effettivo con Claude Code.
+
+### Fase 0 — Pulizia e base mobile (2-3 giorni)
+- Cancellare codice morto e funzioni rimosse (§3), togliere i flag relativi.
+- Auth con header per il nativo, CORS, deep link di callback per Google e Strava.
+- Obiettivi su server; FC a riposo reale; rimozione mock sidebar.
+- Gate di uscita: web invariata in produzione, test verdi.
+
+### Fase 1 — Guscio Android con Capacitor (2-3 giorni)
+- `@capacitor/core`, `@capacitor/android`, progetto `android/` nel repo, icona e splash,
+  status bar e safe area, gestione tasto Indietro, Browser per OAuth, Share, Camera per
+  post e storie, Keep-awake, Push (FCM: progetto Firebase, `google-services.json`,
+  tabella `device_tokens`, invio server).
+- App Links per `swimforge.it` (i link del feed aprono l'app).
+- Distribuzione interna: APK diretto o Firebase App Distribution (come già fatto per
+  GymBro). Aprire subito il Play Console: per gli account personali la prima
+  pubblicazione richiede un test chiuso con 12 tester per 14 giorni (da verificare,
+  la regola cambia).
+- Gate: l'app installata sul Pixel fa login, sync Garmin, feed, DM, con push ricevuta.
+
+### Fase 2 — Nuova veste grafica (3-4 giorni, in parallelo a 0-1)
+- Produco 2-3 direzioni visive come prototipo navigabile (home "Oggi", attività,
+  sessione, bordo vasca, profilo). Tu scegli; poi applico la direzione scelta alle
+  schermate P1 mentre le costruisco, non prima. Vincoli: dark-first, contrasto alto per
+  bordo vasca bagnato, target touch ≥ 48 dp, navigazione a 4-5 tab in basso.
+
+### Fase 3 — Cuore allenamento (5-7 giorni)
+- Sessione personale (§4 #1), creazione Scrivi/Fotografa/AI (#2), calendario e
+  "segna come fatta" (#3), PDF (#4), feedback post-seduta (#8), home "Oggi" (#10).
+- Gate: dal Pixel creo una sessione da foto, la pianifico, nuoto con Garmin, la seduta
+  viene collegata e commentata dal coach.
+
+### Fase 4 — Fisiologia e dati (4-5 giorni)
+- CSS, zone, tabella andature, scala FIN (#6); carico e recupero (#7); check-in
+  settimanale e piano settimanale AI (#9); import FIT/TCX (#15); inserimento manuale
+  marcato; richiesta accesso Garmin API ufficiale (#16, avviata già in fase 0).
+
+### Fase 5 — Bordo vasca e social mobile (3-4 giorni)
+- Modalità bordo vasca con TTS (#5), coach contestuale (#11), condivisione immagine
+  (#13), gare e PB collegati (#14), rifinitura club base (feed, eventi, allenamenti del
+  coach).
+- Gate: pubblicazione nel test chiuso del Play Store.
+
+### Fase 6 — Dopo la pubblicazione
+- Garmin API ufficiale in produzione, classifica per piscina (#17), video al coach del
+  club (#18), review in-app (#19), eventuale iOS con lo stesso progetto Capacitor.
+
+Totale indicativo: 20-27 giorni di lavoro per arrivare al test chiuso.
+
+## 6. Rischi e prerequisiti
+
+- Render free tier e cold start: su mobile si percepisce molto più che sul web.
+- Garmin: la libreria non ufficiale può rompersi in qualsiasi momento; l'import FIT è la
+  rete di sicurezza, l'API ufficiale la soluzione.
+- Play Store: account sviluppatore, chiave di firma (Play App Signing), privacy policy
+  già presente (`PRIVACY_POLICY.md`), dichiarazione dati, test chiuso con tester.
+- Firebase: nuovo progetto solo per FCM (nessun Analytics, nessun permesso pubblicità).
+- Due sessioni Claude sullo stesso working tree vanno evitate; per lavoro parallelo
+  usare un worktree git separato.
+
+## 7. Decisioni richieste
+
+1. Capacitor come architettura: sì/no.
+2. Tagli di §3 marcati "decisione tua": stagioni, storie.
+3. Home "Oggi" con feed in seconda tab: sì/no.
+4. Avviare subito la richiesta Garmin Connect Developer Program.
+5. Walkthrough con screenshot dell'app concorrente (telefono sbloccato, 10 minuti) per
+   completare la parte UX del report, oppure rinunciare.

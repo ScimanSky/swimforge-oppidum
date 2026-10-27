@@ -141,3 +141,6 @@ docs/api/
 
 # Local analysis reports (do not commit)
 docs/reports/
+
+# Reverse-engineering artifacts of third-party apps (never commit)
+artifacts/
