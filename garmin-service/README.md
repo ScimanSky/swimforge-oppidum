@@ -4,7 +4,7 @@ Microservizio Python per l'integrazione con Garmin Connect.
 
 ## Funzionalità
 
-- **Autenticazione OAuth** con Garmin Connect
+- **Autenticazione** con Garmin Connect (`python-garminconnect` 0.3.20, MFA in due passi)
 - **Sincronizzazione attività** di nuoto
 - **Parsing dati** (distanza, tempo, stile, vasche, SWOLF, frequenza cardiaca)
 - **API RESTful** per comunicazione con il backend principale
@@ -27,17 +27,27 @@ pip install -r requirements.txt
 
 # Avvia il servizio
 uvicorn main:app --reload --port 8000
+
+# Test (nessuna chiamata a Garmin)
+pip install pytest && python -m pytest -q
 ```
 
 ## Variabili d'Ambiente
 
 | Variabile | Descrizione | Default |
 |-----------|-------------|---------|
-| `GARMIN_SERVICE_SECRET` | Chiave segreta per autenticazione API | `swimforge-garmin-secret-key` |
+| `GARMIN_SERVICE_SECRET` | Chiave segreta per autenticazione API (obbligatoria) | *(nessuno: il servizio non parte)* |
 | `MAIN_API_URL` | URL del backend principale SwimForge | `http://localhost:3000` |
 | `PORT` | Porta del servizio | `8000` |
+| `TOKEN_STORE_DIR` | Directory dei token Garmin, una sottodirectory per utente | `/tmp/garmin_tokens` |
+| `GARMIN_STATE_KEY` | Chiave Fernet (base64) per cifrare su disco lo stato MFA in attesa. Se assente, lo stato MFA resta solo in memoria | *(vuoto)* |
+| `GARMIN_RATE_LIMIT_COOLDOWN_SECONDS` | Pausa per utente dopo un 429/427 di Garmin | `900` |
 | `GARMIN_CORS_ALLOW_ORIGINS` | Origini browser consentite (CSV). Se vuoto, CORS disabilitato | *(vuoto)* |
 | `GARMIN_CORS_ALLOW_CREDENTIALS` | Abilita credenziali CORS (`true/false`) | `false` |
+
+Generare `GARMIN_STATE_KEY` con
+`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+Dettagli su token store, MFA e codici di errore in `GARMIN_AUTH_NOTES.md`.
 
 ## API Endpoints
 
@@ -53,6 +63,11 @@ Autentica un utente con Garmin Connect.
   "password": "garmin_password"
 }
 ```
+
+Se Garmin richiede l'MFA risponde `mfa_required: true`; il codice va inviato a
+`POST /auth/mfa` (`{"user_id": "123", "mfa_code": "123456"}`) entro 10 minuti,
+anche se nel frattempo il servizio è stato riavviato (con `GARMIN_STATE_KEY`).
+Se Garmin blocca il login (HTTP 427) la risposta è `403`.
 
 #### POST /auth/logout?user_id=123
 Disconnette l'utente da Garmin Connect.
@@ -87,7 +102,8 @@ Sincronizza le attività con SwimForge.
 
 - Tutte le API richiedono header `X-API-Key` con la chiave segreta
 - Le credenziali Garmin sono usate solo per l'autenticazione iniziale
-- I token di sessione sono memorizzati in memoria (usa Redis in produzione)
+- I token Garmin sono in `<TOKEN_STORE_DIR>/<user_id>/garmin_tokens.json` (0600, directory 0700)
+- Lo stato MFA in attesa contiene cookie di sessione Garmin: su disco è solo cifrato (`mfa_state.bin`, 0600) e viene cancellato dopo 10 minuti
 - Le password non vengono mai salvate
 - CORS è disabilitato di default; abilitalo solo se necessario con allowlist esplicita
 

@@ -8,6 +8,12 @@ Supports MFA (Multi-Factor Authentication) with a two-step flow:
 1. POST /auth/login - Initiates login, returns mfa_required if MFA is needed
 2. POST /auth/mfa - Completes login with MFA code
 
+Requires python-garminconnect >= 0.3.20 (no garth). Tokens live in a per-user
+token store directory (<TOKEN_STORE_DIR>/<user_id>/garmin_tokens.json). A pending
+MFA login (the library's client_state) is also written, Fernet-encrypted with
+GARMIN_STATE_KEY, to <TOKEN_STORE_DIR>/<user_id>/mfa_state.bin so the MFA code
+can be submitted after a restart. See GARMIN_AUTH_NOTES.md.
+
 Endpoints:
 - POST /auth/login - Authenticate with Garmin Connect (step 1)
 - POST /auth/mfa - Complete MFA authentication (step 2)
@@ -18,17 +24,22 @@ Endpoints:
 """
 
 import os
+import re
 import json
+import time
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
+from cryptography.fernet import Fernet
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr
 from dotenv import load_dotenv
+
+from mfa_state import load_state_entry, serialize_state
 
 # Load environment variables
 load_dotenv()
@@ -50,6 +61,39 @@ CORS_ALLOW_CREDENTIALS_RAW = os.getenv("GARMIN_CORS_ALLOW_CREDENTIALS", "false")
 TOKEN_STORE_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
 with suppress(OSError):
     TOKEN_STORE_DIR.chmod(0o700)
+
+# Per-user token store layout: <TOKEN_STORE_DIR>/<user_id>/{garmin_tokens.json,mfa_state.bin}
+TOKEN_FILENAME = "garmin_tokens.json"  # name used by python-garminconnect's token store
+MFA_STATE_FILENAME = "mfa_state.bin"
+MFA_STATE_TTL_SECONDS = 600  # 10 minutes, same as the in-memory pending_mfa expiry
+USER_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
+
+
+def load_state_fernet() -> Optional[Fernet]:
+    """Return the Fernet used to encrypt pending MFA state, or None.
+
+    The service had no encryption key of its own, so it reads GARMIN_STATE_KEY
+    (a base64 Fernet key). Without a valid key pending MFA logins stay in
+    memory only (lost on restart) instead of crashing the service.
+    """
+    raw_key = os.getenv("GARMIN_STATE_KEY", "").strip()
+    if not raw_key:
+        logger.warning(
+            "GARMIN_STATE_KEY is not set: pending Garmin MFA logins are kept in memory "
+            "only and are lost if the service restarts before the code is entered."
+        )
+        return None
+    try:
+        return Fernet(raw_key.encode("utf-8"))
+    except (ValueError, TypeError):
+        logger.warning(
+            "GARMIN_STATE_KEY is not a valid Fernet key (32 url-safe base64-encoded bytes): "
+            "pending Garmin MFA logins are kept in memory only."
+        )
+        return None
+
+
+state_fernet: Optional[Fernet] = load_state_fernet()
 
 # In-memory session storage
 # Structure: {user_id: {"client": Garmin, "email": str, "last_sync": datetime, "mfa_state": Any}}
@@ -73,6 +117,26 @@ def is_rate_limit_error(error: str) -> bool:
     )
 
 
+# 427 is the non-standard status Garmin's SSO uses when it blocks an automated
+# login outright. Matches "returned 427" / "status=427" but not the library's
+# generic "(HTTP 429/427)" summary, which stays on the 429 path.
+LOGIN_BLOCKED_STATUS_RE = re.compile(r"(?<![\d/])427(?![\d/])")
+LOGIN_BLOCKED_MESSAGE = "Garmin ha bloccato il login automatico, riprova più tardi"
+
+
+def is_login_blocked_error(error: BaseException) -> bool:
+    """True if the error (or anything it was raised from) is an HTTP 427."""
+    seen = set()
+    current: Optional[BaseException] = error
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        status = getattr(getattr(current, "response", None), "status_code", None)
+        if status == 427 or LOGIN_BLOCKED_STATUS_RE.search(str(current)):
+            return True
+        current = current.__cause__ or current.__context__
+    return False
+
+
 def set_rate_limit_cooldown(user_id: str) -> int:
     now = datetime.now()
     blocked_until = now + timedelta(seconds=RATE_LIMIT_COOLDOWN_SECONDS)
@@ -90,6 +154,17 @@ def get_rate_limit_remaining_seconds(user_id: str) -> int:
         login_rate_limited_until.pop(user_id, None)
         return 0
     return remaining
+
+
+def login_blocked_exception(user_id: str) -> HTTPException:
+    """403 for a Garmin 427 block. Never retried: the cooldown also stops new attempts."""
+    retry_after = set_rate_limit_cooldown(user_id)
+    return HTTPException(
+        status_code=403,
+        detail=LOGIN_BLOCKED_MESSAGE,
+        headers={"Retry-After": str(retry_after)},
+    )
+
 
 def parse_csv_origins(value: str) -> List[str]:
     return [origin.strip() for origin in value.split(",") if origin.strip()]
@@ -228,52 +303,174 @@ async def verify_api_key(x_api_key: str = Header(None)):
 
 
 # Helper functions
-def get_token_path(user_id: str) -> Path:
-    """Get the token file path for a user"""
-    return TOKEN_STORE_DIR / f"{user_id}.json"
+def get_token_dir(user_id: str) -> Path:
+    """Per-user token store directory: <TOKEN_STORE_DIR>/<user_id>/"""
+    if not USER_ID_RE.fullmatch(user_id or ""):
+        raise HTTPException(status_code=400, detail="user_id non valido")
+    return TOKEN_STORE_DIR / user_id
 
 
-def secure_token_path(token_path: Path) -> None:
-    """Tighten token directory/file permissions for existing token stores."""
-    token_path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+def get_token_file(token_dir: Path) -> Path:
+    return token_dir / TOKEN_FILENAME
+
+
+def get_mfa_state_file(token_dir: Path) -> Path:
+    return token_dir / MFA_STATE_FILENAME
+
+
+def secure_token_dir(token_dir: Path) -> None:
+    """Create the token directory as 0700 and tighten its files to 0600."""
+    token_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     with suppress(OSError):
-        token_path.parent.chmod(0o700)
-    if token_path.exists() and not token_path.is_symlink():
-        with suppress(OSError):
-            token_path.chmod(0o600)
+        token_dir.chmod(0o700)
+    for path in (get_token_file(token_dir), get_mfa_state_file(token_dir)):
+        if path.exists() and not path.is_symlink():
+            with suppress(OSError):
+                path.chmod(0o600)
 
 
-def write_token_data_securely(token_path: Path, token_data: str) -> str:
-    """Write token payload with owner-only permissions regardless of umask."""
-    secure_token_path(token_path)
+def migrate_legacy_token_file(user_id: str, token_dir: Path) -> None:
+    """Move a pre-0.3.20 <TOKEN_STORE_DIR>/<user_id>.json into <user_id>/garmin_tokens.json.
+
+    The old single-file store held the same JSON (di_token, di_refresh_token,
+    di_client_id) that the library now reads from garmin_tokens.json.
+    """
+    legacy_file = TOKEN_STORE_DIR / f"{user_id}.json"
+    if not legacy_file.is_file() or legacy_file.is_symlink():
+        return
+    token_file = get_token_file(token_dir)
+    try:
+        if token_file.exists():
+            legacy_file.unlink()
+        else:
+            secure_token_dir(token_dir)
+            os.replace(legacy_file, token_file)
+            with suppress(OSError):
+                token_file.chmod(0o600)
+            logger.info(f"Migrated legacy Garmin token file for user {user_id}")
+    except OSError as err:
+        logger.warning(f"Could not migrate legacy Garmin token file for user {user_id}: {err}")
+
+
+def ensure_token_dir(user_id: str, create: bool = True) -> Path:
+    """Return the user's token directory, migrated from the old single-file layout.
+
+    With create=True the directory is created (0700) and its files tightened to
+    0600; read-only callers pass create=False to avoid creating empty dirs.
+    """
+    token_dir = get_token_dir(user_id)
+    migrate_legacy_token_file(user_id, token_dir)
+    if create or token_dir.exists():
+        secure_token_dir(token_dir)
+    return token_dir
+
+
+def write_private_file(path: Path, data: bytes) -> None:
+    """Write data with owner-only permissions regardless of umask, refusing symlinks."""
+    secure_token_dir(path.parent)
 
     flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
 
-    fd = os.open(token_path, flags, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as token_file:
-        token_file.write(token_data)
+    fd = os.open(path, flags, 0o600)
+    with os.fdopen(fd, "wb") as handle:
+        handle.write(data)
 
     with suppress(OSError):
-        token_path.chmod(0o600)
-
-    return token_path.read_text()
+        path.chmod(0o600)
 
 
-def save_client_tokens(client: Any, token_path: Path) -> Optional[str]:
-    """Persist Garmin tokens and return the serialized token payload."""
-    secure_token_path(token_path)
+def read_private_file(path: Path) -> bytes:
+    flags = os.O_RDONLY
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    fd = os.open(path, flags)
+    with os.fdopen(fd, "rb") as handle:
+        return handle.read()
 
-    if hasattr(client, "client") and hasattr(client.client, "dump"):
-        client.client.dump(str(token_path))
-    elif hasattr(client, "garth") and hasattr(client.garth, "dump"):
-        client.garth.dump(str(token_path))
-    else:
-        raise RuntimeError("Garmin client does not expose a supported token dump method")
 
-    secure_token_path(token_path)
-    return token_path.read_text()
+def write_token_data_securely(token_dir: Path, token_data: str) -> str:
+    """Write a token payload (as returned to the main API) into the user's token store."""
+    token_file = get_token_file(token_dir)
+    write_private_file(token_file, token_data.encode("utf-8"))
+    return token_file.read_text()
+
+
+def read_token_data(token_dir: Path) -> Optional[str]:
+    token_file = get_token_file(token_dir)
+    if not token_file.exists():
+        return None
+    secure_token_dir(token_dir)
+    return token_file.read_text()
+
+
+def save_client_tokens(client: Any, token_dir: Path) -> Optional[str]:
+    """Persist Garmin tokens into the user's token store and return the payload.
+
+    With return_on_mfa=True neither Garmin.login() nor Garmin.resume_login()
+    writes the token store themselves (only a non-MFA-mode login with a
+    tokenstore does), so the tokens are written with the library's own
+    Client.dump(), which creates <dir>/garmin_tokens.json as 0600 in a 0700 dir.
+    """
+    secure_token_dir(token_dir)
+    client.client.dump(str(token_dir))
+    secure_token_dir(token_dir)
+    return read_token_data(token_dir)
+
+
+def login_from_token_store(token_dir: Path) -> Any:
+    """Log in from <token_dir>/garmin_tokens.json (no credentials, no MFA)."""
+    from garminconnect import Garmin
+
+    client = Garmin()
+    client.login(tokenstore=str(token_dir))
+    return client
+
+
+def persist_mfa_state(user_id: str, client_state: Any) -> None:
+    """Store the pending MFA client_state encrypted on disk (best effort)."""
+    if state_fernet is None or not isinstance(client_state, dict):
+        return
+    try:
+        token_dir = ensure_token_dir(user_id)
+        blob = serialize_state(client_state, time.time(), state_fernet)
+        write_private_file(get_mfa_state_file(token_dir), blob)
+    except Exception as err:
+        # Never log the state itself: it holds Garmin session cookies.
+        logger.warning(f"Could not persist MFA state for user {user_id}: {type(err).__name__}")
+
+
+def load_persisted_mfa_state(user_id: str) -> Optional[Tuple[dict, float]]:
+    """Return (client_state, created_at) from mfa_state.bin if valid and fresh.
+
+    An expired, corrupt or undecryptable file is deleted.
+    """
+    if state_fernet is None:
+        return None
+    state_file = get_mfa_state_file(get_token_dir(user_id))
+    if not state_file.exists():
+        return None
+    try:
+        blob = read_private_file(state_file)
+    except OSError as err:
+        logger.warning(f"Could not read MFA state for user {user_id}: {err}")
+        return None
+    entry = load_state_entry(blob, time.time(), MFA_STATE_TTL_SECONDS, state_fernet)
+    if entry is None:
+        logger.info(f"Discarding expired or unreadable MFA state for user {user_id}")
+        delete_mfa_state(user_id)
+    return entry
+
+
+def delete_mfa_state(user_id: str) -> None:
+    with suppress(OSError):
+        get_mfa_state_file(get_token_dir(user_id)).unlink(missing_ok=True)
+
+
+def clear_pending_mfa(user_id: str) -> None:
+    pending_mfa.pop(user_id, None)
+    delete_mfa_state(user_id)
 
 
 def get_garmin_client(user_id: str):
@@ -282,12 +479,10 @@ def get_garmin_client(user_id: str):
     if session and session.get("client"):
         return session["client"]
     # Try to restore session from token store (after deploy/restart)
-    token_path = get_token_path(user_id)
-    if token_path.exists():
+    token_dir = ensure_token_dir(user_id, create=False)
+    if get_token_file(token_dir).exists():
         try:
-            from garminconnect import Garmin
-            client = Garmin()
-            client.login(str(token_path))
+            client = login_from_token_store(token_dir)
             try:
                 display_name = client.display_name
             except Exception:
@@ -447,8 +642,17 @@ def cleanup_expired_mfa():
         if created_at and (now - created_at).total_seconds() > 600:  # 10 minutes
             expired.append(user_id)
     for user_id in expired:
-        del pending_mfa[user_id]
+        clear_pending_mfa(user_id)
         logger.info(f"Cleaned up expired MFA session for user {user_id}")
+
+    # Encrypted MFA states whose in-memory entry is gone (e.g. after a restart).
+    # The file is written when the MFA login starts, so its mtime is its age.
+    cutoff = now.timestamp() - MFA_STATE_TTL_SECONDS
+    for state_file in TOKEN_STORE_DIR.glob(f"*/{MFA_STATE_FILENAME}"):
+        with suppress(OSError):
+            if state_file.stat().st_mtime < cutoff:
+                state_file.unlink()
+                logger.info(f"Deleted expired MFA state file for user {state_file.parent.name}")
 
     expired_rate_limits = []
     for user_id, blocked_until in login_rate_limited_until.items():
@@ -504,14 +708,14 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
                 detail="Garmin Connect library not available."
             )
 
-        token_path = get_token_path(request.user_id)
+        token_dir = ensure_token_dir(request.user_id)
+        token_file = get_token_file(token_dir)
 
         # Try token-based restore first (same pattern used by upstream examples):
         # this avoids unnecessary credential logins that can trigger Garmin rate limits.
-        if token_path.exists():
+        if token_file.exists():
             try:
-                client_from_token = Garmin()
-                client_from_token.login(str(token_path))
+                client_from_token = login_from_token_store(token_dir)
 
                 try:
                     display_name = client_from_token.display_name
@@ -528,8 +732,7 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
 
                 token_data = None
                 try:
-                    secure_token_path(token_path)
-                    token_data = token_path.read_text()
+                    token_data = read_token_data(token_dir)
                 except Exception as read_err:
                     logger.warning(f"Could not read token data for user {request.user_id}: {read_err}")
 
@@ -542,8 +745,10 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
                     token_data=token_data
                 )
             except GarminConnectTooManyRequestsError as rate_err:
-                retry_after = set_rate_limit_cooldown(request.user_id)
                 logger.warning(f"Token restore rate-limited for user {request.user_id}: {rate_err}")
+                if is_login_blocked_error(rate_err):
+                    raise login_blocked_exception(request.user_id)
+                retry_after = set_rate_limit_cooldown(request.user_id)
                 raise HTTPException(
                     status_code=429,
                     detail=(
@@ -555,14 +760,13 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
             except Exception as token_err:
                 logger.warning(f"Stored token restore failed for user {request.user_id}: {token_err}")
                 try:
-                    token_path.unlink()
+                    token_file.unlink()
                     logger.info(f"Deleted invalid tokens for user {request.user_id}")
                 except Exception:
                     pass
 
-        # Clear any pending MFA for this user
-        if request.user_id in pending_mfa:
-            del pending_mfa[request.user_id]
+        # Clear any pending MFA for this user (in memory and on disk)
+        clear_pending_mfa(request.user_id)
         
         # Create Garmin client with return_on_mfa=True
         client = Garmin(
@@ -573,62 +777,17 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
         )
         
         logger.info(f"Attempting Garmin login for user {request.user_id}")
-        
-        # Attempt login
-        # Redirect stdin to avoid EOF error when MFA is required
-        import sys
-        from io import StringIO
-        old_stdin = sys.stdin
-        sys.stdin = StringIO()  # Empty stdin to catch MFA prompt
-        
+
+        # With return_on_mfa=True the library never prompts: it returns
+        # ("needs_mfa", client_state) and resume_login() finishes the login later,
+        # on this instance or on a fresh Garmin() built from client_state.
         try:
             result = client.login()
-            sys.stdin = old_stdin  # Restore stdin
-            
-            # Check if MFA is required
-            # When return_on_mfa=True, login() returns a tuple (status, mfa_state) if MFA is needed
-            if isinstance(result, tuple) and len(result) == 2:
-                status, mfa_state = result
-                if status == "needs_mfa":
-                    logger.info(f"MFA required for user {request.user_id}")
-                    
-                    # Store pending MFA session with mfa_state
-                    pending_mfa[request.user_id] = {
-                        "client": client,
-                        "mfa_state": mfa_state,
-                        "email": request.email,
-                        "created_at": datetime.now()
-                    }
-                    
-                    return LoginResponse(
-                        success=False,
-                        message="È richiesta l'autenticazione a due fattori (MFA). Controlla la tua email e inserisci il codice ricevuto.",
-                        user_id=request.user_id,
-                        mfa_required=True
-                    )
-        except EOFError as eof_error:
-            # EOFError means MFA is required (trying to read from stdin)
-            sys.stdin = old_stdin  # Restore stdin
-            logger.info(f"MFA required for user {request.user_id} (EOFError caught)")
-            
-            # Store pending MFA session with client
-            pending_mfa[request.user_id] = {
-                "client": client,
-                "mfa_state": None,
-                "email": request.email,
-                "created_at": datetime.now()
-            }
-            
-            return LoginResponse(
-                success=False,
-                message="È richiesta l'autenticazione a due fattori (MFA). Controlla la tua email e inserisci il codice ricevuto.",
-                user_id=request.user_id,
-                mfa_required=True
-            )
         except GarminConnectTooManyRequestsError as rate_err:
-            sys.stdin = old_stdin  # Restore stdin
-            retry_after = set_rate_limit_cooldown(request.user_id)
             logger.warning(f"Login rate-limited for user {request.user_id}: {rate_err}")
+            if is_login_blocked_error(rate_err):
+                raise login_blocked_exception(request.user_id)
+            retry_after = set_rate_limit_cooldown(request.user_id)
             raise HTTPException(
                 status_code=429,
                 detail=(
@@ -637,45 +796,44 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
                 ),
                 headers={"Retry-After": str(retry_after)},
             )
-        except Exception as login_error:
-            sys.stdin = old_stdin  # Restore stdin
-            # Check if it's an MFA-related exception
-            error_msg = str(login_error).lower()
-            if "mfa" in error_msg or "multi" in error_msg or "factor" in error_msg or "verification" in error_msg or "eof" in error_msg:
-                logger.info(f"MFA required for user {request.user_id} (exception caught)")
-                
-                # Store pending MFA session with client
-                pending_mfa[request.user_id] = {
-                    "client": client,
-                    "mfa_state": None,  # Will be handled by resume_login
-                    "email": request.email,
-                    "created_at": datetime.now()
-                }
-                
-                return LoginResponse(
-                    success=False,
-                    message="È richiesta l'autenticazione a due fattori (MFA). Controlla la tua email e inserisci il codice ricevuto.",
-                    user_id=request.user_id,
-                    mfa_required=True
-                )
-            else:
-                # Re-raise if not MFA-related
-                raise login_error
-        
+
+        status, mfa_state = result if isinstance(result, tuple) and len(result) == 2 else (None, None)
+        if status == "needs_mfa":
+            logger.info(f"MFA required for user {request.user_id}")
+
+            pending_mfa[request.user_id] = {
+                "client": client,
+                "mfa_state": mfa_state,
+                "email": request.email,
+                "created_at": datetime.now()
+            }
+            # Survives a restart: /auth/mfa can resume from the encrypted file.
+            persist_mfa_state(request.user_id, mfa_state)
+
+            return LoginResponse(
+                success=False,
+                message="È richiesta l'autenticazione a due fattori (MFA). Controlla la tua email e inserisci il codice ricevuto.",
+                user_id=request.user_id,
+                mfa_required=True
+            )
+
         # Login successful without MFA
         logger.info(f"Login successful (no MFA) for user {request.user_id}")
+        # In return_on_mfa mode the library keeps the password on the object;
+        # the session no longer needs it.
+        client.password = None
         
         # Save tokens
         token_data = None
         try:
-            token_data = save_client_tokens(client, token_path)
+            token_data = save_client_tokens(client, token_dir)
             logger.info(f"Saved tokens for user {request.user_id}")
         except Exception as e:
             logger.warning(f"Could not save tokens: {e}")
         
-        # Get display name
+        # Get display name (return_on_mfa mode does not load the profile up front)
         try:
-            display_name = client.display_name
+            display_name = client.display_name or request.email
         except Exception:
             display_name = request.email
         
@@ -703,7 +861,9 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
         logger.error(f"Login error for user {request.user_id}: {error_str}")
         
         # Check for specific errors
-        if "401" in error_str or "Unauthorized" in error_str or "Authentication" in error_str:
+        if is_login_blocked_error(e):
+            raise login_blocked_exception(request.user_id)
+        elif "401" in error_str or "Unauthorized" in error_str or "Authentication" in error_str:
             raise HTTPException(
                 status_code=401,
                 detail="Credenziali Garmin non valide. Verifica email e password."
@@ -738,22 +898,39 @@ async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_ke
     try:
         logger.info(f"Completing MFA for user {request.user_id}")
         
-        # Check if we have a pending MFA session
-        if request.user_id not in pending_mfa:
-            raise HTTPException(
-                status_code=400,
-                detail="Nessuna sessione MFA in attesa. Riavvia il processo di login."
-            )
-        
-        mfa_session = pending_mfa[request.user_id]
+        # Check if we have a pending MFA session: in memory, or (after a restart)
+        # the encrypted client_state written by /auth/login.
+        mfa_session = pending_mfa.get(request.user_id)
+        if mfa_session is None:
+            persisted = load_persisted_mfa_state(request.user_id)
+            if persisted is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Nessuna sessione MFA in attesa. Riavvia il processo di login."
+                )
+            from garminconnect import Garmin
+
+            persisted_state, persisted_created_at = persisted
+            # resume_login() rebuilds the pending SSO login from client_state on
+            # any Garmin instance. Keeping the instance in pending_mfa lets a
+            # wrong code be retried on it, as with the original instance.
+            mfa_session = {
+                "client": Garmin(),
+                "mfa_state": persisted_state,
+                "email": None,
+                "created_at": datetime.fromtimestamp(persisted_created_at),
+            }
+            pending_mfa[request.user_id] = mfa_session
+            logger.info(f"Resuming MFA for user {request.user_id} from persisted state")
+
         client = mfa_session["client"]
         mfa_state = mfa_session["mfa_state"]
         email = mfa_session["email"]
         
         # Check if session is expired (10 minutes)
         created_at = mfa_session.get("created_at")
-        if created_at and (datetime.now() - created_at).total_seconds() > 600:
-            del pending_mfa[request.user_id]
+        if created_at and (datetime.now() - created_at).total_seconds() > MFA_STATE_TTL_SECONDS:
+            clear_pending_mfa(request.user_id)
             raise HTTPException(
                 status_code=400,
                 detail="La sessione MFA è scaduta. Riavvia il processo di login."
@@ -771,17 +948,22 @@ async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_ke
         except HTTPException:
             raise
         except Exception as mfa_error:
+            from garminconnect import GarminConnectAuthenticationError
+
             error_str = str(mfa_error)
             logger.error(f"MFA error for user {request.user_id}: {error_str}")
             
-            if "401" in error_str or "403" in error_str or "Invalid" in error_str or "incorrect" in error_str.lower():
+            if is_login_blocked_error(mfa_error):
+                clear_pending_mfa(request.user_id)
+                raise login_blocked_exception(request.user_id)
+            elif isinstance(mfa_error, GarminConnectAuthenticationError) or "401" in error_str or "403" in error_str or "Invalid" in error_str or "incorrect" in error_str.lower():
                 raise HTTPException(
                     status_code=401,
                     detail="Codice MFA non valido. Verifica il codice e riprova."
                 )
             elif is_rate_limit_error(error_str):
                 # Clean up on rate limit
-                del pending_mfa[request.user_id]
+                clear_pending_mfa(request.user_id)
                 retry_after = set_rate_limit_cooldown(request.user_id)
                 raise HTTPException(
                     status_code=429,
@@ -794,14 +976,14 @@ async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_ke
                     detail=f"Errore durante la verifica MFA: {error_str}"
                 )
         
-        # Clean up pending MFA
-        del pending_mfa[request.user_id]
+        # Clean up pending MFA (in memory and on disk)
+        clear_pending_mfa(request.user_id)
         
         # Save tokens
-        token_path = get_token_path(request.user_id)
+        token_dir = ensure_token_dir(request.user_id)
         token_data = None
         try:
-            token_data = save_client_tokens(client, token_path)
+            token_data = save_client_tokens(client, token_dir)
             logger.info(f"Saved tokens for user {request.user_id}")
         except Exception as e:
             logger.warning(f"Could not save tokens: {e}")
@@ -847,7 +1029,15 @@ async def get_mfa_status(user_id: str, api_key: str = Depends(verify_api_key)):
     if user_id in pending_mfa:
         created_at = pending_mfa[user_id].get("created_at")
         if created_at:
-            remaining = 600 - (datetime.now() - created_at).total_seconds()
+            remaining = MFA_STATE_TTL_SECONDS - (datetime.now() - created_at).total_seconds()
+            return {
+                "pending": True,
+                "remaining_seconds": max(0, int(remaining))
+            }
+    else:
+        persisted = load_persisted_mfa_state(user_id)
+        if persisted is not None:
+            remaining = MFA_STATE_TTL_SECONDS - (time.time() - persisted[1])
             return {
                 "pending": True,
                 "remaining_seconds": max(0, int(remaining))
@@ -863,15 +1053,15 @@ async def logout(user_id: str, api_key: str = Depends(verify_api_key)):
         del sessions[user_id]
         logger.info(f"Logged out user {user_id}")
     
-    if user_id in pending_mfa:
-        del pending_mfa[user_id]
+    clear_pending_mfa(user_id)
     
-    # Delete stored tokens
-    token_path = get_token_path(user_id)
-    try:
-        token_path.unlink(missing_ok=True)
-    except Exception:
-        pass
+    # Delete stored tokens (and any leftover pre-0.3.20 single-file store)
+    token_file = get_token_file(get_token_dir(user_id))
+    for path in (token_file, TOKEN_STORE_DIR / f"{user_id}.json"):
+        try:
+            path.unlink(missing_ok=True)
+        except Exception:
+            pass
     
     return {"success": True, "message": "Disconnesso con successo"}
 
@@ -883,20 +1073,17 @@ async def restore_session(
 ):
     """Restore Garmin session from token data stored in DB."""
     try:
-        token_path = get_token_path(request.user_id)
-        write_token_data_securely(token_path, request.token_data)
+        token_dir = ensure_token_dir(request.user_id)
+        write_token_data_securely(token_dir, request.token_data)
 
         try:
-            from garminconnect import Garmin
+            client = login_from_token_store(token_dir)
         except ImportError as e:
             logger.error(f"Failed to import garminconnect: {e}")
             raise HTTPException(
                 status_code=500,
                 detail="Garmin Connect library not available."
             )
-
-        client = Garmin()
-        client.login(str(token_path))
 
         try:
             display_name = client.display_name
@@ -927,8 +1114,7 @@ async def get_status(user_id: str, api_key: str = Depends(verify_api_key)):
     
     if not session or not session.get("client"):
         # Check if we have stored tokens
-        token_path = get_token_path(user_id)
-        if token_path.exists():
+        if get_token_file(ensure_token_dir(user_id, create=False)).exists():
             return StatusResponse(
                 connected=True,
                 email=None,
@@ -1139,17 +1325,20 @@ async def get_activity_details(
     
     try:
         logger.info(f"Fetching details for activity {activity_id}")
-        activity_details = client.get_activity_evaluation(activity_id)
+        # get_activity_evaluation() does not exist in python-garminconnect 0.3.x;
+        # the activity summary carries the average SWOLF.
+        activity_details = client.get_activity(activity_id)
         
-        logger.info(f"Activity details: {activity_details}")
-        
-        if not activity_details:
+        if not isinstance(activity_details, dict) or not activity_details:
             return {
                 "swolf_score": None
             }
         
-        # Extract SWOLF score
+        # Extract SWOLF score (top level or inside summaryDTO)
+        summary = activity_details.get("summaryDTO")
         swolf_score = activity_details.get("averageSwolf")
+        if swolf_score is None and isinstance(summary, dict):
+            swolf_score = summary.get("averageSwolf")
         
         return {
             "swolf_score": swolf_score
