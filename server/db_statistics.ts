@@ -10,6 +10,7 @@ import {
   calculateRRS, 
   calculatePOI 
 } from "./advanced_metrics";
+import { resolveBaselineRestingHr } from "./lib/resting-hr";
 
 type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
@@ -418,7 +419,7 @@ export async function getAdvancedMetrics(
 
   // RRS: Based on most recent activity
   const lastActivity = currentActivities[0];
-  const baselineRestingHR = 60;  // TODO: Get from user profile
+  const baselineRestingHR = resolveBaselineRestingHr(currentActivities);
   const hoursSinceLastWorkout = lastActivity 
     ? (Date.now() - new Date(lastActivity.activityDate).getTime()) / (1000 * 60 * 60)
     : 999;
