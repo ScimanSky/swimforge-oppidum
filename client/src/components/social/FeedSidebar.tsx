@@ -3,18 +3,14 @@ import { Link } from "wouter"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
-  Calendar,
-  Trophy,
   UserCheck,
   UserPlus,
-  Users,
   UserRoundPlus,
   ChevronRight,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
 import { getInitials } from "@/lib/format"
-import { UI_FEATURE_FLAGS } from "@/lib/feature-flags"
 import { buildFeedSidebarVm, type FeedSidebarProfileVm } from "@/lib/ui-view-models/feed-sidebar"
 import { cn } from "@/lib/utils"
 
@@ -86,12 +82,6 @@ function SuggestedUserRow({
   )
 }
 
-function clubHubIcon(icon: "calendar" | "trophy" | "users") {
-  if (icon === "calendar") return <Calendar className="size-4 text-[var(--electric-cyan)]" />
-  if (icon === "trophy") return <Trophy className="size-4 text-[var(--electric-lime)]" />
-  return <Users className="size-4 text-[var(--electric-cyan)]" />
-}
-
 export default function FeedSidebar() {
   const suggestedQuery = trpc.community.users.suggested.useQuery(
     { limit: 5 },
@@ -104,10 +94,7 @@ export default function FeedSidebar() {
   const profileQuery = trpc.profile.get.useQuery()
   const suggestedUsers = suggestedQuery.data ?? []
   const recentClubs = ((recentClubsQuery.data as any[] | undefined) ?? []).slice(0, 3)
-  const vm = buildFeedSidebarVm({
-    suggestedUsers,
-    mockSectionsEnabled: UI_FEATURE_FLAGS.mockSections,
-  })
+  const vm = buildFeedSidebarVm({ suggestedUsers })
   const profileName = profileQuery.data?.username || "You"
   const profileAvatar = profileQuery.data?.avatarUrl || null
 
@@ -156,39 +143,6 @@ export default function FeedSidebar() {
           </div>
         )}
       </div>
-
-      {vm.clubHub.length > 0 ? (
-        <div className="surface-panel p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-display font-semibold text-foreground">Club Hub</h3>
-            <Link href="/home/community" className="text-xs font-semibold text-[var(--electric-cyan)] hover:underline">
-              View All
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {vm.clubHub.map((entry) => (
-              <Link
-                key={entry.id}
-                href={entry.href}
-                className="flex items-start gap-3 rounded-xl border border-border/55 bg-background/35 px-3 py-2.5 transition-colors hover:border-[var(--electric-cyan)]/55"
-              >
-                <span className="inline-flex size-8 items-center justify-center rounded-lg border border-border/50 bg-card/55">
-                  {clubHubIcon(entry.icon)}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-foreground">{entry.title}</span>
-                  <span className="block truncate text-xs text-muted-foreground">{entry.subtitle}</span>
-                </span>
-                {entry.badge ? (
-                  <span className="rounded-full border border-border/60 px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
-                    {entry.badge}
-                  </span>
-                ) : null}
-              </Link>
-            ))}
-          </div>
-        </div>
-      ) : null}
 
       <div className="surface-panel p-4">
         <h3 className="mb-3 text-sm font-display font-semibold text-foreground">
