@@ -45,12 +45,11 @@ export { getPendingActivityInsights, listActivityInsights, markActivityInsightSe
 export { logger } from "../middleware/logger";
 export { sanitizeActivityNotes } from "../lib/sanitize";
 export { claimSeasonReward, getCurrentSeasonState, getSeasonLeaderboard, getMySeasonRank } from "../season";
+export { awardActionXp, getActionXpStatus } from "../xp_actions";
 export {
-    awardActionXp,
     claimCurrentClubQuestReward,
     createSeasonActivityPrediction,
     evaluateSeasonPredictionWithActivity,
-    getActionXpStatus,
     getCurrentClubQuestStates,
     getSeasonEngagementSnapshot,
     listSeasonActivityPredictions,
