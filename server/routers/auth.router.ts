@@ -6,6 +6,7 @@ import {
     applyRateLimit, sql,
 } from "./_shared";
 import { CSRF_COOKIE_NAME } from "@shared/const";
+import { NATIVE_CLIENT_HEADER, NATIVE_CLIENT_VALUE } from "@shared/native";
 import { getSupabaseAdminClient } from "../_core/supabase_admin";
 import { sendAccountDeletionConfirmationEmail } from "../_core/email";
 import { ENV } from "../_core/env";
@@ -207,7 +208,14 @@ export const authRouter = router({
             ctx.res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ENV.sessionMaxAgeMs });
             issueCsrfCookie(ctx.req, ctx.res);
             await ensureRequiredLegalConsents(user.id, ctx.req);
-            return { success: true, isNewUser, user: { id: user.id, email: user.email, name: user.name } };
+            const clientHeader = ctx.req.headers[NATIVE_CLIENT_HEADER];
+            const isNativeClient = (Array.isArray(clientHeader) ? clientHeader[0] : clientHeader) === NATIVE_CLIENT_VALUE;
+            return {
+                success: true,
+                isNewUser,
+                user: { id: user.id, email: user.email, name: user.name },
+                ...(isNativeClient ? { sessionToken } : {}),
+            };
         }),
 
     exportMyData: protectedProcedure.query(async ({ ctx }) => {
