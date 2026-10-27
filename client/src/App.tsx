@@ -14,6 +14,7 @@ import ActivityInsightNotification from "./components/ActivityInsightNotificatio
 import PbCelebrationNotification from "./components/PbCelebrationNotification";
 import CookieBanner from "./components/CookieBanner";
 import { UI_FEATURE_FLAGS } from "./lib/feature-flags";
+import { hideSplash, initNativeRuntime } from "./lib/native-runtime";
 
 const Home = lazy(() => import("./pages/Home"));
 const Badges = lazy(() => import("./pages/Badges"));
@@ -176,14 +177,40 @@ function ScrollToTop() {
   return null;
 }
 
+/** Native shell wiring (status bar, back button, deep links); renders nothing, no-op on the web. */
+function NativeRuntime() {
+  const [, navigate] = useLocation();
+
+  useEffect(
+    () =>
+      initNativeRuntime({
+        navigate,
+        onAuthCallback: (callback) => {
+          // Wired to the native Google sign-in in the next step.
+          console.warn("[native] auth callback not handled yet", callback.error ?? "code received");
+        },
+      }),
+    // navigate is stable in wouter's browser location hook; register the listeners once.
+    [],
+  );
+
+  return null;
+}
+
 function App() {
   const { pendingBadges, isShowing, clearBadges } = useBadgeNotifications();
+
+  // The splash is configured with launchAutoHide: false; hide it once React has rendered.
+  useEffect(() => {
+    hideSplash();
+  }, []);
 
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
           <Toaster richColors position="top-center" />
+          <NativeRuntime />
           <AutoSync />
           <BadgeUnlockWatcher />
           <ScrollToTop />
