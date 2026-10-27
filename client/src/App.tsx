@@ -95,15 +95,15 @@ function Router() {
         <Redirect to="/track" />
       </Route>
       <Route path="/badges" component={Badges} />
-      <Route path="/season/challenges" component={Challenges} />
-      <Route path="/challenges">
-        <Redirect to="/season/challenges" />
+      <Route path="/challenges" component={Challenges} />
+      <Route path="/season/challenges">
+        <Redirect to="/challenges" />
       </Route>
-      <Route path="/season/challenges/:id" component={ChallengeDetail} />
-      <Route path="/challenges/:id">{(params: { id: string }) => <Redirect to={`/season/challenges/${params.id}`} />}</Route>
-      <Route path="/season/leaderboard" component={Leaderboard} />
-      <Route path="/leaderboard">
-        <Redirect to="/season/leaderboard" />
+      <Route path="/challenges/:id" component={ChallengeDetail} />
+      <Route path="/season/challenges/:id">{(params: { id: string }) => <Redirect to={`/challenges/${params.id}`} />}</Route>
+      <Route path="/leaderboard" component={Leaderboard} />
+      <Route path="/season/leaderboard">
+        <Redirect to="/leaderboard" />
       </Route>
       <Route path="/track/:id" component={ActivityDetail} />
       <Route path="/activities/:id">{(params: { id: string }) => <Redirect to={`/track/${params.id}`} />}</Route>
@@ -111,9 +111,12 @@ function Router() {
       <Route path="/activities">
         <Redirect to="/track" />
       </Route>
-      <Route path="/season/objectives" component={Goals} />
-      <Route path="/goals">
-        <Redirect to="/season/objectives" />
+      <Route path="/goals" component={Goals} />
+      <Route path="/season/objectives">
+        <Redirect to="/goals" />
+      </Route>
+      <Route path="/season">
+        <Redirect to="/track" />
       </Route>
       <Route path="/profile/performance" component={Statistics} />
       <Route path="/statistics">

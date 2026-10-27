@@ -230,7 +230,7 @@ export default function ChallengeDetail() {
           <Button
             variant="ghost-neon"
             size="icon"
-            onClick={() => setLocation("/season/challenges")}
+            onClick={() => setLocation("/challenges")}
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>

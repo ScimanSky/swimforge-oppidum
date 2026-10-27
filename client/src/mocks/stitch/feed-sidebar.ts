@@ -22,7 +22,7 @@ export const STITCH_CLUB_HUB_ITEMS_MOCK: StitchClubHubItemMock[] = [
     title: "Weekly Virtual Race",
     subtitle: "Starts in 2 hours",
     icon: "calendar",
-    href: "/season/challenges",
+    href: "/challenges",
     badge: "+8",
   },
   {
@@ -30,7 +30,7 @@ export const STITCH_CLUB_HUB_ITEMS_MOCK: StitchClubHubItemMock[] = [
     title: "Leaderboard Update",
     subtitle: "You moved up 2 spots!",
     icon: "trophy",
-    href: "/season/leaderboard",
+    href: "/leaderboard",
   },
 ]
 

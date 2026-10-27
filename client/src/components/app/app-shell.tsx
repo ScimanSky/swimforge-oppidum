@@ -73,14 +73,12 @@ type OpenCreatePostEventDetail = {
 
 const normalizePath = (location: string) => location.split("?")[0].split("#")[0] || "/"
 
-const isChallengesPath = (path: string) =>
-  path.startsWith("/season/challenges") || path.startsWith("/challenges")
+const isChallengesPath = (path: string) => path.startsWith("/challenges")
 
 const isTrainingPath = (path: string) =>
   path.startsWith("/track") ||
   path.startsWith("/activities") ||
   path.startsWith("/coach") ||
-  path.startsWith("/season/objectives") ||
   path.startsWith("/goals") ||
   path.startsWith("/session-iq")
 
@@ -101,9 +99,7 @@ const isProfilePath = (path: string) =>
   path.startsWith("/u/") ||
   path.startsWith("/badges")
 
-const isLeaderboardPath = (path: string) =>
-  path.startsWith("/season/leaderboard") ||
-  path.startsWith("/leaderboard")
+const isLeaderboardPath = (path: string) => path.startsWith("/leaderboard")
 
 const athleteNav: NavItem[] = [
   {
@@ -139,12 +135,12 @@ const quickAccessItems: QuickAccessItem[] = [
   { label: "Attività", path: "/track", icon: <Activity className="size-4" />, match: isTrainingPath, dataTour: "track-section" },
   {
     label: "Classifica",
-    path: "/season/leaderboard",
+    path: "/leaderboard",
     icon: <Trophy className="size-4" />,
-    match: (path) => path.startsWith("/season/leaderboard") || path.startsWith("/leaderboard"),
+    match: isLeaderboardPath,
     dataTour: "global-leaderboard",
   },
-  { label: "Challenges", path: "/season/challenges", icon: <Swords className="size-4" />, match: isChallengesPath, dataTour: "challenges-list" },
+  { label: "Challenges", path: "/challenges", icon: <Swords className="size-4" />, match: isChallengesPath, dataTour: "challenges-list" },
   {
     label: "Statistics",
     path: "/profile/performance",
@@ -153,9 +149,9 @@ const quickAccessItems: QuickAccessItem[] = [
   },
   {
     label: "Obiettivi",
-    path: "/season/objectives",
+    path: "/goals",
     icon: <Target className="size-4" />,
-    match: (path) => path.startsWith("/season/objectives") || path.startsWith("/goals"),
+    match: (path) => path.startsWith("/goals"),
   },
   { label: "Badges", path: "/badges", icon: <Award className="size-4" />, match: (path) => path.startsWith("/badges"), dataTour: "badges-nav" },
   { label: "AI Coach", path: "/coach", icon: <BrainCircuit className="size-4" />, match: (path) => path.startsWith("/coach"), dataTour: "ai-coach-btn" },
@@ -168,15 +164,15 @@ function athleteTitleForPath(path: string) {
   if (path.startsWith("/community/club") && path.includes("/documents")) return "Club Documents"
   if (path.startsWith("/community/club")) return "Club Details"
   if (path.startsWith("/home/community") || path === "/community") return "Club Directory"
-  if (path.startsWith("/season/challenges/") || path.startsWith("/challenges/")) return "Challenge Details"
-  if (path.startsWith("/season/challenges") || path.startsWith("/challenges")) return "Challenges"
+  if (path.startsWith("/challenges/")) return "Challenge Details"
+  if (path.startsWith("/challenges")) return "Challenges"
   if (path === "/home") return "Social Home Feed"
   if (path.startsWith("/track/") || path.startsWith("/activities/")) return "Dettaglio Laps"
   if (path.startsWith("/track") || path.startsWith("/activities")) return "Activity Tracker"
-  if (path.startsWith("/season/objectives") || path.startsWith("/goals")) return "Training Objectives"
+  if (path.startsWith("/goals")) return "Training Objectives"
   if (path.startsWith("/coach")) return "AI Coach"
   if (path.startsWith("/badges")) return "Badges"
-  if (path.startsWith("/season/leaderboard") || path.startsWith("/leaderboard")) return "Leaderboard"
+  if (path.startsWith("/leaderboard")) return "Leaderboard"
   if (path.startsWith("/profile/performance") || path.startsWith("/statistics")) return "Performance Profile"
   if (path.startsWith("/settings")) return "Settings"
   if (path.startsWith("/profile")) return "Profile"
