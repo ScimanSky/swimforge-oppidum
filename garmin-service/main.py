@@ -25,7 +25,6 @@ Endpoints:
 
 import os
 import re
-import json
 import time
 import logging
 from datetime import datetime, timedelta
@@ -409,12 +408,19 @@ def save_client_tokens(client: Any, token_dir: Path) -> Optional[str]:
     """Persist Garmin tokens into the user's token store and return the payload.
 
     With return_on_mfa=True neither Garmin.login() nor Garmin.resume_login()
-    writes the token store themselves (only a non-MFA-mode login with a
-    tokenstore does), so the tokens are written with the library's own
-    Client.dump(), which creates <dir>/garmin_tokens.json as 0600 in a 0700 dir.
+    writes the token store or records it on the client (only a non-MFA-mode
+    login with a tokenstore does). So the tokens are written with the library's
+    Client.dump(), which creates <dir>/garmin_tokens.json as 0600 in a 0700 dir,
+    and read back with Client.load() (local file only, no network), which sets
+    the client's token store path: from then on the library writes refreshed DI
+    tokens back to <dir>/garmin_tokens.json for this in-memory session too.
     """
     secure_token_dir(token_dir)
     client.client.dump(str(token_dir))
+    try:
+        client.client.load(str(token_dir))
+    except Exception as err:
+        logger.warning(f"Could not bind Garmin session to its token store: {err}")
     secure_token_dir(token_dir)
     return read_token_data(token_dir)
 
@@ -637,7 +643,7 @@ def cleanup_expired_mfa():
     """Remove expired MFA sessions (older than 10 minutes)"""
     now = datetime.now()
     expired = []
-    for user_id, data in pending_mfa.items():
+    for user_id, data in list(pending_mfa.items()):
         created_at = data.get("created_at")
         if created_at and (now - created_at).total_seconds() > 600:  # 10 minutes
             expired.append(user_id)
@@ -655,11 +661,11 @@ def cleanup_expired_mfa():
                 logger.info(f"Deleted expired MFA state file for user {state_file.parent.name}")
 
     expired_rate_limits = []
-    for user_id, blocked_until in login_rate_limited_until.items():
+    for user_id, blocked_until in list(login_rate_limited_until.items()):
         if blocked_until <= now:
             expired_rate_limits.append(user_id)
     for user_id in expired_rate_limits:
-        del login_rate_limited_until[user_id]
+        login_rate_limited_until.pop(user_id, None)
 
 
 # API Endpoints
@@ -679,7 +685,7 @@ async def health_check():
 
 
 @app.post("/auth/login", response_model=LoginResponse)
-async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
+def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
     """
     Step 1: Authenticate with Garmin Connect
     If MFA is required, returns mfa_required=True and you must call /auth/mfa with the code
@@ -891,7 +897,7 @@ async def login(request: LoginRequest, api_key: str = Depends(verify_api_key)):
 
 
 @app.post("/auth/mfa", response_model=LoginResponse)
-async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_key)):
+def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_key)):
     """
     Step 2: Complete MFA authentication with the code received via email
     """
@@ -942,6 +948,8 @@ async def complete_mfa(request: MFARequest, api_key: str = Depends(verify_api_ke
             
             # Use resume_login to complete MFA authentication
             client.resume_login(mfa_state, request.mfa_code)
+            # The original instance still holds the password; the session no longer needs it.
+            client.password = None
             
             logger.info(f"MFA completed successfully for user {request.user_id}")
                 
@@ -1026,8 +1034,9 @@ async def get_mfa_status(user_id: str, api_key: str = Depends(verify_api_key)):
     """Check if there's a pending MFA session for a user"""
     cleanup_expired_mfa()
     
-    if user_id in pending_mfa:
-        created_at = pending_mfa[user_id].get("created_at")
+    pending = pending_mfa.get(user_id)
+    if pending is not None:
+        created_at = pending.get("created_at")
         if created_at:
             remaining = MFA_STATE_TTL_SECONDS - (datetime.now() - created_at).total_seconds()
             return {
@@ -1067,7 +1076,7 @@ async def logout(user_id: str, api_key: str = Depends(verify_api_key)):
 
 
 @app.post("/auth/restore")
-async def restore_session(
+def restore_session(
     request: RestoreRequest,
     api_key: str = Depends(verify_api_key)
 ):
@@ -1099,6 +1108,8 @@ async def restore_session(
         }
 
         return {"success": True, "message": "Sessione Garmin ripristinata"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to restore session for user {request.user_id}: {e}")
         raise HTTPException(
@@ -1132,7 +1143,7 @@ async def get_status(user_id: str, api_key: str = Depends(verify_api_key)):
 
 
 @app.get("/activities/swimming/{user_id}")
-async def get_swimming_activities(
+def get_swimming_activities(
     user_id: str,
     days_back: int = 30,
     api_key: str = Depends(verify_api_key)
@@ -1220,7 +1231,7 @@ async def get_swimming_activities(
 
 
 @app.get("/activity/{activity_id}/hr-zones")
-async def get_activity_hr_zones(
+def get_activity_hr_zones(
     activity_id: str,
     user_id: str = Header(None, alias="user-id"),
     api_key: str = Depends(verify_api_key)
@@ -1303,7 +1314,7 @@ async def get_activity_hr_zones(
 
 
 @app.get("/activity/{activity_id}/details")
-async def get_activity_details(
+def get_activity_details(
     activity_id: str,
     user_id: str = Header(None, alias="user-id"),
     api_key: str = Depends(verify_api_key)
@@ -1353,7 +1364,7 @@ async def get_activity_details(
 
 
 @app.get("/activity/{activity_id}/full")
-async def get_activity_full_details(
+def get_activity_full_details(
     activity_id: str,
     user_id: str = Header(None, alias="user-id"),
     api_key: str = Depends(verify_api_key)
@@ -1401,7 +1412,7 @@ async def get_activity_full_details(
 
 
 @app.post("/sync", response_model=SyncResponse)
-async def sync_activities(request: SyncRequest, api_key: str = Depends(verify_api_key)):
+def sync_activities(request: SyncRequest, api_key: str = Depends(verify_api_key)):
     """Sync swimming activities from Garmin Connect"""
     client = get_garmin_client(request.user_id)
     
@@ -1413,7 +1424,7 @@ async def sync_activities(request: SyncRequest, api_key: str = Depends(verify_ap
     
     try:
         # Get swimming activities
-        result = await get_swimming_activities(
+        result = get_swimming_activities(
             request.user_id,
             request.days_back,
             api_key

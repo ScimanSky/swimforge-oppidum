@@ -18,7 +18,8 @@ const configSchema = z.object({
     .min(1_000)
     .max(120_000)
     .catch(30_000),
-  GARMIN_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().catch(15_000),
+  // Garmin login strategies can wait up to 20 s each before posting credentials.
+  GARMIN_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().catch(60_000),
   EXTERNAL_API_TIMEOUT_MS: z.coerce.number().int().positive().catch(30_000),
 });
 

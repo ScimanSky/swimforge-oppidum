@@ -36,11 +36,21 @@ su Oracle `/data/tokens` nel volume `garmin_tokens`):
 ```
 
 - I login successivi usano `Garmin().login(tokenstore=str(<user_id dir>))`: la
-  libreria legge `garmin_tokens.json`, rinnova il token se sta per scadere e lo
-  riscrive lì.
-- Dopo un login con credenziali o un `resume_login()` il servizio scrive i
-  token con `client.client.dump(<dir>)`: con `return_on_mfa=True` né `login()`
-  né `resume_login()` salvano il token store da soli.
+  libreria legge `garmin_tokens.json` con `Client.load()`, che registra anche il
+  percorso del token store sul client; da quel momento ogni refresh del token
+  DI (proattivo al login o durante le chiamate API) viene riscritto lì.
+- Con `return_on_mfa=True`, invece, né `login()` (anche senza MFA: ritorna
+  prima di salvare) né `resume_login()` scrivono il token store o ne registrano
+  il percorso. Per questo `save_client_tokens()`, dopo un login con credenziali
+  o un `resume_login()` riuscito:
+  1. scrive i token con `client.client.dump(<dir>)` (file 0600, directory 0700);
+  2. li rilegge con `client.client.load(<dir>)` (solo file locale, nessuna
+     chiamata di rete), che imposta il percorso del token store sul client.
+
+  Così anche le sessioni create da `/auth/login` e `/auth/mfa` riscrivono su
+  disco i token rinnovati, come quelle ripristinate dal token store.
+- Dopo un login riuscito il servizio azzera `client.password`: in modalità
+  `return_on_mfa` la libreria non lo fa da sola.
 - Il contenuto di `garmin_tokens.json` è il `token_data` restituito al server
   Node (che lo salva cifrato nel DB con prefisso `garmin:`) e rimandato a
   `POST /auth/restore` dopo un riavvio.
@@ -87,6 +97,15 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 Se manca o non è valida il servizio parte comunque, con un warning, e tiene lo
 stato MFA solo in memoria (perso a ogni riavvio). Cambiare la chiave invalida
 solo gli eventuali login MFA in corso.
+
+## Concorrenza e timeout
+
+Gli endpoint che chiamano la libreria (`/auth/login`, `/auth/mfa`,
+`/auth/restore`, `/activities/...`, `/activity/...`, `/sync`) sono funzioni
+`def` normali: FastAPI le esegue nel suo threadpool, quindi un login che aspetta
+10-20 s nella strategia "portal" non blocca `/health` né le altre richieste.
+Il server Node aspetta il servizio per `GARMIN_SERVICE_TIMEOUT_MS` (default
+60000 ms), abbastanza per l'intera catena di strategie.
 
 ## Errori di Garmin
 
