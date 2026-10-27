@@ -23,7 +23,7 @@ const featureCards = [
   {
     tag: "Social & Club",
     title: "Allenati insieme, migliora di piu.",
-    body: "Feed social, sfide classiche e ghost, club e confronto con nuotatori del tuo livello.",
+    body: "Feed social, sfide con la community, club e confronto con nuotatori del tuo livello.",
     image: "/images/landing-v5/feature-social-club.webp",
     alt: "Squadra nuoto e coach durante briefing tecnico",
   },
@@ -43,7 +43,7 @@ const workflowSteps = [
   {
     step: "03",
     title: "Challenge",
-    body: "Trasforma i dati in sfide: ghost track, classiche e obiettivi settimanali.",
+    body: "Trasforma i dati in sfide: community, classifica e obiettivi settimanali.",
   },
   {
     step: "04",
@@ -138,7 +138,7 @@ export default function Home() {
               </p>
               <div className="flex flex-wrap gap-2 text-xs uppercase tracking-[0.14em] text-cyan-100/85">
                 <span className="rounded-full border border-cyan-100/25 bg-cyan-300/10 px-3 py-1">XP & Badge</span>
-                <span className="rounded-full border border-cyan-100/25 bg-cyan-300/10 px-3 py-1">Ghost + Classiche</span>
+                <span className="rounded-full border border-cyan-100/25 bg-cyan-300/10 px-3 py-1">Sfide & Classifica</span>
                 <span className="rounded-full border border-cyan-100/25 bg-cyan-300/10 px-3 py-1">Social Feed</span>
                 <span className="rounded-full border border-cyan-100/25 bg-cyan-300/10 px-3 py-1">Club Ranking</span>
               </div>
@@ -169,7 +169,7 @@ export default function Home() {
                 <p className="text-xl font-semibold text-cyan-200">+48</p>
               </div>
               <div className="absolute bottom-4 right-4 rounded-xl border border-cyan-100/30 bg-[#062032]/80 px-3 py-2 backdrop-blur">
-                <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/80">Ghost Challenge</p>
+                <p className="text-[10px] uppercase tracking-[0.18em] text-cyan-100/80">Sfida community</p>
                 <p className="text-sm font-semibold text-white">Rivincita pronta</p>
               </div>
             </figure>
@@ -195,7 +195,7 @@ export default function Home() {
                 <Trophy className="size-4" />
               </div>
               <p className="text-xl font-semibold text-white">Sfide</p>
-              <p className="mt-1 text-xs text-slate-200/80">Ghost e classiche con classifica aggiornata</p>
+              <p className="mt-1 text-xs text-slate-200/80">Sfide con la community e classifica aggiornata</p>
             </article>
             <article className="landing-reveal rounded-xl border border-cyan-100/15 bg-cyan-400/10 p-4" style={{ animationDelay: "400ms" }}>
               <div className="mb-2 inline-flex rounded-lg bg-cyan-300/15 p-2 text-cyan-200">

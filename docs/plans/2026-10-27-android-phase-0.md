@@ -82,7 +82,7 @@ git add -A && git commit -m "chore: remove unreferenced pages, components and ho
 - Delete: `client/src/components/ghost-track/` (cartella), `server/db_ghost_challenges.ts`
 - Modify: `client/src/pages/Challenges.tsx:43` (import GhostTrackTab), `:181` (`useState("ghost")` → `useState("classic")`), `:349` (testo "Ghost Track e sfide classiche…" → "Le tue sfide con la community."), `:380-385` (TabsList/TabsContent "ghost")
 - Modify: `server/routers/community.router.ts:805-883` (procedure `ghostChallenges` e `ghostTrack`) e i relativi import di `db_ghost_challenges`
-- Modify: `client/src/lib/product_analytics.ts:17-18` (eventi `ghost_duel_create`, `ghost_track_open`)
+- Modify: `server/product_analytics.ts:17-18` (eventi `ghost_duel_create`, `ghost_track_open`)
 - Keep: `drizzle/schema.ts:151` tabella `ghost_challenges`; `server/routers/auth.router.ts:337` (delete righe nel reset) resta.
 
 **Step 1:** Rimuovere la tab: in `Challenges.tsx` lasciare una sola `TabsList` con `classic` o, meglio, eliminare `Tabs` e rendere il contenuto "classic" il corpo della pagina. Lo stato `sectionTab` sparisce.
