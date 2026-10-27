@@ -35,7 +35,7 @@ Implicazioni tecniche da gestire (tutte note, nessuna bloccante):
   `npx cap sync android` → Android Studio/Gradle. JDK 17/21 e Android SDK sono già sul PC.
 - **Bundle incluso nell'APK** (avvio immediato, shell offline) con aggiornamenti via Play.
   Niente caricamento remoto del sito.
-- **Backend invariato** su Render; valutare un piano senza cold start, perché un'app
+- **Backend invariato** su Oracle (docker compose); valutare un piano senza cold start, perché un'app
   nativa che resta "a caricare" 30 s al primo avvio viene disinstallata.
 
 ## 2. Stato di partenza (sintesi)

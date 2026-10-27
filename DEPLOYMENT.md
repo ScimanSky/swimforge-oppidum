@@ -1,6 +1,6 @@
 # SwimForge Oppidum - Deployment Guide
 
-This guide reflects the current production architecture used by this repository.
+> **Production runs on Oracle.** Deploys happen through `.github/workflows/deploy-oracle.yml` on every push to `main` (docker compose on the Oracle host + health check on `https://swimforge.it/ready`); see `docs/ORACLE_DEPLOYMENT.md`. The Render sections below are historical.
 
 ## Target Architecture
 - Main app (frontend + backend): Render Web Service (Node)
@@ -118,7 +118,6 @@ Cron routes require `Authorization: Bearer <CRON_SECRET>`.
 Available cron endpoints:
 - `POST /api/cron/complete-challenges`
 - `POST /api/cron/evaluate-skill-level`
-- `POST /api/cron/cleanup-expired-stories`
 - `POST /api/cron/cleanup-social-retention`
 - `POST /api/cron/club-ai/tick`
 

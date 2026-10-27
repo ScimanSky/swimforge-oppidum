@@ -157,7 +157,6 @@ Configura due monitor separati:
 ```cron
 */10 * * * * curl -fsS -X POST "https://<your-domain>/api/cron/complete-challenges" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
 0 2 * * * curl -fsS -X POST "https://<your-domain>/api/cron/evaluate-skill-level" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
-15 2 * * * curl -fsS -X POST "https://<your-domain>/api/cron/cleanup-expired-stories" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
 30 2 * * * curl -fsS -X POST "https://<your-domain>/api/cron/cleanup-social-retention" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
 */15 6-8 * * 1,3,5 curl -fsS -X POST "https://<your-domain>/api/cron/club-ai/tick" -H "Authorization: Bearer <CRON_SECRET>" > /dev/null
 ```
