@@ -16,4 +16,13 @@ describe("buildApiUrl", () => {
       "https://swimforge.it/api/link-preview?url=x",
     );
   });
+  it("returns absolute, protocol-relative and empty values unchanged", () => {
+    expect(buildApiUrl("https://swimforge.it", "https://cdn.example.com/a.png")).toBe("https://cdn.example.com/a.png");
+    expect(buildApiUrl("https://swimforge.it", "//cdn.example.com/a.png")).toBe("//cdn.example.com/a.png");
+    expect(buildApiUrl("https://swimforge.it", "")).toBe("");
+  });
+  it("returns data: and blob: URLs unchanged", () => {
+    expect(buildApiUrl("https://swimforge.it", "data:image/png;base64,AAAA")).toBe("data:image/png;base64,AAAA");
+    expect(buildApiUrl("https://swimforge.it", "blob:https://app.swimforge.it/123")).toBe("blob:https://app.swimforge.it/123");
+  });
 });

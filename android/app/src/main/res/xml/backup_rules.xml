@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API <= 30 (android:fullBackupContent). allowBackup is false, these exclusions are a
+     second line of defence: the native session token lives in the CapacitorStorage shared
+     preferences (@capacitor/preferences), the Supabase session in the WebView storage. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="CapacitorStorage.xml" />
+    <exclude domain="root" path="app_webview/" />
+</full-backup-content>

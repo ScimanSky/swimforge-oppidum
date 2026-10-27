@@ -230,7 +230,7 @@ export function LinkPreviewCard({
   const title = remotePreview?.title ?? preview.pathLabel;
   const description = remotePreview?.description;
   const siteName = remotePreview?.siteName ?? preview.host;
-  const imageSrc = remotePreview?.imageProxyUrl ?? remotePreview?.imageUrl;
+  const imageSrc = remotePreview?.imageProxyUrl ? apiUrl(remotePreview.imageProxyUrl) : remotePreview?.imageUrl;
   const initial = siteName.trim().slice(0, 1).toUpperCase() || preview.host.slice(0, 1).toUpperCase();
 
   return (

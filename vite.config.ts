@@ -150,7 +150,26 @@ function vitePluginManusDebugCollector(): Plugin {
   };
 }
 
-const plugins = [react(), tailwindcss(), jsxLocPlugin()];
+/**
+ * In the `native` mode, writes dist/public/.native-build so that
+ * scripts/prune-native-bundle.mjs can refuse to prune a web build.
+ */
+function nativeBuildMarker(): Plugin {
+  let isNative = false;
+  return {
+    name: "native-build-marker",
+    apply: "build",
+    configResolved(config) {
+      isNative = config.mode === "native";
+    },
+    generateBundle() {
+      if (!isNative) return;
+      this.emitFile({ type: "asset", fileName: ".native-build", source: "native\n" });
+    },
+  };
+}
+
+const plugins = [react(), tailwindcss(), jsxLocPlugin(), nativeBuildMarker()];
 
 // Only include Manus debug plugins in development
 if (process.env.NODE_ENV !== 'production') {

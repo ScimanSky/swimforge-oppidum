@@ -36,6 +36,13 @@ if (!fs.existsSync(path.join(OUT_DIR, "index.html"))) {
   process.exit(1);
 }
 
+// Written only by `vite build --mode native` (vite.config.ts, nativeBuildMarker):
+// a web build in dist/public must never lose its static folders.
+if (!fs.existsSync(path.join(OUT_DIR, ".native-build"))) {
+  console.error(`prune-native-bundle: ${OUT_DIR}/.native-build not found, dist/public is not a native build, not pruning`);
+  process.exit(1);
+}
+
 for (const folder of [...REMOTE_FOLDERS, ...UNUSED_FILES]) {
   const target = path.join(OUT_DIR, folder);
   if (!fs.existsSync(target)) continue;
