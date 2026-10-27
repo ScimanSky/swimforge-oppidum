@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Dettaglio sessione</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Manrope:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#34C6EB}a:hover{color:#7FDCF3}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #0A1520; color: #ECF3F8; font-family: Manrope, system-ui, sans-serif">
+
+  <header style="height: 56px; padding: 0 6px; display: flex; align-items: center; justify-content: space-between">
+    <a href="Attivita.dc.html" aria-label="Indietro" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #ECF3F8">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg>
+    </a>
+    <span style="font-size: 15px; font-weight: 700">Sessione</span>
+    <button aria-label="Altre azioni" style="width: 44px; height: 44px; border: 0; background: transparent; color: #ECF3F8; display: flex; align-items: center; justify-content: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg>
+    </button>
+  </header>
+
+  <section style="padding: 4px 16px 0; display: flex; flex-direction: column; gap: 6px">
+    <span style="font-size: 13px; color: #93A6B8">lun 27 ott · 10:47 · Vasca 25m · Garmin</span>
+    <h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 34px; line-height: 1.05">Soglia 10×200</h1>
+    <div style="display: flex; gap: 8px; margin-top: 4px">
+      <span style="padding: 5px 11px; border-radius: 999px; background: rgba(255,139,71,0.14); color: #FF8B47; font-size: 13px; font-weight: 700">+180 XP</span>
+      <span style="padding: 5px 11px; border-radius: 999px; background: rgba(92,214,160,0.14); color: #5CD6A0; font-size: 13px; font-weight: 700">Record 200m</span>
+    </div>
+  </section>
+
+  <section style="margin: 16px 16px 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: #233649; border: 1px solid #233649; border-radius: 16px; overflow: hidden">
+    <sc-for list="{{metrics}}" as="m" hint-placeholder-count="6">
+      <div style="background: #111E2B; padding: 14px 12px">
+        <div style="font-family: 'Barlow Condensed', sans-serif; font-size: 28px; font-weight: 700; line-height: 1; color: {{m.color}}">{{m.v}}<span style="font-size: 14px; color: #93A6B8; font-weight: 600"> {{m.u}}</span></div>
+        <div style="font-size: 12px; color: #93A6B8; margin-top: 5px">{{m.l}}</div>
+      </div>
+    </sc-for>
+  </section>
+
+  <section style="margin: 16px 16px 0; padding: 16px; background: #111E2B; border: 1px solid #233649; border-radius: 16px">
+    <div style="display: flex; justify-content: space-between; align-items: baseline">
+      <h2 style="margin: 0; font-size: 16px; font-weight: 700">Passo per ripetuta</h2>
+      <span style="font-size: 12px; color: #93A6B8">obiettivo 1:50</span>
+    </div>
+    <div style="position: relative; margin-top: 14px; height: 110px; display: flex; align-items: flex-end; gap: 7px">
+      <div style="position: absolute; left: 0; right: 0; bottom: 82px; border-top: 1px dashed #4A6178"></div>
+      <sc-for list="{{reps}}" as="r" hint-placeholder-count="10">
+        <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px">
+          <div style="width: 100%; height: {{r.h}}; border-radius: 6px 6px 3px 3px; background: {{r.color}}"></div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: #93A6B8"><span>Rip. 1</span><span>Più veloce: rip. 7 · 1:47</span><span>10</span></div>
+  </section>
+
+  <section style="margin: 16px 16px 0; padding: 16px; background: #111E2B; border: 1px solid #233649; border-radius: 16px">
+    <h2 style="margin: 0; font-size: 16px; font-weight: 700">Zone cardio</h2>
+    <div style="display: flex; height: 12px; border-radius: 99px; overflow: hidden; margin-top: 12px; gap: 2px">
+      <div style="width: 8%; background: #3D5770"></div>
+      <div style="width: 22%; background: #2C8FB8"></div>
+      <div style="width: 38%; background: #34C6EB"></div>
+      <div style="width: 24%; background: #FFB27A"></div>
+      <div style="width: 8%; background: #FF8B47"></div>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-top: 10px; font-size: 12px; color: #93A6B8">
+      <span>Z1 8%</span><span>Z2 22%</span><span style="color: #ECF3F8; font-weight: 700">Z3 38%</span><span>Z4 24%</span><span>Z5 8%</span>
+    </div>
+  </section>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 24px; background: linear-gradient(180deg, rgba(10,21,32,0), #0A1520 30%); display: flex; gap: 10px">
+    <button style="flex: 1; height: 50px; border: 0; border-radius: 14px; background: #34C6EB; color: #062030; font: 700 15px Manrope, sans-serif">Condividi nel feed</button>
+    <button aria-label="Chiedi al Coach AI" style="width: 50px; height: 50px; border: 1px solid #2E465C; border-radius: 14px; background: #111E2B; color: #ECF3F8; display: flex; align-items: center; justify-content: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"></path><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"></path></svg>
+    </button>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const metrics = [
+      { v: '3,2', u: 'km', l: 'Distanza', color: '#ECF3F8' },
+      { v: '1:02', u: 'h', l: 'Durata', color: '#ECF3F8' },
+      { v: '1:52', u: '/100', l: 'Passo medio', color: '#34C6EB' },
+      { v: '142', u: 'bpm', l: 'FC media', color: '#ECF3F8' },
+      { v: '171', u: 'bpm', l: 'FC massima', color: '#ECF3F8' },
+      { v: '540', u: 'kcal', l: 'Calorie', color: '#ECF3F8' }
+    ];
+    const secs = [114, 112, 111, 112, 110, 109, 107, 110, 111, 113];
+    const reps = secs.map((s) => ({ h: (40 + (116 - s) * 7) + 'px', color: s <= 110 ? '#34C6EB' : '#2A5670' }));
+    return { metrics, reps };
+  }
+}
+</script>
+</body>
+</html>

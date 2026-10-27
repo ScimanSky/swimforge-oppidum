@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Attività</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Manrope:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#34C6EB}a:hover{color:#7FDCF3}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: {{c.bg}}; color: {{c.text}}; font-family: Manrope, system-ui, sans-serif">
+
+  <header style="height: 60px; padding: 0 16px; display: flex; align-items: center; justify-content: space-between">
+    <h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 30px; letter-spacing: -0.2px">Allenamento</h1>
+    <div style="display: flex; gap: 4px; align-items: center">
+      <button aria-label="Notifiche" style="width: 44px; height: 44px; border: 0; background: transparent; color: {{c.text}}; display: flex; align-items: center; justify-content: center; border-radius: 12px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+      </button>
+      <button aria-label="Profilo" style="width: 36px; height: 36px; border: 0; border-radius: 99px; background: {{c.raised}}; color: {{c.text}}; font: 700 13px Manrope, sans-serif">MR</button>
+    </div>
+  </header>
+
+  <nav aria-label="Sezioni allenamento" style="display: flex; gap: 22px; padding: 0 16px; border-bottom: 1px solid {{c.line}}">
+    <a href="#" style="padding: 10px 0 12px; font-size: 15px; font-weight: 700; color: {{c.text}}; text-decoration: none; border-bottom: 2px solid {{c.accent}}">Sessioni</a>
+    <a href="#" style="padding: 10px 0 12px; font-size: 15px; font-weight: 600; color: {{c.muted}}; text-decoration: none">Obiettivi</a>
+    <a href="#" style="padding: 10px 0 12px; font-size: 15px; font-weight: 600; color: {{c.muted}}; text-decoration: none">Statistiche</a>
+    <a href="#" style="padding: 10px 0 12px; font-size: 15px; font-weight: 600; color: {{c.muted}}; text-decoration: none">Coach AI</a>
+  </nav>
+
+  <section style="margin: 16px 16px 0; padding: 16px; background: {{c.surface}}; border: 1px solid {{c.line}}; border-radius: 16px; display: flex; gap: 16px; align-items: flex-end">
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 10px">
+      <span style="font-size: 13px; font-weight: 600; color: {{c.muted}}">Questa settimana</span>
+      <div style="display: flex; align-items: baseline; gap: 6px">
+        <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 44px; line-height: 0.9">12,7</span>
+        <span style="font-size: 15px; color: {{c.muted}}">km su 15</span>
+      </div>
+      <div style="display: flex; gap: 14px; font-size: 13px; color: {{c.muted}}">
+        <span><b style="color: {{c.text}}">4</b> sessioni</span>
+        <span><b style="color: {{c.xp}}">+620</b> XP</span>
+      </div>
+    </div>
+    <div style="display: flex; gap: 6px; align-items: flex-end; height: 76px">
+      <sc-for list="{{week}}" as="d" hint-placeholder-count="7">
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 6px">
+          <div style="width: 16px; height: {{d.h}}; border-radius: 5px; background: {{d.color}}"></div>
+          <span style="font-size: 12px; color: {{c.muted}}">{{d.l}}</span>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <div style="margin: 16px 16px 0; display: flex; gap: 8px">
+    <div role="tablist" aria-label="Tipo di nuoto" style="flex: 1; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 4px; background: {{c.surface}}; border: 1px solid {{c.line}}; border-radius: 12px">
+      <button role="tab" aria-selected="true" style="height: 36px; border: 0; border-radius: 9px; background: {{c.text}}; color: {{c.bg}}; font: 700 14px Manrope, sans-serif">Tutte</button>
+      <button role="tab" aria-selected="false" style="height: 36px; border: 0; border-radius: 9px; background: transparent; color: {{c.muted}}; font: 600 14px Manrope, sans-serif">Vasca</button>
+      <button role="tab" aria-selected="false" style="height: 36px; border: 0; border-radius: 9px; background: transparent; color: {{c.muted}}; font: 600 14px Manrope, sans-serif">Acque libere</button>
+    </div>
+    <button aria-label="Ordina" style="width: 46px; border: 1px solid {{c.line}}; border-radius: 12px; background: {{c.surface}}; color: {{c.text}}; display: flex; align-items: center; justify-content: center">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"></path><path d="M6 12h12"></path><path d="M10 18h4"></path></svg>
+    </button>
+  </div>
+
+  <div style="margin: 14px 16px 0; display: flex; flex-direction: column; gap: 10px">
+    <sc-for list="{{sessions}}" as="s" hint-placeholder-count="4">
+      <a href="Sessione.dc.html" style="display: flex; flex-direction: column; gap: 12px; padding: 14px; background: {{c.surface}}; border: 1px solid {{c.line}}; border-radius: 16px; text-decoration: none; color: {{c.text}}">
+        <div style="display: flex; gap: 12px; align-items: center">
+          <div style="width: 44px; height: 44px; border-radius: 11px; background: {{s.thumb}}; display: flex; align-items: center; justify-content: center; color: #E6F7FD; flex-shrink: 0">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 8c2 0 2-1.5 4-1.5S8 8 10 8s2-1.5 4-1.5S16 8 18 8s2-1.5 4-1.5"></path><path d="M2 13c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"></path><path d="M2 18c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"></path></svg>
+          </div>
+          <div style="flex: 1; min-width: 0">
+            <div style="font-size: 16px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{s.name}}</div>
+            <div style="font-size: 13px; color: {{c.muted}}; margin-top: 2px">{{s.when}}</div>
+          </div>
+          <span style="padding: 4px 10px; border-radius: 999px; background: {{c.xpBg}}; color: {{c.xp}}; font-size: 13px; font-weight: 700">+{{s.xp}}</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
+          <div><div style="font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 700; line-height: 1">{{s.km}}<span style="font-size: 14px; color: {{c.muted}}"> km</span></div><div style="font-size: 12px; color: {{c.muted}}; margin-top: 3px">Distanza</div></div>
+          <div><div style="font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 700; line-height: 1">{{s.dur}}</div><div style="font-size: 12px; color: {{c.muted}}; margin-top: 3px">Durata</div></div>
+          <div><div style="font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 700; line-height: 1; color: {{c.accentText}}">{{s.pace}}</div><div style="font-size: 12px; color: {{c.muted}}; margin-top: 3px">Passo /100</div></div>
+          <div><div style="font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 700; line-height: 1">{{s.hr}}</div><div style="font-size: 12px; color: {{c.muted}}; margin-top: 3px">FC media</div></div>
+        </div>
+      </a>
+    </sc-for>
+  </div>
+
+  <nav aria-label="Navigazione principale" style="position: absolute; left: 0; right: 0; bottom: 0; height: 84px; box-sizing: border-box; padding: 8px 8px 20px; background: {{c.nav}}; border-top: 1px solid {{c.line}}; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center">
+    <a href="Feed.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: {{c.muted}}; font-size: 12px; font-weight: 600">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>Home</a>
+    <a href="Attivita.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: {{c.accentText}}; font-size: 12px; font-weight: 700">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M2 9c2 0 2-1.5 4-1.5S8 9 10 9s2-1.5 4-1.5S16 9 18 9s2-1.5 4-1.5"></path><path d="M2 15c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"></path></svg>Allenamento</a>
+    <div style="display: flex; justify-content: center">
+      <button aria-label="Registra o crea" style="width: 52px; height: 52px; border: 0; border-radius: 16px; background: {{c.accent}}; color: #062030; display: flex; align-items: center; justify-content: center">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+      </button>
+    </div>
+    <a href="Season.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: {{c.muted}}; font-size: 12px; font-weight: 600">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"></path><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"></path></svg>Season</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: {{c.muted}}; font-size: 12px; font-weight: 600">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"></path></svg>Club</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"light":{"editor":"boolean","default":false},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const light = this.props.light ?? false;
+    const c = light
+      ? { bg: '#F4F7F9', surface: '#FFFFFF', raised: '#E7EDF2', line: '#DCE4EA', text: '#0D1B27', muted: '#556677', accent: '#34C6EB', accentText: '#0577A8', xp: '#C2500F', xpBg: 'rgba(194,80,15,0.10)', nav: '#FFFFFF', bar: '#C9D6E0' }
+      : { bg: '#0A1520', surface: '#111E2B', raised: '#182838', line: '#233649', text: '#ECF3F8', muted: '#93A6B8', accent: '#34C6EB', accentText: '#34C6EB', xp: '#FF8B47', xpBg: 'rgba(255,139,71,0.14)', nav: '#0A1520', bar: '#2A3F54' };
+    const vals = [['L', 30], ['M', 0], ['M', 24], ['G', 0], ['V', 40], ['S', 28], ['D', 32]];
+    const week = vals.map(([l, km], i) => ({ l, h: Math.max(4, km * 1.4) + 'px', color: i === 6 ? c.accent : (km ? c.bar : c.line) }));
+    const sessions = [
+      { name: 'Soglia 10×200', when: 'lun 27 ott · 10:47 · Vasca 25m', xp: 180, km: '3,2', dur: '1:02 h', pace: '1:52', hr: '142', thumb: 'linear-gradient(160deg, #1F7FA6, #0E3B52)' },
+      { name: 'Tecnica + gambe', when: 'dom 26 ott · 9:15 · Vasca 25m', xp: 120, km: '2,4', dur: '50 min', pace: '2:05', hr: '131', thumb: 'linear-gradient(160deg, #1F7FA6, #0E3B52)' },
+      { name: 'Lago di Garda', when: 'sab 25 ott · 8:30 · Acque libere', xp: 160, km: '2,8', dur: '56 min', pace: '2:00', hr: '138', thumb: 'linear-gradient(160deg, #1C9C8A, #0C4A47)' },
+      { name: 'Endurance lunga', when: 'gio 23 ott · 19:05 · Vasca 50m', xp: 220, km: '4,0', dur: '1:20 h', pace: '2:00', hr: '136', thumb: 'linear-gradient(160deg, #1F7FA6, #0E3B52)' }
+    ];
+    return { c, week, sessions };
+  }
+}
+</script>
+</body>
+</html>

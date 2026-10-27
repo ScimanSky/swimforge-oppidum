@@ -121,10 +121,26 @@ commit e push. Stime in giorni di lavoro effettivo con Claude Code.
 - Gate: l'app installata sul Pixel fa login, sync Garmin, feed, DM, con push ricevuta.
 
 ### Fase 2 — Nuova veste grafica (3-4 giorni, in parallelo a 0-1)
-- Produco 2-3 direzioni visive come prototipo navigabile (home "Oggi", attività,
-  sessione, bordo vasca, profilo). Tu scegli; poi applico la direzione scelta alle
-  schermate P1 mentre le costruisco, non prima. Vincoli: dark-first, contrasto alto per
-  bordo vasca bagnato, target touch ≥ 48 dp, navigazione a 4-5 tab in basso.
+- Base scelta: la proposta **«Corsia»** (`docs/design-proposals/claude-corsia/`, 27/10):
+  un accento azzurro `#34C6EB` per le azioni, arancio `#FF8B47` solo per XP e record,
+  Barlow Condensed per numeri e titoli, Manrope per il testo, niente glow né gradienti,
+  mai testo su foto, tutto in italiano, tema scuro + chiaro «Cloro». L'audit incluso
+  (font mai caricati, cinque accenti neon, nav duplicata, lingua mista) è corretto.
+- Adattamenti obbligatori rispetto alle tavole, per coerenza con le decisioni del 27/10:
+  1. la tab **Season** sparisce (stagioni rimosse): il suo contenuto utile (livello, XP al
+     prossimo livello, posizione in classifica, badge, sfide) va in una tab
+     **Community** insieme ai club, oppure nel profilo;
+  2. la **Home** non è il feed: è la schermata **"Oggi"** (sessione di oggi, ultima
+     attività, carico settimana, 4 azioni rapide); il feed diventa la seconda tab e
+     perde la riga delle storie;
+  3. navigazione proposta: **Oggi · Feed · + · Allena · Community**, con Allena che
+     raccoglie Sessioni, Attività, Statistiche e Coach AI;
+  4. mancano le tavole del cuore allenamento (fase 3): libreria/creazione sessione,
+     calendario, modalità bordo vasca, velocità critica e zone: vanno disegnate con lo
+     stesso sistema prima di implementarle;
+  5. nell'app Capacitor i font vanno inclusi nel bundle (niente Google Fonts a runtime).
+- Vincoli invariati: dark-first, contrasto alto per bordo vasca bagnato, target touch
+  ≥ 48 dp, 5 tab in basso.
 
 ### Fase 3 — Cuore allenamento (5-7 giorni)
 - Sessione personale (§4 #1), creazione Scrivi/Fotografa/AI (#2), calendario e
