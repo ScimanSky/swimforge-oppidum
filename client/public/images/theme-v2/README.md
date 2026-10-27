@@ -3,7 +3,6 @@ Inserisci qui le nuove immagini del tema v2 con questi nomi esatti:
 - dashboard-hero.png
 - activities-hero.png
 - challenges-hero.png
-- season-hero.png
 - badges-hero.png
 - community-hero.png
 - club-detail-hero.png
