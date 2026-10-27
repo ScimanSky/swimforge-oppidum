@@ -14,7 +14,7 @@ const scenes = [
     subtitle: "Feed completo con foto, video, tag e reazioni.",
   },
   {
-    title: "Sblocca Season e obiettivi",
+    title: "Sblocca badge e obiettivi",
     subtitle: "Segui il piano, guadagna XP e migliora con costanza.",
   },
   {

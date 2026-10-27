@@ -8,12 +8,10 @@ import {
   Lock,
   X,
   Sparkles,
-  Orbit,
 } from "lucide-react";
 import { Redirect } from "wouter";
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
-import { getSeasonAssignmentImageUrl } from "@/lib/seasonBadgeImages";
 import { AppLayout } from "@/components/AppLayout";
 import { createPortal } from "react-dom";
 
@@ -28,7 +26,6 @@ const categoryLabels: Record<string, string> = {
   special: "Speciali",
   milestone: "Traguardi",
   achievement: "Achievement",
-  season: "Season",
 };
 
 const rarityLabels: Record<string, string> = {
@@ -88,12 +85,6 @@ export default function Badges() {
     undefined,
     { enabled: isAuthenticated }
   );
-  const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
-    enabled: isAuthenticated,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-    refetchOnWindowFocus: true,
-  });
   const { data: achievementDefinitions, isLoading: achievementsLoading } =
     trpc.badges.getAchievementBadgeDefinitions.useQuery(undefined, { enabled: isAuthenticated });
   const { data: userAchievementBadges } =
@@ -128,43 +119,9 @@ export default function Badges() {
     });
   }, [achievementDefinitions, userAchievementBadges]);
 
-  const seasonBadges = useMemo(() => {
-    const season = seasonQuery.data;
-    if (!season?.badgeAssignments?.length) return [];
-
-    const seasonStats = season.seasonStats ?? {};
-    const level = Number(season.progress?.currentLevel ?? 1);
-
-    const metricValue = (metric: string): number => {
-      if (metric === "seasonLevel") return level;
-      return Number((seasonStats as Record<string, unknown>)[metric] ?? 0);
-    };
-
-    return (season.badgeAssignments as any[]).map((assignment) => {
-      const current = metricValue(String(assignment.metric));
-      const target = Math.max(1, Number(assignment.target ?? 1));
-      const progress = Math.min(100, Math.round((current / target) * 100));
-      const earned = current >= target;
-      return {
-        id: `season-${assignment.code}`,
-        code: String(assignment.code),
-        name: String(assignment.name),
-        description: String(assignment.objective),
-        category: "season",
-        rarity: String(assignment.rarity ?? "rare"),
-        requirementType: "season_assignment",
-        requirementValue: target,
-        earned,
-        progress,
-        earnedAt: earned ? new Date().toISOString() : null,
-        image_url: getSeasonAssignmentImageUrl(String(assignment.code)),
-      };
-    });
-  }, [seasonQuery.data]);
-
   const allBadges = useMemo(() => {
-    return [...(badgeProgress || []), ...achievementBadges, ...seasonBadges];
-  }, [badgeProgress, achievementBadges, seasonBadges]);
+    return [...(badgeProgress || []), ...achievementBadges];
+  }, [badgeProgress, achievementBadges]);
 
   // Filter badges by category
   const filteredBadges = allBadges.filter(
@@ -361,29 +318,6 @@ export default function Badges() {
               className="xp-bar-fill" 
               style={{ width: `${(earnedCount / Math.max(totalCount, 1)) * 100}%` }}
             />
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="neon-card p-4"
-        >
-          <div className="flex flex-col gap-3">
-            <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                <Orbit className="size-3.5 text-primary" />
-                Season attiva
-              </div>
-              <p className="text-sm font-semibold text-foreground mt-1">
-                {seasonQuery.data?.season?.name ?? "Season Electric Ice"}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Lv {seasonQuery.data?.progress?.currentLevel ?? 1} ·{" "}
-                {Number(seasonQuery.data?.progress?.seasonXp ?? 0).toLocaleString()} XP ·{" "}
-                {seasonQuery.data?.season?.remainingDays ?? 0} giorni rimanenti
-              </p>
-            </div>
           </div>
         </motion.div>
 

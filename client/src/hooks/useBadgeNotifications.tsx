@@ -7,7 +7,7 @@ export interface BadgeNotificationItem {
   description: string;
   image_url: string;
   rarity?: string;
-  category?: "classic" | "achievement" | "season";
+  category?: "classic" | "achievement";
 }
 
 interface BadgeNotificationStore {

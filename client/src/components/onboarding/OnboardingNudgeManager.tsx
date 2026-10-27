@@ -63,11 +63,6 @@ export function OnboardingNudgeManager({ userId }: Props) {
 
     const candidates: Array<{ id: NudgeId; message: string; condition: boolean }> = [
       {
-        id: "first-season",
-        message: "Partecipa alla Season! +50 XP ti aspettano in classifica.",
-        condition: activityCount >= 1 && !shownNudges.includes("first-season"),
-      },
-      {
         id: "try-coach",
         message: "Hai gia 3 attivita! Prova l'AI Coach per un piano personalizzato.",
         condition: activityCount >= 3 && !shownNudges.includes("try-coach"),

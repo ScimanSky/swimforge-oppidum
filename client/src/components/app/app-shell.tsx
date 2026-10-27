@@ -14,7 +14,6 @@ import {
   LayoutDashboard,
   LogOut,
   MessageSquare,
-  Orbit,
   Plus,
   Radio,
   Settings,
@@ -102,8 +101,7 @@ const isProfilePath = (path: string) =>
   path.startsWith("/u/") ||
   path.startsWith("/badges")
 
-const isSeasonPath = (path: string) =>
-  path === "/season" ||
+const isLeaderboardPath = (path: string) =>
   path.startsWith("/season/leaderboard") ||
   path.startsWith("/leaderboard")
 
@@ -118,7 +116,7 @@ const athleteNav: NavItem[] = [
     label: "Training",
     path: "/track",
     icon: <Waves className="size-4" />,
-    match: (path) => isTrainingPath(path) || isChallengesPath(path) || isSeasonPath(path),
+    match: (path) => isTrainingPath(path) || isChallengesPath(path) || isLeaderboardPath(path),
   },
   {
     label: "Club",
@@ -139,13 +137,6 @@ const athleteTopNav: NavItem[] = []
 const quickAccessItems: QuickAccessItem[] = [
   { label: "Social Feed", path: "/home", icon: <Users className="size-4" />, match: isHomePath },
   { label: "Attività", path: "/track", icon: <Activity className="size-4" />, match: isTrainingPath, dataTour: "track-section" },
-  {
-    label: "Season Hub",
-    path: "/season",
-    icon: <Orbit className="size-4" />,
-    match: (path) => path === "/season" || path.startsWith("/season/leaderboard") || path.startsWith("/leaderboard"),
-    dataTour: "season-hub",
-  },
   {
     label: "Classifica",
     path: "/season/leaderboard",
@@ -185,8 +176,7 @@ function athleteTitleForPath(path: string) {
   if (path.startsWith("/season/objectives") || path.startsWith("/goals")) return "Training Objectives"
   if (path.startsWith("/coach")) return "AI Coach"
   if (path.startsWith("/badges")) return "Badges"
-  if (path === "/season") return "Season Dashboard"
-  if (path.startsWith("/season/leaderboard") || path.startsWith("/leaderboard")) return "Season Leaderboard"
+  if (path.startsWith("/season/leaderboard") || path.startsWith("/leaderboard")) return "Leaderboard"
   if (path.startsWith("/profile/performance") || path.startsWith("/statistics")) return "Performance Profile"
   if (path.startsWith("/settings")) return "Settings"
   if (path.startsWith("/profile")) return "Profile"
@@ -683,11 +673,11 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
             data-tour="track-section"
             className={cn(
               "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors",
-              isTrainingPath(path) || isChallengesPath(path) || isSeasonPath(path)
+              isTrainingPath(path) || isChallengesPath(path) || isLeaderboardPath(path)
                 ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
                 : "text-muted-foreground hover:text-foreground hover:bg-card/45",
             )}
-            aria-current={isTrainingPath(path) || isChallengesPath(path) || isSeasonPath(path) ? "page" : undefined}
+            aria-current={isTrainingPath(path) || isChallengesPath(path) || isLeaderboardPath(path) ? "page" : undefined}
           >
             <Waves className="size-4" />
             <span className="leading-none">Training</span>

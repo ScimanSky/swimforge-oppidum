@@ -35,7 +35,6 @@ import {
   Plus,
   ChevronRight,
   Zap,
-  Sparkles,
 } from "lucide-react"
 import { Link } from "wouter"
 import { trpc } from "@/lib/trpc"
@@ -193,12 +192,6 @@ export default function Challenges() {
   })
 
   const profileQuery = trpc.profile.get.useQuery()
-  const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
-    staleTime: 15_000,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
-    refetchOnMount: "always",
-  })
   const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
   const badgesQuery = trpc.badges.userBadges.useQuery()
   const challengesQuery = trpc.challenges.list.useQuery()
@@ -338,20 +331,16 @@ export default function Challenges() {
           <SurfaceContent className="relative p-4 lg:p-5">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-background/60 px-3 py-1 text-xs text-muted-foreground">
-                  <Sparkles className="size-4 text-primary" />
-                  Stagione in corso
-                </div>
-                <h1 className="mt-3 text-3xl font-display font-bold neon-gradient-text">Sfide</h1>
+                <h1 className="text-3xl font-display font-bold neon-gradient-text">Sfide</h1>
                 <p className="mt-1 text-muted-foreground">
                   Le tue sfide con la community.
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Badge variant="outline" className="text-xs">
-                    Season Lv {seasonQuery.data?.progress?.currentLevel ?? 1}
+                    Lv {profileQuery.data?.level ?? 1}
                   </Badge>
                   <Badge variant="outline" className="text-xs">
-                    {Number(seasonQuery.data?.progress?.seasonXp ?? 0).toLocaleString()} XP
+                    {totalXp.toLocaleString()} XP
                   </Badge>
                 </div>
               </div>
@@ -375,7 +364,7 @@ export default function Challenges() {
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xl font-display font-bold text-foreground">Sfide classiche</h2>
+            <h2 className="text-xl font-display font-bold text-foreground">Sfide</h2>
             <p className="text-muted-foreground">Competi con obiettivi condivisi.</p>
           </div>
           <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>

@@ -200,16 +200,9 @@ ORDER BY CASE WHEN t.cohort_day = 'WEIGHTED_SUMMARY' THEN 1 ELSE 0 END, t.cohort
 -- ============================================================
 -- 3) Weekly core-loop KPI snapshot (last 8 weeks)
 -- KPIs from Phase 0 spec:
--- - season_view per WAU
--- - CTR season_next_action_click / season_view
 -- - % users with >=1 club_workout_open
 -- - % users with >=1 club_workout_complete
--- - % users with >=1 ghost_duel_create
 -- - % users with >=1 pb_detected
--- Phase 1 extension (Season Core Loop v2):
--- - CTR season_step_action_click / season_step_view
--- - CTR season_weekly_action_marked / season_step_action_click
--- - CTR season_weekly_action_marked / season_step_view
 -- ============================================================
 WITH weekly_events AS (
   SELECT
@@ -223,14 +216,8 @@ weekly_base AS (
   SELECT
     week_start,
     COUNT(DISTINCT user_id) AS wau,
-    COUNT(*) FILTER (WHERE event_name = 'season_view') AS season_views,
-    COUNT(*) FILTER (WHERE event_name = 'season_next_action_click') AS season_next_action_clicks,
-    COUNT(*) FILTER (WHERE event_name = 'season_step_view') AS season_step_views,
-    COUNT(*) FILTER (WHERE event_name = 'season_step_action_click') AS season_step_action_clicks,
-    COUNT(*) FILTER (WHERE event_name = 'season_weekly_action_marked') AS season_weekly_action_marked,
     COUNT(DISTINCT user_id) FILTER (WHERE event_name = 'club_workout_open') AS users_club_workout_open,
     COUNT(DISTINCT user_id) FILTER (WHERE event_name = 'club_workout_complete') AS users_club_workout_complete,
-    COUNT(DISTINCT user_id) FILTER (WHERE event_name = 'ghost_duel_create') AS users_ghost_duel_create,
     COUNT(DISTINCT user_id) FILTER (WHERE event_name = 'pb_detected') AS users_pb_detected
   FROM weekly_events
   GROUP BY week_start
@@ -238,19 +225,8 @@ weekly_base AS (
 SELECT
   week_start,
   wau,
-  season_views,
-  season_next_action_clicks,
-  season_step_views,
-  season_step_action_clicks,
-  season_weekly_action_marked,
-  ROUND(season_views::numeric / NULLIF(wau, 0), 3) AS season_view_per_wau,
-  ROUND(100.0 * season_next_action_clicks::numeric / NULLIF(season_views, 0), 2) AS season_next_action_ctr_pct,
-  ROUND(100.0 * season_step_action_clicks::numeric / NULLIF(season_step_views, 0), 2) AS season_step_action_ctr_pct,
-  ROUND(100.0 * season_weekly_action_marked::numeric / NULLIF(season_step_action_clicks, 0), 2) AS season_weekly_mark_from_click_ctr_pct,
-  ROUND(100.0 * season_weekly_action_marked::numeric / NULLIF(season_step_views, 0), 2) AS season_weekly_mark_from_step_view_ctr_pct,
   ROUND(100.0 * users_club_workout_open::numeric / NULLIF(wau, 0), 2) AS pct_users_club_workout_open,
   ROUND(100.0 * users_club_workout_complete::numeric / NULLIF(wau, 0), 2) AS pct_users_club_workout_complete,
-  ROUND(100.0 * users_ghost_duel_create::numeric / NULLIF(wau, 0), 2) AS pct_users_ghost_duel_create,
   ROUND(100.0 * users_pb_detected::numeric / NULLIF(wau, 0), 2) AS pct_users_pb_detected
 FROM weekly_base
 ORDER BY week_start DESC;
@@ -348,17 +324,10 @@ SELECT
   COUNT(*) AS events
 FROM product_engagement_events pe
 WHERE pe.event_name NOT IN (
-  'season_view',
-  'season_next_action_click',
-  'season_step_view',
-  'season_step_action_click',
-  'season_weekly_action_marked',
   'pb_detected',
   'pb_celebration_open',
   'pb_share_click',
   'pb_share_success',
-  'ghost_duel_create',
-  'ghost_track_open',
   'club_workout_open',
   'club_workout_complete',
   'feed_post_create',
