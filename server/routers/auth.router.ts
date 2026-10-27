@@ -340,6 +340,7 @@ export const authRouter = router({
                 await deleteFromIfExists(tx, "public.xp_transactions");
                 await deleteFromIfExists(tx, "public.personal_records");
                 await deleteFromIfExists(tx, "public.weekly_stats");
+                await deleteFromIfExists(tx, "public.user_goals");
 
                 await deleteFromIfExists(tx, "public.ai_insights_cache");
                 await deleteFromIfExists(tx, "public.activity_ai_insights");

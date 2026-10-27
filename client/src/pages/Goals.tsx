@@ -441,25 +441,22 @@ export default function Goals() {
         return true
       })
 
-    if (payloads.length === 0) {
-      try {
-        localStorage.removeItem(LEGACY_CUSTOM_GOALS_KEY)
-      } catch {
-        // ignore storage errors
-      }
-      return
+    // Drop the key before posting anything, so a remount while the batch is in flight
+    // (navigate away and back) cannot read it again and post the same goals twice.
+    try {
+      localStorage.removeItem(LEGACY_CUSTOM_GOALS_KEY)
+    } catch {
+      // ignore storage errors
     }
+    if (payloads.length === 0) return
 
     void Promise.allSettled(payloads.map((payload) => createGoalMutation.mutateAsync(payload))).then(
       (results) => {
         const failed = payloads.filter((_, index) => results[index].status === "rejected")
+        if (failed.length === 0) return
+        // Write back only the goals that could not be saved so the next visit retries them.
         try {
-          if (failed.length === 0) {
-            localStorage.removeItem(LEGACY_CUSTOM_GOALS_KEY)
-          } else {
-            // Keep only the goals that could not be saved so the next visit retries them.
-            localStorage.setItem(LEGACY_CUSTOM_GOALS_KEY, JSON.stringify(failed))
-          }
+          localStorage.setItem(LEGACY_CUSTOM_GOALS_KEY, JSON.stringify(failed))
         } catch {
           // ignore storage errors
         }

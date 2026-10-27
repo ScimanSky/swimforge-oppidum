@@ -28,6 +28,13 @@ describe("goals router", () => {
     expect(g.createUserGoal).toHaveBeenCalledWith(42, { title: "8 km", category: "distance", targetValue: 8, unit: "km" });
   });
 
+  it("rejects create with INTERNAL_SERVER_ERROR when the database is unavailable", async () => {
+    g.createUserGoal.mockResolvedValue(null);
+    await expect(
+      goalsRouter.createCaller(ctx).create({ title: "8 km", category: "distance", targetValue: 8, unit: "km" }),
+    ).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR", message: "Database non disponibile" });
+  });
+
   it("rejects an empty title", async () => {
     await expect(
       goalsRouter.createCaller(ctx).create({ title: "  ", category: "distance", targetValue: null, unit: null }),

@@ -14,7 +14,11 @@ const goalNotFound = () => new TRPCError({ code: "NOT_FOUND", message: "Obiettiv
 
 export const goalsRouter = router({
   list: protectedProcedure.query(({ ctx }) => listUserGoals(ctx.user.id)),
-  create: protectedProcedure.input(goalInput).mutation(({ ctx, input }) => createUserGoal(ctx.user.id, input)),
+  create: protectedProcedure.input(goalInput).mutation(async ({ ctx, input }) => {
+    const row = await createUserGoal(ctx.user.id, input);
+    if (!row) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database non disponibile" });
+    return row;
+  }),
   update: protectedProcedure
     .input(goalInput.partial().extend({ id: z.number().int().positive(), currentValue: z.number().min(0).optional() }))
     .mutation(async ({ ctx, input }) => {

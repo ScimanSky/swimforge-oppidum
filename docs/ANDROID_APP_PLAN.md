@@ -145,7 +145,8 @@ commit e push. Stime in giorni di lavoro effettivo con Claude Code.
 
 ### Fase 0 — Pulizia e base mobile (2-3 giorni)
 - Cancellare codice morto e funzioni rimosse (§3), togliere i flag relativi.
-- Auth con header per il nativo, CORS, deep link di callback per Google e Strava.
+- Auth con header per il nativo, CORS. I deep link di callback per Google e Strava sono
+  spostati alla Fase 1 (richiedono il plugin App di Capacitor).
 - Obiettivi su server; FC a riposo reale; rimozione mock sidebar.
 - Aggiunto il 27/10 (novità Garmin): aggiornare `garmin-service` a python-garminconnect
   0.3.20 e rendere persistente lo stato MFA (Task 17 del piano di fase 0).

@@ -1031,8 +1031,7 @@ export async function exportUserData(userId: number) {
     xpResult,
     recordsResult,
     weeklyStatsResult,
-    storiesResult,
-    storyViewsResult,
+    goalsResult,
     notificationsResult,
     directMessagesResult,
     clubsMembershipResult,
@@ -1067,8 +1066,7 @@ export async function exportUserData(userId: number) {
     db.execute(sql`SELECT * FROM xp_transactions WHERE user_id = ${userId} ORDER BY created_at DESC`),
     db.execute(sql`SELECT * FROM personal_records WHERE user_id = ${userId} ORDER BY achieved_at DESC`),
     db.execute(sql`SELECT * FROM weekly_stats WHERE user_id = ${userId} ORDER BY week_start DESC`),
-    db.execute(sql`SELECT * FROM stories WHERE user_id = ${userId} ORDER BY created_at DESC`),
-    db.execute(sql`SELECT * FROM story_views WHERE viewer_id = ${userId} ORDER BY viewed_at DESC`),
+    db.execute(sql`SELECT * FROM user_goals WHERE user_id = ${userId} ORDER BY created_at DESC`),
     db.execute(sql`SELECT * FROM user_notifications WHERE user_id = ${userId} ORDER BY created_at DESC`),
     db.execute(sql`
       SELECT *
@@ -1101,8 +1099,7 @@ export async function exportUserData(userId: number) {
       xpTransactions: xpResult.rows,
       personalRecords: recordsResult.rows,
       weeklyStats: weeklyStatsResult.rows,
-      stories: storiesResult.rows,
-      storyViews: storyViewsResult.rows,
+      goals: goalsResult.rows,
       notifications: notificationsResult.rows,
       directMessages: directMessagesResult.rows,
       clubMemberships: clubsMembershipResult.rows,
@@ -1265,6 +1262,7 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
     await deleteFromIfExists(tx, "public.user_consents", sql`user_id = ${userId}`);
 
     // Final identity rows
+    await deleteFromIfExists(tx, "public.user_goals", sql`user_id = ${userId}`);
     await deleteFromIfExists(tx, "public.swimmer_profiles", sql`user_id = ${userId}`);
     await tx.execute(sql`DELETE FROM users WHERE id = ${userId}`);
   });
