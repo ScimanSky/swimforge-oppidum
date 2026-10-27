@@ -15,7 +15,6 @@ import {
   LogOut,
   MessageSquare,
   Plus,
-  Radio,
   Settings,
   Shield,
   Target,
@@ -48,7 +47,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import NotificationBell from "@/components/NotificationBell"
 import DirectMessages from "@/components/DirectMessages"
 import { CreatePostSheet, type PbShareTrackingContext } from "@/components/social/CreatePostSheet"
-import { StoryCreator } from "@/components/social/StoryCreator"
 import { OnboardingNudgeManager } from "@/components/onboarding/OnboardingNudgeManager"
 
 type NavItem = {
@@ -101,32 +99,7 @@ const isProfilePath = (path: string) =>
 
 const isLeaderboardPath = (path: string) => path.startsWith("/leaderboard")
 
-const athleteNav: NavItem[] = [
-  {
-    label: "Home",
-    path: "/home",
-    icon: <LayoutDashboard className="size-4" />,
-    match: (path) => isHomePath(path),
-  },
-  {
-    label: "Training",
-    path: "/track",
-    icon: <Waves className="size-4" />,
-    match: (path) => isTrainingPath(path) || isChallengesPath(path) || isLeaderboardPath(path),
-  },
-  {
-    label: "Club",
-    path: "/home/community",
-    icon: <Users className="size-4" />,
-    match: (path) => isClubPath(path),
-  },
-  {
-    label: "Profile",
-    path: "/profile",
-    icon: <User className="size-4" />,
-    match: (path) => isProfilePath(path),
-  },
-]
+const isGoalsPath = (path: string) => path.startsWith("/goals")
 
 const athleteTopNav: NavItem[] = []
 
@@ -151,7 +124,7 @@ const quickAccessItems: QuickAccessItem[] = [
     label: "Obiettivi",
     path: "/goals",
     icon: <Target className="size-4" />,
-    match: (path) => path.startsWith("/goals"),
+    match: isGoalsPath,
   },
   { label: "Badges", path: "/badges", icon: <Award className="size-4" />, match: (path) => path.startsWith("/badges"), dataTour: "badges-nav" },
   { label: "AI Coach", path: "/coach", icon: <BrainCircuit className="size-4" />, match: (path) => path.startsWith("/coach"), dataTour: "ai-coach-btn" },
@@ -233,11 +206,9 @@ function AthleteDesktopNav({ location }: { location: string }) {
 function AthleteSideRail({
   location,
   onOpenCreatePost,
-  onOpenStoryCreator,
 }: {
   location: string
   onOpenCreatePost: (prefill?: string) => void
-  onOpenStoryCreator: () => void
 }) {
   const path = normalizePath(location)
   const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false)
@@ -256,11 +227,10 @@ function AthleteSideRail({
   const createMenuItems: Array<{
     label: string
     path?: string
-    action?: "create-post" | "create-story" | "create-ai-post"
+    action?: "create-post" | "create-ai-post"
     icon: React.ReactNode
   }> = [
     { label: "Post nel feed", action: "create-post", icon: <Plus className="size-4" /> },
-    { label: "Crea Story", action: "create-story", icon: <Radio className="size-4" /> },
     { label: "Messaggio rapido", path: "/messages?new=1", icon: <MessageSquare className="size-4" /> },
     { label: "Bozza IA post", action: "create-ai-post", icon: <Bot className="size-4" /> },
   ]
@@ -355,7 +325,6 @@ function AthleteSideRail({
                     type="button"
                     onClick={() => {
                       if (item.action === "create-post") onOpenCreatePost()
-                      if (item.action === "create-story") onOpenStoryCreator()
                       if (item.action === "create-ai-post") {
                         onOpenCreatePost(
                           "Bozza IA:\n\nAllenamento completato oggi. Ecco i punti chiave:\n- Sensazioni in acqua:\n- Metrica migliore:\n- Cosa migliorare nella prossima sessione:\n\n#swimforge #training",
@@ -426,7 +395,7 @@ function AthleteCompactBrand() {
   )
 }
 
-export function AppShell({ children, headerSlot }: { children: React.ReactNode; headerSlot?: React.ReactNode }) {
+export function AppShell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation()
   const path = normalizePath(location)
   const isAdminRoute = path.startsWith("/admin")
@@ -434,7 +403,6 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false)
   const [createPostInitialContent, setCreatePostInitialContent] = useState<string | undefined>(undefined)
   const [createPostPbShareTracking, setCreatePostPbShareTracking] = useState<PbShareTrackingContext | undefined>(undefined)
-  const [isStoryCreatorOpen, setIsStoryCreatorOpen] = useState(false)
   const [mobileCreateMenuOpen, setMobileCreateMenuOpen] = useState(false)
   const [mobileSectionsOpen, setMobileSectionsOpen] = useState(false)
   const { theme, toggleTheme, switchable } = useTheme()
@@ -448,7 +416,6 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   const heartbeatLastSentAtRef = useRef(0)
 
   const pageTitle = useMemo(() => (isAdminRoute ? adminTitleForPath(path) : athleteTitleForPath(path)), [isAdminRoute, path])
-  const showHeaderStories = Boolean(headerSlot) && !isAdminRoute
   const mobileSectionsItems = useMemo(
     () => quickAccessItems.filter((item) => !["Social Feed", "Attività", "Club"].includes(item.label)),
     [],
@@ -456,7 +423,6 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
   const mobileCreateItems = useMemo(
     () => [
       { label: "Post nel feed", action: "create-post" as const, icon: <Plus className="size-4" /> },
-      { label: "Crea Story", action: "create-story" as const, icon: <Radio className="size-4" /> },
       { label: "Messaggio rapido", path: "/messages?new=1", icon: <MessageSquare className="size-4" /> },
       { label: "Bozza IA post", action: "create-ai-post" as const, icon: <Bot className="size-4" /> },
     ],
@@ -525,18 +491,10 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
       setMobileSectionsOpen(false)
     }
 
-    const handleCloseCreatePost = () => {
-      setIsCreatePostOpen(false)
-      setCreatePostInitialContent(undefined)
-      setCreatePostPbShareTracking(undefined)
-    }
-
     window.addEventListener("swimforge:open-create-post", handleOpenCreatePost)
-    window.addEventListener("swimforge:close-create-post", handleCloseCreatePost)
 
     return () => {
       window.removeEventListener("swimforge:open-create-post", handleOpenCreatePost)
-      window.removeEventListener("swimforge:close-create-post", handleCloseCreatePost)
     }
   }, [])
 
@@ -571,7 +529,6 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
           setCreatePostPbShareTracking(undefined)
           setIsCreatePostOpen(true)
         }}
-        onOpenStoryCreator={() => setIsStoryCreatorOpen(true)}
       />
 
       <header className="fixed left-0 right-0 top-0 z-50 h-[72px] border-b border-border/50 bg-background/80 backdrop-blur-xl">
@@ -636,14 +593,6 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
           </div>
         </div>
       </header>
-
-      {showHeaderStories ? (
-        <div className="fixed left-0 right-0 top-[72px] z-40 border-b border-border/40 bg-background/75 backdrop-blur-lg">
-          <div className="flex h-16 w-full items-center px-2 md:px-3 lg:pl-[84px] lg:pr-4">
-            <div className="w-full overflow-x-auto overflow-y-hidden scrollbar-hide">{headerSlot}</div>
-          </div>
-        </div>
-      ) : null}
 
       <nav
         data-tour="main-navigation"
@@ -785,7 +734,6 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
                           setCreatePostPbShareTracking(undefined)
                           setIsCreatePostOpen(true)
                         }
-                        if (item.action === "create-story") setIsStoryCreatorOpen(true)
                         if (item.action === "create-ai-post") {
                           setCreatePostInitialContent(
                             "Bozza IA:\n\nAllenamento completato oggi. Ecco i punti chiave:\n- Sensazioni in acqua:\n- Metrica migliore:\n- Cosa migliorare nella prossima sessione:\n\n#swimforge #training",
@@ -891,12 +839,7 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
         ) : null}
       </AnimatePresence>
 
-      <main
-        className={cn(
-          "min-h-[calc(100dvh-72px)] pb-20 lg:pb-0 lg:pl-[92px]",
-          showHeaderStories ? "pt-[136px]" : "pt-[84px]",
-        )}
-      >
+      <main className="min-h-[calc(100dvh-72px)] pb-20 pt-[84px] lg:pb-0 lg:pl-[92px]">
         <div className="mx-auto max-w-[1600px] p-4 md:p-6">
           <div className="mb-2 text-xs uppercase tracking-[0.14em] text-muted-foreground/80 lg:hidden">{pageTitle}</div>
           <AnimatePresence mode="wait" initial={false}>
@@ -925,7 +868,6 @@ export function AppShell({ children, headerSlot }: { children: React.ReactNode; 
           }
         }}
       />
-      <StoryCreator open={isStoryCreatorOpen} onOpenChange={setIsStoryCreatorOpen} />
       {meQuery.data?.id && (
         <OnboardingNudgeManager userId={meQuery.data.id} />
       )}

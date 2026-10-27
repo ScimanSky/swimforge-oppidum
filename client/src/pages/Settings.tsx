@@ -1464,7 +1464,7 @@ export default function Settings() {
                 <div>
                   <p className="font-medium text-foreground">Consenti inoltri privati</p>
                   <p className="text-sm text-muted-foreground">
-                    Permetti che post e stories vengano inoltrati in chat privata
+                    Permetti che i post vengano inoltrati in chat privata
                   </p>
                 </div>
                 <Switch

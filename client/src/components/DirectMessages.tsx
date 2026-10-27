@@ -63,7 +63,7 @@ interface Conversation {
 type View = "list" | "conversation" | "search";
 
 type ForwardMetadata = {
-  targetType?: "post" | "story";
+  targetType?: "post";
   targetId?: number;
   ownerName?: string | null;
   previewText?: string | null;
@@ -83,7 +83,7 @@ function parseForwardMetadata(raw: unknown): ForwardMetadata | null {
       : raw
   if (!source || typeof source !== "object" || Array.isArray(source)) return null;
   const data = source as Record<string, unknown>;
-  const targetType = data.targetType === "post" || data.targetType === "story" ? data.targetType : undefined;
+  const targetType = data.targetType === "post" ? data.targetType : undefined;
   const targetId = typeof data.targetId === "number" ? data.targetId : Number(data.targetId);
   const ownerName = typeof data.ownerName === "string" ? data.ownerName : null;
   const previewText = typeof data.previewText === "string" ? data.previewText : null;
@@ -100,7 +100,6 @@ function parseForwardMetadata(raw: unknown): ForwardMetadata | null {
 
 function getConversationPreview(message: Message) {
   if (message.messageType === "forward_post") return "📩 Post inoltrato"
-  if (message.messageType === "forward_story") return "📩 Story inoltrata"
   return message.content
 }
 
@@ -498,9 +497,7 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
               {conversationQuery.data.map((msg) => {
                 const isOwn = msg.message.senderId !== selectedConversation;
                 const forwardMeta = parseForwardMetadata(msg.message.metadata);
-                const isForwarded =
-                  (msg.message.messageType === "forward_post" || msg.message.messageType === "forward_story") &&
-                  !!forwardMeta;
+                const isForwarded = msg.message.messageType === "forward_post" && !!forwardMeta;
                 return (
                   <div
                     key={msg.message.id}
@@ -517,7 +514,7 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
                         <div className="space-y-2">
                           <div className="rounded-md border border-border/60 bg-background/60 p-2">
                             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                              {forwardMeta.targetType === "post" ? "Post inoltrato" : "Story inoltrata"}
+                              Post inoltrato
                             </p>
                             <p className="text-sm font-medium">
                               {forwardMeta.ownerName
@@ -623,9 +620,7 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
           {conversationQuery.data.map((msg) => {
             const isOwn = msg.message.senderId !== selectedConversation;
             const forwardMeta = parseForwardMetadata(msg.message.metadata);
-            const isForwarded =
-              (msg.message.messageType === "forward_post" || msg.message.messageType === "forward_story") &&
-              !!forwardMeta;
+            const isForwarded = msg.message.messageType === "forward_post" && !!forwardMeta;
             return (
               <div
                 key={msg.message.id}
@@ -643,7 +638,7 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
                     <div className="space-y-2">
                       <div className="rounded-xl border border-border/60 bg-background/60 p-2.5">
                         <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          {forwardMeta.targetType === "post" ? "Post inoltrato" : "Story inoltrata"}
+                          Post inoltrato
                         </p>
                         <p className="text-sm font-medium">
                           {forwardMeta.ownerName

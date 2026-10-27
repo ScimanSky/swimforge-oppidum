@@ -44,7 +44,7 @@ export { getUserPublicProfile, toggleFollow, getSuggestedUsers, getFollowStarter
 export { getPendingActivityInsights, listActivityInsights, markActivityInsightSeen } from "../ai_activity_insights";
 export { logger } from "../middleware/logger";
 export { sanitizeActivityNotes } from "../lib/sanitize";
-export { awardActionXp, getActionXpStatus } from "../xp_actions";
+export { awardActionXp } from "../xp_actions";
 
 // ─── Type aliases ───────────────────────────────────────────────────
 import type * as _db from "../db";

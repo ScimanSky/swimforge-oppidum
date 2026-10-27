@@ -20,7 +20,7 @@ import { getInitials } from "@/lib/format"
 import { toast } from "sonner"
 import { X } from "lucide-react"
 
-type ForwardTargetType = "post" | "story"
+type ForwardTargetType = "post"
 
 interface ForwardContentDialogProps {
   open: boolean
@@ -118,7 +118,7 @@ export function ForwardContentDialog({
     })
   }
 
-  const titleLabel = targetType === "post" ? "Inoltra post" : "Inoltra story"
+  const titleLabel = "Inoltra post"
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

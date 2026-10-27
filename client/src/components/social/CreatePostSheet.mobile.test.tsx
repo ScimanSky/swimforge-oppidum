@@ -79,10 +79,6 @@ vi.mock("./ShareActivityPicker", () => ({
   ShareActivityPicker: () => <div data-testid="share-activity-picker">share-picker</div>,
 }));
 
-vi.mock("./StoryCreator", () => ({
-  StoryCreator: () => <div data-testid="story-creator">story-creator</div>,
-}));
-
 describe("CreatePostSheet mobile media interactions", () => {
   beforeEach(() => {
     vi.clearAllMocks();

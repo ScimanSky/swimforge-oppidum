@@ -25,7 +25,7 @@ import {
 import {
   Waves,
   MapPin,
-  Orbit,
+  Star,
   Sparkles,
   Clock3,
   Gauge,
@@ -299,7 +299,7 @@ export default function Activities() {
               </p>
               <div className="mt-2.5 flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="text-xs">
-                  <Orbit className="mr-1 size-3.5 text-primary" />
+                  <Star className="mr-1 size-3.5 text-primary" />
                   Lv {profileQuery.data?.level ?? 1}
                 </Badge>
                 <Badge variant="outline" className="text-xs">

@@ -6,7 +6,7 @@ const AUTH: CloudinaryVideoAuth = {
   apiKey: "demo-key",
   timestamp: 1712345678,
   signature: "signed-payload",
-  folder: "stories/42",
+  folder: "posts/42",
 };
 
 const CLOUDINARY_UPLOAD_URL = "https://api.cloudinary.com/v1_1/demo-cloud/video/upload";
@@ -25,7 +25,7 @@ describe("uploadVideoToCloudinary", () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ secure_url: "https://res.cloudinary.com/demo/video/upload/v1/clip.mp4", public_id: "story-video-1" }),
+      json: async () => ({ secure_url: "https://res.cloudinary.com/demo/video/upload/v1/clip.mp4", public_id: "post-video-1" }),
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -33,7 +33,7 @@ describe("uploadVideoToCloudinary", () => {
 
     expect(result).toEqual({
       url: "https://res.cloudinary.com/demo/video/upload/v1/clip.mp4",
-      publicId: "story-video-1",
+      publicId: "post-video-1",
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0][0]).toBe(CLOUDINARY_UPLOAD_URL);

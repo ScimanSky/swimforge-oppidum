@@ -45,14 +45,9 @@ const ATHLETE_TOUR_STEPS: TourStep[] = [
     body: "Quattro sezioni, tutto ciò che ti serve: Feed, Traccia, Club e Profilo.",
   },
   {
-    selector: '[data-tour="feed-stories"]',
-    title: "Stories",
-    body: "Le Stories della community spariscono dopo 24h. Aprile con un tap.",
-  },
-  {
     selector: '[data-tour="create-post"]',
     title: "Crea contenuti",
-    body: "Post, attività condivisa o story — tutto in un tap con il tasto +.",
+    body: "Post o attività condivisa — tutto in un tap con il tasto +.",
   },
   {
     selector: '[data-tour="track-section"]',
