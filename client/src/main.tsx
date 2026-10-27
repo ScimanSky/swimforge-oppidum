@@ -6,6 +6,9 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
+import { isNativePlatform } from "@/lib/platform";
+import { getNativeSessionToken } from "@/lib/session-token";
+import { buildTrpcHeaders } from "@/lib/trpc-headers";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -37,24 +40,25 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+const readCsrfCookie = (): string | null =>
+  typeof document === "undefined"
+    ? null
+    : document.cookie
+        .split(";")
+        .map((entry) => entry.trim())
+        .find((entry) => entry.startsWith(`${CSRF_COOKIE_NAME}=`))
+        ?.slice(CSRF_COOKIE_NAME.length + 1) ?? null;
+
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       url: "/api/trpc",
       transformer: superjson,
       fetch(input, init) {
-        const csrfToken = typeof document === "undefined"
-          ? null
-          : document.cookie
-              .split(";")
-              .map((entry) => entry.trim())
-              .find((entry) => entry.startsWith(`${CSRF_COOKIE_NAME}=`))
-              ?.slice(CSRF_COOKIE_NAME.length + 1) ?? null;
-
-        const headers = new Headers(init?.headers ?? {});
-        if (csrfToken) {
-          headers.set("x-csrf-token", decodeURIComponent(csrfToken));
-        }
+        const headers = buildTrpcHeaders(
+          { isNative: isNativePlatform(), csrfToken: readCsrfCookie(), nativeToken: getNativeSessionToken() },
+          init?.headers,
+        );
         return globalThis.fetch(input, {
           ...(init ?? {}),
           headers,

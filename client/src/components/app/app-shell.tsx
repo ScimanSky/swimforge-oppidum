@@ -32,6 +32,7 @@ import {
 import { cn } from "@/lib/utils"
 import { trpc } from "@/lib/trpc"
 import { supabase } from "@/lib/supabase"
+import { clearNativeSessionToken } from "@/lib/session-token"
 import { useTheme } from "@/contexts/ThemeContext"
 
 import { Button } from "@/components/ui/button"
@@ -506,6 +507,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore logout errors, still clear client session
     }
+    clearNativeSessionToken()
     try {
       await supabase.auth.signOut()
     } catch {

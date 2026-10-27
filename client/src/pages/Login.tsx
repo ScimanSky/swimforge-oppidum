@@ -16,6 +16,7 @@ import { Waves, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
+import { setNativeSessionToken } from "@/lib/session-token";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import { useAuth } from "@/_core/hooks/useAuth";
 
@@ -39,6 +40,7 @@ export default function Login() {
 
   const syncSupabaseUserMutation = trpc.auth.syncSupabaseUser.useMutation({
     onSuccess: (data) => {
+      if ("sessionToken" in data && typeof data.sessionToken === "string") setNativeSessionToken(data.sessionToken);
       toast.success("Login effettuato con successo!");
       setTimeout(() => {
         window.location.href = data?.isNewUser ? "/settings?tab=profile&onboarding=1" : "/home";
