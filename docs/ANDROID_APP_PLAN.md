@@ -150,6 +150,7 @@ commit e push. Stime in giorni di lavoro effettivo con Claude Code.
 - Aggiunto il 27/10 (novità Garmin): aggiornare `garmin-service` a python-garminconnect
   0.3.20 e rendere persistente lo stato MFA (Task 17 del piano di fase 0).
 - Gate di uscita: web invariata in produzione, test verdi.
+- Completata il 27/10/2026 sul branch android/phase-0 (vedi PR).
 
 ### Fase 1 — Guscio Android con Capacitor (2-3 giorni)
 - `@capacitor/core`, `@capacitor/android`, progetto `android/` nel repo, icona e splash,

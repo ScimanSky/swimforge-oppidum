@@ -34,8 +34,8 @@ In caso di conflitto tra documenti:
 6. Sequenza base:
    - Fase 0: baseline + pruning,
    - Fase 1: identita' nuotatore (PB board) + Club Meets rollout,
-   - Fase 2: Season v2,
-   - Fase 3: Ghost Duels 2.0,
+   - Fase 2: Season v2 (dismessa: Season Hub rimosso nella Fase 0 del piano Android),
+   - Fase 3: Ghost Duels 2.0 (dismessa: Ghost track rimosso nella Fase 0 del piano Android),
    - Fase 4: Club Rituals,
    - Post settimana 12: CSS Hub completo e stream successivi.
 

@@ -48,10 +48,25 @@ Aggiorna `.env.oracle` con almeno:
 - Core: `DATABASE_URL`, `DB_SSL_REJECT_UNAUTHORIZED`, `DB_SSL_ALLOW_INSECURE_FALLBACK`, `DB_SSL_CA_CERT_BASE64`, `JWT_SECRET`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - Security: `CRON_SECRET`, `TOKEN_ENCRYPTION_KEY`, `ALLOWED_ORIGINS`, `OAUTH_ALLOWED_REDIRECT_ORIGINS`
 - Integrations: `GARMIN_SERVICE_SECRET`, `STRAVA_SERVICE_URL`, `STRAVA_SERVICE_SECRET`, `OPENAI_API_KEY` (se usato)
+- Garmin service: `GARMIN_STATE_KEY` (chiave Fernet che cifra su disco lo stato MFA pendente; vuota = solo in memoria), `GARMIN_SERVICE_TIMEOUT_MS=60000` (le strategie di login Garmin possono attendere fino a 20 s ciascuna)
 - Garmin hardening (opzionale, raccomandato): `GARMIN_CORS_ALLOW_ORIGINS`, `GARMIN_CORS_ALLOW_CREDENTIALS=false`
+- Gemini: `GEMINI_API_KEY`, `GEMINI_TEXT_MODEL` (default `gemini-3.8-flash`), `GEMINI_PRO_MODEL` (default `gemini-3.1-pro-preview`), `GEMINI_IMAGE_MODEL` (default `gemini-3.1-flash-image`), `GEMINI_IMAGE_PRO_MODEL` (default `gemini-3-pro-image-preview`)
 - Observability (opzionale): `ROLLBAR_ACCESS_TOKEN`, `DEPLOY_TARGET=oracle`, `APP_RELEASE`, `ROLLBAR_SERVER_HOST`
 - Redis policy (raccomandato esplicito): `REDIS_REQUIRED_FOR_READY=true`, `REDIS_RATE_LIMIT_MODE=memory`
 - Oracle ingress: `DOMAIN`, `ACME_EMAIL`
+
+Generazione `GARMIN_STATE_KEY`:
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Note Gemini:
+- i nuovi progetti Google Cloud non possono più chiamare `gemini-2.5-flash` né `gemini-3-pro-preview` (404 "no longer available to new users"): lasciare i default.
+- i progetti esistenti possono mantenere `gemini-2.5-flash` impostando `GEMINI_TEXT_MODEL=gemini-2.5-flash`; `GEMINI_MODEL`/`FORGE_LLM_MODEL` restano letti come fallback legacy.
+
+Nota CORS:
+- `ALLOWED_ORIGINS` deve mantenere per primo l'origin pubblico (es. `https://app.example.com`).
+- quando verrà rilasciata l'app Android andranno aggiunti `https://localhost,capacitor://localhost` (es. `ALLOWED_ORIGINS=https://app.example.com,https://localhost,capacitor://localhost`).
 
 TLS DB raccomandato:
 - target finale: `DB_SSL_REJECT_UNAUTHORIZED=true` con `DB_SSL_CA_CERT_BASE64` valorizzato
@@ -121,12 +136,24 @@ bash /home/ubuntu/projects/swimforge-oppidum/deploy/swimforge-deploy.sh
 ```
 
 ## 8) Migrazioni DB
-Prima del primo avvio produzione:
-```bash
-docker compose --env-file .env.oracle -f docker-compose.oracle.yml run --rm app pnpm db:migrate
-```
+L'immagine runtime contiene solo `node_modules`, `dist` e `package.json` (niente `drizzle/` né `drizzle.config.ts`), quindi `pnpm db:migrate` non può essere eseguito dentro il container `app`.
+Il workflow di deploy (e `deploy/swimforge-deploy.sh`) non applica mai migrazioni: vanno applicate a mano prima del deploy che le richiede (incluso il primo avvio produzione).
 
-In update ordinari, integrare la migrazione nel runbook operativo prima del `up -d --build`.
+Procedura standard, da un checkout fidato del repository allo stesso commit che verrà deployato:
+```bash
+pnpm install --frozen-lockfile
+DATABASE_URL='<url Supabase diretto o session pooler>' pnpm db:migrate
+```
+Usare la connessione diretta o il session pooler, non il transaction pooler.
+
+Singola migrazione (alternativa manuale):
+1. eseguire il contenuto di `drizzle/<NNNN>_<nome>.sql` sul database;
+2. registrare la migrazione nella tabella di tracking di Drizzle:
+```sql
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+VALUES ('<sha256 del contenuto del file>', <valore "when" della voce in drizzle/meta/_journal.json>);
+```
+L'hash è `sha256sum drizzle/<NNNN>_<nome>.sql` (contenuto del file così com'è); `created_at` è il campo `when` della voce corrispondente nel journal.
 
 ## 9) Verifiche post-deploy
 ```bash
