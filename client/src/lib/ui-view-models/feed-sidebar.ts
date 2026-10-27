@@ -13,8 +13,6 @@ export type FeedSidebarProfileVm = {
   subtitle: string
   avatarUrl: string | null
   level: number | null
-  canFollow: boolean
-  isMock: boolean
 }
 
 export type FeedSidebarFooterLinkVm = {
@@ -45,8 +43,6 @@ function mapRealSuggestedUser(user: FeedSidebarSuggestedUserInput): FeedSidebarP
     subtitle,
     avatarUrl: user.avatarUrl,
     level: user.level,
-    canFollow: true,
-    isMock: false,
   }
 }
 

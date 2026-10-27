@@ -1,6 +1,9 @@
 export const DEFAULT_RESTING_HR = 60;
 
-/** Median of plausible resting heart rates (30-120 bpm); 60 when none is available. */
+/**
+ * Median of plausible resting heart rates (30-120 bpm, inclusive); 60 when none is available.
+ * With an even count, the two middle values are averaged and rounded to the nearest integer.
+ */
 export function resolveBaselineRestingHr(activities: Array<{ restingHeartRate?: number | null }>): number {
   const values = activities
     .map((a) => a.restingHeartRate)

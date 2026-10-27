@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import {
   UserCheck,
   UserPlus,
-  UserRoundPlus,
   ChevronRight,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
@@ -52,16 +51,16 @@ function SuggestedUserRow({
         <p className="text-[10px] text-muted-foreground">{user.subtitle}</p>
       </div>
       <Button
-        variant={user.canFollow ? (isFollowing ? "ghost-neon" : "outline-neon") : "ghost-neon"}
+        variant={isFollowing ? "ghost-neon" : "outline-neon"}
         size="sm"
         className="h-7 text-[10px] gap-1 px-2 shrink-0"
         onClick={() => {
-          if (!user.canFollow || !user.userId) return
+          if (!user.userId) return
           toggleFollow.mutate({ userId: user.userId })
         }}
-        disabled={toggleFollow.isPending || !user.canFollow || !user.userId}
+        disabled={toggleFollow.isPending || !user.userId}
       >
-        {user.canFollow ? (isFollowing ? (
+        {isFollowing ? (
           <>
             <UserCheck className="size-3" />
             Seguendo
@@ -70,11 +69,6 @@ function SuggestedUserRow({
           <>
             <UserPlus className="size-3" />
             Segui
-          </>
-        )) : (
-          <>
-            <UserRoundPlus className="size-3" />
-            Scopri
           </>
         )}
       </Button>
