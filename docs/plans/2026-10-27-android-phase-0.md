@@ -738,3 +738,29 @@ In `db_statistics.ts:421`: `const baselineRestingHR = resolveBaselineRestingHr(c
 **Step 4:** Push del branch; aprire una PR `android/phase-0 → main` con il riepilogo e i numeri di test. Il merge (che deploya su Oracle) lo decide il proprietario. Dopo il merge: rimuovere il job `cleanup-expired-stories` dallo scheduler Oracle (manuale).
 
 **Step 5:** Aggiornare `docs/ANDROID_APP_PLAN.md` §5 marcando la fase 0 come completata, con data.
+
+---
+
+## Task 17 (aggiunto il 27/10 dopo l'approvazione, su richiesta del proprietario): python-garminconnect 0.3.20 e stato MFA persistente
+
+**Perché qui:** il gate della Fase 1 richiede una sync Garmin funzionante dall'app; la 0.3.5
+pinnata soffre del login mobile che rispondeva 429 da aprile (riparato nella 0.3.20) e perde
+lo stato MFA a ogni riavvio del container.
+
+**Files:**
+- Modify: `garmin-service/requirements.txt` (`garminconnect==0.3.20`; `curl_cffi` arriva come dipendenza)
+- Modify: `garmin-service/main.py` — `save_client_tokens` (264-276): usare solo l'API pubblica `client.login(tokenstore=<dir utente>)` per leggere/scrivere i token (la libreria salva `garmin_tokens.json` con 0600 nella dir indicata) e togliere i rami `client.client.dump` / `client.garth.dump`; `pending_mfa` (55-60, 441-451, 507-572): salvare il `client_state` restituito da `login()` nel token store cifrato per utente (stesso meccanismo dei token, chiave già usata dal servizio o `GARMIN_STATE_KEY` via Fernet della dipendenza `cryptography`), con TTL 10 minuti, e in `/auth/mfa` ricaricarlo da disco se non è in memoria, poi `Garmin().resume_login(client_state, code)`; cancellare il file a login completato o scaduto
+- Create: `garmin-service/mfa_state.py` (funzioni pure: `serialize_state(state, now) -> bytes`, `load_state(blob, now, ttl) -> dict | None`) e `garmin-service/test_mfa_state.py` (pytest: round-trip, scadenza, blob corrotto → None)
+- Modify: `garmin-service/GARMIN_AUTH_NOTES.md` — sostituire le note su garth con: versione 0.3.20, flusso `return_on_mfa` + `resume_login` cross-process, errori 427 = blocco Garmin (non ritentare in loop), Python ≥ 3.12
+
+**Step 1:** scrivere `test_mfa_state.py` e vederlo fallire: `cd garmin-service && /home/scima/.local/opt/garminconnect-venv/bin/python -m pytest -q` (installare `pytest` nel venv se manca: `pip3 --python /home/scima/.local/opt/garminconnect-venv/bin/python install pytest`).
+
+**Step 2:** implementare `mfa_state.py`; test verdi.
+
+**Step 3:** aggiornare `main.py` e `requirements.txt`; verificare l'import con il venv 0.3.20: `cd garmin-service && /home/scima/.local/opt/garminconnect-venv/bin/python -c "import main"` (deve caricare senza errori con le env minime del servizio).
+
+**Step 4:** `docker build -t swimforge-garmin:test garmin-service/` → build OK (immagine `python:3.12-slim`, `curl_cffi` ha wheel manylinux).
+
+**Step 5:** prova reale a carico del proprietario in locale: login con MFA, riavvio del processo tra `/auth/login` e `/auth/mfa`, sync di un'attività. Non eseguire login automatici ripetuti: un 427 indica blocco Garmin.
+
+**Step 6: Commit** `git add -A && git commit -m "feat(garmin): upgrade python-garminconnect to 0.3.20 and persist MFA state"`
