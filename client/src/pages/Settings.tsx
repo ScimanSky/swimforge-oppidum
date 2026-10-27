@@ -1,5 +1,6 @@
 "use client"
 
+import { assetUrl } from "@/lib/asset-base";
 import AppLayout from "@/components/AppLayout"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -946,7 +947,7 @@ export default function Settings() {
               <div className="flex items-center gap-6">
                 <div className="relative">
                   <Avatar className="h-24 w-24 border border-border">
-                    <AvatarImage src={profileDraft.avatarUrl || "/images/ai_coach_avatar.webp"} alt={displayName} />
+                    <AvatarImage src={profileDraft.avatarUrl || assetUrl("/images/ai_coach_avatar.webp")} alt={displayName} />
                     <AvatarFallback>{initials}</AvatarFallback>
                   </Avatar>
                   <Button

@@ -1,3 +1,5 @@
+import { assetUrl } from "@/lib/asset-base";
+
 // Mapping badge code -> SVG filename
 export const BADGE_IMAGE_MAP: Record<string, string> = {
   // Distance badges
@@ -53,7 +55,7 @@ export function getBadgeImageUrl(badgeCode: string): string {
   const filename = BADGE_IMAGE_MAP[badgeCode];
   if (!filename) {
     console.warn(`No image mapping found for badge code: ${badgeCode}`);
-    return "/badges_new/oppidum_member.png"; // fallback
+    return assetUrl("/badges_new/oppidum_member.png"); // fallback
   }
-  return `/badges_new/${filename}.png`;
+  return assetUrl(`/badges_new/${filename}.png`);
 }

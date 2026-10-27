@@ -1,5 +1,6 @@
 "use client"
 
+import { assetUrl } from "@/lib/asset-base";
 import AppLayout from "@/components/AppLayout"
 import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -376,7 +377,7 @@ export default function Activities() {
                       )}
                       style={{
                         backgroundImage:
-                          "linear-gradient(132deg, rgba(8,18,27,0.78) 0%, rgba(10,23,34,0.72) 56%, rgba(11,26,39,0.78) 100%), url('/images/theme-v3/feed-activity-bg-day.png')",
+                          `linear-gradient(132deg, rgba(8,18,27,0.78) 0%, rgba(10,23,34,0.72) 56%, rgba(11,26,39,0.78) 100%), url('${assetUrl("/images/theme-v3/feed-activity-bg-day.png")}')`,
                         backgroundPosition: "center",
                         backgroundRepeat: "no-repeat",
                         backgroundSize: "cover",

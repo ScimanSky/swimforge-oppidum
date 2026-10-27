@@ -1,3 +1,4 @@
+import { assetUrl } from "@/lib/asset-base";
 import AppLayout from "@/components/AppLayout";
 import { useMemo } from "react";
 import { Link } from "wouter";
@@ -217,7 +218,7 @@ function BadgeCard({ title, description, imageUrl, unlocked, rarity }: BadgeCard
       >
         {unlocked ? (
           imageUrl ? (
-            <img src={imageUrl} alt={title} className="size-9 object-contain" />
+            <img src={assetUrl(imageUrl)} alt={title} className="size-9 object-contain" />
           ) : (
             <Waves className="size-5 text-primary" />
           )

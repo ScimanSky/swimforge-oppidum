@@ -1,3 +1,4 @@
+import { assetUrl } from "@/lib/asset-base";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -157,7 +158,7 @@ export default function Home() {
               style={{ animationDelay: "170ms" }}
             >
               <img
-                src="/images/landing-v5/hero-main.webp"
+                src={assetUrl("/images/landing-v5/hero-main.webp")}
                 alt="Due nuotatori preparano la sessione guardando i dati"
                 className="aspect-[4/5] w-full object-cover object-center md:aspect-[3/4] lg:aspect-[4/5]"
                 loading="eager"
@@ -221,7 +222,7 @@ export default function Home() {
                   style={{ animationDelay: `${120 + index * 90}ms` }}
                 >
                   <img
-                    src={item.image}
+                    src={assetUrl(item.image)}
                     alt={item.alt}
                     className="aspect-[16/10] w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
                     loading="lazy"
@@ -274,7 +275,7 @@ export default function Home() {
                   style={{ animationDelay: `${120 + index * 80}ms` }}
                 >
                   <img
-                    src={item.src}
+                    src={assetUrl(item.src)}
                     alt={item.alt}
                     className="aspect-[3/4] w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                     loading="lazy"
@@ -291,7 +292,7 @@ export default function Home() {
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <article className="landing-reveal relative overflow-hidden rounded-2xl border border-cyan-100/15" style={{ animationDelay: "360ms" }}>
                 <img
-                  src="/images/landing-v5/showcase-leaderboard.webp"
+                  src={assetUrl("/images/landing-v5/showcase-leaderboard.webp")}
                   alt="Smartphone con classifica sfide e progressione XP"
                   className="aspect-[16/10] w-full object-cover"
                   loading="lazy"
@@ -305,7 +306,7 @@ export default function Home() {
               </article>
               <article className="landing-reveal relative overflow-hidden rounded-2xl border border-cyan-100/15" style={{ animationDelay: "430ms" }}>
                 <img
-                  src="/images/landing-v5/showcase-club.webp"
+                  src={assetUrl("/images/landing-v5/showcase-club.webp")}
                   alt="Community club in piscina dopo una sessione condivisa"
                   className="aspect-[16/10] w-full object-cover"
                   loading="lazy"
@@ -323,7 +324,7 @@ export default function Home() {
 
         <section className="relative overflow-hidden bg-[#030c15] py-16 md:py-20">
           <img
-            src="/images/landing-v5/cta-banner.webp"
+            src={assetUrl("/images/landing-v5/cta-banner.webp")}
             alt="Nuotatore sott acqua in accelerazione verso la corsia"
             className="absolute inset-0 h-full w-full object-cover opacity-35"
             loading="lazy"

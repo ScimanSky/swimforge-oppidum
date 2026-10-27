@@ -2,6 +2,7 @@
  * Club Feed Tab - Il feed dei post del club
  */
 
+import { assetUrl } from "@/lib/asset-base";
 import { ReactNode, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
 import { Surface, SurfaceContent } from "@/components/ui/surface";
@@ -504,7 +505,7 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
                   {isActivityPost && (
                     <>
                       <img
-                        src="/images/theme-v3/landing-tour-poster.png"
+                        src={assetUrl("/images/theme-v3/landing-tour-poster.png")}
                         alt=""
                         aria-hidden="true"
                         className="pointer-events-none !absolute inset-0 h-full w-full object-cover object-center !z-0 opacity-[0.32] saturate-[0.95] contrast-[1.04]"
