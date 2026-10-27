@@ -429,11 +429,17 @@ export default function Goals() {
     } catch {
       // invalid storage: dropped below
     }
-    const existingTitles = new Set((goalsQuery.data ?? []).map((row) => row.title.trim().toLowerCase()))
+    // Skip titles already on the server and duplicates within the legacy list itself.
+    const seenTitles = new Set((goalsQuery.data ?? []).map((row) => row.title.trim().toLowerCase()))
     const payloads = (Array.isArray(parsed) ? parsed : [])
       .map(toLegacyGoalPayload)
       .filter((payload): payload is GoalPayload => payload !== null)
-      .filter((payload) => !existingTitles.has(payload.title.toLowerCase()))
+      .filter((payload) => {
+        const key = payload.title.toLowerCase()
+        if (seenTitles.has(key)) return false
+        seenTitles.add(key)
+        return true
+      })
 
     if (payloads.length === 0) {
       try {
@@ -535,7 +541,7 @@ export default function Goals() {
                     />
                   </div>
                 </div>
-                <Button onClick={addCustomGoal}>Aggiungi obiettivo</Button>
+                <Button onClick={addCustomGoal} disabled={createGoalMutation.isPending}>Aggiungi obiettivo</Button>
 
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-foreground">Suggeriti per te</p>
@@ -549,7 +555,12 @@ export default function Goals() {
                           <p className="text-sm font-semibold text-foreground">{goal.title}</p>
                           <p className="text-xs text-muted-foreground">{goal.description}</p>
                         </div>
-                        <Button size="sm" variant="outline" onClick={() => addSuggestedGoal(goal)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => addSuggestedGoal(goal)}
+                          disabled={createGoalMutation.isPending}
+                        >
                           Aggiungi
                         </Button>
                       </div>
@@ -624,7 +635,7 @@ export default function Goals() {
                   <Button variant="ghost" onClick={() => setIsEditOpen(false)}>
                     Annulla
                   </Button>
-                  <Button variant="neon" onClick={saveEditGoal}>
+                  <Button variant="neon" onClick={saveEditGoal} disabled={updateGoalMutation.isPending}>
                     Salva modifiche
                   </Button>
                 </div>
@@ -756,6 +767,7 @@ export default function Goals() {
                             variant="outline"
                             size="icon"
                             onClick={() => removeCustomGoal(goal.id)}
+                            disabled={removeGoalMutation.isPending}
                             aria-label="Elimina obiettivo"
                           >
                             <Trash2 className="w-4 h-4" />

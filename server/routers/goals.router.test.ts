@@ -34,9 +34,20 @@ describe("goals router", () => {
     ).rejects.toThrow();
   });
 
+  it("updates only the caller's goal and strips extra fields", async () => {
+    g.updateUserGoal.mockResolvedValue({ id: 7 });
+    await goalsRouter.createCaller(ctx).update({ id: 7, userId: 99, title: " t " } as any);
+    expect(g.updateUserGoal).toHaveBeenCalledWith(42, 7, { title: "t" });
+  });
+
   it("deletes only the caller's goal", async () => {
     g.deleteUserGoal.mockResolvedValue(true);
     await goalsRouter.createCaller(ctx).remove({ id: 9 });
     expect(g.deleteUserGoal).toHaveBeenCalledWith(42, 9);
+  });
+
+  it("rejects remove with NOT_FOUND when the goal does not exist", async () => {
+    g.deleteUserGoal.mockResolvedValue(false);
+    await expect(goalsRouter.createCaller(ctx).remove({ id: 9 })).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 });
