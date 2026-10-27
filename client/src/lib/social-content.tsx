@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode, useEffect, useState } from "react";
+import { apiUrl } from "@/lib/api-base";
 
 const CONTENT_TOKEN_SPLIT = /(\s+)/g;
 const DOMAIN_LIKE_PATTERN = /^(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,63}(?::\d{2,5})?(?:\/[^\s<>"']*)?$/i;
@@ -202,7 +203,7 @@ export function LinkPreviewCard({
     }
 
     const controller = new AbortController();
-    fetch(`/api/link-preview?url=${encodeURIComponent(preview.href)}`, {
+    fetch(apiUrl(`/api/link-preview?url=${encodeURIComponent(preview.href)}`), {
       method: "GET",
       credentials: "include",
       signal: controller.signal,

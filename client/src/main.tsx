@@ -6,6 +6,7 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
+import { apiUrl } from "@/lib/api-base";
 import { isNativePlatform } from "@/lib/platform";
 import { clearNativeSessionToken, getNativeSessionToken } from "@/lib/session-token";
 import { buildTrpcHeaders } from "@/lib/trpc-headers";
@@ -53,7 +54,7 @@ const readCsrfCookie = (): string | null =>
 const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      url: "/api/trpc",
+      url: apiUrl("/api/trpc"),
       transformer: superjson,
       fetch(input, init) {
         const headers = buildTrpcHeaders(
