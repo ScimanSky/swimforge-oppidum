@@ -339,7 +339,7 @@ export async function sendDirectMessage(params: {
   senderId: number
   receiverId: number
   content: string
-  messageType?: "text" | "forward_post" | "forward_story"
+  messageType?: "text" | "forward_post"
   metadata?: Record<string, unknown> | null
 }) {
   const db = await requireDb()
@@ -386,7 +386,7 @@ export async function sendDirectMessage(params: {
       senderId: Number(row.senderId),
       receiverId: Number(row.receiverId),
       content: String(row.content ?? ""),
-      messageType: "text" as "text" | "forward_post" | "forward_story",
+      messageType: "text" as "text" | "forward_post",
       metadata: null,
       isRead: Boolean(row.isRead),
       readAt: row.readAt ? new Date(row.readAt) : null,
@@ -447,7 +447,7 @@ export async function getConversation(params: {
         senderId: Number(row.senderId),
         receiverId: Number(row.receiverId),
         content: String(row.content ?? ""),
-        messageType: "text" as "text" | "forward_post" | "forward_story",
+        messageType: "text" as "text" | "forward_post",
         metadata: null,
         isRead: Boolean(row.isRead),
         readAt: row.readAt ? new Date(row.readAt) : null,
@@ -575,7 +575,7 @@ export async function getRecentConversations(userId: number, limit: number = 20)
           senderId: Number(row.senderId),
           receiverId: Number(row.receiverId),
           content: String(row.content ?? ""),
-          messageType: "text" as "text" | "forward_post" | "forward_story",
+          messageType: "text" as "text" | "forward_post",
           metadata: null,
           isRead: Boolean(row.isRead),
           readAt: row.readAt ? new Date(row.readAt) : null,

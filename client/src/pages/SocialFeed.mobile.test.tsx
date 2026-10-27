@@ -10,7 +10,7 @@ const mockState = vi.hoisted(() => ({
     avatarUrl: null,
     preferences: { autoplayVideos: false },
   } as any,
-  storyGroups: [] as any[],
+  feedPosts: [] as any[],
 }));
 
 vi.mock("@/lib/trpc", () => ({
@@ -23,13 +23,6 @@ vi.mock("@/lib/trpc", () => ({
       },
     },
     community: {
-      stories: {
-        active: {
-          useQuery: () => ({
-            data: mockState.storyGroups,
-          }),
-        },
-      },
       users: {
         followStarter: {
           useQuery: () => ({
@@ -40,7 +33,7 @@ vi.mock("@/lib/trpc", () => ({
       },
       feed: {
         useQuery: () => ({
-          data: [],
+          data: mockState.feedPosts,
           isLoading: false,
           isFetching: false,
         }),
@@ -50,35 +43,7 @@ vi.mock("@/lib/trpc", () => ({
 }));
 
 vi.mock("@/components/AppLayout", () => ({
-  default: ({ headerSlot, children }: any) => (
-    <div>
-      <div data-testid="app-header-slot">{headerSlot}</div>
-      <div data-testid="app-content">{children}</div>
-    </div>
-  ),
-}));
-
-vi.mock("@/components/social/StoryAvatar", () => ({
-  StoryAvatar: ({ userId, userName, isCurrentUser, onClick }: any) => (
-    <button
-      type="button"
-      data-testid={`story-avatar-${userId}`}
-      data-current={isCurrentUser ? "yes" : "no"}
-      onClick={onClick}
-    >
-      {userName}
-    </button>
-  ),
-}));
-
-vi.mock("@/components/social/StoryViewer", () => ({
-  StoryViewer: ({ groups, initialGroupIndex }: any) => (
-    <div data-testid="story-viewer-state">{`open:${initialGroupIndex}:groups:${groups.length}`}</div>
-  ),
-}));
-
-vi.mock("@/components/social/StoryCreator", () => ({
-  StoryCreator: ({ open }: any) => <div data-testid="story-creator-state">{open ? "open" : "closed"}</div>,
+  default: ({ children }: any) => <div data-testid="app-content">{children}</div>,
 }));
 
 vi.mock("@/components/social/CreatePostSheet", () => ({
@@ -118,7 +83,7 @@ vi.mock("wouter", () => ({
   Link: ({ href, children }: any) => <a href={href}>{children}</a>,
 }));
 
-describe("SocialFeed mobile stories behavior", () => {
+describe("SocialFeed mobile behavior", () => {
   beforeEach(() => {
     mockState.profile = {
       userId: 1,
@@ -126,7 +91,7 @@ describe("SocialFeed mobile stories behavior", () => {
       avatarUrl: null,
       preferences: { autoplayVideos: false },
     };
-    mockState.storyGroups = [];
+    mockState.feedPosts = [];
   });
 
   afterEach(() => {
@@ -134,73 +99,35 @@ describe("SocialFeed mobile stories behavior", () => {
     vi.clearAllMocks();
   });
 
-  it("opens StoryCreator when current user has placeholder avatar with no stories", async () => {
-    mockState.storyGroups = [
-      {
-        userId: 10,
-        userName: "Alice",
-        userAvatar: null,
-        stories: [{ hasViewed: false }],
-      },
-    ];
-
+  it("opens CreatePostSheet from the empty 'Per te' call to action", async () => {
     render(<SocialFeed />);
 
-    expect(screen.getByTestId("story-creator-state")).toHaveTextContent("closed");
-    await userEvent.click(screen.getByTestId("story-avatar-1"));
+    expect(screen.getByTestId("create-post-sheet-state")).toHaveTextContent("closed");
+    await userEvent.click(screen.getByRole("button", { name: "Condividi la prima sessione" }));
 
     await waitFor(() => {
-      expect(screen.getByTestId("story-creator-state")).toHaveTextContent("open");
+      expect(screen.getByTestId("create-post-sheet-state")).toHaveTextContent("open");
     });
   });
 
-  it("opens StoryViewer with index from displayed story order", async () => {
-    mockState.storyGroups = [
-      {
-        userId: 20,
-        userName: "Bob",
-        userAvatar: null,
-        stories: [{ hasViewed: true }],
-      },
-      {
-        userId: 10,
-        userName: "Alice",
-        userAvatar: null,
-        stories: [{ hasViewed: false }],
-      },
-    ];
-
+  it("shows the follow empty state on the 'Seguiti' tab", async () => {
     render(<SocialFeed />);
-    await userEvent.click(screen.getByTestId("story-avatar-20"));
+
+    await userEvent.click(screen.getByText("tab-seguiti-perte"));
 
     await waitFor(() => {
-      expect(screen.getByTestId("story-viewer-state")).toHaveTextContent("open:2:groups:3");
+      expect(screen.getByText("Segui altri nuotatori")).toBeInTheDocument();
     });
   });
 
-  it("opens StoryViewer for current user when current user already has stories", async () => {
-    mockState.storyGroups = [
-      {
-        userId: 1,
-        userName: "Me",
-        userAvatar: null,
-        stories: [{ hasViewed: true }],
-      },
-      {
-        userId: 10,
-        userName: "Alice",
-        userAvatar: null,
-        stories: [{ hasViewed: false }],
-      },
+  it("renders feed posts when the feed has data", () => {
+    mockState.feedPosts = [
+      { id: 1, created_at: "2026-10-27T10:00:00.000Z" },
+      { id: 2, created_at: "2026-10-26T10:00:00.000Z" },
     ];
 
     render(<SocialFeed />);
 
-    await userEvent.click(screen.getByTestId("story-avatar-1"));
-
-    await waitFor(() => {
-      expect(screen.getByTestId("story-viewer-state")).toHaveTextContent("open:0:groups:2");
-    });
-    expect(screen.getByTestId("story-creator-state")).toHaveTextContent("closed");
+    expect(screen.getAllByTestId("feed-post")).toHaveLength(2);
   });
 });

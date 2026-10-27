@@ -8,13 +8,14 @@ import {
   swimmingActivities,
 } from "../drizzle/schema";
 import { logger } from "./middleware/logger";
+import { ENV } from "./_core/env";
 
 let genAI: GoogleGenerativeAI | null = null;
 const log = logger.child({ component: "ai_activity_insights" });
 const inFlightActivityInsightKeys = new Set<string>();
 const userBackgroundGenerationThrottle = new Map<number, number>();
 const BACKGROUND_THROTTLE_MS = 15_000;
-const GEMINI_MODEL = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash";
+const GEMINI_MODEL = ENV.geminiTextModel;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;

@@ -35,7 +35,7 @@ Implicazioni tecniche da gestire (tutte note, nessuna bloccante):
   `npx cap sync android` → Android Studio/Gradle. JDK 17/21 e Android SDK sono già sul PC.
 - **Bundle incluso nell'APK** (avvio immediato, shell offline) con aggiornamenti via Play.
   Niente caricamento remoto del sito.
-- **Backend invariato** su Render; valutare un piano senza cold start, perché un'app
+- **Backend invariato** su Oracle (docker compose); valutare un piano senza cold start, perché un'app
   nativa che resta "a caricare" 30 s al primo avvio viene disinstallata.
 
 ## 2. Stato di partenza (sintesi)
@@ -90,12 +90,53 @@ Priorità P1 = nella prima app pubblicata, P2 = subito dopo, P3 = quando serve.
 | 13 | **Condividi immagine** dell'attività (card con statistiche su foto) verso Instagram/WhatsApp | P2 | plugin Share + canvas |
 | 14 | **Gare** con data, tempo target, passo target, priorità; PB collegati alla gara | P2 | estende Goals + PB Board |
 | 15 | **Import file FIT/TCX/GPX** dal file picker (Garmin Connect, Apple, Coros, Polar esportano tutti FIT) | P1 | copre tutti gli orologi senza nuove integrazioni; libreria `fit-file-parser` |
-| 16 | Garmin **API ufficiale** (Connect Developer Program, gratuita, con approvazione) con webhook push | P2 | sostituisce la libreria non ufficiale; chiedere l'accesso subito perché i tempi sono lunghi |
+| 16 | Garmin: **aggiornare python-garminconnect da 0.3.5 a 0.3.20** (login mobile riparato, MFA ripristinabile tra processi, timezone del profilo) e usare le API nuove di §4b. L'**API ufficiale** (Connect Developer Program) resta l'opzione a lungo termine | P1 | il servizio Python esiste già; vedi §4b |
 | 17 | Classifica **per piscina/città** con opt-in | P3 | SwimForge ha già club e leaderboard: aggiungere "piscina" al profilo basta |
 | 18 | Analisi video: variante "chiedi al coach del club" (upload 60 s, il coach del club risponde) | P3 | nessuno staff centrale; i club sì |
 | 19 | Richiesta recensione in-app, sondaggio di uscita | P3 | plugin pronto |
 
+| 20 | **Invia al Garmin**: una sessione pianificata diventa un workout strutturato sull'orologio (`upload_swimming_workout` + `schedule_workout` + `push_workout_to_device`), con obiettivi di passo relativi alla CSS (`SwimCssOffsetTarget`) | P2 | la funzione che il concorrente segna "presto disponibile" |
+
 Fuori scope: abbonamenti/paywall, pacchetti a pagamento, articoli, Polar/Wahoo, speech-to-text.
+
+### 4b. Novità di python-garminconnect verificate il 27/10/2026
+
+Stato attuale: `garmin-service/requirements.txt` pinna `garminconnect==0.3.5`; il servizio usa
+`login`/`resume_login` con `return_on_mfa=True`, `get_activities`, `get_activity_details`,
+`get_activity_splits`, `get_activity_typed_splits`, `get_activity_hr_in_timezones`,
+`get_activity_evaluation`. Immagine Docker `python:3.12-slim` (la libreria richiede
+Python ≥ 3.12; dipendenza unica `curl_cffi`, niente più `garth`).
+
+Release utili (fonte: release notes GitHub e pacchetto 0.3.20 installato in locale):
+
+| Versione | Novità | Dove serve nel piano |
+|---|---|---|
+| 0.3.20 (23/10) | Login mobile di nuovo funzionante (da aprile rispondeva 429 e si cadeva sui fallback lenti); `login()` con `return_on_mfa=True` restituisce `("needs_mfa", client_state)` **serializzabile in JSON**, ripristinabile con `Garmin().resume_login(client_state, code)` anche in un altro processo o dopo un riavvio; HTTP 427 (blocco) segnalato chiaramente | Fase 0 Task 17: oggi lo stato MFA vive in memoria (`pending_mfa`) e si perde al riavvio del container |
+| 0.3.19 (16/10) | 340+ metodi allineati alla web app; **timezone del profilo Garmin** per "oggi" (il server Oracle gira in UTC); `get_critical_swim_speed`/`_range`; `get_heart_rate_zones_v2` e `update_heart_rate_zones`; `get_daily_summaries`; training readiness e stato allenamento in range | #6 CSS e zone: importare i valori già calcolati da Garmin oltre a stimarli; #7 |
+| 0.3.18 (15/10) | `SwimCssOffsetTarget` (passo relativo alla CSS nei workout), `create_repeat_group(skip_last_rest_step=…)`, `get_activity_images`, `py.typed` | #20 Invia al Garmin |
+| 0.3.17 (29/9) | Target di intensità negli step (`PaceTarget`, `HeartRateZoneTarget`…), `get_training_four_week_load_balance`, `get_daily_training_status` (carico acuto/cronico), `get_training_load_activities` | #7 carico e recupero: usare i valori Garmin quando ci sono, stimare solo in mancanza |
+| 0.3.13-0.3.16 | `get_activities(activitysubtype=…)`, `get_personal_record` documentato, `get_next_scheduled_workout`, correzioni a `resume_login` | #14 PB; #20 |
+| 0.3.10-0.3.11 | Hardening token store (symlink, scritture atomiche, lock), `download_health_snapshot` | già allineato dal commit "Fix Garmin token store permissions" |
+
+Altri metodi disponibili e utili: `get_activity_swim_details`, `get_activity_laps`,
+`get_personal_records_for_activity`, `download_activity` (FIT originale per archivio e
+re-import), `get_hrv_data`, `get_body_battery`, `get_sleep_data`, `get_training_readiness`,
+`get_max_metrics` (VO2max), `get_devices`, `get_workouts`, `get_scheduled_workouts`.
+Modello workout tipizzato (`garminconnect[workout]`, Pydantic): `SwimmingWorkout`,
+`WorkoutSegment`, `ExecutableStep`, `RepeatGroup`, `create_distance_interval_step`,
+`create_targeted_distance_interval_step`, `create_warmup_step`, `create_cooldown_step`,
+`create_recovery_step`, `StrokeTypeModel`, `EquipmentTypeModel`.
+
+Conseguenze per il piano:
+1. La richiesta all'API ufficiale Garmin non è più urgente: la libreria è mantenuta
+   attivamente (6 release in 6 settimane) e copre più di quanto serva. Resta il rischio
+   dei termini d'uso Garmin e dei blocchi (427): tenere l'import FIT come rete di
+   sicurezza e valutare l'API ufficiale dopo la pubblicazione.
+2. Il recovery score (#7) può partire dai dati Garmin (training readiness, HRV, body
+   battery, sonno, carico acuto/cronico) invece che da una stima interna.
+3. "Invia al Garmin" (#20) rende la sessione SwimForge eseguibile sull'orologio, con
+   ripetute e passi target: è il passo che chiude davvero il cerchio piano → vasca.
+
 
 ## 5. Fasi
 
@@ -104,9 +145,13 @@ commit e push. Stime in giorni di lavoro effettivo con Claude Code.
 
 ### Fase 0 — Pulizia e base mobile (2-3 giorni)
 - Cancellare codice morto e funzioni rimosse (§3), togliere i flag relativi.
-- Auth con header per il nativo, CORS, deep link di callback per Google e Strava.
+- Auth con header per il nativo, CORS. I deep link di callback per Google e Strava sono
+  spostati alla Fase 1 (richiedono il plugin App di Capacitor).
 - Obiettivi su server; FC a riposo reale; rimozione mock sidebar.
+- Aggiunto il 27/10 (novità Garmin): aggiornare `garmin-service` a python-garminconnect
+  0.3.20 e rendere persistente lo stato MFA (Task 17 del piano di fase 0).
 - Gate di uscita: web invariata in produzione, test verdi.
+- Completata il 27/10/2026 sul branch android/phase-0 (vedi PR).
 
 ### Fase 1 — Guscio Android con Capacitor (2-3 giorni)
 - `@capacitor/core`, `@capacitor/android`, progetto `android/` nel repo, icona e splash,
@@ -121,10 +166,26 @@ commit e push. Stime in giorni di lavoro effettivo con Claude Code.
 - Gate: l'app installata sul Pixel fa login, sync Garmin, feed, DM, con push ricevuta.
 
 ### Fase 2 — Nuova veste grafica (3-4 giorni, in parallelo a 0-1)
-- Produco 2-3 direzioni visive come prototipo navigabile (home "Oggi", attività,
-  sessione, bordo vasca, profilo). Tu scegli; poi applico la direzione scelta alle
-  schermate P1 mentre le costruisco, non prima. Vincoli: dark-first, contrasto alto per
-  bordo vasca bagnato, target touch ≥ 48 dp, navigazione a 4-5 tab in basso.
+- Base scelta: la proposta **«Corsia»** (`docs/design-proposals/claude-corsia/`, 27/10):
+  un accento azzurro `#34C6EB` per le azioni, arancio `#FF8B47` solo per XP e record,
+  Barlow Condensed per numeri e titoli, Manrope per il testo, niente glow né gradienti,
+  mai testo su foto, tutto in italiano, tema scuro + chiaro «Cloro». L'audit incluso
+  (font mai caricati, cinque accenti neon, nav duplicata, lingua mista) è corretto.
+- Adattamenti obbligatori rispetto alle tavole, per coerenza con le decisioni del 27/10:
+  1. la tab **Season** sparisce (stagioni rimosse): il suo contenuto utile (livello, XP al
+     prossimo livello, posizione in classifica, badge, sfide) va in una tab
+     **Community** insieme ai club, oppure nel profilo;
+  2. la **Home** non è il feed: è la schermata **"Oggi"** (sessione di oggi, ultima
+     attività, carico settimana, 4 azioni rapide); il feed diventa la seconda tab e
+     perde la riga delle storie;
+  3. navigazione proposta: **Oggi · Feed · + · Allena · Community**, con Allena che
+     raccoglie Sessioni, Attività, Statistiche e Coach AI;
+  4. mancano le tavole del cuore allenamento (fase 3): libreria/creazione sessione,
+     calendario, modalità bordo vasca, velocità critica e zone: vanno disegnate con lo
+     stesso sistema prima di implementarle;
+  5. nell'app Capacitor i font vanno inclusi nel bundle (niente Google Fonts a runtime).
+- Vincoli invariati: dark-first, contrasto alto per bordo vasca bagnato, target touch
+  ≥ 48 dp, 5 tab in basso.
 
 ### Fase 3 — Cuore allenamento (5-7 giorni)
 - Sessione personale (§4 #1), creazione Scrivi/Fotografa/AI (#2), calendario e

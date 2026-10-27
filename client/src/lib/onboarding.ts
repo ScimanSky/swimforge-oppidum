@@ -70,7 +70,6 @@ export function setOnboardingIdentityLocally(
 // --- Nudge system ---
 
 export type NudgeId =
-  | "first-season"
   | "try-coach"
   | "find-club";
 

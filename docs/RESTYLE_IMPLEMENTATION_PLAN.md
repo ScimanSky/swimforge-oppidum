@@ -35,7 +35,7 @@ Rendere l'interfaccia chiaramente riconoscibile come SwimForge con una direzione
 - **Implementato:**
   - Rail desktop con mark flat e glow coerente
   - Top bar con brand anchor persistente (wordmark ridotto nel Feed per evitare crowding)
-- **Verifica:** su mobile assicurare che stories + azioni header restino leggibili
+- **Verifica:** su mobile assicurare che le azioni header restino leggibili
 
 ### 4) Feed Identity
 - **File:** `client/src/components/social/FeedPost.tsx`

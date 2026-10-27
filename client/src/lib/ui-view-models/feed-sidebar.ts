@@ -1,10 +1,3 @@
-import {
-  STITCH_CLUB_HUB_ITEMS_MOCK,
-  STITCH_FEED_FOOTER_LINKS,
-  STITCH_WHO_TO_FOLLOW_MOCK,
-  type StitchSidebarIconKey,
-} from "@/mocks/stitch/feed-sidebar"
-
 export type FeedSidebarSuggestedUserInput = {
   userId: number
   name: string | null
@@ -20,17 +13,6 @@ export type FeedSidebarProfileVm = {
   subtitle: string
   avatarUrl: string | null
   level: number | null
-  canFollow: boolean
-  isMock: boolean
-}
-
-export type FeedSidebarClubHubVm = {
-  id: string
-  title: string
-  subtitle: string
-  icon: StitchSidebarIconKey
-  href: string
-  badge?: string
 }
 
 export type FeedSidebarFooterLinkVm = {
@@ -39,10 +21,16 @@ export type FeedSidebarFooterLinkVm = {
 }
 
 export type FeedSidebarVm = {
-  clubHub: FeedSidebarClubHubVm[]
   whoToFollow: FeedSidebarProfileVm[]
   footerLinks: FeedSidebarFooterLinkVm[]
 }
+
+const FEED_FOOTER_LINKS: FeedSidebarFooterLinkVm[] = [
+  { label: "About", href: "/terms" },
+  { label: "Help", href: "/terms" },
+  { label: "Privacy", href: "/privacy" },
+  { label: "Terms", href: "/terms" },
+]
 
 function mapRealSuggestedUser(user: FeedSidebarSuggestedUserInput): FeedSidebarProfileVm {
   const displayName = user.username || user.name || `#${user.userId}`
@@ -55,47 +43,18 @@ function mapRealSuggestedUser(user: FeedSidebarSuggestedUserInput): FeedSidebarP
     subtitle,
     avatarUrl: user.avatarUrl,
     level: user.level,
-    canFollow: true,
-    isMock: false,
-  }
-}
-
-function mapMockSuggestedUser(mockUser: (typeof STITCH_WHO_TO_FOLLOW_MOCK)[number]): FeedSidebarProfileVm {
-  return {
-    id: mockUser.id,
-    displayName: mockUser.name,
-    subtitle: mockUser.subtitle,
-    avatarUrl: mockUser.avatarUrl ?? null,
-    level: null,
-    canFollow: false,
-    isMock: true,
   }
 }
 
 export function buildFeedSidebarVm({
   suggestedUsers,
-  mockSectionsEnabled,
 }: {
   suggestedUsers: FeedSidebarSuggestedUserInput[]
-  mockSectionsEnabled: boolean
 }): FeedSidebarVm {
-  const realWhoToFollow = suggestedUsers.map(mapRealSuggestedUser)
-
-  const whoToFollow = [...realWhoToFollow]
-
-  if (mockSectionsEnabled && whoToFollow.length < 3) {
-    for (const mockUser of STITCH_WHO_TO_FOLLOW_MOCK) {
-      if (whoToFollow.some((entry) => entry.displayName.toLowerCase() === mockUser.name.toLowerCase())) {
-        continue
-      }
-      whoToFollow.push(mapMockSuggestedUser(mockUser))
-      if (whoToFollow.length >= 5) break
-    }
-  }
+  const whoToFollow = suggestedUsers.map(mapRealSuggestedUser)
 
   return {
-    clubHub: mockSectionsEnabled ? STITCH_CLUB_HUB_ITEMS_MOCK : [],
     whoToFollow: whoToFollow.slice(0, 5),
-    footerLinks: STITCH_FEED_FOOTER_LINKS,
+    footerLinks: FEED_FOOTER_LINKS,
   }
 }

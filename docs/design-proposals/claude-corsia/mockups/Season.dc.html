@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Season</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Manrope:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#34C6EB}a:hover{color:#7FDCF3}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #0A1520; color: #ECF3F8; font-family: Manrope, system-ui, sans-serif">
+
+  <header style="padding: 12px 16px 0; display: flex; justify-content: space-between; align-items: flex-start">
+    <div>
+      <h1 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 30px; line-height: 1.1">Season</h1>
+      <p style="margin: 2px 0 0; font-size: 13px; color: #93A6B8">Electric Ice · finisce tra 23 giorni</p>
+    </div>
+    <button aria-label="Profilo" style="width: 36px; height: 36px; margin-top: 4px; border: 0; border-radius: 99px; background: #182838; color: #ECF3F8; font: 700 13px Manrope, sans-serif">MR</button>
+  </header>
+
+  <section style="margin: 16px 16px 0; padding: 18px; background: #111E2B; border: 1px solid #233649; border-radius: 18px">
+    <div style="display: flex; justify-content: space-between; align-items: flex-end">
+      <div>
+        <div style="font-size: 13px; font-weight: 600; color: #93A6B8">Livello</div>
+        <div style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 60px; line-height: 0.9">12</div>
+      </div>
+      <div style="text-align: right">
+        <div style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 24px; color: #FF8B47; line-height: 1">580 XP</div>
+        <div style="font-size: 13px; color: #93A6B8; margin-top: 2px">al livello 13</div>
+      </div>
+    </div>
+    <div style="margin-top: 14px; height: 10px; border-radius: 99px; background: #233649; overflow: hidden">
+      <div style="width: 74%; height: 100%; border-radius: 99px; background: #FF8B47"></div>
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: #93A6B8"><span>8.420 XP</span><span>Posizione 14 su 236</span></div>
+  </section>
+
+  <section style="margin: 20px 16px 0">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px">
+      <h2 style="margin: 0; font-size: 17px; font-weight: 700">Missioni di oggi</h2>
+      <span style="font-size: 13px; color: #93A6B8">si azzerano tra 13 h</span>
+    </div>
+    <div style="background: #111E2B; border: 1px solid #233649; border-radius: 16px">
+      <sc-for list="{{missions}}" as="m" hint-placeholder-count="3">
+        <div style="display: flex; gap: 12px; align-items: center; padding: 14px; border-top: {{m.border}}">
+          <div style="width: 28px; height: 28px; border-radius: 99px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: {{m.dotBg}}; border: {{m.dotBorder}}; color: #062030">
+            <sc-if value="{{m.done}}" hint-placeholder-val="{{false}}">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+            </sc-if>
+          </div>
+          <div style="flex: 1; min-width: 0">
+            <div style="font-size: 15px; font-weight: 600; color: {{m.titleColor}}">{{m.title}}</div>
+            <div style="font-size: 12px; color: #93A6B8; margin-top: 2px">{{m.sub}}</div>
+          </div>
+          <span style="font-size: 13px; font-weight: 700; color: #FF8B47">+{{m.xp}}</span>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <section style="margin: 20px 16px 0; padding: 16px; background: #111E2B; border: 1px solid #233649; border-radius: 16px">
+    <div style="display: flex; justify-content: space-between; align-items: baseline">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 700">Sfida del club · Nuoto Oppidum</h2>
+    </div>
+    <p style="margin: 4px 0 0; font-size: 13px; color: #93A6B8">200 km insieme entro domenica</p>
+    <div style="display: flex; align-items: center; gap: 12px; margin-top: 12px">
+      <div style="flex: 1; height: 8px; border-radius: 99px; background: #233649; overflow: hidden"><div style="width: 71%; height: 100%; background: #34C6EB; border-radius: 99px"></div></div>
+      <span style="font-family: 'Barlow Condensed', sans-serif; font-size: 20px; font-weight: 700">142<span style="font-size: 14px; color: #93A6B8">/200 km</span></span>
+    </div>
+    <p style="margin: 8px 0 0; font-size: 12px; color: #93A6B8">Il tuo contributo: 12,7 km</p>
+  </section>
+
+  <nav aria-label="Navigazione principale" style="position: absolute; left: 0; right: 0; bottom: 0; height: 84px; box-sizing: border-box; padding: 8px 8px 20px; background: #0A1520; border-top: 1px solid #233649; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center">
+    <a href="Feed.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #93A6B8; font-size: 12px; font-weight: 600">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>Home</a>
+    <a href="Attivita.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #93A6B8; font-size: 12px; font-weight: 600">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 9c2 0 2-1.5 4-1.5S8 9 10 9s2-1.5 4-1.5S16 9 18 9s2-1.5 4-1.5"></path><path d="M2 15c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"></path></svg>Allenamento</a>
+    <div style="display: flex; justify-content: center">
+      <button aria-label="Registra o crea" style="width: 52px; height: 52px; border: 0; border-radius: 16px; background: #34C6EB; color: #062030; display: flex; align-items: center; justify-content: center">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+      </button>
+    </div>
+    <a href="Season.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #34C6EB; font-size: 12px; font-weight: 700">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"></path><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"></path></svg>Season</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #93A6B8; font-size: 12px; font-weight: 600">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"></path></svg>Club</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const raw = [
+      { title: 'Nuota almeno 1.500 m', sub: 'Fatto · 3.200 m', xp: 40, done: true },
+      { title: 'Condividi una sessione', sub: 'Pubblica nel feed', xp: 20, done: false },
+      { title: 'Lascia 3 reazioni', sub: '1 di 3', xp: 15, done: false }
+    ];
+    const missions = raw.map((m, i) => ({
+      ...m,
+      border: i === 0 ? '0' : '1px solid #233649',
+      dotBg: m.done ? '#5CD6A0' : 'transparent',
+      dotBorder: m.done ? '0' : '2px solid #3A5168',
+      titleColor: m.done ? '#93A6B8' : '#ECF3F8'
+    }));
+    return { missions };
+  }
+}
+</script>
+</body>
+</html>

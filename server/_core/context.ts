@@ -2,6 +2,7 @@ import { CSRF_COOKIE_NAME } from "@shared/const";
 import { parse as parseCookieHeader } from "cookie";
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
+import { extractBearerToken } from "./bearer";
 import { issueCsrfCookie } from "./cookies";
 import { sdk } from "./sdk";
 
@@ -23,7 +24,7 @@ export async function createContext(
     user = null;
   }
 
-  if (user && process.env.NODE_ENV !== "test") {
+  if (user && process.env.NODE_ENV !== "test" && extractBearerToken(opts.req.headers) === null) {
     const cookies = parseCookieHeader(opts.req.headers.cookie ?? "");
     if (!cookies[CSRF_COOKIE_NAME]) {
       issueCsrfCookie(opts.req, opts.res);

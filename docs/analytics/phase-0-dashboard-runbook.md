@@ -24,17 +24,9 @@ Build the Week-1 baseline and keep a weekly KPI cadence before Phase 1 rollout.
 
 ## Core-loop (weekly)
 1. WAU from `product_engagement_events`.
-2. `season_view_per_wau`.
-3. `season_next_action_ctr_pct`.
-4. `% users with >=1 club_workout_open`.
-5. `% users with >=1 club_workout_complete`.
-6. `% users with >=1 ghost_duel_create`.
-7. `% users with >=1 pb_detected`.
-
-## Season funnel v2 (weekly, Phase 1 extension)
-1. `season_step_action_ctr_pct` (`season_step_action_click / season_step_view`).
-2. `season_weekly_mark_from_click_ctr_pct` (`season_weekly_action_marked / season_step_action_click`).
-3. `season_weekly_mark_from_step_view_ctr_pct` (`season_weekly_action_marked / season_step_view`).
+2. `% users with >=1 club_workout_open`.
+3. `% users with >=1 club_workout_complete`.
+4. `% users with >=1 pb_detected`.
 
 ## Segment health
 1. Active 28d for `all_users`.
@@ -80,14 +72,8 @@ Use this structure:
 
 ## Core-loop (last completed week)
 - WAU: X
-- season_view_per_wau: X
-- season_next_action_ctr_pct: X%
-- season_step_action_ctr_pct: X%
-- season_weekly_mark_from_click_ctr_pct: X%
-- season_weekly_mark_from_step_view_ctr_pct: X%
 - pct_users_club_workout_open: X%
 - pct_users_club_workout_complete: X%
-- pct_users_ghost_duel_create: X%
 - pct_users_pb_detected: X%
 
 ## Segment health

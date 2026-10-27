@@ -4,6 +4,7 @@ import { getAdvancedMetrics } from "./db_statistics";
 import { getExistingWorkouts } from "./ai_coach";
 import { listActivityInsights } from "./ai_activity_insights";
 import { logger } from "./middleware/logger";
+import { ENV } from "./_core/env";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export type CoachChatMessage = {
@@ -139,7 +140,7 @@ function normalizeAssistantContent(content: unknown): string {
     .trim();
 }
 
-const GEMINI_MODEL = (process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() || "gemini-2.5-flash";
+const GEMINI_MODEL = ENV.geminiTextModel;
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY ?? "").trim();
 const geminiModel = GEMINI_API_KEY
   ? new GoogleGenerativeAI(GEMINI_API_KEY).getGenerativeModel({ model: GEMINI_MODEL })

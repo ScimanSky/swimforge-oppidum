@@ -104,13 +104,6 @@ describe("community.cloudinaryVideoAuth", () => {
     expect(result.signature).toBe(expectedSignature("posts/42", timestamp, "demo-secret"));
   });
 
-  it("uses stories folder when stories scope is requested", async () => {
-    const caller = communityRouter.createCaller(createAuthContext());
-    const result = await caller.cloudinaryVideoAuth({ scope: "stories" });
-
-    expect(result.folder).toBe("stories/42");
-  });
-
   it("rejects clubs scope when clubId is missing", async () => {
     const caller = communityRouter.createCaller(createAuthContext());
     await expect(
@@ -148,7 +141,7 @@ describe("community.cloudinaryVideoAuth", () => {
     });
     const caller = communityRouter.createCaller(createAuthContext());
 
-    await expect(caller.cloudinaryVideoAuth({ scope: "stories" })).rejects.toMatchObject({
+    await expect(caller.cloudinaryVideoAuth({ scope: "posts" })).rejects.toMatchObject({
       code: "PRECONDITION_FAILED",
     });
   });
@@ -160,7 +153,7 @@ describe("community.cloudinaryVideoAuth", () => {
       percentUsed: 81,
     });
     const caller = communityRouter.createCaller(createAuthContext());
-    const result = await caller.cloudinaryVideoAuth({ scope: "stories" });
+    const result = await caller.cloudinaryVideoAuth({ scope: "posts" });
 
     expect(result.warning).toContain("Attenzione: quota Cloudinary al 81.0%");
     expect(result.creditUsage).toEqual({

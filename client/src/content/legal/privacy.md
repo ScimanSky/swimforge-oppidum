@@ -23,7 +23,7 @@ Quando ti registri e utilizzi SwimForge, potresti fornirci:
 - **Informazioni di profilo**: Nome visualizzato, avatar, biografia
 - **Dati di attività**: Attività di nuoto inserite manualmente (distanza, durata, data, tipo di vasca, stile)
 - **Preferenze**: Impostazioni di notifica, preferenze di visualizzazione
-- **Interazioni social**: Commenti, reazioni, messaggi diretti e inoltri privati di post/story (con nota opzionale)
+- **Interazioni social**: Commenti, reazioni, messaggi diretti e inoltri privati di post (con nota opzionale)
 
 ### 1.2 Informazioni raccolte automaticamente
 
@@ -116,9 +116,9 @@ Le classifiche (leaderboard) mostrano pubblicamente:
 
 **Non condividiamo** email, dati di attività dettagliati o altre informazioni sensibili nelle classifiche.
 
-### 3.5 Inoltri privati di post e stories
+### 3.5 Inoltri privati di post
 
-Quando inoltri un post o una story in chat privata:
+Quando inoltri un post in chat privata:
 - Registriamo mittente, destinatario, timestamp, tipo messaggio e metadati minimi del contenuto inoltrato (es. id contenuto, anteprima, autore)
 - L'inoltro viene consentito solo se conforme alle regole privacy dell'autore (es. inoltri consentiti/disabilitati, limitazione ai follower)
 - I destinatari bloccati dalle regole privacy non ricevono l'inoltro

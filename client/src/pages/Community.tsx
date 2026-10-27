@@ -252,7 +252,7 @@ export default function Community() {
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button variant="outline-neon" className="gap-2" asChild>
-                    <Link href="/season/leaderboard">
+                    <Link href="/leaderboard">
                       <Trophy className="h-4 w-4" />
                       Classifica generale
                     </Link>

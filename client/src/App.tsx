@@ -8,7 +8,6 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import BadgeUnlockNotification from "./components/BadgeUnlockNotification";
 import BadgeUnlockWatcher from "./components/BadgeUnlockWatcher";
-import SeasonLaunchPopup from "./components/SeasonLaunchPopup";
 import { useBadgeNotifications } from "./hooks/useBadgeNotifications";
 import AutoSync from "./components/AutoSync";
 import ActivityInsightNotification from "./components/ActivityInsightNotification";
@@ -28,7 +27,6 @@ const Profile = lazy(() => import("./pages/Profile"));
 const PublicProfile = lazy(() => import("./pages/PublicProfile"));
 const Statistics = lazy(() => import("./pages/Statistics"));
 const Coach = lazy(() => import("./pages/Coach"));
-const SeasonPage = lazy(() => import("./pages/Season"));
 const SocialFeed = lazy(() => import("./pages/SocialFeed"));
 const Messages = lazy(() => import("./pages/Messages"));
 const PostDetail = lazy(() => import("./pages/PostDetail"));
@@ -86,7 +84,7 @@ function Router() {
       <Route path="/home/post/:postId">{(params: { postId: string }) => <Redirect to={`/post/${params.postId}`} />}</Route>
       <Route path="/home/report/post/:postId" component={ReportPost} />
       <Route path="/dashboard">
-        <Redirect to="/season" />
+        <Redirect to="/track" />
       </Route>
       <Route path="/report/post/:postId">{(params: { postId: string }) => <Redirect to={`/home/report/post/${params.postId}`} />}</Route>
       <Route path="/admin/reports" component={AdminReports} />
@@ -94,18 +92,18 @@ function Router() {
         <Redirect to="/admin/reports" />
       </Route>
       <Route path="/home/dashboard">
-        <Redirect to="/season" />
+        <Redirect to="/track" />
       </Route>
       <Route path="/badges" component={Badges} />
-      <Route path="/season/challenges" component={Challenges} />
-      <Route path="/challenges">
-        <Redirect to="/season/challenges" />
+      <Route path="/challenges" component={Challenges} />
+      <Route path="/season/challenges">
+        <Redirect to="/challenges" />
       </Route>
-      <Route path="/season/challenges/:id" component={ChallengeDetail} />
-      <Route path="/challenges/:id">{(params: { id: string }) => <Redirect to={`/season/challenges/${params.id}`} />}</Route>
-      <Route path="/season/leaderboard" component={Leaderboard} />
-      <Route path="/leaderboard">
-        <Redirect to="/season/leaderboard" />
+      <Route path="/challenges/:id" component={ChallengeDetail} />
+      <Route path="/season/challenges/:id">{(params: { id: string }) => <Redirect to={`/challenges/${params.id}`} />}</Route>
+      <Route path="/leaderboard" component={Leaderboard} />
+      <Route path="/season/leaderboard">
+        <Redirect to="/leaderboard" />
       </Route>
       <Route path="/track/:id" component={ActivityDetail} />
       <Route path="/activities/:id">{(params: { id: string }) => <Redirect to={`/track/${params.id}`} />}</Route>
@@ -113,9 +111,12 @@ function Router() {
       <Route path="/activities">
         <Redirect to="/track" />
       </Route>
-      <Route path="/season/objectives" component={Goals} />
-      <Route path="/goals">
-        <Redirect to="/season/objectives" />
+      <Route path="/goals" component={Goals} />
+      <Route path="/season/objectives">
+        <Redirect to="/goals" />
+      </Route>
+      <Route path="/season">
+        <Redirect to="/track" />
       </Route>
       <Route path="/profile/performance" component={Statistics} />
       <Route path="/statistics">
@@ -128,7 +129,6 @@ function Router() {
       <Route path="/session-iq">
         <Redirect to="/coach?tab=session-iq" />
       </Route>
-      <Route path="/season" component={SeasonPage} />
       <Route path="/community/invite/:code" component={ClubInvite} />
       <Route path="/community/club/:clubId/event/:eventId" component={ClubEventDetail} />
       {clubMeetsV1Enabled ? (
@@ -186,7 +186,6 @@ function App() {
           <Toaster richColors position="top-center" />
           <AutoSync />
           <BadgeUnlockWatcher />
-          <SeasonLaunchPopup />
           <ScrollToTop />
           <Router />
           <ActivityInsightNotification />

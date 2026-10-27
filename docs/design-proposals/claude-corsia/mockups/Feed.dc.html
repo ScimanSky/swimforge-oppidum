@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Home social</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Manrope:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#34C6EB}a:hover{color:#7FDCF3}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #0A1520; color: #ECF3F8; font-family: Manrope, system-ui, sans-serif">
+
+  <header style="height: 60px; padding: 0 8px 0 16px; display: flex; align-items: center; justify-content: space-between">
+    <div style="display: flex; align-items: center; gap: 8px">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="#34C6EB" aria-hidden="true"><path d="M12 2.5c3.2 4.2 7 8.3 7 12.3A7 7 0 0 1 5 14.8c0-4 3.8-8.1 7-12.3z"></path></svg>
+      <span style="font-family: 'Barlow Condensed', sans-serif; font-weight: 700; font-size: 26px; letter-spacing: 0.2px">SwimForge</span>
+    </div>
+    <div style="display: flex">
+      <button aria-label="Notifiche" style="width: 44px; height: 44px; border: 0; background: transparent; color: #ECF3F8; display: flex; align-items: center; justify-content: center; position: relative">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+        <span style="position: absolute; top: 10px; right: 10px; width: 8px; height: 8px; border-radius: 99px; background: #FF8B47"></span>
+      </button>
+      <button aria-label="Messaggi" style="width: 44px; height: 44px; border: 0; background: transparent; color: #ECF3F8; display: flex; align-items: center; justify-content: center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"></path></svg>
+      </button>
+    </div>
+  </header>
+
+  <div style="display: flex; gap: 14px; padding: 4px 16px 14px; overflow: hidden">
+    <sc-for list="{{stories}}" as="s" hint-placeholder-count="5">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; width: 62px; flex-shrink: 0">
+        <div style="width: 58px; height: 58px; border-radius: 99px; padding: 2px; border: {{s.ring}}; box-sizing: border-box">
+          <div style="width: 100%; height: 100%; border-radius: 99px; background: {{s.bg}}; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: #ECF3F8">{{s.ini}}</div>
+        </div>
+        <span style="font-size: 12px; color: #B7C6D4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 62px">{{s.name}}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div role="tablist" aria-label="Feed" style="display: flex; gap: 24px; padding: 0 16px; border-bottom: 1px solid #233649">
+    <button role="tab" aria-selected="true" style="padding: 10px 0 12px; border: 0; border-bottom: 2px solid #34C6EB; background: transparent; color: #ECF3F8; font: 700 15px Manrope, sans-serif">Per te</button>
+    <button role="tab" aria-selected="false" style="padding: 10px 0 12px; border: 0; background: transparent; color: #93A6B8; font: 600 15px Manrope, sans-serif">Seguiti</button>
+    <button role="tab" aria-selected="false" style="padding: 10px 0 12px; border: 0; background: transparent; color: #93A6B8; font: 600 15px Manrope, sans-serif">Club</button>
+  </div>
+
+  <article style="padding: 16px; border-bottom: 1px solid #233649">
+    <div style="display: flex; gap: 10px; align-items: center">
+      <div style="width: 40px; height: 40px; border-radius: 99px; background: #2C5E7A; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px">GB</div>
+      <div style="flex: 1">
+        <div style="font-size: 15px; font-weight: 700">Giulia Bianchi</div>
+        <div style="font-size: 12px; color: #93A6B8">Nuoto Oppidum · 2 h fa</div>
+      </div>
+    </div>
+    <p style="margin: 12px 0 0; font-size: 15px; line-height: 1.5">Finalmente sotto l'1:50 sui 200. Le ultime tre ripetute sono state le migliori.</p>
+    <a href="Sessione.dc.html" style="display: block; margin-top: 12px; padding: 14px; background: #111E2B; border: 1px solid #233649; border-radius: 14px; text-decoration: none; color: #ECF3F8">
+      <div style="display: flex; justify-content: space-between; align-items: center">
+        <span style="font-size: 14px; font-weight: 700">Soglia 10×200 · Vasca 25m</span>
+        <span style="padding: 3px 9px; border-radius: 999px; background: rgba(92,214,160,0.14); color: #5CD6A0; font-size: 12px; font-weight: 700">Record 200m</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 12px">
+        <div><div style="font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; line-height: 1">3,4<span style="font-size: 14px; color: #93A6B8"> km</span></div><div style="font-size: 12px; color: #93A6B8; margin-top: 3px">Distanza</div></div>
+        <div><div style="font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; line-height: 1; color: #34C6EB">1:49</div><div style="font-size: 12px; color: #93A6B8; margin-top: 3px">Passo /100</div></div>
+        <div><div style="font-family: 'Barlow Condensed', sans-serif; font-size: 26px; font-weight: 700; line-height: 1">1:05<span style="font-size: 14px; color: #93A6B8"> h</span></div><div style="font-size: 12px; color: #93A6B8; margin-top: 3px">Durata</div></div>
+      </div>
+    </a>
+    <div style="display: flex; gap: 4px; margin-top: 8px; margin-left: -10px">
+      <button style="height: 40px; padding: 0 10px; border: 0; background: transparent; color: #ECF3F8; display: flex; align-items: center; gap: 6px; font: 600 14px Manrope, sans-serif">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="#FF8B47" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.5-9.3C1.2 8.4 3.4 5 6.9 5c2 0 3.4 1.1 5.1 3 1.7-1.9 3.1-3 5.1-3 3.5 0 5.7 3.4 4.4 6.7C19.5 16.4 12 21 12 21z"></path></svg>24</button>
+      <button style="height: 40px; padding: 0 10px; border: 0; background: transparent; color: #B7C6D4; display: flex; align-items: center; gap: 6px; font: 600 14px Manrope, sans-serif">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"></path></svg>5</button>
+      <button aria-label="Condividi" style="height: 40px; padding: 0 10px; margin-left: auto; border: 0; background: transparent; color: #B7C6D4; display: flex; align-items: center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"></path><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5"></path></svg>
+      </button>
+    </div>
+  </article>
+
+  <article style="padding: 16px">
+    <div style="display: flex; gap: 10px; align-items: center">
+      <div style="width: 40px; height: 40px; border-radius: 99px; background: #6B4A2E; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px">LV</div>
+      <div style="flex: 1">
+        <div style="font-size: 15px; font-weight: 700">Luca Verdi</div>
+        <div style="font-size: 12px; color: #93A6B8">ha sbloccato un badge · 5 h fa</div>
+      </div>
+    </div>
+    <div style="margin-top: 12px; padding: 14px; background: #111E2B; border: 1px solid #233649; border-radius: 14px; display: flex; gap: 12px; align-items: center">
+      <div style="width: 48px; height: 48px; border-radius: 12px; background: rgba(255,139,71,0.14); display: flex; align-items: center; justify-content: center; color: #FF8B47">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="6"></circle><path d="M8.5 14l-1.5 7 5-3 5 3-1.5-7"></path></svg>
+      </div>
+      <div><div style="font-size: 15px; font-weight: 700">Endurance Legend</div><div style="font-size: 13px; color: #93A6B8">100 km nella stagione</div></div>
+    </div>
+  </article>
+
+  <nav aria-label="Navigazione principale" style="position: absolute; left: 0; right: 0; bottom: 0; height: 84px; box-sizing: border-box; padding: 8px 8px 20px; background: #0A1520; border-top: 1px solid #233649; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center">
+    <a href="Feed.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #34C6EB; font-size: 12px; font-weight: 700">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"></path></svg>Home</a>
+    <a href="Attivita.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #93A6B8; font-size: 12px; font-weight: 600">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 9c2 0 2-1.5 4-1.5S8 9 10 9s2-1.5 4-1.5S16 9 18 9s2-1.5 4-1.5"></path><path d="M2 15c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5"></path></svg>Allenamento</a>
+    <div style="display: flex; justify-content: center">
+      <button aria-label="Registra o crea" style="width: 52px; height: 52px; border: 0; border-radius: 16px; background: #34C6EB; color: #062030; display: flex; align-items: center; justify-content: center">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+      </button>
+    </div>
+    <a href="Season.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #93A6B8; font-size: 12px; font-weight: 600">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"></path><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"></path></svg>Season</a>
+    <a href="#" style="display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none; color: #93A6B8; font-size: 12px; font-weight: 600">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"></circle><path d="M2.5 20a6.5 6.5 0 0 1 13 0"></path><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"></path></svg>Club</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const seen = '2px solid #2E465C';
+    const fresh = '2px solid #34C6EB';
+    const stories = [
+      { ini: '+', name: 'La tua', bg: '#182838', ring: '2px dashed #3A5168' },
+      { ini: 'GB', name: 'Giulia', bg: '#2C5E7A', ring: fresh },
+      { ini: 'LV', name: 'Luca', bg: '#6B4A2E', ring: fresh },
+      { ini: 'NO', name: 'Nuoto Oppidum', bg: '#1C6B62', ring: seen },
+      { ini: 'SF', name: 'Sara', bg: '#4B3B6E', ring: seen }
+    ];
+    return { stories };
+  }
+}
+</script>
+</body>
+</html>

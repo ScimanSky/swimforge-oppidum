@@ -2,7 +2,6 @@ import { useEffect, useMemo } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
-import { getSeasonAssignmentImageUrl } from "@/lib/seasonBadgeImages";
 import { useBadgeNotifications, type BadgeNotificationItem } from "@/hooks/useBadgeNotifications";
 
 type UnlockCandidate = BadgeNotificationItem & {
@@ -23,19 +22,6 @@ const parseSeenSet = (raw: string | null): Set<string> => {
 
 const persistSeenSet = (storageKey: string, keys: Set<string>) => {
   localStorage.setItem(storageKey, JSON.stringify(Array.from(keys)));
-};
-
-const getUnlockedSeasonValue = (metric: string, seasonData: any): number => {
-  const assignment = (seasonData?.badgeAssignments ?? []).find(
-    (entry: any) => String(entry?.metric ?? "") === metric,
-  );
-  if (assignment && Number.isFinite(Number(assignment?.current))) {
-    return Number(assignment.current);
-  }
-  if (metric === "seasonLevel") {
-    return Number(seasonData?.progress?.currentLevel ?? 1);
-  }
-  return Number((seasonData?.seasonStats as Record<string, unknown> | undefined)?.[metric] ?? 0);
 };
 
 export default function BadgeUnlockWatcher() {
@@ -59,17 +45,10 @@ export default function BadgeUnlockWatcher() {
     refetchOnWindowFocus: true,
     refetchInterval: 120_000,
   });
-  const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
-    enabled: isAuthenticated,
-    staleTime: 60_000,
-    refetchInterval: 120_000,
-    refetchOnWindowFocus: false,
-  });
 
   const isDataReady =
     !classicBadgesQuery.isLoading &&
-    !achievementBadgesQuery.isLoading &&
-    !seasonQuery.isLoading;
+    !achievementBadgesQuery.isLoading;
 
   const notificationsEnabled = useMemo(() => {
     const raw = (profileQuery.data?.notificationSettings as Record<string, unknown> | undefined)?.badges;
@@ -115,29 +94,7 @@ export default function BadgeUnlockWatcher() {
       };
     });
 
-    const seasonData = seasonQuery.data;
-    const seasonItems: UnlockCandidate[] = (seasonData?.badgeAssignments ?? [])
-      .filter((assignment: any) => {
-        const target = Math.max(1, Number(assignment?.target ?? 1));
-        const current = getUnlockedSeasonValue(String(assignment?.metric ?? ""), seasonData);
-        return current >= target;
-      })
-      .map((assignment: any) => {
-        const code = String(assignment?.code ?? "season_badge");
-        return {
-          key: `season:${code}`,
-          id: `season-${code}`,
-          code,
-          name: String(assignment?.name ?? code),
-          description: String(assignment?.objective ?? "Badge season sbloccato."),
-          image_url: getSeasonAssignmentImageUrl(code),
-          rarity: typeof assignment?.rarity === "string" ? assignment.rarity : undefined,
-          category: "season",
-          unlockedAtMs: 0,
-        };
-      });
-
-    return [...classicItems, ...achievementItems, ...seasonItems].sort((a, b) => {
+    return [...classicItems, ...achievementItems].sort((a, b) => {
       if (a.unlockedAtMs !== b.unlockedAtMs) {
         // Keep deterministic order; unknown timestamps (0) are pushed after known dates.
         if (a.unlockedAtMs === 0) return 1;
@@ -146,7 +103,7 @@ export default function BadgeUnlockWatcher() {
       }
       return a.name.localeCompare(b.name);
     });
-  }, [achievementBadgesQuery.data, classicBadgesQuery.data, seasonQuery.data]);
+  }, [achievementBadgesQuery.data, classicBadgesQuery.data]);
 
   useEffect(() => {
     if (!isAuthenticated || !userId || !isDataReady) return;

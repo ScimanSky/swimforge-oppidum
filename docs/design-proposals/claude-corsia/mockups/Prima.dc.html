@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Audit UI attuale</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&amp;family=Manrope:wght@400;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#34C6EB}a:hover{color:#7FDCF3}
+</style>
+</helmet>
+<div style="width: 1440px; height: 1180px; box-sizing: border-box; padding: 56px 72px; background: #F4F7F9; color: #0D1B27; font-family: Manrope, system-ui, sans-serif; display: flex; flex-direction: column; gap: 32px">
+  <div style="display: flex; flex-direction: column; gap: 8px; max-width: 900px">
+    <h2 style="margin: 0; font-family: 'Barlow Condensed', sans-serif; font-size: 44px; font-weight: 700; line-height: 1">Com'è oggi, a 390px</h2>
+    <p style="margin: 0; font-size: 16px; line-height: 1.5; color: #556677">Schermate reali dell'app in esecuzione locale (dati di esempio). La base è solida: componenti shadcn, token in OKLCH, tema chiaro e scuro. Il problema è lo strato visivo sopra.</p>
+  </div>
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px">
+
+    <div style="display: flex; flex-direction: column; gap: 14px">
+      <img src="../screenshots/prima-attivita-scuro.png" alt="Attività, tema scuro, versione attuale" style="width: 100%; border-radius: 18px; border: 1px solid #DCE4EA; display: block">
+      <p style="margin: 0; font-size: 15px; font-weight: 700">Attività · scuro</p>
+      <ol style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.5; color: #33444F; display: flex; flex-direction: column; gap: 6px">
+        <li>Il filtro attivo «Tutte» è bianco su gradiente cyan→lime: illeggibile.</li>
+        <li>Foto della piscina sotto ogni card: rumore dietro numeri e titoli.</li>
+        <li>Anelli metrica decorativi; SWOLF vuoto mostra «—» in un cerchio.</li>
+        <li>«Oct 27 · 10:47 AM», «Training», «Activity Tracker»: lingua mista.</li>
+      </ol>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 14px">
+      <img src="../screenshots/prima-attivita-chiaro.png" alt="Attività, tema chiaro, versione attuale" style="width: 100%; border-radius: 18px; border: 1px solid #DCE4EA; display: block">
+      <p style="margin: 0; font-size: 15px; font-weight: 700">Attività · chiaro</p>
+      <ol start="5" style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.5; color: #33444F; display: flex; flex-direction: column; gap: 6px">
+        <li>Titolo, data ed etichette scuri sopra la foto: quasi invisibili.</li>
+        <li>Fondo grigio-azzurro spento: il tema chiaro sembra «sporco».</li>
+        <li>Copy da desktop su mobile: «seleziona a sinistra, analizza a destra».</li>
+      </ol>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 14px">
+      <img src="../screenshots/prima-season-scuro.png" alt="Season Hub, tema scuro, versione attuale" style="width: 100%; border-radius: 18px; border: 1px solid #DCE4EA; display: block">
+      <p style="margin: 0; font-size: 15px; font-weight: 700">Season · scuro</p>
+      <ol start="8" style="margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.5; color: #33444F; display: flex; flex-direction: column; gap: 6px">
+        <li>Doppio titolo: «SEASON DASHBOARD» + «Season Hub» + «Season Electric Ice».</li>
+        <li>Badge a pillola ovunque (Level, 0g 0h, Club, Reset, Scadenza) senza gerarchia.</li>
+        <li>Due orb grandi per dire «livello 12» e «0 missioni».</li>
+      </ol>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 16px; background: #FFFFFF; border: 1px solid #DCE4EA; border-radius: 18px; padding: 24px">
+      <p style="margin: 0; font-size: 15px; font-weight: 700">Problemi trasversali</p>
+      <div style="display: flex; flex-direction: column; gap: 14px; font-size: 14px; line-height: 1.5; color: #33444F">
+        <div><b style="color: #0D1B27">Font mai caricati.</b> Manrope e Rajdhani sono dichiarati in index.css ma non c'è nessun link o @font-face: si vede il font di sistema.</div>
+        <div><b style="color: #0D1B27">Cinque accenti neon.</b> Cyan, lime, corallo, arancio e viola, più glow su bottoni, nav e card. Tutto chiede attenzione, quindi niente la ottiene.</div>
+        <div><b style="color: #0D1B27">Etichette da 10px</b> in MAIUSCOLO spaziato in nav, badge e metriche.</div>
+        <div><b style="color: #0D1B27">Navigazione duplicata.</b> Nella shell la bottom bar dice Home, Training, Crea, Club, Sezioni; esistono altri due componenti nav (MobileNav, app-bottom-nav) con voci diverse (Social, Track, Sfide, Club, Profilo).</div>
+        <div><b style="color: #0D1B27">Bottoni «neon»</b> in MAIUSCOLO con bordo luminoso anche per azioni secondarie.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

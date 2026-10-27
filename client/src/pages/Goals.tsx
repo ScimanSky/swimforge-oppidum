@@ -1,7 +1,7 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
@@ -48,6 +48,24 @@ const formatDate = (date?: string | Date | null) => {
   })
 }
 
+const LEGACY_CUSTOM_GOALS_KEY = "swimforge:customGoals"
+
+type GoalPayload = { title: string; category: string; targetValue: number | null; unit: string | null }
+
+const toLegacyGoalPayload = (entry: any): GoalPayload | null => {
+  const title = typeof entry?.title === "string" ? entry.title.trim().slice(0, 120) : ""
+  if (!title) return null
+  const target = Number(entry?.targetValue)
+  const unit = typeof entry?.unit === "string" ? entry.unit.trim().slice(0, 24) : ""
+  const category = typeof entry?.category === "string" ? entry.category.trim().slice(0, 32) : ""
+  return {
+    title,
+    category: category || "distance",
+    targetValue: Number.isFinite(target) && target > 0 ? target : null,
+    unit: unit || null,
+  }
+}
+
 const categoryIcons: Record<string, React.ElementType> = {
   speed: Zap,
   distance: Waves,
@@ -71,15 +89,20 @@ const categoryColors: Record<string, string> = {
 export default function Goals() {
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isEditOpen, setIsEditOpen] = useState(false)
-  const [customGoals, setCustomGoals] = useState<any[]>([])
   const [customDraft, setCustomDraft] = useState({
     title: "",
     category: "distance",
     targetValue: "",
     unit: "",
   })
-  const [editDraft, setEditDraft] = useState({
-    id: "",
+  const [editDraft, setEditDraft] = useState<{
+    id: number | null
+    title: string
+    category: string
+    targetValue: string
+    unit: string
+  }>({
+    id: null,
     title: "",
     category: "distance",
     targetValue: "",
@@ -91,6 +114,27 @@ export default function Goals() {
   const performanceQuery = trpc.statistics.getPerformance.useQuery({ days: 30 })
   const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
   const userBadgesQuery = trpc.badges.userBadges.useQuery()
+  const utils = trpc.useUtils()
+  const goalsQuery = trpc.goals.list.useQuery()
+  const invalidateGoals = () => utils.goals.list.invalidate()
+  const createGoalMutation = trpc.goals.create.useMutation({ onSuccess: invalidateGoals })
+  const updateGoalMutation = trpc.goals.update.useMutation({ onSuccess: invalidateGoals })
+  const removeGoalMutation = trpc.goals.remove.useMutation({ onSuccess: invalidateGoals })
+
+  const customGoals = useMemo(() => {
+    return (goalsQuery.data ?? []).map((row) => ({
+      id: row.id,
+      title: row.title,
+      category: row.category,
+      currentValue: row.currentValue,
+      targetValue: row.targetValue ?? "—",
+      unit: row.unit ?? "valore",
+      progress: row.targetValue ? Math.min(100, Math.round((row.currentValue / row.targetValue) * 100)) : 0,
+      deadline: "Da iniziare",
+      status: "behind",
+      milestones: [] as { title: string; completed: boolean }[],
+    }))
+  }, [goalsQuery.data])
 
   const profile = profileQuery.data
   const timeline = timelineQuery.data ?? []
@@ -274,26 +318,24 @@ export default function Goals() {
   }, [activeGoals, allActiveGoals.length])
 
   const addSuggestedGoal = (goal: any) => {
-    const id = `${goal.category}-${goal.title}`.toLowerCase().replace(/\s+/g, "-")
-    const exists = customGoals.some((item) => item.id === id)
+    const title = String(goal.title ?? "").trim()
+    const exists = customGoals.some((item) => item.title.trim().toLowerCase() === title.toLowerCase())
     if (exists) {
       toast.info("Obiettivo gia aggiunto")
       return
     }
-    const newGoal = {
-      id,
-      title: goal.title,
-      category: goal.category,
-      currentValue: 0,
-      targetValue: goal.category === "distance" ? 8 : 100,
-      unit: goal.category === "distance" ? "km" : "punti",
-      progress: 0,
-      deadline: "Da iniziare",
-      status: "behind",
-      milestones: [],
-    }
-    setCustomGoals((prev) => [...prev, newGoal])
-    toast.success("Obiettivo aggiunto")
+    createGoalMutation.mutate(
+      {
+        title,
+        category: goal.category,
+        targetValue: goal.category === "distance" ? 8 : 100,
+        unit: goal.category === "distance" ? "km" : "punti",
+      },
+      {
+        onSuccess: () => toast.success("Obiettivo aggiunto"),
+        onError: () => toast.error("Impossibile salvare l'obiettivo"),
+      }
+    )
   }
 
   const addCustomGoal = () => {
@@ -301,87 +343,126 @@ export default function Goals() {
       toast.error("Inserisci un titolo per l'obiettivo")
       return
     }
-    const id = `custom-${Date.now()}`
-    const targetValue = Number(customDraft.targetValue) || 0
-    const newGoal = {
-      id,
-      title: customDraft.title.trim(),
-      category: customDraft.category,
-      currentValue: 0,
-      targetValue: targetValue || "—",
-      unit: customDraft.unit || "valore",
-      progress: 0,
-      deadline: "Da iniziare",
-      status: "behind",
-      milestones: [],
-    }
-    setCustomGoals((prev) => [...prev, newGoal])
-    setCustomDraft({ title: "", category: customDraft.category, targetValue: "", unit: "" })
-    toast.success("Obiettivo creato")
+    const targetValue = Number(customDraft.targetValue)
+    createGoalMutation.mutate(
+      {
+        title: customDraft.title.trim(),
+        category: customDraft.category,
+        targetValue: Number.isFinite(targetValue) && targetValue > 0 ? targetValue : null,
+        unit: customDraft.unit.trim() || null,
+      },
+      {
+        onSuccess: () => {
+          setCustomDraft({ title: "", category: customDraft.category, targetValue: "", unit: "" })
+          toast.success("Obiettivo creato")
+        },
+        onError: () => toast.error("Impossibile salvare l'obiettivo"),
+      }
+    )
   }
 
-  const removeCustomGoal = (id: string) => {
-    setCustomGoals((prev) => prev.filter((goal) => goal.id !== id))
-    toast.success("Obiettivo eliminato")
+  const removeCustomGoal = (id: number) => {
+    removeGoalMutation.mutate(
+      { id },
+      {
+        onSuccess: () => toast.success("Obiettivo eliminato"),
+        onError: () => toast.error("Impossibile eliminare l'obiettivo"),
+      }
+    )
   }
 
   const openEditGoal = (goal: any) => {
+    const row = goalsQuery.data?.find((item) => item.id === goal.id)
     setEditDraft({
       id: goal.id,
-      title: goal.title ?? "",
-      category: goal.category ?? "distance",
-      targetValue: goal.targetValue ? String(goal.targetValue) : "",
-      unit: goal.unit ?? "",
+      title: row?.title ?? goal.title ?? "",
+      category: row?.category ?? goal.category ?? "distance",
+      targetValue: row?.targetValue != null ? String(row.targetValue) : "",
+      unit: row?.unit ?? "",
     })
     setIsEditOpen(true)
   }
 
   const saveEditGoal = () => {
-    if (!editDraft.id || !editDraft.title.trim()) {
+    if (editDraft.id == null || !editDraft.title.trim()) {
       toast.error("Inserisci un titolo per l'obiettivo")
       return
     }
     const targetValueNumber = Number(editDraft.targetValue)
-    setCustomGoals((prev) =>
-      prev.map((goal) => {
-        if (goal.id !== editDraft.id) return goal
-        const numericTarget = Number.isFinite(targetValueNumber) && targetValueNumber > 0
-        const nextTarget = numericTarget ? targetValueNumber : editDraft.targetValue || "—"
-        const currentValue = Number(goal.currentValue) || 0
-        const progress =
-          numericTarget && currentValue > 0
-            ? Math.min(100, (currentValue / targetValueNumber) * 100)
-            : goal.progress ?? 0
-        return {
-          ...goal,
-          title: editDraft.title.trim(),
-          category: editDraft.category,
-          targetValue: nextTarget,
-          unit: editDraft.unit || goal.unit,
-          progress,
-        }
-      })
+    const unit = editDraft.unit.trim()
+    updateGoalMutation.mutate(
+      {
+        id: editDraft.id,
+        title: editDraft.title.trim(),
+        category: editDraft.category,
+        targetValue: Number.isFinite(targetValueNumber) && targetValueNumber > 0 ? targetValueNumber : null,
+        // A blank unit keeps the current one, as before.
+        ...(unit ? { unit } : {}),
+      },
+      {
+        onSuccess: () => {
+          setIsEditOpen(false)
+          toast.success("Obiettivo aggiornato")
+        },
+        onError: () => toast.error("Impossibile aggiornare l'obiettivo"),
+      }
     )
-    setIsEditOpen(false)
-    toast.success("Obiettivo aggiornato")
   }
 
+  // One-time migration of goals previously kept only in localStorage.
+  const legacyMigrationStarted = useRef(false)
   useEffect(() => {
-    const stored = localStorage.getItem("swimforge:customGoals")
-    if (!stored) return
-    try {
-      const parsed = JSON.parse(stored)
-      if (Array.isArray(parsed)) {
-        setCustomGoals(parsed)
-      }
-    } catch {
-      // ignore invalid storage
-    }
-  }, [])
+    if (!goalsQuery.isSuccess || legacyMigrationStarted.current) return
+    legacyMigrationStarted.current = true
 
-  useEffect(() => {
-    localStorage.setItem("swimforge:customGoals", JSON.stringify(customGoals))
-  }, [customGoals])
+    let stored: string | null = null
+    try {
+      stored = localStorage.getItem(LEGACY_CUSTOM_GOALS_KEY)
+    } catch {
+      return
+    }
+    if (stored == null) return
+
+    let parsed: unknown = null
+    try {
+      parsed = JSON.parse(stored)
+    } catch {
+      // invalid storage: dropped below
+    }
+    // Skip titles already on the server and duplicates within the legacy list itself.
+    const seenTitles = new Set((goalsQuery.data ?? []).map((row) => row.title.trim().toLowerCase()))
+    const payloads = (Array.isArray(parsed) ? parsed : [])
+      .map(toLegacyGoalPayload)
+      .filter((payload): payload is GoalPayload => payload !== null)
+      .filter((payload) => {
+        const key = payload.title.toLowerCase()
+        if (seenTitles.has(key)) return false
+        seenTitles.add(key)
+        return true
+      })
+
+    // Drop the key before posting anything, so a remount while the batch is in flight
+    // (navigate away and back) cannot read it again and post the same goals twice.
+    try {
+      localStorage.removeItem(LEGACY_CUSTOM_GOALS_KEY)
+    } catch {
+      // ignore storage errors
+    }
+    if (payloads.length === 0) return
+
+    void Promise.allSettled(payloads.map((payload) => createGoalMutation.mutateAsync(payload))).then(
+      (results) => {
+        const failed = payloads.filter((_, index) => results[index].status === "rejected")
+        if (failed.length === 0) return
+        // Write back only the goals that could not be saved so the next visit retries them.
+        try {
+          localStorage.setItem(LEGACY_CUSTOM_GOALS_KEY, JSON.stringify(failed))
+        } catch {
+          // ignore storage errors
+        }
+      }
+    )
+  }, [goalsQuery.isSuccess])
 
   return (
     <AppLayout>
@@ -457,7 +538,7 @@ export default function Goals() {
                     />
                   </div>
                 </div>
-                <Button onClick={addCustomGoal}>Aggiungi obiettivo</Button>
+                <Button onClick={addCustomGoal} disabled={createGoalMutation.isPending}>Aggiungi obiettivo</Button>
 
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-foreground">Suggeriti per te</p>
@@ -471,7 +552,12 @@ export default function Goals() {
                           <p className="text-sm font-semibold text-foreground">{goal.title}</p>
                           <p className="text-xs text-muted-foreground">{goal.description}</p>
                         </div>
-                        <Button size="sm" variant="outline" onClick={() => addSuggestedGoal(goal)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => addSuggestedGoal(goal)}
+                          disabled={createGoalMutation.isPending}
+                        >
                           Aggiungi
                         </Button>
                       </div>
@@ -546,7 +632,7 @@ export default function Goals() {
                   <Button variant="ghost" onClick={() => setIsEditOpen(false)}>
                     Annulla
                   </Button>
-                  <Button variant="neon" onClick={saveEditGoal}>
+                  <Button variant="neon" onClick={saveEditGoal} disabled={updateGoalMutation.isPending}>
                     Salva modifiche
                   </Button>
                 </div>
@@ -678,6 +764,7 @@ export default function Goals() {
                             variant="outline"
                             size="icon"
                             onClick={() => removeCustomGoal(goal.id)}
+                            disabled={removeGoalMutation.isPending}
                             aria-label="Elimina obiettivo"
                           >
                             <Trash2 className="w-4 h-4" />

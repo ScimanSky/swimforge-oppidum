@@ -7,6 +7,7 @@ import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
+import { extractBearerToken } from "./bearer";
 import { logger } from "../middleware/logger";
 import type {
   ExchangeTokenRequest,
@@ -303,11 +304,13 @@ class SDKServer {
   async authenticateRequest(req: Request): Promise<User> {
     // Regular authentication flow
     const cookies = this.parseCookies(req.headers.cookie);
-    const sessionCookie = cookies.get(COOKIE_NAME);
+    const bearerToken = extractBearerToken(req.headers);
+    // A present bearer must never fall back to the cookie: the CSRF middleware exempts bearer requests.
+    const sessionCookie = bearerToken ?? cookies.get(COOKIE_NAME);
     const session = await this.verifySession(sessionCookie);
 
     if (!session) {
-      throw ForbiddenError("Invalid session cookie");
+      throw ForbiddenError(bearerToken ? "Invalid bearer session" : "Invalid session cookie");
     }
 
     const sessionUserId = session.openId;

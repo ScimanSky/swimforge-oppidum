@@ -604,7 +604,7 @@ async function generateMotivationalText(config: ClubAiConfigRecord): Promise<str
   }
 
   const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-  const modelName = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+  const modelName = ENV.geminiTextModel;
   const model = client.getGenerativeModel({ model: modelName });
 
   const prompt = [

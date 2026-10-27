@@ -1,11 +1,8 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Link } from "wouter"
 import AppLayout from "@/components/AppLayout"
-import { StoryAvatar } from "@/components/social/StoryAvatar"
-import { StoryViewer } from "@/components/social/StoryViewer"
-import { StoryCreator } from "@/components/social/StoryCreator"
 import { CreatePostSheet } from "@/components/social/CreatePostSheet"
 import FeedSubTabs from "@/components/social/FeedSubTabs"
 import FeedPost from "@/components/social/FeedPost"
@@ -16,11 +13,6 @@ import type { FeedPostRecord } from "@/components/social/feed-types"
 import { Button } from "@/components/ui/button"
 import { Waves, Users, RefreshCw, Loader2 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
-import {
-  buildDisplayStoryGroups,
-  findStoryGroupIndex,
-  type SocialStoryGroup,
-} from "@/lib/social-feed-stories"
 
 function EmptyFeedPerTe({ onCreatePost }: { onCreatePost: () => void }) {
   return (
@@ -53,7 +45,7 @@ function EmptyFeedSeguiti() {
       <div>
         <h3 className="text-lg font-display font-bold text-foreground">Segui altri nuotatori</h3>
         <p className="text-sm text-muted-foreground mt-1">
-          Costruisci la tua crew e porta nel feed allenamenti, stories e sfide reali.
+          Costruisci la tua crew e porta nel feed allenamenti e sfide reali.
         </p>
       </div>
       <Button variant="neon" size="lg" className="gap-2 mt-2" asChild>
@@ -69,9 +61,6 @@ export default function SocialFeed() {
   const [extraPosts, setExtraPosts] = useState<FeedPostRecord[]>([])
   const [hasMore, setHasMore] = useState(true)
   const [visibleCount, setVisibleCount] = useState(5)
-  const [storyViewerOpen, setStoryViewerOpen] = useState(false)
-  const [storyViewerGroupIdx, setStoryViewerGroupIdx] = useState(0)
-  const [storyCreatorOpen, setStoryCreatorOpen] = useState(false)
   const [createPostOpen, setCreatePostOpen] = useState(false)
 
   const profileQuery = trpc.profile.get.useQuery()
@@ -84,37 +73,6 @@ export default function SocialFeed() {
     if (typeof value === "number") return value !== 0
     return true
   })()
-
-  const { data: storyGroups } = trpc.community.stories.active.useQuery(undefined, {
-    staleTime: 30_000,
-  })
-
-  const allGroups: SocialStoryGroup[] = (storyGroups as SocialStoryGroup[] | undefined) ?? []
-  const displayName = profile?.username || profile?.userId?.toString() || "Nuotatore"
-  const displayStoryGroups = useMemo(() => {
-    return buildDisplayStoryGroups({
-      allGroups,
-      currentUserId: currentUserId ?? null,
-      displayName,
-      avatarUrl: profile?.avatarUrl ?? null,
-    })
-  }, [allGroups, currentUserId, displayName, profile?.avatarUrl])
-
-  const handleViewStory = useCallback((userId: number) => {
-    const idx = findStoryGroupIndex(displayStoryGroups, userId)
-    if (idx >= 0) {
-      setStoryViewerGroupIdx(idx)
-      setStoryViewerOpen(true)
-    }
-  }, [displayStoryGroups])
-
-  const handleCreateStory = useCallback(() => {
-    setCreatePostOpen(false)
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("swimforge:close-create-post"))
-    }
-    setStoryCreatorOpen(true)
-  }, [])
 
   const scope = tab === "seguiti" ? "following" : "global"
   const followStarterQuery = trpc.community.users.followStarter.useQuery(
@@ -177,36 +135,8 @@ export default function SocialFeed() {
   const isInitialLoading = firstPageQuery.isLoading && posts.length === 0
   const hasFeedError = Boolean(firstPageQuery.error) && posts.length === 0 && !isInitialLoading
 
-  const headerStoriesSlot = (
-    <div data-tour="feed-stories" className="flex h-14 w-full min-w-0 items-center gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide">
-      {displayStoryGroups.length > 0 ? (
-        displayStoryGroups.map((group) => {
-          const isCurrent = Number(group.userId) === Number(currentUserId)
-          const hasStories = (group.stories?.length ?? 0) > 0
-          const hasUnviewed = group.stories.some((story) => !story.hasViewed)
-          return (
-            <StoryAvatar
-              key={group.userId}
-              userId={group.userId}
-              userName={group.userName ?? "Utente"}
-              avatarUrl={group.userAvatar}
-              hasUnviewed={hasUnviewed}
-              hasStories={hasStories}
-              isCurrentUser={isCurrent}
-              size="sm"
-              showLabel
-              onClick={() =>
-                isCurrent && !hasStories ? handleCreateStory() : handleViewStory(group.userId)
-              }
-            />
-          )
-        })
-      ) : null}
-    </div>
-  )
-
   return (
-    <AppLayout headerSlot={headerStoriesSlot}>
+    <AppLayout>
       <div className="social-feed-shell compact-shell mx-auto w-full max-w-[1240px] space-y-3 lg:space-y-2">
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div className="w-full min-w-0">
@@ -298,18 +228,6 @@ export default function SocialFeed() {
           </div>
         </div>
       </div>
-
-      {/* Story Viewer */}
-      {storyViewerOpen && displayStoryGroups.length > 0 && (
-        <StoryViewer
-          groups={displayStoryGroups as unknown as Parameters<typeof StoryViewer>[0]["groups"]}
-          initialGroupIndex={storyViewerGroupIdx}
-          onClose={() => setStoryViewerOpen(false)}
-        />
-      )}
-
-      {/* Story Creator */}
-      <StoryCreator open={storyCreatorOpen} onOpenChange={setStoryCreatorOpen} />
 
       {/* Create Post Sheet (from empty state CTA) */}
       <CreatePostSheet open={createPostOpen} onOpenChange={setCreatePostOpen} />

@@ -5,17 +5,10 @@ import { logger } from "./middleware/logger";
 const log = logger.child({ component: "product_analytics" });
 
 export const PRODUCT_ANALYTICS_EVENT_NAMES = [
-  "season_view",
-  "season_next_action_click",
   "pb_detected",
   "pb_celebration_open",
   "pb_share_click",
   "pb_share_success",
-  "season_step_view",
-  "season_step_action_click",
-  "season_weekly_action_marked",
-  "ghost_duel_create",
-  "ghost_track_open",
   "club_workout_open",
   "club_workout_complete",
   "feed_post_create",

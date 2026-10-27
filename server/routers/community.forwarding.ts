@@ -1,7 +1,5 @@
 import { coerceBoolean } from "./_shared";
 
-export type ForwardTargetType = "post" | "story";
-
 type ForwardPrivacySettings = {
   profilePublic: boolean;
   activitiesPublic: boolean;
@@ -95,7 +93,6 @@ export async function checkForwardRecipientAllowed(input: {
   recipientId: number;
   ownerId: number;
   ownerPrivacy: ForwardPrivacySettings;
-  targetType: ForwardTargetType;
   visibility?: string | null;
   isActivityPost?: boolean;
 }) {
@@ -105,14 +102,14 @@ export async function checkForwardRecipientAllowed(input: {
     return { allowed: false as const, reason: "L'autore non consente inoltri privati dei suoi contenuti." };
   }
 
-  if (input.targetType === "post" && input.visibility === "private") {
+  if (input.visibility === "private") {
     return { allowed: false as const, reason: "Il post è privato e non può essere inoltrato." };
   }
 
   const mustBeFollower =
     !input.ownerPrivacy.profilePublic ||
     input.ownerPrivacy.forwardsFollowersOnly ||
-    (input.targetType === "post" && input.isActivityPost && !input.ownerPrivacy.activitiesPublic);
+    (input.isActivityPost && !input.ownerPrivacy.activitiesPublic);
 
   if (mustBeFollower) {
     const follower = await isAcceptedFollower(input.recipientId, input.ownerId);

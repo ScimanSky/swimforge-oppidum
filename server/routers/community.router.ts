@@ -15,7 +15,6 @@ import { getCloudinaryCreditUsage } from "../lib/cloudinary";
 import { uploadImageToMediaProviders } from "../lib/image_upload";
 import { ensureUserPresenceSchema, getOnlineIntervalSql } from "../user_presence";
 import { createCommunityClubsRouter } from "./community.clubs.router";
-import { communityStoriesRouter } from "./community.stories.router";
 import { createCommunityReactionsRouter } from "./community.reactions.router";
 import { createCommunityMessagesRouter } from "./community.messages.router";
 import { communityNotificationsRouter } from "./community.notifications.router";
@@ -675,7 +674,7 @@ export const communityRouter = router({
         .input(
             z
                 .object({
-                    scope: z.enum(["posts", "stories", "clubs"]).optional(),
+                    scope: z.enum(["posts", "clubs"]).optional(),
                     clubId: z.number().optional(),
                 })
                 .optional()
@@ -691,9 +690,7 @@ export const communityRouter = router({
             const scope = input?.scope ?? "posts";
             let folder = `posts/${ctx.user.id}`;
 
-            if (scope === "stories") {
-                folder = `stories/${ctx.user.id}`;
-            } else if (scope === "clubs") {
+            if (scope === "clubs") {
                 if (!input?.clubId) {
                     throw new TRPCError({
                         code: "BAD_REQUEST",
@@ -771,8 +768,6 @@ export const communityRouter = router({
             return result.rows;
         }),
 
-    stories: communityStoriesRouter,
-
     users: communityUsersRouter,
 
     analytics: router({
@@ -801,87 +796,6 @@ export const communityRouter = router({
                 return { success: true };
             }),
     }),
-
-    ghostChallenges: router({
-        list: protectedProcedure
-            .input(z.object({ clubId: z.number().optional() }).optional())
-            .query(async ({ ctx, input }) => {
-                const { listGhostChallenges } = await import("../db_ghost_challenges");
-                return listGhostChallenges(ctx.user.id, input?.clubId);
-            }),
-        createFromPost: protectedProcedure
-            .input(z.object({ postId: z.number() }))
-            .mutation(async ({ ctx, input }) => {
-                const { createGhostChallengeFromPost } = await import("../db_ghost_challenges");
-                try {
-                    const result = await createGhostChallengeFromPost(ctx.user.id, input.postId);
-                    if (!result) {
-                        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Creazione sfida fallita" });
-                    }
-                    await trackProductEvent({
-                        userId: ctx.user.id,
-                        eventName: "ghost_duel_create",
-                        source: "ghost_track_tab",
-                        entityType: "ghost_challenge",
-                        entityId: result.id,
-                        metadata: {
-                            postId: input.postId,
-                        },
-                    });
-                    return { success: true, id: result.id };
-                } catch (error: unknown) {
-                    const message = error instanceof Error ? error.message : undefined;
-                    throw new TRPCError({
-                        code: "BAD_REQUEST",
-                        message: message || "Impossibile creare la Ghost Track",
-                    });
-                }
-            }),
-    }),
-
-    ghostTrack: router({
-        friends: protectedProcedure
-            .input(z.object({ search: z.string().optional() }).optional())
-            .query(async ({ ctx, input }) => {
-                const { listGhostTrackFriends } = await import("../db_ghost_challenges");
-                const friends = await listGhostTrackFriends(ctx.user.id, input?.search);
-                await trackProductEvent({
-                    userId: ctx.user.id,
-                    eventName: "ghost_track_open",
-                    source: "ghost_track_tab",
-                    metadata: {
-                        hasSearch: Boolean(input?.search?.trim()),
-                        resultCount: Array.isArray(friends) ? friends.length : 0,
-                    },
-                });
-                return friends;
-            }),
-        sessions: protectedProcedure
-            .input(z.object({ friendUserId: z.number() }))
-            .query(async ({ ctx, input }) => {
-                const { listGhostTrackSessions } = await import("../db_ghost_challenges");
-                return listGhostTrackSessions(ctx.user.id, input.friendUserId);
-            }),
-        preview: protectedProcedure
-            .input(z.object({ postId: z.number() }))
-            .mutation(async ({ ctx, input }) => {
-                const { getGhostChallengeContextFromPost } = await import("../db_ghost_challenges");
-                return getGhostChallengeContextFromPost(ctx.user.id, input.postId);
-            }),
-        laps: protectedProcedure
-            .input(z.object({ activityIds: z.array(z.number()).min(1).max(2) }))
-            .query(async ({ input }) => {
-                const { getGhostTrackLaps } = await import("../db_ghost_challenges");
-                return getGhostTrackLaps(input.activityIds);
-            }),
-        leaderboard: protectedProcedure
-            .input(z.object({ limit: z.number().min(1).max(20).optional() }).optional())
-            .query(async ({ input }) => {
-                const { listGhostTrackLeaderboard } = await import("../db_ghost_challenges");
-                return listGhostTrackLeaderboard(input?.limit ?? 5);
-            }),
-    }),
-
 
     clubs: createCommunityClubsRouter({
         requireClubMemberRole,

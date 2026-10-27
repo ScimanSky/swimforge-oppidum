@@ -4,6 +4,8 @@ import superjson from "superjson";
 import type { TrpcContext } from "./context";
 import { handleError } from "../lib/errors";
 import { parse as parseCookieHeader } from "cookie";
+import { extractBearerToken } from "./bearer";
+import { shouldEnforceCsrf } from "./csrf";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -19,31 +21,21 @@ const errorBoundary = t.middleware(async (opts) => {
 });
 
 const csrfProtection = t.middleware(async (opts) => {
-  if (process.env.NODE_ENV === "test" || process.env.DISABLE_CSRF_PROTECTION === "true") {
-    return opts.next();
-  }
-
-  if (opts.type !== "mutation") {
-    return opts.next();
-  }
-
   const cookies = parseCookieHeader(opts.ctx.req.headers.cookie ?? "");
-  const sessionCookie = cookies[COOKIE_NAME];
-  if (!sessionCookie) {
-    return opts.next();
-  }
-
+  const enforce = shouldEnforceCsrf({
+    type: opts.type,
+    hasSessionCookie: Boolean(cookies[COOKIE_NAME]),
+    hasBearer: extractBearerToken(opts.ctx.req.headers) !== null,
+    env: process.env.NODE_ENV,
+    disabled: process.env.DISABLE_CSRF_PROTECTION === "true",
+  });
+  if (!enforce) return opts.next();
   const csrfCookie = cookies[CSRF_COOKIE_NAME];
   const csrfHeaderRaw = opts.ctx.req.headers["x-csrf-token"];
   const csrfHeader = Array.isArray(csrfHeaderRaw) ? csrfHeaderRaw[0] : csrfHeaderRaw;
-
   if (!csrfCookie || !csrfHeader || csrfHeader !== csrfCookie) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "CSRF validation failed",
-    });
+    throw new TRPCError({ code: "FORBIDDEN", message: "CSRF validation failed" });
   }
-
   return opts.next();
 });
 

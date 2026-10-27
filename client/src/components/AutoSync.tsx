@@ -19,7 +19,7 @@ export function AutoSync() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    if (location === "/home" || location === "/season" || location === "/dashboard") {
+    if (location === "/home" || location === "/track" || location === "/dashboard") {
       localStorage.setItem(DASHBOARD_READY_KEY, "1");
       setIsReady(true);
       return;
@@ -55,7 +55,6 @@ export function AutoSync() {
             void utils.badges.progress.invalidate();
             void utils.badges.getUserAchievementBadges.invalidate();
             void utils.badges.checkNewBadges.invalidate();
-            void utils.season.getCurrent.invalidate();
           },
           onError: () => {
             toast.error("Errore nella sincronizzazione", { id: toastId });

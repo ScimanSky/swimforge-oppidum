@@ -1,7 +1,7 @@
 # SwimForge Oppidum
 
 SwimForge Oppidum is a social + analytics web app for swimmers.
-It combines training tracking, social feed/stories/clubs, and AI coach features.
+It combines training tracking, social feed/clubs, and AI coach features.
 
 ## Stack
 - Frontend: React + Vite + TypeScript
@@ -12,8 +12,8 @@ It combines training tracking, social feed/stories/clubs, and AI coach features.
 
 ## Core Features
 - Activity tracking (pool/open-water) with share-to-feed flow
-- Social feed, stories, reactions, comments, direct messages, clubs
-- XP, badges, records, and seasonal engagement mechanics
+- Social feed, reactions, comments, direct messages, clubs
+- XP, badges, and personal records
 - AI coach chat and AI-generated insights
 
 ## Local Development

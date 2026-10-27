@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
+import { setNativeSessionToken } from "@/lib/session-token";
 import { toast } from "sonner";
 import { Waves, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
@@ -16,7 +17,8 @@ export default function AuthCallback() {
 
   const syncSupabaseUserMutation = trpc.auth.syncSupabaseUser.useMutation({
     onSuccess: (data) => {
-      console.log('[AuthCallback] syncSupabaseUser SUCCESS:', data);
+      console.log('[AuthCallback] syncSupabaseUser SUCCESS:', data?.user?.id);
+      if ("sessionToken" in data && typeof data.sessionToken === "string") setNativeSessionToken(data.sessionToken);
       setStatus("success");
       toast.success("Accesso effettuato con successo!");
       setTimeout(() => {

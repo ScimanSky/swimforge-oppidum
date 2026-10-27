@@ -168,7 +168,7 @@ export const commentLimiter = rateLimit({
 export const corsOptions: cors.CorsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
     const allowedOrigins = (
-      process.env.ALLOWED_ORIGINS || 'https://swimforge-frontend.onrender.com'
+      process.env.ALLOWED_ORIGINS || 'https://swimforge-frontend.onrender.com,https://swimforge.it,https://localhost,capacitor://localhost'
     )
       .split(',')
       .map(value => value.trim())
@@ -186,7 +186,7 @@ export const corsOptions: cors.CorsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-csrf-token'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-csrf-token', 'x-swimforge-client'],
   exposedHeaders: ['X-Total-Count', 'X-Page-Number', 'RateLimit-Remaining'],
   maxAge: 86400,
 };

@@ -1,7 +1,6 @@
 import { protectedProcedure, router, TRPCError, z } from "./_shared";
 import {
   checkForwardRecipientAllowed,
-  type ForwardTargetType,
   getUserForwardPrivacySettings,
   getUsersById,
 } from "./community.forwarding";
@@ -32,7 +31,7 @@ export function createCommunityMessagesRouter(input: { requirePostReadable: Requ
     forward: protectedProcedure
       .input(
         z.object({
-          targetType: z.enum(["post", "story"]),
+          targetType: z.literal("post"),
           targetId: z.number().int().positive(),
           recipientIds: z.array(z.number().int().positive()).min(1).max(10),
           note: z.string().max(500).optional().nullable(),
@@ -68,91 +67,44 @@ export function createCommunityMessagesRouter(input: { requirePostReadable: Requ
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
         }
 
-        let ownerId = 0;
-        let ownerName = "Nuotatore";
-        let previewText: string | null = null;
-        let previewMediaUrl: string | null = null;
-        let visibility: string | null = null;
-        let isActivityPost = false;
+        await requirePostReadable(ctx.user.id, input.targetId);
+        const postResult = await db.execute(sql`
+          SELECT
+            p.id,
+            p.user_id,
+            p.content,
+            p.media_url,
+            p.visibility,
+            p.activity_id,
+            u.name AS owner_name
+          FROM social_posts p
+          JOIN users u ON u.id = p.user_id
+          WHERE p.id = ${input.targetId}
+            AND p.is_deleted = false
+          LIMIT 1
+        `);
+        const post = postResult.rows[0] as
+          | {
+              id: number;
+              user_id: number;
+              content: string | null;
+              media_url: string | null;
+              visibility: string | null;
+              activity_id: number | null;
+              owner_name: string | null;
+            }
+          | undefined;
 
-        if (input.targetType === "post") {
-          await requirePostReadable(ctx.user.id, input.targetId);
-          const postResult = await db.execute(sql`
-            SELECT
-              p.id,
-              p.user_id,
-              p.content,
-              p.media_url,
-              p.visibility,
-              p.activity_id,
-              u.name AS owner_name
-            FROM social_posts p
-            JOIN users u ON u.id = p.user_id
-            WHERE p.id = ${input.targetId}
-              AND p.is_deleted = false
-            LIMIT 1
-          `);
-          const post = postResult.rows[0] as
-            | {
-                id: number;
-                user_id: number;
-                content: string | null;
-                media_url: string | null;
-                visibility: string | null;
-                activity_id: number | null;
-                owner_name: string | null;
-              }
-            | undefined;
-
-          if (!post) {
-            throw new TRPCError({ code: "NOT_FOUND", message: "Post non trovato." });
-          }
-
-          ownerId = Number(post.user_id);
-          ownerName = post.owner_name?.trim() || "Nuotatore";
-          previewText = post.content?.trim() || null;
-          previewMediaUrl = post.media_url ?? null;
-          visibility = post.visibility ?? "public";
-          isActivityPost = post.activity_id != null;
-        } else {
-          const storyResult = await db.execute(sql`
-            SELECT
-              s.id,
-              s.user_id,
-              s.caption,
-              s.media_url,
-              s.type,
-              s.expires_at,
-              u.name AS owner_name
-            FROM stories s
-            JOIN users u ON u.id = s.user_id
-            WHERE s.id = ${input.targetId}
-              AND s.expires_at > NOW()
-            LIMIT 1
-          `);
-          const story = storyResult.rows[0] as
-            | {
-                id: number;
-                user_id: number;
-                caption: string | null;
-                media_url: string | null;
-                type: string;
-                expires_at: Date;
-                owner_name: string | null;
-              }
-            | undefined;
-
-          if (!story) {
-            throw new TRPCError({ code: "NOT_FOUND", message: "Story non trovata o scaduta." });
-          }
-
-          ownerId = Number(story.user_id);
-          ownerName = story.owner_name?.trim() || "Nuotatore";
-          previewText = story.caption?.trim() || (story.type === "video" ? "Story video" : "Story");
-          previewMediaUrl = story.media_url ?? null;
-          visibility = "public";
-          isActivityPost = false;
+        if (!post) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Post non trovato." });
         }
+
+        const ownerId = Number(post.user_id);
+        const ownerName = post.owner_name?.trim() || "Nuotatore";
+        const previewText = post.content?.trim() || null;
+        const previewMediaUrl = post.media_url ?? null;
+        const visibility = post.visibility ?? "public";
+        const isActivityPost = post.activity_id != null;
 
         const ownerPrivacy = await getUserForwardPrivacySettings(ownerId);
         const senderAccess = await checkForwardRecipientAllowed({
@@ -160,7 +112,6 @@ export function createCommunityMessagesRouter(input: { requirePostReadable: Requ
           recipientId: ctx.user.id,
           ownerId,
           ownerPrivacy,
-          targetType: input.targetType as ForwardTargetType,
           visibility,
           isActivityPost,
         });
@@ -181,7 +132,6 @@ export function createCommunityMessagesRouter(input: { requirePostReadable: Requ
             recipientId,
             ownerId,
             ownerPrivacy,
-            targetType: input.targetType as ForwardTargetType,
             visibility,
             isActivityPost,
           });
@@ -202,8 +152,8 @@ export function createCommunityMessagesRouter(input: { requirePostReadable: Requ
           });
         }
 
-        const messageType = input.targetType === "post" ? "forward_post" : "forward_story";
-        const fallbackText = input.targetType === "post" ? `Post inoltrato da ${ownerName}` : `Story inoltrata da ${ownerName}`;
+        const messageType = "forward_post";
+        const fallbackText = `Post inoltrato da ${ownerName}`;
         const trimmedNote = input.note?.trim() ?? "";
         const content = trimmedNote.length > 0 ? `${fallbackText}\n\n${trimmedNote}` : fallbackText;
         const metadata = {

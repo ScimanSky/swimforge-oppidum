@@ -25,7 +25,7 @@ import {
 import {
   Waves,
   MapPin,
-  Orbit,
+  Star,
   Sparkles,
   Clock3,
   Gauge,
@@ -153,12 +153,7 @@ export default function Activities() {
   const [page, setPage] = useState(1)
 
   const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
-  const seasonQuery = trpc.season.getCurrent.useQuery(undefined, {
-    staleTime: 15_000,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
-    refetchOnMount: "always",
-  })
+  const profileQuery = trpc.profile.get.useQuery()
   const utils = trpc.useContext()
   const toggleShareMutation = trpc.community.toggleShare.useMutation({
     onSuccess: async (_, vars) => {
@@ -304,11 +299,11 @@ export default function Activities() {
               </p>
               <div className="mt-2.5 flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="text-xs">
-                  <Orbit className="mr-1 size-3.5 text-primary" />
-                  Season Lv {seasonQuery.data?.progress?.currentLevel ?? 1}
+                  <Star className="mr-1 size-3.5 text-primary" />
+                  Lv {profileQuery.data?.level ?? 1}
                 </Badge>
                 <Badge variant="outline" className="text-xs">
-                  {Number(seasonQuery.data?.progress?.seasonXp ?? 0).toLocaleString()} XP
+                  {Number(profileQuery.data?.totalXp ?? 0).toLocaleString()} XP
                 </Badge>
               </div>
             </div>

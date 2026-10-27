@@ -45,24 +45,14 @@ const ATHLETE_TOUR_STEPS: TourStep[] = [
     body: "Quattro sezioni, tutto ciò che ti serve: Feed, Traccia, Club e Profilo.",
   },
   {
-    selector: '[data-tour="feed-stories"]',
-    title: "Stories",
-    body: "Le Stories della community spariscono dopo 24h. Aprile con un tap.",
-  },
-  {
     selector: '[data-tour="create-post"]',
     title: "Crea contenuti",
-    body: "Post, attività condivisa o story — tutto in un tap con il tasto +.",
+    body: "Post o attività condivisa — tutto in un tap con il tasto +.",
   },
   {
     selector: '[data-tour="track-section"]',
     title: "Traccia le tue vasche",
     body: "Log la tua prima vasca manualmente, o connetti Garmin/Strava per il sync automatico.",
-  },
-  {
-    selector: '[data-tour="season-hub"]',
-    title: "Season Hub",
-    body: "La stagione è il tuo campionato personale. XP, livelli e progressi stagione per stagione.",
   },
   {
     selector: '[data-tour="challenges-list"]',
@@ -136,8 +126,6 @@ const PUBLIC_PATHS = [
   "/terms",
   "/cookies",
 ] as const;
-const SEASON_POPUP_DATASET_KEY = "seasonLaunchOpen";
-const SEASON_POPUP_EVENT = "swimforge:season-popup:state";
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some((base) => pathname === base || pathname.startsWith(`${base}/`));
@@ -183,7 +171,6 @@ export default function OnboardingFlow() {
   const [pendingTourLaunch, setPendingTourLaunch] = useState(false);
   const [welcomeCompleted, setWelcomeCompleted] = useState(false);
   const [resumePathAfterTour, setResumePathAfterTour] = useState<string | null>(null);
-  const [seasonPopupOpen, setSeasonPopupOpen] = useState(false);
   const [onboardingRole, setOnboardingRole] = useState<OnboardingRole>("athlete");
   const onboardingUserId = meQuery.data?.id ? String(meQuery.data.id) : null;
 
@@ -214,36 +201,9 @@ export default function OnboardingFlow() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined" || typeof document === "undefined") return;
-
-    const readCurrent = () => document.documentElement.dataset[SEASON_POPUP_DATASET_KEY] === "1";
-    setSeasonPopupOpen(readCurrent());
-
-    const handler = (event: Event) => {
-      const customEvent = event as CustomEvent<{ open?: boolean }>;
-      if (typeof customEvent.detail?.open === "boolean") {
-        setSeasonPopupOpen(customEvent.detail.open);
-        return;
-      }
-      setSeasonPopupOpen(readCurrent());
-    };
-
-    window.addEventListener(SEASON_POPUP_EVENT, handler as EventListener);
-    return () => window.removeEventListener(SEASON_POPUP_EVENT, handler as EventListener);
-  }, []);
-
-  useEffect(() => {
     if (!meQuery.data?.id) {
       setStage("hidden");
       setHighlightRect(null);
-      return;
-    }
-
-    if (seasonPopupOpen) {
-      if (stage !== "hidden") {
-        setStage("hidden");
-        setHighlightRect(null);
-      }
       return;
     }
 
@@ -278,7 +238,7 @@ export default function OnboardingFlow() {
       setStage("hidden");
       setHighlightRect(null);
     }
-  }, [canEvaluate, meQuery.data?.id, onboardingUserId, pathname, pendingTourLaunch, seasonPopupOpen, serverDone, shouldForce, stage]);
+  }, [canEvaluate, meQuery.data?.id, onboardingUserId, pathname, pendingTourLaunch, serverDone, shouldForce, stage]);
 
   useEffect(() => {
     if (!canEvaluate || !meQuery.data?.id) return;

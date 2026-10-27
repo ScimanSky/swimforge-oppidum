@@ -69,6 +69,22 @@ function parseIntListEnv(name: string): number[] {
   return Array.from(new Set(values));
 }
 
+function firstNonEmptyEnv(names: string[], fallback: string): string {
+  for (const name of names) {
+    const value = process.env[name]?.trim();
+    if (value) return value;
+  }
+  return fallback;
+}
+
+// Gemini model names. New Google Cloud projects can no longer call
+// gemini-2.5-flash / gemini-3-pro-preview, so the defaults point at the current
+// models; existing projects can pin older names through these variables.
+const geminiTextModel = firstNonEmptyEnv(["GEMINI_TEXT_MODEL", "GEMINI_MODEL", "FORGE_LLM_MODEL"], "gemini-3.8-flash");
+const geminiProModel = firstNonEmptyEnv(["GEMINI_PRO_MODEL"], "gemini-3.1-pro-preview");
+const geminiImageModel = firstNonEmptyEnv(["GEMINI_IMAGE_MODEL"], "gemini-3.1-flash-image");
+const geminiImageProModel = firstNonEmptyEnv(["GEMINI_IMAGE_PRO_MODEL"], "gemini-3-pro-image-preview");
+
 const sessionMaxAgeDays = parseIntEnv("SESSION_MAX_AGE_DAYS", 30, { min: 1, max: 365 });
 
 export const ENV = {
@@ -89,9 +105,11 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
-  forgeLlmModel:
-    (process.env.FORGE_LLM_MODEL ?? process.env.GEMINI_MODEL ?? "gemini-2.5-flash").trim() ||
-    "gemini-2.5-flash",
+  forgeLlmModel: firstNonEmptyEnv(["FORGE_LLM_MODEL"], geminiTextModel),
+  geminiTextModel,
+  geminiProModel,
+  geminiImageModel,
+  geminiImageProModel,
   supabaseUrl: requireEnv("SUPABASE_URL", "VITE_SUPABASE_URL"),
   supabaseAnonKey: requireEnv("SUPABASE_ANON_KEY", "VITE_SUPABASE_ANON_KEY"),
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",

@@ -31,14 +31,12 @@ vi.mock("@/lib/trpc", () => ({
         }),
       },
     },
-    season: {
-      getCurrent: {
+    profile: {
+      get: {
         useQuery: () => ({
           data: {
-            progress: {
-              currentLevel: 5,
-              seasonXp: 1234,
-            },
+            level: 5,
+            totalXp: 1234,
           },
         }),
       },

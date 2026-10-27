@@ -13,10 +13,9 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet"
-import { Activity, Camera, ChevronLeft, Loader2, PenLine, X, Hash, AtSign, ImagePlus } from "lucide-react"
+import { Activity, ChevronLeft, Loader2, PenLine, X, Hash, AtSign, ImagePlus } from "lucide-react"
 import { toast } from "sonner"
 import { ShareActivityPicker } from "./ShareActivityPicker"
-import { StoryCreator } from "./StoryCreator"
 import { UploadStatusPill } from "./UploadStatusPill"
 import {
   extractHashtags,
@@ -70,7 +69,6 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
   const [tagQuery, setTagQuery] = useState("")
   const [taggedUsers, setTaggedUsers] = useState<TaggedUser[]>([])
   const [sharePickerOpen, setSharePickerOpen] = useState(false)
-  const [storyCreatorOpen, setStoryCreatorOpen] = useState(false)
 
   const mediaInputRef = useRef<HTMLInputElement>(null)
   const postHistoryEntryActiveRef = useRef(false)
@@ -298,11 +296,6 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
     setContent(initialContent.trim())
   }, [initialContent, open])
 
-  const openStoryComposer = () => {
-    resetAndClose()
-    window.setTimeout(() => setStoryCreatorOpen(true), 180)
-  }
-
   return (
     <>
       <Sheet
@@ -363,22 +356,6 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
                 <div>
                   <div className="font-semibold">Nuovo Post</div>
                   <div className="text-sm text-muted-foreground">Testo, foto, video, tag amici e hashtag</div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  openStoryComposer()
-                }}
-                className="flex items-center gap-4 rounded-2xl border border-border/80 bg-background/60 p-4 text-left transition-colors hover:bg-card/60"
-              >
-                <div className="flex size-12 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--electric-cyan)_15%,var(--electric-lime)_10%)]">
-                  <Camera className="size-6 text-foreground/70" />
-                </div>
-                <div>
-                  <div className="font-semibold">Nuova Storia</div>
-                  <div className="text-sm text-muted-foreground">Condividi un momento (24h)</div>
                 </div>
               </button>
             </div>
@@ -531,7 +508,6 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
       </Sheet>
 
       <ShareActivityPicker open={sharePickerOpen} onOpenChange={setSharePickerOpen} />
-      <StoryCreator open={storyCreatorOpen} onOpenChange={setStoryCreatorOpen} />
     </>
   )
 }
