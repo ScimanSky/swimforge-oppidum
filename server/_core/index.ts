@@ -11,7 +11,6 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { completeChallenges } from "../cron_challenges";
 import { evaluateAllUsersWeekly } from "../ai_skill_level";
-import { cleanupExpiredStories } from "../db_stories";
 import { cleanupSocialRetention } from "../db_social_enhanced";
 import { setupSwagger } from "../swagger-setup";
 import { connectRedis } from "../lib/cache";
@@ -258,33 +257,6 @@ async function startServer() {
         scope: "cron",
         cronJob: "evaluate-skill-level",
         route: "/api/cron/evaluate-skill-level",
-      });
-      return res.status(500).json({ success: false, error: "Cron execution failed" });
-    }
-  });
-
-  // Cleanup expired stories and corresponding ImageKit files
-  app.post("/api/cron/cleanup-expired-stories", async (req, res) => {
-    if (!authorizeCronRequest(req, res)) return;
-
-    const requestedLimit = Number(req.body?.limit ?? req.query?.limit ?? 300);
-    const limit = Number.isFinite(requestedLimit) ? requestedLimit : 300;
-
-    try {
-      const result = await cleanupExpiredStories(limit);
-      return res.json({ success: true, ...result });
-    } catch (error: unknown) {
-      const err = toError(error);
-      log.error("[Cron] Failed to cleanup expired stories", {
-        event: "cron:cleanup_expired_stories_failed",
-        message: err.message,
-        stack: err.stack,
-      });
-      captureError(err, {
-        scope: "cron",
-        cronJob: "cleanup-expired-stories",
-        route: "/api/cron/cleanup-expired-stories",
-        limit,
       });
       return res.status(500).json({ success: false, error: "Cron execution failed" });
     }

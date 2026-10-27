@@ -15,7 +15,6 @@ import { getCloudinaryCreditUsage } from "../lib/cloudinary";
 import { uploadImageToMediaProviders } from "../lib/image_upload";
 import { ensureUserPresenceSchema, getOnlineIntervalSql } from "../user_presence";
 import { createCommunityClubsRouter } from "./community.clubs.router";
-import { communityStoriesRouter } from "./community.stories.router";
 import { createCommunityReactionsRouter } from "./community.reactions.router";
 import { createCommunityMessagesRouter } from "./community.messages.router";
 import { communityNotificationsRouter } from "./community.notifications.router";
@@ -675,7 +674,7 @@ export const communityRouter = router({
         .input(
             z
                 .object({
-                    scope: z.enum(["posts", "stories", "clubs"]).optional(),
+                    scope: z.enum(["posts", "clubs"]).optional(),
                     clubId: z.number().optional(),
                 })
                 .optional()
@@ -691,9 +690,7 @@ export const communityRouter = router({
             const scope = input?.scope ?? "posts";
             let folder = `posts/${ctx.user.id}`;
 
-            if (scope === "stories") {
-                folder = `stories/${ctx.user.id}`;
-            } else if (scope === "clubs") {
+            if (scope === "clubs") {
                 if (!input?.clubId) {
                     throw new TRPCError({
                         code: "BAD_REQUEST",
@@ -770,8 +767,6 @@ export const communityRouter = router({
             `);
             return result.rows;
         }),
-
-    stories: communityStoriesRouter,
 
     users: communityUsersRouter,
 
