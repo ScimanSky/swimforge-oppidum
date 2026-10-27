@@ -21,6 +21,7 @@ import {
 import { challengesRouter } from "./challenges.router";
 import { communityRouter } from "./community.router";
 import { consentRouter } from "./consent.router";
+import { goalsRouter } from "./goals.router";
 import {
     adminRouter,
     statisticsRouter,
@@ -48,6 +49,7 @@ export const appRouter = router({
     challenges: challengesRouter,
     community: communityRouter,
     consent: consentRouter,
+    goals: goalsRouter,
     admin: adminRouter,
     statistics: statisticsRouter,
     aiCoach: aiCoachRouter,

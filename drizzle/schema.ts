@@ -1023,3 +1023,18 @@ export type SocialHiddenPost = typeof socialHiddenPosts.$inferSelect;
 export type InsertSocialHiddenPost = typeof socialHiddenPosts.$inferInsert;
 export type SocialPostReport = typeof socialPostReports.$inferSelect;
 export type InsertSocialPostReport = typeof socialPostReports.$inferInsert;
+
+export const userGoals = pgTable("user_goals", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  title: varchar("title", { length: 120 }).notNull(),
+  category: varchar("category", { length: 32 }).notNull().default("distance"),
+  targetValue: real("target_value"),
+  unit: varchar("unit", { length: 24 }),
+  currentValue: real("current_value").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userGoalsUserIdx: index("idx_user_goals_user").on(table.userId),
+}));
+export type UserGoal = typeof userGoals.$inferSelect;

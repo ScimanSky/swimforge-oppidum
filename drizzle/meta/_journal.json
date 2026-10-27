@@ -8,6 +8,13 @@
       "when": 1772384511895,
       "tag": "0032_add_club_ai_automation",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793111686199,
+      "tag": "0033_add_user_goals",
+      "breakpoints": true
     }
   ]
 }
