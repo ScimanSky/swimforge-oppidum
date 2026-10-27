@@ -146,3 +146,12 @@ docs/reports/
 
 # Reverse-engineering artifacts of third-party apps (never commit)
 artifacts/
+
+# Android (Capacitor): the android/ project is versioned, build outputs and local files are not
+android/app/build/
+android/build/
+android/.gradle/
+android/local.properties
+android/app/google-services.json
+android/.idea/
+android/*.iml

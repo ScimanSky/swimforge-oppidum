@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SwimForge</string>
+    <string name="title_activity_main">SwimForge</string>
+    <string name="package_name">it.swimforge.app</string>
+    <string name="custom_url_scheme">it.swimforge.app</string>
+</resources>
