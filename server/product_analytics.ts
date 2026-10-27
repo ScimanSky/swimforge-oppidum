@@ -14,8 +14,6 @@ export const PRODUCT_ANALYTICS_EVENT_NAMES = [
   "season_step_view",
   "season_step_action_click",
   "season_weekly_action_marked",
-  "ghost_duel_create",
-  "ghost_track_open",
   "club_workout_open",
   "club_workout_complete",
   "feed_post_create",

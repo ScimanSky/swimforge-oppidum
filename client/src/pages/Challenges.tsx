@@ -40,7 +40,6 @@ import {
 import { Link } from "wouter"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
-import GhostTrackTab from "@/components/ghost-track/GhostTrackTab"
 
 const formatDistance = (meters?: number | null) => {
   if (!meters) return "—"
@@ -178,7 +177,6 @@ type ChallengeCreateDraft = {
 }
 
 export default function Challenges() {
-  const [sectionTab, setSectionTab] = useState("ghost")
   const [activeTab, setActiveTab] = useState("active")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isDesktopWide, setIsDesktopWide] = useState(false)
@@ -346,7 +344,7 @@ export default function Challenges() {
                 </div>
                 <h1 className="mt-3 text-3xl font-display font-bold neon-gradient-text">Sfide</h1>
                 <p className="mt-1 text-muted-foreground">
-                  Ghost Track e sfide classiche nello stesso hub. Scegli il tuo campo gara.
+                  Le tue sfide con la community.
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Badge variant="outline" className="text-xs">
@@ -375,447 +373,434 @@ export default function Challenges() {
           </SurfaceContent>
         </Surface>
 
-        <Tabs value={sectionTab} onValueChange={setSectionTab} className="space-y-4 lg:space-y-2">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-display font-bold text-foreground">Sfide classiche</h2>
+            <p className="text-muted-foreground">Competi con obiettivi condivisi.</p>
+          </div>
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button variant="neon" className="gap-2">
+                <Plus className="w-4 h-4" />
+                Crea sfida
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle>Crea sfida</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Nome sfida</label>
+                  <input
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    value={createDraft.name}
+                    onChange={(event) =>
+                      setCreateDraft((prev) => ({ ...prev, name: event.target.value }))
+                    }
+                    placeholder="Es. Settimana sprint"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-foreground">Descrizione</label>
+                  <textarea
+                    className="w-full min-h-[90px] rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    value={createDraft.description}
+                    onChange={(event) =>
+                      setCreateDraft((prev) => ({ ...prev, description: event.target.value }))
+                    }
+                    placeholder="Descrivi l'obiettivo della sfida"
+                  />
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Tipo</label>
+	                    <Select
+	                      value={createDraft.type}
+	                      onValueChange={(value) =>
+	                        setCreateDraft((prev) => ({ ...prev, type: value as ChallengeType }))
+	                      }
+	                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Tipo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pool">Piscina</SelectItem>
+                        <SelectItem value="open_water">Open water</SelectItem>
+                        <SelectItem value="both">Entrambi</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Obiettivo</label>
+	                    <Select
+	                      value={createDraft.objective}
+	                      onValueChange={(value) =>
+	                        setCreateDraft((prev) => ({ ...prev, objective: value as ChallengeObjective }))
+	                      }
+	                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Obiettivo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="total_distance">Distanza totale</SelectItem>
+                        <SelectItem value="total_sessions">Sessioni totali</SelectItem>
+                        <SelectItem value="consistency">Costanza</SelectItem>
+                        <SelectItem value="avg_pace">Pace medio</SelectItem>
+                        <SelectItem value="total_time">Tempo totale</SelectItem>
+                        <SelectItem value="longest_session">Sessione più lunga</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Durata</label>
+	                    <Select
+	                      value={createDraft.duration}
+	                      onValueChange={(value) =>
+	                        setCreateDraft((prev) => ({ ...prev, duration: value as ChallengeDuration }))
+	                      }
+	                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Durata" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1_week">1 settimana</SelectItem>
+                        <SelectItem value="2_weeks">2 settimane</SelectItem>
+                        <SelectItem value="1_month">1 mese</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">Data inizio</label>
+                    <input
+                      type="date"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                      value={createDraft.startDate}
+                      onChange={(event) =>
+                        setCreateDraft((prev) => ({ ...prev, startDate: event.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+                <Button
+                  variant="neon"
+                  className="w-full"
+                  onClick={() => createChallenge.mutate(createDraft)}
+                  disabled={!createDraft.name.trim()}
+                >
+                  Crea sfida
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        <Tabs
+          value={activeTab}
+          onValueChange={(value) => {
+            setActiveTab(value)
+            if (value === "active") setActivePage(1)
+            if (value === "available") setAvailablePage(1)
+            if (value === "leaderboard") setLeaderboardPage(1)
+          }}
+        >
           <TabsList className="w-full sm:w-fit">
-            <TabsTrigger value="ghost">Ghost Track</TabsTrigger>
-            <TabsTrigger value="classic">Sfide classiche</TabsTrigger>
+            <TabsTrigger value="active">
+              Active ({activeChallenges.length + pendingChallenges.length})
+            </TabsTrigger>
+            <TabsTrigger value="available">Available</TabsTrigger>
+            <TabsTrigger value="completed">Completed</TabsTrigger>
+            <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="ghost">
-            <GhostTrackTab />
-          </TabsContent>
+          <TabsContent value="active" className="mt-3 space-y-3">
+            {participatingChallenges.length === 0 && (
+              <Surface className="bg-card border-border">
+                <SurfaceContent className="p-6 text-muted-foreground">
+                  Nessuna sfida attiva. Esplora le nuove sfide disponibili!
+                </SurfaceContent>
+              </Surface>
+            )}
+            {pagedParticipatingChallenges.map((challenge) => {
+              const leaderboard = (challenge.leaderboard ?? []) as Array<{ progress: number }>
+              const maxProgress = leaderboard.reduce(
+                (max, item) => Math.max(max, item.progress || 0),
+                0
+              )
+              const progressValue = challenge.current_progress ?? 0
+              const progressPercent =
+                maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
 
-          <TabsContent value="classic" className="space-y-4 lg:space-y-2">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-xl font-display font-bold text-foreground">Sfide classiche</h2>
-                <p className="text-muted-foreground">Competi con obiettivi condivisi.</p>
-              </div>
-              <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="neon" className="gap-2">
-                    <Plus className="w-4 h-4" />
-                    Crea sfida
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle>Crea sfida</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">Nome sfida</label>
-                      <input
-                        className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                        value={createDraft.name}
-                        onChange={(event) =>
-                          setCreateDraft((prev) => ({ ...prev, name: event.target.value }))
-                        }
-                        placeholder="Es. Settimana sprint"
+              return (
+                <Surface key={challenge.id} className="bg-card border-border overflow-hidden">
+                  <div className="flex flex-col md:flex-row">
+                    <div className="relative h-32 w-full md:h-auto md:w-48">
+                      <Image
+                        src={getClassicChallengeImage(challenge)}
+                        alt={challenge.name}
+                        fill
+                        className="object-cover"
                       />
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent to-card md:bg-gradient-to-t md:from-transparent md:to-card/50" />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-foreground">Descrizione</label>
-                      <textarea
-                        className="w-full min-h-[90px] rounded-md border border-border bg-background px-3 py-2 text-sm"
-                        value={createDraft.description}
-                        onChange={(event) =>
-                          setCreateDraft((prev) => ({ ...prev, description: event.target.value }))
-                        }
-                        placeholder="Descrivi l'obiettivo della sfida"
-                      />
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Tipo</label>
-	                        <Select
-	                          value={createDraft.type}
-	                          onValueChange={(value) =>
-	                            setCreateDraft((prev) => ({ ...prev, type: value as ChallengeType }))
-	                          }
-	                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Tipo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pool">Piscina</SelectItem>
-                            <SelectItem value="open_water">Open water</SelectItem>
-                            <SelectItem value="both">Entrambi</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Obiettivo</label>
-	                        <Select
-	                          value={createDraft.objective}
-	                          onValueChange={(value) =>
-	                            setCreateDraft((prev) => ({ ...prev, objective: value as ChallengeObjective }))
-	                          }
-	                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Obiettivo" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="total_distance">Distanza totale</SelectItem>
-                            <SelectItem value="total_sessions">Sessioni totali</SelectItem>
-                            <SelectItem value="consistency">Costanza</SelectItem>
-                            <SelectItem value="avg_pace">Pace medio</SelectItem>
-                            <SelectItem value="total_time">Tempo totale</SelectItem>
-                            <SelectItem value="longest_session">Sessione più lunga</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Durata</label>
-	                        <Select
-	                          value={createDraft.duration}
-	                          onValueChange={(value) =>
-	                            setCreateDraft((prev) => ({ ...prev, duration: value as ChallengeDuration }))
-	                          }
-	                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Durata" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1_week">1 settimana</SelectItem>
-                            <SelectItem value="2_weeks">2 settimane</SelectItem>
-                            <SelectItem value="1_month">1 mese</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-foreground">Data inizio</label>
-                        <input
-                          type="date"
-                          className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-                          value={createDraft.startDate}
-                          onChange={(event) =>
-                            setCreateDraft((prev) => ({ ...prev, startDate: event.target.value }))
-                          }
-                        />
-                      </div>
-                    </div>
-                    <Button
-                      variant="neon"
-                      className="w-full"
-                      onClick={() => createChallenge.mutate(createDraft)}
-                      disabled={!createDraft.name.trim()}
-                    >
-                      Crea sfida
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            <Tabs
-              value={activeTab}
-              onValueChange={(value) => {
-                setActiveTab(value)
-                if (value === "active") setActivePage(1)
-                if (value === "available") setAvailablePage(1)
-                if (value === "leaderboard") setLeaderboardPage(1)
-              }}
-            >
-              <TabsList className="w-full sm:w-fit">
-                <TabsTrigger value="active">
-                  Active ({activeChallenges.length + pendingChallenges.length})
-                </TabsTrigger>
-                <TabsTrigger value="available">Available</TabsTrigger>
-                <TabsTrigger value="completed">Completed</TabsTrigger>
-                <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="active" className="mt-3 space-y-3">
-                {participatingChallenges.length === 0 && (
-                  <Surface className="bg-card border-border">
-                    <SurfaceContent className="p-6 text-muted-foreground">
-                      Nessuna sfida attiva. Esplora le nuove sfide disponibili!
-                    </SurfaceContent>
-                  </Surface>
-                )}
-                {pagedParticipatingChallenges.map((challenge) => {
-                  const leaderboard = (challenge.leaderboard ?? []) as Array<{ progress: number }>
-                  const maxProgress = leaderboard.reduce(
-                    (max, item) => Math.max(max, item.progress || 0),
-                    0
-                  )
-                  const progressValue = challenge.current_progress ?? 0
-                  const progressPercent =
-                    maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
-
-                  return (
-                    <Surface key={challenge.id} className="bg-card border-border overflow-hidden">
-                      <div className="flex flex-col md:flex-row">
-                        <div className="relative h-32 w-full md:h-auto md:w-48">
-                          <Image
-                            src={getClassicChallengeImage(challenge)}
-                            alt={challenge.name}
-                            fill
-                            className="object-cover"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-card md:bg-gradient-to-t md:from-transparent md:to-card/50" />
-                        </div>
-                        <SurfaceContent className="flex-1 p-4">
-                          <div className="mb-3 flex items-start justify-between">
-                            <div>
-                              <h3 className="text-lg font-display font-bold text-foreground">
-                                {challenge.name}
-                              </h3>
-                              <p className="text-sm text-muted-foreground">
-                                {challenge.description || ""}
-                              </p>
-                            </div>
-                            <Badge variant="outline" className="border-primary/30 text-primary">
-                              {challenge.status === "pending" ? "In arrivo" : "Attiva"}
-                            </Badge>
-                          </div>
-
-                          <div className="mb-4 grid grid-cols-2 gap-4 text-sm">
-                            <div className="flex items-center gap-2">
-                              <Target className="h-4 w-4 text-primary" />
-                              <span className="text-muted-foreground">
-                                {objectiveLabel(challenge.objective)}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Users className="h-4 w-4 text-primary" />
-                              <span className="text-muted-foreground">
-                                {challenge.participantCount} partecipanti
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Clock className="h-4 w-4 text-primary" />
-                              <span className="text-muted-foreground">
-                                {formatDaysLeft(challenge.end_date)}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Trophy className="h-4 w-4 text-primary" />
-                              <span className="text-muted-foreground">
-                                {challenge.prize_description || "Badge esclusivo"}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">Your Progress</span>
-                              <span className="font-medium text-foreground">
-                                {formatObjective(challenge.objective, progressValue)}
-                              </span>
-                            </div>
-                            <Progress value={progressPercent} className="h-2" />
-                          </div>
-
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            <Button variant="outline-neon" size="sm" className="gap-2" asChild>
-                              <Link href={`/season/challenges/${challenge.id}`}>
-                                Dettagli
-                                <ChevronRight className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                            <Button
-                              variant="ghost-neon"
-                              size="sm"
-                              onClick={() => leaveChallenge.mutate({ challengeId: challenge.id })}
-                            >
-                              Leave
-                            </Button>
-                          </div>
-                        </SurfaceContent>
-                      </div>
-                    </Surface>
-                  )
-                })}
-                {participatingChallenges.length > activePageSize && (
-                  <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2">
-                    <p className="text-xs text-muted-foreground">Pagina {activePage} di {activeTotalPages}</p>
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline-neon"
-                        onClick={() => setActivePage((prev) => Math.max(1, prev - 1))}
-                        disabled={activePage === 1}
-                      >
-                        Indietro
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline-neon"
-                        onClick={() => setActivePage((prev) => Math.min(activeTotalPages, prev + 1))}
-                        disabled={activePage === activeTotalPages}
-                      >
-                        Avanti
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-
-              <TabsContent value="available" className="mt-3 space-y-3">
-                {availableChallenges.length === 0 && (
-                  <Surface className="bg-card border-border">
-                    <SurfaceContent className="p-6 text-muted-foreground">
-                      Nessuna sfida disponibile al momento.
-                    </SurfaceContent>
-                  </Surface>
-                )}
-                {pagedAvailableChallenges.map((challenge) => (
-                  <Surface key={challenge.id} className="bg-card border-border">
-                    <SurfaceContent className="p-4">
-                      <div className="flex items-start justify-between gap-4">
+                    <SurfaceContent className="flex-1 p-4">
+                      <div className="mb-3 flex items-start justify-between">
                         <div>
                           <h3 className="text-lg font-display font-bold text-foreground">
                             {challenge.name}
                           </h3>
-                          <p className="text-sm text-muted-foreground">{challenge.description || ""}</p>
-                          <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
-                            <Users className="h-4 w-4" />
-                            {challenge.participantCount} partecipanti
-                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {challenge.description || ""}
+                          </p>
                         </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <Badge variant="secondary">{objectiveLabel(challenge.objective)}</Badge>
-                          <Button
-                            variant="neon"
-                            size="sm"
-                            onClick={() => joinChallenge.mutate({ challengeId: challenge.id })}
-                          >
-                            Join
-                          </Button>
+                        <Badge variant="outline" className="border-primary/30 text-primary">
+                          {challenge.status === "pending" ? "In arrivo" : "Attiva"}
+                        </Badge>
+                      </div>
+
+                      <div className="mb-4 grid grid-cols-2 gap-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <Target className="h-4 w-4 text-primary" />
+                          <span className="text-muted-foreground">
+                            {objectiveLabel(challenge.objective)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Users className="h-4 w-4 text-primary" />
+                          <span className="text-muted-foreground">
+                            {challenge.participantCount} partecipanti
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-primary" />
+                          <span className="text-muted-foreground">
+                            {formatDaysLeft(challenge.end_date)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Trophy className="h-4 w-4 text-primary" />
+                          <span className="text-muted-foreground">
+                            {challenge.prize_description || "Badge esclusivo"}
+                          </span>
                         </div>
                       </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">Your Progress</span>
+                          <span className="font-medium text-foreground">
+                            {formatObjective(challenge.objective, progressValue)}
+                          </span>
+                        </div>
+                        <Progress value={progressPercent} className="h-2" />
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Button variant="outline-neon" size="sm" className="gap-2" asChild>
+                          <Link href={`/season/challenges/${challenge.id}`}>
+                            Dettagli
+                            <ChevronRight className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                        <Button
+                          variant="ghost-neon"
+                          size="sm"
+                          onClick={() => leaveChallenge.mutate({ challengeId: challenge.id })}
+                        >
+                          Leave
+                        </Button>
+                      </div>
                     </SurfaceContent>
-                  </Surface>
-                ))}
-                {availableChallenges.length > availablePageSize && (
-                  <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2">
-                    <p className="text-xs text-muted-foreground">Pagina {availablePage} di {availableTotalPages}</p>
-                    <div className="flex gap-2">
+                  </div>
+                </Surface>
+              )
+            })}
+            {participatingChallenges.length > activePageSize && (
+              <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Pagina {activePage} di {activeTotalPages}</p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline-neon"
+                    onClick={() => setActivePage((prev) => Math.max(1, prev - 1))}
+                    disabled={activePage === 1}
+                  >
+                    Indietro
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline-neon"
+                    onClick={() => setActivePage((prev) => Math.min(activeTotalPages, prev + 1))}
+                    disabled={activePage === activeTotalPages}
+                  >
+                    Avanti
+                  </Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="available" className="mt-3 space-y-3">
+            {availableChallenges.length === 0 && (
+              <Surface className="bg-card border-border">
+                <SurfaceContent className="p-6 text-muted-foreground">
+                  Nessuna sfida disponibile al momento.
+                </SurfaceContent>
+              </Surface>
+            )}
+            {pagedAvailableChallenges.map((challenge) => (
+              <Surface key={challenge.id} className="bg-card border-border">
+                <SurfaceContent className="p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-display font-bold text-foreground">
+                        {challenge.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">{challenge.description || ""}</p>
+                      <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                        <Users className="h-4 w-4" />
+                        {challenge.participantCount} partecipanti
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-2">
+                      <Badge variant="secondary">{objectiveLabel(challenge.objective)}</Badge>
                       <Button
+                        variant="neon"
                         size="sm"
-                        variant="outline-neon"
-                        onClick={() => setAvailablePage((prev) => Math.max(1, prev - 1))}
-                        disabled={availablePage === 1}
+                        onClick={() => joinChallenge.mutate({ challengeId: challenge.id })}
                       >
-                        Indietro
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline-neon"
-                        onClick={() => setAvailablePage((prev) => Math.min(availableTotalPages, prev + 1))}
-                        disabled={availablePage === availableTotalPages}
-                      >
-                        Avanti
+                        Join
                       </Button>
                     </div>
                   </div>
-                )}
-              </TabsContent>
+                </SurfaceContent>
+              </Surface>
+            ))}
+            {availableChallenges.length > availablePageSize && (
+              <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2">
+                <p className="text-xs text-muted-foreground">Pagina {availablePage} di {availableTotalPages}</p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline-neon"
+                    onClick={() => setAvailablePage((prev) => Math.max(1, prev - 1))}
+                    disabled={availablePage === 1}
+                  >
+                    Indietro
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline-neon"
+                    onClick={() => setAvailablePage((prev) => Math.min(availableTotalPages, prev + 1))}
+                    disabled={availablePage === availableTotalPages}
+                  >
+                    Avanti
+                  </Button>
+                </div>
+              </div>
+            )}
+          </TabsContent>
 
-              <TabsContent value="completed" className="mt-3">
-                <Surface className="bg-card border-border">
-                  <SurfaceContent className="p-6 text-muted-foreground">
-                    Nessuna sfida completata al momento.
-                  </SurfaceContent>
-                </Surface>
-              </TabsContent>
+          <TabsContent value="completed" className="mt-3">
+            <Surface className="bg-card border-border">
+              <SurfaceContent className="p-6 text-muted-foreground">
+                Nessuna sfida completata al momento.
+              </SurfaceContent>
+            </Surface>
+          </TabsContent>
 
-              <TabsContent value="leaderboard" className="mt-3">
-                <Surface className="bg-card border-border">
-                  <SurfaceContent className="p-4">
-                    <div className="space-y-4">
-                      {leaderboard.length === 0 && (
-                        <div className="text-muted-foreground">
-                          Nessuna classifica disponibile.
-                        </div>
-                      )}
-                      {pagedLeaderboard.map((entry, index) => {
-                        const absoluteIndex = (leaderboardPage - 1) * leaderboardPageSize + index
-                        const profile = entry.profile ?? entry
-                        const name = entry.name ?? profile.name ?? "Nuotatore"
-                        const rawUserId = profile.userId ?? entry.userId
-                        const userId = Number(rawUserId)
-                        const hasProfileLink = Number.isFinite(userId) && userId > 0
-
-                        const rowContent = (
-                          <>
-                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                              {absoluteIndex === 0 ? (
-                                <Crown className="h-4 w-4 text-primary" />
-                              ) : (
-                                <span className="text-sm font-bold text-foreground">
-                                  {absoluteIndex + 1}
-                                </span>
-                              )}
-                            </div>
-                            <Avatar className="h-10 w-10">
-                              <AvatarImage
-                                src={profile.profileImage || "/placeholder.svg"}
-                                alt={name}
-                              />
-                              <AvatarFallback>{getInitials(name)}</AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <h4 className="font-medium text-foreground">{name}</h4>
-                              <p className="text-xs text-muted-foreground">
-                                {formatDistance(profile.totalDistanceMeters || 0)}
-                              </p>
-                            </div>
-                            <Badge className="bg-accent/20 text-accent">{profile.totalXp} XP</Badge>
-                          </>
-                        )
-
-                        return hasProfileLink ? (
-                          <Link
-                            key={entry.userId ?? entry.id ?? index}
-                            href={`/u/${userId}`}
-                            className="flex items-center gap-4 rounded-lg bg-secondary/30 p-3 transition-colors hover:bg-secondary/45"
-                          >
-                            {rowContent}
-                          </Link>
-                        ) : (
-                          <div
-                            key={entry.userId ?? entry.id ?? index}
-                            className="flex items-center gap-4 rounded-lg bg-secondary/30 p-3"
-                          >
-                            {rowContent}
-                          </div>
-                        )
-                      })}
-                      {leaderboard.length > leaderboardPageSize && (
-                        <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2">
-                          <p className="text-xs text-muted-foreground">
-                            Pagina {leaderboardPage} di {leaderboardTotalPages}
-                          </p>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline-neon"
-                              onClick={() => setLeaderboardPage((prev) => Math.max(1, prev - 1))}
-                              disabled={leaderboardPage === 1}
-                            >
-                              Indietro
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline-neon"
-                              onClick={() => setLeaderboardPage((prev) => Math.min(leaderboardTotalPages, prev + 1))}
-                              disabled={leaderboardPage === leaderboardTotalPages}
-                            >
-                              Avanti
-                            </Button>
-                          </div>
-                        </div>
-                      )}
+          <TabsContent value="leaderboard" className="mt-3">
+            <Surface className="bg-card border-border">
+              <SurfaceContent className="p-4">
+                <div className="space-y-4">
+                  {leaderboard.length === 0 && (
+                    <div className="text-muted-foreground">
+                      Nessuna classifica disponibile.
                     </div>
-                  </SurfaceContent>
-                </Surface>
-              </TabsContent>
-            </Tabs>
+                  )}
+                  {pagedLeaderboard.map((entry, index) => {
+                    const absoluteIndex = (leaderboardPage - 1) * leaderboardPageSize + index
+                    const profile = entry.profile ?? entry
+                    const name = entry.name ?? profile.name ?? "Nuotatore"
+                    const rawUserId = profile.userId ?? entry.userId
+                    const userId = Number(rawUserId)
+                    const hasProfileLink = Number.isFinite(userId) && userId > 0
+
+                    const rowContent = (
+                      <>
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                          {absoluteIndex === 0 ? (
+                            <Crown className="h-4 w-4 text-primary" />
+                          ) : (
+                            <span className="text-sm font-bold text-foreground">
+                              {absoluteIndex + 1}
+                            </span>
+                          )}
+                        </div>
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage
+                            src={profile.profileImage || "/placeholder.svg"}
+                            alt={name}
+                          />
+                          <AvatarFallback>{getInitials(name)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <h4 className="font-medium text-foreground">{name}</h4>
+                          <p className="text-xs text-muted-foreground">
+                            {formatDistance(profile.totalDistanceMeters || 0)}
+                          </p>
+                        </div>
+                        <Badge className="bg-accent/20 text-accent">{profile.totalXp} XP</Badge>
+                      </>
+                    )
+
+                    return hasProfileLink ? (
+                      <Link
+                        key={entry.userId ?? entry.id ?? index}
+                        href={`/u/${userId}`}
+                        className="flex items-center gap-4 rounded-lg bg-secondary/30 p-3 transition-colors hover:bg-secondary/45"
+                      >
+                        {rowContent}
+                      </Link>
+                    ) : (
+                      <div
+                        key={entry.userId ?? entry.id ?? index}
+                        className="flex items-center gap-4 rounded-lg bg-secondary/30 p-3"
+                      >
+                        {rowContent}
+                      </div>
+                    )
+                  })}
+                  {leaderboard.length > leaderboardPageSize && (
+                    <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/40 px-3 py-2">
+                      <p className="text-xs text-muted-foreground">
+                        Pagina {leaderboardPage} di {leaderboardTotalPages}
+                      </p>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline-neon"
+                          onClick={() => setLeaderboardPage((prev) => Math.max(1, prev - 1))}
+                          disabled={leaderboardPage === 1}
+                        >
+                          Indietro
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline-neon"
+                          onClick={() => setLeaderboardPage((prev) => Math.min(leaderboardTotalPages, prev + 1))}
+                          disabled={leaderboardPage === leaderboardTotalPages}
+                        >
+                          Avanti
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </SurfaceContent>
+            </Surface>
           </TabsContent>
         </Tabs>
       </div>
