@@ -1,6 +1,6 @@
 # SwimForge Android — piano proposto (27 ottobre 2026)
 
-Stato: **proposta da approvare**. Nasce dal confronto fra l'inventario delle funzionalità
+Stato: **approvato il 27/10/2026** (Capacitor confermato; decisioni in §7). Nasce dal confronto fra l'inventario delle funzionalità
 attuali di SwimForge e l'analisi di un'app Android concorrente orientata all'allenamento
 (report locale in `docs/reports/2026-10-27-swimbox-rea.md`, non versionato).
 
@@ -60,12 +60,12 @@ Implicazioni tecniche da gestire (tutte note, nessuna bloccante):
 |---|---|---|
 | Predizioni/scommesse, recap video Remotion, "core loop v2" | rimuovere codice e flag | mai attivati, giudicati da rimuovere o ridimensionare |
 | Ghost track / ghost challenges | rimuovere dall'app Android (parcheggiare il codice) | esecuzione giudicata scarsa; si può ripensare dopo |
-| Stagioni a 56 giorni con battle pass, missioni, club quest | **decisione tua**: proposta = tenere XP, livelli, badge e classifiche; togliere la macchina delle stagioni | missioni "non specifiche per il nuoto"; complessità alta per il valore percepito |
+| Stagioni a 56 giorni con battle pass, missioni, club quest | **DECISO 27/10**: tenere XP, livelli, badge e classifiche; togliere stagioni, battle pass, missioni e club quest | missioni "non specifiche per il nuoto"; complessità alta per il valore percepito |
 | Sfide utente generiche | semplificare a 3 tipi (metri totali, sedute, costanza) o rinviare | troppo generiche |
 | Meet, storia club, automazioni AI dei club | fuori dalla prima app Android (flag restano spenti) | 2.300 righe di router per funzioni mai attivate |
 | Codice morto elencato sopra | cancellare | peso del bundle e manutenzione |
 | Obiettivi in localStorage | portare su server o togliere | su mobile si perdono a ogni reinstallazione |
-| Storie 24h | **decisione tua**: tenere solo se le usi davvero | costo di mantenimento (upload mobile instabile da roadmap) |
+| Storie 24h | **DECISO 27/10**: rimuovere (UI, router e cron; le tabelle restano) | costo di mantenimento (upload mobile instabile da roadmap) |
 | Blocco dell'inserimento manuale | rimuovere il blocco: attività manuale ammessa ma marcata "manuale", senza XP (o XP ridotto) e fuori classifica | sblocca chi non ha Garmin, senza rovinare le classifiche |
 | Login Garmin con email/password | sostituire appena possibile (vedi fase 4) | fragile, MFA problematico, contro i termini Garmin |
 
@@ -84,7 +84,7 @@ Priorità P1 = nella prima app pubblicata, P2 = subito dopo, P3 = quando serve.
 | 7 | **Carico interno** (punti = tempo per zona HR pesato; SwimForge ha già il tempo nelle zone 1-5 da Garmin) con grafico 12 settimane; **recupero** (ACWR acuto/cronico) con feedback giornaliero | P2 | dati già nel DB (`time in HR zones`, training effect) |
 | 8 | **Feedback post-seduta**: RPE 1-10, obiettivo raggiunto, nota | P1 | alimenta Session IQ e il coach |
 | 9 | **Check-in settimanale** (30 s) → il coach AI genera la settimana successiva | P2 | estende il piano giornaliero attuale a piano settimanale |
-| 10 | **Home "Oggi"**: sessione di oggi, ultima attività, carico settimana, 4 azioni rapide (Allenati ora, Pianifica, Sincronizza, Chiedi al coach). Il feed social diventa la seconda tab | P1 | **decisione tua**: cambia l'identità feed-first |
+| 10 | **Home "Oggi"**: sessione di oggi, ultima attività, carico settimana, 4 azioni rapide (Allenati ora, Pianifica, Sincronizza, Chiedi al coach). Il feed social diventa la seconda tab | P1 | **DECISO 27/10**: sì, home "Oggi" con feed in seconda tab |
 | 11 | **Coach AI contestuale**: la chat sa in che schermata sei (attività, sessione, piano) e propone domande | P2 | la chat Gemini esiste, manca il contesto per schermata |
 | 12 | **Push notifications** (FCM via Capacitor): sync completata, PB, promemoria sessione, DM, commenti, risposte del coach | P1 | server: Firebase Admin SDK su Render; tabella device token |
 | 13 | **Condividi immagine** dell'attività (card con statistiche su foto) verso Instagram/WhatsApp | P2 | plugin Share + canvas |
@@ -160,11 +160,15 @@ Totale indicativo: 20-27 giorni di lavoro per arrivare al test chiuso.
 - Due sessioni Claude sullo stesso working tree vanno evitate; per lavoro parallelo
   usare un worktree git separato.
 
-## 7. Decisioni richieste
+## 7. Decisioni prese (27/10/2026)
 
-1. Capacitor come architettura: sì/no.
-2. Tagli di §3 marcati "decisione tua": stagioni, storie.
-3. Home "Oggi" con feed in seconda tab: sì/no.
-4. Avviare subito la richiesta Garmin Connect Developer Program.
-5. Walkthrough con screenshot dell'app concorrente (telefono sbloccato, 10 minuti) per
-   completare la parte UX del report, oppure rinunciare.
+1. Capacitor come architettura: **sì**.
+2. Gamification leggera: restano XP, livelli, badge e classifiche; via stagioni, battle
+   pass, missioni e club quest.
+3. Storie 24h: **rimosse**.
+4. Home "Oggi" con feed social in seconda tab: **sì**.
+5. Walkthrough con screenshot dell'app concorrente: rinviato a un'altra sessione.
+
+Azione a carico del proprietario: richiedere l'accesso al Garmin Connect Developer
+Program (serve un account aziendale/sviluppatore Garmin; l'approvazione richiede
+settimane).
