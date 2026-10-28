@@ -873,6 +873,8 @@ export function ActivityCard({ activity, href, onSelect, selected = false }: {
 }
 ```
 
+Anche `client/src/components/ui/surface.tsx`: togli `hover:-translate-y-px` e `transform` dalla transizione (niente movimento al passaggio del mouse; resta solo il cambio di colore del bordo).
+
 Test `corsia.test.tsx` (Testing Library; per `SectionTabs` usa `import { Router } from "wouter"` e `import { memoryLocation } from "wouter/memory-location"` con `<Router hook={memoryLocation({ path: "/goals" }).hook}>`):
 1. `Metric` mostra valore, unità ed etichetta.
 2. `Chip tone="xp"` contiene il testo.
@@ -911,10 +913,16 @@ const RULES = {
   "token-legacy": /electric-(?:cyan|lime|coral|violet)|forge-orange/,
   "variante-neon": /variant=["'](?:neon|outline-neon|ghost-neon)["']/,
   "testo-primario": /(?<![\w-])text-primary(?![\w-])/,
-  "accento-lime": /\b(?:text|border|ring|from|to|via)-accent\b/,
-  "gradiente": /bg-gradient-to-|bg-\[(?:linear|radial|conic)-gradient/,
+  "accento-lime": /(?<![\w-])(?:text|border|ring|from|to|via)-accent(?![\w-])/,
+  "gradiente": /bg-gradient-to-|bg-(?:linear|radial|conic)-|(?:linear|radial|conic)-gradient\(/,
+  "sfocatura": /backdrop-blur|backdrop-filter/,
 } as const;
 type Rule = keyof typeof RULES;
+
+/** Files allowed to match a rule for good (justify each entry). */
+const EXEMPT: Partial<Record<Rule, readonly string[]>> = {
+  gradiente: ["index.css"], // skeleton shimmer animation
+};
 
 /**
  * Files still to clean, per rule. Ratchet: a file leaves the list in the task that cleans it
@@ -930,10 +938,15 @@ const PENDING: Record<Rule, string[]> = {
   "testo-primario": [],
   "accento-lime": [],
   "gradiente": [],
+  "sfocatura": [],
 };
 
 const contents = new Map(sourceFiles().map((file) => [file, readFileSync(path.join(SRC, file), "utf8")]));
-const offenders = (rule: Rule) => [...contents].filter(([, text]) => RULES[rule].test(text)).map(([file]) => file).sort();
+const offenders = (rule: Rule) =>
+  [...contents]
+    .filter(([file, text]) => RULES[rule].test(text) && !EXEMPT[rule]?.includes(file))
+    .map(([file]) => file)
+    .sort();
 
 describe("design-lint Corsia", () => {
   for (const rule of Object.keys(RULES) as Rule[]) {
@@ -951,7 +964,8 @@ describe("design-lint Corsia", () => {
 1. Esegui `pnpm vitest run client/src/styles/design-lint.test.ts`: i test «nessun file fuori elenco» falliscono e stampano gli elenchi attuali.
 2. Copia ogni elenco, ordinato, nel relativo `PENDING` (percorsi relativi a `client/src`, es. `"pages/Activities.tsx"`). `index.css` comparirà in `token-legacy` e `testo-gradiente` (alias e definizione): resta fino al Task 22.
 3. Riesegui → PASS. `pnpm test` verde.
-4. Commit `test(ui): Corsia design-lint ratchet`.
+4. Robustezza del test di contrasto (`client/src/styles/corsia-contrast.test.ts`): `block()` deve scegliere il blocco del tema e non il blocco derivato `:root,\n.dark {`. Cerca tutte le righe `^<selettore> \{$`, scarta quelle precedute da una riga che finisce con `,`, e fallisci se ne resta più o meno di una.
+5. Commit `test(ui): Corsia design-lint ratchet`.
 
 Da qui in poi **ogni task di schermata o pulizia toglie da `PENDING` i file che ripulisce** (e il test lo impone).
 
@@ -1122,11 +1136,10 @@ Tutti i file ancora presenti in `PENDING` per le regole `testo-piccolo`, `alone-
 ### Task 22: Rinomina dei nomi legacy
 **Files:** tutto `client/src` (sostituzioni meccaniche), `client/src/index.css`, `components/ui/{button,badge}.tsx`, `variants.test.ts`.
 1. Varianti: `variant="neon"` → `variant="default"` (se il componente è `Badge`, → `variant="secondary"` o `Chip`, a seconda del contesto), `variant="outline-neon"` → `variant="outline"`, `variant="ghost-neon"` → `variant="ghost"` più `className` con `text-action-text` dove il testo era colorato. Poi elimina le varianti `neon`, `outline-neon`, `ghost-neon` da `button.tsx` e `neon` da `badge.tsx`; aggiorna `variants.test.ts`.
-2. `client/src/components/ui/surface.tsx`: togli `hover:-translate-y-px` e `transform` dalla transizione (niente movimento al passaggio del mouse).
-3. Token: `var(--electric-cyan)` → `var(--action-text)` (o classe `text-action-text`/`border-action-text`/`bg-primary` dove è un riempimento), `--electric-lime` → `--success`, `--electric-coral` → `--danger`, `--electric-violet` → `--muted-foreground`, `--forge-orange` → `--xp`, `--forge-orange-soft` → `color-mix(in oklch, var(--xp) 16%, transparent)`, `--chip-*` → token Corsia; `--neon-*`, `--forge-glow`, `--surface-glow`: elimina gli usi. Poi elimina gli alias dal blocco `:root, .dark` e da `@theme inline` (`--color-neon-*`, `--color-chip-*`, `--color-surface-glow`).
-4. `.neon-gradient-text`: rimuovi la classe da tutti i JSX e la definizione da `index.css`.
-5. Elimina la regola `.surface-panel > * { position: relative; }` da `@layer utilities` (le decorazioni assolute nei pannelli sono state tolte dai task di pagina; verifica con grep che nessun figlio diretto di un `surface-panel` usi ancora `absolute` per decorazioni).
-6. `PENDING` di `token-legacy`, `variante-neon` e `testo-gradiente` vuoti; `pnpm check && pnpm test && pnpm build && pnpm build:native` verdi.
+2. Token: `var(--electric-cyan)` → `var(--action-text)` (o classe `text-action-text`/`border-action-text`/`bg-primary` dove è un riempimento), `--electric-lime` → `--success`, `--electric-coral` → `--danger`, `--electric-violet` → `--muted-foreground`, `--forge-orange` → `--xp`, `--forge-orange-soft` → `color-mix(in oklch, var(--xp) 16%, transparent)`, `--chip-*` → token Corsia; `--neon-*`, `--forge-glow`, `--surface-glow`: elimina gli usi. Poi elimina gli alias dal blocco `:root, .dark` e da `@theme inline` (`--color-neon-*`, `--color-chip-*`, `--color-surface-glow`).
+3. `.neon-gradient-text`: rimuovi la classe da tutti i JSX e la definizione da `index.css`.
+4. Elimina la regola `.surface-panel > * { position: relative; }` da `@layer utilities` (le decorazioni assolute nei pannelli sono state tolte dai task di pagina; verifica con grep che nessun figlio diretto di un `surface-panel` usi ancora `absolute` per decorazioni).
+5. `PENDING` di `token-legacy`, `variante-neon` e `testo-gradiente` vuoti; `pnpm check && pnpm test && pnpm build && pnpm build:native` verdi.
 Commit `refactor(ui): drop legacy neon names`.
 
 ### Task 23: Documentazione
