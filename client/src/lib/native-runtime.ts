@@ -9,7 +9,7 @@ export type NativeAuthCallback = { code: string | null; error: string | null };
 
 export type NativeRuntimeOptions = {
   navigate: (path: string) => void;
-  onAuthCallback: (callback: NativeAuthCallback) => void | Promise<void>;
+  onAuthCallback: (callback: NativeAuthCallback) => unknown;
 };
 
 const NATIVE_BACKGROUND = "#0A1520";

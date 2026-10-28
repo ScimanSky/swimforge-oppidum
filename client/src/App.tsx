@@ -15,6 +15,8 @@ import PbCelebrationNotification from "./components/PbCelebrationNotification";
 import CookieBanner from "./components/CookieBanner";
 import { UI_FEATURE_FLAGS } from "./lib/feature-flags";
 import { hideSplash, initNativeRuntime } from "./lib/native-runtime";
+import { completeNativeAuthCallback } from "./lib/native-auth";
+import { trpc } from "./lib/trpc";
 
 const Home = lazy(() => import("./pages/Home"));
 const Badges = lazy(() => import("./pages/Badges"));
@@ -180,15 +182,23 @@ function ScrollToTop() {
 /** Native shell wiring (status bar, back button, deep links); renders nothing, no-op on the web. */
 function NativeRuntime() {
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
 
   useEffect(
     () =>
       initNativeRuntime({
         navigate,
-        onAuthCallback: (callback) => {
-          // Wired to the native Google sign-in in the next step.
-          console.warn("[native] auth callback not handled yet", callback.error ?? "code received");
-        },
+        // Native Google sign-in returns here via swimforge://auth/callback (lib/native-auth.ts).
+        onAuthCallback: (callback) =>
+          completeNativeAuthCallback(callback, {
+            syncUser: (input) => utils.client.auth.syncSupabaseUser.mutate(input),
+            onSignedIn: async (path) => {
+              // Leave /login first (its "already authenticated" redirect would override the
+              // onboarding path), then refetch everything with the new session.
+              navigate(path, { replace: true });
+              await utils.invalidate();
+            },
+          }),
       }),
     // navigate is stable in wouter's browser location hook; register the listeners once.
     [],

@@ -61,11 +61,15 @@ export function getNativeSessionToken(): string | null {
   return readLegacyToken();
 }
 
-/** Stores the native session token returned by auth.syncSupabaseUser; storage errors are ignored. */
-export function setNativeSessionToken(token: string): void {
+/**
+ * Stores the native session token returned by auth.syncSupabaseUser; storage errors are ignored.
+ * The in-memory copy is updated synchronously; the returned promise resolves once the token
+ * is persisted (await it before a full page reload on native).
+ */
+export async function setNativeSessionToken(token: string): Promise<void> {
   if (isNativePlatform()) {
     nativeCache = token;
-    Preferences.set({ key: PREFERENCES_SESSION_TOKEN_KEY, value: token }).catch(() => {});
+    await Preferences.set({ key: PREFERENCES_SESSION_TOKEN_KEY, value: token }).catch(() => {});
     return;
   }
   try {
