@@ -1127,7 +1127,7 @@ Per ogni task: applica le **Regole Corsia** ai file elencati e a quelli importat
 `pages/ClubDetailEnhanced.tsx`, `ClubEventDetail.tsx`, `ClubWorkoutsPage.tsx`, `ClubWorkoutDetailPage.tsx`, `ClubPbLeaderboardPage.tsx`, `ClubDocumentsPage.tsx`, `ClubCoachModeration.tsx`, `ClubInvite.tsx`, `components/club/*`. Le pagine dietro flag spenti (`ClubMeetDetail`, `ClubMeetProgramBuilder`, `ClubHistory*`) ricevono solo le sostituzioni meccaniche necessarie a svuotare `PENDING`, nessun ridisegno.
 
 ### Task 19: Social e messaggi
-`pages/Messages.tsx`, `pages/PostDetail.tsx`, `pages/ReportPost.tsx`, `pages/PublicProfile.tsx`, `pages/AdminReports.tsx`, `components/DirectMessages*.tsx`, `components/NotificationBell.tsx` e i componenti di notifica.
+`pages/Messages.tsx`, `pages/PostDetail.tsx`, `pages/ReportPost.tsx`, `pages/PublicProfile.tsx`, `pages/AdminReports.tsx`, `components/DirectMessages*.tsx`, `components/NotificationBell.tsx` e i componenti di notifica. Anche `components/PostReactions.tsx` (colori fissi delle emoji, es. `text-blue-500`, non intercettati dal design-lint) e `lib/social-content.tsx` (classi di default legacy, ancora in `PENDING`).
 
 ### Task 20: Accesso, impostazioni, landing, pagine legali
 `pages/Login.tsx`, `Register.tsx`, `ForgotPassword.tsx`, `ResetPassword.tsx`, `AuthCallback.tsx`, `Settings.tsx`, `Home.tsx` (landing pubblica: stessi token, niente blob/griglie neon), `Privacy.tsx`, `Terms.tsx`, `CookiePolicy.tsx`, `NotFound.tsx`, `components/CookieBanner.tsx`, `components/onboarding/*`, `components/BadgeUnlockNotification.tsx`, `PbCelebrationNotification.tsx`, `ActivityInsightNotification.tsx`, `GarminSection.tsx`.

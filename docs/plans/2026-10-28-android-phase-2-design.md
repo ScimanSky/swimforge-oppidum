@@ -163,10 +163,11 @@ Dall'alto:
 - La card «Sessione di oggi» arriva in fase 3; nessun segnaposto ora.
 
 ### 5.2 Feed (`/home`)
-Come la tavola `renders/Feed.png`, senza la riga delle storie: sotto-schede Per te · Seguiti ·
-Club, post con avatar, testo, card attività compatta (tre `Metric`), chip record, reazioni,
+Come la tavola `renders/Feed.png`, senza la riga delle storie: sotto-schede Per te · Seguiti
+(la scheda «Club» della tavola richiede un nuovo filtro lato server: rinviata), post con avatar, testo, card attività compatta (tre `Metric`), chip record, reazioni,
 commenti, condivisione. Foto e video del post restano media a tutta larghezza senza testo
-sovrapposto.
+sovrapposto. La chip «Record» nella card attività del feed è rinviata: la query del feed non
+espone ancora i record personali.
 
 ### 5.3 Allena · Attività (`/track`, `/track/:id`)
 - Lista come `renders/Attivita.png`: card «Questa settimana» in testa, filtro segmentato
