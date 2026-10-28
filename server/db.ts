@@ -856,17 +856,21 @@ export async function getLevelForXp(xp: number) {
   return result.length > 0 ? result[0] : { level: 1, title: 'Novizio', color: '#9ca3af' };
 }
 
-export async function getNextLevelThreshold(currentLevel: number) {
+export async function getLevelThreshold(level: number) {
   const db = await getDb();
   if (!db) return undefined;
-  
+
   const result = await db
     .select()
     .from(levelThresholds)
-    .where(eq(levelThresholds.level, currentLevel + 1))
+    .where(eq(levelThresholds.level, level))
     .limit(1);
-  
+
   return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getNextLevelThreshold(currentLevel: number) {
+  return getLevelThreshold(currentLevel + 1);
 }
 
 export async function createLevelThreshold(level: number, xpRequired: number, title: string, color: string) {

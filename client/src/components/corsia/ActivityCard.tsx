@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Waves } from "lucide-react";
 import { Link } from "wouter";
 import { Chip } from "./Chip";
@@ -24,27 +25,32 @@ export type ActivityCardData = {
   poolLengthMeters?: number | null;
 };
 
-/** Corsia activity card: icon tile, title, date, XP chip, up to four metrics. */
-export function ActivityCard({
-  activity,
-  href,
-  onSelect,
-  selected = false,
-}: {
-  activity: ActivityCardData;
-  href?: string;
-  onSelect?: () => void;
-  selected?: boolean;
-}) {
+/** Either a link (default `/track/:id`) or a selectable button, never both. */
+export type ActivityCardProps = { activity: ActivityCardData } & (
+  | { href?: string; onSelect?: never; selected?: never }
+  | { onSelect: () => void; selected?: boolean; href?: never }
+);
+
+/**
+ * Corsia activity card: icon tile, title, date, XP chip, up to four metrics.
+ * Phrasing content only (block spans), valid inside both `<a>` and `<button>`.
+ * Accessible name = title, description = date and place.
+ */
+export function ActivityCard(props: ActivityCardProps) {
+  const { activity } = props;
+  const titleId = useId();
+  const metaId = useId();
   const openWater = Boolean(activity.isOpenWater);
   const where = openWater
     ? "Acque libere"
-    : `Vasca ${activity.poolLengthMeters ?? 25}m`;
+    : activity.poolLengthMeters
+      ? `Vasca ${activity.poolLengthMeters}m`
+      : "Vasca";
   const duration = formatDurationParts(activity.durationSeconds);
   const pace = paceSecondsPer100m(activity);
   const body = (
     <>
-      <div className="flex items-start gap-3">
+      <span className="flex items-start gap-3">
         <span
           className={cn(
             "inline-flex size-12 shrink-0 items-center justify-center rounded-xl",
@@ -53,62 +59,80 @@ export function ActivityCard({
               : "bg-primary/15 text-action-text"
           )}
         >
-          <Waves className="size-6" />
+          <Waves className="size-6" aria-hidden="true" />
         </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-[17px] font-bold">
+        <span className="block min-w-0 flex-1">
+          <span id={titleId} className="block truncate text-[17px] font-bold">
             {activity.activityName || "Nuotata"}
-          </p>
-          <p className="truncate text-sm text-muted-foreground">
+          </span>
+          <span
+            id={metaId}
+            className="block truncate text-sm text-muted-foreground"
+          >
             {formatSessionDate(activity.activityDate)} · {where}
-          </p>
-        </div>
+          </span>
+        </span>
         {activity.xpEarned ? (
           <Chip tone="xp">+{activity.xpEarned}</Chip>
         ) : null}
-      </div>
-      <div className="mt-4 grid grid-cols-4 gap-3 border-t border-border pt-4">
+      </span>
+      <span className="mt-4 grid grid-cols-4 gap-3 border-t border-border pt-4">
         <Metric
           value={formatKm(activity.distanceMeters)}
           unit="km"
           label="Distanza"
+          size="sm"
         />
         {duration ? (
-          <Metric value={duration.value} unit={duration.unit} label="Durata" />
+          <Metric
+            value={duration.value}
+            unit={duration.unit}
+            label="Durata"
+            size="sm"
+          />
         ) : null}
         {pace ? (
           <Metric
             value={formatPaceValue(pace)}
             label="Passo /100"
             tone="action"
+            size="sm"
           />
         ) : null}
         {activity.avgHeartRate ? (
           <Metric
             value={String(Math.round(activity.avgHeartRate))}
             label="FC media"
+            size="sm"
           />
         ) : null}
-      </div>
+      </span>
     </>
   );
+  const a11y = { "aria-labelledby": titleId, "aria-describedby": metaId };
+  const selected = props.onSelect ? Boolean(props.selected) : false;
   const className = cn(
     "surface-panel block w-full p-4 text-left transition-colors hover:border-action-text/40",
     selected && "border-action-text"
   );
-  if (onSelect)
+  if (props.onSelect)
     return (
       <button
         type="button"
-        onClick={onSelect}
+        onClick={props.onSelect}
         className={className}
-        aria-pressed={selected}
+        aria-current={selected ? "true" : undefined}
+        {...a11y}
       >
         {body}
       </button>
     );
   return (
-    <Link href={href ?? `/track/${activity.id}`} className={className}>
+    <Link
+      href={props.href ?? `/track/${activity.id}`}
+      className={className}
+      {...a11y}
+    >
       {body}
     </Link>
   );

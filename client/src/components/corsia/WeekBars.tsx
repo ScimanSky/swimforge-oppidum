@@ -1,7 +1,11 @@
 import { cn } from "@/lib/utils";
 import type { WeekDay } from "@/lib/week-summary";
 
-/** Seven bars Mon-Sun; today in the action colour. */
+/**
+ * Seven bars Mon-Sun; today in the action colour.
+ * Decorative (`aria-hidden`): the caller must also render the week totals as text
+ * (metres, sessions), otherwise screen readers get nothing.
+ */
 export function WeekBars({ days }: { days: readonly WeekDay[] }) {
   const max = Math.max(1, ...days.map(day => day.meters));
   return (

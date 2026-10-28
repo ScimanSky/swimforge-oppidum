@@ -6,7 +6,9 @@ const TONE: Record<MetricTone, string> = {
   action: "text-action-text",
   xp: "text-xp",
 };
+/** sm fits four metrics in a 360px-wide card; md is the default. */
 const SIZE = {
+  sm: "text-[24px]",
   md: "text-[28px]",
   lg: "text-[36px]",
   xl: "text-[56px]",
@@ -21,7 +23,10 @@ export type MetricProps = {
   className?: string;
 };
 
-/** Corsia metric: big Barlow number, small grey unit, 12px label. */
+/**
+ * Corsia metric: big Barlow number, small grey unit, 12px label.
+ * Phrasing content only (block spans), so it can sit inside a button or link.
+ */
 export function Metric({
   value,
   unit,
@@ -31,10 +36,10 @@ export function Metric({
   className,
 }: MetricProps) {
   return (
-    <div className={cn("min-w-0", className)}>
-      <p
+    <span className={cn("block min-w-0", className)}>
+      <span
         className={cn(
-          "font-display font-bold leading-none tabular-nums",
+          "block whitespace-nowrap font-display font-bold leading-none tabular-nums",
           SIZE[size],
           TONE[tone]
         )}
@@ -45,10 +50,10 @@ export function Metric({
             {unit}
           </span>
         ) : null}
-      </p>
-      <p className="mt-1.5 truncate text-xs font-medium text-muted-foreground">
+      </span>
+      <span className="mt-1.5 block truncate text-xs font-medium text-muted-foreground">
         {label}
-      </p>
-    </div>
+      </span>
+    </span>
   );
 }

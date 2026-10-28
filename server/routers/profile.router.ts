@@ -14,7 +14,10 @@ export const profileRouter = router({
             throw new TRPCError({ code: "NOT_FOUND", message: "Profile not found" });
         }
 
-        const nextLevel = await db.getNextLevelThreshold(profile.level);
+        const [nextLevel, currentLevel] = await Promise.all([
+            db.getNextLevelThreshold(profile.level),
+            db.getLevelThreshold(profile.level),
+        ]);
         const currentLevelInfo = await db.getLevelForXp(profile.totalXp);
 
         // Get profile badge
@@ -44,6 +47,7 @@ export const profileRouter = router({
             xpLevelTitle: currentLevelInfo.title,
             xpLevelColor: currentLevelInfo.color,
             xpLevel: profile.level,
+            currentLevelXp: currentLevel?.xpRequired ?? 0,
             nextLevelXp: nextLevel?.xpRequired || null,
             xpToNextLevel: nextLevel ? nextLevel.xpRequired - profile.totalXp : 0,
             profileBadge,
