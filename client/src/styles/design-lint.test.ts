@@ -15,7 +15,9 @@ function sourceFiles(dir = SRC): string[] {
 }
 
 const RULES = {
-  "testo-piccolo": /text-\[(?:[5-9]|10|11)px\]|text-\[0\.[5-6]\d*rem\]/,
+  // Under 12px, also decimal px and rem (0.75rem = 12px stays allowed).
+  "testo-piccolo":
+    /text-\[(?:[5-9]|10|11)(?:\.\d+)?px\]|text-\[0\.(?:[5-6]\d*|7[0-4]\d*|7)rem\]/,
   "alone-neon": /neon-glow|neon-soft|forge-glow|shadow-\[0_0_/,
   "maiuscolo-spaziato":
     /\buppercase\b[^"'`\n]*\btracking-(?:\[[^\]]+\]|wide|wider|widest)|\btracking-(?:\[[^\]]+\]|wide|wider|widest)[^"'`\n]*\buppercase\b/,
@@ -283,6 +285,26 @@ const offenders = (rule: Rule) =>
     .sort();
 
 describe("design-lint Corsia", () => {
+  it("testo-piccolo: px e rem decimali sotto i 12px, 0.75rem ammesso", () => {
+    const rule = RULES["testo-piccolo"];
+    for (const bad of ["text-[10px]", "text-[11.5px]", "text-[9.75px]", "text-[0.7rem]", "text-[0.74rem]", "text-[0.625rem]", "text-[0.6rem]"]) {
+      expect(rule.test(bad), bad).toBe(true);
+    }
+    for (const ok of ["text-[12px]", "text-[0.75rem]", "text-[0.8rem]", "text-[15px]", "text-[17px]"]) {
+      expect(rule.test(ok), ok).toBe(false);
+    }
+  });
+
+  it("ogni esenzione corrisponde ancora alla sua regola", () => {
+    const stale = (Object.entries(EXEMPT) as Array<[Rule, readonly string[]]>).flatMap(
+      ([rule, files]) =>
+        files
+          .filter(file => !RULES[rule].test(contents.get(file) ?? ""))
+          .map(file => `${rule}: ${file}`)
+    );
+    expect(stale).toEqual([]);
+  });
+
   for (const rule of Object.keys(RULES) as Rule[]) {
     it(`${rule}: nessun file fuori elenco`, () => {
       expect(
