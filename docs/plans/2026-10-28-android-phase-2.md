@@ -28,6 +28,8 @@
 
 **Lingua.** Tutto in italiano, date con i formatter di `lib/format.ts` (§Task 5). Glossario: Training → Allenamento; Activity Tracker → Attività; Social Home Feed → Feed; Challenges → Sfide; Challenge Details → Sfida; Leaderboard → Classifica (plurale Classifiche); Statistics / Performance Profile → Statistiche; Badges → Badge; AI Coach → Coach AI; Club Directory / Club Details → Club; Club Event → Evento; Club Meet → Gara; Club Documents → Documenti; Training Objectives → Obiettivi; Settings → Impostazioni; Profile → Profilo; Sign out → Esci; Moderation → Moderazione; Open Water → Acque libere; Pool Swim → Vasca; Swim Session → Nuotata; Pace → Passo; HR → FC; Laps → Vasche; Theme → Tema; Dark/Light → Scuro/Chiaro.
 
+**Titoli.** Il titolo della pagina è l'`h1` nell'header della shell (`pageTitleForPath`); le pagine non hanno un proprio `h1` né una testata con il titolo ripetuto: eventuali titoli di sezione sono `h2`/`h3`. La shell è persistente (montata una volta sopra le rotte): le pagine continuano a usare `<AppLayout>`, che dentro la shell non disegna nulla.
+
 **Copy mobile.** Niente frasi da desktop («seleziona a sinistra…»). Testi brevi, verbi all'imperativo nei pulsanti.
 
 **Comportamento invariato.** I task di stile non cambiano query, mutazioni, rotte o logica; se un test esistente cerca un testo che cambia (glossario), si aggiorna il test nello stesso commit. Gli attributi `data-tour` restano sugli elementi equivalenti.
@@ -1037,7 +1039,8 @@ Dati (tutti già esistenti):
 - `trpc.profile.get.useQuery(undefined, { staleTime: 120_000 })` → `level`, `totalXp`, `currentLevelXp` (soglia del livello attuale, aggiunta dopo la review del Task 7), `nextLevelXp`, `xpToNextLevel`.
 - `trpc.garmin.status.useQuery(undefined, { staleTime: 300_000 })` → `connected`.
 - `trpc.activityInsights.list.useQuery({ limit: 1, offset: 0 })` → righe SQL grezze (`activity_id`, `summary`): mostra `summary` solo se `activity_id === ultimaAttività.id`, troncato a 2 righe (`line-clamp-2`).
-- Sincronizza: stessa mutazione e stessi toast del foglio «Crea» (Task 9). Estrai un hook condiviso `client/src/hooks/useGarminQuickSync.ts` (`{ sync, isPending, connected }`) e usalo in entrambi i posti.
+- Sincronizza: usa `useGarminQuickSync({ watchStatus: true })` (`client/src/hooks/useGarminQuickSync.ts`, creato nel Task 9: `{ sync, isPending, connected }`, guardia contro il doppio tocco e toast di avanzamento già inclusi).
+- Rifiniture di `ActivityCard` (dalla review del Task 7): `aria-describedby` include anche la riga delle metriche e la chip XP; se la data manca, la descrizione omette il segmento invece di mostrare «— ·»; `formatKm` e `formatInteger` restituiscono «—» per valori non finiti (test).
 
 Struttura (dall'alto), dentro `AppLayout`:
 1. Sottotitolo `formatWeekdayDayMonth(new Date())` in `text-sm text-muted-foreground` (il titolo «Oggi» è nell'header).
@@ -1100,8 +1103,9 @@ Riferimento: `renders/Sessione.png`.
 **Files:** `client/src/pages/Profile.tsx`, `client/src/pages/Badges.tsx` (solo l'ingresso dal profilo), `client/src/components/ThemeToggleButton.tsx` (eliminalo se non più usato; `ClubDetailEnhanced.tsx` lo importa: sostituisci lì con niente, il tema sta nel profilo).
 - In testa: avatar, nome (`font-display text-[30px]`, via `neon-gradient-text`), badge profilo come `Chip`, follower/seguiti.
 - `LevelCard` con i dati di `profile.get` (`level`, `totalXp`, `currentLevelXp`, `nextLevelXp`, `xpToNextLevel`): la barra mostra il progresso dentro il livello attuale; `data-tour="profile-stats"` sulla sezione statistiche come oggi.
-- Anteprima badge: griglia di 6 con «Vedi tutti» → `/badges`, `data-tour="badges-nav"`.
-- Sezione «Aspetto»: due opzioni «Scuro» e «Chiaro» (`role="radiogroup"`, `setTheme` dal Task 10), stato attivo con bordo `border-action-text`.
+- Anteprima badge: griglia di 6 con «Vedi tutti» → `/badges`, `data-tour="badges-nav"`. È l'unico ingresso visibile a `/badges` (il vecchio menu «Sezioni» non c'è più): deve esserci anche con zero badge («Ancora nessun badge · Vedi tutti»).
+- Sezione «Aspetto»: due opzioni «Scuro» e «Chiaro» (`role="radiogroup"`, `setTheme?.()` dal Task 10: è opzionale nel contesto), stato attivo con bordo `border-action-text`. È l'unico selettore del tema rimasto (il menu dell'avatar non lo ha più).
+- Ancore del tour: `data-tour="profile-stats"` sulla sezione statistiche e `data-tour="badges-nav"` sull'anteprima badge (oggi non esistono in nessuna pagina).
 - Collegamenti «Statistiche» (`/profile/performance`) e «Impostazioni» (`/settings`).
 - Togli da `PENDING`. Commit `feat(ui): Corsia profile with level card and appearance`.
 
@@ -1154,6 +1158,6 @@ Commit `docs: phase 2 documentation`.
 ### Task 24: Verifica finale (coordinatore)
 1. `pnpm check`, `pnpm lint`, `pnpm test`, `pnpm build`, `pnpm build:native`, `pnpm audit --prod --audit-level=high`.
 2. **Avvio locale del server compilato** (lezione dell'hotfix del 28/10): `pnpm build`, poi `node dist/index.js` con `NODE_ENV=production PORT=3999 JWT_SECRET=… DATABASE_URL=postgres://u:p@127.0.0.1:1/x SUPABASE_URL=https://example.supabase.co SUPABASE_ANON_KEY=dummy`; attendere `server:listening`; `/healthz` 200 e `/` 200.
-3. Build di prova sul Pixel (`pnpm android:distribute`): screenshot via `adb.exe -P 5038 exec-out screencap -p` di Oggi, Feed, Allena (lista e dettaglio), Community, Profilo, in tema scuro e chiaro; controllo che la barra in basso non sia coperta dalla barra gesti.
+3. Build di prova sul Pixel (`pnpm android:distribute`): screenshot via `adb.exe -P 5038 exec-out screencap -p` di Oggi, Feed, Allena (lista e dettaglio), Community, Profilo, in tema scuro e chiaro; controllo che la barra in basso non sia coperta dalla barra gesti. **Barra di stato:** su Android 15/16 (targetSdk 36) `StatusBar.setBackgroundColor` non ha effetto; verificare icone e sfondo della barra di stato con tema app scuro/chiaro × modalità notte di sistema on/off; se non coincidono, passare a `SystemBars` di Capacitor 8 o far disegnare la WebView sotto la barra.
 4. Desktop 1280px: WebView di debug via `chrome://inspect`/CDP (`adb forward tcp:9222 localabstract:webview_devtools_remote_<pid>`, `Emulation.setDeviceMetricsOverride` 1280×800, `Page.captureScreenshot`) sulle stesse schermate.
 5. Review finale dell'intero branch (agente Fable), correzioni, PR verso `main` con gli screenshot, merge, deploy, controllo esterno `curl https://swimforge.it/ready`.

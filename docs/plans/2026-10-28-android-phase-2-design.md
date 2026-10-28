@@ -125,7 +125,13 @@ I valori arrivano da `tokens.json`. Il tema scuro resta la classe `.dark` (defau
   campanella notifiche, messaggi, avatar con menu: Profilo, Impostazioni, Moderazione (solo
   admin), Esci.
 - **Desktop (≥ 1024px):** barra laterale con le stesse cinque voci (il «+» come pulsante
-  «Crea») e l'avatar in fondo; niente gradienti, voce attiva con fondo rialzo.
+  «Crea»); l'avatar resta nell'header; niente gradienti, voce attiva con fondo rialzo.
+- **Shell persistente:** montata una volta sopra le rotte autenticate (le pagine continuano a
+  usare `<AppLayout>`, che dentro la shell non disegna nulla); il caricamento di una pagina
+  mostra un indicatore nel contenuto, la barra in basso non sparisce.
+- **Indietro:** torna nella cronologia solo se la voce precedente è dell'app (indice salvato
+  nello stato della cronologia); altrimenti va alla pagina padre, così da un link esterno non
+  si esce dal sito.
 - **Il «+»** apre un foglio dal basso: Nuovo post, Messaggio, Bozza IA del post, Sincronizza
   Garmin.
 - **Hub con sotto-schede** (`SectionTabs` sotto il `PageHeader`):
