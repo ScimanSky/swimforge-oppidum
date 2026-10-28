@@ -179,8 +179,6 @@ body,
   --color-zone-3: var(--zone-3);
   --color-zone-4: var(--zone-4);
   --color-zone-5: var(--zone-5);
-  --color-neon-glow: var(--neon-glow);
-  --color-neon-soft: var(--neon-soft);
   --color-chip-cyan: var(--chip-cyan);
   --color-chip-emerald: var(--chip-emerald);
   --color-chip-amber: var(--chip-amber);
@@ -274,21 +272,20 @@ body,
     .sf-page-root>* {
       min-width: 0;
     }
-
-    .sf-page-root .stream-shell {
-      gap: 0.9rem;
-    }
-
-    .sf-page-root .stream-main {
-      gap: 0.75rem;
-    }
-
-    .sf-page-root .stream-card {
-      padding: 0.85rem;
-      border-radius: 18px;
-    }
   }
 
+  /*
+   * Kept in utilities on purpose: it overrides `absolute` on panel children, which hides
+   * the old absolute decorations inside panels until the page tasks remove them.
+   * Delete in Task 22.
+   */
+  .surface-panel>* {
+    position: relative;
+  }
+}
+
+/* Shared component classes: in the components layer, so utilities on the same element win. */
+@layer components {
   /* Corsia card: flat surface, 1px border, 16px radius (design §3.3). */
   .surface-panel {
     position: relative;
@@ -296,27 +293,6 @@ body,
     border: 1px solid var(--border);
     background: var(--card);
     transition: border-color 150ms ease;
-  }
-
-  .surface-panel>* {
-    position: relative;
-  }
-
-  .dashboard-shell .surface-panel,
-  .compact-shell .surface-panel {
-    border-color: var(--border);
-    background: var(--card);
-  }
-
-  .dashboard-shell .stream-card,
-  .compact-shell .stream-card {
-    background: color-mix(in oklch, var(--card) 100%, transparent);
-    border-color: color-mix(in oklch, var(--border) 100%, transparent);
-  }
-
-  .dashboard-shell .stream-card:hover,
-  .compact-shell .stream-card:hover {
-    border-color: color-mix(in oklch, var(--action-text) 45%, var(--border));
   }
 
   [data-slot="surface-header"]+[data-slot="surface-content"] {
@@ -327,28 +303,6 @@ body,
     margin-top: 0.9rem;
     padding-top: 0.8rem;
     border-top: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
-  }
-
-  .neon-gradient-text {
-    color: inherit;
-  }
-
-  .sf-wordmark {
-    font-family: var(--font-display);
-    font-weight: 700;
-    letter-spacing: 0;
-  }
-
-  .sf-brand-anchor {
-    position: relative;
-    isolation: isolate;
-    border: 1px solid var(--border);
-    background: var(--card);
-    box-shadow: none;
-  }
-
-  .sf-brand-anchor:hover {
-    border-color: color-mix(in oklch, var(--action-text) 45%, var(--border));
   }
 
   .sf-activity-card {
@@ -385,31 +339,6 @@ body,
     box-shadow: none;
   }
 
-  .ei-border-gradient {
-    border: 1px solid var(--border);
-    background: var(--card);
-    box-shadow: none;
-  }
-
-  .bento-surface {
-    border: 1px solid var(--border);
-    background: var(--card);
-    box-shadow: none;
-  }
-
-  .neon-outline {
-    box-shadow: 0 0 0 1px var(--border);
-  }
-
-  /* Decorative neon backdrops: hidden in Corsia. */
-  .ei-bg-grid,
-  .ei-blob,
-  .ei-blob-lime,
-  .ei-blob-coral,
-  .orb-lane {
-    display: none;
-  }
-
   .shimmer-bg {
     background: linear-gradient(90deg,
         var(--card) 0%,
@@ -440,8 +369,8 @@ body,
 
   .stream-card {
     border-radius: 16px;
-    border: 1px solid color-mix(in oklch, var(--border) 100%, transparent);
-    background: color-mix(in oklch, var(--card) 100%, transparent);
+    border: 1px solid var(--border);
+    background: var(--card);
     padding: 1rem;
     transition: border-color 150ms ease;
   }
@@ -451,6 +380,19 @@ body,
   }
 
   @media (min-width: 1024px) {
+    .sf-page-root .stream-shell {
+      gap: 0.9rem;
+    }
+
+    .sf-page-root .stream-main {
+      gap: 0.75rem;
+    }
+
+    .sf-page-root .stream-card {
+      padding: 0.85rem;
+      border-radius: 18px;
+    }
+
     .stream-main {
       padding-left: 1.5rem;
     }
@@ -488,10 +430,6 @@ body,
       grid-template-columns: minmax(0, 1fr) 22rem;
       align-items: start;
     }
-
-    .orb-lane {
-      display: none;
-    }
   }
 }
 
@@ -515,24 +453,6 @@ body,
     opacity: 0;
     transform: translate(var(--tx), var(--ty)) scale(0.3);
   }
-}
-
-@keyframes ei-float {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-
-  50% {
-    transform: translate3d(22px, -18px, 0) scale(1.05);
-  }
-
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-:root {
-  --landing-accent: var(--action-text);
 }
 
 .landing-shell {
