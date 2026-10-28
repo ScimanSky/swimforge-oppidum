@@ -42,7 +42,7 @@ const ATHLETE_TOUR_STEPS: TourStep[] = [
   {
     selector: '[data-tour="main-navigation"]',
     title: "Navigazione principale",
-    body: "Quattro sezioni, tutto ciò che ti serve: Feed, Traccia, Club e Profilo.",
+    body: "Cinque voci: Oggi, Feed, il tasto +, Allena e Community.",
   },
   {
     selector: '[data-tour="create-post"]',
@@ -51,23 +51,23 @@ const ATHLETE_TOUR_STEPS: TourStep[] = [
   },
   {
     selector: '[data-tour="track-section"]',
-    title: "Traccia le tue vasche",
-    body: "Log la tua prima vasca manualmente, o connetti Garmin/Strava per il sync automatico.",
+    title: "Allena",
+    body: "Allena raccoglie attività, obiettivi, statistiche e Coach AI.",
   },
   {
     selector: '[data-tour="challenges-list"]',
-    title: "Sfide settimanali",
-    body: "Partecipa alle sfide attive e scala la classifica in tempo reale.",
+    title: "Sfide",
+    body: "Le sfide sono in Community, accanto ai club e alle classifiche.",
   },
   {
     selector: '[data-tour="ai-coach-btn"]',
-    title: "AI Coach",
+    title: "Coach AI",
     body: "Il tuo coach AI genera allenamenti personalizzati in secondi. Prova il primo oggi.",
   },
   {
     selector: '[data-tour="badges-nav"]',
-    title: "Badge e Achievement",
-    body: "Ogni milestone sblocca un badge. Già ne hai uno — dai un'occhiata!",
+    title: "Badge",
+    body: "I badge sono nel tuo profilo.",
   },
   {
     selector: '[data-tour="club-directory"]',
@@ -298,7 +298,11 @@ export default function OnboardingFlow() {
         return;
       }
 
-      const element = document.querySelector(step.selector) as HTMLElement | null;
+      // Same anchor in the bottom bar and the desktop rail: highlight the one on screen.
+      const element =
+        Array.from(document.querySelectorAll<HTMLElement>(step.selector)).find(
+          (candidate) => candidate.getClientRects().length > 0,
+        ) ?? null;
       if (!element) {
         setHighlightRect(null);
         return;

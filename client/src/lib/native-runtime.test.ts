@@ -1,14 +1,23 @@
-import { describe, expect, it, vi } from "vitest";
-import { createDeepLinkHandler, shouldExitOnBack } from "./native-runtime";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { StatusBar } from "@capacitor/status-bar";
+import {
+  createDeepLinkHandler,
+  NATIVE_THEME_COLORS,
+  shouldExitOnBack,
+  syncNativeStatusBar,
+} from "./native-runtime";
 
 describe("shouldExitOnBack", () => {
   it("goes back when there is history and we are not on the home", () => {
     expect(shouldExitOnBack("/post/7", true)).toBe(false);
     expect(shouldExitOnBack("/home/messages", true)).toBe(false);
   });
-  it("exits on the home even with history", () => {
-    expect(shouldExitOnBack("/home", true)).toBe(true);
-    expect(shouldExitOnBack("/home/", true)).toBe(true);
+  it("exits on the native home (Oggi) even with history", () => {
+    expect(shouldExitOnBack("/today", true)).toBe(true);
+    expect(shouldExitOnBack("/today/", true)).toBe(true);
+  });
+  it("goes back from the feed when there is history (it is not the native home)", () => {
+    expect(shouldExitOnBack("/home", true)).toBe(false);
   });
   it("exits when there is nowhere to go back to", () => {
     expect(shouldExitOnBack("/post/7", false)).toBe(true);
@@ -62,7 +71,8 @@ const runtimeMocks = vi.hoisted(() => ({
   listeners: [] as Array<{ event: string; cb: (data: unknown) => void }>,
 }));
 
-vi.mock("./platform", () => ({ isNativePlatform: () => true }));
+const platformMock = vi.hoisted(() => ({ native: true }));
+vi.mock("./platform", () => ({ isNativePlatform: () => platformMock.native }));
 vi.mock("@capacitor/app", () => ({
   App: {
     addListener: vi.fn(async (event: string, cb: (data: unknown) => void) => {
@@ -75,7 +85,7 @@ vi.mock("@capacitor/app", () => ({
 }));
 vi.mock("@capacitor/status-bar", () => ({
   StatusBar: { setStyle: vi.fn(async () => {}), setBackgroundColor: vi.fn(async () => {}) },
-  Style: { Dark: "DARK" },
+  Style: { Dark: "DARK", Light: "LIGHT" },
 }));
 vi.mock("@capacitor/splash-screen", () => ({ SplashScreen: { hide: vi.fn(async () => {}) } }));
 const pushMocks = vi.hoisted(() => ({ setPushNavigate: vi.fn() }));
@@ -128,6 +138,41 @@ describe("initNativeRuntime launch URL", () => {
     const navigate = vi.fn();
     const cleanup = initNativeRuntime({ navigate, onAuthCallback: vi.fn() });
     expect(pushMocks.setPushNavigate).toHaveBeenLastCalledWith(navigate);
+    cleanup();
+  });
+});
+
+describe("syncNativeStatusBar", () => {
+  beforeEach(() => {
+    vi.mocked(StatusBar.setStyle).mockClear();
+    vi.mocked(StatusBar.setBackgroundColor).mockClear();
+    platformMock.native = true;
+  });
+
+  it("follows the dark theme: light icons on the dark background", () => {
+    syncNativeStatusBar("dark");
+    expect(StatusBar.setStyle).toHaveBeenCalledWith({ style: "DARK" });
+    expect(StatusBar.setBackgroundColor).toHaveBeenCalledWith({ color: NATIVE_THEME_COLORS.dark });
+  });
+
+  it("follows the light theme: dark icons on the light background", () => {
+    syncNativeStatusBar("light");
+    expect(StatusBar.setStyle).toHaveBeenCalledWith({ style: "LIGHT" });
+    expect(StatusBar.setBackgroundColor).toHaveBeenCalledWith({ color: "#F4F7F9" });
+  });
+
+  it("does nothing on the web", () => {
+    platformMock.native = false;
+    syncNativeStatusBar("dark");
+    expect(StatusBar.setStyle).not.toHaveBeenCalled();
+    expect(StatusBar.setBackgroundColor).not.toHaveBeenCalled();
+  });
+
+  it("initNativeRuntime leaves the status bar to the theme", async () => {
+    const { initNativeRuntime } = await import("./native-runtime");
+    const cleanup = initNativeRuntime({ navigate: vi.fn(), onAuthCallback: vi.fn() });
+    expect(StatusBar.setStyle).not.toHaveBeenCalled();
+    expect(StatusBar.setBackgroundColor).not.toHaveBeenCalled();
     cleanup();
   });
 });

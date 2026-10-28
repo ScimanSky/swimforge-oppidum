@@ -3,6 +3,7 @@ import type { PluginListenerHandle } from "@capacitor/core";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { resolveDeepLink } from "./deep-links";
+import { normalizePath, TODAY_PATH } from "./navigation";
 import { isNativePlatform } from "./platform";
 import { setPushNavigate } from "./push";
 
@@ -13,8 +14,7 @@ export type NativeRuntimeOptions = {
   onAuthCallback: (callback: NativeAuthCallback) => unknown;
 };
 
-const NATIVE_BACKGROUND = "#0A1520";
-const HOME_PATH = "/home";
+export const NATIVE_THEME_COLORS = { dark: "#0A1520", light: "#F4F7F9" } as const;
 /** appUrlOpen may repeat the launch URL on a cold start: the same URL within this window is ignored. */
 const DUPLICATE_URL_WINDOW_MS = 2000;
 /**
@@ -37,11 +37,17 @@ export function claimLaunchUrl(url: string): boolean {
 
 /**
  * Android back button: go back in the WebView history when there is somewhere to go and we
- * are not on the home; otherwise close the app.
+ * are not on the native home (Oggi); otherwise close the app.
  */
 export function shouldExitOnBack(path: string, canGoBack: boolean): boolean {
-  const normalized = path.replace(/\/+$/, "") || "/";
-  return !canGoBack || normalized === HOME_PATH;
+  return !canGoBack || normalizePath(path) === TODAY_PATH;
+}
+
+/** Status bar follows the app theme. No-op on the web. */
+export function syncNativeStatusBar(theme: "dark" | "light"): void {
+  if (!isNativePlatform()) return;
+  StatusBar.setStyle({ style: theme === "dark" ? Style.Dark : Style.Light }).catch(() => {});
+  StatusBar.setBackgroundColor({ color: NATIVE_THEME_COLORS[theme] }).catch(() => {});
 }
 
 /**
@@ -78,7 +84,7 @@ export function hideSplash(): void {
 }
 
 /**
- * Native only (no-op on the web): status bar style, Android back button, deep links
+ * Native only (no-op on the web): Android back button, deep links
  * (including the URL the app was cold-started with), in-app navigation for notification
  * taps. Returns a cleanup function.
  */
@@ -86,9 +92,6 @@ export function initNativeRuntime(options: NativeRuntimeOptions): () => void {
   if (!isNativePlatform()) return () => {};
 
   setPushNavigate(options.navigate);
-
-  StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
-  StatusBar.setBackgroundColor({ color: NATIVE_BACKGROUND }).catch(() => {});
 
   const handleUrl = createDeepLinkHandler(options);
   const handles: Promise<PluginListenerHandle>[] = [

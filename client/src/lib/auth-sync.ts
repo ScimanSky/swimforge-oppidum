@@ -1,4 +1,6 @@
 import type { Session } from "@supabase/supabase-js";
+import { homePathForPlatform } from "./navigation";
+import { isNativePlatform } from "./platform";
 import { registerPushToken } from "./push";
 import { setNativeSessionToken } from "./session-token";
 
@@ -15,11 +17,9 @@ export type SyncSupabaseUser = (input: SyncSupabaseUserInput) => Promise<SyncSup
 export type SyncFallback = { email?: string; name?: string | null };
 
 export const ONBOARDING_PATH = "/settings?tab=profile&onboarding=1";
-export const HOME_PATH = "/home";
-
-/** Where to go after a successful sign-in. */
+/** Where to go after a successful sign-in: onboarding, else Oggi in the app and the feed on the web. */
 export function postLoginPath(isNewUser: boolean): string {
-  return isNewUser ? ONBOARDING_PATH : HOME_PATH;
+  return isNewUser ? ONBOARDING_PATH : homePathForPlatform(isNativePlatform());
 }
 
 /**

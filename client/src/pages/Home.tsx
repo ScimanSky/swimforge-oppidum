@@ -1,6 +1,8 @@
 import { assetUrl } from "@/lib/asset-base";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { buttonVariants } from "@/components/ui/button";
+import { homePathForPlatform } from "@/lib/navigation";
+import { isNativePlatform } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Medal, Trophy, Users, Zap } from "lucide-react";
 import { useEffect } from "react";
@@ -76,15 +78,17 @@ const proofShots = [
 
 export default function Home() {
   const { isAuthenticated, loading } = useAuth();
+  const isNative = isNativePlatform();
 
   useEffect(() => {
     if (loading) return;
-    if (!isAuthenticated) return;
-    window.location.href = "/home";
-  }, [isAuthenticated, loading]);
+    // replace: "/" is only a switch, the back button must not return to it.
+    if (isAuthenticated) window.location.replace(homePathForPlatform(isNative));
+    else if (isNative) window.location.replace("/login"); // the public landing is web only
+  }, [isAuthenticated, isNative, loading]);
 
-  if (loading || isAuthenticated) {
-    return <div className="min-h-screen bg-[#04101b]" />;
+  if (loading || isAuthenticated || isNative) {
+    return <div className="min-h-screen bg-background" />;
   }
 
   return (

@@ -22,6 +22,7 @@ import { trpc } from "./lib/trpc";
 // Lazy like every other page: it pulls in AppLayout → app-shell → supabase-js.
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const Home = lazy(() => import("./pages/Home"));
+const Today = lazy(() => import("./pages/Today"));
 const Badges = lazy(() => import("./pages/Badges"));
 const Challenges = lazy(() => import("./pages/Challenges"));
 const ChallengeDetail = lazy(() => import("./pages/ChallengeDetail"));
@@ -81,6 +82,7 @@ function Router() {
       <Route path="/signup" component={Register} />
       <Route path="/forgot-password" component={ForgotPassword} />
       <Route path="/reset-password" component={ResetPassword} />
+      <Route path="/today" component={Today} />
       <Route path="/home" component={SocialFeed} />
       <Route path="/messages" component={Messages} />
       <Route path="/home/messages">

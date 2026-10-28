@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("./session-token", () => ({ setNativeSessionToken: mocks.setNativeSessionToken }));
 vi.mock("./push", () => ({ registerPushToken: mocks.registerPushToken }));
+const platform = vi.hoisted(() => ({ native: false }));
+vi.mock("./platform", () => ({ isNativePlatform: () => platform.native }));
 
 import { postLoginPath, syncSupabaseSession } from "./auth-sync";
 
@@ -56,8 +58,22 @@ describe("syncSupabaseSession", () => {
 });
 
 describe("postLoginPath", () => {
-  it("sends new users to the profile onboarding and others home", () => {
+  beforeEach(() => {
+    platform.native = false;
+  });
+
+  it("sends new users to the profile onboarding on both platforms", () => {
     expect(postLoginPath(true)).toBe("/settings?tab=profile&onboarding=1");
+    platform.native = true;
+    expect(postLoginPath(true)).toBe("/settings?tab=profile&onboarding=1");
+  });
+
+  it("sends returning users to the feed on the web", () => {
     expect(postLoginPath(false)).toBe("/home");
+  });
+
+  it("sends returning users to Oggi in the app", () => {
+    platform.native = true;
+    expect(postLoginPath(false)).toBe("/today");
   });
 });
