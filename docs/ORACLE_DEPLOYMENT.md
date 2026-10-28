@@ -54,6 +54,7 @@ Aggiorna `.env.oracle` con almeno:
 - Observability (opzionale): `ROLLBAR_ACCESS_TOKEN`, `DEPLOY_TARGET=oracle`, `APP_RELEASE`, `ROLLBAR_SERVER_HOST`
 - Redis policy (raccomandato esplicito): `REDIS_REQUIRED_FOR_READY=true`, `REDIS_RATE_LIMIT_MODE=memory`
 - Oracle ingress: `DOMAIN`, `ACME_EMAIL`
+- Push (app Android, opzionale): `FIREBASE_SERVICE_ACCOUNT_JSON` (base64 del JSON del service account Firebase; vuota = push disattivate con un warning all'avvio)
 
 Generazione `GARMIN_STATE_KEY`:
 ```bash
@@ -69,6 +70,16 @@ Nota CORS:
 - l'app Android gira con origin `https://app.swimforge.it` (WebView Capacitor, stesso sito di `swimforge.it`): va aggiunta in coda, es. `ALLOWED_ORIGINS=https://swimforge.it,https://www.swimforge.it,https://app.swimforge.it`. `https://localhost` e `capacitor://localhost` non servono più.
 - le origini non ammesse ricevono `403 {"error":"origin_not_allowed"}` (warn `security:origin_not_allowed` nei log, nessuno stack); le richieste senza header `Origin` passano.
 - le risposte usano `Cross-Origin-Resource-Policy: same-site`, così l'app può caricare immagini e file statici da `https://swimforge.it`.
+
+Push FCM (app Android):
+- in Firebase Console (progetto `swimforge-oppidum`) → Impostazioni progetto → Account di servizio → "Genera nuova chiave privata" (oppure un service account dedicato con ruolo "Firebase Cloud Messaging API Admin").
+- codifica il JSON su una riga e mettilo in `.env.oracle`, poi elimina il file locale:
+  ```bash
+  echo "FIREBASE_SERVICE_ACCOUNT_JSON=$(base64 -w0 service-account.json)" >> .env.oracle
+  shred -u service-account.json
+  ```
+- serve la migrazione `0034_add_device_tokens` (tabella `device_tokens`); all'avvio il log mostra `push:enabled` oppure `push:disabled`/`push:invalid_config`.
+- i token restituiti da FCM come non registrati o non validi vengono cancellati automaticamente.
 
 TLS DB raccomandato:
 - target finale: `DB_SSL_REJECT_UNAUTHORIZED=true` con `DB_SSL_CA_CERT_BASE64` valorizzato

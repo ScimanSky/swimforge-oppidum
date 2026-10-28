@@ -1038,3 +1038,18 @@ export const userGoals = pgTable("user_goals", {
   userGoalsUserIdx: index("idx_user_goals_user").on(table.userId),
 }));
 export type UserGoal = typeof userGoals.$inferSelect;
+
+// Push notification device tokens (FCM). One row per device token; the token moves
+// to whichever user registered it last (shared devices, re-login).
+export const deviceTokens = pgTable("device_tokens", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  token: varchar("token", { length: 512 }).notNull().unique(),
+  platform: varchar("platform", { length: 16 }).notNull(),
+  appVersion: varchar("app_version", { length: 32 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+}, (table) => ({
+  deviceTokensUserIdx: index("idx_device_tokens_user").on(table.userId),
+}));
+export type DeviceToken = typeof deviceTokens.$inferSelect;

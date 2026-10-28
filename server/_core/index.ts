@@ -27,6 +27,7 @@ import {
 import { requestLogger, errorHandler, logger } from "../middleware/logger";
 import { applySecurityMiddleware, applyRateLimiting } from "../middleware/security";
 import { rollbar, captureError } from "../middleware/rollbar-init";
+import { initPush } from "../push";
 
 const log = logger.child({ component: "server" });
 let processHandlersInstalled = false;
@@ -460,6 +461,9 @@ async function startServer() {
     // Don't send error details to client.
     return res.status(500).json({ error: "Internal Server Error" });
   });
+
+  // FCM push: logs once whether it is enabled (FIREBASE_SERVICE_ACCOUNT_JSON).
+  initPush();
 
   const preferredPort = parseInt(process.env.PORT || "3000");
   const port = await findAvailablePort(preferredPort);

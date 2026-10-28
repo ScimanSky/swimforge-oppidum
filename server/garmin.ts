@@ -36,6 +36,8 @@ import { logger } from "./middleware/logger";
 import { classifyAsyncError } from "./lib/withErrorHandling";
 import { config } from "./config";
 import { fetchWithTimeout } from "./lib/fetchWithTimeout";
+import { sendPushToUser } from "./push";
+import { buildGarminSyncPush, buildPersonalRecordPush, type PersonalRecordSummary } from "./push_messages";
 
 // Garmin microservice configuration
 const GARMIN_SERVICE_URL = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
@@ -1651,6 +1653,8 @@ export async function syncGarminActivities(
       }
     }
 
+    notifyGarminSyncResult(userId, syncedCount, detectedPbs);
+
     return { synced: syncedCount, newXp: totalNewXp, detectedPbs };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
@@ -1660,6 +1664,34 @@ export async function syncGarminActivities(
       message,
     });
     return { synced: 0, newXp: 0, detectedPbs: [], error: message || "Sync failed" };
+  }
+}
+
+/**
+ * Push at the end of a Garmin sync (fire-and-forget, never throws): a summary when
+ * new activities were imported (gated by the `activity_sync` setting) and one
+ * notification for the new personal records.
+ */
+export function notifyGarminSyncResult(
+  userId: number,
+  syncedCount: number,
+  detectedPbs: PersonalRecordSummary[],
+): void {
+  const send = (...args: Parameters<typeof sendPushToUser>) => {
+    try {
+      void Promise.resolve(sendPushToUser(...args)).catch(() => {
+        // Push is best-effort.
+      });
+    } catch {
+      // Push is best-effort.
+    }
+  };
+  if (syncedCount > 0) {
+    send(userId, buildGarminSyncPush(syncedCount), { settingKey: "activity_sync" });
+  }
+  const recordPush = buildPersonalRecordPush(detectedPbs);
+  if (recordPush) {
+    send(userId, recordPush);
   }
 }
 

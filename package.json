@@ -68,6 +68,7 @@
     "drizzle-orm": "^0.45.2",
     "express": "^4.22.3",
     "express-rate-limit": "^8.2.2",
+    "firebase-admin": "^14.5.0",
     "framer-motion": "^12.23.22",
     "helmet": "^8.1.0",
     "jose": "6.1.0",
