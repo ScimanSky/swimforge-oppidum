@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
@@ -79,8 +79,11 @@ vi.mock("@/components/onboarding/OnboardingNudgeManager", () => ({
   OnboardingNudgeManager: () => null,
 }));
 
+let currentLocation: ReturnType<typeof memoryLocation> & { history: string[] };
+
 function renderShell(path: string) {
   const location = memoryLocation({ path, record: true });
+  currentLocation = location;
   render(
     <Router hook={location.hook}>
       <AppShell>
@@ -210,6 +213,50 @@ describe("AppShell Corsia", () => {
     }
     expect(aside.getByRole("link", { name: "Messaggio" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "Crea" })).not.toBeInTheDocument();
+  });
+
+  it("foglio Crea: Escape lo chiude e il fuoco torna al +", async () => {
+    renderShell("/today");
+    const plus = within(bottomBar()).getByRole("button", { name: "Crea" });
+    await userEvent.click(plus);
+    const dialog = screen.getByRole("dialog", { name: "Crea" });
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+    await userEvent.keyboard("{Escape}");
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Crea" })).not.toBeInTheDocument());
+    await waitFor(() => expect(document.activeElement).toBe(plus));
+  });
+
+  it("cambiare pagina chiude il foglio e il menu della barra laterale", async () => {
+    renderShell("/today");
+    await userEvent.click(within(bottomBar()).getByRole("button", { name: "Crea" }));
+    expect(screen.getByRole("dialog", { name: "Crea" })).toBeInTheDocument();
+    act(() => currentLocation.navigate("/home"));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Crea" })).not.toBeInTheDocument());
+
+    const aside = within(screen.getByRole("complementary"));
+    await userEvent.click(aside.getByRole("button", { name: "Crea" }));
+    expect(aside.getByRole("button", { name: "Crea" })).toHaveAttribute("aria-expanded", "true");
+    act(() => currentLocation.navigate("/track"));
+    expect(aside.getByRole("button", { name: "Crea" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("menu Crea della barra laterale: aria-controls, chiusura con clic fuori ed Escape", async () => {
+    renderShell("/home");
+    const aside = within(screen.getByRole("complementary"));
+    const button = aside.getByRole("button", { name: "Crea" });
+    await userEvent.click(button);
+    const menuId = button.getAttribute("aria-controls");
+    expect(menuId).toBeTruthy();
+    expect(document.getElementById(menuId!)).toContainElement(aside.getByRole("button", { name: "Nuovo post" }));
+
+    await userEvent.click(screen.getByText("contenuto"));
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    expect(aside.queryByRole("button", { name: "Nuovo post" })).not.toBeInTheDocument();
+
+    await userEvent.click(button);
+    await userEvent.keyboard("{Escape}");
+    expect(button).toHaveAttribute("aria-expanded", "false");
+    expect(document.activeElement).toBe(button);
   });
 
   it("il listener swimforge:open-create-post apre il CreatePostSheet con il testo", async () => {
