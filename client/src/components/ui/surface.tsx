@@ -7,7 +7,7 @@ function Surface({ className, ...props }: React.ComponentProps<"section">) {
     <section
       data-slot="surface"
       className={cn(
-        "surface-panel relative isolate p-4 sm:p-5 lg:p-6 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-px",
+        "surface-panel relative isolate p-4 sm:p-5 lg:p-6 transition-[border-color,box-shadow] duration-200",
         className
       )}
       {...props}
