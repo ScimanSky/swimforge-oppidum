@@ -4,6 +4,7 @@ import { SplashScreen } from "@capacitor/splash-screen";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { resolveDeepLink } from "./deep-links";
 import { isNativePlatform } from "./platform";
+import { setPushNavigate } from "./push";
 
 export type NativeAuthCallback = { code: string | null; error: string | null };
 
@@ -78,10 +79,13 @@ export function hideSplash(): void {
 
 /**
  * Native only (no-op on the web): status bar style, Android back button, deep links
- * (including the URL the app was cold-started with). Returns a cleanup function.
+ * (including the URL the app was cold-started with), in-app navigation for notification
+ * taps. Returns a cleanup function.
  */
 export function initNativeRuntime(options: NativeRuntimeOptions): () => void {
   if (!isNativePlatform()) return () => {};
+
+  setPushNavigate(options.navigate);
 
   StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
   StatusBar.setBackgroundColor({ color: NATIVE_BACKGROUND }).catch(() => {});

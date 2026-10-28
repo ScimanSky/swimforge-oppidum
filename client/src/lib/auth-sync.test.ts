@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ setNativeSessionToken: vi.fn(async () => {}) }));
+const mocks = vi.hoisted(() => ({
+  setNativeSessionToken: vi.fn(async () => {}),
+  registerPushToken: vi.fn(async () => {}),
+}));
 vi.mock("./session-token", () => ({ setNativeSessionToken: mocks.setNativeSessionToken }));
+vi.mock("./push", () => ({ registerPushToken: mocks.registerPushToken }));
 
 import { postLoginPath, syncSupabaseSession } from "./auth-sync";
 
@@ -19,6 +23,7 @@ describe("syncSupabaseSession", () => {
       user: { id: "u1", email: "a@b.it", name: "Ada Lovelace" },
     });
     expect(mocks.setNativeSessionToken).toHaveBeenCalledWith("native-token");
+    expect(mocks.registerPushToken).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ isNewUser: true });
   });
 
@@ -26,6 +31,7 @@ describe("syncSupabaseSession", () => {
     const syncUser = vi.fn(async () => ({ isNewUser: false }));
     await expect(syncSupabaseSession(session({}), syncUser)).resolves.toEqual({ isNewUser: false });
     expect(mocks.setNativeSessionToken).not.toHaveBeenCalled();
+    expect(mocks.registerPushToken).not.toHaveBeenCalled();
   });
 
   it("uses metadata name, then the fallback, then null", async () => {

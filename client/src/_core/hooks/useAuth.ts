@@ -1,5 +1,6 @@
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
+import { unregisterPushToken } from "@/lib/push";
 import { clearNativeSessionToken } from "@/lib/session-token";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
@@ -26,6 +27,8 @@ export function useAuth(options?: UseAuthOptions) {
   });
 
   const logout = useCallback(async () => {
+    // Before the server logout: push.unregister needs the session.
+    await unregisterPushToken();
     try {
       await logoutMutation.mutateAsync();
     } catch (error: unknown) {

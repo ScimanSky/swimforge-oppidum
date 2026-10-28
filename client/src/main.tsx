@@ -1,15 +1,13 @@
 import { trpc } from "@/lib/trpc";
-import { CSRF_COOKIE_NAME, UNAUTHED_ERR_MSG } from '@shared/const';
+import { UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { httpBatchLink, TRPCClientError } from "@trpc/client";
+import { TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
-import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
-import { apiUrl } from "@/lib/api-base";
-import { isNativePlatform } from "@/lib/platform";
-import { clearNativeSessionToken, getNativeSessionToken, loadNativeSessionToken } from "@/lib/session-token";
-import { buildTrpcHeaders } from "@/lib/trpc-headers";
+import { unregisterPushToken } from "@/lib/push";
+import { clearNativeSessionToken, loadNativeSessionToken } from "@/lib/session-token";
+import { createTrpcLinks } from "@/lib/trpc-client";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -22,6 +20,9 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
+  // The session is already invalid: push.unregister fails, but the FCM token is deleted
+  // on the device, so the server prunes its row on the next send.
+  void unregisterPushToken();
   clearNativeSessionToken();
   window.location.href = getLoginUrl();
 };
@@ -42,34 +43,7 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
-const readCsrfCookie = (): string | null =>
-  typeof document === "undefined"
-    ? null
-    : document.cookie
-        .split(";")
-        .map((entry) => entry.trim())
-        .find((entry) => entry.startsWith(`${CSRF_COOKIE_NAME}=`))
-        ?.slice(CSRF_COOKIE_NAME.length + 1) ?? null;
-
-const trpcClient = trpc.createClient({
-  links: [
-    httpBatchLink({
-      url: apiUrl("/api/trpc"),
-      transformer: superjson,
-      fetch(input, init) {
-        const headers = buildTrpcHeaders(
-          { isNative: isNativePlatform(), csrfToken: readCsrfCookie(), nativeToken: getNativeSessionToken() },
-          init?.headers,
-        );
-        return globalThis.fetch(input, {
-          ...(init ?? {}),
-          headers,
-          credentials: "include",
-        });
-      },
-    }),
-  ],
-});
+const trpcClient = trpc.createClient({ links: createTrpcLinks() });
 
 const render = () =>
   createRoot(document.getElementById("root")!).render(

@@ -176,8 +176,15 @@ if (process.env.NODE_ENV !== 'production') {
   plugins.push(vitePluginManusRuntime(), vitePluginManusDebugCollector());
 }
 
+const packageJson = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, "package.json"), "utf-8")) as {
+  version?: string;
+};
+
 export default defineConfig({
   plugins,
+  define: {
+    __APP_VERSION__: JSON.stringify(packageJson.version ?? "dev"),
+  },
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),

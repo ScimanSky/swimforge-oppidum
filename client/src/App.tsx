@@ -14,6 +14,9 @@ import PbCelebrationNotification from "./components/PbCelebrationNotification";
 import CookieBanner from "./components/CookieBanner";
 import { UI_FEATURE_FLAGS } from "./lib/feature-flags";
 import { hideSplash, initNativeRuntime } from "./lib/native-runtime";
+import { isNativePlatform } from "./lib/platform";
+import { registerPushToken } from "./lib/push";
+import { getNativeSessionToken } from "./lib/session-token";
 import { trpc } from "./lib/trpc";
 
 // Lazy like every other page: it pulls in AppLayout → app-shell → supabase-js.
@@ -179,7 +182,7 @@ function ScrollToTop() {
   return null;
 }
 
-/** Native shell wiring (status bar, back button, deep links); renders nothing, no-op on the web. */
+/** Native shell wiring (status bar, back button, deep links, push); renders nothing, no-op on the web. */
 function NativeRuntime() {
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
@@ -206,6 +209,12 @@ function NativeRuntime() {
     // navigate is stable in wouter's browser location hook; register the listeners once.
     [],
   );
+
+  // Already signed in at start: (re)register for push (also picks up a refreshed FCM token
+  // and the tap that cold-started the app). Fresh sign-ins register from syncSupabaseSession.
+  useEffect(() => {
+    if (isNativePlatform() && getNativeSessionToken()) void registerPushToken();
+  }, []);
 
   return null;
 }

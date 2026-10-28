@@ -78,6 +78,8 @@ vi.mock("@capacitor/status-bar", () => ({
   Style: { Dark: "DARK" },
 }));
 vi.mock("@capacitor/splash-screen", () => ({ SplashScreen: { hide: vi.fn(async () => {}) } }));
+const pushMocks = vi.hoisted(() => ({ setPushNavigate: vi.fn() }));
+vi.mock("./push", () => ({ setPushNavigate: pushMocks.setPushNavigate }));
 
 describe("initNativeRuntime launch URL", () => {
   const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
@@ -118,6 +120,14 @@ describe("initNativeRuntime launch URL", () => {
     await flush();
     runtimeMocks.listeners.find((l) => l.event === "appUrlOpen")?.cb({ url: "https://www.swimforge.it/home/messages" });
     expect(navigate).toHaveBeenCalledWith("/home/messages");
+    cleanup();
+  });
+
+  it("hands the navigate function to the push module", async () => {
+    const { initNativeRuntime } = await import("./native-runtime");
+    const navigate = vi.fn();
+    const cleanup = initNativeRuntime({ navigate, onAuthCallback: vi.fn() });
+    expect(pushMocks.setPushNavigate).toHaveBeenLastCalledWith(navigate);
     cleanup();
   });
 });

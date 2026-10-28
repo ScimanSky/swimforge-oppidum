@@ -1,4 +1,5 @@
 import type { Session } from "@supabase/supabase-js";
+import { registerPushToken } from "./push";
 import { setNativeSessionToken } from "./session-token";
 
 export type SyncSupabaseUserInput = {
@@ -23,7 +24,8 @@ export function postLoginPath(isNewUser: boolean): string {
 
 /**
  * Syncs a Supabase session with the backend (auth.syncSupabaseUser: cookie on the web,
- * bearer token in the response on native) and stores the native token when present.
+ * bearer token in the response on native) and stores the native token when present; on
+ * native it then starts the push registration (fire-and-forget).
  * `fallback` fills email/name when the Supabase user lacks them (e.g. the form values).
  * Throws when the server call fails.
  */
@@ -49,6 +51,7 @@ export async function syncSupabaseSession(
 
   if (typeof result.sessionToken === "string" && result.sessionToken) {
     await setNativeSessionToken(result.sessionToken);
+    void registerPushToken();
   }
   return { isNewUser: Boolean(result.isNewUser) };
 }

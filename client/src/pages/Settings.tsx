@@ -42,6 +42,7 @@ import {
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
 import { supabase } from "@/lib/supabase"
+import { registerPushToken, unregisterPushToken } from "@/lib/push"
 import { clearNativeSessionToken } from "@/lib/session-token"
 import { ONBOARDING_FORCE_QUERY_PARAM } from "@/lib/onboarding"
 import { formatDistanceToNow } from "date-fns"
@@ -444,6 +445,8 @@ export default function Settings() {
       window.location.href = "/login"
     },
     onError: (error) => {
+      // Still signed in: restore the push registration removed before the call.
+      void registerPushToken()
       toast.error(error.message || "Impossibile disconnettere tutte le sessioni.")
     },
   })
@@ -465,6 +468,8 @@ export default function Settings() {
       window.location.href = "/"
     },
     onError: (error) => {
+      // Still signed in: restore the push registration removed before the call.
+      void registerPushToken()
       toast.error(error.message || "Impossibile eliminare l'account.")
     },
   })
@@ -785,15 +790,19 @@ export default function Settings() {
     }
   }
 
-  const handleLogoutAllDevices = () => {
+  const handleLogoutAllDevices = async () => {
+    // Before the server call: push.unregister needs the session.
+    await unregisterPushToken()
     logoutAllDevicesMutation.mutate()
   }
 
-  const handleDeleteAccount = () => {
+  const handleDeleteAccount = async () => {
     if (deleteRequiresPassword && !deletePassword.trim()) {
       toast.error("Inserisci la password per confermare l'eliminazione.")
       return
     }
+    // Before the server call: push.unregister needs the session.
+    await unregisterPushToken()
     deleteAccountMutation.mutate(
       deleteRequiresPassword ? { password: deletePassword.trim() } : {}
     )
@@ -1589,7 +1598,7 @@ export default function Settings() {
                 <Button
                   variant="outline-neon"
                   className="gap-2 text-destructive bg-transparent"
-                  onClick={handleLogoutAllDevices}
+                  onClick={() => void handleLogoutAllDevices()}
                   disabled={logoutAllDevicesMutation.isPending}
                 >
                   <LogOut className="w-4 h-4" />
@@ -1686,7 +1695,7 @@ export default function Settings() {
             </Button>
             <Button
               variant="destructive"
-              onClick={handleDeleteAccount}
+              onClick={() => void handleDeleteAccount()}
               disabled={
                 deleteAccountMutation.isPending ||
                 (deleteRequiresPassword && deletePassword.trim().length === 0)
