@@ -39,4 +39,22 @@ describe("riepilogo settimana", () => {
     ]);
     expect(summary.days.findIndex(day => day.isToday)).toBe(2);
   });
+  it("salta le date non valide e ignora distanze non valide", () => {
+    const summary = summarizeWeek(
+      [
+        { activityDate: "non una data", distanceMeters: 4000, xpEarned: 50 },
+        { activityDate: at(27), distanceMeters: Number.NaN, xpEarned: 40 },
+        { activityDate: at(27, 18), distanceMeters: -300, xpEarned: null },
+        { activityDate: at(29), distanceMeters: 1500, xpEarned: 90 },
+      ],
+      wednesday
+    );
+    expect(summary.sessions).toBe(3);
+    expect(summary.xp).toBe(130);
+    expect(summary.totalMeters).toBe(1500);
+    expect(summary.days.map(day => day.meters)).toEqual([
+      0, 0, 0, 1500, 0, 0, 0,
+    ]);
+    expect(summary.days.every(day => Number.isFinite(day.meters))).toBe(true);
+  });
 });

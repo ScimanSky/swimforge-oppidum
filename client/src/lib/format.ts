@@ -1,45 +1,66 @@
 type DateInput = string | Date
-const toDate = (value: DateInput) => (value instanceof Date ? value : new Date(value))
+const NO_VALUE = "—"
+
+/** Date or null when missing or unparsable (never an Invalid Date). */
+const toDate = (value: DateInput | null | undefined): Date | null => {
+  if (value === null || value === undefined || value === "") return null
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date
+}
 const weekdayFmt = new Intl.DateTimeFormat("it-IT", { weekday: "short" })
 const dayMonthFmt = new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "short" })
 const timeFmt = new Intl.DateTimeFormat("it-IT", { hour: "2-digit", minute: "2-digit" })
-const kmFmt = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 })
+// One grouping rule app-wide: Italian CLDR skips the separator on 4-digit numbers (8420),
+// Corsia always shows it («8.420»).
+const kmFmt = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1, useGrouping: "always" })
+const integerFmt = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 0, useGrouping: "always" })
 
-/** «lun 26 ott · 10:47» */
-export const formatSessionDate = (value: DateInput) => {
+/** «lun 26 ott · 10:47»; «—» for a missing or invalid date. */
+export const formatSessionDate = (value: DateInput | null | undefined) => {
   const date = toDate(value)
+  if (!date) return NO_VALUE
   return `${weekdayFmt.format(date)} ${dayMonthFmt.format(date)} · ${timeFmt.format(date)}`
 }
 
-/** «26 ott» */
-export const formatDayMonth = (value: DateInput) => dayMonthFmt.format(toDate(value))
-
-/** «lun 26 ott» */
-export const formatWeekdayDayMonth = (value: DateInput) => {
+/** «26 ott»; «—» for a missing or invalid date. */
+export const formatDayMonth = (value: DateInput | null | undefined) => {
   const date = toDate(value)
+  return date ? dayMonthFmt.format(date) : NO_VALUE
+}
+
+/** «lun 26 ott»; «—» for a missing or invalid date. */
+export const formatWeekdayDayMonth = (value: DateInput | null | undefined) => {
+  const date = toDate(value)
+  if (!date) return NO_VALUE
   return `${weekdayFmt.format(date)} ${dayMonthFmt.format(date)}`
 }
+
+/** Integer with the Italian thousands separator, always: 8420 → «8.420». */
+export const formatInteger = (value: number) => integerFmt.format(Math.round(value))
 
 /** Kilometres with Italian decimal comma, no unit: 3200 → «3,2». */
 export const formatKm = (meters: number) => kmFmt.format(Math.round(meters / 100) / 10)
 
+/** «3,2 km» or «800 m» (chosen after rounding: 999.6 → «1 km»); «—» without a positive value. */
 export const formatDistance = (meters?: number | null) => {
-  if (!meters) return "—"
-  return meters >= 1000 ? `${formatKm(meters)} km` : `${Math.round(meters)} m`
+  if (meters === null || meters === undefined || !Number.isFinite(meters) || meters <= 0) return NO_VALUE
+  const rounded = Math.round(meters)
+  return rounded >= 1000 ? `${formatKm(meters)} km` : `${rounded} m`
 }
 
-/** 3720 s → { value: "1:02", unit: "h" }; 3000 s → { value: "50", unit: "min" }; 0 → null. */
+/** 3720 s → { value: "1:02", unit: "h" }; 3000 s → { value: "50", unit: "min" }; 1-29 s → 1 min; 0 → null. */
 export const formatDurationParts = (
   seconds?: number | null
 ): { value: string; unit: string } | null => {
-  if (!seconds || seconds <= 0) return null
-  const minutes = Math.round(seconds / 60)
+  if (seconds === null || seconds === undefined || !Number.isFinite(seconds) || seconds <= 0) return null
+  const minutes = Math.max(1, Math.round(seconds / 60))
   if (minutes < 60) return { value: String(minutes), unit: "min" }
   return { value: `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`, unit: "h" }
 }
 
-/** Seconds per 100 m → «1:52». */
+/** Seconds per 100 m → «1:52»; «—» when not finite or not positive. */
 export const formatPaceValue = (secondsPer100m: number) => {
+  if (!Number.isFinite(secondsPer100m) || secondsPer100m <= 0) return NO_VALUE
   const total = Math.round(secondsPer100m)
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`
 }

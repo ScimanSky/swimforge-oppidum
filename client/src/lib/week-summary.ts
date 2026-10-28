@@ -42,9 +42,12 @@ export function summarizeWeek(
       activity.activityDate instanceof Date
         ? activity.activityDate
         : new Date(activity.activityDate);
+    if (Number.isNaN(date.getTime())) continue; // unparsable date: not in any week
     if (date < start || date >= end) continue;
     const index = (date.getDay() + 6) % 7; // exact in local time, also across DST changes
-    days[index].meters += activity.distanceMeters;
+    const meters = activity.distanceMeters;
+    // A session with a corrupt distance still counts, but adds no metres.
+    days[index].meters += Number.isFinite(meters) && meters > 0 ? meters : 0;
     sessions += 1;
     xp += activity.xpEarned ?? 0;
   }
