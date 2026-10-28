@@ -29,7 +29,7 @@ const actionClass =
   "surface-panel flex h-20 w-full items-center gap-3 px-4 text-left text-[15px] font-semibold transition-colors hover:border-action-text/40 disabled:opacity-60";
 
 function QuickAction({
-  icon: Icon,
+  icon,
   label,
   href,
   onClick,
@@ -41,6 +41,7 @@ function QuickAction({
   onClick?: () => void;
   disabled?: boolean;
 }) {
+  const Icon = icon;
   const content = (
     <>
       <Icon className="size-6 shrink-0 text-action-text" aria-hidden />
