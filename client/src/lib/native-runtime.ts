@@ -3,6 +3,7 @@ import type { PluginListenerHandle } from "@capacitor/core";
 import { SplashScreen } from "@capacitor/splash-screen";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { resolveDeepLink } from "./deep-links";
+import { canGoBackInApp } from "./in-app-history";
 import { normalizePath, TODAY_PATH } from "./navigation";
 import { isNativePlatform } from "./platform";
 import { setPushNavigate } from "./push";
@@ -96,7 +97,8 @@ export function initNativeRuntime(options: NativeRuntimeOptions): () => void {
   const handleUrl = createDeepLinkHandler(options);
   const handles: Promise<PluginListenerHandle>[] = [
     App.addListener("backButton", ({ canGoBack }) => {
-      const canGoBackInHistory = canGoBack ?? window.history.length > 1;
+      // Only entries created by the app: never back to the login page or a pre-app entry.
+      const canGoBackInHistory = canGoBack !== false && canGoBackInApp();
       if (shouldExitOnBack(window.location.pathname, canGoBackInHistory)) {
         App.exitApp().catch(() => {});
       } else {

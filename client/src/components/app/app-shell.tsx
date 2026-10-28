@@ -30,6 +30,7 @@ import { supabase } from "@/lib/supabase"
 import { unregisterPushToken } from "@/lib/push"
 import { clearNativeSessionToken } from "@/lib/session-token"
 import { isNativePlatform } from "@/lib/platform"
+import { canGoBackInApp } from "@/lib/in-app-history"
 import {
   FEED_PATH,
   HUB_TABS,
@@ -282,8 +283,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   const goBack = () => {
-    if (window.history.length > 1) window.history.back()
-    else if (parentPath) navigate(parentPath)
+    if (canGoBackInApp()) window.history.back()
+    else if (parentPath) navigate(parentPath, { replace: true })
   }
 
   const profileLabel = meQuery.data?.name || meQuery.data?.email || "Nuotatore"

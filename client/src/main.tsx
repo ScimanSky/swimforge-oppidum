@@ -8,6 +8,7 @@ import { getLoginUrl } from "./const";
 import { endExpiredSession } from "@/lib/session-expired";
 import { loadNativeSessionToken } from "@/lib/session-token";
 import { createTrpcLinks } from "@/lib/trpc-client";
+import { installInAppHistory } from "@/lib/in-app-history";
 import "@fontsource/manrope/latin-400.css";
 import "@fontsource/manrope/latin-500.css";
 import "@fontsource/manrope/latin-600.css";
@@ -15,6 +16,9 @@ import "@fontsource/manrope/latin-700.css";
 import "@fontsource/barlow-condensed/latin-600.css";
 import "@fontsource/barlow-condensed/latin-700.css";
 import "./index.css";
+
+// Before any navigation: «Indietro» and the Android back button only go back inside the app.
+installInAppHistory();
 
 const queryClient = new QueryClient();
 

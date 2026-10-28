@@ -176,3 +176,36 @@ describe("syncNativeStatusBar", () => {
     cleanup();
   });
 });
+
+describe("Android back button", () => {
+  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  async function pressBack(state: unknown, path: string, canGoBack = true) {
+    const { App } = await import("@capacitor/app");
+    const { initNativeRuntime } = await import("./native-runtime");
+    vi.mocked(App.exitApp).mockClear();
+    runtimeMocks.listeners.length = 0;
+    window.history.replaceState(state, "", path);
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const cleanup = initNativeRuntime({ navigate: vi.fn(), onAuthCallback: vi.fn() });
+    await flush();
+    runtimeMocks.listeners.find((l) => l.event === "backButton")?.cb({ canGoBack });
+    cleanup();
+    const result = { exited: vi.mocked(App.exitApp).mock.calls.length > 0, wentBack: back.mock.calls.length > 0 };
+    back.mockRestore();
+    return result;
+  }
+
+  it("goes back when the previous entry belongs to the app", async () => {
+    expect(await pressBack({ sfIdx: 2 }, "/track/4")).toEqual({ exited: false, wentBack: true });
+  });
+
+  it("exits when the previous entry is not the app's (e.g. the login page before a reload)", async () => {
+    expect(await pressBack({ sfIdx: 0 }, "/track/4")).toEqual({ exited: true, wentBack: false });
+  });
+
+  it("exits on Oggi and when the WebView has nothing behind", async () => {
+    expect(await pressBack({ sfIdx: 3 }, "/today")).toEqual({ exited: true, wentBack: false });
+    expect(await pressBack({ sfIdx: 3 }, "/track/4", false)).toEqual({ exited: true, wentBack: false });
+  });
+});

@@ -129,13 +129,32 @@ describe("AppShell Corsia", () => {
     expect(tabs.getByRole("link", { name: "Sfide" })).toHaveAttribute("aria-current", "page");
   });
 
-  it("su /track/4: nessuna sotto-scheda, Indietro torna ad Allena", async () => {
-    const history = renderShell("/track/4");
+  it("su /track/4: nessuna sotto-scheda e il pulsante Indietro", () => {
+    renderShell("/track/4");
     expect(screen.queryByRole("navigation", { name: /^Sezioni di/ })).not.toBeInTheDocument();
     expect(within(bottomBar()).getByRole("link", { name: "Allena" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Indietro" })).toBeInTheDocument();
+  });
+
+  it("Indietro senza storia nell'app (arrivo da fuori) sostituisce la pagina con il genitore", async () => {
+    window.history.replaceState({ sfIdx: 0 }, "");
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const history = renderShell("/track/4");
     await userEvent.click(screen.getByRole("button", { name: "Indietro" }));
-    // jsdom starts with history.length === 1: no in-app history, so it goes to the parent.
-    expect(history.at(-1)).toBe("/track");
+    expect(back).not.toHaveBeenCalled();
+    expect(history).toEqual(["/track"]); // replaced: no extra entry
+    back.mockRestore();
+  });
+
+  it("Indietro con storia nell'app torna alla pagina precedente", async () => {
+    window.history.replaceState({ sfIdx: 2 }, "");
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    const history = renderShell("/track/4");
+    await userEvent.click(screen.getByRole("button", { name: "Indietro" }));
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(history).toEqual(["/track/4"]);
+    back.mockRestore();
+    window.history.replaceState(null, "");
   });
 
   it("su /home mostra il marchio e nessun pulsante Indietro", () => {
