@@ -1229,7 +1229,7 @@ export default function Settings() {
                   </div>
                   {account.connected ? (
                     <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
-                      <div className="flex items-center gap-2 text-sm text-accent">
+                      <div className="flex items-center gap-2 text-sm text-success">
                         <Check className="w-4 h-4" />
                         Connesso
                       </div>
@@ -1540,7 +1540,7 @@ export default function Settings() {
               <div className="rounded-lg border border-border/60 bg-background/40 p-3 text-sm">
                 <div className="flex items-center justify-between">
                   <p className="font-medium text-foreground">Termini di Servizio</p>
-                  <span className="text-xs text-accent">Obbligatorio · accettato</span>
+                  <span className="text-xs text-success">Obbligatorio · accettato</span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Versione: {(consentsQuery.data as any)?.versions?.terms_acceptance ?? "v1.1"}
@@ -1549,7 +1549,7 @@ export default function Settings() {
               <div className="rounded-lg border border-border/60 bg-background/40 p-3 text-sm">
                 <div className="flex items-center justify-between">
                   <p className="font-medium text-foreground">Privacy Policy</p>
-                  <span className="text-xs text-accent">Obbligatorio · accettata</span>
+                  <span className="text-xs text-success">Obbligatorio · accettata</span>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Versione: {(consentsQuery.data as any)?.versions?.privacy_policy ?? "v1.1"}

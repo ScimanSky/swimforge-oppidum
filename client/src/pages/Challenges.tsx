@@ -742,7 +742,7 @@ export default function Challenges() {
                             {formatDistance(profile.totalDistanceMeters || 0)}
                           </p>
                         </div>
-                        <Badge className="bg-accent/20 text-accent">{profile.totalXp} XP</Badge>
+                        <Badge className="bg-xp/15 text-xp">{profile.totalXp} XP</Badge>
                       </>
                     )
 

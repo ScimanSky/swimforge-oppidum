@@ -79,7 +79,7 @@ const categoryIcons: Record<string, React.ElementType> = {
 const categoryColors: Record<string, string> = {
   speed: "text-chart-5 bg-chart-5/10",
   distance: "text-action-text bg-primary/10",
-  efficiency: "text-accent bg-accent/10",
+  efficiency: "text-muted-foreground bg-raised",
   frequency: "text-chart-4 bg-chart-4/10",
   endurance: "text-chart-3 bg-chart-3/10",
   technique: "text-chart-2 bg-chart-2/10",
@@ -803,7 +803,7 @@ export default function Goals() {
                   <div className="flex-1">
                     <h4 className="font-medium text-foreground">{goal.title}</h4>
                     <p className="text-xs text-muted-foreground">{formatDate(goal.completedAt)}</p>
-                    <Badge className="mt-2 bg-accent/20 text-accent">{goal.reward}</Badge>
+                    <Badge className="mt-2 bg-xp/15 text-xp">{goal.reward}</Badge>
                   </div>
                 </div>
               ))}

@@ -235,7 +235,7 @@ export default function NotificationBell() {
                   key={notification.id}
                   onClick={() => handleNotificationClick(notification)}
                   className={`w-full text-left p-4 hover:bg-accent transition-colors ${
-                    !notification.isRead ? "bg-accent/50" : ""
+                    !notification.isRead ? "bg-primary/10" : ""
                   }`}
                 >
                   <div className="flex gap-3">

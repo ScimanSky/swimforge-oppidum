@@ -389,7 +389,7 @@ export default function Activities() {
                             <span
                               className={cn(
                                 "inline-flex size-8 items-center justify-center rounded-lg",
-                                isOpenWater ? "bg-accent/15 text-accent" : "bg-primary/15 text-action-text",
+                                isOpenWater ? "bg-raised text-muted-foreground" : "bg-primary/15 text-action-text",
                               )}
                             >
                               {isOpenWater ? <MapPin className="size-4" /> : <Waves className="size-4" />}
@@ -402,7 +402,7 @@ export default function Activities() {
                             {formatDate(activity.activityDate)} · {formatTime(activity.activityDate)}
                           </p>
                         </div>
-                        <Badge variant="neon" className={cn("text-[10px]", isOpenWater ? "text-accent" : "text-action-text")}>
+                        <Badge variant="neon" className={cn("text-[10px]", isOpenWater ? "text-muted-foreground" : "text-action-text")}>
                           {isOpenWater ? "Open Water" : "Vasca"}
                         </Badge>
                       </div>
@@ -440,7 +440,7 @@ export default function Activities() {
                         <span className="text-xs text-muted-foreground">
                           {formatDistance(activity.distanceMeters)} · {formatDuration(activity.durationSeconds)}
                         </span>
-                        <span className="text-sm font-semibold text-accent">+{activity.xpEarned ?? 0} XP</span>
+                        <span className="text-sm font-semibold text-xp">+{activity.xpEarned ?? 0} XP</span>
                       </div>
                     </button>
                   )
@@ -577,7 +577,7 @@ export default function Activities() {
                   </div>
                   <div className="rounded-2xl border border-border/70 bg-card/35 p-3">
                     <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground">XP Guadagnati</p>
-                    <p className="mt-1 text-3xl font-display font-bold text-accent">+{selectedActivity.xpEarned ?? 0}</p>
+                    <p className="mt-1 text-3xl font-display font-bold text-xp">+{selectedActivity.xpEarned ?? 0}</p>
                   </div>
                 </div>
 

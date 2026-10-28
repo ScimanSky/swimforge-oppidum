@@ -410,7 +410,7 @@ export default function Community() {
                         Membro
                       </Badge>
                     ) : club.member_status === "pending" ? (
-                      <Badge className="absolute right-3 top-3 bg-accent/20 text-accent border border-accent/35">
+                      <Badge className="absolute right-3 top-3 bg-raised text-muted-foreground border border-border">
                         In attesa
                       </Badge>
                     ) : null}
