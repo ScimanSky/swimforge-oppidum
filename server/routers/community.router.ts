@@ -135,6 +135,7 @@ async function notifyTaggedUsers(input: {
                     message: `${actorName} ti ha taggato in un post.`,
                     link,
                     referenceId: input.postId,
+                    actorId: input.authorUserId,
                 })
             )
         );

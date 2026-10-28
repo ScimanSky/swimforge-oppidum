@@ -19,7 +19,7 @@ It combines training tracking, social feed/clubs, and AI coach features.
 ## Local Development
 
 Prerequisites:
-- Node.js 20+
+- Node.js 22+
 - pnpm
 - PostgreSQL (local or Supabase)
 

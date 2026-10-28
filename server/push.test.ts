@@ -9,6 +9,7 @@ const h = vi.hoisted(() => {
     cert: vi.fn((serviceAccount: unknown) => ({ serviceAccount })),
     getApps: vi.fn((): Array<{ name: string }> => []),
     sendEachForMulticast: vi.fn(),
+    getMessaging: vi.fn(),
     listUserDeviceTokens: vi.fn(),
     deleteTokens: vi.fn(),
     getUserNotificationSettings: vi.fn(),
@@ -21,7 +22,7 @@ vi.mock("firebase-admin/app", () => ({
   getApps: h.getApps,
 }));
 vi.mock("firebase-admin/messaging", () => ({
-  getMessaging: () => ({ sendEachForMulticast: h.sendEachForMulticast }),
+  getMessaging: () => h.getMessaging(),
 }));
 vi.mock("./_core/env", () => ({ ENV: h.env }));
 vi.mock("./middleware/logger", () => ({ logger: { child: () => h.log } }));
@@ -43,6 +44,7 @@ describe("push", () => {
     resetPushForTests();
     h.env.firebaseServiceAccountJson = encoded;
     h.getApps.mockReturnValue([]);
+    h.getMessaging.mockImplementation(() => ({ sendEachForMulticast: h.sendEachForMulticast }));
     h.listUserDeviceTokens.mockResolvedValue(["tok-a", "tok-b"]);
     h.getUserNotificationSettings.mockResolvedValue(null);
     h.deleteTokens.mockResolvedValue(undefined);
@@ -69,6 +71,17 @@ describe("push", () => {
     expect(initPush()).toBe(false);
     await expect(sendPushToUser(1, payload)).resolves.toEqual({ sent: 0, failed: 0 });
     expect(h.sendEachForMulticast).not.toHaveBeenCalled();
+    expect(h.log.warn).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.not.objectContaining({ message: expect.anything() }),
+    );
+  });
+
+  it("never rejects when the messaging client cannot be created", async () => {
+    h.getMessaging.mockImplementation(() => {
+      throw new Error("no messaging");
+    });
+    await expect(sendPushToUser(42, payload)).resolves.toEqual({ sent: 0, failed: 2 });
   });
 
   it("initialises firebase once from the base64 service account", async () => {

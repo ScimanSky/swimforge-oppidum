@@ -11,26 +11,32 @@ export type PushPayload = {
   tag?: string;
 };
 
-const POST_TYPES = new Set(["reaction", "comment", "mention", "splash", "activity_shared"]);
+const POST_TYPES = new Set(["reaction", "comment", "mention"]);
 
-function isClubType(type: string) {
-  return type.startsWith("club_") || type.startsWith("meet_");
+/**
+ * Notification types that also go out as push. Everything else (follow, splash,
+ * meet_*, other club_*, report_update, activity_shared, ...) stays in-app only.
+ */
+export const PUSH_NOTIFICATION_TYPES: readonly string[] = [
+  "reaction",
+  "comment",
+  "mention",
+  "club_workout_published",
+];
+
+export function shouldPushNotificationType(type: string): boolean {
+  return PUSH_NOTIFICATION_TYPES.includes(type);
 }
 
+const PUSH_TITLES: Record<string, string> = {
+  reaction: "Nuova reazione",
+  comment: "Nuovo commento",
+  mention: "Ti hanno menzionato",
+  club_workout_published: "Nuovo allenamento del club",
+};
+
 function titleForType(type: string, fallback: string): string {
-  switch (type) {
-    case "reaction":
-      return "Nuova reazione";
-    case "comment":
-      return "Nuovo commento";
-    case "mention":
-      return "Ti hanno menzionato";
-    case "club_workout_published":
-      return "Nuovo allenamento del club";
-    default:
-      if (isClubType(type)) return "Novità dal club";
-      return fallback.trim() || "SwimForge";
-  }
+  return PUSH_TITLES[type] ?? (fallback.trim() || "SwimForge");
 }
 
 /** Only same-app absolute paths are used as deep links. */

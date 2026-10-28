@@ -1,10 +1,37 @@
 import { describe, expect, it } from "vitest";
 import {
+  PUSH_NOTIFICATION_TYPES,
   buildDirectMessagePush,
   buildGarminSyncPush,
   buildNotificationPush,
   buildPersonalRecordPush,
+  shouldPushNotificationType,
 } from "./push_messages";
+
+describe("shouldPushNotificationType", () => {
+  it("allows only reactions, comments, mentions and published club workouts", () => {
+    expect([...PUSH_NOTIFICATION_TYPES].sort()).toEqual(["club_workout_published", "comment", "mention", "reaction"]);
+    for (const type of PUSH_NOTIFICATION_TYPES) expect(shouldPushNotificationType(type)).toBe(true);
+  });
+
+  it("keeps every other type in-app only", () => {
+    for (const type of [
+      "follow",
+      "splash",
+      "meet_published",
+      "meet_entries_open",
+      "meet_entry_pending",
+      "meet_results_imported",
+      "club_ai_post",
+      "club_workout_generated_weekly",
+      "report_update",
+      "activity_shared",
+      "",
+    ]) {
+      expect(shouldPushNotificationType(type)).toBe(false);
+    }
+  });
+});
 
 describe("buildNotificationPush", () => {
   it("uses the Italian title per type and the notification message as body", () => {
@@ -16,10 +43,6 @@ describe("buildNotificationPush", () => {
     expect(
       buildNotificationPush({ type: "club_workout_published", title: "x", message: "m", link: "/community/club/3/workouts/9" }),
     ).toEqual({ title: "Nuovo allenamento del club", body: "m", url: "/community/club/3/workouts/9" });
-    expect(buildNotificationPush({ type: "meet_published", title: "x", message: "m", link: "/community/club/3/meet/1" }).title).toBe(
-      "Novità dal club",
-    );
-    expect(buildNotificationPush({ type: "club_ai_post", title: "x", message: "m" }).title).toBe("Novità dal club");
     expect(buildNotificationPush({ type: "follow", title: "Nuovo follower", message: "m", link: "/u/4" }).title).toBe("Nuovo follower");
   });
 

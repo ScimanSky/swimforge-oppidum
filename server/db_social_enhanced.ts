@@ -26,7 +26,7 @@ import {
 } from "../drizzle/schema"
 import { and, eq, desc, sql, gte, lte, or, isNull, inArray } from "drizzle-orm"
 import { sendPushToUser } from "./push"
-import { buildDirectMessagePush, buildNotificationPush } from "./push_messages"
+import { buildDirectMessagePush, buildNotificationPush, shouldPushNotificationType } from "./push_messages"
 
 type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>
 
@@ -663,14 +663,19 @@ export async function createNotification(params: {
   message: string
   link?: string
   referenceId?: number
+  /** User who caused the notification: never pushed about their own action. */
+  actorId?: number
 }) {
-  const notification = await insertNotification(params)
-  // Push to the recipient's devices (fire-and-forget). Callers already skip the actor.
-  void Promise.resolve()
-    .then(() => sendPushToUser(params.userId, buildNotificationPush(params)))
-    .catch(() => {
-      // Push is best-effort.
-    })
+  const { actorId, ...row } = params
+  const notification = await insertNotification(row)
+  // Push only for the allowlisted types and never to the actor (fire-and-forget).
+  if (shouldPushNotificationType(row.type) && actorId !== row.userId) {
+    void Promise.resolve()
+      .then(() => sendPushToUser(row.userId, buildNotificationPush(row)))
+      .catch(() => {
+        // Push is best-effort.
+      })
+  }
   return notification
 }
 

@@ -19,6 +19,7 @@ Questa guida descrive il percorso **ufficiale** di deploy Oracle:
    - `80/tcp` (HTTP)
    - `443/tcp` (HTTPS)
 4. Punta il record DNS `A` (es. `app.example.com`) all'IP pubblico.
+5. Runtime: l'immagine Docker usa Node.js 22 (`node:22-bookworm-slim`); sulla VM serve solo Docker. Per comandi `pnpm` eseguiti fuori dal container (es. `pnpm db:migrate` dal checkout) serve Node.js 22+ (`engines.node >=22` in `package.json`).
 
 ## 2) Installa Docker sulla VM
 ```bash

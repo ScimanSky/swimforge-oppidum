@@ -56,11 +56,12 @@ export function initPush(): boolean {
     pushState = "enabled";
     log.info("[push] FCM push enabled", { event: "push:enabled", projectId: serviceAccount.project_id });
     return true;
-  } catch (error) {
+  } catch {
+    // Fixed reason only: the error text could echo parts of the credential.
     pushState = "disabled";
     log.warn("[push] Invalid FIREBASE_SERVICE_ACCOUNT_JSON: push notifications disabled", {
       event: "push:invalid_config",
-      message: error instanceof Error ? error.message : String(error),
+      reason: "FIREBASE_SERVICE_ACCOUNT_JSON is not a base64-encoded service-account JSON",
     });
     return false;
   }
@@ -123,7 +124,17 @@ export async function sendPushToUser(
   let sent = 0;
   let failed = 0;
   const stale: string[] = [];
-  const messaging = getMessaging(pushApp);
+  let messaging: ReturnType<typeof getMessaging>;
+  try {
+    messaging = getMessaging(pushApp);
+  } catch (error) {
+    log.warn("[push] FCM messaging unavailable", {
+      event: "push:messaging_unavailable",
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return { sent: 0, failed: tokens.length };
+  }
 
   for (let start = 0; start < tokens.length; start += FCM_BATCH_SIZE) {
     const batch = tokens.slice(start, start + FCM_BATCH_SIZE);

@@ -19,6 +19,13 @@ describe("parseAllowedOrigins", () => {
     ]);
   });
 
+  it("normalises case and trailing slashes and drops duplicates", () => {
+    expect(parseAllowedOrigins("HTTPS://SwimForge.it/, https://app.swimforge.it//, https://swimforge.it")).toEqual([
+      "https://swimforge.it",
+      "https://app.swimforge.it",
+    ]);
+  });
+
   it("includes the app origin and no longer the localhost capacitor origins by default", () => {
     expect(DEFAULT_ALLOWED_ORIGINS).toContain("https://app.swimforge.it");
     expect(DEFAULT_ALLOWED_ORIGINS).toContain("https://swimforge.it");
@@ -43,6 +50,11 @@ describe("isOriginAllowed", () => {
   it("allows a missing origin only outside production", () => {
     expect(isOriginAllowed(undefined, list, true)).toBe(false);
     expect(isOriginAllowed(undefined, list, false)).toBe(true);
+  });
+
+  it("compares origins case-insensitively and ignores a trailing slash", () => {
+    expect(isOriginAllowed("https://App.SwimForge.it", list, true)).toBe(true);
+    expect(isOriginAllowed("https://app.swimforge.it", ["https://app.swimforge.it/"], true)).toBe(true);
   });
 
   it("matches entries that came from an env list with spaces", () => {

@@ -14,12 +14,17 @@ export const DEFAULT_ALLOWED_ORIGINS: readonly string[] = [
   "https://app.swimforge.it",
 ];
 
+/** Origins compare as scheme://host[:port]: trimmed, lowercase, no trailing slash. */
+export function normalizeOrigin(value: string): string {
+  return value.trim().toLowerCase().replace(/\/+$/, "");
+}
+
 export function parseAllowedOrigins(raw: string | undefined): string[] {
   const entries = (raw ?? "")
     .split(",")
-    .map((value) => value.trim())
+    .map(normalizeOrigin)
     .filter(Boolean);
-  return entries.length > 0 ? entries : [...DEFAULT_ALLOWED_ORIGINS];
+  return entries.length > 0 ? Array.from(new Set(entries)) : [...DEFAULT_ALLOWED_ORIGINS];
 }
 
 /**
@@ -32,7 +37,8 @@ export function isOriginAllowed(
   isProduction: boolean,
 ): boolean {
   if (!origin) return !isProduction;
-  return allowedOrigins.includes(origin.trim());
+  const normalized = normalizeOrigin(origin);
+  return allowedOrigins.some((entry) => normalizeOrigin(entry) === normalized);
 }
 
 export type OriginRejection = { origin: string; method: string; path: string };

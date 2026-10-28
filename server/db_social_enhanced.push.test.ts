@@ -40,6 +40,45 @@ describe("push hooks in db_social_enhanced", () => {
     });
   });
 
+  it("createNotification does not push to the actor and keeps the in-app row unchanged", async () => {
+    const values = vi.fn(() => ({ returning: async () => [{ id: 9 }] }));
+    h.db.insert.mockReturnValue({ values });
+    await createNotification({
+      userId: 7,
+      type: "comment",
+      title: "Nuovo commento",
+      message: "m",
+      link: "/post/1",
+      referenceId: 1,
+      actorId: 7,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(h.sendPushToUser).not.toHaveBeenCalled();
+    expect(values).toHaveBeenCalledWith({
+      userId: 7,
+      type: "comment",
+      title: "Nuovo commento",
+      message: "m",
+      link: "/post/1",
+      referenceId: 1,
+    });
+  });
+
+  it("createNotification pushes when the actor is someone else", async () => {
+    insertReturning({ id: 10 });
+    await createNotification({ userId: 7, type: "mention", title: "t", message: "m", link: "/post/2", actorId: 8 });
+    await vi.waitFor(() => expect(h.sendPushToUser).toHaveBeenCalledWith(7, expect.objectContaining({ url: "/post/2" })));
+  });
+
+  it("createNotification keeps non-allowlisted types in-app only", async () => {
+    insertReturning({ id: 11 });
+    await createNotification({ userId: 7, type: "follow", title: "Nuovo follower", message: "m", link: "/u/8", actorId: 8 });
+    await createNotification({ userId: 7, type: "meet_published", title: "t", message: "m", link: "/community/club/1/meet/2" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(h.sendPushToUser).not.toHaveBeenCalled();
+    expect(h.db.insert).toHaveBeenCalledTimes(2);
+  });
+
   it("createNotification does not fail when the push fails", async () => {
     insertReturning({ id: 2 });
     h.sendPushToUser.mockRejectedValue(new Error("boom"));
