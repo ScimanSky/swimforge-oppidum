@@ -1,3 +1,4 @@
+import { assetUrl } from "@/lib/asset-base";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -362,7 +363,7 @@ export default function ChallengeDetail() {
 	                        </Avatar>
 	                        {participant.profileBadgeUrl ? (
 	                          <img
-	                            src={participant.profileBadgeUrl}
+	                            src={assetUrl(participant.profileBadgeUrl)}
 	                            alt={participant.profileBadgeName || "Badge"}
 	                            className="h-7 w-7 object-contain opacity-90"
 	                            title={`${participant.profileBadgeName} (Livello ${participant.profileBadgeLevel})`}

@@ -1,3 +1,4 @@
+import { assetUrl } from "@/lib/asset-base";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -361,7 +362,7 @@ export default function Badges() {
 	                  typeof (badge as { image_url?: unknown }).image_url === "string"
 	                    ? (badge as { image_url: string }).image_url
 	                    : null;
-	                const pngPath = badgeImageUrl || getBadgeImageUrl(badge.code);
+	                const pngPath = assetUrl(badgeImageUrl || getBadgeImageUrl(badge.code));
 
                 return (
                   <motion.div
@@ -529,11 +530,11 @@ export default function Badges() {
                         >
                           {selectedBadge.earned ? (
                             <img
-                              src={
+                              src={assetUrl(
                                 (typeof (selectedBadge as { image_url?: unknown }).image_url === "string"
                                   ? (selectedBadge as { image_url: string }).image_url
-                                  : null) || getBadgeImageUrl(selectedBadge.code)
-                              }
+                                  : null) || getBadgeImageUrl(selectedBadge.code),
+                              )}
                               alt={selectedBadge.name}
                               className="w-full h-full object-contain"
                               onContextMenu={(e) => e.preventDefault()}

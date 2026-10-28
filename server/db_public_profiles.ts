@@ -220,6 +220,7 @@ export async function toggleFollow(params: { followerId: number; followingId: nu
       title: "Nuovo follower",
       message: `${actorName} ha iniziato a seguirti.`,
       link: `/u/${params.followerId}`,
+      actorId: params.followerId,
     });
   } catch {
     // non-critical, don't block the follow

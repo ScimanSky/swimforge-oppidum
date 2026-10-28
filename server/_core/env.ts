@@ -133,6 +133,8 @@ export const ENV = {
   clubAiTimezone: (process.env.CLUB_AI_TIMEZONE ?? "Europe/Rome").trim() || "Europe/Rome",
   clubAiPostImageEnabled: parseBoolEnv("CLUB_AI_POST_IMAGE_ENABLED", true),
   clubAiPostImageModel: (process.env.CLUB_AI_POST_IMAGE_MODEL ?? "").trim(),
+  // Base64 of the Firebase service-account JSON (FCM push). Empty → push disabled.
+  firebaseServiceAccountJson: (process.env.FIREBASE_SERVICE_ACCOUNT_JSON ?? "").trim(),
   sessionMaxAgeDays,
   sessionMaxAgeMs: sessionMaxAgeDays * 24 * 60 * 60 * 1000,
 };

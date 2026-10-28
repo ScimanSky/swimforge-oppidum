@@ -14,6 +14,7 @@ import { trpc } from "@/lib/trpc";
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
 import { getWorkoutSeriesDisplay, parseWorkoutPlan } from "@/lib/workout-plan";
 import { toast } from "sonner";
+import { publicSiteUrl } from "@/lib/public-url";
 import { ArrowLeft, Bot, Calendar as CalendarIcon, Check, Clock3, Copy, Database, Flag, PlayCircle, Plus, Printer, RefreshCw, Shield, Users, Sparkles } from "lucide-react";
 
 type MeetForm = {
@@ -363,8 +364,7 @@ function toggleMultiSelect<T extends string>(list: T[], value: T) {
 
 function InviteRow({ invite }: { invite: any }) {
   const [copied, setCopied] = useState(false);
-  const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const link = `${origin}/community/invite/${invite.code}`;
+  const link = publicSiteUrl(`/community/invite/${invite.code}`);
 
   return (
     <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-card/35 p-2 text-sm">
@@ -686,11 +686,7 @@ export default function ClubCoachModeration() {
       `${title}`,
       `Data: ${sessionDate}`,
       `Distanza: ${distance}`,
-      `Apri SwimForge: ${
-        typeof window !== "undefined"
-          ? `${window.location.origin}/community/club/${clubId}/workouts/${workoutPreview.id}`
-          : `/community/club/${clubId}/workouts/${workoutPreview.id}`
-      }`,
+      `Apri SwimForge: ${publicSiteUrl(`/community/club/${clubId}/workouts/${workoutPreview.id}`)}`,
     ].join("\n");
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
   }, [workoutPreview, workoutPreviewPlan?.title, workoutPreviewPlan?.totalDistance, workoutSessionDate, club?.name, clubId]);

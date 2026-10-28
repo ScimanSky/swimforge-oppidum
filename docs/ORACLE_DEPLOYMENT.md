@@ -19,6 +19,7 @@ Questa guida descrive il percorso **ufficiale** di deploy Oracle:
    - `80/tcp` (HTTP)
    - `443/tcp` (HTTPS)
 4. Punta il record DNS `A` (es. `app.example.com`) all'IP pubblico.
+5. Runtime: l'immagine Docker usa Node.js 22 (`node:22-bookworm-slim`); sulla VM serve solo Docker. Per comandi `pnpm` eseguiti fuori dal container (es. `pnpm db:migrate` dal checkout) serve Node.js 22+ (`engines.node >=22` in `package.json`).
 
 ## 2) Installa Docker sulla VM
 ```bash
@@ -54,6 +55,8 @@ Aggiorna `.env.oracle` con almeno:
 - Observability (opzionale): `ROLLBAR_ACCESS_TOKEN`, `DEPLOY_TARGET=oracle`, `APP_RELEASE`, `ROLLBAR_SERVER_HOST`
 - Redis policy (raccomandato esplicito): `REDIS_REQUIRED_FOR_READY=true`, `REDIS_RATE_LIMIT_MODE=memory`
 - Oracle ingress: `DOMAIN`, `ACME_EMAIL`
+- Origini: `ALLOWED_ORIGINS=https://swimforge.it,https://www.swimforge.it,https://app.swimforge.it` (origin pubblico per primo; `app.swimforge.it` e' l'origin dell'app Android)
+- Push (app Android, consigliato): `FIREBASE_SERVICE_ACCOUNT_JSON` (base64 del JSON del service account Firebase, `base64 -w0 file.json`; vuota = push disattivate con un warning all'avvio)
 
 Generazione `GARMIN_STATE_KEY`:
 ```bash
@@ -65,8 +68,20 @@ Note Gemini:
 - i progetti esistenti possono mantenere `gemini-2.5-flash` impostando `GEMINI_TEXT_MODEL=gemini-2.5-flash`; `GEMINI_MODEL`/`FORGE_LLM_MODEL` restano letti come fallback legacy.
 
 Nota CORS:
-- `ALLOWED_ORIGINS` deve mantenere per primo l'origin pubblico (es. `https://app.example.com`).
-- quando verrà rilasciata l'app Android andranno aggiunti `https://localhost,capacitor://localhost` (es. `ALLOWED_ORIGINS=https://app.example.com,https://localhost,capacitor://localhost`).
+- `ALLOWED_ORIGINS` deve mantenere per primo l'origin pubblico (es. `https://swimforge.it`): `server/db_club_meets.ts` usa la prima voce per i link nelle email.
+- l'app Android gira con origin `https://app.swimforge.it` (WebView Capacitor, stesso sito di `swimforge.it`): va aggiunta in coda, es. `ALLOWED_ORIGINS=https://swimforge.it,https://www.swimforge.it,https://app.swimforge.it`. `https://localhost` e `capacitor://localhost` non servono più.
+- le origini non ammesse ricevono `403 {"error":"origin_not_allowed"}` (warn `security:origin_not_allowed` nei log, nessuno stack); le richieste senza header `Origin` passano.
+- le risposte usano `Cross-Origin-Resource-Policy: same-site`, così l'app può caricare immagini e file statici da `https://swimforge.it`.
+
+Push FCM (app Android):
+- in Firebase Console (progetto `swimforge-oppidum`) → Impostazioni progetto → Account di servizio → "Genera nuova chiave privata" (oppure un service account dedicato con ruolo "Firebase Cloud Messaging API Admin").
+- codifica il JSON su una riga e mettilo in `.env.oracle`, poi elimina il file locale:
+  ```bash
+  echo "FIREBASE_SERVICE_ACCOUNT_JSON=$(base64 -w0 service-account.json)" >> .env.oracle
+  shred -u service-account.json
+  ```
+- serve la migrazione `0034_add_device_tokens` (tabella `device_tokens`); all'avvio il log mostra `push:enabled` oppure `push:disabled`/`push:invalid_config`.
+- i token restituiti da FCM come non registrati o non validi vengono cancellati automaticamente.
 
 TLS DB raccomandato:
 - target finale: `DB_SSL_REJECT_UNAUTHORIZED=true` con `DB_SSL_CA_CERT_BASE64` valorizzato
@@ -139,6 +154,8 @@ bash /home/ubuntu/projects/swimforge-oppidum/deploy/swimforge-deploy.sh
 L'immagine runtime contiene solo `node_modules`, `dist` e `package.json` (niente `drizzle/` né `drizzle.config.ts`), quindi `pnpm db:migrate` non può essere eseguito dentro il container `app`.
 Il workflow di deploy (e `deploy/swimforge-deploy.sh`) non applica mai migrazioni: vanno applicate a mano prima del deploy che le richiede (incluso il primo avvio produzione).
 
+Migrazioni recenti da applicare allo stesso modo di `0033` (obiettivi utente): `0034_add_device_tokens` (tabella `device_tokens`, necessaria alle push dell'app Android). Il deploy non migra mai: applicarla prima del merge/deploy che la richiede.
+
 Procedura standard, da un checkout fidato del repository allo stesso commit che verrà deployato:
 ```bash
 pnpm install --frozen-lockfile
@@ -191,6 +208,15 @@ Configura due monitor separati:
 Note `club-ai/tick`:
 - richiede `CLUB_AI_AUTOMATION_ENABLED=true`
 - ritorna `503` se automazione disabilitata o se non ci sono configurazioni club abilitate (per evitare falsi OK operativi)
+
+## 12) Checklist rilascio fase 1 (app Android)
+Ordine da rispettare; il merge su `main` fa partire il deploy automatico.
+1. Prima del merge, su `.env.oracle` della VM: aggiornare `ALLOWED_ORIGINS` (vedi sopra, origin pubblico per primo, `https://app.swimforge.it` incluso) e aggiungere `FIREBASE_SERVICE_ACCOUNT_JSON` (base64). L'immagine usa Node 22.
+2. Prima del merge: applicare la migrazione `0034_add_device_tokens` (sezione 8).
+3. Supabase Dashboard: `swimforge://auth/callback` tra gli "Additional Redirect URLs" (vedi `docs/ANDROID_APP.md`).
+4. Merge su `main` e attesa del deploy GitHub Actions.
+5. Controllare i log (`docker compose --env-file .env.oracle -f docker-compose.oracle.yml logs app`): deve comparire `push:enabled` e non devono comparire `security:origin_not_allowed` per l'origin dell'app.
+6. Smoke test dall'APK: login (email e Google), feed, immagini caricate, invio di un DM da un altro account con app chiusa (push ricevuta), logout.
 
 ## Troubleshooting
 - Certificati TLS non emessi:

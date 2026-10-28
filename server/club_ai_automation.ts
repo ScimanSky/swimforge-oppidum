@@ -230,6 +230,7 @@ async function notifyClubMembers(params: {
         message: params.message,
         link: params.link,
         referenceId: params.referenceId,
+        actorId: params.actorUserId,
       }),
     ),
   );

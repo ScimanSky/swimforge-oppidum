@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
     "build": "vite build && esbuild server/_core/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build:native": "vite build --mode native && node scripts/prune-native-bundle.mjs",
+    "android:sync": "npx cap sync android",
+    "android:build": "pnpm build:native && npx cap sync android && cd android && ./gradlew assembleDebug",
+    "android:open": "npx cap open android",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "docs:generate": "typedoc --entryPoints server/_core/index.ts --out docs/api",
@@ -16,9 +20,20 @@
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:validate": "node scripts/validate-drizzle-chain.mjs"
+    "db:validate": "node scripts/validate-drizzle-chain.mjs",
+    "android:distribute": "node scripts/distribute-android.mjs"
   },
   "dependencies": {
+    "@capacitor/android": "8.5.3",
+    "@capacitor/app": "8.1.2",
+    "@capacitor/browser": "8.0.5",
+    "@capacitor/core": "8.5.3",
+    "@capacitor/keyboard": "8.0.6",
+    "@capacitor/preferences": "8.0.1",
+    "@capacitor/push-notifications": "8.1.3",
+    "@capacitor/share": "8.0.3",
+    "@capacitor/splash-screen": "8.0.2",
+    "@capacitor/status-bar": "8.0.4",
     "@google/genai": "^1.42.0",
     "@google/generative-ai": "^0.24.1",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -54,6 +69,7 @@
     "drizzle-orm": "^0.45.2",
     "express": "^4.22.3",
     "express-rate-limit": "^8.2.2",
+    "firebase-admin": "^14.5.0",
     "framer-motion": "^12.23.22",
     "helmet": "^8.1.0",
     "jose": "6.1.0",
@@ -85,6 +101,8 @@
   },
   "devDependencies": {
     "@builder.io/vite-plugin-jsx-loc": "^0.1.1",
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.5.3",
     "@tailwindcss/vite": "^4.1.3",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -124,6 +142,9 @@
     "vite-plugin-manus-runtime": "^0.0.57",
     "vitest": "^2.1.4"
   },
+  "engines": {
+    "node": ">=22"
+  },
   "packageManager": "pnpm@10.4.1+sha512.c753b6c3ad7afa13af388fa6d808035a008e30ea9993f58c6663e2bc5ff21679aa834db094987129aa4d488b86df57f7b634981b2f827cdcacc698cc0cfb88af",
   "pnpm": {
     "patchedDependencies": {
@@ -148,7 +169,8 @@
       "proxy-addr": "2.0.8",
       "follow-redirects": "1.16.2",
       "js-yaml": "4.3.2",
-      "source-map-js": "1.2.2"
+      "source-map-js": "1.2.2",
+      "@capacitor/assets>sharp": "0.34.5"
     }
   }
 }

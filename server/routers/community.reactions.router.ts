@@ -64,6 +64,7 @@ export function createCommunityReactionsRouter(input: { requirePostReadable: Req
                 message: `${actorName} ha reagito ${emoji} al tuo post.`,
                 link,
                 referenceId: input.postId,
+                actorId: ctx.user.id,
               });
             }
           } catch {

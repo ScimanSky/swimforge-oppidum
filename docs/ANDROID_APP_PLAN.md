@@ -84,7 +84,7 @@ Priorità P1 = nella prima app pubblicata, P2 = subito dopo, P3 = quando serve.
 | 7 | **Carico interno** (punti = tempo per zona HR pesato; SwimForge ha già il tempo nelle zone 1-5 da Garmin) con grafico 12 settimane; **recupero** (ACWR acuto/cronico) con feedback giornaliero | P2 | dati già nel DB (`time in HR zones`, training effect) |
 | 8 | **Feedback post-seduta**: RPE 1-10, obiettivo raggiunto, nota | P1 | alimenta Session IQ e il coach |
 | 9 | **Check-in settimanale** (30 s) → il coach AI genera la settimana successiva | P2 | estende il piano giornaliero attuale a piano settimanale |
-| 10 | **Home "Oggi"**: sessione di oggi, ultima attività, carico settimana, 4 azioni rapide (Allenati ora, Pianifica, Sincronizza, Chiedi al coach). Il feed social diventa la seconda tab | P1 | **DECISO 27/10**: sì, home "Oggi" con feed in seconda tab |
+| 10 | **Home "Oggi"**: sessione di oggi, ultima attività, carico settimana, 4 azioni rapide (Allenati ora, Pianifica, Sincronizza, Chiedi al coach). Il feed social diventa la seconda tab | P1 | **DECISO 27/10**: sì, home "Oggi" con feed in seconda tab **solo nell'app Android**; sul web la home resta il feed social (scelta per piattaforma tramite `isNativePlatform()`) |
 | 11 | **Coach AI contestuale**: la chat sa in che schermata sei (attività, sessione, piano) e propone domande | P2 | la chat Gemini esiste, manca il contesto per schermata |
 | 12 | **Push notifications** (FCM via Capacitor): sync completata, PB, promemoria sessione, DM, commenti, risposte del coach | P1 | server: Firebase Admin SDK su Render; tabella device token |
 | 13 | **Condividi immagine** dell'attività (card con statistiche su foto) verso Instagram/WhatsApp | P2 | plugin Share + canvas |
@@ -164,6 +164,8 @@ commit e push. Stime in giorni di lavoro effettivo con Claude Code.
   pubblicazione richiede un test chiuso con 12 tester per 14 giorni (da verificare,
   la regola cambia).
 - Gate: l'app installata sul Pixel fa login, sync Garmin, feed, DM, con push ricevuta.
+- Completata il 28/10/2026 sul branch android/phase-1 (PR). Strava in app e App Links verificati
+  sono slittati alle fasi successive (vedi `docs/ANDROID_APP.md`, limiti noti).
 
 ### Fase 2 — Nuova veste grafica (3-4 giorni, in parallelo a 0-1)
 - Base scelta: la proposta **«Corsia»** (`docs/design-proposals/claude-corsia/`, 27/10):
@@ -227,7 +229,7 @@ Totale indicativo: 20-27 giorni di lavoro per arrivare al test chiuso.
 2. Gamification leggera: restano XP, livelli, badge e classifiche; via stagioni, battle
    pass, missioni e club quest.
 3. Storie 24h: **rimosse**.
-4. Home "Oggi" con feed social in seconda tab: **sì**.
+4. Home "Oggi" con feed social in seconda tab: **sì, solo nell'app Android**; sul web il feed resta la home (deciso il 27/10 sera). Tutto il social (post con foto e video, commenti, reazioni, DM, club, profili) resta in entrambe le versioni.
 5. Walkthrough con screenshot dell'app concorrente: rinviato a un'altra sessione.
 
 Azione a carico del proprietario: richiedere l'accesso al Garmin Connect Developer

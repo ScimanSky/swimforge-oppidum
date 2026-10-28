@@ -23,7 +23,10 @@ import {
 import { Waves, Eye, EyeOff, ArrowRight, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
-import { setNativeSessionToken } from "@/lib/session-token";
+import { postLoginPath, syncSupabaseSession } from "@/lib/auth-sync";
+import { startNativeGoogleLogin } from "@/lib/native-auth";
+import { isNativePlatform } from "@/lib/platform";
+import { publicSiteUrl } from "@/lib/public-url";
 import { toast } from "sonner";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -47,6 +50,7 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const utils = trpc.useUtils();
 
   useEffect(() => {
     if (authLoading) return;
@@ -57,20 +61,6 @@ export default function Register() {
   if (authLoading || isAuthenticated) {
     return <div className="min-h-screen bg-background" />;
   }
-
-  const syncSupabaseUserMutation = trpc.auth.syncSupabaseUser.useMutation({
-    onSuccess: (data) => {
-      if ("sessionToken" in data && typeof data.sessionToken === "string") setNativeSessionToken(data.sessionToken);
-      toast.success("Registrazione completata!");
-      setTimeout(() => {
-        window.location.href = data?.isNewUser ? "/settings?tab=profile&onboarding=1" : "/home";
-      }, 100);
-    },
-    onError: (error) => {
-      toast.error(error.message || "Errore durante la registrazione");
-      setIsLoading(false);
-    },
-  });
 
   const handleContinue = () => {
     if (!firstName || !lastName) {
@@ -104,7 +94,7 @@ export default function Register() {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: publicSiteUrl("/auth/callback"),
         data: {
           full_name: fullName || undefined,
           name: fullName || undefined,
@@ -119,18 +109,20 @@ export default function Register() {
     }
 
     if (data.session) {
-      syncSupabaseUserMutation.mutate({
-        accessToken: data.session.access_token,
-        user: {
-          id: data.user?.id ?? "",
-          email: data.user?.email ?? email,
-          name:
-            data.user?.user_metadata?.full_name ||
-            data.user?.user_metadata?.name ||
-            fullName ||
-            null,
-        },
-      });
+      try {
+        const { isNewUser } = await syncSupabaseSession(
+          data.session,
+          (input) => utils.client.auth.syncSupabaseUser.mutate(input),
+          { email, name: fullName || null },
+        );
+        toast.success("Registrazione completata!");
+        setTimeout(() => {
+          window.location.href = postLoginPath(isNewUser);
+        }, 100);
+      } catch (syncError) {
+        toast.error((syncError as Error)?.message || "Errore durante la registrazione");
+        setIsLoading(false);
+      }
       return;
     }
 
@@ -142,6 +134,12 @@ export default function Register() {
   const handleGoogleRegister = async () => {
     try {
       setIsGoogleLoading(true);
+      if (isNativePlatform()) {
+        // Custom Tab + swimforge://auth/callback, completed in native-runtime (App.tsx).
+        await startNativeGoogleLogin();
+        setIsGoogleLoading(false);
+        return;
+      }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: `${window.location.origin}/auth/callback` },

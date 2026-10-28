@@ -15,6 +15,13 @@
       "when": 1793111686199,
       "tag": "0033_add_user_goals",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1793180371366,
+      "tag": "0034_add_device_tokens",
+      "breakpoints": true
     }
   ]
 }

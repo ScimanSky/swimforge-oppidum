@@ -1,0 +1,9 @@
+# Docker build context for the web/server image (Dockerfile: COPY . . then pnpm build).
+node_modules
+dist
+android
+.manus-logs
+# Native-only Vite env (the native build never runs in the image).
+# Other .env* files stay: the image's `vite build` reads the VITE_* values from them.
+.env.native
+.env.native.local

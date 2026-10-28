@@ -579,6 +579,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                                         message: `Il meeting \"${meet.name}\" è stato pubblicato.`,
                                         link: `/community/club/${meet.clubId}/meet/${meet.id}`,
                                         referenceId: meet.id,
+                                        actorId: ctx.user.id,
                                     }),
                                 ),
                             );
@@ -614,6 +615,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                                         message: `Le iscrizioni per \"${meet.name}\" sono aperte.`,
                                         link: `/community/club/${meet.clubId}/meet/${meet.id}`,
                                         referenceId: meet.id,
+                                        actorId: ctx.user.id,
                                     }),
                                 ),
                             );
@@ -764,6 +766,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                                                 message: `${actorName} ha richiesto iscrizione a ${result.eventLabel} (${result.meetName}).`,
                                                 link: `/community/club/${result.clubId}/coach`,
                                                 referenceId: result.meetId,
+                                                actorId: ctx.user.id,
                                             }),
                                         ),
                                 );
@@ -828,6 +831,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                                         message: "Nuovi risultati disponibili per il meeting del club.",
                                         link: `/community/club`,
                                         referenceId: input.meetId,
+                                        actorId: ctx.user.id,
                                     }),
                                 ),
                             );
@@ -1162,6 +1166,7 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
                                             message: `Nuovo workout disponibile: ${workout.title}`,
                                             link: `/community/club/${workout.clubId}/workouts/${workout.id}`,
                                             referenceId: workout.id,
+                                            actorId: ctx.user.id,
                                         }),
                                     ),
                                 );

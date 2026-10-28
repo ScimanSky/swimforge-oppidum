@@ -1,3 +1,4 @@
+import { assetUrl } from "@/lib/asset-base";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useRoute } from "wouter";
 import AppLayout from "@/components/AppLayout";
@@ -262,7 +263,7 @@ export default function ClubHistoryAthletesPage() {
                     }`}
                   >
                     <img
-                      src="/images/theme-v3/landing-tour-poster.png"
+                      src={assetUrl("/images/theme-v3/landing-tour-poster.png")}
                       alt=""
                       aria-hidden="true"
                       className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-[0.18]"
@@ -347,7 +348,7 @@ export default function ClubHistoryAthletesPage() {
                           }`}
                         >
                           <img
-                            src="/images/theme-v3/landing-tour-poster.png"
+                            src={assetUrl("/images/theme-v3/landing-tour-poster.png")}
                             alt=""
                             aria-hidden="true"
                             className="pointer-events-none absolute inset-0 h-full w-full object-cover object-center opacity-[0.2] saturate-[0.9] contrast-[1.03]"

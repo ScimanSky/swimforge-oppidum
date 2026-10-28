@@ -570,6 +570,7 @@ export async function toggleSplash(userId: number, postId: number) {
         message: `${actorName} ha messo Splash al tuo post.`,
         link,
         referenceId: postId,
+        actorId: userId,
       });
     } catch {
       // Notifications are best-effort; don't break splash interaction if it fails.
@@ -609,6 +610,7 @@ export async function addComment(userId: number, postId: number, content: string
         message: `${actorName}: ${preview}${content.trim().length > 120 ? "..." : ""}`,
         link,
         referenceId: postId,
+        actorId: userId,
       });
     }
   } catch {

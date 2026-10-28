@@ -2,7 +2,6 @@ import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
-import NotFound from "@/pages/NotFound";
 import { Redirect, Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -14,7 +13,14 @@ import ActivityInsightNotification from "./components/ActivityInsightNotificatio
 import PbCelebrationNotification from "./components/PbCelebrationNotification";
 import CookieBanner from "./components/CookieBanner";
 import { UI_FEATURE_FLAGS } from "./lib/feature-flags";
+import { hideSplash, initNativeRuntime } from "./lib/native-runtime";
+import { isNativePlatform } from "./lib/platform";
+import { registerPushToken } from "./lib/push";
+import { getNativeSessionToken } from "./lib/session-token";
+import { trpc } from "./lib/trpc";
 
+// Lazy like every other page: it pulls in AppLayout → app-shell → supabase-js.
+const NotFound = lazy(() => import("@/pages/NotFound"));
 const Home = lazy(() => import("./pages/Home"));
 const Badges = lazy(() => import("./pages/Badges"));
 const Challenges = lazy(() => import("./pages/Challenges"));
@@ -176,14 +182,57 @@ function ScrollToTop() {
   return null;
 }
 
+/** Native shell wiring (status bar, back button, deep links, push); renders nothing, no-op on the web. */
+function NativeRuntime() {
+  const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
+
+  useEffect(
+    () =>
+      initNativeRuntime({
+        navigate,
+        // Native Google sign-in returns here via swimforge://auth/callback (lib/native-auth.ts,
+        // loaded lazily so supabase-js stays out of the entry chunk).
+        onAuthCallback: async (callback) => {
+          const { completeNativeAuthCallback } = await import("./lib/native-auth");
+          return completeNativeAuthCallback(callback, {
+            syncUser: (input) => utils.client.auth.syncSupabaseUser.mutate(input),
+            onSignedIn: async (path) => {
+              // Leave /login first (its "already authenticated" redirect would override the
+              // onboarding path), then refetch everything with the new session.
+              navigate(path, { replace: true });
+              await utils.invalidate();
+            },
+          });
+        },
+      }),
+    // navigate is stable in wouter's browser location hook; register the listeners once.
+    [],
+  );
+
+  // Already signed in at start: (re)register for push (also picks up a refreshed FCM token
+  // and the tap that cold-started the app). Fresh sign-ins register from syncSupabaseSession.
+  useEffect(() => {
+    if (isNativePlatform() && getNativeSessionToken()) void registerPushToken();
+  }, []);
+
+  return null;
+}
+
 function App() {
   const { pendingBadges, isShowing, clearBadges } = useBadgeNotifications();
+
+  // The splash is configured with launchAutoHide: false; hide it once React has rendered.
+  useEffect(() => {
+    hideSplash();
+  }, []);
 
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="dark" switchable>
         <TooltipProvider>
           <Toaster richColors position="top-center" />
+          <NativeRuntime />
           <AutoSync />
           <BadgeUnlockWatcher />
           <ScrollToTop />

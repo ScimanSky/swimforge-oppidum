@@ -32,6 +32,7 @@ import {
 import { cn } from "@/lib/utils"
 import { trpc } from "@/lib/trpc"
 import { supabase } from "@/lib/supabase"
+import { unregisterPushToken } from "@/lib/push"
 import { clearNativeSessionToken } from "@/lib/session-token"
 import { useTheme } from "@/contexts/ThemeContext"
 
@@ -502,6 +503,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const handleLogout = async () => {
     if (isLoggingOut) return
     setIsLoggingOut(true)
+    // Before the server logout: push.unregister needs the session.
+    await unregisterPushToken()
     try {
       await logoutMutation.mutateAsync()
     } catch {

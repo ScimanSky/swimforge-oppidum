@@ -1,3 +1,4 @@
+import { assetUrl } from "@/lib/asset-base";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import confetti from "canvas-confetti";
@@ -16,10 +17,12 @@ export default function BadgeUnlockNotification({ badges, onComplete }: BadgeUnl
   const currentBadge = badges[currentIndex];
   const normalizeBadgeUrl = (url: string) =>
     url.startsWith("/badges/") ? url.replace("/badges/", "/badges_new/") : url;
-  const resolvedImageUrl = currentBadge?.image_url
-    ? normalizeBadgeUrl(currentBadge.image_url)
-    : (currentBadge?.code ? getBadgeImageUrl(currentBadge.code) : "");
-  const fallbackImageUrl = "/badges_new/oppidum_member.png";
+  const resolvedImageUrl = assetUrl(
+    currentBadge?.image_url
+      ? normalizeBadgeUrl(currentBadge.image_url)
+      : (currentBadge?.code ? getBadgeImageUrl(currentBadge.code) : ""),
+  );
+  const fallbackImageUrl = assetUrl("/badges_new/oppidum_member.png");
 
   // Play celebration sound using Web Audio API
   const playCelebrationSound = () => {

@@ -1,5 +1,6 @@
 "use client"
 
+import { assetUrl } from "@/lib/asset-base";
 import AppLayout from "@/components/AppLayout"
 import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
@@ -527,7 +528,7 @@ export default function Challenges() {
                   <div className="flex flex-col md:flex-row">
                     <div className="relative h-32 w-full md:h-auto md:w-48">
                       <Image
-                        src={getClassicChallengeImage(challenge)}
+                        src={assetUrl(getClassicChallengeImage(challenge))}
                         alt={challenge.name}
                         fill
                         className="object-cover"

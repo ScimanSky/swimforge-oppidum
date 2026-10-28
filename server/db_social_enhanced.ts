@@ -25,6 +25,8 @@ import {
   communityClubMembers
 } from "../drizzle/schema"
 import { and, eq, desc, sql, gte, lte, or, isNull, inArray } from "drizzle-orm"
+import { sendPushToUser } from "./push"
+import { buildDirectMessagePush, buildNotificationPush, shouldPushNotificationType } from "./push_messages"
 
 type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>
 
@@ -342,6 +344,43 @@ export async function sendDirectMessage(params: {
   messageType?: "text" | "forward_post"
   metadata?: Record<string, unknown> | null
 }) {
+  const message = await insertDirectMessage(params)
+  pushDirectMessage(params)
+  return message
+}
+
+/**
+ * Push al destinatario di un DM (fire-and-forget: non blocca né fa fallire l'invio).
+ */
+function pushDirectMessage(params: {
+  senderId: number
+  receiverId: number
+  content: string
+  messageType?: "text" | "forward_post"
+}) {
+  if (params.senderId === params.receiverId) return
+  void (async () => {
+    const db = await getDb()
+    const sender = db
+      ? await db.execute(sql`SELECT name FROM users WHERE id = ${params.senderId} LIMIT 1`)
+      : null
+    const senderName = (sender?.rows[0] as { name?: string | null } | undefined)?.name ?? null
+    await sendPushToUser(
+      params.receiverId,
+      buildDirectMessagePush({ senderName, content: params.content, messageType: params.messageType })
+    )
+  })().catch(() => {
+    // Push is best-effort.
+  })
+}
+
+async function insertDirectMessage(params: {
+  senderId: number
+  receiverId: number
+  content: string
+  messageType?: "text" | "forward_post"
+  metadata?: Record<string, unknown> | null
+}) {
   const db = await requireDb()
   try {
     const [message] = await db
@@ -618,6 +657,29 @@ export async function getUnreadDmCount(userId: number): Promise<number> {
  * Crea una notifica
  */
 export async function createNotification(params: {
+  userId: number
+  type: string
+  title: string
+  message: string
+  link?: string
+  referenceId?: number
+  /** User who caused the notification: never pushed about their own action. */
+  actorId?: number
+}) {
+  const { actorId, ...row } = params
+  const notification = await insertNotification(row)
+  // Push only for the allowlisted types and never to the actor (fire-and-forget).
+  if (shouldPushNotificationType(row.type) && actorId !== row.userId) {
+    void Promise.resolve()
+      .then(() => sendPushToUser(row.userId, buildNotificationPush(row)))
+      .catch(() => {
+        // Push is best-effort.
+      })
+  }
+  return notification
+}
+
+async function insertNotification(params: {
   userId: number
   type: string
   title: string

@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { supabase } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
-import { setNativeSessionToken } from "@/lib/session-token";
+import { postLoginPath, syncSupabaseSession } from "@/lib/auth-sync";
 import { toast } from "sonner";
 import { Waves, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
@@ -12,28 +12,31 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export default function AuthCallback() {
   const [, navigate] = useLocation();
-  const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
+  const [status, setStatus] = useState<"loading" | "success" | "error" | "confirmed">("loading");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const syncSupabaseUserMutation = trpc.auth.syncSupabaseUser.useMutation({
-    onSuccess: (data) => {
-      console.log('[AuthCallback] syncSupabaseUser SUCCESS:', data?.user?.id);
-      if ("sessionToken" in data && typeof data.sessionToken === "string") setNativeSessionToken(data.sessionToken);
+  const utils = trpc.useUtils();
+
+  const syncWithBackend = async (session: Parameters<typeof syncSupabaseSession>[0]) => {
+    try {
+      const { isNewUser } = await syncSupabaseSession(session, (input) =>
+        utils.client.auth.syncSupabaseUser.mutate(input),
+      );
+      console.log('[AuthCallback] syncSupabaseUser SUCCESS:', session.user.id);
       setStatus("success");
       toast.success("Accesso effettuato con successo!");
       setTimeout(() => {
-        const target = data?.isNewUser ? "/settings?tab=profile&onboarding=1" : "/home";
+        const target = postLoginPath(isNewUser);
         console.log('[AuthCallback] Redirecting to:', target);
         window.location.href = target;
       }, 1000);
-    },
-    onError: (error) => {
+    } catch (error) {
       console.error('[AuthCallback] syncSupabaseUser ERROR:', error);
       setStatus("error");
-      setErrorMessage(error.message || "Errore durante la sincronizzazione");
+      setErrorMessage((error as Error)?.message || "Errore durante la sincronizzazione");
       toast.error("Errore durante l'accesso");
-    },
-  });
+    }
+  };
 
   const waitForSession = async (attempts = 8, delayMs = 250) => {
     for (let attempt = 0; attempt < attempts; attempt++) {
@@ -52,6 +55,7 @@ export default function AuthCallback() {
 
         let session = null;
         let error = null;
+        let verifierMissing = false;
 
         // 1. Check for PKCE flow (code in query params)
         const urlParams = new URLSearchParams(window.location.search);
@@ -88,6 +92,7 @@ export default function AuthCallback() {
               // Recover from race where auto-detection already consumed the verifier.
               console.warn('[AuthCallback] PKCE verifier missing, retrying session recovery');
               error = null;
+              verifierMissing = true;
               session = await waitForSession(8, 300);
             }
           }
@@ -97,6 +102,16 @@ export default function AuthCallback() {
 
         if (error) {
           throw error;
+        }
+
+        if (!session && verifierMissing) {
+          // A valid code without its PKCE verifier: typically the signup confirmation email
+          // opened in a browser other than the one (or the app) that started the signup.
+          // Supabase has already confirmed the email; ask the user to sign in where they were.
+          console.warn('[AuthCallback] Code without PKCE verifier, showing the email-confirmed message');
+          window.history.replaceState({}, document.title, "/auth/callback");
+          setStatus("confirmed");
+          return;
         }
 
         if (!session) {
@@ -117,14 +132,7 @@ export default function AuthCallback() {
         });
         
         console.log('[AuthCallback] Calling syncSupabaseUser mutation...');
-        syncSupabaseUserMutation.mutate({
-          accessToken: session.access_token,
-          user: {
-            id: session.user.id,
-            email: session.user.email!,
-            name: session.user.user_metadata?.full_name || session.user.user_metadata?.name || null,
-          },
-        });
+        await syncWithBackend(session);
       } catch (error: any) {
         setStatus("error");
         const rawMessage = error?.message || "Errore durante l'autenticazione";
@@ -174,6 +182,15 @@ export default function AuthCallback() {
           <>
             <h2 className="text-2xl font-bold text-green-400">✓ Accesso completato!</h2>
             <p className="text-slate-400">Reindirizzamento alla dashboard...</p>
+          </>
+        )}
+
+        {status === "confirmed" && (
+          <>
+            <p className="text-slate-300">Email confermata. Se stavi usando l'app, torna nell'app e accedi.</p>
+            <Link href="/login" className="inline-block text-sm font-semibold text-cyan-400 hover:underline">
+              Vai al login
+            </Link>
           </>
         )}
 

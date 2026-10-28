@@ -16,7 +16,9 @@ import { Waves, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
-import { setNativeSessionToken } from "@/lib/session-token";
+import { postLoginPath, syncSupabaseSession } from "@/lib/auth-sync";
+import { startNativeGoogleLogin } from "@/lib/native-auth";
+import { isNativePlatform } from "@/lib/platform";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import { useAuth } from "@/_core/hooks/useAuth";
 
@@ -27,6 +29,7 @@ export default function Login() {
   const [loginPassword, setLoginPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const utils = trpc.useUtils();
 
   useEffect(() => {
     if (authLoading) return;
@@ -37,20 +40,6 @@ export default function Login() {
   if (authLoading || isAuthenticated) {
     return <div className="min-h-screen bg-background" />;
   }
-
-  const syncSupabaseUserMutation = trpc.auth.syncSupabaseUser.useMutation({
-    onSuccess: (data) => {
-      if ("sessionToken" in data && typeof data.sessionToken === "string") setNativeSessionToken(data.sessionToken);
-      toast.success("Login effettuato con successo!");
-      setTimeout(() => {
-        window.location.href = data?.isNewUser ? "/settings?tab=profile&onboarding=1" : "/home";
-      }, 100);
-    },
-    onError: (error) => {
-      toast.error(error.message || "Errore durante il login");
-    },
-    onSettled: () => setIsLoading(false),
-  });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,23 +59,32 @@ export default function Login() {
       return;
     }
 
-    const user = data.user;
-    syncSupabaseUserMutation.mutate({
-      accessToken: data.session.access_token,
-      user: {
-        id: user?.id ?? "",
-        email: user?.email ?? loginEmail,
-        name:
-          user?.user_metadata?.full_name ||
-          user?.user_metadata?.name ||
-          null,
-      },
-    });
+    try {
+      const { isNewUser } = await syncSupabaseSession(
+        data.session,
+        (input) => utils.client.auth.syncSupabaseUser.mutate(input),
+        { email: loginEmail },
+      );
+      toast.success("Login effettuato con successo!");
+      setTimeout(() => {
+        window.location.href = postLoginPath(isNewUser);
+      }, 100);
+    } catch (syncError) {
+      toast.error((syncError as Error)?.message || "Errore durante il login");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleGoogleLogin = async () => {
     try {
       setIsGoogleLoading(true);
+      if (isNativePlatform()) {
+        // Custom Tab + swimforge://auth/callback, completed in native-runtime (App.tsx).
+        await startNativeGoogleLogin();
+        setIsGoogleLoading(false);
+        return;
+      }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: { redirectTo: `${window.location.origin}/auth/callback` },

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API 31+ (android:dataExtractionRules). allowBackup=false disables cloud backup but not
+     device-to-device transfer, so both are excluded explicitly: the native session token
+     lives in the CapacitorStorage shared preferences (@capacitor/preferences), the Supabase
+     session in the WebView storage. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="CapacitorStorage.xml" />
+        <exclude domain="root" path="app_webview/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="CapacitorStorage.xml" />
+        <exclude domain="root" path="app_webview/" />
+    </device-transfer>
+</data-extraction-rules>

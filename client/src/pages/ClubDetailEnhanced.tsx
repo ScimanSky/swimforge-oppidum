@@ -29,6 +29,7 @@ import ClubMembersTab from "@/components/club/ClubMembersTab";
 import EventMapEditor from "@/components/club/EventMapEditor";
 import { pointsToRouteGeojson, routeDistanceMeters, type RoutePoint } from "@/lib/club-event-map";
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
+import { publicSiteUrl } from "@/lib/public-url";
 
 async function geocodeLocation(query: string): Promise<{ lat: number; lng: number; displayName: string } | null> {
   const q = query.trim();
@@ -1458,7 +1459,7 @@ function ClubSettingsForm({
 
 function InviteRow({ invite }: { invite: any }) {
   const [copied, setCopied] = useState(false);
-  const link = `${window.location.origin}/community/invite/${invite.code}`;
+  const link = publicSiteUrl(`/community/invite/${invite.code}`);
 
   return (
     <div className="flex items-center gap-2 surface-panel p-2 text-sm">
