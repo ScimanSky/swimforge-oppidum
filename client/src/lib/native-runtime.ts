@@ -4,7 +4,7 @@ import { SplashScreen } from "@capacitor/splash-screen";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { resolveDeepLink } from "./deep-links";
 import { canGoBackInApp } from "./in-app-history";
-import { normalizePath, TODAY_PATH } from "./navigation";
+import { isPublicPath, normalizePath, TODAY_PATH } from "./navigation";
 import { isNativePlatform } from "./platform";
 import { setPushNavigate } from "./push";
 
@@ -40,12 +40,14 @@ export type BackButtonAction = "back" | "home" | "exit";
 
 /**
  * Android back button: on the native home (Oggi) close the app; elsewhere go back in the
- * history when the previous entry belongs to the app, otherwise land on Oggi (replacing the
- * current entry) instead of closing the app from a deep page.
+ * history when the previous entry belongs to the app. Without such an entry a shell page lands
+ * on Oggi (replacing the current entry) instead of closing the app from a deep page, while a
+ * public page (login, privacy…) closes the app: signed out, Oggi would bounce back to the login.
  */
 export function backButtonAction(path: string, canGoBack: boolean): BackButtonAction {
   if (normalizePath(path) === TODAY_PATH) return "exit";
-  return canGoBack ? "back" : "home";
+  if (canGoBack) return "back";
+  return isPublicPath(path) ? "exit" : "home";
 }
 
 /** Status bar follows the app theme. No-op on the web. */

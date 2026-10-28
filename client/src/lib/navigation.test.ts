@@ -3,6 +3,7 @@ import {
   activeTabForPath,
   homePathForPlatform,
   hubForPath,
+  isPublicPath,
   normalizePath,
   pageTitleForPath,
   parentPathForPath,
@@ -119,5 +120,33 @@ describe("homePathForPlatform", () => {
   it("app nativa su Oggi, sito sul Feed", () => {
     expect(homePathForPlatform(true)).toBe("/today");
     expect(homePathForPlatform(false)).toBe("/home");
+  });
+});
+
+describe("isPublicPath", () => {
+  it("riconosce le pagine pubbliche (fuori dalla shell)", () => {
+    for (const path of [
+      "/",
+      "/auth",
+      "/auth/callback",
+      "/strava/callback",
+      "/login",
+      "/login/",
+      "/login?next=/today",
+      "/register",
+      "/signup",
+      "/forgot-password",
+      "/reset-password",
+      "/privacy",
+      "/terms",
+      "/cookies",
+    ]) {
+      expect(isPublicPath(path), path).toBe(true);
+    }
+  });
+  it("le pagine della shell non sono pubbliche", () => {
+    for (const path of ["/today", "/home", "/post/7", "/track", "/profile", "/loginx", "/privacy/x"]) {
+      expect(isPublicPath(path), path).toBe(false);
+    }
   });
 });

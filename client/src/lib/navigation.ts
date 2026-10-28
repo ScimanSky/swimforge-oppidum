@@ -16,6 +16,35 @@ export const normalizePath = (location: string) => {
   return path.length > 1 ? path.replace(/\/+$/, "") || "/" : path;
 };
 
+/**
+ * Public routes, rendered outside the persistent (signed-in) shell. App.tsx builds its public
+ * <Route>s from this list; everything else goes to the shell.
+ */
+export const PUBLIC_PATHS = [
+  "/",
+  "/auth",
+  "/auth/callback",
+  "/strava/callback",
+  "/login",
+  "/register",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/privacy",
+  "/terms",
+  "/cookies",
+] as const;
+export type PublicPath = (typeof PUBLIC_PATHS)[number];
+
+/** True for the public pages (and anything under /auth/), false for the shell pages. */
+export function isPublicPath(location: string): boolean {
+  const path = normalizePath(location);
+  return (
+    (PUBLIC_PATHS as readonly string[]).includes(path) ||
+    path.startsWith("/auth/")
+  );
+}
+
 const starts =
   (...prefixes: string[]) =>
   (path: string) =>

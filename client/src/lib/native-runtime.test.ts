@@ -24,6 +24,19 @@ describe("backButtonAction", () => {
     expect(backButtonAction("/post/7", false)).toBe("home");
     expect(backButtonAction("/home", false)).toBe("home");
   });
+  // Signed out on a cold start: Oggi would 401 and reload the login page, looping.
+  it.each(["/login", "/", "/register", "/auth/callback", "/privacy", "/login/?next=1"])(
+    "exits from the public screen %s when there is no in-app history",
+    path => {
+      expect(backButtonAction(path, false)).toBe("exit");
+    },
+  );
+  it.each(["/login", "/", "/register", "/auth/callback", "/privacy"])(
+    "goes back from the public screen %s when there is in-app history",
+    path => {
+      expect(backButtonAction(path, true)).toBe("back");
+    },
+  );
 });
 
 describe("createDeepLinkHandler", () => {

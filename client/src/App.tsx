@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, type ComponentType } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
@@ -13,6 +13,7 @@ import ActivityInsightNotification from "./components/ActivityInsightNotificatio
 import PbCelebrationNotification from "./components/PbCelebrationNotification";
 import CookieBanner from "./components/CookieBanner";
 import { hideSplash, initNativeRuntime } from "./lib/native-runtime";
+import { PUBLIC_PATHS, type PublicPath } from "./lib/navigation";
 import { isNativePlatform } from "./lib/platform";
 import { registerPushToken } from "./lib/push";
 import { getNativeSessionToken } from "./lib/session-token";
@@ -33,25 +34,37 @@ const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 const OnboardingFlow = lazy(() => import("./components/onboarding/OnboardingFlow"));
 const ShellRoutes = lazy(() => import("./components/app/ShellRoutes"));
 
+const AuthRedirect = () => <Redirect to="/login" />;
+
+/** One page per public path: typed on PUBLIC_PATHS so the two cannot drift apart. */
+const PUBLIC_PAGES: Record<PublicPath, ComponentType> = {
+  "/": Home,
+  "/auth": AuthRedirect,
+  "/auth/callback": AuthCallback,
+  "/strava/callback": StravaConnect,
+  "/login": Login,
+  "/register": Register,
+  "/signup": Register,
+  "/forgot-password": ForgotPassword,
+  "/reset-password": ResetPassword,
+  "/privacy": Privacy,
+  "/terms": Terms,
+  "/cookies": CookiePolicy,
+};
+
 /** Public routes; everything else goes to the persistent shell. */
 export function AppRoutes() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center h-screen"><Spinner /></div>}>
     <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/auth">
-        <Redirect to="/login" />
-      </Route>
-      <Route path="/auth/callback" component={AuthCallback} />
-      <Route path="/strava/callback" component={StravaConnect} />
-      <Route path="/login" component={Login} />
-      <Route path="/register" component={Register} />
-      <Route path="/signup" component={Register} />
-      <Route path="/forgot-password" component={ForgotPassword} />
-      <Route path="/reset-password" component={ResetPassword} />
-      <Route path="/privacy" component={Privacy} />
-      <Route path="/terms" component={Terms} />
-      <Route path="/cookies" component={CookiePolicy} />
+      {PUBLIC_PATHS.map((path) => {
+        const Page = PUBLIC_PAGES[path];
+        return (
+          <Route key={path} path={path}>
+            <Page />
+          </Route>
+        );
+      })}
       <Route component={ShellRoutes} />
     </Switch>
     </Suspense>

@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useLocation, useSearch } from "wouter";
 
 import { trpc } from "@/lib/trpc";
-import { homePathForPlatform } from "@/lib/navigation";
+import { homePathForPlatform, isPublicPath } from "@/lib/navigation";
 import { isNativePlatform } from "@/lib/platform";
 import {
   ONBOARDING_CONSENT_TYPE,
@@ -115,23 +115,6 @@ const COACH_TOUR_STEPS: TourStep[] = [
     body: "La panoramica completa: membri, eventi, statistiche del club.",
   },
 ];
-
-const PUBLIC_PATHS = [
-  "/",
-  "/auth",
-  "/login",
-  "/register",
-  "/signup",
-  "/forgot-password",
-  "/reset-password",
-  "/privacy",
-  "/terms",
-  "/cookies",
-] as const;
-
-function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATHS.some((base) => pathname === base || pathname.startsWith(`${base}/`));
-}
 
 function getTooltipPosition(rect: DOMRect | null) {
   const viewportWidth = window.innerWidth;
