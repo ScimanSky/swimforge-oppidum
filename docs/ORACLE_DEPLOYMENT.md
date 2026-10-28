@@ -65,8 +65,10 @@ Note Gemini:
 - i progetti esistenti possono mantenere `gemini-2.5-flash` impostando `GEMINI_TEXT_MODEL=gemini-2.5-flash`; `GEMINI_MODEL`/`FORGE_LLM_MODEL` restano letti come fallback legacy.
 
 Nota CORS:
-- `ALLOWED_ORIGINS` deve mantenere per primo l'origin pubblico (es. `https://app.example.com`).
-- quando verrà rilasciata l'app Android andranno aggiunti `https://localhost,capacitor://localhost` (es. `ALLOWED_ORIGINS=https://app.example.com,https://localhost,capacitor://localhost`).
+- `ALLOWED_ORIGINS` deve mantenere per primo l'origin pubblico (es. `https://swimforge.it`): `server/db_club_meets.ts` usa la prima voce per i link nelle email.
+- l'app Android gira con origin `https://app.swimforge.it` (WebView Capacitor, stesso sito di `swimforge.it`): va aggiunta in coda, es. `ALLOWED_ORIGINS=https://swimforge.it,https://www.swimforge.it,https://app.swimforge.it`. `https://localhost` e `capacitor://localhost` non servono più.
+- le origini non ammesse ricevono `403 {"error":"origin_not_allowed"}` (warn `security:origin_not_allowed` nei log, nessuno stack); le richieste senza header `Origin` passano.
+- le risposte usano `Cross-Origin-Resource-Policy: same-site`, così l'app può caricare immagini e file statici da `https://swimforge.it`.
 
 TLS DB raccomandato:
 - target finale: `DB_SSL_REJECT_UNAUTHORIZED=true` con `DB_SSL_CA_CERT_BASE64` valorizzato

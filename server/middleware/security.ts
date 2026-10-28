@@ -13,6 +13,7 @@ import helmet from 'helmet';
 import { Request, Response, NextFunction } from 'express';
 import { createRedisStore } from '../lib/redis-rate-limit-store';
 import { logger } from "./logger";
+import { createOriginGuard, isOriginAllowed, parseAllowedOrigins } from "./origins";
 
 const log = logger.child({ component: "security" });
 
@@ -165,24 +166,13 @@ export const commentLimiter = rateLimit({
 /**
  * CORS options - Configurazione esplicita
  */
+const getAllowedOrigins = () => parseAllowedOrigins(process.env.ALLOWED_ORIGINS);
+
 export const corsOptions: cors.CorsOptions = {
   origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
-    const allowedOrigins = (
-      process.env.ALLOWED_ORIGINS || 'https://swimforge-frontend.onrender.com,https://swimforge.it,https://localhost,capacitor://localhost'
-    )
-      .split(',')
-      .map(value => value.trim())
-      .filter(Boolean);
-
-    if (!origin) {
-      // Allow missing origin only in development (same-site requests)
-      return callback(null, process.env.NODE_ENV !== "production");
-    }
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS policy: origin ${origin} not allowed`));
-    }
+    // Never raise here: disallowed origins are answered with 403 by `originGuard`
+    // (mounted before cors); `false` just omits the CORS headers.
+    callback(null, isOriginAllowed(origin, getAllowedOrigins(), process.env.NODE_ENV === "production"));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -263,6 +253,10 @@ export const helmetConfig = {
     includeSubDomains: true,
     preload: true,
   },
+  // The Android app runs at https://app.swimforge.it (Capacitor WebView) and loads
+  // images and other static files from https://swimforge.it: same-site, different
+  // origin. Helmet's default (`same-origin`) would block those embeds.
+  crossOriginResourcePolicy: { policy: 'same-site' } as const,
   noSniff: true,
   xssFilter: true,
   frameguard: { action: 'deny' },
@@ -271,6 +265,21 @@ export const helmetConfig = {
 // ============================================================================
 // CUSTOM SECURITY MIDDLEWARE
 // ============================================================================
+
+/**
+ * 403 JSON per le origini non ammesse (preflight incluso), senza stack nei log
+ */
+export const originGuard = createOriginGuard({
+  getAllowedOrigins,
+  onReject: ({ origin, method, path }) => {
+    log.warn('[SECURITY] Origin not allowed', {
+      event: "security:origin_not_allowed",
+      origin,
+      method,
+      path,
+    });
+  },
+});
 
 /**
  * Middleware per validare user agent
@@ -333,6 +342,7 @@ export function payloadSizeLimit(
 export function applySecurityMiddleware() {
   return [
     helmet(helmetConfig as any),
+    originGuard,
     cors(corsOptions),
     userAgentValidation,
     payloadSizeLimit,
@@ -360,6 +370,7 @@ export default {
   commentLimiter,
   corsOptions,
   helmetConfig,
+  originGuard,
   userAgentValidation,
   payloadSizeLimit,
   applySecurityMiddleware,
