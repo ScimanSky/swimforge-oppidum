@@ -97,7 +97,8 @@ all'app solo dopo gli App Links verificati (fase successiva).
 
 Prerequisiti una tantum: API App Distribution abilitata sul progetto `swimforge-oppidum`,
 gruppo tester `owner` con gli indirizzi dei tester, CLI Firebase autenticata
-(`npx firebase-tools login`).
+(`npx firebase-tools login`, oppure credenziali ADC di gcloud: lo script imposta da solo
+`GOOGLE_CLOUD_QUOTA_PROJECT`). Servono `JAVA_HOME` (JDK 21) e `ANDROID_HOME` nell'ambiente.
 
 ```bash
 pnpm android:distribute            # bump versionCode, build, upload al gruppo "owner"

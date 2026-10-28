@@ -25,7 +25,8 @@ const group = option("--group", "owner");
 
 function run(cmd, cmdArgs, opts = {}) {
   return new Promise((resolveRun, reject) => {
-    const child = spawn(cmd, cmdArgs, { stdio: "inherit", cwd: root, ...opts });
+    const env = { GOOGLE_CLOUD_QUOTA_PROJECT: PROJECT_ID, ...process.env };
+    const child = spawn(cmd, cmdArgs, { stdio: "inherit", cwd: root, env, ...opts });
     child.on("exit", (code) => (code === 0 ? resolveRun() : reject(new Error(`${cmd} ${cmdArgs.join(" ")} exited with ${code}`))));
     child.on("error", reject);
   });
