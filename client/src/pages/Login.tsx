@@ -19,6 +19,7 @@ import { trpc } from "@/lib/trpc";
 import { postLoginPath, syncSupabaseSession } from "@/lib/auth-sync";
 import { startNativeGoogleLogin } from "@/lib/native-auth";
 import { isNativePlatform } from "@/lib/platform";
+import { homePathForPlatform } from "@/lib/navigation";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import { useAuth } from "@/_core/hooks/useAuth";
 
@@ -34,7 +35,7 @@ export default function Login() {
   useEffect(() => {
     if (authLoading) return;
     if (!isAuthenticated) return;
-    window.location.href = "/home";
+    window.location.href = homePathForPlatform(isNativePlatform());
   }, [authLoading, isAuthenticated]);
 
   if (authLoading || isAuthenticated) {

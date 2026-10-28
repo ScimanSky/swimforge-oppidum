@@ -10,7 +10,10 @@ const state = vi.hoisted(() => ({
   calls: [] as string[],
   garminSync: vi.fn(),
   garminPending: false,
+  native: false,
 }));
+
+vi.mock("@/lib/platform", () => ({ isNativePlatform: () => state.native }));
 
 vi.mock("@/lib/trpc", () => ({
   trpc: {
@@ -96,6 +99,7 @@ describe("AppShell Corsia", () => {
     state.me = { id: 1, name: "Mario Rossi", email: "mario@example.com", role: "user" };
     state.calls = [];
     state.garminPending = false;
+    state.native = false;
     state.garminSync.mockReset();
   });
   afterEach(cleanup);
@@ -197,8 +201,7 @@ describe("AppShell Corsia", () => {
     expect(await screen.findByTestId("create-post-sheet")).toHaveTextContent("Nuovo PB!");
   });
 
-  it("menu avatar in italiano, Moderazione solo per gli admin, Esci nell'ordine di sempre", async () => {
-    state.me = { ...state.me, role: "admin" };
+  async function logoutTarget() {
     const hrefSetter = vi.fn();
     const originalLocation = window.location;
     Object.defineProperty(window, "location", {
@@ -209,20 +212,42 @@ describe("AppShell Corsia", () => {
       renderShell("/today");
       await userEvent.click(screen.getByRole("button", { name: "Menu del profilo" }));
       const menu = within(await screen.findByRole("menu"));
-      const items = menu.getAllByRole("menuitem").map(item => item.textContent?.trim());
-      expect(items).toEqual(["Profilo", "Impostazioni", "Moderazione", "Esci"]);
-
       await userEvent.click(menu.getByRole("menuitem", { name: "Esci" }));
-      await waitFor(() => expect(hrefSetter).toHaveBeenCalledWith("/"));
-      expect(state.calls).toEqual([
-        "unregisterPushToken",
-        "logout",
-        "clearNativeSessionToken",
-        "supabase.signOut",
-      ]);
+      await waitFor(() => expect(hrefSetter).toHaveBeenCalled());
+      return hrefSetter.mock.calls[0][0];
     } finally {
       Object.defineProperty(window, "location", { configurable: true, value: originalLocation });
     }
+  }
+
+  it("menu avatar in italiano, Moderazione solo per gli admin", async () => {
+    state.me = { ...state.me, role: "admin" };
+    renderShell("/today");
+    await userEvent.click(screen.getByRole("button", { name: "Menu del profilo" }));
+    const menu = within(await screen.findByRole("menu"));
+    const items = menu.getAllByRole("menuitem").map(item => item.textContent?.trim());
+    expect(items).toEqual(["Profilo", "Impostazioni", "Moderazione", "Esci"]);
+  });
+
+  it("Esci sul web: ordine di sempre, poi la landing", async () => {
+    expect(await logoutTarget()).toBe("/");
+    expect(state.calls).toEqual([
+      "unregisterPushToken",
+      "logout",
+      "clearNativeSessionToken",
+      "supabase.signOut",
+    ]);
+  });
+
+  it("Esci nell'app: direttamente al login", async () => {
+    state.native = true;
+    expect(await logoutTarget()).toBe("/login");
+    expect(state.calls).toEqual([
+      "unregisterPushToken",
+      "logout",
+      "clearNativeSessionToken",
+      "supabase.signOut",
+    ]);
   });
 
   it("menu avatar senza Moderazione per gli utenti normali", async () => {

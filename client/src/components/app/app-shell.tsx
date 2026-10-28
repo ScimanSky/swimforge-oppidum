@@ -261,7 +261,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
     localStorage.removeItem("swimforge:autoSync:dashboardReady")
     localStorage.removeItem("swimforge:autoSync:last")
-    window.location.href = "/"
+    // Native has no public landing: straight to the login, no reload through "/".
+    window.location.href = isNativePlatform() ? "/login" : "/"
   }
 
   const closeCreateMenus = () => {
@@ -296,7 +297,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex h-full items-center gap-2 px-4 md:px-6">
           <Link
             href={homePath}
-            aria-label="SwimForge, home"
+            aria-label="SwimForge, vai al feed"
             className="hidden w-[224px] shrink-0 lg:inline-flex"
           >
             <Brand />

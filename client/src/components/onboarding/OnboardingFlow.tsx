@@ -1,9 +1,11 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
 
 import { trpc } from "@/lib/trpc";
+import { homePathForPlatform } from "@/lib/navigation";
+import { isNativePlatform } from "@/lib/platform";
 import {
   ONBOARDING_CONSENT_TYPE,
   ONBOARDING_CONSENT_VERSION,
@@ -55,12 +57,12 @@ const ATHLETE_TOUR_STEPS: TourStep[] = [
     body: "Allena raccoglie attività, obiettivi, statistiche e Coach AI.",
   },
   {
-    selector: '[data-tour="challenges-list"]',
+    selector: '[data-tour="club-directory"]',
     title: "Sfide",
     body: "Le sfide sono in Community, accanto ai club e alle classifiche.",
   },
   {
-    selector: '[data-tour="ai-coach-btn"]',
+    selector: '[data-tour="track-section"]',
     title: "Coach AI",
     body: "Il tuo coach AI genera allenamenti personalizzati in secondi. Prova il primo oggi.",
   },
@@ -181,8 +183,12 @@ export default function OnboardingFlow() {
 
   const syncAttemptedRef = useRef(false);
 
-  const pathname = useMemo(() => location.split("?")[0] || "/", [location]);
-  const queryParams = useMemo(() => new URLSearchParams(location.split("?")[1] ?? ""), [location]);
+  // wouter: useLocation() is the pathname, the query string comes from useSearch().
+  const search = useSearch();
+  const pathname = location || "/";
+  const fullLocation = search ? `${pathname}?${search}` : pathname;
+  const queryParams = useMemo(() => new URLSearchParams(search), [search]);
+  const tourPath = homePathForPlatform(isNativePlatform());
 
   const forceFromQuery = queryParams.get(ONBOARDING_FORCE_QUERY_PARAM) === "1" || queryParams.get("tour") === "1";
   const shouldForce = forceFromQuery || manualRunNonce > 0;
@@ -260,7 +266,7 @@ export default function OnboardingFlow() {
   }, [canEvaluate, meQuery.data?.id, onboardingUserId, serverDone, setConsentMutation, utils.consent.list]);
 
   useEffect(() => {
-    if (!pendingTourLaunch || pathname !== "/home") return;
+    if (!pendingTourLaunch || pathname !== tourPath) return;
 
     const timer = window.setTimeout(() => {
       setCurrentStep(0);
@@ -268,12 +274,12 @@ export default function OnboardingFlow() {
       setPendingTourLaunch(false);
       setWelcomeCompleted(false);
       setManualRunNonce(0);
-      const cleanLocation = stripOnboardingParams(location);
-      if (cleanLocation !== location) setLocation(cleanLocation);
+      const cleanLocation = stripOnboardingParams(fullLocation);
+      if (cleanLocation !== fullLocation) setLocation(cleanLocation);
     }, 220);
 
     return () => window.clearTimeout(timer);
-  }, [location, pathname, pendingTourLaunch, setLocation]);
+  }, [fullLocation, pathname, pendingTourLaunch, setLocation, tourPath]);
 
   useEffect(() => {
     if (stage !== "welcome") return;
@@ -344,12 +350,12 @@ export default function OnboardingFlow() {
     setPendingTourLaunch(false);
     setResumePathAfterTour(null);
 
-    const cleanLocation = stripOnboardingParams(location);
+    const cleanLocation = stripOnboardingParams(fullLocation);
     const nextLocation =
-      targetAfterCompletion && cleanLocation.startsWith("/home")
+      targetAfterCompletion && pathname === tourPath
         ? targetAfterCompletion
         : cleanLocation;
-    if (nextLocation !== location) setLocation(nextLocation);
+    if (nextLocation !== fullLocation) setLocation(nextLocation);
 
     if (!meQuery.data?.id || serverDone) return;
 
@@ -367,20 +373,20 @@ export default function OnboardingFlow() {
 
   const startTour = () => {
     setManualRunNonce(0);
-    if (pathname !== "/home") {
-      setResumePathAfterTour(stripOnboardingParams(location));
+    if (pathname !== tourPath) {
+      setResumePathAfterTour(stripOnboardingParams(fullLocation));
       setPendingTourLaunch(true);
       setStage("hidden");
       setHighlightRect(null);
-      setLocation("/home?tour=1");
+      setLocation(`${tourPath}?tour=1`);
       return;
     }
 
     setCurrentStep(0);
     setStage("tour");
     setWelcomeCompleted(false);
-    const cleanLocation = stripOnboardingParams(location);
-    if (cleanLocation !== location) setLocation(cleanLocation);
+    const cleanLocation = stripOnboardingParams(fullLocation);
+    if (cleanLocation !== fullLocation) setLocation(cleanLocation);
   };
 
   const skipWelcome = async () => {

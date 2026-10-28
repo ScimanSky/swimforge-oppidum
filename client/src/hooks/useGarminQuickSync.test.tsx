@@ -3,24 +3,30 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
-import { GARMIN_CONNECT_PATH, useGarminQuickSync } from "./useGarminQuickSync";
+import {
+  GARMIN_CONNECT_PATH,
+  GARMIN_SYNC_TOAST_ID,
+  useGarminQuickSync,
+} from "./useGarminQuickSync";
 
 const state = vi.hoisted(() => ({
   status: undefined as { connected: boolean } | undefined,
   fetchStatus: vi.fn(),
   mutate: vi.fn(),
-  isPending: false,
   syncOptions: null as any,
   invalidateActivities: vi.fn(),
   invalidateProfile: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
+  toastLoading: vi.fn(),
+  statusOptions: null as any,
 }));
 
 vi.mock("sonner", () => ({
   toast: {
     success: (...args: any[]) => state.toastSuccess(...args),
     error: (...args: any[]) => state.toastError(...args),
+    loading: (...args: any[]) => state.toastLoading(...args),
   },
 }));
 
@@ -32,31 +38,36 @@ vi.mock("@/lib/trpc", () => ({
       profile: { get: { invalidate: state.invalidateProfile } },
     }),
     garmin: {
-      status: { useQuery: () => ({ data: state.status }) },
+      status: {
+        useQuery: (_input: unknown, options: any) => {
+          state.statusOptions = options;
+          return { data: state.status };
+        },
+      },
       sync: {
         useMutation: (options: any) => {
           state.syncOptions = options;
-          return { mutate: state.mutate, isPending: state.isPending };
+          return { mutate: state.mutate, isPending: false };
         },
       },
     },
   },
 }));
 
-function setup() {
+function setup(options?: { watchStatus?: boolean }) {
   const location = memoryLocation({ path: "/today", record: true });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <Router hook={location.hook}>{children}</Router>
   );
-  const hook = renderHook(() => useGarminQuickSync(), { wrapper });
+  const hook = renderHook(() => useGarminQuickSync(options), { wrapper });
   return { ...hook, history: location.history! };
 }
 
 describe("useGarminQuickSync", () => {
   beforeEach(() => {
     state.status = undefined;
-    state.isPending = false;
     vi.clearAllMocks();
+    state.fetchStatus.mockReset();
   });
   afterEach(cleanup);
 
@@ -95,28 +106,61 @@ describe("useGarminQuickSync", () => {
     expect(history.at(-1)).toBe("/today");
   });
 
-  it("già in corso: non riparte", async () => {
-    state.status = { connected: true };
-    state.isPending = true;
+  it("doppio tocco: una sola sincronizzazione, anche mentre verifica lo stato", async () => {
+    let resolveStatus: (value: { connected: boolean }) => void = () => {};
+    state.fetchStatus.mockReturnValue(
+      new Promise(resolve => {
+        resolveStatus = resolve;
+      })
+    );
     const { result } = setup();
+    let first!: Promise<void>;
+    let second!: Promise<void>;
+    act(() => {
+      first = result.current.sync();
+      second = result.current.sync();
+    });
+    resolveStatus({ connected: true });
+    await act(async () => {
+      await Promise.all([first, second]);
+    });
+    expect(state.fetchStatus).toHaveBeenCalledTimes(1);
+    expect(state.mutate).toHaveBeenCalledTimes(1);
+
+    // Still running: a third tap is ignored; once settled a new sync can start.
     await act(() => result.current.sync());
-    expect(state.mutate).not.toHaveBeenCalled();
+    expect(state.mutate).toHaveBeenCalledTimes(1);
+    act(() => state.syncOptions.onSettled());
+    await act(() => result.current.sync());
+    expect(state.mutate).toHaveBeenCalledTimes(2);
   });
 
-  it("esito: toast e aggiornamento di attività e profilo", () => {
-    setup();
+  it("il toast di caricamento è sostituito dall'esito con lo stesso id", async () => {
+    state.status = { connected: true };
+    const { result } = setup();
+    await act(() => result.current.sync());
+    expect(state.toastLoading).toHaveBeenCalledWith("Sincronizzazione Garmin…", { id: GARMIN_SYNC_TOAST_ID });
+
     state.syncOptions.onSuccess({ synced: 3, detectedPbs: [{}] });
-    expect(state.toastSuccess).toHaveBeenCalledWith("3 attività sincronizzate!");
+    expect(state.toastSuccess).toHaveBeenCalledWith("3 attività sincronizzate!", { id: GARMIN_SYNC_TOAST_ID });
     expect(state.toastSuccess).toHaveBeenCalledWith("Nuovi PB rilevati: 1");
     expect(state.invalidateActivities).toHaveBeenCalled();
     expect(state.invalidateProfile).toHaveBeenCalled();
 
     state.syncOptions.onSuccess({ error: "Sessione Garmin scaduta" });
-    expect(state.toastError).toHaveBeenCalledWith("Sessione Garmin scaduta");
+    expect(state.toastError).toHaveBeenCalledWith("Sessione Garmin scaduta", { id: GARMIN_SYNC_TOAST_ID });
 
     state.syncOptions.onError(new Error("boom"));
-    expect(state.toastError).toHaveBeenCalledWith(
-      "Errore nella sincronizzazione: boom"
-    );
+    expect(state.toastError).toHaveBeenCalledWith("Errore nella sincronizzazione: boom", {
+      id: GARMIN_SYNC_TOAST_ID,
+    });
+  });
+
+  it("lo stato Garmin si osserva solo dove serve", () => {
+    setup();
+    expect(state.statusOptions.enabled).toBe(false);
+    cleanup();
+    setup({ watchStatus: true });
+    expect(state.statusOptions.enabled).toBe(true);
   });
 });

@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { isNativePlatform } from "./platform";
 import { vanillaTrpc } from "./trpc-client";
 
+// A notification without a usable link opens the Feed: that is where its activity shows up.
 const FALLBACK_PATH = "/home";
 /** Must match the server's android.notification.channelId (server/push.ts). */
 export const PUSH_CHANNEL_ID = "default";

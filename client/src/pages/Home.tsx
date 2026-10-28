@@ -6,7 +6,7 @@ import { isNativePlatform } from "@/lib/platform";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Medal, Trophy, Users, Zap } from "lucide-react";
 import { useEffect } from "react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 const featureCards = [
   {
@@ -78,14 +78,15 @@ const proofShots = [
 
 export default function Home() {
   const { isAuthenticated, loading } = useAuth();
+  const [, navigate] = useLocation();
   const isNative = isNativePlatform();
 
   useEffect(() => {
     if (loading) return;
     // replace: "/" is only a switch, the back button must not return to it.
-    if (isAuthenticated) window.location.replace(homePathForPlatform(isNative));
-    else if (isNative) window.location.replace("/login"); // the public landing is web only
-  }, [isAuthenticated, isNative, loading]);
+    if (isAuthenticated) navigate(homePathForPlatform(isNative), { replace: true });
+    else if (isNative) navigate("/login", { replace: true }); // the public landing is web only
+  }, [isAuthenticated, isNative, loading, navigate]);
 
   if (loading || isAuthenticated || isNative) {
     return <div className="min-h-screen bg-background" />;

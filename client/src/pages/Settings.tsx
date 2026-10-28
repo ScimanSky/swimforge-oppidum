@@ -46,6 +46,9 @@ import { registerPushToken, unregisterPushToken } from "@/lib/push"
 import { clearNativeSessionToken } from "@/lib/session-token"
 import { UNAUTHED_ERR_MSG } from "@shared/const"
 import { ONBOARDING_FORCE_QUERY_PARAM } from "@/lib/onboarding"
+import { useSettingsTab } from "@/hooks/useSettingsTab"
+import { homePathForPlatform } from "@/lib/navigation"
+import { isNativePlatform } from "@/lib/platform"
 import { formatDistanceToNow } from "date-fns"
 import { it } from "date-fns/locale"
 import { toast } from "sonner"
@@ -203,34 +206,8 @@ const strokeOptions = [
 ]
 
 export default function Settings() {
-  const [location, setLocation] = useLocation()
-
-  const urlParams = useMemo(() => {
-    const query = location.split("?")[1] ?? ""
-    return new URLSearchParams(query)
-  }, [location])
-
-  const onboarding = urlParams.get("onboarding") === "1"
-
-  const tabFromUrl = useMemo(() => {
-    const tab = urlParams.get("tab")
-    const allowed = new Set(["profile", "connections", "notifications", "preferences", "privacy"])
-    return tab && allowed.has(tab) ? tab : "profile"
-  }, [urlParams])
-
-  const [activeTab, setActiveTab] = useState(tabFromUrl)
-
-  useEffect(() => {
-    setActiveTab(tabFromUrl)
-  }, [tabFromUrl])
-
-  const updateTabInUrl = (nextTab: string) => {
-    const basePath = location.split("?")[0] || "/settings"
-    const nextParams = new URLSearchParams(urlParams)
-    nextParams.set("tab", nextTab)
-    setActiveTab(nextTab)
-    setLocation(`${basePath}?${nextParams.toString()}`)
-  }
+  const [, setLocation] = useLocation()
+  const { activeTab, selectTab: updateTabInUrl, onboarding } = useSettingsTab()
 
   const scrollToGarminControls = () => {
     if (activeTab !== "connections") {
@@ -878,7 +855,7 @@ export default function Settings() {
                   {garminSyncMutation.isPending ? "Sincronizzazione..." : "Sincronizza Garmin"}
                 </Button>
               )}
-              <Button variant="outline-neon" onClick={() => (window.location.href = "/home")}>
+              <Button variant="outline-neon" onClick={() => (window.location.href = homePathForPlatform(isNativePlatform()))}>
                 Vai alla Home
               </Button>
             </div>
@@ -1372,7 +1349,7 @@ export default function Settings() {
                     if (typeof window !== "undefined") {
                       window.dispatchEvent(new CustomEvent("swimforge:onboarding:start"))
                     }
-                    setLocation(`/home?${ONBOARDING_FORCE_QUERY_PARAM}=1`)
+                    setLocation(`${homePathForPlatform(isNativePlatform())}?${ONBOARDING_FORCE_QUERY_PARAM}=1`)
                   }}
                 >
                   Rivedi onboarding
