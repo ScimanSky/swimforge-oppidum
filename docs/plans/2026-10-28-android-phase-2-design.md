@@ -45,21 +45,29 @@ I valori arrivano da `tokens.json`. Il tema scuro resta la classe `.dark` (defau
 | `--muted-foreground` | `#93A6B8` | `#556677` | testo secondario |
 | `--primary` | `#34C6EB` | `#34C6EB` | azione (riempimento) |
 | `--primary-foreground` | `#062030` | `#062030` | testo su azione |
-| `--action-text` (nuovo) | `#34C6EB` | `#05709E` | azione come testo/icona |
-| `--xp` (nuovo) | `#FF8B47` | `#B1490E` | XP, livello, record |
-| `--success` | `#5CD6A0` | `#147851` | successo |
-| `--destructive`, `--danger` | `#FF6B6B` | `#C33333` | errore |
-| `--ring` | `#34C6EB` | `#05709E` | focus |
+| `--action-text` (nuovo) | `#34C6EB` | `#056A96` | azione come testo/icona |
+| `--xp` (nuovo) | `#FF8B47` | `#983F0C` | XP, livello, record |
+| `--success` | `#5CD6A0` | `#116846` | successo |
+| `--destructive`, `--danger` | `#FF7B7B` | `#A62B2B` | errore |
+| `--ring` | `#34C6EB` | `#056A96` | focus |
 
-- Nel chiaro i quattro accenti come testo (azione, XP, successo, errore) sono scuriti
-  rispetto a `tokens.json` (`#0577A8`, `#C2500F`) quanto basta per superare 4.5:1 anche sul
-  fondale `#F4F7F9` e sul rialzo `#E7EDF2`, non solo sul bianco; il test di contrasto (§6) li
-  verifica.
+- Nel chiaro gli accenti come testo (azione, XP, successo, errore, avviso `#785400`, oro
+  `#74570E`) sono scuriti rispetto a `tokens.json` quanto basta per superare 4.5:1 sul
+  fondale, sulla superficie e sul rialzo, **anche dentro i chip colorati al 15%**; nel
+  scuro l'errore passa da `#FF6B6B` a `#FF7B7B` per lo stesso motivo. Il test di contrasto
+  (§6) verifica testi semplici e chip. Ogni tema dichiara `color-scheme`.
+- I token derivati (alias legacy, `--sidebar-*`, …) stanno in un blocco `:root, .dark` così
+  un sotto-albero `.dark` locale li ricalcola con i valori scuri.
+- Il tema è applicato prima del primo disegno da `client/public/theme-init.js` (script
+  esterno: la CSP vieta gli script inline), quindi niente lampo chiaro all'avvio.
 - **Alias legacy** durante la transizione: `--electric-cyan` → azione, `--electric-lime` →
   successo, `--electric-coral` → errore, `--forge-orange` → XP, `--electric-violet` →
   testo secondario. `--neon-glow`, `--neon-soft`, `--forge-glow`, `--surface-glow` diventano
   `transparent`: gli aloni spariscono ovunque senza toccare i componenti.
 - `--accent` diventa il rialzo (oggi è il lime): in shadcn `accent` è lo sfondo hover dei menu.
+  Gli usi «lime» nelle pagine passano a `xp`, `success` o testo secondario; `text-primary`
+  come testo diventa `text-action-text` (nel chiaro il riempimento `#34C6EB` non è leggibile
+  come testo).
 - Grafici: `--chart-1..5` = azione, `#2C8FB8`, `#5CD6A0`, `#FFB27A`, XP. Zone cardio:
   `--zone-1..5` = `#3D5770`, `#2C8FB8`, `#34C6EB`, `#FFB27A`, `#FF8B47`.
 - Raggi: chip 999px, controlli 12px, card 16px, hero 18px (`--radius` = 12px).

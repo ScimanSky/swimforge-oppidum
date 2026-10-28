@@ -14,11 +14,11 @@
 
 ## Regole Corsia (valgono per ogni task che tocca UI)
 
-**Colori.** Solo token: `bg-background` (fondale), `bg-card` (superficie), `bg-raised` (rialzo), `border-border`, `text-foreground`, `text-muted-foreground`, `bg-primary`/`text-primary-foreground` (azione piena), `text-action-text` (azione come testo o icona), `text-xp`/`bg-xp` (solo XP, livello, record), `text-success`, `text-danger`, `text-warning`. Vietati: hex o `rgba()` fissi nei componenti, `text-white`/`bg-black/..` (salvo velo pieno su foto e testo su `bg-destructive`), gradienti decorativi, glow (`shadow-[0_0_...]`), `backdrop-blur` su card. **Un solo accento per schermata**: l'azzurro per le azioni, l'arancio solo per XP e record, il verde solo per esiti positivi.
+**Colori.** `bg-accent` è il grigio di hover dei menu (non più lime) e `text-primary` è vietato come testo: si usa `text-action-text`. Solo token: `bg-background` (fondale), `bg-card` (superficie), `bg-raised` (rialzo), `border-border`, `text-foreground`, `text-muted-foreground`, `bg-primary`/`text-primary-foreground` (azione piena), `text-action-text` (azione come testo o icona), `text-xp`/`bg-xp` (solo XP, livello, record), `text-success`, `text-danger`, `text-warning`. Vietati: hex o `rgba()` fissi nei componenti, `text-white`/`bg-black/..` (salvo velo pieno su foto e testo su `bg-destructive`), gradienti decorativi, glow (`shadow-[0_0_...]`), `backdrop-blur` su card. **Un solo accento per schermata**: l'azzurro per le azioni, l'arancio solo per XP e record, il verde solo per esiti positivi.
 
 **Tipografia.** `font-display` (Barlow Condensed 700) solo per numeri/metriche e titoli di pagina; tutto il resto Manrope (`font-sans`, default). Minimo `text-xs` (12px): niente `text-[9px|10px|11px]` né `text-[0.6xrem]`. Etichette in minuscolo (sentence case), niente `uppercase` con `tracking-*` largo. Numeri con `tabular-nums`.
 
-**Superfici.** Card = `.surface-panel` o `rounded-2xl border border-border bg-card` (raggio 16px), padding 16px (`p-4`). Niente card dentro card con bordi doppi: dentro una card si separa con `border-t border-border` o `bg-raised`. Chip = `<Chip>` (§Task 7), pillola alta 28px.
+**Superfici.** Le classi condivise (`.surface-panel`, `.glass-panel`, …) stanno in `@layer components`: le utility sullo stesso elemento vincono, quindi `surface-panel bg-raised` funziona. Card = `.surface-panel` o `rounded-2xl border border-border bg-card` (raggio 16px), padding 16px (`p-4`). Niente card dentro card con bordi doppi: dentro una card si separa con `border-t border-border` o `bg-raised`. Chip = `<Chip>` (§Task 7), pillola alta 28px.
 
 **Foto.** Mai testo sopra una foto. Le foto di sfondo diventano miniature (48px, `rounded-xl object-cover`) o media a tutta larghezza senza testo sovrapposto.
 
@@ -129,8 +129,8 @@ describe.each(themes)("token Corsia, tema %s", (_theme, color) => {
 
   --primary: #34C6EB;
   --primary-foreground: #062030;
-  --action-text: #05709E;
-  --ring: #05709E;
+  --action-text: #056A96;
+  --ring: #056A96;
   --secondary: #E7EDF2;
   --secondary-foreground: #0D1B27;
   --muted: #E7EDF2;
@@ -138,14 +138,14 @@ describe.each(themes)("token Corsia, tema %s", (_theme, color) => {
   --accent: #E7EDF2;
   --accent-foreground: #0D1B27;
 
-  --xp: #B1490E;
-  --success: #147851;
-  --warning: #8A6100;
-  --danger: #C33333;
-  --destructive: #C33333;
+  --xp: #983F0C;
+  --success: #116846;
+  --warning: #785400;
+  --danger: #A62B2B;
+  --destructive: #A62B2B;
   --destructive-foreground: #FFFFFF;
-  --gold: #866510;
-  --gold-light: #866510;
+  --gold: #74570E;
+  --gold-light: #74570E;
 
   --chart-1: #34C6EB;
   --chart-2: #2C8FB8;
@@ -232,8 +232,8 @@ e il blocco `.dark { ... }` (righe 93-160) con:
   --xp: #FF8B47;
   --success: #5CD6A0;
   --warning: #F2C14E;
-  --danger: #FF6B6B;
-  --destructive: #FF6B6B;
+  --danger: #FF7B7B;
+  --destructive: #FF7B7B;
   --destructive-foreground: #0A1520;
   --gold: #E8B84A;
   --gold-light: #E8B84A;
@@ -254,6 +254,8 @@ Nel blocco `@theme inline` aggiungi, accanto ai `--color-*` esistenti:
   --color-zone-4: var(--zone-4);
   --color-zone-5: var(--zone-5);
 ```
+
+**Aggiornamento dopo la review (28/10):** valori del chiaro scuriti per i chip al 15% (sopra già aggiornati), `color-scheme` in entrambi i blocchi, token derivati (alias, `--sidebar-*`, `--azure: var(--primary)`) spostati in un blocco `:root, .dark`, test esteso (token dichiarati in entrambi i blocchi, `gold`, chip al 15%), `client/public/theme-init.js` per il tema prima del primo disegno.
 
 **Step 4:** `pnpm vitest run client/src/styles/corsia-contrast.test.ts` → PASS (46 casi). Poi `pnpm check && pnpm test && pnpm build` → verdi.
 
@@ -887,10 +889,10 @@ Commit `feat(ui): Corsia primitives (metric, chip, section tabs, level card, wee
 ```ts
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-const SRC = fileURLToPath(new URL("..", import.meta.url));
+// Not new URL(.., import.meta.url): under vitest/jsdom Vite rewrites it into an asset URL.
+const SRC = path.resolve(import.meta.dirname, "..");
 
 function sourceFiles(dir = SRC): string[] {
   return readdirSync(dir).flatMap((name) => {
@@ -908,6 +910,9 @@ const RULES = {
   "testo-gradiente": /neon-gradient-text|bg-clip-text/,
   "token-legacy": /electric-(?:cyan|lime|coral|violet)|forge-orange/,
   "variante-neon": /variant=["'](?:neon|outline-neon|ghost-neon)["']/,
+  "testo-primario": /(?<![\w-])text-primary(?![\w-])/,
+  "accento-lime": /\b(?:text|border|ring|from|to|via)-accent\b/,
+  "gradiente": /bg-gradient-to-|bg-\[(?:linear|radial|conic)-gradient/,
 } as const;
 type Rule = keyof typeof RULES;
 
@@ -922,6 +927,9 @@ const PENDING: Record<Rule, string[]> = {
   "testo-gradiente": [],
   "token-legacy": [],
   "variante-neon": [],
+  "testo-primario": [],
+  "accento-lime": [],
+  "gradiente": [],
 };
 
 const contents = new Map(sourceFiles().map((file) => [file, readFileSync(path.join(SRC, file), "utf8")]));
@@ -1105,7 +1113,7 @@ Per ogni task: applica le **Regole Corsia** ai file elencati e a quelli importat
 `pages/Login.tsx`, `Register.tsx`, `ForgotPassword.tsx`, `ResetPassword.tsx`, `AuthCallback.tsx`, `Settings.tsx`, `Home.tsx` (landing pubblica: stessi token, niente blob/griglie neon), `Privacy.tsx`, `Terms.tsx`, `CookiePolicy.tsx`, `NotFound.tsx`, `components/CookieBanner.tsx`, `components/onboarding/*`, `components/BadgeUnlockNotification.tsx`, `PbCelebrationNotification.tsx`, `ActivityInsightNotification.tsx`, `GarminSection.tsx`.
 
 ### Task 21: Coda
-Tutti i file ancora presenti in `PENDING` per le regole `testo-piccolo`, `alone-neon`, `maiuscolo-spaziato`, `testo-gradiente` (escluso `index.css`, che esce nel Task 22). Alla fine queste quattro liste sono vuote.
+Tutti i file ancora presenti in `PENDING` per le regole `testo-piccolo`, `alone-neon`, `maiuscolo-spaziato`, `testo-gradiente`, `testo-primario`, `accento-lime`, `gradiente`. Alla fine queste liste sono vuote (i gradienti dei grafici SVG `<linearGradient>` non rientrano nella regola).
 
 ---
 
@@ -1114,9 +1122,11 @@ Tutti i file ancora presenti in `PENDING` per le regole `testo-piccolo`, `alone-
 ### Task 22: Rinomina dei nomi legacy
 **Files:** tutto `client/src` (sostituzioni meccaniche), `client/src/index.css`, `components/ui/{button,badge}.tsx`, `variants.test.ts`.
 1. Varianti: `variant="neon"` → `variant="default"` (se il componente è `Badge`, → `variant="secondary"` o `Chip`, a seconda del contesto), `variant="outline-neon"` → `variant="outline"`, `variant="ghost-neon"` → `variant="ghost"` più `className` con `text-action-text` dove il testo era colorato. Poi elimina le varianti `neon`, `outline-neon`, `ghost-neon` da `button.tsx` e `neon` da `badge.tsx`; aggiorna `variants.test.ts`.
-2. Token: `var(--electric-cyan)` → `var(--action-text)` (o classe `text-action-text`/`border-action-text`/`bg-primary` dove è un riempimento), `--electric-lime` → `--success`, `--electric-coral` → `--danger`, `--electric-violet` → `--muted-foreground`, `--forge-orange` → `--xp`, `--forge-orange-soft` → `color-mix(in oklch, var(--xp) 16%, transparent)`, `--chip-*` → token Corsia; `--neon-*`, `--forge-glow`, `--surface-glow`: elimina gli usi. Poi elimina il blocco alias da `:root` e da `@theme inline` (`--color-neon-*`, `--color-chip-*`, `--color-surface-glow`).
-3. `.neon-gradient-text`: rimuovi la classe da tutti i JSX e la definizione da `index.css`.
-4. `PENDING` di `token-legacy`, `variante-neon` e `testo-gradiente` vuoti; `pnpm check && pnpm test && pnpm build && pnpm build:native` verdi.
+2. `client/src/components/ui/surface.tsx`: togli `hover:-translate-y-px` e `transform` dalla transizione (niente movimento al passaggio del mouse).
+3. Token: `var(--electric-cyan)` → `var(--action-text)` (o classe `text-action-text`/`border-action-text`/`bg-primary` dove è un riempimento), `--electric-lime` → `--success`, `--electric-coral` → `--danger`, `--electric-violet` → `--muted-foreground`, `--forge-orange` → `--xp`, `--forge-orange-soft` → `color-mix(in oklch, var(--xp) 16%, transparent)`, `--chip-*` → token Corsia; `--neon-*`, `--forge-glow`, `--surface-glow`: elimina gli usi. Poi elimina gli alias dal blocco `:root, .dark` e da `@theme inline` (`--color-neon-*`, `--color-chip-*`, `--color-surface-glow`).
+4. `.neon-gradient-text`: rimuovi la classe da tutti i JSX e la definizione da `index.css`.
+5. Elimina la regola `.surface-panel > * { position: relative; }` da `@layer utilities` (le decorazioni assolute nei pannelli sono state tolte dai task di pagina; verifica con grep che nessun figlio diretto di un `surface-panel` usi ancora `absolute` per decorazioni).
+6. `PENDING` di `token-legacy`, `variante-neon` e `testo-gradiente` vuoti; `pnpm check && pnpm test && pnpm build && pnpm build:native` verdi.
 Commit `refactor(ui): drop legacy neon names`.
 
 ### Task 23: Documentazione
