@@ -297,7 +297,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Link
             href={homePath}
             aria-label="SwimForge, home"
-            className="hidden w-[208px] shrink-0 lg:inline-flex"
+            className="hidden w-[224px] shrink-0 lg:inline-flex"
           >
             <Brand />
           </Link>
