@@ -87,11 +87,15 @@ I valori arrivano da `tokens.json`. Il tema scuro resta la classe `.dark` (defau
 - Nuovi primitivi in `client/src/components/corsia/`:
   - `Metric`: valore Barlow 700, unità più piccola in grigio, etichetta 12px. Varianti di
     colore: neutro, azione (passo), XP.
-  - `PageHeader`: titolo Barlow 30px, sottotitolo opzionale, azioni a destra.
   - `SectionTabs`: sotto-schede a link (sottolineatura azione sulla voce attiva), scorrevoli
     in orizzontale su schermi stretti.
   - `Chip`: neutro, XP (`+180 XP`), successo (`Record 200m`).
-  - `LevelCard`: livello, XP al prossimo livello, barra arancio, posizione in classifica.
+  - `LevelCard` e `LevelStrip`: livello, XP al prossimo livello, barra arancio (nessun nuovo
+    endpoint: la posizione in classifica resta nella pagina Classifiche).
+  - `WeekBars`, `ActivityCard`: barre della settimana e card attività condivise da Oggi,
+    Attività e Feed.
+  - Il titolo della pagina sta nell'header della shell (Barlow 26px), non in un componente
+    di pagina.
 
 ### 3.4 Date e numeri
 - `lib/format.ts`: `formatSessionDate(date)` → «lun 27 ott · 10:47», `formatDayMonth(date)` →
@@ -107,10 +111,11 @@ I valori arrivano da `tokens.json`. Il tema scuro resta la classe `.dark` (defau
 - **Barra in basso** (mobile web e app), cinque voci: **Oggi** `/today` · **Feed** `/home` ·
   **+** · **Allena** `/track` · **Community** `/home/community`. Il «+» è un pulsante pieno
   azione al centro. Voce attiva: icona e testo colore azione, nessun gradiente. Etichette
-  12px. Altezza 64px più `env(safe-area-inset-bottom)`.
+  12px. Altezza 64px.
 - Il menu «Sezioni» e la lista `quickAccessItems` a nove voci spariscono.
-- **Header:** titolo della pagina (o logo su Feed), campanella notifiche, messaggi, avatar che
-  apre `/profile`. Padding superiore `env(safe-area-inset-top)`.
+- **Header:** pulsante indietro sulle pagine di dettaglio, titolo della pagina (logo su Feed),
+  campanella notifiche, messaggi, avatar con menu: Profilo, Impostazioni, Moderazione (solo
+  admin), Esci.
 - **Desktop (≥ 1024px):** barra laterale con le stesse cinque voci (il «+» come pulsante
   «Crea») e l'avatar in fondo; niente gradienti, voce attiva con fondo rialzo.
 - **Il «+»** apre un foglio dal basso: Nuovo post, Messaggio, Bozza IA del post, Sincronizza
@@ -130,7 +135,7 @@ I valori arrivano da `tokens.json`. Il tema scuro resta la classe `.dark` (defau
 
 ### 5.1 Oggi (`/today`, nuova)
 Dall'alto:
-1. `PageHeader` «Oggi» con la data (es. «mer 29 ott»).
+1. Sotto il titolo «Oggi» dell'header, la data (es. «mer 29 ott»).
 2. **Questa settimana:** km totali (Barlow), numero di nuotate, XP della settimana in arancio,
    barre per giorno lun–dom con oggi evidenziato. Dati: `activities.list` filtrato sulla
    settimana corrente (lunedì–domenica, ora locale).
@@ -161,10 +166,10 @@ sovrapposto.
   esistenti restano, ricolorati; spariscono gli anelli decorativi e il «—» nei cerchi.
 
 ### 5.4 Allena · Obiettivi, Statistiche, Coach AI
-Pulizia (§5.7) con `PageHeader` dell'hub e `SectionTabs`; nessun cambio di funzione.
+Pulizia (§5.7) sotto l'header e le sotto-schede della shell; nessun cambio di funzione.
 
 ### 5.5 Community · Club, Classifiche, Sfide
-Pulizia con `PageHeader` «Community» e `SectionTabs`. Le pagine del singolo club ricevono
+Pulizia sotto l'header e le sotto-schede della shell. Le pagine del singolo club ricevono
 la pulizia generale.
 
 ### 5.6 Profilo (`/profile`)
@@ -193,8 +198,9 @@ a Statistiche e Impostazioni, sezione Aspetto (§3.5).
   `CreatePostSheet.mobile.test.tsx`) vengono aggiornati alle nuove etichette.
 
 ## 7. App Android
-- Safe area: barra in basso e header usano `env(safe-area-inset-*)`; il meta viewport
-  aggiunge `viewport-fit=cover`. Verifica sul Pixel 8a con navigazione a gesti.
+- Safe area: nessun `viewport-fit=cover`. Capacitor 8 (plugin SystemBars, `insetsHandling`
+  «css» di default) tiene la WebView dentro le barre di sistema, come oggi. Verifica sul
+  Pixel 8a con navigazione a gesti.
 - Build di prova dal branch con `pnpm android:distribute` (versionCode crescente) dopo ogni
   gruppo di lavoro visibile.
 
