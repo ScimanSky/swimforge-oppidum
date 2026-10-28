@@ -51,6 +51,20 @@ Migration policy:
 Optional demo seed:
 - `docs/sample-data/seed.sql`
 
+## App Android
+App Android `it.swimforge.app` (Capacitor 8) che incapsula la stessa web app. Guida completa: `docs/ANDROID_APP.md`.
+
+Prerequisiti: Node 22, JDK 21, Android SDK 36, `.env.native` (da `.env.native.example`) e `android/app/google-services.json` (progetto Firebase `swimforge-oppidum`, app `it.swimforge.app`; non versionato).
+
+```bash
+pnpm android:build   # vite build --mode native + rimozione immagini pesanti + cap sync + gradlew assembleDebug
+pnpm android:sync    # solo cap sync android
+pnpm android:open    # apre il progetto in Android Studio
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk   # APK ~20 MB
+```
+
+Nell'app l'API (`VITE_API_BASE_URL`) e le immagini pesanti (`/images`, `/profile_badges`, `/badges_new`, `/videos`, `VITE_ASSET_BASE_URL`) sono caricate da `https://swimforge.it`; l'origin del WebView e' `https://app.swimforge.it`.
+
 ## Monorepo Layout
 - `client/`: UI and pages
 - `server/`: API and business logic
@@ -60,6 +74,8 @@ Optional demo seed:
 
 ## Operations
 - Deploy guide: `DEPLOYMENT.md`
+- Deploy Oracle (produzione): `docs/ORACLE_DEPLOYMENT.md`
+- App Android: `docs/ANDROID_APP.md`
 - Self-hosting: `docs/SELF_HOST.md`
 - SwimForge 2.0 guide: `docs/SWIMFORGE_2_0_GUIDE.md`
 - Security policy: `SECURITY.md`

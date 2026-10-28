@@ -3,14 +3,28 @@
 App Android `it.swimforge.app`: la stessa web app React dentro un guscio Capacitor 8 (`android/`,
 `capacitor.config.ts`). Piano e design: `docs/plans/2026-10-27-android-phase-1*.md`.
 
+## Identità
+
+- `appId` `it.swimforge.app`, nome "SwimForge", schema deep link `swimforge://`; callback OAuth
+  esatta `swimforge://auth/callback`.
+- Origin del WebView `https://app.swimforge.it` (`server.hostname` in `capacitor.config.ts`,
+  schema https servito dal guscio); deve stare in `ALLOWED_ORIGINS` sul server.
+- L'app punta solo alla produzione (`https://swimforge.it`).
+
 ## Build
 
+- Prerequisiti: Node 22, JDK 21, Android SDK 36, `android/app/google-services.json` (Firebase
+  `swimforge-oppidum`, non versionato).
 - `.env.native` (non versionato, modello in `.env.native.example`): `VITE_API_BASE_URL` e
-  `VITE_ASSET_BASE_URL` = `https://swimforge.it` (origine assoluta), stesse
+  `VITE_ASSET_BASE_URL` = `https://swimforge.it` (origine assoluta; le immagini pesanti
+  `/images`, `/profile_badges`, `/badges_new`, `/videos` sono tolte dall'APK e caricate dal sito),
+  `VITE_PUBLIC_SITE_URL` = `https://swimforge.it` (link che escono dall'app), stesse
   `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` del web.
 - `pnpm build:native` (Vite in modalità `native` + rimozione delle cartelle pesanti caricate
   dal sito), poi `pnpm android:build` per l'APK debug
-  (`android/app/build/outputs/apk/debug/app-debug.apk`).
+  (`android/app/build/outputs/apk/debug/app-debug.apk`, ~20 MB; `adb install -r`).
+  `pnpm android:build` esegue tutti i passi (build nativa, `cap sync`, `gradlew assembleDebug`);
+  `pnpm android:sync` e `pnpm android:open` per sync e Android Studio.
 
 ## Prerequisiti esterni
 
@@ -24,8 +38,30 @@ Supabase accetta solo redirect in lista, quindi una volta per progetto:
 **Supabase Dashboard → Authentication → URL Configuration → Additional Redirect URLs →
 aggiungere `swimforge://auth/callback`.**
 
+Flusso: Custom Tab (plugin Browser) → Google → Supabase → `swimforge://auth/callback?code=…` →
+`exchangeCodeForSession` (PKCE) → sync con il server.
+
 Senza questa voce Supabase ignora il `redirectTo` e rimanda al Site URL (il sito web): il login
 Google nell'app non torna nell'app. Il login email/password non ne ha bisogno.
+
+### Link nelle email
+Conferma email e reset password puntano al sito pubblico (`VITE_PUBLIC_SITE_URL`, default
+`https://swimforge.it`), non all'app: si aprono nel browser.
+
+## Notifiche push (FCM)
+
+- Canale Android `default`. Il server invia con `firebase-admin` (`FIREBASE_SERVICE_ACCOUNT_JSON`,
+  vedi `docs/ORACLE_DEPLOYMENT.md`; migrazione `0034_add_device_tokens`).
+- Tipi: reazione, commento, menzione, `club_workout_published`, messaggi diretti, riepilogo
+  sync Garmin, nuovo record personale. Gli altri tipi restano solo in-app; l'autore dell'azione
+  non riceve la propria push.
+- Il token FCM si registra dopo il login e a ogni avvio dell'app; si deregistra al logout. I
+  token non validi sono eliminati dal server.
+- In foreground la notifica e' mostrata come toast in-app; il tap apre `data.url`.
+
+## Tasto Indietro
+
+Torna indietro nella cronologia; esce dall'app dalla home (`/home`) o se non c'e' cronologia.
 
 ## Sessione nativa
 
@@ -45,3 +81,10 @@ Google nell'app non torna nell'app. Il login email/password non ne ha bisogno.
 
 Oggi il manifest registra solo lo schema `swimforge://`; i link `https://swimforge.it` arrivano
 all'app solo dopo gli App Links verificati (fase successiva).
+
+## Limiti noti
+
+- App Links https non ancora verificati: i link del sito si aprono nel browser.
+- Collegamento Strava non disponibile nell'app (si usa il sito); rinviato a una fase successiva.
+- L'app punta solo alla produzione; nessun selettore di ambiente.
+- Solo APK debug; keystore di rilascio e Play Console sono fasi successive.

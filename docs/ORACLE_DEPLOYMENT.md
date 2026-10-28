@@ -55,7 +55,8 @@ Aggiorna `.env.oracle` con almeno:
 - Observability (opzionale): `ROLLBAR_ACCESS_TOKEN`, `DEPLOY_TARGET=oracle`, `APP_RELEASE`, `ROLLBAR_SERVER_HOST`
 - Redis policy (raccomandato esplicito): `REDIS_REQUIRED_FOR_READY=true`, `REDIS_RATE_LIMIT_MODE=memory`
 - Oracle ingress: `DOMAIN`, `ACME_EMAIL`
-- Push (app Android, opzionale): `FIREBASE_SERVICE_ACCOUNT_JSON` (base64 del JSON del service account Firebase; vuota = push disattivate con un warning all'avvio)
+- Origini: `ALLOWED_ORIGINS=https://swimforge.it,https://www.swimforge.it,https://app.swimforge.it` (origin pubblico per primo; `app.swimforge.it` e' l'origin dell'app Android)
+- Push (app Android, consigliato): `FIREBASE_SERVICE_ACCOUNT_JSON` (base64 del JSON del service account Firebase, `base64 -w0 file.json`; vuota = push disattivate con un warning all'avvio)
 
 Generazione `GARMIN_STATE_KEY`:
 ```bash
@@ -153,6 +154,8 @@ bash /home/ubuntu/projects/swimforge-oppidum/deploy/swimforge-deploy.sh
 L'immagine runtime contiene solo `node_modules`, `dist` e `package.json` (niente `drizzle/` né `drizzle.config.ts`), quindi `pnpm db:migrate` non può essere eseguito dentro il container `app`.
 Il workflow di deploy (e `deploy/swimforge-deploy.sh`) non applica mai migrazioni: vanno applicate a mano prima del deploy che le richiede (incluso il primo avvio produzione).
 
+Migrazioni recenti da applicare allo stesso modo di `0033` (obiettivi utente): `0034_add_device_tokens` (tabella `device_tokens`, necessaria alle push dell'app Android). Il deploy non migra mai: applicarla prima del merge/deploy che la richiede.
+
 Procedura standard, da un checkout fidato del repository allo stesso commit che verrà deployato:
 ```bash
 pnpm install --frozen-lockfile
@@ -205,6 +208,15 @@ Configura due monitor separati:
 Note `club-ai/tick`:
 - richiede `CLUB_AI_AUTOMATION_ENABLED=true`
 - ritorna `503` se automazione disabilitata o se non ci sono configurazioni club abilitate (per evitare falsi OK operativi)
+
+## 12) Checklist rilascio fase 1 (app Android)
+Ordine da rispettare; il merge su `main` fa partire il deploy automatico.
+1. Prima del merge, su `.env.oracle` della VM: aggiornare `ALLOWED_ORIGINS` (vedi sopra, origin pubblico per primo, `https://app.swimforge.it` incluso) e aggiungere `FIREBASE_SERVICE_ACCOUNT_JSON` (base64). L'immagine usa Node 22.
+2. Prima del merge: applicare la migrazione `0034_add_device_tokens` (sezione 8).
+3. Supabase Dashboard: `swimforge://auth/callback` tra gli "Additional Redirect URLs" (vedi `docs/ANDROID_APP.md`).
+4. Merge su `main` e attesa del deploy GitHub Actions.
+5. Controllare i log (`docker compose --env-file .env.oracle -f docker-compose.oracle.yml logs app`): deve comparire `push:enabled` e non devono comparire `security:origin_not_allowed` per l'origin dell'app.
+6. Smoke test dall'APK: login (email e Google), feed, immagini caricate, invio di un DM da un altro account con app chiusa (push ricevuta), logout.
 
 ## Troubleshooting
 - Certificati TLS non emessi:

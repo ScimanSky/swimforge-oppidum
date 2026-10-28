@@ -164,6 +164,8 @@ commit e push. Stime in giorni di lavoro effettivo con Claude Code.
   pubblicazione richiede un test chiuso con 12 tester per 14 giorni (da verificare,
   la regola cambia).
 - Gate: l'app installata sul Pixel fa login, sync Garmin, feed, DM, con push ricevuta.
+- Completata il 28/10/2026 sul branch android/phase-1 (PR). Strava in app e App Links verificati
+  sono slittati alle fasi successive (vedi `docs/ANDROID_APP.md`, limiti noti).
 
 ### Fase 2 — Nuova veste grafica (3-4 giorni, in parallelo a 0-1)
 - Base scelta: la proposta **«Corsia»** (`docs/design-proposals/claude-corsia/`, 27/10):
