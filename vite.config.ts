@@ -176,14 +176,23 @@ if (process.env.NODE_ENV !== 'production') {
   plugins.push(vitePluginManusRuntime(), vitePluginManusDebugCollector());
 }
 
-const packageJson = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, "package.json"), "utf-8")) as {
-  version?: string;
-};
+// This config is also bundled into dist/index.js (server/_core/vite.ts imports it), where
+// PROJECT_ROOT is dist/ and package.json is absent: never let a missing file crash the server.
+function readAppVersion(): string {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, "package.json"), "utf-8")) as {
+      version?: string;
+    };
+    return pkg.version ?? "dev";
+  } catch {
+    return "dev";
+  }
+}
 
 export default defineConfig({
   plugins,
   define: {
-    __APP_VERSION__: JSON.stringify(packageJson.version ?? "dev"),
+    __APP_VERSION__: JSON.stringify(readAppVersion()),
   },
   resolve: {
     alias: {
