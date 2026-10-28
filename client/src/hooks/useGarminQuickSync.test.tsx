@@ -54,6 +54,18 @@ vi.mock("@/lib/trpc", () => ({
   },
 }));
 
+function setupTwo() {
+  const location = memoryLocation({ path: "/today", record: true });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <Router hook={location.hook}>{children}</Router>
+  );
+  // The shell («Crea») and the Today screen are mounted together.
+  return renderHook(
+    () => ({ shell: useGarminQuickSync(), today: useGarminQuickSync({ watchStatus: true }) }),
+    { wrapper }
+  );
+}
+
 function setup(options?: { watchStatus?: boolean }) {
   const location = memoryLocation({ path: "/today", record: true });
   const wrapper = ({ children }: { children: ReactNode }) => (
@@ -69,7 +81,11 @@ describe("useGarminQuickSync", () => {
     vi.clearAllMocks();
     state.fetchStatus.mockReset();
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    // The in-flight guard is module-level: settle whatever a test left running.
+    if (state.syncOptions) act(() => state.syncOptions.onSettled());
+    cleanup();
+  });
 
   it("collegato: sincronizza gli ultimi 7 giorni", async () => {
     state.status = { connected: true };
@@ -132,6 +148,27 @@ describe("useGarminQuickSync", () => {
     expect(state.mutate).toHaveBeenCalledTimes(1);
     act(() => state.syncOptions.onSettled());
     await act(() => result.current.sync());
+    expect(state.mutate).toHaveBeenCalledTimes(2);
+  });
+
+  it("due istanze (shell e Oggi): una sola sincronizzazione e stato condiviso", async () => {
+    state.status = { connected: true };
+    const { result } = setupTwo();
+    await act(async () => {
+      await Promise.all([result.current.shell.sync(), result.current.today.sync()]);
+    });
+    expect(state.mutate).toHaveBeenCalledTimes(1);
+    // Started from one instance, shown as syncing by both.
+    expect(result.current.shell.isPending).toBe(true);
+    expect(result.current.today.isPending).toBe(true);
+
+    await act(() => result.current.today.sync());
+    expect(state.mutate).toHaveBeenCalledTimes(1);
+
+    act(() => state.syncOptions.onSettled());
+    expect(result.current.shell.isPending).toBe(false);
+    expect(result.current.today.isPending).toBe(false);
+    await act(() => result.current.today.sync());
     expect(state.mutate).toHaveBeenCalledTimes(2);
   });
 

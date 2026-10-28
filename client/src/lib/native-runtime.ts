@@ -11,7 +11,7 @@ import { setPushNavigate } from "./push";
 export type NativeAuthCallback = { code: string | null; error: string | null };
 
 export type NativeRuntimeOptions = {
-  navigate: (path: string) => void;
+  navigate: (path: string, options?: { replace?: boolean }) => void;
   onAuthCallback: (callback: NativeAuthCallback) => unknown;
 };
 
@@ -36,12 +36,16 @@ export function claimLaunchUrl(url: string): boolean {
   return true;
 }
 
+export type BackButtonAction = "back" | "home" | "exit";
+
 /**
- * Android back button: go back in the WebView history when there is somewhere to go and we
- * are not on the native home (Oggi); otherwise close the app.
+ * Android back button: on the native home (Oggi) close the app; elsewhere go back in the
+ * history when the previous entry belongs to the app, otherwise land on Oggi (replacing the
+ * current entry) instead of closing the app from a deep page.
  */
-export function shouldExitOnBack(path: string, canGoBack: boolean): boolean {
-  return !canGoBack || normalizePath(path) === TODAY_PATH;
+export function backButtonAction(path: string, canGoBack: boolean): BackButtonAction {
+  if (normalizePath(path) === TODAY_PATH) return "exit";
+  return canGoBack ? "back" : "home";
 }
 
 /** Status bar follows the app theme. No-op on the web. */
@@ -99,11 +103,10 @@ export function initNativeRuntime(options: NativeRuntimeOptions): () => void {
     App.addListener("backButton", ({ canGoBack }) => {
       // Only entries created by the app: never back to the login page or a pre-app entry.
       const canGoBackInHistory = canGoBack !== false && canGoBackInApp();
-      if (shouldExitOnBack(window.location.pathname, canGoBackInHistory)) {
-        App.exitApp().catch(() => {});
-      } else {
-        window.history.back();
-      }
+      const action = backButtonAction(window.location.pathname, canGoBackInHistory);
+      if (action === "exit") App.exitApp().catch(() => {});
+      else if (action === "back") window.history.back();
+      else options.navigate(TODAY_PATH, { replace: true });
     }),
     App.addListener("appUrlOpen", ({ url }) => {
       handleUrl(url);

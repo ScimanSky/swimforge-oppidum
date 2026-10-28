@@ -168,6 +168,15 @@ describe("AppShell Corsia", () => {
     expect(screen.queryByRole("navigation", { name: /^Sezioni di/ })).not.toBeInTheDocument();
   });
 
+  it("il marchio porta alla home della piattaforma: feed sul web, Oggi nell'app", () => {
+    renderShell("/track");
+    expect(screen.getByRole("link", { name: "SwimForge, vai al feed" })).toHaveAttribute("href", "/home");
+    cleanup();
+    state.native = true;
+    renderShell("/track");
+    expect(screen.getByRole("link", { name: "SwimForge, vai a Oggi" })).toHaveAttribute("href", "/today");
+  });
+
   it("su /today: Oggi attiva, titolo Oggi", () => {
     renderShell("/today");
     expect(within(bottomBar()).getByRole("link", { name: "Oggi" })).toHaveAttribute("aria-current", "page");

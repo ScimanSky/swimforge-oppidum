@@ -2,7 +2,7 @@ import { Link, useLocation } from "wouter"
 import { ChevronDown, ChevronLeft, Droplet, LogOut, Settings, Shield, User } from "lucide-react"
 
 import { canGoBackInApp } from "@/lib/in-app-history"
-import { FEED_PATH, normalizePath, pageTitleForPath, parentPathForPath } from "@/lib/navigation"
+import { FEED_PATH, TODAY_PATH, normalizePath, pageTitleForPath, parentPathForPath } from "@/lib/navigation"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -60,7 +60,10 @@ export function ShellHeader({ homePath, profileLabel, avatarUrl, isAdmin, isLogg
     <header className="fixed inset-x-0 top-0 z-50 h-16 border-b border-border bg-background">
       <div className="flex h-full items-center gap-2 px-4 md:px-6">
         {/* Desktop: brand above the rail (224px + gap + gutter = rail width + gutter). */}
-        <Link href={homePath} aria-label="SwimForge, vai al feed" className="hidden w-[224px] shrink-0 lg:inline-flex">
+        <Link
+          href={homePath}
+          aria-label={homePath === TODAY_PATH ? "SwimForge, vai a Oggi" : "SwimForge, vai al feed"}
+          className="hidden w-[224px] shrink-0 lg:inline-flex">
           <Brand />
         </Link>
 

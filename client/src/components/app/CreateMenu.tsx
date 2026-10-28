@@ -9,6 +9,8 @@ export const AI_POST_DRAFT =
   "Bozza IA:\n\nAllenamento completato oggi. Ecco i punti chiave:\n- Sensazioni in acqua:\n- Metrica migliore:\n- Cosa migliorare nella prossima sessione:\n\n#swimforge #training"
 
 export type CreateAction = "post" | "ai-post" | "garmin"
+/** Actions that open another dialog: focus must not go back to «+» when the sheet closes. */
+const OPENS_DIALOG: ReadonlySet<CreateAction> = new Set<CreateAction>(["post", "ai-post"])
 type CreateItem = { label: string; icon: LucideIcon } & ({ href: string } | { action: CreateAction })
 
 const CREATE_ITEMS: CreateItem[] = [
@@ -72,16 +74,30 @@ function CreateMenuList({
  * focus back to the trigger). `children` is the trigger, the «+» of the bottom bar.
  */
 export function CreateSheet({ children, onAction, isGarminSyncing, open, onOpenChange }: CreateMenuProps & { children: ReactNode }) {
+  // Set when the chosen action opens another dialog: that dialog takes the focus, not «+».
+  const keepFocusAwayRef = useRef(false)
+  const runAction = (action: CreateAction) => {
+    keepFocusAwayRef.current = OPENS_DIALOG.has(action)
+    onAction(action)
+  }
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetTrigger asChild>{children}</SheetTrigger>
       <SheetContent
         side="bottom"
         aria-describedby={undefined}
+        onOpenAutoFocus={() => {
+          keepFocusAwayRef.current = false
+        }}
+        onCloseAutoFocus={(event) => {
+          if (!keepFocusAwayRef.current) return
+          keepFocusAwayRef.current = false
+          event.preventDefault()
+        }}
         className="gap-0 rounded-t-2xl border-border bg-card p-2 pb-4 shadow-none"
       >
         <SheetTitle className="px-3 py-2 text-sm font-semibold text-muted-foreground">Crea</SheetTitle>
-        <CreateMenuList onAction={onAction} onNavigate={() => onOpenChange(false)} isGarminSyncing={isGarminSyncing} />
+        <CreateMenuList onAction={runAction} onNavigate={() => onOpenChange(false)} isGarminSyncing={isGarminSyncing} />
       </SheetContent>
     </Sheet>
   )

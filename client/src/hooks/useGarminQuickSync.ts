@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
@@ -7,6 +7,25 @@ export const GARMIN_CONNECT_PATH = "/settings?tab=connections";
 /** One toast for the whole sync: the loading toast is replaced by the outcome. */
 export const GARMIN_SYNC_TOAST_ID = "garmin-quick-sync";
 const QUICK_SYNC_DAYS = 7;
+
+/**
+ * Shared by every instance of the hook (the «Crea» sheet in the shell and the Today button
+ * are mounted together): `inFlight` covers the status check and the mutation, so only one
+ * sync can start; `syncing` is the mutation itself, shown as «Sincronizzazione…» everywhere.
+ */
+const syncState = { inFlight: false, syncing: false };
+const listeners = new Set<() => void>();
+const setSyncState = (next: Partial<typeof syncState>) => {
+  Object.assign(syncState, next);
+  listeners.forEach(listener => listener());
+};
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+};
+const getSyncing = () => syncState.syncing;
 
 type GarminSyncResult = {
   synced?: number;
@@ -25,7 +44,7 @@ export function useGarminQuickSync({
 }: { watchStatus?: boolean } = {}) {
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
-  const inFlightRef = useRef(false);
+  const sharedSyncing = useSyncExternalStore(subscribe, getSyncing, getSyncing);
   const statusQuery = trpc.garmin.status.useQuery(undefined, {
     staleTime: 300_000,
     enabled: watchStatus,
@@ -51,7 +70,7 @@ export function useGarminQuickSync({
       });
     },
     onSettled: () => {
-      inFlightRef.current = false;
+      setSyncState({ inFlight: false, syncing: false });
     },
   });
 
@@ -60,26 +79,27 @@ export function useGarminQuickSync({
 
   const sync = useCallback(async () => {
     // Covers the status check and the mutation: a double tap starts one sync.
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
+    if (syncState.inFlight) return;
+    setSyncState({ inFlight: true });
     let isConnected = connected;
     if (isConnected === undefined) {
       try {
         isConnected = (await utils.garmin.status.fetch()).connected;
       } catch {
-        inFlightRef.current = false;
+        setSyncState({ inFlight: false });
         toast.error("Non riesco a verificare il collegamento Garmin");
         return;
       }
     }
     if (!isConnected) {
-      inFlightRef.current = false;
+      setSyncState({ inFlight: false });
       navigate(GARMIN_CONNECT_PATH);
       return;
     }
     toast.loading("Sincronizzazione Garmin…", { id: GARMIN_SYNC_TOAST_ID });
+    setSyncState({ syncing: true });
     mutate({ daysBack: QUICK_SYNC_DAYS });
   }, [connected, mutate, navigate, utils]);
 
-  return { sync, isPending: syncMutation.isPending, connected };
+  return { sync, isPending: syncMutation.isPending || sharedSyncing, connected };
 }

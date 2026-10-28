@@ -3,24 +3,26 @@ import { StatusBar } from "@capacitor/status-bar";
 import {
   createDeepLinkHandler,
   NATIVE_THEME_COLORS,
-  shouldExitOnBack,
+  backButtonAction,
   syncNativeStatusBar,
 } from "./native-runtime";
 
-describe("shouldExitOnBack", () => {
-  it("goes back when there is history and we are not on the home", () => {
-    expect(shouldExitOnBack("/post/7", true)).toBe(false);
-    expect(shouldExitOnBack("/home/messages", true)).toBe(false);
+describe("backButtonAction", () => {
+  it("goes back when there is in-app history and we are not on the home", () => {
+    expect(backButtonAction("/post/7", true)).toBe("back");
+    expect(backButtonAction("/home/messages", true)).toBe("back");
   });
-  it("exits on the native home (Oggi) even with history", () => {
-    expect(shouldExitOnBack("/today", true)).toBe(true);
-    expect(shouldExitOnBack("/today/", true)).toBe(true);
+  it("exits on the native home (Oggi), with or without history", () => {
+    expect(backButtonAction("/today", true)).toBe("exit");
+    expect(backButtonAction("/today/", true)).toBe("exit");
+    expect(backButtonAction("/today", false)).toBe("exit");
   });
   it("goes back from the feed when there is history (it is not the native home)", () => {
-    expect(shouldExitOnBack("/home", true)).toBe(false);
+    expect(backButtonAction("/home", true)).toBe("back");
   });
-  it("exits when there is nowhere to go back to", () => {
-    expect(shouldExitOnBack("/post/7", false)).toBe(true);
+  it("lands on Oggi instead of exiting when there is nowhere to go back to", () => {
+    expect(backButtonAction("/post/7", false)).toBe("home");
+    expect(backButtonAction("/home", false)).toBe("home");
   });
 });
 
@@ -187,25 +189,42 @@ describe("Android back button", () => {
     runtimeMocks.listeners.length = 0;
     window.history.replaceState(state, "", path);
     const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
-    const cleanup = initNativeRuntime({ navigate: vi.fn(), onAuthCallback: vi.fn() });
+    const navigate = vi.fn();
+    const cleanup = initNativeRuntime({ navigate, onAuthCallback: vi.fn() });
     await flush();
     runtimeMocks.listeners.find((l) => l.event === "backButton")?.cb({ canGoBack });
     cleanup();
-    const result = { exited: vi.mocked(App.exitApp).mock.calls.length > 0, wentBack: back.mock.calls.length > 0 };
+    const result = {
+      exited: vi.mocked(App.exitApp).mock.calls.length > 0,
+      wentBack: back.mock.calls.length > 0,
+      navigated: navigate.mock.calls,
+    };
     back.mockRestore();
     return result;
   }
 
   it("goes back when the previous entry belongs to the app", async () => {
-    expect(await pressBack({ sfIdx: 2 }, "/track/4")).toEqual({ exited: false, wentBack: true });
+    expect(await pressBack({ sfIdx: 2 }, "/track/4")).toEqual({ exited: false, wentBack: true, navigated: [] });
   });
 
-  it("exits when the previous entry is not the app's (e.g. the login page before a reload)", async () => {
-    expect(await pressBack({ sfIdx: 0 }, "/track/4")).toEqual({ exited: true, wentBack: false });
+  it("lands on Oggi (replace) when the previous entry is not the app's (e.g. the login page before a reload)", async () => {
+    expect(await pressBack({ sfIdx: 0 }, "/track/4")).toEqual({
+      exited: false,
+      wentBack: false,
+      navigated: [["/today", { replace: true }]],
+    });
   });
 
-  it("exits on Oggi and when the WebView has nothing behind", async () => {
-    expect(await pressBack({ sfIdx: 3 }, "/today")).toEqual({ exited: true, wentBack: false });
-    expect(await pressBack({ sfIdx: 3 }, "/track/4", false)).toEqual({ exited: true, wentBack: false });
+  it("lands on Oggi when the WebView has nothing behind a deep page", async () => {
+    expect(await pressBack({ sfIdx: 3 }, "/track/4", false)).toEqual({
+      exited: false,
+      wentBack: false,
+      navigated: [["/today", { replace: true }]],
+    });
+  });
+
+  it("exits on Oggi, with or without history behind", async () => {
+    expect(await pressBack({ sfIdx: 3 }, "/today")).toEqual({ exited: true, wentBack: false, navigated: [] });
+    expect(await pressBack({ sfIdx: 0 }, "/today", false)).toEqual({ exited: true, wentBack: false, navigated: [] });
   });
 });
