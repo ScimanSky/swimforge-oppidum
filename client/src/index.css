@@ -132,8 +132,8 @@ body,
 }
 
 @theme inline {
-  --font-sans: "Manrope", "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
-  --font-display: "Rajdhani", "Barlow Condensed", "Manrope", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Manrope", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Barlow Condensed", "Manrope", "Segoe UI", Arial, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -200,7 +200,9 @@ body,
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: 15px;
+    line-height: 1.5;
   }
 }
 

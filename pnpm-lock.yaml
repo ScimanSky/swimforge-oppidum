@@ -65,6 +65,12 @@ importers:
       '@capacitor/status-bar':
         specifier: 8.0.4
         version: 8.0.4(@capacitor/core@8.5.3)
+      '@fontsource/barlow-condensed':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/manrope':
+        specifier: 5.3.0
+        version: 5.3.0
       '@google/genai':
         specifier: ^1.42.0
         version: 1.42.0
@@ -1185,6 +1191,12 @@ packages:
 
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
+
+  '@fontsource/barlow-condensed@5.3.0':
+    resolution: {integrity: sha512-RA7MmIx0v3eQ6Gcf74qLVLOwLB0GpPOzx+eU9iG/AmCnSJGcIWYeU8y6CEMGZ210MGwGg5CZhzLkkvyZdTTk1g==}
+
+  '@fontsource/manrope@5.3.0':
+    resolution: {integrity: sha512-obJ1Dv3+uCA6HlHgW8u4BGYxJR9In2HW7gjJhlflEvkrj1X1iSEwu0fToL+JYGC/FEKFfIz1sBuPduvcL2gIAA==}
 
   '@gerrit0/mini-shiki@3.22.0':
     resolution: {integrity: sha512-jMpciqEVUBKE1QwU64S4saNMzpsSza6diNCk4MWAeCxO2+LFi2FIFmL2S0VDLzEJCxuvCbU783xi8Hp/gkM5CQ==}
@@ -6924,6 +6936,10 @@ snapshots:
       react-dom: 19.2.1(react@19.2.1)
 
   '@floating-ui/utils@0.2.10': {}
+
+  '@fontsource/barlow-condensed@5.3.0': {}
+
+  '@fontsource/manrope@5.3.0': {}
 
   '@gerrit0/mini-shiki@3.22.0':
     dependencies:
