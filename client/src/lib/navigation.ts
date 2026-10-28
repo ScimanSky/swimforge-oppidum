@@ -13,7 +13,7 @@ export const FEED_PATH = "/home";
 /** Path without query, hash and trailing slash ("/" stays "/"). */
 export const normalizePath = (location: string) => {
   const path = location.split("?")[0].split("#")[0] || "/";
-  return path.length > 1 ? path.replace(/\/+$/, "") : path;
+  return path.length > 1 ? path.replace(/\/+$/, "") || "/" : path;
 };
 
 const starts =
@@ -24,6 +24,7 @@ const starts =
     );
 
 const isToday = starts(TODAY_PATH);
+const isReport = starts("/home/report/post", "/report/post");
 const isFeed = (path: string) =>
   path === FEED_PATH || starts("/post", "/home/report", "/report/post")(path);
 const isTrain = starts(
@@ -126,6 +127,7 @@ const TITLES: Array<[(path: string) => boolean, string]> = [
   [isToday, "Oggi"],
   [path => path === FEED_PATH, "Feed"],
   [starts("/post"), "Post"],
+  [isReport, "Segnala"],
   [starts("/track", "/activities"), "Allena"],
   [path => hubForPath(path) === "train", "Allena"],
   [path => /^\/challenges\/[^/]+$/.test(path), "Sfida"],
@@ -151,13 +153,20 @@ export function parentPathForPath(location: string): string | null {
   const path = normalizePath(location);
   if (/^\/track\/[^/]+$/.test(path)) return "/track";
   if (/^\/post\/[^/]+$/.test(path)) return FEED_PATH;
+  const report = /^(?:\/home)?\/report\/post\/([^/]+)$/.exec(path);
+  if (report) return `/post/${report[1]}`;
   if (/^\/challenges\/[^/]+$/.test(path)) return "/challenges";
+  // Club sub-pages one level deeper go back to their list (workout → workouts, program → meet).
+  if (/^\/community\/club\/[^/]+\/workouts\/[^/]+$/.test(path))
+    return path.split("/").slice(0, 5).join("/");
+  if (/^\/community\/club\/[^/]+\/meet\/[^/]+\/program$/.test(path))
+    return path.split("/").slice(0, 6).join("/");
   if (/^\/community\/club\/[^/]+\/.+/.test(path))
     return path.split("/").slice(0, 4).join("/");
   if (/^\/community\/(?:club|invite)\/[^/]+$/.test(path))
     return "/home/community";
-  if (/^\/u\/[^/]+$/.test(path) || path === "/badges" || path === "/settings")
-    return "/profile";
+  if (/^\/u\/[^/]+$/.test(path)) return FEED_PATH; // public profiles are reached from the feed
+  if (path === "/badges" || path === "/settings") return "/profile";
   return null;
 }
 

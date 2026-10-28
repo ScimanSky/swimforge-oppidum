@@ -15,6 +15,8 @@ describe("normalizePath", () => {
     expect(normalizePath("/")).toBe("/");
     expect(normalizePath("")).toBe("/");
     expect(normalizePath("?x=1")).toBe("/");
+    expect(normalizePath("//")).toBe("/");
+    expect(normalizePath("///?x=1")).toBe("/");
   });
 });
 
@@ -80,6 +82,7 @@ describe("pageTitleForPath", () => {
     ["/settings", "Impostazioni"],
     ["/messages", "Messaggi"],
     ["/admin/reports", "Moderazione"],
+    ["/home/report/post/5", "Segnala"],
   ])("%s → %s", (path, title) => {
     expect(pageTitleForPath(path)).toBe(title);
   });
@@ -95,8 +98,14 @@ describe("parentPathForPath", () => {
     ["/post/9", "/home"],
     ["/challenges/2", "/challenges"],
     ["/community/club/3/workouts", "/community/club/3"],
+    ["/community/club/3/workouts/9", "/community/club/3/workouts"],
+    ["/community/club/3/meet/4", "/community/club/3"],
+    ["/community/club/3/meet/4/program", "/community/club/3/meet/4"],
     ["/community/club/3", "/home/community"],
-    ["/u/8", "/profile"],
+    ["/home/report/post/5", "/post/5"],
+    ["/u/8", "/home"],
+    ["/badges", "/profile"],
+    ["/settings", "/profile"],
     ["/home", null],
     ["/today", null],
     ["/track", null],
