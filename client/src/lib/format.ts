@@ -1,6 +1,58 @@
+type DateInput = string | Date
+const toDate = (value: DateInput) => (value instanceof Date ? value : new Date(value))
+const weekdayFmt = new Intl.DateTimeFormat("it-IT", { weekday: "short" })
+const dayMonthFmt = new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "short" })
+const timeFmt = new Intl.DateTimeFormat("it-IT", { hour: "2-digit", minute: "2-digit" })
+const kmFmt = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 })
+
+/** «lun 26 ott · 10:47» */
+export const formatSessionDate = (value: DateInput) => {
+  const date = toDate(value)
+  return `${weekdayFmt.format(date)} ${dayMonthFmt.format(date)} · ${timeFmt.format(date)}`
+}
+
+/** «26 ott» */
+export const formatDayMonth = (value: DateInput) => dayMonthFmt.format(toDate(value))
+
+/** «lun 26 ott» */
+export const formatWeekdayDayMonth = (value: DateInput) => {
+  const date = toDate(value)
+  return `${weekdayFmt.format(date)} ${dayMonthFmt.format(date)}`
+}
+
+/** Kilometres with Italian decimal comma, no unit: 3200 → «3,2». */
+export const formatKm = (meters: number) => kmFmt.format(Math.round(meters / 100) / 10)
+
 export const formatDistance = (meters?: number | null) => {
   if (!meters) return "—"
-  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`
+  return meters >= 1000 ? `${formatKm(meters)} km` : `${Math.round(meters)} m`
+}
+
+/** 3720 s → { value: "1:02", unit: "h" }; 3000 s → { value: "50", unit: "min" }; 0 → null. */
+export const formatDurationParts = (
+  seconds?: number | null
+): { value: string; unit: string } | null => {
+  if (!seconds || seconds <= 0) return null
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return { value: String(minutes), unit: "min" }
+  return { value: `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, "0")}`, unit: "h" }
+}
+
+/** Seconds per 100 m → «1:52». */
+export const formatPaceValue = (secondsPer100m: number) => {
+  const total = Math.round(secondsPer100m)
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`
+}
+
+/** Stored pace when present, otherwise duration / (distance / 100); null without distance. */
+export const paceSecondsPer100m = (activity: {
+  avgPacePer100m?: number | null
+  distanceMeters?: number | null
+  durationSeconds?: number | null
+}) => {
+  if (activity.avgPacePer100m && activity.avgPacePer100m > 0) return activity.avgPacePer100m
+  if (!activity.distanceMeters || activity.distanceMeters <= 0 || !activity.durationSeconds) return null
+  return activity.durationSeconds / (activity.distanceMeters / 100)
 }
 
 export const formatDuration = (seconds?: number | null) => {
