@@ -88,3 +88,20 @@ all'app solo dopo gli App Links verificati (fase successiva).
 - Collegamento Strava non disponibile nell'app (si usa il sito); rinviato a una fase successiva.
 - L'app punta solo alla produzione; nessun selettore di ambiente.
 - Solo APK debug; keystore di rilascio e Play Console sono fasi successive.
+
+## Distribuzione ai tester (Firebase App Distribution)
+
+Prerequisiti una tantum: API App Distribution abilitata sul progetto `swimforge-oppidum`,
+gruppo tester `owner` con gli indirizzi dei tester, CLI Firebase autenticata
+(`npx firebase-tools login`).
+
+```bash
+pnpm android:distribute            # bump versionCode, build, upload al gruppo "owner"
+pnpm android:distribute -- --no-build   # carica l'APK già compilato
+pnpm android:distribute -- --group beta --notes "testo note"
+```
+
+Lo script incrementa `versionCode` in `android/app/build.gradle` (il `versionName` diventa
+`<versione package.json>.<versionCode>`), compila l'APK di debug, lo carica e manda ai
+tester l'email con il link. Sul telefono i tester installano l'app "App Tester" di Firebase
+o aprono il link dall'email. Committare il bump di versione insieme al rilascio.
