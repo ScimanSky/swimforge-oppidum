@@ -345,7 +345,7 @@ export default function ClubEventDetail() {
                     href={buildOsmMapLink(eventLat, eventLng)}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                    className="inline-flex items-center gap-1 text-sm text-action-text hover:underline"
                   >
                     <ExternalLink className="h-4 w-4" />
                     Apri mappa completa

@@ -128,7 +128,7 @@ export default function ForgotPassword() {
               {!isSent && (
                 <p className="text-center text-sm text-muted-foreground mt-6">
                   Ricordi la password?{" "}
-                  <Link href="/login" className="text-primary hover:underline">
+                  <Link href="/login" className="text-action-text hover:underline">
                     Accedi
                   </Link>
                 </p>

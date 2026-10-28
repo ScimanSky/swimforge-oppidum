@@ -220,7 +220,7 @@ function BadgeCard({ title, description, imageUrl, unlocked, rarity }: BadgeCard
           imageUrl ? (
             <img src={assetUrl(imageUrl)} alt={title} className="size-9 object-contain" />
           ) : (
-            <Waves className="size-5 text-primary" />
+            <Waves className="size-5 text-action-text" />
           )
         ) : (
           <span className="text-lg font-semibold text-muted-foreground">?</span>
@@ -256,9 +256,9 @@ function ActivityItem({ type, date, duration, distance, pace }: ActivityItemProp
       <div className="flex items-center gap-3">
         <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
           {type === "Piscina" ? (
-            <Waves className="size-5 text-primary" />
+            <Waves className="size-5 text-action-text" />
           ) : (
-            <Droplets className="size-5 text-primary" />
+            <Droplets className="size-5 text-action-text" />
           )}
         </div>
         <div>
@@ -515,7 +515,7 @@ export default function Profile() {
                         Livello {profile?.level ?? 1}
                       </Badge>
                       {profile?.profileBadge?.name && (
-                        <Badge variant="outline" className="border-primary/40 text-primary">
+                        <Badge variant="outline" className="border-primary/40 text-action-text">
                           {profile.profileBadge.name}
                         </Badge>
                       )}
@@ -640,7 +640,7 @@ export default function Profile() {
                         {Number(row.poolLengthMeters)}m
                       </Badge>
                     </div>
-                    <p className="mt-1 font-display text-lg font-bold text-primary">
+                    <p className="mt-1 font-display text-lg font-bold text-action-text">
                       {formatSwimCentiseconds(row.timeCs)}
                     </p>
                     <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">

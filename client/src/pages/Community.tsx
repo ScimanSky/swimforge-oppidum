@@ -245,7 +245,7 @@ export default function Community() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="inline-flex items-center gap-2 rounded-xl border border-border/80 bg-background/60 px-3 py-1 text-xs text-muted-foreground">
-                    <Sparkles className="size-4 text-primary" />
+                    <Sparkles className="size-4 text-action-text" />
                     Club Hub
                   </div>
                   <h1 className="mt-1 text-xl font-display font-bold neon-gradient-text sm:text-2xl">Club</h1>
@@ -406,7 +406,7 @@ export default function Community() {
                         : "Pubblico"}
                     </Badge>
                     {club.is_member ? (
-                      <Badge className="absolute right-3 top-3 bg-primary/20 text-primary border border-primary/35">
+                      <Badge className="absolute right-3 top-3 bg-primary/20 text-action-text border border-primary/35">
                         Membro
                       </Badge>
                     ) : club.member_status === "pending" ? (

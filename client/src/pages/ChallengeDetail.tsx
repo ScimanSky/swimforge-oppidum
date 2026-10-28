@@ -252,25 +252,25 @@ export default function ChallengeDetail() {
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Target className="h-4 w-4 text-primary" />
+                  <Target className="h-4 w-4 text-action-text" />
                   <span className="text-sm">
                     {typeLabels[challenge.type as keyof typeof typeLabels]}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Trophy className="h-4 w-4 text-primary" />
+                  <Trophy className="h-4 w-4 text-action-text" />
                   <span className="text-sm">
                     {objectiveLabels[challenge.objective as keyof typeof objectiveLabels]}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Calendar className="h-4 w-4 text-primary" />
+                  <Calendar className="h-4 w-4 text-action-text" />
                   <span className="text-sm">
                     {durationLabels[challenge.duration as keyof typeof durationLabels]}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Users className="h-4 w-4 text-primary" />
+                  <Users className="h-4 w-4 text-action-text" />
                   <span className="text-sm">{challenge.participants?.length || 0} Partecipanti</span>
                 </div>
               </div>
@@ -278,7 +278,7 @@ export default function ChallengeDetail() {
               {/* Countdown Timer */}
               {challenge.status === "active" && timeLeft && timeLeft !== "Terminata" && (
                 <div className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-primary/15 px-4 py-3">
-                  <Clock className="h-5 w-5 text-primary" />
+                  <Clock className="h-5 w-5 text-action-text" />
                   <span className="text-lg font-bold text-foreground">{timeLeft}</span>
                   <span className="text-sm text-muted-foreground">rimanenti</span>
                 </div>
@@ -312,7 +312,7 @@ export default function ChallengeDetail() {
           <Surface className="bg-card border-border">
             <SurfaceHeader>
               <SurfaceTitle className="flex items-center gap-2 font-display">
-                <Medal className="h-5 w-5 text-primary" />
+                <Medal className="h-5 w-5 text-action-text" />
                 Classifica
               </SurfaceTitle>
             </SurfaceHeader>
@@ -382,7 +382,7 @@ export default function ChallengeDetail() {
                         {participant.username}
                       </span>
 
-                      <span className="font-bold text-primary">
+                      <span className="font-bold text-action-text">
                         {formatProgress(participant.progress || 0)}
                       </span>
                     </motion.div>

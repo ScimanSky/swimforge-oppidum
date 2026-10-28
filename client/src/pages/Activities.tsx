@@ -300,7 +300,7 @@ export default function Activities() {
               </p>
               <div className="mt-2.5 flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className="text-xs">
-                  <Star className="mr-1 size-3.5 text-primary" />
+                  <Star className="mr-1 size-3.5 text-action-text" />
                   Lv {profileQuery.data?.level ?? 1}
                 </Badge>
                 <Badge variant="outline" className="text-xs">
@@ -389,7 +389,7 @@ export default function Activities() {
                             <span
                               className={cn(
                                 "inline-flex size-8 items-center justify-center rounded-lg",
-                                isOpenWater ? "bg-accent/15 text-accent" : "bg-primary/15 text-primary",
+                                isOpenWater ? "bg-accent/15 text-accent" : "bg-primary/15 text-action-text",
                               )}
                             >
                               {isOpenWater ? <MapPin className="size-4" /> : <Waves className="size-4" />}
@@ -402,7 +402,7 @@ export default function Activities() {
                             {formatDate(activity.activityDate)} · {formatTime(activity.activityDate)}
                           </p>
                         </div>
-                        <Badge variant="neon" className={cn("text-[10px]", isOpenWater ? "text-accent" : "text-primary")}>
+                        <Badge variant="neon" className={cn("text-[10px]", isOpenWater ? "text-accent" : "text-action-text")}>
                           {isOpenWater ? "Open Water" : "Vasca"}
                         </Badge>
                       </div>
@@ -642,7 +642,7 @@ export default function Activities() {
         <DialogContent className="border-border/70 bg-background/95 sm:max-w-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="size-4 text-primary" />
+              <Sparkles className="size-4 text-action-text" />
               Nuova attività sincronizzata
             </DialogTitle>
             <DialogDescription>

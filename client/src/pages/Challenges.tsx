@@ -545,32 +545,32 @@ export default function Challenges() {
                             {challenge.description || ""}
                           </p>
                         </div>
-                        <Badge variant="outline" className="border-primary/30 text-primary">
+                        <Badge variant="outline" className="border-primary/30 text-action-text">
                           {challenge.status === "pending" ? "In arrivo" : "Attiva"}
                         </Badge>
                       </div>
 
                       <div className="mb-4 grid grid-cols-2 gap-4 text-sm">
                         <div className="flex items-center gap-2">
-                          <Target className="h-4 w-4 text-primary" />
+                          <Target className="h-4 w-4 text-action-text" />
                           <span className="text-muted-foreground">
                             {objectiveLabel(challenge.objective)}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-primary" />
+                          <Users className="h-4 w-4 text-action-text" />
                           <span className="text-muted-foreground">
                             {challenge.participantCount} partecipanti
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-primary" />
+                          <Clock className="h-4 w-4 text-action-text" />
                           <span className="text-muted-foreground">
                             {formatDaysLeft(challenge.end_date)}
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Trophy className="h-4 w-4 text-primary" />
+                          <Trophy className="h-4 w-4 text-action-text" />
                           <span className="text-muted-foreground">
                             {challenge.prize_description || "Badge esclusivo"}
                           </span>
@@ -722,7 +722,7 @@ export default function Challenges() {
                       <>
                         <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
                           {absoluteIndex === 0 ? (
-                            <Crown className="h-4 w-4 text-primary" />
+                            <Crown className="h-4 w-4 text-action-text" />
                           ) : (
                             <span className="text-sm font-bold text-foreground">
                               {absoluteIndex + 1}

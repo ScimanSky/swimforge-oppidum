@@ -196,7 +196,7 @@ export default function ResetPassword() {
               {hasSession && (
                 <p className="text-center text-sm text-muted-foreground mt-6">
                   Torna al{" "}
-                  <Link href="/login" className="text-primary hover:underline">
+                  <Link href="/login" className="text-action-text hover:underline">
                     login
                   </Link>
                 </p>

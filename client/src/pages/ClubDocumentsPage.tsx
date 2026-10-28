@@ -55,7 +55,7 @@ export default function ClubDocumentsPage() {
               <ArrowLeft className="h-4 w-4" /> Torna al club
             </Link>
             <h1 className="mt-1 inline-flex items-center gap-2 text-2xl font-display font-bold">
-              <FileText className="h-5 w-5 text-primary" />
+              <FileText className="h-5 w-5 text-action-text" />
               Documenti Club • {club.name}
             </h1>
           </div>

@@ -78,7 +78,7 @@ const categoryIcons: Record<string, React.ElementType> = {
 
 const categoryColors: Record<string, string> = {
   speed: "text-chart-5 bg-chart-5/10",
-  distance: "text-primary bg-primary/10",
+  distance: "text-action-text bg-primary/10",
   efficiency: "text-accent bg-accent/10",
   frequency: "text-chart-4 bg-chart-4/10",
   endurance: "text-chart-3 bg-chart-3/10",
@@ -667,7 +667,7 @@ export default function Goals() {
           ) : (
             allActiveGoals.map((goal) => {
               const Icon = categoryIcons[goal.category] || Target
-              const colorClass = categoryColors[goal.category] || "text-primary bg-primary/10"
+              const colorClass = categoryColors[goal.category] || "text-action-text bg-primary/10"
               const isCustom = customGoals.some((item) => item.id === goal.id)
               return (
                 <section key={goal.id} className="surface-panel p-6">
@@ -694,7 +694,7 @@ export default function Goals() {
                           <Badge
                             className={
                               goal.status === "on-track"
-                                ? "bg-primary/20 text-primary"
+                                ? "bg-primary/20 text-action-text"
                                 : "bg-chart-5/20 text-chart-5"
                             }
                           >
@@ -730,7 +730,7 @@ export default function Goals() {
                               {goal.milestones.map((milestone: { completed: boolean; title: string }, index: number) => (
                                 <div key={index} className="flex items-center gap-2">
                                   {milestone.completed ? (
-                                    <CheckCircle2 className="w-4 h-4 text-primary" />
+                                    <CheckCircle2 className="w-4 h-4 text-action-text" />
                                   ) : (
                                     <Circle className="w-4 h-4 text-muted-foreground" />
                                   )}
@@ -798,7 +798,7 @@ export default function Goals() {
               {completedGoals.map((goal) => (
                 <div key={goal.id} className="flex items-start gap-3 p-4 rounded-lg bg-secondary/30">
                   <div className="p-2 rounded-lg bg-primary/10">
-                    <Flag className="w-5 h-5 text-primary" />
+                    <Flag className="w-5 h-5 text-action-text" />
                   </div>
                   <div className="flex-1">
                     <h4 className="font-medium text-foreground">{goal.title}</h4>

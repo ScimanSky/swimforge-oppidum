@@ -628,7 +628,7 @@ export default function ClubDetailEnhanced() {
                 animate={{ opacity: 1 }}
                 className="surface-panel p-3 flex items-start gap-2"
               >
-                <Pin className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
+                <Pin className="h-4 w-4 mt-0.5 shrink-0 text-action-text" />
                 <div>
                   <p className="font-semibold text-sm">{item.announcement.title}</p>
                   <p className="text-xs text-muted-foreground line-clamp-2">{item.announcement.content}</p>

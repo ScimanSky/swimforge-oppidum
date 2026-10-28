@@ -181,7 +181,7 @@ export default function ClubPbLeaderboardPage() {
                       <div className="min-w-0">
                         <Link
                           href={`/u/${row.userId}?from=${encodeURIComponent(`/community/club/${clubId}/pb`)}`}
-                          className="truncate text-sm font-semibold text-foreground hover:text-primary"
+                          className="truncate text-sm font-semibold text-foreground hover:text-action-text"
                         >
                           {String(row.displayName ?? `User ${row.userId}`)}
                         </Link>
@@ -191,7 +191,7 @@ export default function ClubPbLeaderboardPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-display text-lg font-bold text-primary">{formatSwimCentiseconds(row.timeCs)}</p>
+                      <p className="font-display text-lg font-bold text-action-text">{formatSwimCentiseconds(row.timeCs)}</p>
                       <p className="text-[11px] text-muted-foreground">PB</p>
                     </div>
                   </div>

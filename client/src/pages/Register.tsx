@@ -182,7 +182,7 @@ export default function Register() {
             {features.map((feature, index) => (
               <li key={index} className="flex items-center gap-3 text-muted-foreground">
                 <div className="w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
-                  <Check className="w-3 h-3 text-primary" />
+                  <Check className="w-3 h-3 text-action-text" />
                 </div>
                 {feature}
               </li>
@@ -301,11 +301,11 @@ export default function Register() {
                     />
                     <label htmlFor="terms" className="text-sm text-muted-foreground">
                       Accetto i{" "}
-                      <Link href="/terms" className="text-primary hover:underline">
+                      <Link href="/terms" className="text-action-text hover:underline">
                         Termini di Servizio
                       </Link>{" "}
                       e la{" "}
-                      <Link href="/privacy" className="text-primary hover:underline">
+                      <Link href="/privacy" className="text-action-text hover:underline">
                         Privacy Policy
                       </Link>
                     </label>
@@ -429,7 +429,7 @@ export default function Register() {
 
                   <p className="text-center text-sm text-muted-foreground mt-6">
                     Hai gia un account?{" "}
-                    <Link href="/login" className="text-primary hover:underline">
+                    <Link href="/login" className="text-action-text hover:underline">
                       Accedi
                     </Link>
                   </p>

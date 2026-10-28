@@ -159,7 +159,7 @@ export default function AdminReports() {
                         <span className="text-muted-foreground"> · Post #{item.post_id}</span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline" className="border-primary/30 text-primary">
+                        <Badge variant="outline" className="border-primary/30 text-action-text">
                           {statusText}
                         </Badge>
                         <span>{formatTimeAgo(item.created_at)}</span>

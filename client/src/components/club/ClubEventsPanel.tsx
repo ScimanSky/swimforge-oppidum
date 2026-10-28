@@ -46,7 +46,7 @@ export default function ClubEventsPanel({
     <section className={`${rootClassName} ${className ?? ""}`.trim()} aria-label="Eventi del club">
       <div className="mb-2 flex items-center justify-between">
         <p className="inline-flex items-center gap-2 text-xs font-display uppercase tracking-wide text-muted-foreground">
-          <CalendarClock className="h-4 w-4 text-primary" />
+          <CalendarClock className="h-4 w-4 text-action-text" />
           Gare ed Eventi
         </p>
         <span className="text-xs text-muted-foreground">{items.length}</span>

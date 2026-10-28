@@ -406,7 +406,7 @@ export default function Statistics() {
             <AccordionItem value="timeline" className="border-0">
               <AccordionTrigger className="rounded-xl border border-border/70 bg-card/60 px-4 py-3 text-left font-medium hover:no-underline">
                 <span className="inline-flex items-center gap-2">
-                  <BarChart3 className="size-4 text-primary" />
+                  <BarChart3 className="size-4 text-action-text" />
                   Progress Timeline
                 </span>
               </AccordionTrigger>
@@ -483,7 +483,7 @@ export default function Statistics() {
             <AccordionItem value="performance" className="border-0">
               <AccordionTrigger className="rounded-xl border border-border/70 bg-card/60 px-4 py-3 text-left font-medium hover:no-underline">
                 <span className="inline-flex items-center gap-2">
-                  <Gauge className="size-4 text-primary" />
+                  <Gauge className="size-4 text-action-text" />
                   Analisi prestazioni
                 </span>
               </AccordionTrigger>
@@ -644,7 +644,7 @@ export default function Statistics() {
               <AccordionItem value="advanced" className="border-0">
                 <AccordionTrigger className="rounded-xl border border-border/70 bg-card/60 px-4 py-3 text-left font-medium hover:no-underline">
                   <span className="inline-flex items-center gap-2">
-                    <Sparkles className="size-4 text-primary" />
+                    <Sparkles className="size-4 text-action-text" />
                     Analisi avanzate
                   </span>
                 </AccordionTrigger>

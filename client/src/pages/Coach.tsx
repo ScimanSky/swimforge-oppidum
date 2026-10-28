@@ -611,7 +611,7 @@ export default function Coach() {
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div className="flex items-center gap-4">
                 <div className="rounded-2xl bg-gradient-to-br from-primary/20 to-accent/20 p-3">
-                  <Brain className="h-8 w-8 text-primary" />
+                  <Brain className="h-8 w-8 text-action-text" />
                 </div>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
@@ -625,7 +625,7 @@ export default function Coach() {
                   </p>
                 </div>
               </div>
-              <Badge variant="outline" className="text-xs border-primary/40 text-primary">
+              <Badge variant="outline" className="text-xs border-primary/40 text-action-text">
                 Ultimo sync: {lastSyncLabel}
               </Badge>
             </div>
@@ -634,21 +634,21 @@ export default function Coach() {
               <div className="rounded-lg border border-border bg-background/60 px-4 py-3">
                 <p className="text-xs text-muted-foreground">Focus oggi</p>
                 <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
-                  <Target className="size-4 text-primary" />
+                  <Target className="size-4 text-action-text" />
                   {focusLabel}
                 </div>
               </div>
               <div className="rounded-lg border border-border bg-background/60 px-4 py-3">
                 <p className="text-xs text-muted-foreground">Condition</p>
                 <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
-                  <HeartPulse className="size-4 text-primary" />
+                  <HeartPulse className="size-4 text-action-text" />
                   {conditionLabel}
                 </div>
               </div>
               <div className="rounded-lg border border-border bg-background/60 px-4 py-3">
                 <p className="text-xs text-muted-foreground">Attività analizzate</p>
                 <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
-                  <Activity className="size-4 text-primary" />
+                  <Activity className="size-4 text-action-text" />
                   {sessionInsightsQuery.data?.length ?? 0}
                 </div>
               </div>
@@ -750,7 +750,7 @@ export default function Coach() {
                       </div>
                       <div className="flex items-start gap-4">
                         <div className="p-2 rounded-lg bg-primary/10">
-                          <Sparkles className="w-5 h-5 text-primary" />
+                          <Sparkles className="w-5 h-5 text-action-text" />
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
@@ -1023,7 +1023,7 @@ export default function Coach() {
                 {latestSessionInsight ? (
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                      <span className="rounded-full bg-primary/10 px-2 py-1 text-primary">
+                      <span className="rounded-full bg-primary/10 px-2 py-1 text-action-text">
                         Ultima sessione
                       </span>
                       {formatDate(latestSessionInsight.activity_date) && (
@@ -1050,7 +1050,7 @@ export default function Coach() {
                       <ul className="space-y-2 text-sm text-foreground">
                         {parsedSessionBullets.map((bullet: string, idx: number) => (
                           <li key={idx} className="flex items-start gap-2">
-                            <span className="text-primary">•</span>
+                            <span className="text-action-text">•</span>
                             <span>{bullet}</span>
                           </li>
                         ))}
@@ -1132,7 +1132,7 @@ export default function Coach() {
                               <ul className="mt-2 space-y-1 text-xs text-foreground">
                                 {bullets.map((bullet: string, idx: number) => (
                                   <li key={idx} className="flex items-start gap-2">
-                                    <span className="text-primary">•</span>
+                                    <span className="text-action-text">•</span>
                                     <span className="line-clamp-1">{bullet}</span>
                                   </li>
                                 ))}

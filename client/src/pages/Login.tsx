@@ -166,7 +166,7 @@ export default function Login() {
                     <Label>Password</Label>
                     <Link
                       href="/forgot-password"
-                      className="inline-flex min-h-[44px] items-center text-sm text-primary hover:underline"
+                      className="inline-flex min-h-[44px] items-center text-sm text-action-text hover:underline"
                     >
                       Password dimenticata?
                     </Link>
@@ -246,7 +246,7 @@ export default function Login() {
 
               <p className="text-center text-sm text-muted-foreground mt-6">
                 Non hai un account?{" "}
-                <Link href="/register" className="text-primary hover:underline">
+                <Link href="/register" className="text-action-text hover:underline">
                   Registrati
                 </Link>
               </p>

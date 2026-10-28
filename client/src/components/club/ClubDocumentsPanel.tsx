@@ -95,7 +95,7 @@ export default function ClubDocumentsPanel({ clubId, isMember, canUpload }: Club
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="inline-flex items-center gap-2 text-xs font-display uppercase tracking-wide text-muted-foreground">
-            <FileText className="h-4 w-4 text-primary" />
+            <FileText className="h-4 w-4 text-action-text" />
             Documenti Club
           </p>
           <p className="mt-1 text-sm text-muted-foreground">

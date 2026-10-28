@@ -164,7 +164,7 @@ export default function PublicProfile() {
                         <Zap className="size-3" />
                         Livello {Number.isFinite(level) ? level : 1}
                       </Badge>
-                      <Badge variant="outline" className="border-primary/40 text-primary">
+                      <Badge variant="outline" className="border-primary/40 text-action-text">
                         {totalXp.toLocaleString()} XP
                       </Badge>
                     </div>
@@ -254,7 +254,7 @@ export default function PublicProfile() {
                             {Number(row.poolLengthMeters)}m
                           </Badge>
                         </div>
-                        <p className="mt-1 font-display text-base font-bold text-primary">
+                        <p className="mt-1 font-display text-base font-bold text-action-text">
                           {formatSwimCentiseconds(row.timeCs)}
                         </p>
                         <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">

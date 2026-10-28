@@ -975,7 +975,7 @@ export default function ClubCoachModeration() {
         {clubMeetsV1Enabled ? (
           <section className="surface-panel p-4 space-y-3">
             <div className="flex items-center gap-2">
-              <Flag className="h-4 w-4 text-primary" />
+              <Flag className="h-4 w-4 text-action-text" />
               <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Convocazioni Gare</h2>
             </div>
             <div className="grid gap-2 md:grid-cols-2">
@@ -1197,7 +1197,7 @@ export default function ClubCoachModeration() {
 
         <section className="surface-panel p-4 space-y-3">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
+            <Sparkles className="h-4 w-4 text-action-text" />
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Allenamenti in vasca (AI)</h2>
           </div>
 
@@ -1474,7 +1474,7 @@ export default function ClubCoachModeration() {
           <section className="surface-panel p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Bot className="h-4 w-4 text-primary" />
+                <Bot className="h-4 w-4 text-action-text" />
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Coach AI Autonomo</h2>
               </div>
               <Badge variant="outline">{aiSectionEnabledForClub ? "enabled" : "disabled"}</Badge>
@@ -1612,7 +1612,7 @@ export default function ClubCoachModeration() {
           <section className="surface-panel p-4 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Database className="h-4 w-4 text-primary" />
+                <Database className="h-4 w-4 text-action-text" />
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Storico Oppidum</h2>
               </div>
               <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
@@ -1664,7 +1664,7 @@ export default function ClubCoachModeration() {
 
         <section className="surface-panel p-4 space-y-3">
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-primary" />
+            <Users className="h-4 w-4 text-action-text" />
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Inviti Club</h2>
           </div>
           <Button
