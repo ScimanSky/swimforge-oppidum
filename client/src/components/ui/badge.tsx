@@ -5,7 +5,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
-  'inline-flex items-center justify-center rounded-md border px-2 py-0.5 text-xs font-medium w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden',
+  'inline-flex items-center justify-center rounded-full border px-2.5 py-0.5 text-xs font-semibold w-fit whitespace-nowrap shrink-0 [&>svg]:size-3 gap-1 [&>svg]:pointer-events-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive transition-[color,box-shadow] overflow-hidden',
   {
     variants: {
       variant: {
@@ -14,16 +14,12 @@ const badgeVariants = cva(
         secondary:
           'border-transparent bg-secondary text-secondary-foreground flex-none',
         destructive:
-          'border-transparent bg-destructive text-white [a&]:hover:bg-destructive/90',
-        outline: 'text-foreground border border-border',
-        neon:
-          'border-[1.5px] border-primary bg-primary/20 text-primary shadow-[0_0_20px_var(--neon-soft)] font-extrabold tracking-widest uppercase text-[0.65rem] px-2.5 py-1',
-        'rank-gold':
-          'border-[1.5px] border-[var(--gold)] bg-[var(--gold)]/20 text-[var(--gold)] font-extrabold tracking-widest uppercase text-[0.65rem] px-2.5 py-1 shadow-[0_0_16px_color-mix(in_oklch,var(--gold)_40%,transparent)]',
-        'rank-silver':
-          'border-[1.5px] border-slate-300 bg-slate-300/20 text-slate-200 font-extrabold tracking-widest uppercase text-[0.65rem] px-2.5 py-1 shell-text-shadow',
-        'rank-bronze':
-          'border-[1.5px] border-orange-500 bg-orange-500/20 text-orange-400 font-extrabold tracking-widest uppercase text-[0.65rem] px-2.5 py-1 shell-text-shadow',
+          'border-transparent bg-destructive text-destructive-foreground [a&]:hover:bg-destructive/90',
+        outline: 'border-border text-foreground',
+        neon: 'border-transparent bg-primary/15 text-action-text',
+        'rank-gold': 'border-transparent bg-[var(--gold)]/15 text-[var(--gold)]',
+        'rank-silver': 'border-transparent bg-raised text-foreground',
+        'rank-bronze': 'border-transparent bg-xp/15 text-xp',
       },
     },
     defaultVariants: {
