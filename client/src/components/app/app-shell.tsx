@@ -1,32 +1,27 @@
 "use client"
 
-import React, { useEffect, useMemo, useRef, useState } from "react"
+import React, { useEffect, useRef, useState } from "react"
 import { Link, useLocation } from "wouter"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import {
-  Activity,
-  Award,
-  BarChart3,
-  Bot,
-  BrainCircuit,
   ChevronDown,
-  Grid2x2,
-  LayoutDashboard,
+  ChevronLeft,
+  Droplet,
   LogOut,
   MessageSquare,
+  Newspaper,
   Plus,
+  RefreshCw,
   Settings,
   Shield,
-  Target,
-  Trophy,
+  Sparkles,
+  SquarePen,
+  Sun,
   User,
   Users,
   Waves,
   X,
-  Moon,
-  Sun,
-  Swords,
-  UsersRound,
+  type LucideIcon,
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -34,7 +29,20 @@ import { trpc } from "@/lib/trpc"
 import { supabase } from "@/lib/supabase"
 import { unregisterPushToken } from "@/lib/push"
 import { clearNativeSessionToken } from "@/lib/session-token"
-import { useTheme } from "@/contexts/ThemeContext"
+import { isNativePlatform } from "@/lib/platform"
+import {
+  FEED_PATH,
+  HUB_TABS,
+  NAV_TABS,
+  activeTabForPath,
+  homePathForPlatform,
+  hubForPath,
+  normalizePath,
+  pageTitleForPath,
+  parentPathForPath,
+  type TabId,
+} from "@/lib/navigation"
+import { useGarminQuickSync } from "@/hooks/useGarminQuickSync"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -48,117 +56,34 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import NotificationBell from "@/components/NotificationBell"
 import DirectMessages from "@/components/DirectMessages"
+import { SectionTabs } from "@/components/corsia/SectionTabs"
 import { CreatePostSheet, type PbShareTrackingContext } from "@/components/social/CreatePostSheet"
 import { OnboardingNudgeManager } from "@/components/onboarding/OnboardingNudgeManager"
-
-type NavItem = {
-  label: string
-  path: string
-  icon: React.ReactNode
-  match: (path: string) => boolean
-}
-
-type QuickAccessItem = {
-  label: string
-  path: string
-  icon: React.ReactNode
-  match?: (path: string) => boolean
-  dataTour?: string
-}
 
 type OpenCreatePostEventDetail = {
   initialContent?: string
   pbShareTracking?: PbShareTrackingContext
 }
 
-const normalizePath = (location: string) => location.split("?")[0].split("#")[0] || "/"
+const TAB_ICONS: Record<TabId, LucideIcon> = {
+  today: Sun,
+  feed: Newspaper,
+  train: Waves,
+  community: Users,
+}
 
-const isChallengesPath = (path: string) => path.startsWith("/challenges")
+const AI_POST_DRAFT =
+  "Bozza IA:\n\nAllenamento completato oggi. Ecco i punti chiave:\n- Sensazioni in acqua:\n- Metrica migliore:\n- Cosa migliorare nella prossima sessione:\n\n#swimforge #training"
 
-const isTrainingPath = (path: string) =>
-  path.startsWith("/track") ||
-  path.startsWith("/activities") ||
-  path.startsWith("/coach") ||
-  path.startsWith("/goals") ||
-  path.startsWith("/session-iq")
+type CreateAction = "post" | "ai-post" | "garmin"
+type CreateItem = { label: string; icon: LucideIcon } & ({ href: string } | { action: CreateAction })
 
-const isHomePath = (path: string) =>
-  path === "/home" ||
-  path.startsWith("/post/") ||
-  path.startsWith("/home/report/") ||
-  path.startsWith("/report/post/")
-
-const isClubPath = (path: string) =>
-  path.startsWith("/home/community") ||
-  path.startsWith("/community")
-
-const isProfilePath = (path: string) =>
-  path.startsWith("/profile") ||
-  path.startsWith("/settings") ||
-  path.startsWith("/statistics") ||
-  path.startsWith("/u/") ||
-  path.startsWith("/badges")
-
-const isLeaderboardPath = (path: string) => path.startsWith("/leaderboard")
-
-const isGoalsPath = (path: string) => path.startsWith("/goals")
-
-const athleteTopNav: NavItem[] = []
-
-const quickAccessItems: QuickAccessItem[] = [
-  { label: "Social Feed", path: "/home", icon: <Users className="size-4" />, match: isHomePath },
-  { label: "Attività", path: "/track", icon: <Activity className="size-4" />, match: isTrainingPath, dataTour: "track-section" },
-  {
-    label: "Classifica",
-    path: "/leaderboard",
-    icon: <Trophy className="size-4" />,
-    match: isLeaderboardPath,
-    dataTour: "global-leaderboard",
-  },
-  { label: "Challenges", path: "/challenges", icon: <Swords className="size-4" />, match: isChallengesPath, dataTour: "challenges-list" },
-  {
-    label: "Statistics",
-    path: "/profile/performance",
-    icon: <BarChart3 className="size-4" />,
-    match: (path) => path.startsWith("/profile/performance") || path.startsWith("/statistics"),
-  },
-  {
-    label: "Obiettivi",
-    path: "/goals",
-    icon: <Target className="size-4" />,
-    match: isGoalsPath,
-  },
-  { label: "Badges", path: "/badges", icon: <Award className="size-4" />, match: (path) => path.startsWith("/badges"), dataTour: "badges-nav" },
-  { label: "AI Coach", path: "/coach", icon: <BrainCircuit className="size-4" />, match: (path) => path.startsWith("/coach"), dataTour: "ai-coach-btn" },
-  { label: "Club", path: "/home/community", icon: <UsersRound className="size-4" />, match: isClubPath, dataTour: "club-directory" },
+const CREATE_ITEMS: CreateItem[] = [
+  { label: "Nuovo post", icon: SquarePen, action: "post" },
+  { label: "Messaggio", icon: MessageSquare, href: "/messages?new=1" },
+  { label: "Bozza IA del post", icon: Sparkles, action: "ai-post" },
+  { label: "Sincronizza Garmin", icon: RefreshCw, action: "garmin" },
 ]
-
-function athleteTitleForPath(path: string) {
-  if (path.startsWith("/community/club") && path.includes("/event/")) return "Club Event"
-  if (path.startsWith("/community/club") && path.includes("/meet/")) return "Club Meet"
-  if (path.startsWith("/community/club") && path.includes("/documents")) return "Club Documents"
-  if (path.startsWith("/community/club")) return "Club Details"
-  if (path.startsWith("/home/community") || path === "/community") return "Club Directory"
-  if (path.startsWith("/challenges/")) return "Challenge Details"
-  if (path.startsWith("/challenges")) return "Challenges"
-  if (path === "/home") return "Social Home Feed"
-  if (path.startsWith("/track/") || path.startsWith("/activities/")) return "Dettaglio Laps"
-  if (path.startsWith("/track") || path.startsWith("/activities")) return "Activity Tracker"
-  if (path.startsWith("/goals")) return "Training Objectives"
-  if (path.startsWith("/coach")) return "AI Coach"
-  if (path.startsWith("/badges")) return "Badges"
-  if (path.startsWith("/leaderboard")) return "Leaderboard"
-  if (path.startsWith("/profile/performance") || path.startsWith("/statistics")) return "Performance Profile"
-  if (path.startsWith("/settings")) return "Settings"
-  if (path.startsWith("/profile")) return "Profile"
-  if (path.startsWith("/post/")) return "Post"
-  return "SwimForge"
-}
-
-function adminTitleForPath(path: string) {
-  if (path.startsWith("/admin/reports")) return "Moderation Queue"
-  return "Admin"
-}
 
 function initialsFromName(nameOrEmail: string | undefined) {
   if (!nameOrEmail) return "SF"
@@ -171,265 +96,79 @@ function initialsFromName(nameOrEmail: string | undefined) {
   return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase()
 }
 
-function AthleteDesktopNav({ location }: { location: string }) {
-  const path = normalizePath(location)
-  if (athleteTopNav.length === 0) return null
+function Brand() {
   return (
-    <nav className="hidden lg:flex items-center gap-1 rounded-xl border border-border/50 bg-card/30 px-2 py-1">
-      {athleteTopNav.map((item) => {
-        const active = item.match(path)
+    <span className="inline-flex items-center gap-2">
+      <Droplet className="size-6 fill-current text-action-text" aria-hidden />
+      <span className="font-display text-[26px] font-bold leading-none text-foreground">SwimForge</span>
+    </span>
+  )
+}
+
+/** The four actions of the «Crea» menu (bottom sheet on mobile, inline in the desktop rail). */
+function CreateMenuList({
+  onAction,
+  onNavigate,
+  isGarminSyncing,
+}: {
+  onAction: (action: CreateAction) => void
+  onNavigate: () => void
+  isGarminSyncing: boolean
+}) {
+  const rowClass =
+    "flex h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-[15px] font-semibold text-foreground transition-colors hover:bg-raised disabled:opacity-60"
+  return (
+    <ul className="space-y-1">
+      {CREATE_ITEMS.map((item) => {
+        const Icon = item.icon
+        const icon = <Icon className="size-5 shrink-0 text-action-text" aria-hidden />
+        if ("href" in item) {
+          return (
+            <li key={item.label}>
+              <Link href={item.href} onClick={onNavigate} className={rowClass}>
+                {icon}
+                {item.label}
+              </Link>
+            </li>
+          )
+        }
+        const syncing = item.action === "garmin" && isGarminSyncing
         return (
-          <Link
-            key={item.path}
-            href={item.path}
-            className={cn(
-              "relative inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors",
-              active
-                ? "text-foreground bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))]"
-                : "text-muted-foreground hover:text-foreground hover:bg-card/50",
-            )}
-            aria-current={active ? "page" : undefined}
-          >
-            <span className="hidden xl:inline-flex">{item.icon}</span>
-            <span>{item.label}</span>
-            <span
-              className={cn(
-                "pointer-events-none absolute bottom-1 left-2 right-2 h-0.5 rounded-full bg-[linear-gradient(90deg,var(--electric-cyan),var(--electric-lime))] transition-opacity",
-                active ? "opacity-100" : "opacity-0",
-              )}
-            />
-          </Link>
+          <li key={item.label}>
+            <button type="button" onClick={() => onAction(item.action)} disabled={syncing} className={rowClass}>
+              {icon}
+              {syncing ? "Sincronizzazione…" : item.label}
+            </button>
+          </li>
         )
       })}
-    </nav>
-  )
-}
-
-function AthleteSideRail({
-  location,
-  onOpenCreatePost,
-}: {
-  location: string
-  onOpenCreatePost: (prefill?: string) => void
-}) {
-  const path = normalizePath(location)
-  const [isCreateMenuOpen, setIsCreateMenuOpen] = useState(false)
-  const [isRailHovered, setIsRailHovered] = useState(false)
-  const isRailExpanded = isCreateMenuOpen || isRailHovered
-  const railRouteItems = quickAccessItems.filter((item) => item.label !== "Social Feed")
-  const postInsertIndex = Math.floor(railRouteItems.length / 2)
-  const topRouteItems = railRouteItems.slice(0, postInsertIndex)
-  const bottomRouteItems = railRouteItems.slice(postInsertIndex)
-  const railRowBase = cn(
-    "group/item flex h-11 w-full items-center rounded-xl text-muted-foreground transition-all duration-200 hover:bg-card/45 hover:text-foreground",
-    isRailExpanded ? "justify-start gap-3 px-3.5" : "justify-center",
-  )
-  const railRowActive =
-    "text-foreground bg-[linear-gradient(90deg,color-mix(in_oklch,var(--electric-cyan)_14%,transparent),color-mix(in_oklch,var(--electric-lime)_10%,transparent))]"
-  const createMenuItems: Array<{
-    label: string
-    path?: string
-    action?: "create-post" | "create-ai-post"
-    icon: React.ReactNode
-  }> = [
-    { label: "Post nel feed", action: "create-post", icon: <Plus className="size-4" /> },
-    { label: "Messaggio rapido", path: "/messages?new=1", icon: <MessageSquare className="size-4" /> },
-    { label: "Bozza IA post", action: "create-ai-post", icon: <Bot className="size-4" /> },
-  ]
-
-  useEffect(() => {
-    setIsCreateMenuOpen(false)
-  }, [path])
-
-  return (
-    <aside
-      onMouseEnter={() => setIsRailHovered(true)}
-      onMouseLeave={() => setIsRailHovered(false)}
-      className={cn(
-        "group/rail fixed inset-y-0 left-0 z-40 hidden bg-transparent px-2 pb-4 pt-[84px] transition-[width] duration-300 ease-out lg:flex lg:flex-col",
-        isRailExpanded ? "w-[272px]" : "w-[84px]",
-      )}
-    >
-      <nav className="flex flex-1 flex-col justify-center space-y-3">
-        {topRouteItems.map((item) => {
-          const active = item.match ? item.match(path) : path.startsWith(item.path)
-          return (
-            <Link
-              key={item.path}
-              href={item.path}
-              className={cn(railRowBase, active && railRowActive)}
-              aria-current={active ? "page" : undefined}
-              title={item.label}
-              data-tour={item.dataTour}
-            >
-              <span className="inline-flex transition-transform duration-300 ease-out group-hover/item:scale-110">
-                {item.icon}
-              </span>
-              <span
-                className={cn(
-                  "overflow-hidden whitespace-nowrap text-sm font-medium transition-all duration-200",
-                  isRailExpanded ? "max-w-[160px] opacity-100" : "max-w-0 opacity-0",
-                )}
-              >
-                {item.label}
-              </span>
-            </Link>
-          )
-        })}
-
-        <button
-          type="button"
-          onClick={() => setIsCreateMenuOpen((prev) => !prev)}
-          className={cn(railRowBase, "text-[var(--electric-cyan)] hover:text-[var(--electric-cyan)]")}
-          title="Post"
-          aria-label="Post"
-          aria-expanded={isCreateMenuOpen}
-        >
-          <span className="inline-flex transition-transform duration-300 ease-out group-hover/item:scale-110">
-            <Plus className="size-5" />
-          </span>
-          <span
-            className={cn(
-              "overflow-hidden whitespace-nowrap text-sm font-medium transition-all duration-200",
-              isRailExpanded ? "max-w-[160px] opacity-100" : "max-w-0 opacity-0",
-            )}
-          >
-            Post
-          </span>
-        </button>
-
-        <AnimatePresence initial={false}>
-          {isCreateMenuOpen ? (
-            <motion.div
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-              className="mx-3 overflow-hidden rounded-xl border border-border/70 bg-card/85 backdrop-blur-md"
-            >
-              {createMenuItems.map((item, index) => (
-                item.path ? (
-                  <Link
-                    key={item.label}
-                    href={item.path}
-                    onClick={() => setIsCreateMenuOpen(false)}
-                    className={cn(
-                      "flex h-11 items-center justify-between px-3 text-sm text-foreground transition-colors hover:bg-background/55",
-                      index !== createMenuItems.length - 1 && "border-b border-border/60",
-                    )}
-                  >
-                    <span className="whitespace-nowrap">{item.label}</span>
-                    <span className="text-[var(--electric-cyan)]">{item.icon}</span>
-                  </Link>
-                ) : (
-                  <button
-                    key={item.label}
-                    type="button"
-                    onClick={() => {
-                      if (item.action === "create-post") onOpenCreatePost()
-                      if (item.action === "create-ai-post") {
-                        onOpenCreatePost(
-                          "Bozza IA:\n\nAllenamento completato oggi. Ecco i punti chiave:\n- Sensazioni in acqua:\n- Metrica migliore:\n- Cosa migliorare nella prossima sessione:\n\n#swimforge #training",
-                        )
-                      }
-                      setIsCreateMenuOpen(false)
-                    }}
-                    className={cn(
-                      "flex h-11 w-full items-center justify-between px-3 text-left text-sm text-foreground transition-colors hover:bg-background/55",
-                      index !== createMenuItems.length - 1 && "border-b border-border/60",
-                    )}
-                  >
-                    <span className="whitespace-nowrap">{item.label}</span>
-                    <span className="text-[var(--electric-cyan)]">{item.icon}</span>
-                  </button>
-                )
-              ))}
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
-
-        {bottomRouteItems.map((item) => {
-          const active = item.match ? item.match(path) : path.startsWith(item.path)
-          return (
-            <Link
-              key={item.path}
-              href={item.path}
-              className={cn(railRowBase, active && railRowActive)}
-              aria-current={active ? "page" : undefined}
-              title={item.label}
-              data-tour={item.dataTour}
-            >
-              <span className="inline-flex transition-transform duration-300 ease-out group-hover/item:scale-110">
-                {item.icon}
-              </span>
-              <span
-                className={cn(
-                  "overflow-hidden whitespace-nowrap text-sm font-medium transition-all duration-200",
-                  isRailExpanded ? "max-w-[160px] opacity-100" : "max-w-0 opacity-0",
-                )}
-              >
-                {item.label}
-              </span>
-            </Link>
-          )
-        })}
-      </nav>
-
-    </aside>
-  )
-}
-
-function AthleteCompactBrand() {
-  return (
-    <Link
-      href="/home"
-      className="inline-flex min-h-[44px] items-center rounded-xl border border-border/60 bg-card/35 px-2.5 py-1.5 transition-colors hover:border-[var(--electric-cyan)]/55 hover:bg-card/55"
-      aria-label="Go to Home"
-    >
-      <img
-        src="/brand/swimforge-navbar-logo.png"
-        alt="SwimForge"
-        className="h-7 w-auto object-contain"
-        loading="lazy"
-        decoding="async"
-      />
-    </Link>
+    </ul>
   )
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation()
+  const [location, navigate] = useLocation()
   const path = normalizePath(location)
-  const isAdminRoute = path.startsWith("/admin")
+  const activeTab = activeTabForPath(path)
+  const hub = hubForPath(path)
+  const parentPath = parentPathForPath(path)
+  const isFeedRoot = path === FEED_PATH
+  const pageTitle = pageTitleForPath(path)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [isCreatePostOpen, setIsCreatePostOpen] = useState(false)
   const [createPostInitialContent, setCreatePostInitialContent] = useState<string | undefined>(undefined)
   const [createPostPbShareTracking, setCreatePostPbShareTracking] = useState<PbShareTrackingContext | undefined>(undefined)
   const [mobileCreateMenuOpen, setMobileCreateMenuOpen] = useState(false)
-  const [mobileSectionsOpen, setMobileSectionsOpen] = useState(false)
-  const { theme, toggleTheme, switchable } = useTheme()
+  const [railCreateMenuOpen, setRailCreateMenuOpen] = useState(false)
   const logoutMutation = trpc.auth.logout.useMutation()
   const heartbeatMutation = trpc.auth.heartbeat.useMutation()
   const meQuery = trpc.auth.me.useQuery()
   const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 120_000 })
+  const garminSync = useGarminQuickSync()
   const reduceMotion = useReducedMotion()
   const isAdmin = meQuery.data?.role === "admin"
   const heartbeatPendingRef = useRef(false)
   const heartbeatLastSentAtRef = useRef(0)
-
-  const pageTitle = useMemo(() => (isAdminRoute ? adminTitleForPath(path) : athleteTitleForPath(path)), [isAdminRoute, path])
-  const mobileSectionsItems = useMemo(
-    () => quickAccessItems.filter((item) => !["Social Feed", "Attività", "Club"].includes(item.label)),
-    [],
-  )
-  const mobileCreateItems = useMemo(
-    () => [
-      { label: "Post nel feed", action: "create-post" as const, icon: <Plus className="size-4" /> },
-      { label: "Messaggio rapido", path: "/messages?new=1", icon: <MessageSquare className="size-4" /> },
-      { label: "Bozza IA post", action: "create-ai-post" as const, icon: <Bot className="size-4" /> },
-    ],
-    [],
-  )
 
   useEffect(() => {
     if (typeof window === "undefined" || typeof document === "undefined") return
@@ -467,18 +206,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     setMobileCreateMenuOpen(false)
-    setMobileSectionsOpen(false)
+    setRailCreateMenuOpen(false)
   }, [path])
 
   useEffect(() => {
-    if (typeof document === "undefined") return
-    const shouldLock = mobileCreateMenuOpen || mobileSectionsOpen
+    if (typeof document === "undefined" || !mobileCreateMenuOpen) return
     const previous = document.body.style.overflow
-    if (shouldLock) document.body.style.overflow = "hidden"
+    document.body.style.overflow = "hidden"
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileCreateMenuOpen(false)
+    }
+    document.addEventListener("keydown", onKeyDown)
     return () => {
       document.body.style.overflow = previous
+      document.removeEventListener("keydown", onKeyDown)
     }
-  }, [mobileCreateMenuOpen, mobileSectionsOpen])
+  }, [mobileCreateMenuOpen])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -490,7 +233,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       setCreatePostPbShareTracking(customEvent.detail?.pbShareTracking)
       setIsCreatePostOpen(true)
       setMobileCreateMenuOpen(false)
-      setMobileSectionsOpen(false)
+      setRailCreateMenuOpen(false)
     }
 
     window.addEventListener("swimforge:open-create-post", handleOpenCreatePost)
@@ -521,37 +264,77 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     window.location.href = "/"
   }
 
-  const profileLabel = meQuery.data?.name || meQuery.data?.email || "Swimmer"
+  const closeCreateMenus = () => {
+    setMobileCreateMenuOpen(false)
+    setRailCreateMenuOpen(false)
+  }
+
+  const runCreateAction = (action: CreateAction) => {
+    closeCreateMenus()
+    if (action === "garmin") {
+      void garminSync.sync()
+      return
+    }
+    setCreatePostInitialContent(action === "ai-post" ? AI_POST_DRAFT : undefined)
+    setCreatePostPbShareTracking(undefined)
+    setIsCreatePostOpen(true)
+  }
+
+  const goBack = () => {
+    if (window.history.length > 1) window.history.back()
+    else if (parentPath) navigate(parentPath)
+  }
+
+  const profileLabel = meQuery.data?.name || meQuery.data?.email || "Nuotatore"
   const profileInitials = initialsFromName(profileLabel)
   const avatarUrl = profileQuery.data?.avatarUrl || undefined
+  const homePath = homePathForPlatform(isNativePlatform())
 
   return (
-    <div className="min-h-[100dvh] bg-transparent overflow-x-hidden">
-      <AthleteSideRail
-        location={location}
-        onOpenCreatePost={(prefill) => {
-          setCreatePostInitialContent(prefill)
-          setCreatePostPbShareTracking(undefined)
-          setIsCreatePostOpen(true)
-        }}
-      />
+    <div className="min-h-[100dvh] overflow-x-hidden bg-background">
+      <header className="fixed inset-x-0 top-0 z-50 h-16 border-b border-border bg-background">
+        <div className="flex h-full items-center gap-2 px-4 md:px-6">
+          <Link
+            href={homePath}
+            aria-label="SwimForge, home"
+            className="hidden w-[208px] shrink-0 lg:inline-flex"
+          >
+            <Brand />
+          </Link>
 
-      <header className="fixed left-0 right-0 top-0 z-50 h-[72px] border-b border-border/50 bg-background/80 backdrop-blur-xl">
-        <div className="flex h-full w-full items-center gap-3 pl-0 pr-4 md:pr-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <AthleteCompactBrand />
+          <div className="flex min-w-0 flex-1 items-center gap-1">
+            {parentPath ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={goBack}
+                aria-label="Indietro"
+                className="-ml-2 shrink-0"
+              >
+                <ChevronLeft className="size-6" />
+              </Button>
+            ) : null}
+            {isFeedRoot ? (
+              <h1 className="min-w-0">
+                <span className="lg:hidden">
+                  <Brand />
+                </span>
+                <span className="hidden font-display text-[26px] font-bold leading-none lg:inline">{pageTitle}</span>
+              </h1>
+            ) : (
+              <h1 className="min-w-0 truncate font-display text-[26px] font-bold leading-none">{pageTitle}</h1>
+            )}
           </div>
 
-          <AthleteDesktopNav location={location} />
-
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-1">
             <NotificationBell />
             <DirectMessages mode="link" />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="min-h-[44px] gap-2 rounded-xl px-2">
-                  <Avatar className="h-8 w-8 border border-border/50">
+                <Button variant="ghost" className="gap-2 px-1.5" aria-label="Menu del profilo">
+                  <Avatar className="size-8 border border-border">
                     <AvatarImage src={avatarUrl} alt={profileLabel} />
                     <AvatarFallback>{profileInitials}</AvatarFallback>
                   </Avatar>
@@ -560,38 +343,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-60">
-                <DropdownMenuLabel>{profileLabel}</DropdownMenuLabel>
+                <DropdownMenuLabel className="truncate">{profileLabel}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link href="/profile" className="flex items-center gap-2">
                     <User className="size-4" />
-                    Profile
+                    Profilo
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link href="/settings" className="flex items-center gap-2">
                     <Settings className="size-4" />
-                    Settings
+                    Impostazioni
                   </Link>
                 </DropdownMenuItem>
                 {isAdmin && (
                   <DropdownMenuItem asChild>
                     <Link href="/admin/reports" className="flex items-center gap-2">
                       <Shield className="size-4" />
-                      Moderation
+                      Moderazione
                     </Link>
-                  </DropdownMenuItem>
-                )}
-                {switchable && toggleTheme && (
-                  <DropdownMenuItem onClick={() => toggleTheme()}>
-                    {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-                    Theme: {theme === "dark" ? "Dark" : "Light"}
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onClick={() => void handleLogout()}>
                   <LogOut className="size-4" />
-                  {isLoggingOut ? "Signing out..." : "Sign out"}
+                  {isLoggingOut ? "Uscita…" : "Esci"}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -601,258 +378,161 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <nav
         data-tour="main-navigation"
-        className="fixed bottom-0 left-0 right-0 z-50 border-t border-border/50 bg-background/90 backdrop-blur-xl lg:hidden"
+        aria-label="Navigazione principale"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background lg:hidden"
       >
-        <div className="mx-auto grid h-16 max-w-3xl grid-cols-5 gap-1 px-2">
-          <Link
-            href="/home"
-            className={cn(
-              "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors",
-              isHomePath(path)
-                ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-card/45",
-            )}
-            aria-current={isHomePath(path) ? "page" : undefined}
-          >
-            <LayoutDashboard className="size-4" />
-            <span className="leading-none">Home</span>
-          </Link>
-
-          <Link
-            href="/track"
-            data-tour="track-section"
-            className={cn(
-              "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors",
-              isTrainingPath(path) || isChallengesPath(path) || isLeaderboardPath(path)
-                ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-card/45",
-            )}
-            aria-current={isTrainingPath(path) || isChallengesPath(path) || isLeaderboardPath(path) ? "page" : undefined}
-          >
-            <Waves className="size-4" />
-            <span className="leading-none">Training</span>
-          </Link>
-
-          <button
-            type="button"
-            data-tour="create-post"
-            onClick={() => {
-              setMobileSectionsOpen(false)
-              setMobileCreateMenuOpen((prev) => !prev)
-            }}
-            className={cn(
-              "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors",
-              mobileCreateMenuOpen
-                ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
-                : "text-[var(--electric-cyan)] hover:bg-card/45",
-            )}
-            aria-expanded={mobileCreateMenuOpen}
-            aria-label="Crea"
-          >
-            <Plus className="size-4" />
-            <span className="leading-none">Crea</span>
-          </button>
-
-          <Link
-            href="/home/community"
-            data-tour="club-directory"
-            className={cn(
-              "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors",
-              isClubPath(path)
-                ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-card/45",
-            )}
-            aria-current={isClubPath(path) ? "page" : undefined}
-          >
-            <Users className="size-4" />
-            <span className="leading-none">Club</span>
-          </Link>
-
-          <button
-            type="button"
-            onClick={() => {
-              setMobileCreateMenuOpen(false)
-              setMobileSectionsOpen((prev) => !prev)
-            }}
-            className={cn(
-              "flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-1 rounded-xl text-[10px] font-semibold transition-colors",
-              mobileSectionsOpen
-                ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-card/45",
-            )}
-            aria-expanded={mobileSectionsOpen}
-            aria-label="Sezioni"
-          >
-            <Grid2x2 className="size-4" />
-            <span className="leading-none">Sezioni</span>
-          </button>
+        <div className="mx-auto grid h-16 max-w-3xl grid-cols-5 px-1">
+          {NAV_TABS.map((tab, index) => {
+            const Icon = TAB_ICONS[tab.id]
+            const active = activeTab === tab.id
+            const link = (
+              <Link
+                key={tab.id}
+                href={tab.path}
+                data-tour={tab.dataTour}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex min-h-[44px] flex-col items-center justify-center gap-1 text-xs font-semibold transition-colors",
+                  active ? "text-action-text" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Icon className="size-6" aria-hidden />
+                <span className="leading-none">{tab.label}</span>
+              </Link>
+            )
+            if (index !== 2) return link
+            return (
+              <React.Fragment key={tab.id}>
+                <div className="flex items-center justify-center">
+                  <button
+                    type="button"
+                    data-tour="create-post"
+                    onClick={() => setMobileCreateMenuOpen((open) => !open)}
+                    aria-expanded={mobileCreateMenuOpen}
+                    aria-haspopup="dialog"
+                    aria-label="Crea"
+                    className="inline-flex size-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground transition-colors hover:bg-primary/90 active:bg-primary/80"
+                  >
+                    <Plus className="size-6" aria-hidden />
+                  </button>
+                </div>
+                {link}
+              </React.Fragment>
+            )
+          })}
         </div>
       </nav>
+
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[232px] flex-col border-r border-border bg-background px-3 pb-4 pt-20 lg:flex">
+        <nav data-tour="main-navigation" aria-label="Navigazione" className="space-y-1">
+          {NAV_TABS.map((tab) => {
+            const Icon = TAB_ICONS[tab.id]
+            const active = activeTab === tab.id
+            return (
+              <Link
+                key={tab.id}
+                href={tab.path}
+                data-tour={tab.dataTour}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] font-semibold transition-colors",
+                  active ? "bg-raised text-foreground" : "text-muted-foreground hover:bg-raised hover:text-foreground",
+                )}
+              >
+                <Icon className={cn("size-5", active && "text-action-text")} aria-hidden />
+                {tab.label}
+              </Link>
+            )
+          })}
+        </nav>
+
+        <Button
+          type="button"
+          data-tour="create-post"
+          onClick={() => setRailCreateMenuOpen((open) => !open)}
+          aria-expanded={railCreateMenuOpen}
+          className="mt-4 w-full justify-start"
+        >
+          <Plus className="size-5" aria-hidden />
+          Crea
+        </Button>
+
+        <AnimatePresence initial={false}>
+          {railCreateMenuOpen ? (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="mt-2 rounded-2xl border border-border bg-card p-1"
+            >
+              <CreateMenuList
+                onAction={runCreateAction}
+                onNavigate={closeCreateMenus}
+                isGarminSyncing={garminSync.isPending}
+              />
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
+      </aside>
 
       <AnimatePresence>
         {mobileCreateMenuOpen ? (
           <motion.div
-            className="fixed inset-0 z-[60] bg-black/45 backdrop-blur-[1px] lg:hidden"
+            className="fixed inset-0 z-[60] bg-black/50 lg:hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setMobileCreateMenuOpen(false)}
           >
             <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Crea"
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 20, opacity: 0 }}
               transition={{ duration: 0.18, ease: "easeOut" }}
-              className="absolute bottom-[76px] left-2 right-2 rounded-2xl border border-border/70 bg-card/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.45)]"
+              className="absolute inset-x-2 bottom-[76px] rounded-2xl border border-border bg-card p-2"
               onClick={(event) => event.stopPropagation()}
             >
-              <div className="mb-1 flex items-center justify-between px-2 py-1.5">
-                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Crea</span>
-                <button
+              <div className="flex items-center justify-between px-3 py-1">
+                <span className="text-sm font-semibold text-muted-foreground">Crea</span>
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={() => setMobileCreateMenuOpen(false)}
-                  className="rounded-md p-1 text-muted-foreground hover:bg-background/60 hover:text-foreground"
-                  aria-label="Chiudi crea"
+                  aria-label="Chiudi"
+                  className="-mr-2 text-muted-foreground"
                 >
-                  <X className="size-4" />
-                </button>
+                  <X className="size-5" />
+                </Button>
               </div>
-              <div className="space-y-1">
-                {mobileCreateItems.map((item, index) => (
-                  item.path ? (
-                    <Link
-                      key={`${item.label}-${index}`}
-                      href={item.path}
-                      onClick={() => setMobileCreateMenuOpen(false)}
-                      className="flex h-11 items-center justify-between rounded-xl px-3 text-sm text-foreground transition-colors hover:bg-background/60"
-                    >
-                      <span className="whitespace-nowrap">{item.label}</span>
-                      <span className="text-[var(--electric-cyan)]">{item.icon}</span>
-                    </Link>
-                  ) : (
-                    <button
-                      key={`${item.label}-${index}`}
-                      type="button"
-                      onClick={() => {
-                        if (item.action === "create-post") {
-                          setCreatePostInitialContent(undefined)
-                          setCreatePostPbShareTracking(undefined)
-                          setIsCreatePostOpen(true)
-                        }
-                        if (item.action === "create-ai-post") {
-                          setCreatePostInitialContent(
-                            "Bozza IA:\n\nAllenamento completato oggi. Ecco i punti chiave:\n- Sensazioni in acqua:\n- Metrica migliore:\n- Cosa migliorare nella prossima sessione:\n\n#swimforge #training",
-                          )
-                          setCreatePostPbShareTracking(undefined)
-                          setIsCreatePostOpen(true)
-                        }
-                        setMobileCreateMenuOpen(false)
-                      }}
-                      className="flex h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm text-foreground transition-colors hover:bg-background/60"
-                    >
-                      <span className="whitespace-nowrap">{item.label}</span>
-                      <span className="text-[var(--electric-cyan)]">{item.icon}</span>
-                    </button>
-                  )
-                ))}
-              </div>
+              <CreateMenuList
+                onAction={runCreateAction}
+                onNavigate={closeCreateMenus}
+                isGarminSyncing={garminSync.isPending}
+              />
             </motion.div>
           </motion.div>
         ) : null}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {mobileSectionsOpen ? (
-          <motion.div
-            className="fixed inset-0 z-[60] bg-black/45 backdrop-blur-[1px] lg:hidden"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setMobileSectionsOpen(false)}
-          >
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-              className="absolute bottom-[76px] left-2 right-2 rounded-2xl border border-border/70 bg-card/95 p-2 shadow-[0_20px_40px_rgba(0,0,0,0.45)]"
-              onClick={(event) => event.stopPropagation()}
-            >
-              <div className="mb-1 flex items-center justify-between px-2 py-1.5">
-                <span className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">Sezioni</span>
-                <button
-                  type="button"
-                  onClick={() => setMobileSectionsOpen(false)}
-                  className="rounded-md p-1 text-muted-foreground hover:bg-background/60 hover:text-foreground"
-                  aria-label="Chiudi sezioni"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-1">
-                {mobileSectionsItems.map((item) => {
-                  const active = item.match ? item.match(path) : path.startsWith(item.path)
-                  return (
-                    <Link
-                      key={item.path}
-                      href={item.path}
-                      onClick={() => setMobileSectionsOpen(false)}
-                      data-tour={item.dataTour}
-                      className={cn(
-                        "flex h-11 items-center justify-between rounded-xl border border-border/60 px-3 text-sm transition-colors",
-                        active
-                          ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
-                          : "text-foreground hover:bg-background/60",
-                      )}
-                    >
-                      <span className="truncate">{item.label}</span>
-                      <span className="text-[var(--electric-cyan)]">{item.icon}</span>
-                    </Link>
-                  )
-                })}
-                <Link
-                  href="/profile"
-                  data-tour="profile-stats"
-                  onClick={() => setMobileSectionsOpen(false)}
-                  className={cn(
-                    "flex h-11 items-center justify-between rounded-xl border border-border/60 px-3 text-sm transition-colors",
-                    isProfilePath(path)
-                      ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
-                      : "text-foreground hover:bg-background/60",
-                  )}
-                >
-                  <span>Profile</span>
-                  <User className="size-4 text-[var(--electric-cyan)]" />
-                </Link>
-                <Link
-                  href="/settings"
-                  onClick={() => setMobileSectionsOpen(false)}
-                  className={cn(
-                    "flex h-11 items-center justify-between rounded-xl border border-border/60 px-3 text-sm transition-colors",
-                    path.startsWith("/settings")
-                      ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),color-mix(in_oklch,var(--electric-lime)_12%,transparent))] text-foreground"
-                      : "text-foreground hover:bg-background/60",
-                  )}
-                >
-                  <span>Settings</span>
-                  <Settings className="size-4 text-[var(--electric-cyan)]" />
-                </Link>
-              </div>
-            </motion.div>
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-
-      <main className="min-h-[calc(100dvh-72px)] pb-20 pt-[84px] lg:pb-0 lg:pl-[92px]">
-        <div className="mx-auto max-w-[1600px] p-4 md:p-6">
-          <div className="mb-2 text-xs uppercase tracking-[0.14em] text-muted-foreground/80 lg:hidden">{pageTitle}</div>
+      <main className="min-h-[100dvh] pb-24 pt-20 lg:pb-8 lg:pl-[232px]">
+        <div className="mx-auto max-w-[1100px] px-4 md:px-6">
+          {hub ? (
+            <SectionTabs
+              tabs={HUB_TABS[hub]}
+              ariaLabel={hub === "train" ? "Sezioni di Allena" : "Sezioni di Community"}
+            />
+          ) : null}
           <AnimatePresence mode="wait" initial={false}>
             <motion.div
               key={location}
-              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8, filter: "blur(2px)" }}
-              animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: "blur(0px)" }}
-              exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -6, filter: "blur(2px)" }}
+              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
+              animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
+              exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -6 }}
               transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: "easeOut" }}
             >
               {children}

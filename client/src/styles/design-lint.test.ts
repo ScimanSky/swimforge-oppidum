@@ -45,7 +45,6 @@ const EXEMPT: Partial<Record<Rule, readonly string[]>> = {
 const PENDING: Record<Rule, string[]> = {
   "testo-piccolo": [
     "components/DirectMessages.tsx",
-    "components/app/app-shell.tsx",
     "components/club/ClubDocumentsPanel.tsx",
     "components/club/ClubFeedTab.tsx",
     "components/club/ClubHero.tsx",
@@ -93,7 +92,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/ActivityInsightNotification.tsx",
     "components/DirectMessages.tsx",
     "components/PbCelebrationNotification.tsx",
-    "components/app/app-shell.tsx",
     "components/club/ClubDocumentsPanel.tsx",
     "components/club/ClubEventsPanel.tsx",
     "components/club/HistoryMetricCircle.tsx",
@@ -134,7 +132,6 @@ const PENDING: Record<Rule, string[]> = {
   ],
   "token-legacy": [
     "components/DirectMessages.tsx",
-    "components/app/app-shell.tsx",
     "components/club/ClubFeedTab.tsx",
     "components/club/ClubHero.tsx",
     "components/club/PulseBar.tsx",
@@ -224,7 +221,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/BadgeUnlockNotification.tsx",
     "components/DirectMessages.tsx",
     "components/PbCelebrationNotification.tsx",
-    "components/app/app-shell.tsx",
     "components/club/ClubFeedTab.tsx",
     "components/club/ClubHero.tsx",
     "components/club/HistoryMetricCircle.tsx",
@@ -259,7 +255,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/BadgeUnlockNotification.tsx",
     "components/CookieBanner.tsx",
     "components/PbCelebrationNotification.tsx",
-    "components/app/app-shell.tsx",
     "components/club/HistoryMetricCircle.tsx",
     "components/metrics/MetricOrb.tsx",
     "components/social/FeedPost.tsx",
