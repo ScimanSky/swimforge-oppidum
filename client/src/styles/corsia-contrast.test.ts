@@ -5,13 +5,25 @@ import { describe, expect, it } from "vitest";
 // path.resolve, not `new URL(..., import.meta.url)`: Vite rewrites that pattern into an asset URL.
 const css = readFileSync(path.resolve(import.meta.dirname, "../index.css"), "utf8");
 
-/** Custom properties declared directly in `selector { ... }` (no nesting in these blocks). */
+const lines = css.split("\n");
+
+/**
+ * Custom properties declared directly in the theme block `selector { ... }` (no nesting in
+ * these blocks). Only a block whose selector list is just `selector` counts: derived blocks
+ * such as `:root,\n.dark {` (previous line ends with a comma) are skipped, and exactly one
+ * theme block must remain, so a reordering or a duplicate cannot pick the wrong one.
+ */
 function block(selector: string): Record<string, string> {
-  const start = css.indexOf(`\n${selector} {`);
-  if (start < 0) throw new Error(`blocco ${selector} non trovato in index.css`);
-  const end = css.indexOf("\n}", start + 1);
+  const starts = lines.flatMap((line, index) =>
+    line === `${selector} {` && !(lines[index - 1] ?? "").trimEnd().endsWith(",") ? [index] : [],
+  );
+  if (starts.length !== 1) {
+    throw new Error(`atteso un solo blocco «${selector} {» in index.css, trovati ${starts.length}`);
+  }
+  const end = lines.indexOf("}", starts[0]);
+  if (end < 0) throw new Error(`blocco ${selector} senza chiusura in index.css`);
   const tokens: Record<string, string> = {};
-  for (const match of css.slice(start, end).matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) {
+  for (const match of lines.slice(starts[0], end).join("\n").matchAll(/--([a-z0-9-]+):\s*([^;]+);/g)) {
     tokens[match[1]] = match[2].trim();
   }
   return tokens;
