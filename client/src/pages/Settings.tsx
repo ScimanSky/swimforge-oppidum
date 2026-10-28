@@ -44,6 +44,7 @@ import { trpc } from "@/lib/trpc"
 import { supabase } from "@/lib/supabase"
 import { registerPushToken, unregisterPushToken } from "@/lib/push"
 import { clearNativeSessionToken } from "@/lib/session-token"
+import { UNAUTHED_ERR_MSG } from "@shared/const"
 import { ONBOARDING_FORCE_QUERY_PARAM } from "@/lib/onboarding"
 import { formatDistanceToNow } from "date-fns"
 import { it } from "date-fns/locale"
@@ -445,8 +446,9 @@ export default function Settings() {
       window.location.href = "/login"
     },
     onError: (error) => {
-      // Still signed in: restore the push registration removed before the call.
-      void registerPushToken()
+      // Still signed in (not an expired session): restore the push registration removed
+      // before the call. A wrong password is UNAUTHORIZED too, but keeps the session.
+      if (error.message !== UNAUTHED_ERR_MSG) void registerPushToken()
       toast.error(error.message || "Impossibile disconnettere tutte le sessioni.")
     },
   })
@@ -468,8 +470,9 @@ export default function Settings() {
       window.location.href = "/"
     },
     onError: (error) => {
-      // Still signed in: restore the push registration removed before the call.
-      void registerPushToken()
+      // Still signed in (not an expired session): restore the push registration removed
+      // before the call. A wrong password is UNAUTHORIZED too, but keeps the session.
+      if (error.message !== UNAUTHED_ERR_MSG) void registerPushToken()
       toast.error(error.message || "Impossibile eliminare l'account.")
     },
   })
@@ -492,6 +495,8 @@ export default function Settings() {
     },
   })
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  // True while the push token is removed before logout-all / delete (buttons disabled).
+  const [isUnregistering, setIsUnregistering] = useState(false)
   const [deletePassword, setDeletePassword] = useState("")
   const [resetDialogOpen, setResetDialogOpen] = useState(false)
   const [resetConfirmationText, setResetConfirmationText] = useState("")
@@ -791,8 +796,14 @@ export default function Settings() {
   }
 
   const handleLogoutAllDevices = async () => {
+    if (isUnregistering || logoutAllDevicesMutation.isPending) return
     // Before the server call: push.unregister needs the session.
-    await unregisterPushToken()
+    setIsUnregistering(true)
+    try {
+      await unregisterPushToken()
+    } finally {
+      setIsUnregistering(false)
+    }
     logoutAllDevicesMutation.mutate()
   }
 
@@ -801,8 +812,14 @@ export default function Settings() {
       toast.error("Inserisci la password per confermare l'eliminazione.")
       return
     }
+    if (isUnregistering || deleteAccountMutation.isPending) return
     // Before the server call: push.unregister needs the session.
-    await unregisterPushToken()
+    setIsUnregistering(true)
+    try {
+      await unregisterPushToken()
+    } finally {
+      setIsUnregistering(false)
+    }
     deleteAccountMutation.mutate(
       deleteRequiresPassword ? { password: deletePassword.trim() } : {}
     )
@@ -1599,10 +1616,10 @@ export default function Settings() {
                   variant="outline-neon"
                   className="gap-2 text-destructive bg-transparent"
                   onClick={() => void handleLogoutAllDevices()}
-                  disabled={logoutAllDevicesMutation.isPending}
+                  disabled={isUnregistering || logoutAllDevicesMutation.isPending}
                 >
                   <LogOut className="w-4 h-4" />
-                  {logoutAllDevicesMutation.isPending ? "Logout..." : "Logout"}
+                  {isUnregistering || logoutAllDevicesMutation.isPending ? "Logout..." : "Logout"}
                 </Button>
               </div>
               <div className="flex items-center justify-between p-4 rounded-lg bg-destructive/10">
@@ -1689,7 +1706,7 @@ export default function Settings() {
             <Button
               variant="outline-neon"
               onClick={() => setDeleteDialogOpen(false)}
-              disabled={deleteAccountMutation.isPending}
+              disabled={isUnregistering || deleteAccountMutation.isPending}
             >
               Annulla
             </Button>
@@ -1697,11 +1714,12 @@ export default function Settings() {
               variant="destructive"
               onClick={() => void handleDeleteAccount()}
               disabled={
+                isUnregistering ||
                 deleteAccountMutation.isPending ||
                 (deleteRequiresPassword && deletePassword.trim().length === 0)
               }
             >
-              {deleteAccountMutation.isPending ? "Eliminazione..." : "Conferma eliminazione"}
+              {isUnregistering || deleteAccountMutation.isPending ? "Eliminazione..." : "Conferma eliminazione"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -36,6 +36,7 @@ import {
   resolvePushUrl,
   setPushNavigate,
   unregisterPushToken,
+  unregisterPushTokenLocally,
 } from "./push";
 
 const TOKEN = "fcm-token-0123456789abcdef";
@@ -101,6 +102,23 @@ describe("registerPushToken", () => {
     expect(mocks.register).not.toHaveBeenCalled();
   });
 
+  it("shares one attempt between concurrent calls", async () => {
+    await Promise.all([registerPushToken(), registerPushToken()]);
+    expect(PushNotifications.checkPermissions).toHaveBeenCalledTimes(1);
+    expect(PushNotifications.register).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not keep a token that push.register rejected", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mocks.register.mockRejectedValueOnce(new Error("UNAUTHORIZED"));
+    await registerPushToken();
+    await emit("registration", { value: TOKEN });
+    await unregisterPushToken();
+    expect(mocks.unregister).not.toHaveBeenCalled();
+    expect(PushNotifications.unregister).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
   it("adds the listeners once across calls", async () => {
     await registerPushToken();
     await registerPushToken();
@@ -153,19 +171,63 @@ describe("unregisterPushToken", () => {
     mocks.listeners.clear();
   });
 
-  it("removes the registered token from the server, then from FCM", async () => {
+  it("deletes the token on the device first, then on the server", async () => {
     await registerPushToken();
     await emit("registration", { value: TOKEN });
     await unregisterPushToken();
     expect(mocks.unregister).toHaveBeenCalledWith({ token: TOKEN });
     expect(PushNotifications.unregister).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(mocks.unregister).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(PushNotifications.unregister).mock.invocationCallOrder[0],
+    expect(vi.mocked(PushNotifications.unregister).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(mocks.unregister).mock.invocationCallOrder[0],
     );
 
     // The token is forgotten: a second logout only touches FCM.
     await unregisterPushToken();
     expect(mocks.unregister).toHaveBeenCalledTimes(1);
+  });
+
+  it("gives up on the server after 3 s", async () => {
+    await registerPushToken();
+    await emit("registration", { value: TOKEN });
+    vi.useFakeTimers();
+    try {
+      mocks.unregister.mockImplementationOnce(() => new Promise(() => {}));
+      let done = false;
+      const pending = unregisterPushToken().then(() => {
+        done = true;
+      });
+      await vi.advanceTimersByTimeAsync(2999);
+      expect(done).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      await pending;
+      expect(done).toBe(true);
+      expect(PushNotifications.unregister).toHaveBeenCalledTimes(1);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("clears its timer when the server answers in time", async () => {
+    await registerPushToken();
+    await emit("registration", { value: TOKEN });
+    vi.useFakeTimers();
+    try {
+      await unregisterPushToken();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("locally: deletes the device token without calling the server, and forgets it", async () => {
+    await registerPushToken();
+    await emit("registration", { value: TOKEN });
+    await unregisterPushTokenLocally();
+    expect(PushNotifications.unregister).toHaveBeenCalledTimes(1);
+    expect(mocks.unregister).not.toHaveBeenCalled();
+    await unregisterPushToken();
+    expect(mocks.unregister).not.toHaveBeenCalled();
   });
 
   it("skips the server without a token and ignores failures", async () => {

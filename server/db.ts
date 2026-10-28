@@ -1261,6 +1261,9 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
     // Consent audit
     await deleteFromIfExists(tx, "public.user_consents", sql`user_id = ${userId}`);
 
+    // Push device tokens (no FK to users)
+    await deleteFromIfExists(tx, "public.device_tokens", sql`user_id = ${userId}`);
+
     // Final identity rows
     await deleteFromIfExists(tx, "public.user_goals", sql`user_id = ${userId}`);
     await deleteFromIfExists(tx, "public.swimmer_profiles", sql`user_id = ${userId}`);

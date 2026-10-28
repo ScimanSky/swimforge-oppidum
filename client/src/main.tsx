@@ -5,8 +5,8 @@ import { TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { getLoginUrl } from "./const";
-import { unregisterPushToken } from "@/lib/push";
-import { clearNativeSessionToken, loadNativeSessionToken } from "@/lib/session-token";
+import { endExpiredSession } from "@/lib/session-expired";
+import { loadNativeSessionToken } from "@/lib/session-token";
 import { createTrpcLinks } from "@/lib/trpc-client";
 import "./index.css";
 
@@ -20,11 +20,10 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  // The session is already invalid: push.unregister fails, but the FCM token is deleted
-  // on the device, so the server prunes its row on the next send.
-  void unregisterPushToken();
-  clearNativeSessionToken();
-  window.location.href = getLoginUrl();
+  // Device-side push cleanup first (awaited, max 1 s), then token clear and redirect.
+  void endExpiredSession(() => {
+    window.location.href = getLoginUrl();
+  });
 };
 
 queryClient.getQueryCache().subscribe(event => {

@@ -8,7 +8,9 @@ const config: CapacitorConfig = {
   plugins: {
     SplashScreen: { launchAutoHide: false, backgroundColor: "#0A1520" },
     StatusBar: { style: "DARK", overlaysWebView: false },
-    PushNotifications: { presentationOptions: ["badge", "sound", "alert"] },
+    // No "alert": in the foreground the plugin would post its own system notification on top
+    // of the in-app sonner toast (lib/push.ts). Background notifications are unaffected.
+    PushNotifications: { presentationOptions: ["badge", "sound"] },
   },
 };
 

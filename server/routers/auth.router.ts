@@ -13,6 +13,7 @@ import { ENV } from "../_core/env";
 import { ensureRequiredLegalConsents } from "../consent";
 import { markUserOffline, touchUserPresence } from "../user_presence";
 import { deleteFromIfExists } from "../lib/relation-exists";
+import { deleteUserDeviceTokens } from "../db_device_tokens";
 
 const DEV_RESET_EMAIL = (process.env.RESET_APP_ALLOWED_EMAIL ?? process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
 const RESET_CONFIRMATION_PHRASE = "RESET APP";
@@ -233,6 +234,8 @@ export const authRouter = router({
 
     logoutAllDevices: protectedProcedure.mutation(async ({ ctx }) => {
         await db.incrementSessionTokenVersion(ctx.user.id);
+        // Every session is now invalid: no device may keep receiving this user's pushes.
+        await deleteUserDeviceTokens(ctx.user.id);
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.clearCookie(COOKIE_NAME, cookieOptions);
         return { success: true } as const;

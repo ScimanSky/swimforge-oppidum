@@ -47,6 +47,12 @@ export async function deleteDeviceToken(userId: number, token: string): Promise<
   await db.delete(deviceTokens).where(and(eq(deviceTokens.userId, userId), eq(deviceTokens.token, token)));
 }
 
+/** Removes every token of the user (logout from all devices). */
+export async function deleteUserDeviceTokens(userId: number): Promise<void> {
+  const db = await requireDb();
+  await db.delete(deviceTokens).where(eq(deviceTokens.userId, userId));
+}
+
 export async function listUserDeviceTokens(userId: number): Promise<string[]> {
   const db = await getDb();
   if (!db) return [];

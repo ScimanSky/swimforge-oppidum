@@ -36,6 +36,24 @@ export function resolvePushUrl(data: unknown): string {
   return url;
 }
 
+/** Resolves with `promise` or after `ms`, whichever comes first; never rejects; clears its timer. */
+export async function settleWithin(promise: Promise<unknown>, ms: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      promise.then(
+        () => {},
+        () => {},
+      ),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 function appVersion(): string {
   return typeof __APP_VERSION__ === "string" && __APP_VERSION__ ? __APP_VERSION__ : "dev";
 }
@@ -107,21 +125,29 @@ export function registerPushToken(): Promise<void> {
 }
 
 /**
- * Native only (no-op on the web): removes the token from the server (needs the session, so
- * call it before the server logout; capped at 3 s) and deletes it on the device, so a token
- * left on the server goes stale and is pruned on the next send. Never throws.
+ * Native only (no-op on the web), device side only: deletes the FCM token and forgets it.
+ * For an already invalid session (401): a row left on the server goes stale and is pruned
+ * on the next send. Never throws.
+ */
+export async function unregisterPushTokenLocally(): Promise<void> {
+  if (!isNativePlatform()) return;
+  currentToken = null;
+  await PushNotifications.unregister().catch(() => {});
+}
+
+/**
+ * Native only (no-op on the web), explicit logout: deletes the FCM token on the device first
+ * (so the device stops receiving even if the network call fails), then removes the row from
+ * the server (needs the session, so call it before the server logout; capped at 3 s).
+ * Never throws.
  */
 export async function unregisterPushToken(): Promise<void> {
   if (!isNativePlatform()) return;
   const token = currentToken;
-  currentToken = null;
+  await unregisterPushTokenLocally();
   if (token) {
-    await Promise.race([
-      vanillaTrpc.push.unregister.mutate({ token }).catch(() => {}),
-      new Promise<void>((resolve) => setTimeout(resolve, UNREGISTER_TIMEOUT_MS)),
-    ]);
+    await settleWithin(vanillaTrpc.push.unregister.mutate({ token }), UNREGISTER_TIMEOUT_MS);
   }
-  await PushNotifications.unregister().catch(() => {});
 }
 
 /** Test helper: resets the module state. */
