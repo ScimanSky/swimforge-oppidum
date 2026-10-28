@@ -1,0 +1,114 @@
+import { describe, expect, it } from "vitest";
+import {
+  activeTabForPath,
+  homePathForPlatform,
+  hubForPath,
+  normalizePath,
+  pageTitleForPath,
+  parentPathForPath,
+} from "./navigation";
+
+describe("normalizePath", () => {
+  it("toglie query, hash e barra finale", () => {
+    expect(normalizePath("/track/?x=1#a")).toBe("/track");
+    expect(normalizePath("/track#a")).toBe("/track");
+    expect(normalizePath("/")).toBe("/");
+    expect(normalizePath("")).toBe("/");
+    expect(normalizePath("?x=1")).toBe("/");
+  });
+});
+
+describe("activeTabForPath", () => {
+  it.each([
+    ["/today", "today"],
+    ["/home", "feed"],
+    ["/post/9", "feed"],
+    ["/track", "train"],
+    ["/track/4", "train"],
+    ["/goals", "train"],
+    ["/profile/performance", "train"],
+    ["/coach", "train"],
+    ["/home/community", "community"],
+    ["/community/club/3", "community"],
+    ["/leaderboard", "community"],
+    ["/challenges/2", "community"],
+    ["/profile", null],
+    ["/messages", null],
+    ["/settings", null],
+    ["/badges", null],
+  ])("%s → %s", (path, tab) => {
+    expect(activeTabForPath(path)).toBe(tab);
+  });
+
+  it("ignora query e barra finale", () => {
+    expect(activeTabForPath("/track/?from=today")).toBe("train");
+  });
+
+  it("non confonde prefissi simili", () => {
+    expect(activeTabForPath("/homepage")).toBeNull();
+    expect(activeTabForPath("/tracker")).toBeNull();
+  });
+});
+
+describe("hubForPath", () => {
+  it.each([
+    ["/track", "train"],
+    ["/goals", "train"],
+    ["/coach", "train"],
+    ["/track/4", null],
+    ["/home/community", "community"],
+    ["/leaderboard", "community"],
+    ["/challenges", "community"],
+    ["/challenges/2", null],
+    ["/community/club/3", null],
+  ])("%s → %s", (path, hub) => {
+    expect(hubForPath(path)).toBe(hub);
+  });
+});
+
+describe("pageTitleForPath", () => {
+  it.each([
+    ["/today", "Oggi"],
+    ["/home", "Feed"],
+    ["/track", "Allena"],
+    ["/track/4", "Allena"],
+    ["/home/community", "Community"],
+    ["/challenges/2", "Sfida"],
+    ["/community/club/3/event/5", "Evento"],
+    ["/community/club/3", "Club"],
+    ["/profile", "Profilo"],
+    ["/settings", "Impostazioni"],
+    ["/messages", "Messaggi"],
+    ["/admin/reports", "Moderazione"],
+  ])("%s → %s", (path, title) => {
+    expect(pageTitleForPath(path)).toBe(title);
+  });
+
+  it("ricade su SwimForge per le rotte sconosciute", () => {
+    expect(pageTitleForPath("/unknown")).toBe("SwimForge");
+  });
+});
+
+describe("parentPathForPath", () => {
+  it.each([
+    ["/track/4", "/track"],
+    ["/post/9", "/home"],
+    ["/challenges/2", "/challenges"],
+    ["/community/club/3/workouts", "/community/club/3"],
+    ["/community/club/3", "/home/community"],
+    ["/u/8", "/profile"],
+    ["/home", null],
+    ["/today", null],
+    ["/track", null],
+    ["/messages", null],
+  ])("%s → %s", (path, parent) => {
+    expect(parentPathForPath(path)).toBe(parent);
+  });
+});
+
+describe("homePathForPlatform", () => {
+  it("app nativa su Oggi, sito sul Feed", () => {
+    expect(homePathForPlatform(true)).toBe("/today");
+    expect(homePathForPlatform(false)).toBe("/home");
+  });
+});
