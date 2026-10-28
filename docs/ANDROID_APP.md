@@ -59,6 +59,10 @@ Conferma email e reset password puntano al sito pubblico (`VITE_PUBLIC_SITE_URL`
   token non validi sono eliminati dal server.
 - In foreground la notifica e' mostrata come toast in-app; il tap apre `data.url`.
 
+Privacy: la notifica di un messaggio diretto contiene il nome del mittente e i primi 100
+caratteri del testo; transita sui server FCM di Google e compare sulla schermata di blocco.
+Un'opzione "senza anteprima" è prevista in una fase successiva.
+
 ## Tasto Indietro
 
 Torna indietro nella cronologia; esce dall'app dalla home (`/home`) o se non c'e' cronologia.

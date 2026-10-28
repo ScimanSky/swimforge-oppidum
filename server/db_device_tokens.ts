@@ -1,4 +1,5 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { deleteFromIfExists } from "./lib/relation-exists";
 import { deviceTokens, swimmerProfiles } from "../drizzle/schema";
 import { getDb } from "./db";
 
@@ -47,10 +48,14 @@ export async function deleteDeviceToken(userId: number, token: string): Promise<
   await db.delete(deviceTokens).where(and(eq(deviceTokens.userId, userId), eq(deviceTokens.token, token)));
 }
 
-/** Removes every token of the user (logout from all devices). */
+/**
+ * Removes every token of the user (logout from all devices).
+ * Tolerates a missing table so that logout never fails because of push bookkeeping
+ * (the deploy does not run migrations: 0034 may land after the code).
+ */
 export async function deleteUserDeviceTokens(userId: number): Promise<void> {
   const db = await requireDb();
-  await db.delete(deviceTokens).where(eq(deviceTokens.userId, userId));
+  await deleteFromIfExists(db, "public.device_tokens", sql`user_id = ${userId}`);
 }
 
 export async function listUserDeviceTokens(userId: number): Promise<string[]> {
