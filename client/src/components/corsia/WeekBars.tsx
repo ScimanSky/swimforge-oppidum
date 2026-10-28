@@ -9,9 +9,9 @@ import type { WeekDay } from "@/lib/week-summary";
 export function WeekBars({ days }: { days: readonly WeekDay[] }) {
   const max = Math.max(1, ...days.map(day => day.meters));
   return (
-    <div className="flex items-end gap-2" aria-hidden>
+    <div className="flex shrink-0 items-end gap-1.5" aria-hidden>
       {days.map((day, index) => (
-        <div key={index} className="flex w-6 flex-col items-center gap-1.5">
+        <div key={index} className="flex w-4 flex-col items-center gap-1.5">
           <div className="flex h-16 w-full items-end">
             <div
               className={cn(

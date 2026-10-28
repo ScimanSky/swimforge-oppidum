@@ -45,12 +45,17 @@ export function Metric({
         )}
       >
         {value}
+        {/* A real space, not a margin: «3,2 km» also when read as text. */}
         {unit ? (
-          <span className="ml-1 text-[0.5em] font-semibold text-muted-foreground">
-            {unit}
-          </span>
+          <>
+            {" "}
+            <span className="text-[0.5em] font-semibold text-muted-foreground">
+              {unit}
+            </span>
+          </>
         ) : null}
       </span>
+      {/* Not rendered between blocks; keeps «km Distanza» apart in accessible text. */}{" "}
       <span className="mt-1.5 block truncate text-xs font-medium text-muted-foreground">
         {label}
       </span>

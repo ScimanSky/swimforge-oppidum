@@ -1,5 +1,6 @@
 type DateInput = string | Date
-const NO_VALUE = "—"
+/** Placeholder for a missing value. */
+export const NO_VALUE = "—"
 
 /** Date or null when missing or unparsable (never an Invalid Date). */
 const toDate = (value: DateInput | null | undefined): Date | null => {
@@ -35,11 +36,13 @@ export const formatWeekdayDayMonth = (value: DateInput | null | undefined) => {
   return `${weekdayFmt.format(date)} ${dayMonthFmt.format(date)}`
 }
 
-/** Integer with the Italian thousands separator, always: 8420 → «8.420». */
-export const formatInteger = (value: number) => integerFmt.format(Math.round(value))
+/** Integer with the Italian thousands separator, always: 8420 → «8.420»; «—» if not finite. */
+export const formatInteger = (value: number) =>
+  Number.isFinite(value) ? integerFmt.format(Math.round(value)) : NO_VALUE
 
-/** Kilometres with Italian decimal comma, no unit: 3200 → «3,2». */
-export const formatKm = (meters: number) => kmFmt.format(Math.round(meters / 100) / 10)
+/** Kilometres with Italian decimal comma, no unit: 3200 → «3,2»; «—» if not finite. */
+export const formatKm = (meters: number) =>
+  Number.isFinite(meters) ? kmFmt.format(Math.round(meters / 100) / 10) : NO_VALUE
 
 /** «3,2 km» or «800 m» (chosen after rounding: 999.6 → «1 km»); «—» without a positive value. */
 export const formatDistance = (meters?: number | null) => {

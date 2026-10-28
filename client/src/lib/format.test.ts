@@ -93,4 +93,11 @@ describe("formatter Corsia", () => {
     expect(formatInteger(1_234_567)).toBe("1.234.567");
     expect(formatKm(1_234_500)).toBe("1.234,5");
   });
+
+  it("formatKm e formatInteger: «—» per valori non finiti", () => {
+    for (const value of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      expect(formatKm(value)).toBe("—");
+      expect(formatInteger(value)).toBe("—");
+    }
+  });
 });

@@ -1,10 +1,11 @@
-import { useId } from "react";
+import { Fragment, useId } from "react";
 import { Waves } from "lucide-react";
 import { Link } from "wouter";
 import { Chip } from "./Chip";
-import { Metric } from "./Metric";
+import { Metric, type MetricProps } from "./Metric";
 import { cn } from "@/lib/utils";
 import {
+  NO_VALUE,
   formatDurationParts,
   formatKm,
   formatPaceValue,
@@ -40,14 +41,33 @@ export function ActivityCard(props: ActivityCardProps) {
   const { activity } = props;
   const titleId = useId();
   const metaId = useId();
+  const xpId = useId();
+  const metricsId = useId();
   const openWater = Boolean(activity.isOpenWater);
   const where = openWater
     ? "Acque libere"
     : activity.poolLengthMeters
       ? `Vasca ${activity.poolLengthMeters}m`
       : "Vasca";
+  const date = formatSessionDate(activity.activityDate);
+  // Without a date the line is just the place, never «— · Vasca».
+  const meta = date === NO_VALUE ? where : `${date} · ${where}`;
+  const distance = formatKm(activity.distanceMeters);
   const duration = formatDurationParts(activity.durationSeconds);
   const pace = paceSecondsPer100m(activity);
+  // A metric without data is not shown.
+  const metrics: MetricProps[] = [];
+  if (distance !== NO_VALUE)
+    metrics.push({ value: distance, unit: "km", label: "Distanza" });
+  if (duration)
+    metrics.push({ value: duration.value, unit: duration.unit, label: "Durata" });
+  if (pace)
+    metrics.push({ value: formatPaceValue(pace), label: "Passo /100", tone: "action" });
+  if (activity.avgHeartRate)
+    metrics.push({
+      value: String(Math.round(activity.avgHeartRate)),
+      label: "FC media",
+    });
   const body = (
     <>
       <span className="flex items-start gap-3">
@@ -69,47 +89,37 @@ export function ActivityCard(props: ActivityCardProps) {
             id={metaId}
             className="block truncate text-sm text-muted-foreground"
           >
-            {formatSessionDate(activity.activityDate)} · {where}
+            {meta}
           </span>
         </span>
         {activity.xpEarned ? (
-          <Chip tone="xp">+{activity.xpEarned}</Chip>
+          <Chip tone="xp">
+            <span id={xpId}>
+              +{activity.xpEarned} <span className="sr-only">XP</span>
+            </span>
+          </Chip>
         ) : null}
       </span>
-      <span className="mt-4 grid grid-cols-4 gap-3 border-t border-border pt-4">
-        <Metric
-          value={formatKm(activity.distanceMeters)}
-          unit="km"
-          label="Distanza"
-          size="sm"
-        />
-        {duration ? (
-          <Metric
-            value={duration.value}
-            unit={duration.unit}
-            label="Durata"
-            size="sm"
-          />
-        ) : null}
-        {pace ? (
-          <Metric
-            value={formatPaceValue(pace)}
-            label="Passo /100"
-            tone="action"
-            size="sm"
-          />
-        ) : null}
-        {activity.avgHeartRate ? (
-          <Metric
-            value={String(Math.round(activity.avgHeartRate))}
-            label="FC media"
-            size="sm"
-          />
-        ) : null}
+      <span
+        id={metricsId}
+        className="mt-4 grid grid-cols-4 gap-3 border-t border-border pt-4"
+      >
+        {metrics.map(metric => (
+          // The space keeps the metrics apart when read as text (not rendered in a grid).
+          <Fragment key={metric.label}>
+            <Metric {...metric} size="sm" />{" "}
+          </Fragment>
+        ))}
       </span>
     </>
   );
-  const a11y = { "aria-labelledby": titleId, "aria-describedby": metaId };
+  const a11y = {
+    "aria-labelledby": titleId,
+    // Date and place, XP, then the metrics: the whole card content for screen readers.
+    "aria-describedby": [metaId, activity.xpEarned ? xpId : null, metricsId]
+      .filter(Boolean)
+      .join(" "),
+  };
   const selected = props.onSelect ? Boolean(props.selected) : false;
   const className = cn(
     "surface-panel block w-full p-4 text-left transition-colors hover:border-action-text/40",

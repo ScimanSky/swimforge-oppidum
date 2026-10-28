@@ -10,6 +10,8 @@ import { Chip } from "./Chip";
 import { LevelCard, LevelStrip } from "./LevelCard";
 import { Metric } from "./Metric";
 import { SectionTabs } from "./SectionTabs";
+import { WeekCard } from "./WeekCard";
+import { summarizeWeek } from "@/lib/week-summary";
 
 const withRouter = (path: string, ui: ReactNode) => (
   <Router hook={memoryLocation({ path }).hook}>{ui}</Router>
@@ -174,7 +176,10 @@ describe("primitivi Corsia", () => {
     expect(screen.getByText("+180")).toBeInTheDocument();
     const link = screen.getByRole("link", { name: "Soglia 10×200" });
     expect(link).toHaveAttribute("href", "/track/7");
-    expect(link).toHaveAccessibleDescription("lun 26 ott · 10:47 · Vasca 25m");
+    // Date and place, XP, then the metrics.
+    expect(link).toHaveAccessibleDescription(
+      "lun 26 ott · 10:47 · Vasca 25m +180 XP 3,2 km Distanza 1:02 h Durata 1:52 Passo /100"
+    );
     expect(screen.getByText("1:02")).toBeInTheDocument();
     expect(screen.getByText("1:52")).toHaveClass("text-[24px]");
   });
@@ -191,6 +196,21 @@ describe("primitivi Corsia", () => {
     expect(screen.getByText("FC media")).toBeInTheDocument();
     expect(screen.getByText("142")).toBeInTheDocument();
     expect(screen.queryByText(/^\+/)).toBeNull();
+    // No XP chip: the description goes from the place straight to the metrics.
+    expect(screen.getByRole("link")).toHaveAccessibleDescription(
+      "lun 26 ott · 10:47 · Vasca 25m 3,2 km Distanza 1:02 h Durata 1:52 Passo /100 142 FC media"
+    );
+  });
+
+  it("ActivityCard: una distanza non valida non diventa «— km»", () => {
+    render(
+      withRouter(
+        "/track",
+        <ActivityCard activity={{ ...activity, distanceMeters: Number.NaN }} />
+      )
+    );
+    expect(screen.queryByText("Distanza")).toBeNull();
+    expect(screen.queryByText("—")).toBeNull();
   });
 
   it("ActivityCard: vasca senza lunghezza, data non valida, icona decorativa", () => {
@@ -206,7 +226,10 @@ describe("primitivi Corsia", () => {
         />
       )
     );
-    expect(screen.getByRole("link")).toHaveAccessibleDescription("— · Vasca");
+    // No date: the segment is left out, never «— ·».
+    expect(screen.getByRole("link")).toHaveAccessibleDescription(
+      "Vasca +180 XP 3,2 km Distanza 1:02 h Durata 1:52 Passo /100"
+    );
     const svgs = container.querySelectorAll("svg");
     expect(svgs.length).toBeGreaterThan(0);
     svgs.forEach(svg => expect(svg).toHaveAttribute("aria-hidden", "true"));
@@ -225,7 +248,7 @@ describe("primitivi Corsia", () => {
     expect(button).toHaveAttribute("aria-current", "true");
     expect(button).not.toHaveAttribute("aria-pressed");
     expect(button).toHaveAccessibleDescription(
-      "lun 26 ott · 10:47 · Acque libere"
+      "lun 26 ott · 10:47 · Acque libere +180 XP 3,2 km Distanza 1:02 h Durata 1:52 Passo /100"
     );
     expect(button.querySelector("div, p, section, ul")).toBeNull();
     button.click();
@@ -244,6 +267,19 @@ describe("primitivi Corsia", () => {
     const selectedLink = <ActivityCard activity={activity} selected />;
     expect(both).toBeTruthy();
     expect(selectedLink).toBeTruthy();
+  });
+
+  it("WeekCard: totali come testo, singolare, XP solo se ci sono", () => {
+    const now = new Date(2026, 9, 28, 18);
+    const summary = summarizeWeek(
+      [{ activityDate: new Date(2026, 9, 27, 8), distanceMeters: 12_700, xpEarned: 0 }],
+      now
+    );
+    render(<WeekCard summary={summary} />);
+    const card = screen.getByRole("region", { name: "Questa settimana" });
+    expect(card).toHaveTextContent("12,7 km");
+    expect(screen.getByText("1 nuotata")).toBeInTheDocument();
+    expect(screen.queryByText(/XP/)).toBeNull();
   });
 
   it("Surface è piatta: nessun movimento al passaggio del mouse", () => {
