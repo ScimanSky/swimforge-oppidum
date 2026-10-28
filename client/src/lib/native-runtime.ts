@@ -16,6 +16,23 @@ const NATIVE_BACKGROUND = "#0A1520";
 const HOME_PATH = "/home";
 /** appUrlOpen may repeat the launch URL on a cold start: the same URL within this window is ignored. */
 const DUPLICATE_URL_WINDOW_MS = 2000;
+/**
+ * getLaunchUrl() keeps returning the cold-start URL for the whole process, also after a full
+ * page reload (e.g. window.location.href = "/home" after a sign-in): the handled one is kept
+ * in sessionStorage (cleared with the process) so it is not replayed.
+ */
+export const HANDLED_LAUNCH_URL_KEY = "swimforge:handledLaunchUrl";
+
+/** True the first time a launch URL is seen in this WebView session; storage errors allow it. */
+export function claimLaunchUrl(url: string): boolean {
+  try {
+    if (sessionStorage.getItem(HANDLED_LAUNCH_URL_KEY) === url) return false;
+    sessionStorage.setItem(HANDLED_LAUNCH_URL_KEY, url);
+  } catch {
+    /* storage unavailable: handle it (the in-memory dedupe still applies) */
+  }
+  return true;
+}
 
 /**
  * Android back button: go back in the WebView history when there is somewhere to go and we
@@ -85,7 +102,10 @@ export function initNativeRuntime(options: NativeRuntimeOptions): () => void {
   ];
 
   App.getLaunchUrl()
-    .then((launch) => handleUrl(launch?.url))
+    .then((launch) => {
+      const url = launch?.url;
+      if (url && claimLaunchUrl(url)) handleUrl(url);
+    })
     .catch(() => {});
 
   return () => {

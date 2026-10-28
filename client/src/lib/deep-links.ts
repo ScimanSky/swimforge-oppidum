@@ -4,7 +4,7 @@
  * - `swimforge://auth/callback?code=...` (exact path) → OAuth return (Supabase PKCE);
  *   `error` / `error_description` are read from the query or, as a fallback, the fragment.
  * - `https://swimforge.it/<path>` and `https://www.swimforge.it/<path>` → in-app route
- *   (path + query, origin stripped; the fragment is dropped).
+ *   (path + query, origin stripped, leading slashes collapsed to one; the fragment is dropped).
  * - anything else (other schemes, hosts, ports, malformed URLs) → null.
  */
 export type DeepLink =
@@ -37,7 +37,9 @@ export function resolveDeepLink(url: string): DeepLink | null {
   }
 
   if (parsed.protocol === "https:" && WEB_HOSTS.has(parsed.hostname) && !parsed.port) {
-    return { kind: "route", path: `${parsed.pathname || "/"}${parsed.search}` };
+    // "//evil.example/x" must not become a protocol-relative navigation.
+    const path = (parsed.pathname || "/").replace(/^\/+/, "/");
+    return { kind: "route", path: `${path}${parsed.search}` };
   }
 
   return null;

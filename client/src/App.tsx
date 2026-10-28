@@ -2,7 +2,6 @@ import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
-import NotFound from "@/pages/NotFound";
 import { Redirect, Route, Switch, useLocation } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -15,9 +14,10 @@ import PbCelebrationNotification from "./components/PbCelebrationNotification";
 import CookieBanner from "./components/CookieBanner";
 import { UI_FEATURE_FLAGS } from "./lib/feature-flags";
 import { hideSplash, initNativeRuntime } from "./lib/native-runtime";
-import { completeNativeAuthCallback } from "./lib/native-auth";
 import { trpc } from "./lib/trpc";
 
+// Lazy like every other page: it pulls in AppLayout → app-shell → supabase-js.
+const NotFound = lazy(() => import("@/pages/NotFound"));
 const Home = lazy(() => import("./pages/Home"));
 const Badges = lazy(() => import("./pages/Badges"));
 const Challenges = lazy(() => import("./pages/Challenges"));
@@ -188,9 +188,11 @@ function NativeRuntime() {
     () =>
       initNativeRuntime({
         navigate,
-        // Native Google sign-in returns here via swimforge://auth/callback (lib/native-auth.ts).
-        onAuthCallback: (callback) =>
-          completeNativeAuthCallback(callback, {
+        // Native Google sign-in returns here via swimforge://auth/callback (lib/native-auth.ts,
+        // loaded lazily so supabase-js stays out of the entry chunk).
+        onAuthCallback: async (callback) => {
+          const { completeNativeAuthCallback } = await import("./lib/native-auth");
+          return completeNativeAuthCallback(callback, {
             syncUser: (input) => utils.client.auth.syncSupabaseUser.mutate(input),
             onSignedIn: async (path) => {
               // Leave /login first (its "already authenticated" redirect would override the
@@ -198,7 +200,8 @@ function NativeRuntime() {
               navigate(path, { replace: true });
               await utils.invalidate();
             },
-          }),
+          });
+        },
       }),
     // navigate is stable in wouter's browser location hook; register the listeners once.
     [],

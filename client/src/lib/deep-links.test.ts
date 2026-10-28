@@ -45,6 +45,13 @@ describe("resolveDeepLink", () => {
     expect(resolveDeepLink("https://swimforge.it")).toEqual({ kind: "route", path: "/" });
   });
 
+  it("collapses leading slashes so a route never becomes protocol-relative", () => {
+    expect(resolveDeepLink("https://swimforge.it//evil.example/x?y=1")).toEqual({
+      kind: "route",
+      path: "/evil.example/x?y=1",
+    });
+  });
+
   it("ignores other hosts, schemes and ports", () => {
     expect(resolveDeepLink("https://evil.example/home")).toBeNull();
     expect(resolveDeepLink("https://swimforge.it.evil.example/home")).toBeNull();

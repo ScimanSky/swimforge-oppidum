@@ -26,6 +26,7 @@ import { trpc } from "@/lib/trpc";
 import { postLoginPath, syncSupabaseSession } from "@/lib/auth-sync";
 import { startNativeGoogleLogin } from "@/lib/native-auth";
 import { isNativePlatform } from "@/lib/platform";
+import { publicSiteUrl } from "@/lib/public-url";
 import { toast } from "sonner";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -93,7 +94,7 @@ export default function Register() {
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: publicSiteUrl("/auth/callback"),
         data: {
           full_name: fullName || undefined,
           name: fullName || undefined,

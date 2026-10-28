@@ -81,5 +81,12 @@ const render = () =>
   );
 
 // Native: the session token lives in Preferences (async); load it into the in-memory cache
-// before the first query runs. Resolves immediately on the web.
-void loadNativeSessionToken().finally(render);
+// before the first query runs. Resolves immediately on the web. Capped at 3 s so a stuck
+// bridge never leaves the app blank (worst case: signed out until the next start).
+const NATIVE_TOKEN_LOAD_TIMEOUT_MS = 3000;
+void Promise.race([
+  loadNativeSessionToken(),
+  new Promise<void>((resolve) => setTimeout(resolve, NATIVE_TOKEN_LOAD_TIMEOUT_MS)),
+])
+  .catch(() => {})
+  .finally(render);

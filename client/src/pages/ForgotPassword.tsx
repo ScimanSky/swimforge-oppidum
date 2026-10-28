@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Waves, ArrowRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { publicSiteUrl } from "@/lib/public-url";
 import { toast } from "sonner";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
 
@@ -31,7 +32,7 @@ export default function ForgotPassword() {
 
     setIsLoading(true);
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: publicSiteUrl("/reset-password"),
     });
 
     if (error) {

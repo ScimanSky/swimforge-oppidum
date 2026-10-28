@@ -3,6 +3,7 @@ import { MessageCircle, Send, Share2 } from "lucide-react"
 import { toast } from "sonner"
 import PostReactions from "@/components/PostReactions"
 import { ForwardContentDialog } from "@/components/social/ForwardContentDialog"
+import { publicSiteUrl } from "@/lib/public-url"
 
 interface FeedPostActionsProps {
   post: {
@@ -14,7 +15,7 @@ interface FeedPostActionsProps {
 }
 
 async function handleShare(postId: number) {
-  const url = `${window.location.origin}/post/${postId}`
+  const url = publicSiteUrl(`/post/${postId}`)
 
   if (navigator.share) {
     try {
