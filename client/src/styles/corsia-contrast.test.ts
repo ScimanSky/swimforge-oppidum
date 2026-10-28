@@ -45,12 +45,39 @@ const themes: Array<[string, (name: string) => string]> = [
   ["scuro", (name) => resolve(name, dark, light)],
 ];
 
-const TEXTS = ["foreground", "muted-foreground", "action-text", "xp", "success", "danger", "warning"];
+const TEXTS = ["foreground", "muted-foreground", "action-text", "xp", "success", "danger", "warning", "gold"];
 const SURFACES = ["background", "card", "raised"];
 const ON_FILLS: Array<[string, string]> = [
   ["primary-foreground", "primary"],
   ["destructive-foreground", "destructive"],
 ];
+
+/** Tinted chip: text on a 15% fill blended over a surface (`bg-xp/15` and friends). */
+const TINTS: Array<[string, string]> = [
+  ["xp", "xp"],
+  ["success", "success"],
+  ["warning", "warning"],
+  ["danger", "danger"],
+  ["gold", "gold"],
+  ["action-text", "primary"],
+];
+
+function tint(fill: string, surface: string, alpha = 0.15): string {
+  const channel = (hex: string, i: number) => parseInt(hex.slice(i, i + 2), 16);
+  return `#${[1, 3, 5]
+    .map((i) => Math.round(alpha * channel(fill, i) + (1 - alpha) * channel(surface, i)))
+    .map((c) => c.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+const TESTED = [...new Set([...TEXTS, ...SURFACES, ...ON_FILLS.flat(), ...TINTS.flat()])];
+
+describe("token Corsia dichiarati in entrambi i temi", () => {
+  it.each(TESTED)("--%s è dichiarato direttamente in :root e in .dark", (name) => {
+    expect(light[name], `:root senza --${name}`).toBeDefined();
+    expect(dark[name], `.dark senza --${name}`).toBeDefined();
+  });
+});
 
 describe.each(themes)("token Corsia, tema %s", (_theme, color) => {
   it.each(TEXTS.flatMap((text) => SURFACES.map((surface) => [text, surface])))(
@@ -62,4 +89,10 @@ describe.each(themes)("token Corsia, tema %s", (_theme, color) => {
   it.each(ON_FILLS)("--%s su --%s almeno 4.5:1", (text, fill) => {
     expect(contrast(color(text), color(fill))).toBeGreaterThanOrEqual(4.5);
   });
+  it.each(TINTS.flatMap(([text, fill]) => SURFACES.map((surface) => [text, fill, surface])))(
+    "--%s su chip --%s al 15%% sopra --%s almeno 4.5:1",
+    (text, fill, surface) => {
+      expect(contrast(color(text), tint(color(fill), color(surface)))).toBeGreaterThanOrEqual(4.5);
+    },
+  );
 });

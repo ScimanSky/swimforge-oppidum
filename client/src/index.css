@@ -12,6 +12,7 @@ body,
 
 :root {
   /* Corsia · tema chiaro «Cloro» (docs/plans/2026-10-28-android-phase-2-design.md §3.1) */
+  color-scheme: light;
   --background: #F4F7F9;
   --foreground: #0D1B27;
   --card: #FFFFFF;
@@ -25,8 +26,8 @@ body,
 
   --primary: #34C6EB;
   --primary-foreground: #062030;
-  --action-text: #05709E;
-  --ring: #05709E;
+  --action-text: #056A96;
+  --ring: #056A96;
   --secondary: #E7EDF2;
   --secondary-foreground: #0D1B27;
   --muted: #E7EDF2;
@@ -34,14 +35,14 @@ body,
   --accent: #E7EDF2;
   --accent-foreground: #0D1B27;
 
-  --xp: #B1490E;
-  --success: #147851;
-  --warning: #8A6100;
-  --danger: #C33333;
-  --destructive: #C33333;
+  --xp: #983F0C;
+  --success: #116846;
+  --warning: #785400;
+  --danger: #A62B2B;
+  --destructive: #A62B2B;
   --destructive-foreground: #FFFFFF;
-  --gold: #866510;
-  --gold-light: #866510;
+  --gold: #74570E;
+  --gold-light: #74570E;
 
   --chart-1: #34C6EB;
   --chart-2: #2C8FB8;
@@ -54,30 +55,8 @@ body,
   --zone-4: #FFB27A;
   --zone-5: #FF8B47;
 
-  /* Legacy aliases: removed in Task 22 (rename). Text-safe mapping. */
-  --electric-cyan: var(--action-text);
-  --electric-lime: var(--success);
-  --electric-coral: var(--danger);
-  --electric-violet: var(--muted-foreground);
-  --forge-orange: var(--xp);
-  --forge-orange-soft: color-mix(in oklch, var(--xp) 16%, transparent);
+  /* Legacy hex alias: removed in Task 22 (rename). */
   --ink: #062030;
-  --neon-glow: transparent;
-  --neon-soft: transparent;
-  --forge-glow: transparent;
-  --surface-glow: transparent;
-  --chip-cyan: var(--action-text);
-  --chip-emerald: var(--success);
-  --chip-amber: var(--muted-foreground);
-  --chip-rose: var(--danger);
-  --chip-sky: var(--muted-foreground);
-  --chip-violet: var(--muted-foreground);
-  --navy: var(--card);
-  --navy-light: var(--raised);
-  --azure: var(--action-text);
-  --badge-spotlight: var(--raised);
-  --badge-ring: var(--border);
-  --badge-shadow: transparent;
 
   --z-base: 1;
   --z-nav: 40;
@@ -87,18 +66,11 @@ body,
   --z-toast: 80;
 
   --radius: 0.75rem;
-  --sidebar: var(--card);
-  --sidebar-foreground: var(--foreground);
-  --sidebar-primary: var(--primary);
-  --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: var(--raised);
-  --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: var(--border);
-  --sidebar-ring: var(--ring);
 }
 
 .dark {
   /* Corsia · tema scuro (default) */
+  color-scheme: dark;
   --background: #0A1520;
   --foreground: #ECF3F8;
   --card: #111E2B;
@@ -124,11 +96,48 @@ body,
   --xp: #FF8B47;
   --success: #5CD6A0;
   --warning: #F2C14E;
-  --danger: #FF6B6B;
-  --destructive: #FF6B6B;
+  --danger: #FF7B7B;
+  --destructive: #FF7B7B;
   --destructive-foreground: #0A1520;
   --gold: #E8B84A;
   --gold-light: #E8B84A;
+}
+
+/* Derived tokens: recomputed in every scope, so a nested .dark (e.g. Badges) gets dark values. */
+:root,
+.dark {
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--raised);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+
+  /* Legacy aliases: removed in Task 22 (rename). Text-safe mapping. */
+  --electric-cyan: var(--action-text);
+  --electric-lime: var(--success);
+  --electric-coral: var(--danger);
+  --electric-violet: var(--muted-foreground);
+  --forge-orange: var(--xp);
+  --forge-orange-soft: color-mix(in oklch, var(--xp) 16%, transparent);
+  --neon-glow: transparent;
+  --neon-soft: transparent;
+  --forge-glow: transparent;
+  --surface-glow: transparent;
+  --chip-cyan: var(--action-text);
+  --chip-emerald: var(--success);
+  --chip-amber: var(--muted-foreground);
+  --chip-rose: var(--danger);
+  --chip-sky: var(--muted-foreground);
+  --chip-violet: var(--muted-foreground);
+  --navy: var(--card);
+  --navy-light: var(--raised);
+  --azure: var(--primary);
+  --badge-spotlight: var(--raised);
+  --badge-ring: var(--border);
+  --badge-shadow: transparent;
 }
 
 @theme inline {
