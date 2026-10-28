@@ -313,10 +313,11 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
                   type="button"
                   onClick={() => setMode("menu")}
                   className="text-muted-foreground hover:text-foreground"
+                  aria-label="Indietro"
                 >
-                  <ChevronLeft className="size-5" />
+                  <ChevronLeft className="size-5" aria-hidden />
                 </button>
-                <SheetTitle>Nuovo Post</SheetTitle>
+                <SheetTitle>Nuovo post</SheetTitle>
               </div>
             ) : (
               <>
@@ -334,13 +335,13 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
                   onOpenChange(false)
                   setTimeout(() => setSharePickerOpen(true), 200)
                 }}
-                className="flex items-center gap-4 rounded-2xl border border-border/80 bg-background/60 p-4 text-left transition-colors hover:bg-card/60"
+                className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:bg-raised"
               >
-                <div className="flex size-12 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--electric-cyan)_15%,transparent)]">
-                  <Activity className="size-6 text-[var(--electric-cyan)]" />
+                <div className="flex size-12 items-center justify-center rounded-xl bg-primary/15">
+                  <Activity className="size-6 text-action-text" aria-hidden />
                 </div>
                 <div>
-                  <div className="font-semibold">Condividi Attivita</div>
+                  <div className="font-semibold">Condividi attività</div>
                   <div className="text-sm text-muted-foreground">Condividi un allenamento recente</div>
                 </div>
               </button>
@@ -348,13 +349,13 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
               <button
                 type="button"
                 onClick={() => setMode("text")}
-                className="flex items-center gap-4 rounded-2xl border border-border/80 bg-background/60 p-4 text-left transition-colors hover:bg-card/60"
+                className="flex items-center gap-4 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:bg-raised"
               >
-                <div className="flex size-12 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--electric-lime)_15%,transparent)]">
-                  <PenLine className="size-6 text-[var(--electric-lime)]" />
+                <div className="flex size-12 items-center justify-center rounded-xl bg-raised">
+                  <PenLine className="size-6 text-action-text" aria-hidden />
                 </div>
                 <div>
-                  <div className="font-semibold">Nuovo Post</div>
+                  <div className="font-semibold">Nuovo post</div>
                   <div className="text-sm text-muted-foreground">Testo, foto, video, tag amici e hashtag</div>
                 </div>
               </button>
@@ -376,7 +377,7 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
               <div className="flex items-center justify-between gap-2">
                 <Button
                   type="button"
-                  variant="outline-neon"
+                  variant="outline"
                   size="sm"
                   className="gap-2"
                   onClick={() => mediaInputRef.current?.click()}
@@ -412,7 +413,7 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
                       <button
                         type="button"
                         onClick={() => removeMedia(item.id)}
-                        className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white"
+                        className="absolute right-1 top-1 rounded-full border border-border bg-background/90 p-1 text-foreground"
                         aria-label="Rimuovi media"
                       >
                         <X className="size-3.5" />
@@ -450,7 +451,7 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
                           </Avatar>
                           <div className="min-w-0">
                             <p className="truncate text-xs font-medium">{user.name || "Utente"}</p>
-                            <p className="truncate text-[11px] text-muted-foreground">@{user.username || `u${user.userId}`}</p>
+                            <p className="truncate text-xs text-muted-foreground">@{user.username || `u${user.userId}`}</p>
                           </div>
                         </button>
                       ))
@@ -479,7 +480,7 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {hashtags.map((tag) => (
-                      <span key={tag} className="rounded-full bg-card/60 px-2 py-0.5 text-[11px] text-[var(--electric-cyan)]">
+                      <span key={tag} className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-action-text">
                         #{tag}
                       </span>
                     ))}
@@ -490,7 +491,7 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">{content.length}/2000</span>
                 <Button
-                  variant="neon"
+                  variant="default"
                   onClick={() => void handleSubmitText()}
                   disabled={(!hasContent && !hasMedia) || isPostPending}
                 >

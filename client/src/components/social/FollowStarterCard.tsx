@@ -65,13 +65,17 @@ export default function FollowStarterCard({ state, isLoading = false }: FollowSt
   return (
     <section className="surface-panel p-4 space-y-3">
       <div className="space-y-1">
-        <h3 className="text-sm font-semibold text-foreground">
+        <h2 className="text-[15px] font-bold text-foreground">
           Segui {state.remaining} nuotator{state.remaining === 1 ? "e" : "i"} per personalizzare il feed
-        </h3>
-        <p className="text-xs text-muted-foreground">
+        </h2>
+        <p className="text-sm text-muted-foreground">
           Suggeriti in base a livello e attività recente nella community.
         </p>
-        <Progress value={progress} className="h-2 mt-2" />
+        <Progress
+          value={progress}
+          className="mt-2 h-2"
+          aria-label={`Profili seguiti: ${state.followingCount} su ${state.target}`}
+        />
       </div>
 
       {state.suggestedUsers.length > 0 ? (
@@ -81,9 +85,9 @@ export default function FollowStarterCard({ state, isLoading = false }: FollowSt
             return (
               <div key={user.userId} className="flex items-center gap-2">
                 <Link href={`/u/${user.userId}`}>
-                  <Avatar className="size-9 border border-border/60 cursor-pointer">
+                  <Avatar className="size-10 cursor-pointer">
                     <AvatarImage src={user.avatarUrl || ""} alt={displayName} />
-                    <AvatarFallback className="text-[10px] font-semibold">
+                    <AvatarFallback className="text-xs font-semibold">
                       {getInitials(displayName)}
                     </AvatarFallback>
                   </Avatar>
@@ -93,17 +97,17 @@ export default function FollowStarterCard({ state, isLoading = false }: FollowSt
                     {displayName}
                   </Link>
                   {user.level != null ? (
-                    <p className="text-[11px] text-muted-foreground">Livello {user.level}</p>
+                    <p className="text-xs text-muted-foreground">Livello {user.level}</p>
                   ) : null}
                 </div>
                 <Button
-                  variant="outline-neon"
+                  variant="outline"
                   size="sm"
-                  className="gap-1"
+                  className="h-9 gap-1"
                   onClick={() => toggleFollow.mutate({ userId: user.userId })}
                   disabled={toggleFollow.isPending}
                 >
-                  <UserPlus className="size-3.5" />
+                  <UserPlus className="size-4" aria-hidden />
                   Segui
                 </Button>
               </div>
@@ -111,7 +115,7 @@ export default function FollowStarterCard({ state, isLoading = false }: FollowSt
           })}
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">Nessun suggerimento disponibile al momento.</p>
+        <p className="text-sm text-muted-foreground">Nessun suggerimento disponibile al momento.</p>
       )}
     </section>
   )

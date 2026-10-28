@@ -4,6 +4,7 @@ import { toast } from "sonner"
 import PostReactions from "@/components/PostReactions"
 import { ForwardContentDialog } from "@/components/social/ForwardContentDialog"
 import { publicSiteUrl } from "@/lib/public-url"
+import { cn } from "@/lib/utils"
 
 interface FeedPostActionsProps {
   post: {
@@ -46,46 +47,45 @@ export default function FeedPostActions({
   const commentCount = Number(post.comment_count) || 0
   const [forwardOpen, setForwardOpen] = useState(false)
 
+  const iconButton =
+    "flex min-h-[44px] items-center gap-1.5 rounded-xl px-2 text-sm font-semibold transition-colors hover:bg-raised"
+
   return (
-    <div className="px-4 pb-3 pt-1">
-      <div className="flex items-center gap-1 border-t border-border/50 pt-2">
+    <div className="-mx-2 pb-2 pt-1">
+      <div className="flex items-center gap-2">
+        <PostReactions postId={post.id} variant="heart" />
+
         <button
           type="button"
           onClick={onToggleComments}
-          className={[
-            "flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-all duration-200",
-            "active:scale-95",
-            commentsOpen
-              ? "bg-[var(--electric-cyan)]/10 text-[var(--electric-cyan)]"
-              : "text-muted-foreground hover:bg-muted/40 hover:text-foreground",
-          ].join(" ")}
+          aria-expanded={Boolean(commentsOpen)}
+          aria-label={commentCount > 0 ? `Commenti, ${commentCount}` : "Commenta"}
+          className={cn(iconButton, commentsOpen ? "text-action-text" : "text-foreground")}
         >
           <MessageCircle
-            className={`size-[18px] ${commentsOpen ? "fill-[var(--electric-cyan)]/20" : ""}`}
+            aria-hidden
+            className={cn("size-[22px]", commentsOpen ? "text-action-text" : "text-muted-foreground")}
           />
-          <span>{commentCount > 0 ? commentCount : "Commenta"}</span>
+          {commentCount > 0 ? <span className="tabular-nums">{commentCount}</span> : null}
         </button>
 
-        <button
-          type="button"
-          onClick={() => setForwardOpen(true)}
-          className="flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-muted/40 hover:text-foreground active:scale-95"
-        >
-          <Send className="size-[18px]" />
-          <span className="hidden sm:inline">Inoltra</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => handleShare(post.id)}
-          className="flex min-h-[44px] items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-muted/40 hover:text-foreground active:scale-95"
-        >
-          <Share2 className="size-[18px]" />
-          <span className="hidden sm:inline">Condividi</span>
-        </button>
-
-        <div className="ml-auto shrink-0">
-          <PostReactions postId={post.id} />
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setForwardOpen(true)}
+            aria-label="Inoltra"
+            className={cn(iconButton, "text-muted-foreground hover:text-foreground")}
+          >
+            <Send className="size-[22px]" aria-hidden />
+          </button>
+          <button
+            type="button"
+            onClick={() => handleShare(post.id)}
+            aria-label="Condividi"
+            className={cn(iconButton, "text-muted-foreground hover:text-foreground")}
+          >
+            <Share2 className="size-[22px]" aria-hidden />
+          </button>
         </div>
       </div>
       {forwardOpen ? (

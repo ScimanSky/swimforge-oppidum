@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
-import { Droplet } from "lucide-react";
+import { Droplet, Heart } from "lucide-react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -21,6 +21,11 @@ interface PostReactionsProps {
   initialReactions?: any[];
   userReaction?: any;
   onReactionChange?: () => void;
+  /**
+   * "heart" (Corsia feed): one heart, filled in the XP colour when you reacted, with the
+   * total count; the picker is the same. "emoji" (default): the reaction and the grouped emoji.
+   */
+  variant?: "emoji" | "heart";
 }
 
 const reactionEmojis = {
@@ -50,6 +55,7 @@ export default function PostReactions({
   initialReactions = [],
   userReaction,
   onReactionChange,
+  variant = "emoji",
 }: PostReactionsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [burstReactions, setBurstReactions] = useState<FloatingReaction[]>([]);
@@ -109,12 +115,33 @@ export default function PostReactions({
     ? reactionEmojis[currentUserReaction as keyof typeof reactionEmojis]
     : null;
   const triggerAnimationKey = useMemo(() => `${currentUserReaction ?? "none"}`, [currentUserReaction]);
+  const totalReactions = (reactionsQuery.data ?? []).reduce(
+    (sum: number, reaction: any) => sum + (Number(reaction?.count) || 0),
+    0
+  );
+  const isHeart = variant === "heart";
 
   return (
     <div className="relative flex items-center gap-2">
       {/* Picker delle reazioni */}
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
+          {isHeart ? (
+            <button
+              type="button"
+              aria-label={`${currentUserReaction ? "Cambia reazione" : "Reagisci"}, ${totalReactions} ${totalReactions === 1 ? "reazione" : "reazioni"}`}
+              className="flex min-h-[44px] items-center gap-1.5 rounded-xl px-2 text-sm font-semibold text-foreground transition-colors hover:bg-raised"
+            >
+              <Heart
+                aria-hidden
+                className={cn(
+                  "size-[22px]",
+                  currentUserReaction ? "fill-current text-xp" : "text-muted-foreground"
+                )}
+              />
+              {totalReactions > 0 ? <span className="tabular-nums">{totalReactions}</span> : null}
+            </button>
+          ) : (
           <Button
             variant="ghost"
             size="sm"
@@ -137,12 +164,15 @@ export default function PostReactions({
               <Droplet className="h-4 w-4" />
             )}
           </Button>
+          )}
         </PopoverTrigger>
         <PopoverContent className="w-auto p-2" align="start">
           <div className="flex gap-1">
             {Object.entries(reactionEmojis).map(([type, { emoji, label }]) => (
               <motion.button
                 key={type}
+                type="button"
+                aria-label={label}
                 onClick={() => handleReaction(type as keyof typeof reactionEmojis)}
                 className={cn(
                   "flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-accent transition-all hover:scale-110",
@@ -166,7 +196,7 @@ export default function PostReactions({
       </Popover>
 
       {/* Mostra le reazioni raggruppate */}
-      {reactionsQuery.data && reactionsQuery.data.length > 0 && (
+      {!isHeart && reactionsQuery.data && reactionsQuery.data.length > 0 && (
         <div className="flex gap-1">
           {reactionsQuery.data.map((reaction: any) => (
             <motion.div

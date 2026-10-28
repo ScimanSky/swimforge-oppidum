@@ -309,7 +309,7 @@ export function ShareActivityPicker({
             {firstLinkInCaption ? <LinkPreviewCard url={firstLinkInCaption} /> : null}
 
             <div className="flex items-center justify-between gap-2">
-              <Button type="button" variant="outline-neon" size="sm" className="gap-2" onClick={() => mediaInputRef.current?.click()}>
+              <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => mediaInputRef.current?.click()}>
                 <ImagePlus className="size-4" />
                 Aggiungi foto/video
               </Button>
@@ -341,7 +341,7 @@ export function ShareActivityPicker({
                     <button
                       type="button"
                       onClick={() => removeMedia(item.id)}
-                      className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white"
+                      className="absolute right-1 top-1 rounded-full border border-border bg-background/90 p-1 text-foreground"
                       aria-label="Rimuovi media"
                     >
                       <X className="size-3.5" />
@@ -379,7 +379,7 @@ export function ShareActivityPicker({
                         </Avatar>
                         <div className="min-w-0">
                           <p className="truncate text-xs font-medium">{user.name || "Utente"}</p>
-                          <p className="truncate text-[11px] text-muted-foreground">@{user.username || `u${user.userId}`}</p>
+                          <p className="truncate text-xs text-muted-foreground">@{user.username || `u${user.userId}`}</p>
                         </div>
                       </button>
                     ))
@@ -408,7 +408,7 @@ export function ShareActivityPicker({
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {hashtags.map((tag) => (
-                    <span key={tag} className="rounded-full bg-card/60 px-2 py-0.5 text-[11px] text-[var(--electric-cyan)]">
+                    <span key={tag} className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-action-text">
                       #{tag}
                     </span>
                   ))}
@@ -417,7 +417,7 @@ export function ShareActivityPicker({
             )}
 
             <Button
-              variant="neon"
+              variant="default"
               onClick={() => void handleShare()}
               disabled={isPending}
               className="w-full"
@@ -432,7 +432,7 @@ export function ShareActivityPicker({
             ) : !activities?.length ? (
               <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
                 <Waves className="size-8 opacity-50" />
-                <p>Nessuna attivita recente da condividere</p>
+                <p>Nessuna attività recente da condividere</p>
               </div>
             ) : (
               <div className="flex flex-col gap-2">
@@ -444,10 +444,10 @@ export function ShareActivityPicker({
                       setSelectedId(activity.id)
                       resetComposer()
                     }}
-                    className="flex items-center gap-3 rounded-2xl border border-border/80 bg-background/60 p-4 text-left transition-colors hover:bg-card/60"
+                    className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:bg-raised"
                   >
-                    <div className="flex size-10 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--electric-cyan)_15%,transparent)]">
-                      <Waves className="size-5 text-[var(--electric-cyan)]" />
+                    <div className="flex size-10 items-center justify-center rounded-xl bg-primary/15">
+                      <Waves className="size-5 text-action-text" aria-hidden />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">

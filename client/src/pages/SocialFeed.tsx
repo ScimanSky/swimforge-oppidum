@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Link } from "wouter"
 import AppLayout from "@/components/AppLayout"
 import { CreatePostSheet } from "@/components/social/CreatePostSheet"
@@ -11,47 +11,58 @@ import FeedSidebar from "@/components/social/FeedSidebar"
 import FollowStarterCard from "@/components/social/FollowStarterCard"
 import type { FeedPostRecord } from "@/components/social/feed-types"
 import { Button } from "@/components/ui/button"
-import { Waves, Users, RefreshCw, Loader2 } from "lucide-react"
+import { Waves, Users, RefreshCw, Loader2, type LucideIcon } from "lucide-react"
 import { trpc } from "@/lib/trpc"
+
+function EmptyState({
+  icon,
+  title,
+  text,
+  children,
+}: {
+  icon: LucideIcon
+  title: string
+  text: string
+  children: ReactNode
+}) {
+  const Icon = icon
+  return (
+    <div className="surface-panel flex flex-col items-center gap-3 p-6 text-center">
+      <span className="inline-flex size-12 items-center justify-center rounded-xl bg-raised">
+        <Icon className="size-6 text-action-text" aria-hidden />
+      </span>
+      <div>
+        <h2 className="text-[17px] font-bold text-foreground">{title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{text}</p>
+      </div>
+      <div className="mt-1">{children}</div>
+    </div>
+  )
+}
 
 function EmptyFeedPerTe({ onCreatePost }: { onCreatePost: () => void }) {
   return (
-    <div className="surface-panel p-8 flex flex-col items-center text-center gap-4">
-      {/* Inline swimmer SVG illustration */}
-      <div className="relative w-32 h-32 flex items-center justify-center">
-        <div className="absolute inset-0 rounded-full bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_12%,transparent),color-mix(in_oklch,var(--electric-lime)_8%,transparent))]" />
-        <Waves className="size-14 text-[var(--electric-cyan)] relative z-10" />
-      </div>
-      <div>
-        <h3 className="text-lg font-display font-bold text-foreground">Il feed è vuoto</h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          Forgia la prima sessione della settimana e accendi il tuo feed.
-        </p>
-      </div>
-      <Button variant="neon" size="lg" className="gap-2 mt-2" onClick={onCreatePost}>
-        Condividi la prima sessione
-      </Button>
-    </div>
+    <EmptyState
+      icon={Waves}
+      title="Il feed è vuoto"
+      text="Forgia la prima sessione della settimana e accendi il tuo feed."
+    >
+      <Button onClick={onCreatePost}>Condividi la prima sessione</Button>
+    </EmptyState>
   )
 }
 
 function EmptyFeedSeguiti() {
   return (
-    <div className="surface-panel p-8 flex flex-col items-center text-center gap-4">
-      <div className="relative w-32 h-32 flex items-center justify-center">
-        <div className="absolute inset-0 rounded-full bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-lime)_12%,transparent),color-mix(in_oklch,var(--electric-violet)_8%,transparent))]" />
-        <Users className="size-14 text-[var(--electric-lime)] relative z-10" />
-      </div>
-      <div>
-        <h3 className="text-lg font-display font-bold text-foreground">Segui altri nuotatori</h3>
-        <p className="text-sm text-muted-foreground mt-1">
-          Costruisci la tua crew e porta nel feed allenamenti e sfide reali.
-        </p>
-      </div>
-      <Button variant="neon" size="lg" className="gap-2 mt-2" asChild>
+    <EmptyState
+      icon={Users}
+      title="Segui altri nuotatori"
+      text="Costruisci la tua crew e porta nel feed allenamenti e sfide reali."
+    >
+      <Button asChild>
         <Link href="/home/community">Esplora la community</Link>
       </Button>
-    </div>
+    </EmptyState>
   )
 }
 
@@ -137,15 +148,13 @@ export default function SocialFeed() {
 
   return (
     <AppLayout>
-      <div className="social-feed-shell compact-shell mx-auto w-full max-w-[1240px] space-y-3 lg:space-y-2">
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="w-full">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
           <div className="w-full min-w-0">
-            <div
-              className="relative z-10 mb-3 w-full"
-            >
+            <div className="mb-2 w-full">
               {firstPageQuery.isFetching && !isInitialLoading && (
                 <div className="mb-1.5 flex justify-center py-1">
-                  <RefreshCw className="size-4 animate-spin text-muted-foreground" />
+                  <RefreshCw className="size-4 animate-spin text-muted-foreground" aria-label="Aggiornamento" />
                 </div>
               )}
               <FeedSubTabs tab={tab} onChange={setTab} />
@@ -159,11 +168,11 @@ export default function SocialFeed() {
               {isInitialLoading ? (
                 <FeedSkeleton />
               ) : hasFeedError ? (
-                <div className="surface-panel p-6 text-center">
+                <div className="surface-panel p-6 text-center" role="alert">
                   <p className="text-sm text-foreground">Impossibile caricare il feed al momento.</p>
                   <Button
                     type="button"
-                    variant="outline-neon"
+                    variant="outline"
                     className="mt-3"
                     onClick={() => {
                       void firstPageQuery.refetch()
@@ -179,22 +188,21 @@ export default function SocialFeed() {
                   <EmptyFeedPerTe onCreatePost={() => setCreatePostOpen(true)} />
                 )
               ) : (
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col">
                   {posts.slice(0, visibleCount).map((post, index) => (
-                    <div key={post.id}>
-                      <FeedPost
-                        post={post}
-                        currentUserId={currentUserId}
-                        index={index}
-                        autoplayVideos={autoplayVideos}
-                      />
-                    </div>
+                    <FeedPost
+                      key={post.id}
+                      post={post}
+                      currentUserId={currentUserId}
+                      index={index}
+                      autoplayVideos={autoplayVideos}
+                    />
                   ))}
                   {(visibleCount < posts.length || hasMore) && (
                     <div className="py-2">
                       <button
                         type="button"
-                        className="w-full rounded-xl py-3 text-sm font-medium text-[var(--electric-cyan)] transition-colors hover:bg-[var(--electric-cyan)]/5"
+                        className="h-11 w-full rounded-xl text-sm font-semibold text-action-text transition-colors hover:bg-raised disabled:opacity-60"
                         disabled={nextPageQuery.isFetching}
                         onClick={() => {
                           if (visibleCount < posts.length) {
@@ -207,8 +215,8 @@ export default function SocialFeed() {
                       >
                         {nextPageQuery.isFetching ? (
                           <span className="inline-flex items-center gap-2">
-                            <Loader2 className="size-4 animate-spin" />
-                            Caricamento...
+                            <Loader2 className="size-4 animate-spin" aria-hidden />
+                            Caricamento…
                           </span>
                         ) : (
                           "Carica altri"
