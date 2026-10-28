@@ -1,5 +1,7 @@
 import { ReactNode } from "react";
+import { cn } from "@/lib/utils";
 import { AppShell } from "./app/app-shell";
+import { useInShell } from "./app/shell-context";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -10,18 +12,27 @@ interface AppLayoutProps {
 }
 
 /**
- * AppLayout Component
- * 
- * Unified layout wrapper for the V0 layout.
+ * Page wrapper. Under the persistent shell (ShellRoutes) it is only the page root: the shell
+ * already draws header, navigation and main. Outside it (public pages, tests) it draws the
+ * full-screen background and, with `withShell`, its own AppShell.
  */
 export function AppLayout({
   children,
   className = "",
   withShell = true,
 }: AppLayoutProps) {
+  const inShell = useInShell();
+  if (inShell) {
+    return (
+      <div className={cn(withShell && "sf-page-root", className)}>
+        {children}
+      </div>
+    );
+  }
+
   const wrappedChildren = withShell ? <div className="sf-page-root">{children}</div> : children;
 
-  const layout = (
+  return (
     <div
       className={`relative min-h-screen bg-background text-foreground ${className} overflow-hidden`}
     >
@@ -30,8 +41,6 @@ export function AppLayout({
       </div>
     </div>
   );
-
-  return layout;
 }
 
 export default AppLayout;

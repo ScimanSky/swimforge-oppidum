@@ -1,6 +1,6 @@
-import React, { useEffect, useRef, useState } from "react"
+import React, { Suspense, useEffect, useRef, useState } from "react"
 import { useLocation } from "wouter"
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
+import { motion, useReducedMotion } from "framer-motion"
 
 import { trpc } from "@/lib/trpc"
 import { supabase } from "@/lib/supabase"
@@ -17,6 +17,8 @@ import { BottomBar } from "./BottomBar"
 import { AI_POST_DRAFT, type CreateAction } from "./CreateMenu"
 import { DesktopRail } from "./DesktopRail"
 import { ShellHeader } from "./ShellHeader"
+import { ShellContext } from "./shell-context"
+import { Spinner } from "@/components/ui/spinner"
 
 type OpenCreatePostEventDetail = {
   initialContent?: string
@@ -140,6 +142,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const profileLabel = meQuery.data?.name || meQuery.data?.email || "Nuotatore"
 
   return (
+    <ShellContext.Provider value={true}>
     <div className="min-h-[100dvh] overflow-x-hidden bg-background">
       <ShellHeader
         homePath={homePathForPlatform(isNativePlatform())}
@@ -174,17 +177,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               ariaLabel={hub === "train" ? "Sezioni di Allena" : "Sezioni di Community"}
             />
           ) : null}
-          <AnimatePresence mode="wait" initial={false}>
+          {/* Pages load inside main: header and navigation stay mounted across routes. */}
+          <Suspense
+            fallback={
+              <div className="flex justify-center py-16">
+                <Spinner aria-label="Caricamento" className="size-6 text-muted-foreground" />
+              </div>
+            }
+          >
+            {/* Enter-only fade: no waiting for the old page to leave. */}
             <motion.div
-              key={location}
-              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
-              animate={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
-              exit={reduceMotion ? { opacity: 1 } : { opacity: 0, y: -6 }}
-              transition={reduceMotion ? { duration: 0 } : { duration: 0.24, ease: "easeOut" }}
+              key={path}
+              initial={reduceMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: reduceMotion ? 0 : 0.15, ease: "easeOut" }}
             >
               {children}
             </motion.div>
-          </AnimatePresence>
+          </Suspense>
         </div>
       </main>
 
@@ -204,5 +214,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <OnboardingNudgeManager userId={meQuery.data.id} />
       )}
     </div>
+    </ShellContext.Provider>
   )
 }
