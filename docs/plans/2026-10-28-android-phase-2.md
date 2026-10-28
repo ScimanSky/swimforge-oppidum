@@ -8,6 +8,8 @@
 
 **Tech Stack:** React 19, Vite 7, Tailwind 4 (`@theme inline` in `index.css`), shadcn/ui (`client/src/components/ui`), wouter 3 (`memoryLocation` per i test), tRPC 11, vitest + Testing Library (jsdom per `client/**`), `@fontsource/manrope` e `@fontsource/barlow-condensed` (OFL), Capacitor 8 (`@capacitor/status-bar`).
 
+**Test di componenti:** il setup non pulisce il DOM tra un test e l'altro: ogni nuovo file di test con `render` chiama `afterEach(cleanup)` (import da `@testing-library/react`).
+
 **Verifica sempre dalla root:** `pnpm check`, `pnpm lint` (0 errori; 28 warning preesistenti), `pnpm test` (63 file / 360 test di partenza, devono solo crescere), `pnpm build`. **Push:** `git push git@github.com:ScimanSky/swimforge-oppidum.git android/phase-2`. Mai `main` (deploya in produzione). Nessuna modifica al server, al database o a `android/` salvo dove indicato.
 
 ---
@@ -1032,7 +1034,7 @@ Verifica: `pnpm check && pnpm test && pnpm build && pnpm build:native`. Commit `
 
 Dati (tutti già esistenti):
 - `trpc.activities.list.useQuery({ limit: 50, offset: 0, source: "all" })` → `summarizeWeek(data ?? [], new Date())` e ultima attività = prima per `activityDate` decrescente.
-- `trpc.profile.get.useQuery(undefined, { staleTime: 120_000 })` → `level`, `totalXp`, `nextLevelXp`, `xpToNextLevel`.
+- `trpc.profile.get.useQuery(undefined, { staleTime: 120_000 })` → `level`, `totalXp`, `currentLevelXp` (soglia del livello attuale, aggiunta dopo la review del Task 7), `nextLevelXp`, `xpToNextLevel`.
 - `trpc.garmin.status.useQuery(undefined, { staleTime: 300_000 })` → `connected`.
 - `trpc.activityInsights.list.useQuery({ limit: 1, offset: 0 })` → righe SQL grezze (`activity_id`, `summary`): mostra `summary` solo se `activity_id === ultimaAttività.id`, troncato a 2 righe (`line-clamp-2`).
 - Sincronizza: stessa mutazione e stessi toast del foglio «Crea» (Task 9). Estrai un hook condiviso `client/src/hooks/useGarminQuickSync.ts` (`{ sync, isPending, connected }`) e usalo in entrambi i posti.
@@ -1076,7 +1078,7 @@ Commit `feat(ui): Corsia feed`.
 Riferimento: `renders/Attivita.png`.
 - In testa la card «Questa settimana» (stessa del Task 11: estrai `client/src/components/corsia/WeekCard.tsx` e usala in entrambe le schermate).
 - Filtro: `Tabs` con «Tutte», «Vasca», «Acque libere» (non più «Open Water») e il `Select` ordinamento con `aria-label="Ordina"`.
-- Lista: `ActivityCard` al posto del bottone con foto di sfondo, `MiniMetricRing` e `MetricOrb` (eliminali dal file se non più usati). Sotto `xl` (1280px) il tocco apre `/track/:id` (`href`); da `xl` in su resta la selezione con il pannello a destra (`onSelect` + `selected`). Usa `useMediaQuery`/`matchMedia` con guardia per jsdom (se `window.matchMedia` non esiste, considera desktop così il test esistente resta valido) oppure rendi entrambe le varianti con classi `xl:hidden`/`hidden xl:block`.
+- Lista: `ActivityCard` al posto del bottone con foto di sfondo (API: o `href`, che di default è `/track/:id`, oppure `onSelect` + `selected`, mai entrambi; la selezione è esposta con `aria-current`), `MiniMetricRing` e `MetricOrb` (eliminali dal file se non più usati). Sotto `xl` (1280px) il tocco apre `/track/:id` (`href`); da `xl` in su resta la selezione con il pannello a destra (`onSelect` + `selected`). Usa `useMediaQuery`/`matchMedia` con guardia per jsdom (se `window.matchMedia` non esiste, considera desktop così il test esistente resta valido) oppure rendi entrambe le varianti con classi `xl:hidden`/`hidden xl:block`.
 - Pannello di dettaglio (xl): titolo `font-display text-3xl`, data con `formatSessionDate`, chip «Vasca»/«Acque libere», interruttore «Condividi nel feed» (il test lo cerca con questo nome), griglia di `Metric`, pulsante «Dettaglio vasche» (`variant="outline"`).
 - Rimuovi la testata con livello/XP in cima (il livello è nel profilo e su Oggi) e ogni frase da desktop.
 - Togli da `PENDING`. Commit `feat(ui): Corsia activity list`.
@@ -1097,7 +1099,7 @@ Riferimento: `renders/Sessione.png`.
 
 **Files:** `client/src/pages/Profile.tsx`, `client/src/pages/Badges.tsx` (solo l'ingresso dal profilo), `client/src/components/ThemeToggleButton.tsx` (eliminalo se non più usato; `ClubDetailEnhanced.tsx` lo importa: sostituisci lì con niente, il tema sta nel profilo).
 - In testa: avatar, nome (`font-display text-[30px]`, via `neon-gradient-text`), badge profilo come `Chip`, follower/seguiti.
-- `LevelCard` con i dati di `profile.get`; `data-tour="profile-stats"` sulla sezione statistiche come oggi.
+- `LevelCard` con i dati di `profile.get` (`level`, `totalXp`, `currentLevelXp`, `nextLevelXp`, `xpToNextLevel`): la barra mostra il progresso dentro il livello attuale; `data-tour="profile-stats"` sulla sezione statistiche come oggi.
 - Anteprima badge: griglia di 6 con «Vedi tutti» → `/badges`, `data-tour="badges-nav"`.
 - Sezione «Aspetto»: due opzioni «Scuro» e «Chiaro» (`role="radiogroup"`, `setTheme` dal Task 10), stato attivo con bordo `border-action-text`.
 - Collegamenti «Statistiche» (`/profile/performance`) e «Impostazioni» (`/settings`).
