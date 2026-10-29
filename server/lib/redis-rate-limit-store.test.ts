@@ -3,7 +3,10 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 // Use vi.hoisted so mock objects are available before vi.mock factory runs
 const { mockRedis, mockLogger } = vi.hoisted(() => ({
   mockRedis: {
+    // During an outage node-redis keeps reconnecting, so isOpen stays true;
+    // only isReady says whether commands can be sent.
     isOpen: true,
+    isReady: true,
     incr: vi.fn(),
     pExpire: vi.fn(),
     pTTL: vi.fn(),
@@ -31,6 +34,7 @@ vi.mock("../middleware/logger", () => ({
 
 import { RedisRateLimitStore } from "./redis-rate-limit-store";
 import { REDIS_COMMAND_TIMEOUT_MS, resetRedisCircuit } from "./with-timeout";
+import { LOG_THROTTLE_MS, resetLogThrottle } from "./throttled-log";
 
 describe("RedisRateLimitStore", () => {
   let store: RedisRateLimitStore;
@@ -38,7 +42,9 @@ describe("RedisRateLimitStore", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetRedisCircuit();
+    resetLogThrottle();
     mockRedis.isOpen = true;
+    mockRedis.isReady = true;
     delete process.env.REDIS_RATE_LIMIT_MODE;
     store = new RedisRateLimitStore({
       prefix: "test:",
@@ -89,7 +95,7 @@ describe("RedisRateLimitStore", () => {
     });
 
     it("should use in-memory fallback when Redis is not connected", async () => {
-      mockRedis.isOpen = false;
+      mockRedis.isReady = false;
 
       const result = await store.increment("test-key");
 
@@ -99,7 +105,7 @@ describe("RedisRateLimitStore", () => {
     });
 
     it("should accumulate hits in in-memory fallback", async () => {
-      mockRedis.isOpen = false;
+      mockRedis.isReady = false;
 
       const result1 = await store.increment("test-key");
       const result2 = await store.increment("test-key");
@@ -121,7 +127,7 @@ describe("RedisRateLimitStore", () => {
 
     it("should fail closed when REDIS_RATE_LIMIT_MODE=block and Redis is unavailable", async () => {
       process.env.REDIS_RATE_LIMIT_MODE = "block";
-      mockRedis.isOpen = false;
+      mockRedis.isReady = false;
 
       const result = await store.increment("test-key");
 
@@ -150,7 +156,7 @@ describe("RedisRateLimitStore", () => {
     });
 
     it("should do nothing when Redis is not connected", async () => {
-      mockRedis.isOpen = false;
+      mockRedis.isReady = false;
 
       await store.decrement("test-key");
 
@@ -169,7 +175,7 @@ describe("RedisRateLimitStore", () => {
     });
 
     it("should do nothing when Redis is not connected", async () => {
-      mockRedis.isOpen = false;
+      mockRedis.isReady = false;
 
       await store.resetKey("test-key");
 
@@ -198,12 +204,58 @@ describe("RedisRateLimitStore", () => {
     });
 
     it("should return undefined when Redis is not connected", async () => {
-      mockRedis.isOpen = false;
+      mockRedis.isReady = false;
 
       const result = await store.get("test-key");
 
       expect(result).toBeUndefined();
       expect(mockRedis.get).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Redis outage (client open but not ready)", () => {
+    it("short-circuits without calling Redis or logging errors, and warns at most once a minute", async () => {
+      vi.useFakeTimers();
+      try {
+        mockRedis.isReady = false;
+        for (let i = 0; i < 100; i++) await store.increment(`ip-${i % 5}`);
+        await store.decrement("ip-0");
+        await store.resetKey("ip-0");
+        await store.get("ip-0");
+
+        expect(mockRedis.incr).not.toHaveBeenCalled();
+        expect(mockRedis.get).not.toHaveBeenCalled();
+        expect(mockRedis.del).not.toHaveBeenCalled();
+        expect(mockLogger.error).not.toHaveBeenCalled();
+        expect(mockLogger.warn).toHaveBeenCalledTimes(1);
+        expect(mockLogger.warn.mock.calls[0][1]).toMatchObject({ event: "rate-limit:fail_open_memory_fallback" });
+
+        vi.advanceTimersByTime(LOG_THROTTLE_MS);
+        await store.increment("ip-0");
+        expect(mockLogger.warn).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it("throttles the error log when every Redis call fails", async () => {
+      mockRedis.incr.mockRejectedValue(new Error("The client is offline"));
+      mockRedis.get.mockRejectedValue(new Error("The client is offline"));
+      mockRedis.del.mockRejectedValue(new Error("The client is offline"));
+      for (let i = 0; i < 50; i++) {
+        await store.increment("ip");
+        await store.decrement("ip");
+        await store.resetKey("ip");
+        await store.get("ip");
+      }
+      const events = mockLogger.error.mock.calls.map((c) => c[1]?.event);
+      expect(events.sort()).toEqual([
+        "rate-limit:decrement_failed",
+        "rate-limit:get_failed",
+        "rate-limit:increment_failed",
+        "rate-limit:reset_failed",
+      ]);
+      expect(mockLogger.warn).toHaveBeenCalledTimes(1); // memory fallback notice
     });
   });
 

@@ -10,6 +10,7 @@ import { redis } from './cache';
 import { getRedisPolicy } from './redis-policy';
 import { logger } from '../middleware/logger';
 import { withRedisTimeout } from './with-timeout';
+import { LOG_THROTTLE_MS, logThrottled } from './throttled-log';
 
 // Cleanup expired local store entries at most once per minute to avoid performance overhead
 const LOCAL_STORE_CLEANUP_INTERVAL_MS = 60000;
@@ -21,8 +22,8 @@ export class RedisRateLimitStore implements Store {
   localKeys: boolean;
   private localStore: Map<string, { count: number; resetTime: number }> = new Map();
   private lastCleanup: number = Date.now();
-  private lastFailOpenLogAt = 0;
-  private lastFailClosedLogAt = 0;
+  private lastFailOpenLogAt = Number.NEGATIVE_INFINITY;
+  private lastFailClosedLogAt = Number.NEGATIVE_INFINITY;
 
   constructor(options: { prefix?: string; windowMs: number; resetExpiryOnChange?: boolean }) {
     this.prefix = options.prefix || 'rl:';
@@ -67,7 +68,7 @@ export class RedisRateLimitStore implements Store {
   }
 
   private shouldLog(now: number, lastAt: number): boolean {
-    return now - lastAt >= LOCAL_STORE_CLEANUP_INTERVAL_MS;
+    return now - lastAt >= LOG_THROTTLE_MS;
   }
 
   private failOpenMemoryFallback(key: string): IncrementResponse {
@@ -100,7 +101,9 @@ export class RedisRateLimitStore implements Store {
     const policy = getRedisPolicy();
     
     try {
-      if (!redis.isOpen) {
+      // Not ready = disconnected or reconnecting (isOpen stays true while the
+      // client retries): skip Redis without trying, the fallback logs once a minute.
+      if (!redis.isReady) {
         return policy.rateLimitMode === 'block'
           ? this.failClosedBlock()
           : this.failOpenMemoryFallback(key);
@@ -120,9 +123,7 @@ export class RedisRateLimitStore implements Store {
       return { totalHits, resetTime };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.error(`Rate limit increment failed: ${message}`, {
-        event: 'rate-limit:increment_failed',
-      });
+      logThrottled('error', 'rate-limit:increment_failed', `Rate limit increment failed: ${message}`);
       return policy.rateLimitMode === 'block'
         ? this.failClosedBlock()
         : this.failOpenMemoryFallback(key);
@@ -133,7 +134,7 @@ export class RedisRateLimitStore implements Store {
     const redisKey = this.getKey(key);
     
     try {
-      if (!redis.isOpen) return;
+      if (!redis.isReady) return;
       
       const current = await withRedisTimeout(() => redis.get(redisKey), 'rate-limit GET');
       if (current) {
@@ -144,9 +145,7 @@ export class RedisRateLimitStore implements Store {
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.error(`Rate limit decrement failed: ${message}`, {
-        event: 'rate-limit:decrement_failed',
-      });
+      logThrottled('error', 'rate-limit:decrement_failed', `Rate limit decrement failed: ${message}`);
     }
   }
 
@@ -154,13 +153,11 @@ export class RedisRateLimitStore implements Store {
     const redisKey = this.getKey(key);
     
     try {
-      if (!redis.isOpen) return;
+      if (!redis.isReady) return;
       await withRedisTimeout(() => redis.del(redisKey), 'rate-limit DEL');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.error(`Rate limit reset failed: ${message}`, {
-        event: 'rate-limit:reset_failed',
-      });
+      logThrottled('error', 'rate-limit:reset_failed', `Rate limit reset failed: ${message}`);
     }
   }
 
@@ -169,7 +166,7 @@ export class RedisRateLimitStore implements Store {
     const redisKey = this.getKey(key);
     
     try {
-      if (!redis.isOpen) return undefined;
+      if (!redis.isReady) return undefined;
       
       const value = await withRedisTimeout(() => redis.get(redisKey), 'rate-limit GET');
       if (!value) return undefined;
@@ -182,9 +179,7 @@ export class RedisRateLimitStore implements Store {
       return { totalHits: parseInt(valueStr), resetTime };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.error(`Rate limit get failed: ${message}`, {
-        event: 'rate-limit:get_failed',
-      });
+      logThrottled('error', 'rate-limit:get_failed', `Rate limit get failed: ${message}`);
       return undefined;
     }
   }
@@ -192,10 +187,10 @@ export class RedisRateLimitStore implements Store {
   // Optional: Initialize store (called once when store is created)
   init?(): void {
     const policy = getRedisPolicy();
-    const status = redis.isOpen ? 'connected' : 'disconnected';
+    const status = redis.isReady ? 'connected' : 'disconnected';
     logger.info(`Redis rate limit store initialized (Redis: ${status})`, {
       event: 'rate-limit:store_init',
-      redisConnected: redis.isOpen,
+      redisConnected: redis.isReady,
       rateLimitMode: policy.rateLimitMode,
       rateLimitFailOpen: policy.rateLimitFailOpen,
     });

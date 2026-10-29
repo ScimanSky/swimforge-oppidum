@@ -4,7 +4,7 @@ import type { Server } from "node:http";
 import express from "express";
 
 const m = vi.hoisted(() => ({
-  redis: { isOpen: true, ping: vi.fn() },
+  redis: { isOpen: true, isReady: true, ping: vi.fn() },
   getDb: vi.fn(),
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -41,6 +41,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetRedisCircuit();
   m.redis.isOpen = true;
+  m.redis.isReady = true;
   m.getDb.mockResolvedValue({ execute: vi.fn(async () => ({ rows: [] })) });
 });
 
@@ -75,5 +76,29 @@ describe("health routes with a hung Redis", () => {
     expect(res.status).toBe(503);
     expect(elapsed).toBeLessThan(5000);
     expect(await res.json()).toMatchObject({ database: false, redis: true });
+  }, 10_000);
+});
+
+describe("health routes while Redis reconnects (open but not ready)", () => {
+  beforeEach(() => {
+    m.redis.isOpen = true;
+    m.redis.isReady = false;
+  });
+
+  it("/ready reports redis false without sending PING", async () => {
+    const start = Date.now();
+    const res = await fetch(`${baseUrl}/ready`);
+    expect(Date.now() - start).toBeLessThan(500);
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ database: true, redis: false });
+    expect(m.redis.ping).not.toHaveBeenCalled();
+  });
+
+  it("/health reports redis not connected without sending PING", async () => {
+    const res = await fetch(`${baseUrl}/health`);
+    const body = await res.json();
+    expect(body.checks.redis).toBe(false);
+    expect(body.details.redis).toEqual({ message: "redis not connected" });
+    expect(m.redis.ping).not.toHaveBeenCalled();
   }, 10_000);
 });

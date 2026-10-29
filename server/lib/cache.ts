@@ -10,6 +10,7 @@ import { logger } from '../middleware/logger';
 import { randomUUID } from 'node:crypto';
 import { getRedisPolicy } from './redis-policy';
 import { REDIS_COMMAND_TIMEOUT_MS, isRedisCircuitOpen, withRedisTimeout, withTimeout } from './with-timeout';
+import { logThrottled } from './throttled-log';
 
 /**
  * Largest serialized value we send to Redis. Upstash rejects requests over
@@ -36,8 +37,8 @@ export const redis = createClient({
 
 redis.on('error', (err) => {
   const message = err instanceof Error ? err.message : String(err);
-  logger.error(`Redis error: ${message}`, {
-    event: 'redis:error',
+  // Emitted on every reconnect attempt during an outage: keep it bounded.
+  logThrottled('error', 'redis:error', `Redis error: ${message}`, {
     stack: err instanceof Error ? err.stack : undefined,
   });
 });
@@ -113,7 +114,7 @@ async function acquireLock(
   lockKey: string,
   ttlMs: number
 ): Promise<{ token: string } | 'busy' | 'unavailable'> {
-  if (!redis.isOpen) return 'unavailable';
+  if (!redis.isReady) return 'unavailable';
   const token = randomUUID();
   try {
     const res = await withRedisTimeout(
@@ -124,13 +125,13 @@ async function acquireLock(
     return { token };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.warn(`Failed to acquire cache lock ${lockKey}: ${message}`, { event: 'cache:lock_unavailable' });
+    logThrottled('warn', 'cache:lock_unavailable', `Failed to acquire cache lock ${lockKey}: ${message}`);
     return 'unavailable';
   }
 }
 
 async function releaseLock(lockKey: string, token: string): Promise<void> {
-  if (!redis.isOpen) return;
+  if (!redis.isReady) return;
   // Only delete the lock if we still own it (prevents unlocking someone else's lock after TTL expiry).
   const script = `
     if redis.call("GET", KEYS[1]) == ARGV[1] then
@@ -143,7 +144,7 @@ async function releaseLock(lockKey: string, token: string): Promise<void> {
     await withRedisTimeout(() => redis.eval(script, { keys: [lockKey], arguments: [token] }), `EVAL release ${lockKey}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.warn(`Failed to release cache lock ${lockKey}: ${message}`, { event: 'cache:lock_release_failed' });
+    logThrottled('warn', 'cache:lock_release_failed', `Failed to release cache lock ${lockKey}: ${message}`);
   }
 }
 
@@ -152,7 +153,7 @@ async function releaseLock(lockKey: string, token: string): Promise<void> {
  */
 export async function getCached<T>(key: string): Promise<T | null> {
   try {
-    if (!redis.isOpen) return null; // Redis not connected
+    if (!redis.isReady) return null; // Redis not connected (or reconnecting)
     const cached = await withRedisTimeout(() => redis.get(key), `GET ${key}`);
     if (!cached) return null;
 
@@ -164,9 +165,7 @@ export async function getCached<T>(key: string): Promise<T | null> {
     return JSON.parse(cached) as T;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error(`Cache get failed for key ${key}: ${message}`, {
-      event: 'cache:get_failed',
-    });
+    logThrottled('error', 'cache:get_failed', `Cache get failed for key ${key}: ${message}`);
     return null;
   }
 }
@@ -180,7 +179,7 @@ export async function setCached<T>(
   ttl: number = 3600
 ): Promise<void> {
   try {
-    if (!redis.isOpen) return; // Redis not connected
+    if (!redis.isReady) return; // Redis not connected (or reconnecting)
     const payload = JSON.stringify(value);
     if (payload === undefined) return;
     const bytes = Buffer.byteLength(payload, 'utf8');
@@ -200,9 +199,7 @@ export async function setCached<T>(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error(`Cache set failed for key ${key}: ${message}`, {
-      event: 'cache:set_failed',
-    });
+    logThrottled('error', 'cache:set_failed', `Cache set failed for key ${key}: ${message}`);
   }
 }
 
@@ -211,7 +208,7 @@ export async function setCached<T>(
  */
 export async function deleteCached(key: string): Promise<void> {
   try {
-    if (!redis.isOpen) return; // Redis not connected
+    if (!redis.isReady) return; // Redis not connected (or reconnecting)
     await withRedisTimeout(() => redis.del(key), `DEL ${key}`);
 
     logger.debug(`Cache delete: ${key}`, {
@@ -219,9 +216,7 @@ export async function deleteCached(key: string): Promise<void> {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error(`Cache delete failed for key ${key}: ${message}`, {
-      event: 'cache:delete_failed',
-    });
+    logThrottled('error', 'cache:delete_failed', `Cache delete failed for key ${key}: ${message}`);
   }
 }
 
@@ -230,7 +225,7 @@ export async function deleteCached(key: string): Promise<void> {
  */
 export async function deleteMultipleCached(keys: string[]): Promise<void> {
   try {
-    if (!redis.isOpen || keys.length === 0) return; // Redis not connected
+    if (!redis.isReady || keys.length === 0) return; // Redis not connected (or reconnecting)
     await withRedisTimeout(() => redis.del(keys), `DEL ${keys.length} keys`);
 
     logger.debug(`Cache delete multiple: ${keys.length} keys`, {
@@ -238,8 +233,7 @@ export async function deleteMultipleCached(keys: string[]): Promise<void> {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.warn(`Redis connection warning: ${message}`, {
-      event: 'redis:connection_warning',
+    logThrottled('warn', 'redis:connection_warning', `Redis connection warning: ${message}`, {
       stack: error instanceof Error ? error.stack : undefined,
     });
   }
@@ -253,8 +247,8 @@ export async function getOrSetCached<T>(
   fetcher: () => Promise<T>,
   ttl: number = 3600
 ): Promise<T> {
-  if (!redis.isOpen) {
-    // Redis not connected; behave like a pass-through.
+  if (!redis.isReady) {
+    // Redis not connected (or reconnecting); behave like a pass-through.
     return await fetcher();
   }
 
@@ -313,7 +307,7 @@ export async function getOrSetCached<T>(
  */
 export async function invalidateCachePattern(pattern: string): Promise<void> {
   try {
-    if (!redis.isOpen || isRedisCircuitOpen()) return; // Redis not connected / not answering
+    if (!redis.isReady || isRedisCircuitOpen()) return; // Redis not connected / not answering
     const work = async () => {
       const keysToDelete: string[] = [];
 
@@ -338,9 +332,7 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
     await withTimeout(work(), REDIS_COMMAND_TIMEOUT_MS * 3, `invalidate ${pattern}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error(`Cache invalidate pattern failed for ${pattern}: ${message}`, {
-      event: 'cache:invalidate_pattern_failed',
-    });
+    logThrottled('error', 'cache:invalidate_pattern_failed', `Cache invalidate pattern failed for ${pattern}: ${message}`);
   }
 }
 
@@ -363,7 +355,7 @@ export const cacheKeys = {
  * Invalidate user-related caches
  */
 export async function invalidateUserCache(userId: string): Promise<void> {
-  if (!redis.isOpen) return;
+  if (!redis.isReady) return;
 
   const lockKey = `lock:cache_invalidate:user:${userId}`;
   const lock = await acquireLock(lockKey, 5000);
@@ -391,9 +383,7 @@ export async function invalidateUserCache(userId: string): Promise<void> {
       await withRedisTimeout(() => multi.exec(), `MULTI DEL user ${userId}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.warn(`Cache invalidate failed for user ${userId}: ${message}`, {
-        event: 'cache:invalidate_user_failed',
-      });
+      logThrottled('warn', 'cache:invalidate_user_failed', `Cache invalidate failed for user ${userId}: ${message}`);
     }
 
     // Pattern-based delete (SCAN) is best-effort; cannot be fully atomic with writes.
@@ -415,7 +405,7 @@ export async function invalidateLeaderboardCache(): Promise<void> {
  */
 export async function getCacheStats() {
   try {
-    if (!redis.isOpen) {
+    if (!redis.isReady) {
       return { keys: 0, info: 'Redis not connected' };
     }
     const info = await withRedisTimeout(() => redis.info('stats'), 'INFO stats');
@@ -427,9 +417,7 @@ export async function getCacheStats() {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error(`Cache stats failed: ${message}`, {
-      event: 'cache:stats_failed',
-    });
+    logThrottled('error', 'cache:stats_failed', `Cache stats failed: ${message}`);
     return null;
   }
 }

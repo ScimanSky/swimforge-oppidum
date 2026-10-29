@@ -76,7 +76,8 @@ async function runHealthChecks(): Promise<{ checks: HealthChecks; details: Recor
   }
 
   try {
-    if (redis.isOpen) {
+    // Not ready = disconnected or still reconnecting: don't even send PING.
+    if (redis.isReady) {
       await withRedisTimeout(() => redis.ping(), "PING");
       checks.redis = true;
     } else {
@@ -194,7 +195,7 @@ healthRouter.get("/ready", async (_req, res) => {
   const dbProbe = probeDatabase().catch(() => false);
   const redisProbe: Promise<boolean> = !redisPolicy.redisConfigured
     ? Promise.resolve(true)
-    : redis.isOpen
+    : redis.isReady
       ? withRedisTimeout(() => redis.ping(), "PING").then(
           () => true,
           () => false
