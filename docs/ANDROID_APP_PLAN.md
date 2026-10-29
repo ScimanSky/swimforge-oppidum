@@ -275,8 +275,12 @@ Decisioni del 29/10/2026:
    record personali, invio degli allenamenti all'orologio (Forerunner 970), benessere per
    il coach con consenso. Esclusi i dati non pertinenti al nuoto o troppo sensibili (golf,
    ciclo mestruale, pressione, glicemia).
-8. Niente app Connect IQ per ora: gli allenamenti arrivano all'orologio tramite il
-   calendario di Garmin Connect.
+8. Niente app Connect IQ per gli allenamenti: arrivano all'orologio tramite il calendario
+   di Garmin Connect e li esegue l'app nuoto nativa (rilevamento vasche, recuperi, passo
+   relativo alla CSS), che un'app Connect IQ non può eguagliare. Il proprietario ha
+   l'account sviluppatore Connect IQ e il simulatore installato: un glance o widget
+   SwimForge (forma di oggi, sessione del giorno, consiglio del coach) resta un'opzione per
+   le fasi 5-6.
 
 Azione a carico del proprietario: richiedere l'accesso al Garmin Connect Developer
 Program (serve un account aziendale/sviluppatore Garmin; l'approvazione richiede
