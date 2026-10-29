@@ -178,7 +178,8 @@ coach e allenamenti le parlino (sostituiscono le cinque zone Z1–Z5 della prima
   - CV < 2%: molto regolare; 2–4%: regolare; > 4%: irregolare.
   - Calo > 5%: «cali nel finale».
 - **Mostrato:** CV e calo mediani degli ultimi 28 giorni. Grafico: i tempi della serie più recente
-  (barre) e il CV per sessione nel tempo.
+  (punti uniti da una linea su un asse intorno ai tempi, che non parte da zero e lo dice sotto il
+  grafico; barre tagliate esagererebbero le differenze) e il CV per sessione nel tempo.
 
 ### 4.6 Volume e costanza
 - **Calcolo:** km e nuotate per settimana (lunedì–domenica, fuso Europe/Rome) nelle ultime 12

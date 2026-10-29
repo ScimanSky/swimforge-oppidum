@@ -425,6 +425,10 @@ describe("Metriche: riquadri", () => {
         name: "Ultima serie, 27 ott: 6 × 100 m stile libero in 1:43, 1:45, 1:46, 1:48, 1:49, 1:51.",
       })
     ).toBeTruthy();
+    // Points on an axis around the times (1:43 to 1:51 → from 1:40), said in words.
+    expect(region).toHaveTextContent(
+      "Tempo di ogni ripetuta (minuti:secondi). L'asse parte da 1:40, non da zero, perché si vedano anche pochi secondi di differenza."
+    );
     // The same set, rep by rep: its distance per cycle drops 5,6% (over the 5% convention).
     expect(
       within(region).getByRole("img", {

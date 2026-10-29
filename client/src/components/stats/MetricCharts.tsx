@@ -477,45 +477,59 @@ export function EfficiencyChart({ metrics }: { metrics: SwimMetrics }) {
 
 // ─── Regolarità e tenuta nelle ripetute ─────────────────────────────────────
 
-/** Times of the most recent set; the axis starts near the fastest rep so differences show. */
+/**
+ * Times of the most recent set: a point per rep joined by a line, on an axis around the times
+ * (not from zero, so a fade of a few seconds shows), said in words under the chart. Bars on a cut
+ * axis would make the differences look bigger than they are.
+ */
 export function PacingSetChart({ set }: { set: NonNullable<SwimMetrics["pacing"]["latestSet"]> }) {
   const data = set.repSeconds.map((seconds, index) => ({ rep: index + 1, seconds }));
-  const min = Math.min(...set.repSeconds);
-  const max = Math.max(...set.repSeconds);
-  // Room under the fastest rep, so even it has a visible bar.
-  const scale = niceScale([Math.max(0, min - Math.max(max - min, 2) - 1), max], SECOND_STEPS);
+  const scale = niceScale([Math.min(...set.repSeconds) - 1, Math.max(...set.repSeconds) + 1], SECOND_STEPS);
   return (
-    <ChartFrame
-      title={`Ultima serie · ${formatKeyDayMonth(set.date)} · ${setTitle(set)}`}
-      summary={pacingSetSummary(set)}
-    >
-      <BarChart data={data} margin={MARGIN}>
-        {GRID}
-        <XAxis dataKey="rep" {...X_AXIS} />
-        <YAxis
-          {...Y_AXIS}
-          domain={scale.domain}
-          ticks={scale.ticks}
-          interval={0}
-          allowDataOverflow
-          tickFormatter={(value: number) => formatClock(value)}
-        />
-        <Tooltip
-          {...TOOLTIP}
-          cursor={BAR_CURSOR}
-          labelFormatter={(rep) => `Ripetuta ${rep}`}
-          formatter={(value) => [formatClock(Number(value)), "Tempo"]}
-        />
-        <Bar
-          dataKey="seconds"
-          name="Tempo"
-          fill="var(--chart-1)"
-          radius={[4, 4, 0, 0]}
-          maxBarSize={24}
-          isAnimationActive={false}
-        />
-      </BarChart>
-    </ChartFrame>
+    <div>
+      <ChartFrame
+        title={`Ultima serie · ${formatKeyDayMonth(set.date)} · ${setTitle(set)}`}
+        summary={pacingSetSummary(set)}
+      >
+        <LineChart data={data} margin={MARGIN}>
+          {GRID}
+          {/* Reps on a number axis from 0,5 to n + 0,5, as in the distance per stroke chart below. */}
+          <XAxis
+            dataKey="rep"
+            {...X_AXIS}
+            type="number"
+            domain={[0.5, data.length + 0.5]}
+            ticks={data.map((point) => point.rep)}
+            interval={0}
+          />
+          <YAxis
+            {...Y_AXIS}
+            domain={scale.domain}
+            ticks={scale.ticks}
+            interval={0}
+            tickFormatter={(value: number) => formatClock(value)}
+          />
+          <Tooltip
+            {...TOOLTIP}
+            cursor={LINE_CURSOR}
+            labelFormatter={(rep) => `Ripetuta ${rep}`}
+            formatter={(value) => [formatClock(Number(value)), "Tempo"]}
+          />
+          <Line
+            dataKey="seconds"
+            name="Tempo"
+            stroke="var(--chart-1)"
+            strokeWidth={2}
+            dot={dot("var(--chart-1)")}
+            isAnimationActive={false}
+          />
+        </LineChart>
+      </ChartFrame>
+      <p className="mt-1 text-xs text-muted-foreground">
+        Tempo di ogni ripetuta (minuti:secondi). L&apos;asse parte da {formatClock(scale.domain[0])}, non da zero,
+        perché si vedano anche pochi secondi di differenza.
+      </p>
+    </div>
   );
 }
 
@@ -534,8 +548,8 @@ export function PacingDpsChart({ set }: { set: NonNullable<SwimMetrics["pacing"]
     <ChartFrame title="Distanza per bracciata per ripetuta (m)" summary={summary} height={130}>
       <LineChart data={data} margin={MARGIN}>
         {GRID}
-        {/* Reps on a number axis from 0,5 to n + 0,5: each point and its tick sit over the middle
-            of the rep's bar in the chart above. */}
+        {/* Reps on a number axis from 0,5 to n + 0,5: each point and its tick sit under the rep's
+            time in the chart above. */}
         <XAxis
           dataKey="rep"
           {...X_AXIS}
