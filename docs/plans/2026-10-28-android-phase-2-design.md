@@ -228,6 +228,11 @@ a Statistiche e Impostazioni, sezione Aspetto (§3.5).
 - Dopo il merge: deploy Oracle e controllo esterno `https://swimforge.it/ready`.
 
 ## 9. Fuori ambito
+- Rinviati alla fase 3 durante l'implementazione (28-29/10): analisi del coach per la singola
+  attività (oggi «Coach AI» apre la pagina del coach, che analizza solo l'ultima sessione);
+  suddivisione di `ActivityDetail.tsx` (≈1.400 righe) in componenti e funzioni pure prima di
+  costruirci sopra le sessioni; scheda «Club» del feed e chip «Record» (servono dati dal
+  server).
 - Cuore allenamento (sessioni pianificate, calendario, bordo vasca, CSS e zone): tavole e
   codice all'inizio della fase 3 con questo sistema.
 - Obiettivo settimanale in km («12,7 su 15»): arriva con il check-in settimanale (fase 4).
