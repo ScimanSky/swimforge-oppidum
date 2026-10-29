@@ -6,10 +6,14 @@ const TONE: Record<MetricTone, string> = {
   action: "text-action-text",
   xp: "text-xp",
 };
-/** sm fits four metrics in a 360px-wide card; md is the default. */
+/**
+ * sm fits four metrics in a 360px-wide card; md is the default; responsive is sm on phones
+ * and md from the `sm` breakpoint (three columns of ~85px at 360px hold «1.234 kcal»).
+ */
 const SIZE = {
   sm: "text-[24px]",
   md: "text-[28px]",
+  responsive: "text-[24px] sm:text-[28px]",
   lg: "text-[36px]",
   xl: "text-[56px]",
 } as const;

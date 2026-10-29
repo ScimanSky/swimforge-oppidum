@@ -27,22 +27,20 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { getSyncPromptDecision, SYNC_PROMPT_SEEN_KEY } from "@/lib/sync-share-prompt"
 import { ActivityCard } from "@/components/corsia/ActivityCard"
 import { Chip } from "@/components/corsia/Chip"
-import { Metric, type MetricProps } from "@/components/corsia/Metric"
+import { Metric } from "@/components/corsia/Metric"
 import { WeekCard } from "@/components/corsia/WeekCard"
 import { ShareToggle } from "@/components/corsia/ShareToggle"
 import { ZoneBar } from "@/components/corsia/ZoneBar"
 import { useCurrentDay } from "@/hooks/useCurrentDay"
 import { summarizeWeek } from "@/lib/week-summary"
 import { activityPlaceLabel, activitySourceLabel } from "@/lib/activity-labels"
+import { activityMetrics, activityZoneSeconds } from "@/lib/activity-metrics"
 import {
   NO_VALUE,
-  distanceParts,
   formatDistance,
   formatDurationParts,
   formatInteger,
-  formatPaceValue,
   formatSessionDate,
-  paceSecondsPer100m,
 } from "@/lib/format"
 
 /** From here the list keeps a selection and shows the detail panel beside it. */
@@ -65,40 +63,6 @@ function useIsWide() {
     return () => media.removeEventListener?.("change", sync)
   }, [])
   return wide
-}
-
-const positiveNumber = (value: unknown) => {
-  const number = Number(value ?? 0)
-  return Number.isFinite(number) && number > 0 ? number : null
-}
-
-const getSwolfValue = (activity: any) => positiveNumber(activity?.avgSwolf ?? activity?.avg_swolf)
-const getAvgHeartRate = (activity: any) =>
-  positiveNumber(activity?.avgHeartRate ?? activity?.avg_heart_rate)
-const getMaxHeartRate = (activity: any) =>
-  positiveNumber(activity?.maxHeartRate ?? activity?.max_heart_rate)
-const getCalories = (activity: any) =>
-  positiveNumber(activity?.calories ?? activity?.caloriesBurned ?? activity?.calories_burned)
-
-/** Metrics of the selected session; one without data is not shown. */
-function sessionMetrics(activity: any): MetricProps[] {
-  const metrics: MetricProps[] = []
-  if (positiveNumber(activity.distanceMeters))
-    metrics.push({ ...distanceParts(activity.distanceMeters), label: "Distanza" })
-  const duration = formatDurationParts(activity.durationSeconds)
-  if (duration) metrics.push({ value: duration.value, unit: duration.unit, label: "Durata" })
-  const pace = paceSecondsPer100m(activity)
-  if (pace)
-    metrics.push({ value: formatPaceValue(pace), unit: "/100", label: "Passo medio", tone: "action" })
-  const swolf = getSwolfValue(activity)
-  if (swolf) metrics.push({ value: String(Math.round(swolf)), label: "SWOLF" })
-  const avgHr = getAvgHeartRate(activity)
-  if (avgHr) metrics.push({ value: String(Math.round(avgHr)), unit: "bpm", label: "FC media" })
-  const maxHr = getMaxHeartRate(activity)
-  if (maxHr) metrics.push({ value: String(Math.round(maxHr)), unit: "bpm", label: "FC massima" })
-  const calories = getCalories(activity)
-  if (calories) metrics.push({ value: formatInteger(calories), unit: "kcal", label: "Calorie" })
-  return metrics
 }
 
 export default function Activities() {
@@ -207,16 +171,8 @@ export default function Activities() {
   // Only the wide layout has the panel: below it a card opens `/track/:id`.
   const panelActivity = isWide ? selectedActivity : null
   const panelDate = panelActivity ? formatSessionDate(panelActivity.activityDate) : NO_VALUE
-  const panelMetrics = panelActivity ? sessionMetrics(panelActivity) : []
-  const panelZones = panelActivity
-    ? [
-        panelActivity.hrZone1Seconds,
-        panelActivity.hrZone2Seconds,
-        panelActivity.hrZone3Seconds,
-        panelActivity.hrZone4Seconds,
-        panelActivity.hrZone5Seconds,
-      ]
-    : []
+  const panelMetrics = panelActivity ? activityMetrics(panelActivity) : []
+  const panelZones = panelActivity ? activityZoneSeconds(panelActivity) : null
   const syncPromptDistance = formatDistance(syncPromptActivity?.distanceMeters)
   const syncPromptDuration = formatDurationParts(syncPromptActivity?.durationSeconds)
   const syncPromptSource = activitySourceLabel(syncPromptActivity?.activitySource)
@@ -342,13 +298,13 @@ export default function Activities() {
 
               {panelMetrics.length > 0 ? (
                 <div className="grid grid-cols-3 gap-x-4 gap-y-5 border-t border-border pt-5">
-                  {panelMetrics.map((metric) => (
-                    <Metric key={metric.label} {...metric} />
+                  {panelMetrics.map(({ id, ...metric }) => (
+                    <Metric key={id} {...metric} />
                   ))}
                 </div>
               ) : null}
 
-              {panelZones.some((value) => Number(value) > 0) ? (
+              {panelZones ? (
                 <div className="border-t border-border pt-5">
                   <h3 className="text-base font-bold">Zone cardio</h3>
                   <ZoneBar seconds={panelZones} className="mt-3" />

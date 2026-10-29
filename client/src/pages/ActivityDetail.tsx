@@ -14,15 +14,14 @@ import { PaceBars, paceBars } from "@/components/corsia/PaceBars"
 import { ShareToggle } from "@/components/corsia/ShareToggle"
 import { ZoneBar } from "@/components/corsia/ZoneBar"
 import { activityPlaceLabel, activitySourceLabel } from "@/lib/activity-labels"
+import { activityMetrics, activityZoneSeconds } from "@/lib/activity-metrics"
 import {
   NO_VALUE,
   distanceParts,
   formatDistance,
-  formatDurationParts,
   formatInteger,
   formatPaceValue,
   formatSessionDate,
-  paceSecondsPer100m,
 } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { ChevronDown, ChevronLeft, ChevronRight, Sparkles } from "lucide-react"
@@ -287,34 +286,8 @@ const positiveNumber = (value: unknown) => {
   return Number.isFinite(number) && number > 0 ? number : null
 }
 
-/** Session summary (3-column grid of `Sessione.png`, SWOLF added when present); a metric without data is not shown. */
-function sessionSummaryMetrics(activity: {
-  distanceMeters?: number | null
-  durationSeconds?: number | null
-  avgPacePer100m?: number | null
-  avgSwolf?: number | null
-  avgHeartRate?: number | null
-  maxHeartRate?: number | null
-  calories?: number | null
-}): MetricProps[] {
-  const metrics: MetricProps[] = []
-  const distance = positiveNumber(activity.distanceMeters)
-  if (distance) metrics.push({ ...distanceParts(distance), label: "Distanza" })
-  const duration = formatDurationParts(activity.durationSeconds)
-  if (duration) metrics.push({ value: duration.value, unit: duration.unit, label: "Durata" })
-  const pace = paceSecondsPer100m(activity)
-  if (pace)
-    metrics.push({ value: formatPaceValue(pace), unit: "/100", label: "Passo medio", tone: "action" })
-  const swolf = positiveNumber(activity.avgSwolf)
-  if (swolf) metrics.push({ value: String(Math.round(swolf)), label: "SWOLF" })
-  const avgHr = positiveNumber(activity.avgHeartRate)
-  if (avgHr) metrics.push({ value: String(Math.round(avgHr)), unit: "bpm", label: "FC media" })
-  const maxHr = positiveNumber(activity.maxHeartRate)
-  if (maxHr) metrics.push({ value: String(Math.round(maxHr)), unit: "bpm", label: "FC massima" })
-  const calories = positiveNumber(activity.calories)
-  if (calories) metrics.push({ value: formatInteger(calories), unit: "kcal", label: "Calorie" })
-  return metrics
-}
+/** The summary keeps the 2×3 grid of `Sessione.png`: the first six metrics in display order. */
+const SUMMARY_METRICS = 6
 
 /** Distance, time, pace and SWOLF of a lap, split, repeat or length (only those with data). */
 const segmentMetrics = (segment: {
@@ -876,15 +849,8 @@ export default function ActivityDetail() {
   ]
     .filter(Boolean)
     .join(" · ")
-  const summaryMetrics = sessionSummaryMetrics(activity)
-  const zoneSeconds = [
-    activity.hrZone1Seconds,
-    activity.hrZone2Seconds,
-    activity.hrZone3Seconds,
-    activity.hrZone4Seconds,
-    activity.hrZone5Seconds,
-  ]
-  const hasZones = zoneSeconds.some((value) => Number(value) > 0)
+  const summaryMetrics = activityMetrics(activity).slice(0, SUMMARY_METRICS)
+  const zoneSeconds = activityZoneSeconds(activity)
   const lengthsTotal = repeatRows.reduce((sum, row) => sum + row.lengths.length, 0)
   const counts = [
     laps.length ? `${laps.length} giri` : null,
@@ -913,24 +879,28 @@ export default function ActivityDetail() {
         </header>
 
         {summaryMetrics.length > 0 ? (
-          <div data-testid="session-metrics" className="surface-panel grid grid-cols-3 overflow-hidden p-0">
-            {summaryMetrics.map((metric, index) => (
-              <div
-                key={metric.label}
+          <ul
+            aria-label="Metriche della sessione"
+            className="surface-panel grid grid-cols-3 overflow-hidden p-0"
+          >
+            {summaryMetrics.map(({ id, ...metric }, index) => (
+              <li
+                key={id}
                 className={cn(
                   "min-w-0 border-border p-3 sm:p-4",
                   index % 3 !== 0 && "border-l",
                   index >= 3 && "border-t",
                 )}
               >
-                <Metric {...metric} />
-              </div>
+                {/* 24px on phones: three ~85px columns at 360px still hold «1.234 kcal». */}
+                <Metric {...metric} size="responsive" />
+              </li>
             ))}
-          </div>
+          </ul>
         ) : null}
 
-        {paceRows || hasZones ? (
-          <div className={cn("grid gap-4", paceRows && hasZones && "lg:grid-cols-2")}>
+        {paceRows || zoneSeconds ? (
+          <div className={cn("grid gap-4", paceRows && zoneSeconds && "lg:grid-cols-2")}>
             {paceRows ? (
               <section className="surface-panel p-4 sm:p-5" aria-labelledby={`${detailTitleId}-pace`}>
                 <h3 id={`${detailTitleId}-pace`} className="mb-4 text-base font-bold">
@@ -939,7 +909,7 @@ export default function ActivityDetail() {
                 <PaceBars bars={paceRows} />
               </section>
             ) : null}
-            {hasZones ? (
+            {zoneSeconds ? (
               <section className="surface-panel p-4 sm:p-5" aria-labelledby={`${detailTitleId}-zones`}>
                 <h3 id={`${detailTitleId}-zones`} className="mb-4 text-base font-bold">
                   Zone cardio

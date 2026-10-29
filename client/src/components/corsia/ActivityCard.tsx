@@ -4,14 +4,9 @@ import { Link } from "wouter";
 import { Chip } from "./Chip";
 import { Metric, type MetricProps } from "./Metric";
 import { cn } from "@/lib/utils";
-import {
-  NO_VALUE,
-  distanceParts,
-  formatDurationParts,
-  formatPaceValue,
-  formatSessionDate,
-  paceSecondsPer100m,
-} from "@/lib/format";
+import { activityPlaceLabel } from "@/lib/activity-labels";
+import { activityMetrics, type ActivityMetricId } from "@/lib/activity-metrics";
+import { NO_VALUE, formatSessionDate } from "@/lib/format";
 
 export type ActivityCardData = {
   id: number;
@@ -24,6 +19,14 @@ export type ActivityCardData = {
   xpEarned?: number | null;
   isOpenWater?: boolean | null;
   poolLengthMeters?: number | null;
+};
+
+/** The four metrics a card shows, with their compact label and unit overrides. */
+const CARD_METRICS: Partial<Record<ActivityMetricId, Partial<MetricProps>>> = {
+  distance: {},
+  duration: {},
+  pace: { label: "Passo /100", unit: undefined },
+  avgHr: { unit: undefined },
 };
 
 /** Either a link (default `/track/:id`) or a selectable button, never both. */
@@ -44,29 +47,15 @@ export function ActivityCard(props: ActivityCardProps) {
   const xpId = useId();
   const metricsId = useId();
   const openWater = Boolean(activity.isOpenWater);
-  const where = openWater
-    ? "Acque libere"
-    : activity.poolLengthMeters
-      ? `Vasca ${activity.poolLengthMeters}m`
-      : "Vasca";
+  const where = activityPlaceLabel(activity);
   const date = formatSessionDate(activity.activityDate);
   // Without a date the line is just the place, never «— · Vasca».
   const meta = date === NO_VALUE ? where : `${date} · ${where}`;
-  const distance = distanceParts(activity.distanceMeters);
-  const duration = formatDurationParts(activity.durationSeconds);
-  const pace = paceSecondsPer100m(activity);
-  // A metric without data is not shown.
-  const metrics: MetricProps[] = [];
-  if (distance.unit) metrics.push({ ...distance, label: "Distanza" });
-  if (duration)
-    metrics.push({ value: duration.value, unit: duration.unit, label: "Durata" });
-  if (pace)
-    metrics.push({ value: formatPaceValue(pace), label: "Passo /100", tone: "action" });
-  if (activity.avgHeartRate)
-    metrics.push({
-      value: String(Math.round(activity.avgHeartRate)),
-      label: "FC media",
-    });
+  // Values from the shared builder (a metric without data is not shown); the card keeps its
+  // compact choice of four, with the pace unit in the label and heart rate without «bpm».
+  const metrics: (MetricProps & { id: ActivityMetricId })[] = activityMetrics(activity)
+    .filter(metric => metric.id in CARD_METRICS)
+    .map(metric => ({ ...metric, ...CARD_METRICS[metric.id] }));
   const body = (
     <>
       <span className="flex items-start gap-3">
@@ -103,9 +92,9 @@ export function ActivityCard(props: ActivityCardProps) {
         id={metricsId}
         className="mt-4 grid grid-cols-4 gap-3 border-t border-border pt-4"
       >
-        {metrics.map(metric => (
+        {metrics.map(({ id, ...metric }) => (
           // The space keeps the metrics apart when read as text (not rendered in a grid).
-          <Fragment key={metric.label}>
+          <Fragment key={id}>
             <Metric {...metric} size="sm" />{" "}
           </Fragment>
         ))}

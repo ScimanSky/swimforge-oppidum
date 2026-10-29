@@ -174,41 +174,39 @@ describe("ActivityDetail (Corsia)", () => {
     expect(screen.getByText("+180 XP")).toBeInTheDocument();
   });
 
+  const metricCells = () =>
+    within(screen.getByRole("list", { name: "Metriche della sessione" }))
+      .getAllByRole("listitem")
+      .map(cell => cell.textContent);
+
   it("metric grid shows only the metrics with data, never a «—»", () => {
     render(<ActivityDetail />);
 
-    for (const label of ["Distanza", "Durata", "Passo medio", "FC media", "Calorie"]) {
-      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
-    }
-    expect(screen.getByText("Passo medio").previousElementSibling).toHaveTextContent("1:52 /100");
+    expect(metricCells()).toEqual([
+      "3,2 km Distanza",
+      "1:02 h Durata",
+      "1:52 /100 Passo medio",
+      "142 bpm FC media",
+      "540 kcal Calorie",
+    ]);
     expect(screen.queryByText("FC massima")).not.toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();
   });
 
-  it("SWOLF joins the grid when present, in order, with dividers for a third row", () => {
+  it("SWOLF joins the grid in order; at most six cells (2×3), so Calorie goes with all seven", () => {
     state.activity = session({ avgSwolf: 38, maxHeartRate: 171 });
 
     render(<ActivityDetail />);
 
-    const grid = screen.getByTestId("session-metrics");
-    const cells = Array.from(grid.children) as HTMLElement[];
-    expect(cells.map(cell => cell.lastElementChild?.lastElementChild?.textContent)).toEqual([
-      "Distanza",
-      "Durata",
-      "Passo medio",
-      "SWOLF",
-      "FC media",
-      "FC massima",
-      "Calorie",
+    expect(metricCells()).toEqual([
+      "3,2 km Distanza",
+      "1:02 h Durata",
+      "1:52 /100 Passo medio",
+      "38 SWOLF",
+      "142 bpm FC media",
+      "171 bpm FC massima",
     ]);
-    expect(within(cells[3]).getByText("38")).toBeInTheDocument();
-    // Three columns: a left divider except at the start of a row, a top divider from row two.
-    expect(cells.map(cell => cell.classList.contains("border-l"))).toEqual([
-      false, true, true, false, true, true, false,
-    ]);
-    expect(cells.map(cell => cell.classList.contains("border-t"))).toEqual([
-      false, false, false, true, true, true, true,
-    ]);
+    expect(screen.queryByText("Calorie")).not.toBeInTheDocument();
   });
 
   it("without heart-rate zones or lap paces the charts are not drawn", () => {
@@ -342,7 +340,7 @@ describe("ActivityDetail (Corsia)", () => {
 
     render(<ActivityDetail />);
 
-    expect(screen.getByTestId("session-metrics")).toHaveTextContent("800 m Distanza");
+    expect(metricCells()[0]).toBe("800 m Distanza");
   });
 
   it("«Passo migliore» is never the average pace: «—» in the table, left out of the panel", async () => {
