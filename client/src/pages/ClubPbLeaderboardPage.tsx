@@ -130,8 +130,6 @@ export default function ClubPbLeaderboardPage() {
   const leaderboardFailed = !leaderboardQuery.data && leaderboardQuery.isError;
   // The previous filter's ranking while the new one loads.
   const showingPrevious = leaderboardQuery.isPlaceholderData;
-  const profileHref = (userId: unknown) =>
-    `/u/${userId}?from=${encodeURIComponent(`/community/club/${clubId}/pb`)}`;
 
   let ranking: ReactNode;
   // An empty previous ranking is no answer for the new filter: a skeleton, not «Nessun record».
@@ -180,7 +178,7 @@ export default function ClubPbLeaderboardPage() {
                   avatarUrl={row.avatarUrl}
                   subtitle={subtitle || undefined}
                   value={formatSwimCentiseconds(row.timeCs)}
-                  href={profileHref(row.userId)}
+                  href={`/u/${row.userId}`}
                   isCurrentUser={user != null && Number(user.id) === Number(row.userId)}
                 />
               </li>

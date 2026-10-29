@@ -119,9 +119,8 @@ describe("Record del club (Corsia)", () => {
     expect(within(items[1]).getByText("Tu")).toBeTruthy();
     expect(within(items[2]).getByText("3")).toBeTruthy();
     expect(within(items[3]).getByText("Senza posizione")).toBeTruthy();
-    expect(within(items[0]).getByRole("link").getAttribute("href")).toBe(
-      `/u/1?from=${encodeURIComponent("/community/club/7/pb")}`
-    );
+    // Back from the profile is the history's job: no ?from= that nothing reads.
+    expect(within(items[0]).getByRole("link").getAttribute("href")).toBe("/u/1");
   });
 
   it("molti record: venti per pagina", async () => {
