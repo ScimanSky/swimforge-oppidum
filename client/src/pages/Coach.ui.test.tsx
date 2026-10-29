@@ -108,12 +108,13 @@ describe("Coach AI", () => {
     render(<Coach />);
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
     const summary = screen.getByRole("region", { name: "Riepilogo del coach" });
-    expect(summary).toHaveTextContent("EquilibrioIn costruzione");
+    // The fixture's balance, −7,3, is in the neutral band (−10 to +5).
+    expect(summary).toHaveTextContent("EquilibrioNeutro");
     expect(within(summary).getByText("Ultima analisi")).toBeTruthy();
     expect(within(summary).queryByText("Focus di oggi")).toBeNull();
 
     const metrics = screen.getByRole("region", { name: "Metriche" });
-    expect(metrics).toHaveTextContent("1:48 /100 m Passo soglia");
+    expect(metrics).toHaveTextContent("1:49 /100 m Passo soglia");
     expect(metrics).toHaveTextContent("64% facile Intensità");
     expect(metrics).toHaveTextContent("7,7 km/sett. Volume");
     expect(metrics).toHaveTextContent("9 sett. Serie");
