@@ -305,6 +305,15 @@ describe("DirectMessages (Corsia)", () => {
       expect(screen.getByRole("textbox", { name: "Messaggio" })).toHaveFocus();
     });
 
+    it("the list dates a conversation briefly: the time today, «27 ott» before", () => {
+      const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60_000);
+      const day = new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "short" }).format(threeDaysAgo);
+      state.recent = [conversation(5, "Ada Rossi", "Ci sei domani?", 0, 1), conversation(6, "Bruno", "Ok!", 0, 3 * 24 * 60)];
+      renderIn(<DirectMessages mode="page" />);
+      expect(screen.getByRole("button", { name: /^Ada Rossi/ })).toHaveAccessibleName(/^Ada Rossi \d\d:\d\d Ci sei domani\?$/);
+      expect(screen.getByRole("button", { name: /^Bruno/ })).toHaveAccessibleName(`Bruno ${day} Ok!`);
+    });
+
     it("no fake tabs or call buttons: only what works", () => {
       renderIn(<DirectMessages mode="page" />);
       for (const name of ["Primary", "General", "Richieste", "Chiama", "Videochiamata", "Info"]) {

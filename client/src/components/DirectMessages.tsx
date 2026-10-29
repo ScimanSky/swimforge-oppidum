@@ -37,7 +37,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
-import { formatSessionDate, getInitials } from "@/lib/format";
+import { formatDayMonth, formatSessionDate, getInitials } from "@/lib/format";
 import { previousInAppPath } from "@/lib/in-app-history";
 import { uniqueRealtimeTopic } from "@/lib/realtime-topic";
 import { supabase } from "@/lib/supabase";
@@ -149,6 +149,13 @@ function messageTime(value: Date | string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   return date.toDateString() === new Date().toDateString() ? timeFmt.format(date) : formatSessionDate(date);
+}
+
+/** The conversation list's short date: «10:47» today, «27 ott» before; nothing for an invalid date. */
+function listTime(value: Date | string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toDateString() === new Date().toDateString() ? timeFmt.format(date) : formatDayMonth(date);
 }
 
 function MessageTime({ value }: { value: Date | string }) {
@@ -698,7 +705,7 @@ function MessagesPage() {
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-2">
                     <span className="truncate text-sm font-semibold">{name}</span>{" "}
-                    <span className="shrink-0 text-xs text-muted-foreground">{messageTime(conv.lastMessage.createdAt)}</span>
+                    <span className="shrink-0 text-xs text-muted-foreground">{listTime(conv.lastMessage.createdAt)}</span>
                   </span>{" "}
                   <span className="mt-0.5 flex items-center justify-between gap-2">
                     <span className="truncate text-sm text-muted-foreground">{conversationPreview(conv.lastMessage)}</span>
