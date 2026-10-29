@@ -219,7 +219,9 @@ export default function ClubDetailEnhanced() {
   // A public club shows its weekly numbers to everyone, the others to members only (the server
   // answers FORBIDDEN otherwise): not even asked for then.
   const canSeeWeeklyStats =
-    isMemberFromClubQuery || (clubQuery.data as any | undefined)?.visibility === "public";
+    isMemberFromClubQuery ||
+    ((clubQuery.data as any | undefined)?.visibility === "public" &&
+      !(clubQuery.data as any | undefined)?.is_private);
   const statsQuery = trpc.community.clubs.weeklyStats.useQuery(
     { clubId },
     { enabled: match && Number.isFinite(clubId) && canSeeWeeklyStats }

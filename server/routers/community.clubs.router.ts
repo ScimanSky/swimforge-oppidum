@@ -203,8 +203,21 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
 
         weeklyStats: protectedProcedure
             .input(z.object({ clubId: z.number() }))
-            .query(async ({ input }) => {
-                const { getClubWeeklyStats } = await import("../db_clubs");
+            .query(async ({ ctx, input }) => {
+                const { getClubById, getClubWeeklyStats } = await import("../db_clubs");
+                const club = await getClubById(ctx.user.id, input.clubId);
+                if (!club) {
+                    throw new TRPCError({ code: "NOT_FOUND" });
+                }
+                // The stats carry activity counts and the next event's title: clubs that
+                // are not public (private, invite) show them to members only.
+                const isPublicClub = club.visibility === "public" && !club.is_private;
+                if (!isPublicClub && !club.is_member) {
+                    throw new TRPCError({
+                        code: "FORBIDDEN",
+                        message: "Devi iscriverti al club per vedere le statistiche.",
+                    });
+                }
                 return getClubWeeklyStats(input.clubId);
             }),
 

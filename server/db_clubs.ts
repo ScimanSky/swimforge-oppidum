@@ -275,6 +275,15 @@ export async function createClubPost(
   return inserted[0]?.id ?? null;
 }
 
+/**
+ * clubs.get hides a club from non-members only when is_private is set, so every club
+ * that is not public ("private" and "invite") is stored as private, as updateClub does.
+ */
+export function clubPrivacy(input: { isPrivate?: boolean; visibility?: "public" | "private" | "invite" }) {
+  const visibility = input.visibility ?? (input.isPrivate ? "private" : "public");
+  return { visibility, isPrivate: visibility !== "public" };
+}
+
 export async function createClub(userId: number, input: { name: string; description?: string | null; coverImageUrl?: string | null; websiteUrl?: string | null; isPrivate?: boolean; visibility?: "public" | "private" | "invite"; rules?: string | null }) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -298,8 +307,7 @@ export async function createClub(userId: number, input: { name: string; descript
       coverImageUrl: input.coverImageUrl ?? null,
       websiteUrl: input.websiteUrl ?? null,
       ownerId: userId,
-      isPrivate: input.isPrivate ?? false,
-      visibility: input.visibility ?? (input.isPrivate ? "private" : "public"),
+      ...clubPrivacy(input),
       createdAt: new Date(),
       updatedAt: new Date(),
     })

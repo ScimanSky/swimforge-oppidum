@@ -441,7 +441,8 @@ export async function getLeaderboard(
   if (periodValidated === "all") {
     if (orderByValidated === "badges") {
       // Use Drizzle query builder + aggregation to avoid raw SQL string assembly.
-      const badgeCountExpr = sql<number>`count(${userBadges.id})`;
+      // count() is a bigint: node-postgres returns it as a string, so map it to a number.
+      const badgeCountExpr = sql<number>`count(${userBadges.id})`.mapWith(Number);
       return await db
         .select({
           ...leaderboardProfileColumns,
@@ -502,7 +503,7 @@ export async function getLeaderboard(
       sp.created_at as "createdAt",
       sp.updated_at as "updatedAt",
       u.name,
-      COALESCE((SELECT COUNT(*) FROM user_badges WHERE user_id = sp.user_id AND earned_at >= ${startDate}), 0) as "badgeCount",
+      COALESCE((SELECT COUNT(*) FROM user_badges WHERE user_id = sp.user_id AND earned_at >= ${startDate}), 0)::int as "badgeCount",
       COALESCE(
         NULLIF(
           (SELECT SUM(amount) FROM xp_transactions WHERE user_id = sp.user_id AND created_at >= ${startDate}),
@@ -510,7 +511,7 @@ export async function getLeaderboard(
         ),
         (SELECT SUM(xp_earned) FROM swimming_activities WHERE user_id = sp.user_id AND activity_date >= ${startDate}),
         0
-      ) as "periodXp"
+      )::int as "periodXp"
     FROM swimmer_profiles sp
     JOIN users u ON sp.user_id = u.id
     ORDER BY ${orderBySql}
