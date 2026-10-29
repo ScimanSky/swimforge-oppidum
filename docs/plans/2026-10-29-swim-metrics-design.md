@@ -218,7 +218,7 @@ usano solo in sezioni che spariscono se la richiesta fallisce.
 - **tRPC:**
   - `statistics.getMetrics` (solo per sé);
   - `statistics.setCssTest` e `statistics.clearCssTest`, con validazione: tempi plausibili e
-    T400/T200 tra 1,9 e 2,4;
+    T400/T200 tra 2,02 e 2,4 (come al §4.1);
   - `statistics.setPaceZones` e `statistics.clearPaceZones` («Le tue zone»): cinque passi tra
     1:00 e 4:00, ognuno più veloce del precedente, errori in italiano sul loro campo; svuotano la
     cache delle metriche;
@@ -231,15 +231,44 @@ usano solo in sezioni che spariscono se la richiesta fallisce.
   - istruzioni: usare solo queste metriche, citarle quando servono, dire quando i dati sono pochi o
     l'affidabilità è bassa, non inventare altri indici.
   - zone A1–C3 (chat e generatore): ogni ripetuta con codice, livello e passo dalle zone
-    dell'atleta («6×100 B2 · Soglia 1:49–1:54, rec. 20″»); mai oltre la ripetuta massima; ogni zona
-    usata spiegata in parole semplici (il vero allenatore del proprietario non usa le zone);
-    l'allenamento si segue anche solo con livelli e passi.
-  - **Allenamenti generati** (`server/ai_coach_zones.ts`): dopo la risposta del modello il server
-    controlla codici e distanze; spezza una ripetuta troppo lunga in vasche di andata e ritorno
-    con lo stesso recupero (4×300 C1 → 8×150 C1); per una zona sconosciuta o mancante chiede una
-    volta di nuovo dicendo cosa non va; se alla seconda una ripetuta è ancora troppo lunga usa
-    l'allenamento di riserva. Registra ogni violazione, aggiunge livello e passo obiettivo (solo
-    stile libero) e ricalcola il totale dei metri.
+    dell'atleta (l'esempio delle regole usa la B2 dell'atleta, «m:ss–m:ss» senza zone, mai i passi
+    di un altro); mai oltre la ripetuta massima; ogni zona usata spiegata in parole semplici (il
+    vero allenatore del proprietario non usa le zone); l'allenamento si segue anche solo con
+    livelli e passi. Nella chat, quando ci sono zone, la risposta ha la sezione «Le zone di oggi»
+    (una riga per zona usata, con passo).
+  - **Limiti di sicurezza** (convenzione nostra per un nuotatore amatore, `WORKOUT_SAFETY_LIMITS`,
+    detti nelle regole del coach e nelle convenzioni dell'intensità): in un allenamento al massimo
+    1600 m in C1, 600 m in C2 e 300 m in C3; recupero in C2 almeno lungo quanto la ripetuta, in C3
+    almeno 3 volte (con una ripartenza conta il recupero che resta al passo della zona, preso
+    all'estremo lento: C2/C3 al confine C1/C2; senza zone il passo medio recente o 2:30/100 m);
+    sempre almeno 200 m facili in A1 di riscaldamento; totale non oltre 1,5 volte la mediana delle
+    ultime 6 nuotate in vasca (nessun tetto senza storico).
+  - **Allenamenti generati** (`server/ai_coach_zones.ts`, `ai_coach_reps.ts`, `ai_coach_safety.ts`):
+    - il generatore riceve la vasca abituale (la più frequente delle ultime 10 nuotate in vasca) e
+      il totale massimo; il volume delle fasi è in quote del totale, non in metri fissi;
+    - le ripetute si leggono da numeri, «sets»/«distance» e nome, con ogni campo convertito in
+      testo (anche «1,5 km», «2x(4x50)», «2 serie di 4x300»); se nome e campi non coincidono è una
+      violazione;
+    - una ripetuta troppo lunga si spezza in vasche che finiscono al muro (in vasca da 50 m in
+      100 m): il recupero resta, una ripartenza si accorcia in proporzione arrotondata a 5 s
+      (4×300 C1 «a 5:00» → 8×150 «a 2:30»);
+    - in vasca da 50 m il C3 è una vasca: 25 m sprint + 25 m facile;
+    - un codice dentro un'etichetta («B2 · Soglia») vale; l'intensità diventa il livello; niente
+      passo per altri stili (parole intere) e con pinne, palette, pull buoy, tavoletta o gambe;
+    - ogni violazione (zone, distanze, nome e campi, limiti di sicurezza) fa chiedere una volta di
+      nuovo con l'elenco; alla seconda, una ripetuta ancora troppo lunga porta all'allenamento di
+      riserva, il resto viene tagliato in modo deterministico (meno ripetute delle serie più dure,
+      recuperi più lunghi, riscaldamento aggiunto) con una nota in italiano sotto ogni serie
+      cambiata; anche l'allenamento di riserva rispetta i limiti. Ogni violazione e ogni taglio
+      sono registrati; il server ricalcola il totale dei metri.
+    - Esempio di taglio (mediana 1000 m → al massimo 1500 m): 400 A1 + 6×100 B2 + 4×50 C2 + 400 A2
+      + 200 A1 = 1800 m diventa 400 A1 + 5×100 B2 + 400 A2 + 200 A1 = 1500 m; il 4×50 C2 è tolto
+      (detto nelle note del coach) e sotto il 5×100 c'è «Ridotto da 6×100 m a 5×100 m: il totale
+      resta entro 1500 m, …».
+  - **Pagina Coach:** il passo di ogni ripetuta viene dalle zone di oggi (quello salvato resta come
+    storia, detto se è cambiato); si vedono tutti gli esercizi della parte; «Ripartenza» per una
+    ripartenza, «Recupero» per un recupero; il numero di un consiglio è solo una percentuale o una
+    variazione con segno.
 
 ## 7. Interfaccia (Allena → Statistiche)
 - La sezione «Analisi avanzate» diventa «Metriche»: sei riquadri richiudibili, tutti chiusi
