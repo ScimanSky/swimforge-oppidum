@@ -125,7 +125,7 @@ describe("FeedPost Corsia", () => {
     expect(screen.getByText("#soglia")).toHaveClass("text-action-text")
   })
 
-  it("azioni: cuore con il totale, commenti, condividi; cuore pieno arancio se hai reagito", () => {
+  it("azioni: cuore con il totale, commenti, condividi; cuore pieno blu azione (non arancio XP) se hai reagito", () => {
     renderPost(activityPost)
     const heart = screen.getByRole("button", { name: "Reagisci, 24 reazioni" })
     expect(heart).toHaveTextContent("24")
@@ -137,7 +137,8 @@ describe("FeedPost Corsia", () => {
     state.userReaction = { reactionType: "love" }
     renderPost(activityPost)
     const active = screen.getByRole("button", { name: "Cambia reazione, 24 reazioni" })
-    expect(active.querySelector("svg")).toHaveClass("fill-current", "text-xp")
+    expect(active.querySelector("svg")).toHaveClass("fill-current", "text-action-text")
+    expect(active.querySelector("svg")).not.toHaveClass("text-xp")
   })
 
   it("i commenti si aprono dal pulsante", async () => {
