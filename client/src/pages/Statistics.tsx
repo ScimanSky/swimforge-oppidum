@@ -21,7 +21,12 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Metric } from "@/components/corsia/Metric";
 import { ZoneBar } from "@/components/corsia/ZoneBar";
-import { formatDayMonth, formatDayMonthYear, formatInteger } from "@/lib/format";
+import {
+  formatDayMonth,
+  formatDayMonthYear,
+  formatInteger,
+  formatPaceValue,
+} from "@/lib/format";
 
 const PERIOD_OPTIONS = [
   { value: 7, label: "7 giorni" },
@@ -39,6 +44,16 @@ const tooltipStyle = {
   color: "var(--foreground)",
 };
 const axisTick = { fill: "var(--muted-foreground)", fontSize: 12 };
+
+const kmNumber = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 });
+const formatKmNumber = (km: number) => kmNumber.format(km);
+
+/** Tooltip values of the «Andamento» chart: «2,5 km», «1:52 /100 m». */
+const timelineTooltipValue = (value: unknown, name: string, item: { dataKey?: unknown }) => {
+  const number = Number(value);
+  if (item.dataKey === "passo") return [`${formatPaceValue(number)} /100 m`, name];
+  return [`${formatKmNumber(number)} km`, name];
+};
 
 const accordionTrigger =
   "rounded-2xl border border-border bg-card px-4 py-3 text-left text-[15px] font-semibold hover:no-underline";
@@ -182,23 +197,50 @@ export default function Statistics() {
     : [];
   const hasHrZones = hrZones.some((value) => value > 0);
 
-  // Format timeline data for chart
+  // Chart data: distance in km, pace in seconds per 100 m (formatted as mm:ss on axis and tooltip).
   const timelineChartData = timeline?.map((point) => ({
     date: formatDayMonth(point.date),
     distanza: point.distance,
-    pace: point.pace ? point.pace / 60 : null, // convert to minutes
+    passo: point.pace ?? null,
     sessioni: point.sessions,
   }));
+  const timelineSummary = (() => {
+    if (!timeline || timeline.length === 0) return null;
+    const totalKm = timeline.reduce((sum, point) => sum + (point.distance || 0), 0);
+    const sessions = timeline.reduce((sum, point) => sum + (point.sessions || 0), 0);
+    const paced = timeline.filter((point) => point.pace);
+    const pacedSessions = paced.reduce((sum, point) => sum + (point.sessions || 1), 0);
+    const avgPace = pacedSessions
+      ? paced.reduce((sum, point) => sum + point.pace! * (point.sessions || 1), 0) / pacedSessions
+      : null;
+    return [
+      `Nel periodo ${formatKmNumber(totalKm)} km in ${formatInteger(sessions)} ${sessions === 1 ? "nuotata" : "nuotate"}`,
+      avgPace ? `, passo medio ${formatPaceValue(avgPace)} /100 m` : "",
+      ".",
+    ].join("");
+  })();
+  const paceDistributionSummary =
+    performance && performance.paceDistribution.length > 0
+      ? `Nuotate per fascia di passo: ${performance.paceDistribution
+          .map((band) => `${band.range} ${formatInteger(band.count)}`)
+          .join(", ")}.`
+      : null;
 
   const progressiveOverloadValue =
     advanced?.poiBaseline === false ? null : advanced?.progressiveOverloadIndex ?? null;
 
-  const trendValue =
-    advanced?.trendBaseline && advanced?.trendIndicator
-      ? advanced.trendIndicator.direction === "down"
-        ? -advanced.trendIndicator.percentage
-        : advanced.trendIndicator.percentage
-      : null;
+  // The signed value when the server sends it; older payloads only have |%| and a direction.
+  const trend = advanced?.trendBaseline ? advanced.trendIndicator : null;
+  const trendScore: { value: string | null; unit?: string } = !trend
+    ? { value: null }
+    : typeof trend.signedPercentage === "number"
+      ? { value: signedValue(trend.signedPercentage), unit: "%" }
+      : trend.direction === "stable"
+        ? { value: "Stabile" }
+        : {
+            value: signedValue(trend.direction === "down" ? -trend.percentage : trend.percentage),
+            unit: "%",
+          };
 
   const streak = advanced?.streak;
 
@@ -240,31 +282,51 @@ export default function Statistics() {
                   </p>
                   <div className="mt-4">
                     {timelineChartData && timelineChartData.length > 0 ? (
-                      <ResponsiveContainer width="100%" height={250}>
-                        <LineChart data={timelineChartData}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                          <XAxis dataKey="date" stroke="var(--border)" tick={axisTick} />
-                          <YAxis stroke="var(--border)" tick={axisTick} width={36} />
-                          <Tooltip contentStyle={tooltipStyle} />
-                          <Legend wrapperStyle={{ fontSize: 12 }} />
-                          <Line
-                            type="monotone"
-                            dataKey="distanza"
-                            stroke="var(--chart-1)"
-                            strokeWidth={2}
-                            name="Distanza (km)"
-                            dot={{ fill: "var(--chart-1)" }}
-                          />
-                          <Line
-                            type="monotone"
-                            dataKey="pace"
-                            stroke="var(--chart-2)"
-                            strokeWidth={2}
-                            name="Passo (min/100 m)"
-                            dot={{ fill: "var(--chart-2)" }}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
+                      <>
+                        {timelineSummary ? <p className="sr-only">{timelineSummary}</p> : null}
+                        <ResponsiveContainer width="100%" height={250}>
+                          <LineChart data={timelineChartData} accessibilityLayer>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                            <XAxis dataKey="date" stroke="var(--border)" tick={axisTick} />
+                            <YAxis
+                              yAxisId="distance"
+                              stroke="var(--border)"
+                              tick={axisTick}
+                              width={36}
+                              tickFormatter={(value: number) => formatKmNumber(value)}
+                            />
+                            <YAxis
+                              yAxisId="pace"
+                              orientation="right"
+                              stroke="var(--border)"
+                              tick={axisTick}
+                              width={40}
+                              domain={["auto", "auto"]}
+                              tickFormatter={(value: number) => formatPaceValue(value)}
+                            />
+                            <Tooltip contentStyle={tooltipStyle} formatter={timelineTooltipValue} />
+                            <Legend wrapperStyle={{ fontSize: 12 }} />
+                            <Line
+                              yAxisId="distance"
+                              type="monotone"
+                              dataKey="distanza"
+                              stroke="var(--chart-1)"
+                              strokeWidth={2}
+                              name="Distanza"
+                              dot={{ fill: "var(--chart-1)" }}
+                            />
+                            <Line
+                              yAxisId="pace"
+                              type="monotone"
+                              dataKey="passo"
+                              stroke="var(--chart-2)"
+                              strokeWidth={2}
+                              name="Passo"
+                              dot={{ fill: "var(--chart-2)" }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </>
                     ) : (
                       <p className="py-8 text-center text-sm text-muted-foreground">
                         Nessun dato in questo periodo
@@ -299,9 +361,12 @@ export default function Statistics() {
                     <p className="mt-1 text-sm text-muted-foreground">
                       Nuotate per fascia di passo (min/100 m).
                     </p>
+                    {paceDistributionSummary ? (
+                      <p className="sr-only">{paceDistributionSummary}</p>
+                    ) : null}
                     <div className="mt-4">
                       <ResponsiveContainer width="100%" height={200}>
-                        <BarChart data={performance.paceDistribution}>
+                        <BarChart data={performance.paceDistribution} accessibilityLayer>
                           <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                           <XAxis dataKey="range" stroke="var(--border)" tick={axisTick} />
                           <YAxis stroke="var(--border)" tick={axisTick} width={36} allowDecimals={false} />
@@ -423,8 +488,7 @@ export default function Statistics() {
                       },
                       {
                         label: "Tendenza",
-                        value: signedValue(trendValue),
-                        unit: "%",
+                        ...trendScore,
                         info: metricsDefinitions.trend,
                       },
                     ]}

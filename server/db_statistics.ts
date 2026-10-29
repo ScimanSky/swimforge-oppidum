@@ -48,13 +48,29 @@ export interface PerformanceAnalysis {
   swolfAvg: number | null;
 }
 
+export interface TrendIndicator {
+  direction: 'up' | 'down' | 'stable';
+  /** Absolute change in percent (kept for older clients). */
+  percentage: number;
+  /** Signed change in percent: −3 means 3 % less than the previous period, also when «stable». */
+  signedPercentage: number;
+}
+
+/** Distance trend between two equal periods (km); 0 % and stable without a previous period. */
+export function computeTrendIndicator(currentKm: number, previousKm: number): TrendIndicator {
+  const signedPercentage =
+    previousKm > 0 ? Math.round(((currentKm - previousKm) / previousKm) * 100) : 0;
+  return {
+    direction: signedPercentage > 5 ? 'up' : signedPercentage < -5 ? 'down' : 'stable',
+    percentage: Math.abs(signedPercentage),
+    signedPercentage: signedPercentage === 0 ? 0 : signedPercentage,
+  };
+}
+
 export interface AdvancedMetrics {
   performanceIndex: number; // 0-100
   consistencyScore: number; // 0-100
-  trendIndicator: {
-    direction: 'up' | 'down' | 'stable';
-    percentage: number;
-  };
+  trendIndicator: TrendIndicator;
   trendBaseline: boolean;
   insights: string[];
   predictions: {
@@ -338,14 +354,7 @@ export async function getAdvancedMetrics(
   const previousDistance =
     comparisonPreviousActivities.reduce((sum, a) => sum + a.distanceMeters, 0) / 1000;
   const trendBaseline = previousDistance > 0;
-  const trendPercentage = trendBaseline
-    ? Math.round(((comparisonCurrentDistance - previousDistance) / previousDistance) * 100)
-    : 0;
-
-  const trendIndicator = {
-    direction: (trendPercentage > 5 ? 'up' : trendPercentage < -5 ? 'down' : 'stable') as 'up' | 'down' | 'stable',
-    percentage: Math.abs(trendPercentage),
-  };
+  const trendIndicator = computeTrendIndicator(comparisonCurrentDistance, previousDistance);
 
   // Get user profile for level and XP
   const profile = await db

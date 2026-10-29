@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({
   loading: false,
   periods: [] as number[],
   advanced: undefined as any,
+  timeline: [] as any[],
 }));
 
 const performance = {
@@ -23,7 +24,7 @@ vi.mock("@/lib/trpc", () => ({
       getTimeline: {
         useQuery: (input: { days: number }) => {
           state.periods.push(input.days);
-          return { data: [], isLoading: state.loading };
+          return { data: state.timeline, isLoading: state.loading };
         },
       },
       getPerformance: { useQuery: () => ({ data: performance, isLoading: false }) },
@@ -47,6 +48,7 @@ describe("Statistiche", () => {
   beforeEach(() => {
     state.loading = false;
     state.periods.length = 0;
+    state.timeline = [];
     state.advanced = {
       performanceIndex: 72.4,
       consistencyScore: null,
@@ -113,11 +115,33 @@ describe("Statistiche", () => {
     ]);
   });
 
-  it("mostra la tendenza reale anche entro ±2 %", async () => {
-    state.advanced.trendIndicator = { direction: "down", percentage: 2 };
+  it("mostra il segno reale della tendenza anche quando è «stabile»", async () => {
+    state.advanced.trendIndicator = { direction: "stable", percentage: 3, signedPercentage: -3 };
     render(<Statistics />);
     await userEvent.click(screen.getByRole("button", { name: "Analisi avanzate" }));
-    expect(screen.getByText("−2")).toBeTruthy();
+    expect(screen.getByText("−3")).toBeTruthy();
+    expect(screen.queryByText("+3")).toBeNull();
+  });
+
+  it("senza valore con segno una tendenza stabile si legge «Stabile»", async () => {
+    state.advanced.trendIndicator = { direction: "stable", percentage: 3 };
+    render(<Statistics />);
+    await userEvent.click(screen.getByRole("button", { name: "Analisi avanzate" }));
+    expect(screen.getByText("Stabile")).toBeTruthy();
+    expect(screen.queryByText("+3")).toBeNull();
+  });
+
+  it("riassume i grafici per i lettori di schermo", async () => {
+    state.timeline = [
+      { date: "2026-10-20", distance: 2.5, pace: 110, sessions: 1 },
+      { date: "2026-10-22", distance: 3.2, pace: 120, sessions: 2 },
+      { date: "2026-10-24", distance: 0, pace: null, sessions: 0 },
+    ];
+    render(<Statistics />);
+    // Weighted by sessions: (110 + 2 × 120) / 3 = 116,7 s → 1:57.
+    expect(screen.getByText("Nel periodo 5,7 km in 3 nuotate, passo medio 1:57 /100 m.")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Analisi prestazioni" }));
+    expect(screen.getByText("Nuotate per fascia di passo: 1:30-1:45 3.")).toBeTruthy();
   });
 
   it("senza dati non mostra riquadri vuoti ma una riga per sezione", async () => {
