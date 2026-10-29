@@ -31,6 +31,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { formatTimeAgo } from "@/lib/format";
 import { toInAppPath } from "@/lib/navigation";
+import { uniqueRealtimeTopic } from "@/lib/realtime-topic";
 import { trpc } from "@/lib/trpc";
 import { errorToastMessage } from "@/lib/trpc-errors";
 import { supabase } from "@/lib/supabase";
@@ -134,7 +135,7 @@ export default function NotificationBell() {
     if (!currentUserId || !inAppEnabled) return;
 
     const channel = supabase
-      .channel(`notifications:${currentUserId}`)
+      .channel(uniqueRealtimeTopic(`notifications:${currentUserId}`))
       .on(
         "postgres_changes" as any,
         {

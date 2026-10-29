@@ -15,10 +15,11 @@ const state = vi.hoisted(() => ({
   marks: [] as unknown[],
   markError: null as unknown,
   refetch: vi.fn(),
+  invalidate: vi.fn(),
 }));
 
 vi.mock("@/lib/trpc", () => {
-  const cache = { setData: vi.fn(), invalidate: vi.fn() };
+  const cache = { setData: vi.fn(), invalidate: state.invalidate };
   return {
     trpc: {
       useUtils: () => ({ community: { notifications: { unreadCount: cache, list: cache } } }),
@@ -55,10 +56,39 @@ vi.mock("@/lib/trpc", () => {
   };
 });
 
-vi.mock("@/lib/supabase", () => {
-  const channel = { on: () => channel, subscribe: () => channel };
-  return { supabase: { channel: () => channel, removeChannel: vi.fn() } };
+// Like realtime-js: channel(topic) hands back the channel with that topic while it is still in
+// the client's list, removeChannel only starts leaving (asynchronous), and adding a callback to
+// a channel already subscribed throws.
+const realtime = vi.hoisted(() => {
+  type FakeChannel = { topic: string; subscribed: boolean; inserts: Array<() => void>; on: any; subscribe: any };
+  const channels = new Map<string, FakeChannel>();
+  const channel = (topic: string) => {
+    const existing = channels.get(topic);
+    if (existing) return existing;
+    const created: FakeChannel = {
+      topic,
+      subscribed: false,
+      inserts: [],
+      on(_type: string, _filter: unknown, callback: () => void) {
+        if (created.subscribed) {
+          throw new Error(`cannot add \`postgres_changes\` callbacks for realtime:${topic} after \`subscribe()\`.`);
+        }
+        created.inserts.push(callback);
+        return created;
+      },
+      subscribe() {
+        created.subscribed = true;
+        return created;
+      },
+    };
+    channels.set(topic, created);
+    return created;
+  };
+  return { channels, channel, removeChannel: async () => "ok", latest: () => Array.from(channels.values()).at(-1) };
 });
+vi.mock("@/lib/supabase", () => ({
+  supabase: { channel: realtime.channel, removeChannel: realtime.removeChannel },
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 // The popover's ScrollArea measures itself; jsdom has no ResizeObserver.
 vi.stubGlobal(
@@ -102,8 +132,22 @@ describe("NotificationBell (Corsia)", () => {
     state.marks = [];
     state.markError = null;
     state.refetch.mockClear();
+    state.invalidate.mockClear();
+    realtime.channels.clear();
     vi.mocked(toast.success).mockClear();
     vi.mocked(toast.error).mockClear();
+  });
+
+  it("a quick remount subscribes anew (never to a channel still leaving): a new notification refreshes the bell", () => {
+    renderBell();
+    cleanup();
+    renderBell();
+    expect(realtime.channels.size).toBe(2);
+    const channel = realtime.latest()!;
+    expect(channel.topic).toMatch(/^notifications:4:/);
+
+    channel.inserts.forEach((insert) => insert());
+    expect(state.invalidate).toHaveBeenCalledTimes(2);
   });
 
   it("the bell says how many are unread; nothing when in-app notifications are off", () => {

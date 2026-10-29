@@ -39,6 +39,7 @@ import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { formatSessionDate, getInitials } from "@/lib/format";
 import { previousInAppPath } from "@/lib/in-app-history";
+import { uniqueRealtimeTopic } from "@/lib/realtime-topic";
 import { supabase } from "@/lib/supabase";
 import { trpc } from "@/lib/trpc";
 import { errorToastMessage } from "@/lib/trpc-errors";
@@ -177,7 +178,7 @@ function useMessagesRealtime() {
     if (!currentUserId) return;
 
     const channel = supabase
-      .channel(`dm:${currentUserId}`)
+      .channel(uniqueRealtimeTopic(`dm:${currentUserId}`))
       .on(
         "postgres_changes" as any,
         {

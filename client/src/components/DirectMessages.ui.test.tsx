@@ -26,10 +26,11 @@ const state = vi.hoisted(() => ({
   profiles: {} as Record<number, any>,
   previous: null as string | null,
   refetch: vi.fn(),
+  invalidate: vi.fn(),
 }));
 
 vi.mock("@/lib/trpc", () => {
-  const cache = { invalidate: vi.fn() };
+  const cache = { invalidate: state.invalidate };
   // Like TanStack Query: a disabled query has no data and stays pending.
   const query = (name: string, data: (input: any) => unknown, error: () => unknown = () => null) => ({
     useQuery: (input: any, options?: { enabled?: boolean }) => {
@@ -94,10 +95,39 @@ vi.mock("@/lib/trpc", () => {
   };
 });
 
-vi.mock("@/lib/supabase", () => {
-  const channel = { on: () => channel, subscribe: () => channel };
-  return { supabase: { channel: () => channel, removeChannel: vi.fn() } };
+// Like realtime-js: channel(topic) hands back the channel with that topic while it is still in
+// the client's list, removeChannel only starts leaving (asynchronous), and adding a callback to
+// a channel already subscribed throws.
+const realtime = vi.hoisted(() => {
+  type FakeChannel = { topic: string; subscribed: boolean; inserts: Array<() => void>; on: any; subscribe: any };
+  const channels = new Map<string, FakeChannel>();
+  const channel = (topic: string) => {
+    const existing = channels.get(topic);
+    if (existing) return existing;
+    const created: FakeChannel = {
+      topic,
+      subscribed: false,
+      inserts: [],
+      on(_type: string, _filter: unknown, callback: () => void) {
+        if (created.subscribed) {
+          throw new Error(`cannot add \`postgres_changes\` callbacks for realtime:${topic} after \`subscribe()\`.`);
+        }
+        created.inserts.push(callback);
+        return created;
+      },
+      subscribe() {
+        created.subscribed = true;
+        return created;
+      },
+    };
+    channels.set(topic, created);
+    return created;
+  };
+  return { channels, channel, removeChannel: async () => "ok", latest: () => Array.from(channels.values()).at(-1) };
 });
+vi.mock("@/lib/supabase", () => ({
+  supabase: { channel: realtime.channel, removeChannel: realtime.removeChannel },
+}));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/in-app-history", () => ({ previousInAppPath: () => state.previous }));
 // Radix ScrollArea measures itself; jsdom has no ResizeObserver.
@@ -193,10 +223,24 @@ describe("DirectMessages (Corsia)", () => {
     state.profiles = {};
     state.previous = null;
     state.refetch.mockClear();
+    state.invalidate.mockClear();
+    realtime.channels.clear();
     vi.mocked(toast.error).mockClear();
   });
 
   describe("header link", () => {
+    it("a quick remount subscribes anew (never to a channel still leaving): new messages refresh the count", () => {
+      renderIn(<DirectMessages mode="link" />);
+      cleanup();
+      renderIn(<DirectMessages mode="link" />);
+      expect(realtime.channels.size).toBe(2);
+      const channel = realtime.latest()!;
+      expect(channel.topic).toMatch(/^dm:4:/);
+
+      channel.inserts.forEach((insert) => insert());
+      expect(state.invalidate).toHaveBeenCalledTimes(3);
+    });
+
     it("goes to /messages and says how many are unread", () => {
       renderIn(<DirectMessages mode="link" />);
       expect(screen.getByRole("link", { name: "Messaggi, 3 non letti" })).toHaveAttribute("href", "/messages");
