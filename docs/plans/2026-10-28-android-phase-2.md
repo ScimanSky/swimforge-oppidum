@@ -1139,7 +1139,7 @@ Per ogni task: applica le **Regole Corsia** ai file elencati e a quelli importat
 `pages/Login.tsx`, `Register.tsx`, `ForgotPassword.tsx`, `ResetPassword.tsx`, `AuthCallback.tsx`, `Settings.tsx`, `Home.tsx` (landing pubblica: stessi token, niente blob/griglie neon), `Privacy.tsx`, `Terms.tsx`, `CookiePolicy.tsx`, `NotFound.tsx`, `components/CookieBanner.tsx`, `components/onboarding/*`, `components/BadgeUnlockNotification.tsx`, `PbCelebrationNotification.tsx`, `ActivityInsightNotification.tsx`, `GarminSection.tsx`.
 
 ### Task 21: Coda
-Tutti i file ancora presenti in `PENDING` per le regole `testo-piccolo`, `alone-neon`, `maiuscolo-spaziato`, `testo-gradiente`, `testo-primario`, `accento-lime`, `gradiente`. Alla fine queste liste sono vuote (i gradienti dei grafici SVG `<linearGradient>` non rientrano nella regola).
+Tutti i file ancora presenti in `PENDING` per le regole `testo-piccolo`, `alone-neon`, `maiuscolo-spaziato`, `testo-gradiente`, `testo-primario`, `accento-lime`, `gradiente`, `sfocatura`, `titolo-pagina`, `colore-fisso`. Alla fine queste liste sono vuote (i gradienti dei grafici SVG `<linearGradient>` non rientrano nella regola).
 
 ---
 
