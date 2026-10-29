@@ -38,6 +38,7 @@ import { config } from "./config";
 import { fetchWithTimeout } from "./lib/fetchWithTimeout";
 import { sendPushToUser } from "./push";
 import { buildGarminSyncPush, buildPersonalRecordPush, type PersonalRecordSummary } from "./push_messages";
+import type { GarminSyncCount } from "@shared/garmin-sync";
 
 // Garmin microservice configuration
 const GARMIN_SERVICE_URL = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
@@ -1092,11 +1093,14 @@ function calculateActivityXp(activity: GarminServiceActivity): number {
  *
  * @param userId - SwimForge user id.
  * @param daysBack - How many days back to fetch (default 30).
+ * @param maxActivities - When given, import only the N most recent swims (the
+ *   Garmin service then ignores daysBack). Omitted for auto-sync.
  * @returns Number of activities synced and newly earned XP.
  */
 export async function syncGarminActivities(
   userId: number,
-  daysBack: number = 30
+  daysBack: number = 30,
+  maxActivities?: GarminSyncCount
 ): Promise<{
   synced: number;
   newXp: number;
@@ -1141,6 +1145,7 @@ export async function syncGarminActivities(
     const result: GarminServiceResponse = await callGarminService("/sync", "POST", {
       user_id: String(userId),
       days_back: daysBack,
+      ...(maxActivities !== undefined ? { max_activities: maxActivities } : {}),
     });
 
     if (!result.success || !result.activities) {
