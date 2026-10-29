@@ -1,30 +1,30 @@
-import { useMemo } from "react";
-import { Link, useRoute } from "wouter";
-import AppLayout from "@/components/AppLayout";
+/**
+ * One workout the club coach published: date, distance, blocks and series, coach notes; mark it
+ * done or print it (members only; the shell header carries the «Club» title and the back button).
+ */
+
+import { useId, useMemo } from "react";
+import { useRoute } from "wouter";
+import { CalendarDays, CheckCircle2, Clock3, Printer, Ruler } from "lucide-react";
+import { toast } from "sonner";
+import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
+import { ClubAccessState, ClubNotice } from "@/components/club/ClubPageState";
+import { clubAccess } from "@/lib/club-access";
+import { formatSessionDay, planFact } from "@/lib/club-workouts";
+import { NO_VALUE } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
 import { getWorkoutSeriesDisplay, parseWorkoutPlan } from "@/lib/workout-plan";
-import { ArrowLeft, CalendarDays, CheckCircle2, Clock3, Printer } from "lucide-react";
-import { toast } from "sonner";
 
-function formatSessionDate(value?: string | Date | null) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    const fallback = String(value).slice(0, 10);
-    const parsed = new Date(`${fallback}T00:00:00`);
-    if (Number.isNaN(parsed.getTime())) return fallback || "-";
-    return parsed.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" });
-  }
-  return date.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
+const NOT_MEMBER_TEXT = "Iscriviti al club per vedere gli allenamenti pubblicati.";
 
 export default function ClubWorkoutDetailPage() {
   const [match, params] = useRoute("/community/club/:clubId/workouts/:workoutId");
   const clubId = Number(params?.clubId);
   const workoutId = Number(params?.workoutId);
   const hasValidWorkoutId = Number.isFinite(workoutId) && workoutId > 0;
+  const titleId = useId();
 
   const clubQuery = trpc.community.clubs.get.useQuery(
     { clubId },
@@ -36,10 +36,10 @@ export default function ClubWorkoutDetailPage() {
   );
   const markCompletedMutation = trpc.community.clubs.workouts.markCompleted.useMutation({
     onSuccess: () => {
-      toast.success("Workout segnato come completato.");
+      toast.success("Allenamento segnato come completato.");
     },
     onError: (error) => {
-      toast.error(error.message || "Impossibile registrare completamento workout.");
+      toast.error(error.message || "Non riesco a segnare l'allenamento come completato.");
     },
   });
 
@@ -62,42 +62,69 @@ export default function ClubWorkoutDetailPage() {
 
   if (!match || !Number.isFinite(clubId)) return null;
 
-  if (clubQuery.isLoading || workoutDetailQuery.isLoading) {
+  const backToList = `/community/club/${clubId}/workouts`;
+  const access = clubAccess(clubQuery);
+  if (access !== "member") {
     return (
       <AppLayout>
-        <div className="container py-6">
-          <div className="surface-panel p-6 text-center text-muted-foreground">Caricamento workout...</div>
-        </div>
+        <ClubAccessState
+          access={access}
+          clubId={clubId}
+          loadingLabel="Caricamento dell'allenamento…"
+          notMemberText={NOT_MEMBER_TEXT}
+          onRetry={() => void clubQuery.refetch()}
+        />
       </AppLayout>
     );
   }
 
-  const club = clubQuery.data as any;
-  if (!club || !club.is_member) {
+  // Before `isPending`: the query is disabled on purpose without a valid id.
+  if (!hasValidWorkoutId) {
     return (
       <AppLayout>
-        <div className="container py-6">
-          <div className="surface-panel p-6 text-center text-muted-foreground">Devi essere iscritto al club per vedere i workout pubblicati.</div>
-        </div>
+        <ClubNotice backHref={backToList} backLabel="Torna agli allenamenti">
+          Allenamento non trovato o non disponibile.
+        </ClubNotice>
       </AppLayout>
     );
   }
-
-  if (!hasValidWorkoutId || !detailWorkout) {
+  if (workoutDetailQuery.isPending) {
     return (
       <AppLayout>
-        <div className="container py-6 space-y-4">
-          <Link href={`/community/club/${clubId}/workouts`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Torna ai workout club
-          </Link>
-          <div className="surface-panel p-6 text-center text-muted-foreground">Workout non trovato o non disponibile.</div>
-        </div>
+        <LoadingSkeleton label="Caricamento dell'allenamento…" count={3} itemClassName="h-24 w-full rounded-2xl" />
+      </AppLayout>
+    );
+  }
+  if (!detailWorkout) {
+    const errorCode = workoutDetailQuery.error?.data?.code;
+    if (workoutDetailQuery.isError && errorCode === "FORBIDDEN") {
+      return (
+        <AppLayout>
+          <ClubNotice backHref={`/community/club/${clubId}`}>{NOT_MEMBER_TEXT}</ClubNotice>
+        </AppLayout>
+      );
+    }
+    if (workoutDetailQuery.isError && errorCode !== "NOT_FOUND") {
+      return (
+        <AppLayout>
+          <LoadError onRetry={() => void workoutDetailQuery.refetch()} />
+        </AppLayout>
+      );
+    }
+    return (
+      <AppLayout>
+        <ClubNotice backHref={backToList} backLabel="Torna agli allenamenti">
+          Allenamento non trovato o non disponibile.
+        </ClubNotice>
       </AppLayout>
     );
   }
 
   const blocks = Array.isArray(detailPlan?.blocks) ? detailPlan.blocks : [];
   const coachNotes = Array.isArray(detailPlan?.coachNotes) ? detailPlan.coachNotes : [];
+  const sessionDay = formatSessionDay(detailWorkout.sessionDate);
+  const totalDistance = planFact(detailPlan?.totalDistance);
+  const estimatedDuration = planFact(detailPlan?.estimatedDuration);
 
   return (
     <AppLayout>
@@ -195,98 +222,109 @@ export default function ClubWorkoutDetailPage() {
           }
         `}
       </style>
+      <div className="workout-print-root">
+        <section aria-labelledby={titleId} className="surface-panel p-4 workout-print-sheet">
+          <h2
+            id={titleId}
+            className="break-words font-display text-[32px] font-bold leading-none workout-print-title"
+          >
+            {String(detailPlan?.title || detailWorkout.title || "Allenamento")}
+          </h2>
+          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground workout-print-meta">
+            {sessionDay !== NO_VALUE ? (
+              <li className="inline-flex items-center gap-1.5">
+                <CalendarDays className="size-4" aria-hidden />
+                {sessionDay}
+              </li>
+            ) : null}
+            {totalDistance ? (
+              <li className="inline-flex items-center gap-1.5">
+                <Ruler className="size-4" aria-hidden />
+                Distanza {totalDistance}
+              </li>
+            ) : null}
+            {estimatedDuration ? (
+              <li className="inline-flex items-center gap-1.5">
+                <Clock3 className="size-4" aria-hidden />
+                Durata stimata {estimatedDuration}
+              </li>
+            ) : null}
+          </ul>
+          {String(detailPlan?.description ?? "").trim().length > 0 ? (
+            <p className="mt-3 text-sm text-foreground workout-print-description">{String(detailPlan?.description)}</p>
+          ) : null}
 
-      <div className="container py-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 workout-print-hide">
-          <div>
-            <Link href={`/community/club/${clubId}/workouts`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" /> Torna ai workout club
-            </Link>
-            <h1 className="mt-1 text-2xl font-display font-bold">Workout Club • {club.name}</h1>
-            <p className="text-sm text-muted-foreground">Dettaglio completo workout pubblicato.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">Membri</Badge>
+          <div className="mt-4 flex flex-wrap gap-2 workout-print-hide">
             <Button
               type="button"
               size="sm"
-              variant="neon"
               onClick={handleMarkCompleted}
               disabled={markCompletedMutation.isPending}
             >
-              <CheckCircle2 className="mr-1.5 h-4 w-4" />
+              <CheckCircle2 aria-hidden />
               {markCompletedMutation.isPending ? "Salvataggio..." : "Segna completato"}
             </Button>
-            <Button type="button" size="sm" variant="outline-neon" onClick={handlePrintWorkout}>
-              <Printer className="mr-1.5 h-4 w-4" />
-              Stampa workout
+            <Button type="button" size="sm" variant="outline" onClick={handlePrintWorkout}>
+              <Printer aria-hidden />
+              Stampa
             </Button>
           </div>
-        </div>
 
-        <div className="workout-print-root">
-          <section className="surface-panel p-4 space-y-3 workout-print-sheet">
-            <div className="flex items-center gap-2 text-muted-foreground workout-print-meta">
-              <CalendarDays className="h-4 w-4" />
-              <p className="text-sm">
-                Data: {formatSessionDate(detailWorkout.sessionDate)} • Distanza: {String(detailPlan?.totalDistance ?? "n/d")}
-              </p>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground workout-print-meta">
-              <Clock3 className="h-4 w-4" />
-              <p className="text-sm">Durata stimata: {String(detailPlan?.estimatedDuration ?? "n/d")}</p>
-            </div>
-            <h2 className="text-2xl font-display font-bold workout-print-title">
-              {String(detailPlan?.title ?? detailWorkout.title ?? "Workout")}
-            </h2>
-            {String(detailPlan?.description ?? "").trim().length > 0 ? (
-              <p className="text-sm text-muted-foreground workout-print-description">{String(detailPlan?.description)}</p>
-            ) : null}
-
-            {blocks.length > 0 ? (
-              <div className="space-y-2">
-                {blocks.map((block: any, blockIndex: number) => (
-                  <div key={`${detailWorkout.id}-${blockIndex}`} className="rounded-xl border border-border/60 bg-card/35 p-3 workout-print-block">
-                    <p className="text-sm font-semibold workout-print-block-title">{String(block?.label ?? `Blocco ${blockIndex + 1}`)}</p>
-                    {Array.isArray(block?.items) && block.items.length > 0 ? (
-                      <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
-                        {block.items.map((item: any, itemIndex: number) => {
-                          const line = getWorkoutSeriesDisplay(item);
-                          return (
-                            <li key={`${detailWorkout.id}-${blockIndex}-${itemIndex}`} className="rounded-md border border-border/50 bg-background/40 p-2 workout-print-series">
-                              <p className="font-medium text-foreground/90 workout-print-series-title">{String(item?.label ?? "Serie")}</p>
-                              <p>
-                                Stile: {String(line.stroke ?? "n/d")} • Serie: {line.reps} • Distanza serie: {line.seriesDistance}
-                              </p>
-                              <p>Ripartenza: {line.sendoff}</p>
-                              {line.betweenSetsRest ? <p>Recupero prima prossima serie: {line.betweenSetsRest}</p> : null}
-                              {line.intensity ? <p>Intensità: {line.intensity}</p> : null}
-                              {line.targetPace ? <p>Pace target: {line.targetPace}</p> : null}
-                              {line.notes ? <p>Note: {line.notes}</p> : null}
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Dettagli workout non disponibili.</p>
-            )}
-
-            {coachNotes.length > 0 ? (
-              <section className="rounded-xl border border-border/60 bg-card/35 p-3 workout-print-block workout-print-notes">
-                <h3 className="text-sm font-semibold workout-print-block-title">Note Coach</h3>
-                <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
-                  {coachNotes.map((note: string, index: number) => (
-                    <li key={`${detailWorkout.id}-coach-note-${index}`} className="workout-print-note-item">• {note}</li>
-                  ))}
-                </ul>
+          {blocks.length > 0 ? (
+            blocks.map((block: any, blockIndex: number) => (
+              <section
+                key={`${detailWorkout.id}-${blockIndex}`}
+                className="mt-4 border-t border-border pt-4 workout-print-block"
+              >
+                <h3 className="text-[17px] font-bold workout-print-block-title">
+                  {String(block?.label ?? `Blocco ${blockIndex + 1}`)}
+                </h3>
+                {Array.isArray(block?.items) && block.items.length > 0 ? (
+                  <ul className="mt-2 space-y-2">
+                    {block.items.map((item: any, itemIndex: number) => {
+                      const line = getWorkoutSeriesDisplay(item);
+                      return (
+                        <li
+                          key={`${detailWorkout.id}-${blockIndex}-${itemIndex}`}
+                          className="rounded-xl bg-raised p-3 text-sm text-muted-foreground workout-print-series"
+                        >
+                          <p className="font-semibold text-foreground workout-print-series-title">
+                            {String(item?.label ?? "Serie")}
+                          </p>
+                          <p>
+                            Stile: {String(line.stroke ?? "n/d")} · Serie: {line.reps} · Distanza serie: {line.seriesDistance}
+                          </p>
+                          <p>Ripartenza: {line.sendoff}</p>
+                          {line.betweenSetsRest ? <p>Recupero prima della serie successiva: {line.betweenSetsRest}</p> : null}
+                          {line.intensity ? <p>Intensità: {line.intensity}</p> : null}
+                          {line.targetPace ? <p>Passo obiettivo: {line.targetPace}</p> : null}
+                          {line.notes ? <p>Note: {line.notes}</p> : null}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : null}
               </section>
-            ) : null}
-          </section>
-        </div>
+            ))
+          ) : (
+            <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
+              Dettagli dell'allenamento non disponibili.
+            </p>
+          )}
+
+          {coachNotes.length > 0 ? (
+            <section className="mt-4 border-t border-border pt-4 workout-print-block workout-print-notes">
+              <h3 className="text-[17px] font-bold workout-print-block-title">Note del coach</h3>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                {coachNotes.map((note: string, index: number) => (
+                  <li key={`${detailWorkout.id}-coach-note-${index}`} className="workout-print-note-item">
+                    {note}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </section>
       </div>
     </AppLayout>
   );

@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
-import { Link, useLocation, useRoute } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { toast } from "sonner";
 import {
   Calendar,
@@ -44,6 +44,7 @@ import {
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { Metric } from "@/components/corsia/Metric";
 import EventMapEditor from "@/components/club/EventMapEditor";
+import { ClubNotice } from "@/components/club/ClubPageState";
 import {
   parseRouteGeojson,
   pointsToRouteGeojson,
@@ -176,14 +177,7 @@ const pointsEqual = (a: RoutePoint[], b: RoutePoint[]) => {
 function Notice({ children, clubId }: { children: ReactNode; clubId?: number }) {
   return (
     <AppLayout>
-      <div className="surface-panel p-4 text-center">
-        <p className="text-sm text-muted-foreground">{children}</p>
-        {clubId ? (
-          <Button variant="outline" className="mt-3" asChild>
-            <Link href={`/community/club/${clubId}`}>Torna al club</Link>
-          </Button>
-        ) : null}
-      </div>
+      <ClubNotice backHref={clubId ? `/community/club/${clubId}` : undefined}>{children}</ClubNotice>
     </AppLayout>
   );
 }
