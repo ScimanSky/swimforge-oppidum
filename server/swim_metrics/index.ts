@@ -8,6 +8,7 @@ import type { SwimMetrics } from "@shared/swimMetrics";
 import { addDaysToKey, dayKey } from "@shared/swimMetrics";
 import { garminActivityLaps, swimmerProfiles, swimmingActivities } from "../../drizzle/schema";
 import { getDb } from "../db";
+import { clearAIInsightsCache } from "../ai_insights";
 import { cacheKeys, deleteCached, getOrSetCached } from "../lib/cache";
 import { computeSwimMetrics, HISTORY_DAYS, type CssTest, type SwimMetricsInput } from "./compute";
 import type { CssLap } from "./css";
@@ -171,16 +172,22 @@ async function loadInput(userId: number, now: Date): Promise<SwimMetricsInput> {
   };
 }
 
-/** The six metrics of a user (only ever called for the logged-in user). */
+/** The six metrics of a user (only ever called for the logged-in user), cached per Rome day. */
 export async function getSwimMetrics(userId: number, now: Date = new Date()): Promise<SwimMetrics> {
   return getOrSetCached(
-    cacheKeys.swimMetrics(String(userId)),
+    cacheKeys.swimMetrics(String(userId), dayKey(now)),
     async () => computeSwimMetrics(await loadInput(userId, now), now),
     SWIM_METRICS_TTL_SECONDS,
   );
 }
 
-/** Drop the cached metrics (new laps, CSS test saved or removed). */
-export async function invalidateSwimMetrics(userId: number): Promise<void> {
-  await deleteCached(cacheKeys.swimMetrics(String(userId)));
+/**
+ * Drop today's cached metrics and the Coach page insights written from them (new swims or laps,
+ * CSS test saved or removed).
+ */
+export async function invalidateSwimMetrics(userId: number, now: Date = new Date()): Promise<void> {
+  await Promise.all([
+    deleteCached(cacheKeys.swimMetrics(String(userId), dayKey(now))),
+    clearAIInsightsCache(userId),
+  ]);
 }

@@ -12,6 +12,11 @@ const m = vi.hoisted(() => {
     rowsFor: (_table: unknown, _selection: Record<string, unknown>): unknown[] => [],
   };
   const db = {
+    deleted: [] as unknown[],
+    delete: vi.fn((table: unknown) => {
+      db.deleted.push(table);
+      return { where: async () => undefined };
+    }),
     select: vi.fn((selection: Record<string, unknown>) => {
       let table: unknown;
       const index = state.selections.length;
@@ -42,16 +47,17 @@ const m = vi.hoisted(() => {
       return chain;
     }),
   };
-  return { state, db, getOrSetCached: vi.fn() };
+  return { state, db, getOrSetCached: vi.fn(), deleteCached: vi.fn(async () => {}) };
 });
 
 vi.mock("../db", () => ({ getDb: async () => m.db }));
 vi.mock("../lib/cache", async () => {
   const actual = await vi.importActual<typeof import("../lib/cache")>("../lib/cache");
-  return { ...actual, getOrSetCached: m.getOrSetCached };
+  return { ...actual, getOrSetCached: m.getOrSetCached, deleteCached: m.deleteCached };
 });
 
-import { getSwimMetrics, parseCssTest } from "./index";
+import { aiInsightsCache } from "../../drizzle/schema";
+import { getSwimMetrics, invalidateSwimMetrics, parseCssTest } from "./index";
 
 let lapId = 0;
 function laps(activityId: number, specs: Array<[number, number, string | null, number | null, number | null]>) {
@@ -143,10 +149,20 @@ describe("getSwimMetrics", () => {
     m.getOrSetCached.mockImplementation((_key: string, fetcher: () => Promise<unknown>) => fetcher());
   });
 
-  it("caches per user for one hour", async () => {
+  it("caches per user and Rome day for one hour, so today's load rolls at midnight", async () => {
     useData();
     await getSwimMetrics(42, NOW);
-    expect(m.getOrSetCached).toHaveBeenCalledWith("swim-metrics:v1:42", expect.any(Function), 3600);
+    expect(m.getOrSetCached).toHaveBeenCalledWith("swim-metrics:v2:42:2026-10-29", expect.any(Function), 3600);
+    // 23:30Z on 29/10 is already 30/10 in Rome.
+    await getSwimMetrics(42, new Date("2026-10-29T23:30:00Z"));
+    expect(m.getOrSetCached).toHaveBeenLastCalledWith("swim-metrics:v2:42:2026-10-30", expect.any(Function), 3600);
+  });
+
+  it("invalidation drops today's cached metrics and the AI insights rows", async () => {
+    m.db.deleted.length = 0;
+    await invalidateSwimMetrics(42, NOW);
+    expect(m.deleteCached).toHaveBeenCalledWith("swim-metrics:v2:42:2026-10-29");
+    expect(m.db.deleted).toEqual([aiInsightsCache]);
   });
 
   it("reads swims, laps, profile, CSS laps and swims per week with independent queries in parallel", async () => {

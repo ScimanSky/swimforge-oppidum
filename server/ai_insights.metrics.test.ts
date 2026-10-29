@@ -1,13 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { aiInsightsCache } from "../drizzle/schema";
+import { aiInsightsCache, swimmingActivities } from "../drizzle/schema";
 import { sampleSwimMetrics } from "./swim_metrics/test-helpers";
 
 const h = vi.hoisted(() => {
   process.env.GEMINI_API_KEY = "test-key";
-  const state = { cached: [] as unknown[], inserted: [] as Array<{ table: unknown; values: any }> };
+  const state = {
+    cached: [] as unknown[],
+    swimsEver: [{ id: 1 }] as unknown[],
+    inserted: [] as Array<{ table: unknown; values: any }>,
+    tables: [] as unknown[],
+  };
   const db = {
     select: vi.fn(() => {
-      const chain: any = { from: () => chain, where: () => chain, limit: async () => state.cached };
+      let table: unknown;
+      const chain: any = {
+        from: (t: unknown) => {
+          table = t;
+          state.tables.push(t);
+          return chain;
+        },
+        where: () => chain,
+        limit: async () => (table === state.activitiesTable ? state.swimsEver : state.cached),
+      };
       return chain;
     }),
     delete: vi.fn(() => ({ where: async () => undefined })),
@@ -17,7 +31,7 @@ const h = vi.hoisted(() => {
       },
     })),
   };
-  return { state, db, generateContent: vi.fn() };
+  return { state: Object.assign(state, { activitiesTable: null as unknown }), db, generateContent: vi.fn() };
 });
 
 vi.mock("./db", () => ({ getDb: async () => h.db }));
@@ -45,6 +59,8 @@ describe("generateAIInsights from the swim metrics", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     h.state.cached = [];
+    h.state.swimsEver = [{ id: 1 }];
+    h.state.activitiesTable = swimmingActivities;
     h.state.inserted.length = 0;
     h.generateContent.mockResolvedValue({ response: { text: () => AI_TEXT } });
   });
@@ -73,11 +89,21 @@ describe("generateAIInsights from the swim metrics", () => {
     expect(h.generateContent).not.toHaveBeenCalled();
   });
 
-  it("without swims in 90 days gives onboarding insights", async () => {
+  it("a user who never swam gets the onboarding insights", async () => {
     const metrics = sampleSwimMetrics();
     metrics.sessions = [];
+    h.state.swimsEver = [];
     const insights = await generateAIInsights(metrics, 42);
     expect(insights.length).toBeGreaterThanOrEqual(6);
+    expect(insights[0]).toMatch(/base/);
     expect(h.generateContent).not.toHaveBeenCalled();
+  });
+
+  it("no swims in 90 days but older ones: real insights, not the onboarding (total swims ever)", async () => {
+    const metrics = sampleSwimMetrics();
+    metrics.sessions = [];
+    await generateAIInsights(metrics, 42);
+    expect(h.state.tables).toContain(swimmingActivities);
+    expect(h.generateContent).toHaveBeenCalledTimes(1);
   });
 });

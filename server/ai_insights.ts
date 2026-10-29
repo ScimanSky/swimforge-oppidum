@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getDb } from "./db";
-import { aiInsightsCache } from "../drizzle/schema";
+import { aiInsightsCache, swimmingActivities } from "../drizzle/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { logger } from "./middleware/logger";
 import { ENV } from "./_core/env";
@@ -112,6 +112,34 @@ function parseInsightsFromAiText(text: string): string[] {
   return picked.slice(0, 8);
 }
 
+/**
+ * Drops the user's cached Coach page insights (their swims or CSS changed). Best effort: a
+ * failure is logged, never thrown.
+ */
+export async function clearAIInsightsCache(userId: number): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    await db.delete(aiInsightsCache).where(eq(aiInsightsCache.userId, userId));
+  } catch (error) {
+    log.warn("[AI Insights] Could not clear the cached insights", {
+      event: "ai_insights:cache_clear_failed",
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/** True when the user has at least one swim, ever (not only in the metrics' 90 days). */
+async function hasAnySwim(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, userId: number): Promise<boolean> {
+  const rows = await db
+    .select({ id: swimmingActivities.id })
+    .from(swimmingActivities)
+    .where(eq(swimmingActivities.userId, userId))
+    .limit(1);
+  return rows.length > 0;
+}
+
 /** 6-8 insights for the Coach page from the swim metrics (cached 24 hours). */
 export async function generateAIInsights(
   metrics: SwimMetrics,
@@ -122,9 +150,9 @@ export async function generateAIInsights(
     return [];
   }
 
-  // New users (no synced activities) shouldn't trigger AI generation/parsing noise.
-  // Provide a small set of onboarding insights (analysis + direction, no workouts).
-  if (metrics.sessions.length === 0) {
+  // New users (no swim ever) shouldn't trigger AI generation/parsing noise: onboarding insights
+  // (analysis + direction, no workouts). Someone back after a break gets real insights.
+  if (metrics.sessions.length === 0 && !(await hasAnySwim(db, userId))) {
     const insights = [
       "📈 Progressione: Sei in una fase perfetta per creare una base. La cosa piu' importante adesso e' costruire regolarita' prima di inseguire la velocita'.",
       "🔄 Recupero: Parti con calma. Sessioni leggere e costanti ti aiutano a rendere sostenibile l'abitudine senza accumulare fatica.",

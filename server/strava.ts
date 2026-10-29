@@ -22,6 +22,7 @@ import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
 import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
 import { invalidateUserCache } from "./lib/cache";
+import { invalidateSwimMetrics } from "./swim_metrics";
 import { calculateActivityXp } from "./lib/utils";
 import { logger } from "./middleware/logger";
 import { config } from "./config";
@@ -661,8 +662,9 @@ export async function syncStravaActivities(
       // Auto-update challenge progress for active challenges
       await updateActiveChallengesProgress(userId);
 
-      // Invalidate cached data for this user
+      // Invalidate cached data for this user (and the Coach page insights).
       await invalidateUserCache(String(userId));
+      await invalidateSwimMetrics(userId);
 
       try {
         const { trackProductEvent } = await import("./product_analytics");

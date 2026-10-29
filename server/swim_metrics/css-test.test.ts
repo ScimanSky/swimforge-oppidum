@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PgDialect } from "drizzle-orm/pg-core";
-import { swimmerProfiles } from "../../drizzle/schema";
+import { aiInsightsCache, swimmerProfiles } from "../../drizzle/schema";
 
 const m = vi.hoisted(() => {
   const state = { profileExists: true, updates: [] as Array<{ table: unknown; values: any }> };
@@ -102,11 +102,14 @@ describe("updateCssTest", () => {
     const { sql, params } = render(m.state.updates[0].values.preferences);
     expect(sql).toContain("||");
     expect(params).toEqual([JSON.stringify({ cssTest: test })]);
-    expect(m.deleteCached).toHaveBeenCalledWith(expect.stringMatching(/^swim-metrics:v\d+:42/));
+    expect(m.deleteCached).toHaveBeenCalledWith(expect.stringMatching(/^swim-metrics:v2:42:\d{4}-\d{2}-\d{2}$/));
+    // The Coach page insights were written from the old CSS: their cache rows go too.
+    expect(m.db.delete).toHaveBeenCalledWith(aiInsightsCache);
   });
 
   it("removes only the test", async () => {
     expect(await updateCssTest(42, null)).toBe(true);
+    expect(m.db.delete).toHaveBeenCalledWith(aiInsightsCache);
     const { sql, params } = render(m.state.updates[0].values.preferences);
     expect(sql).toMatch(/- \$\d+::text/);
     expect(params).toEqual(["{}", "cssTest"]);
