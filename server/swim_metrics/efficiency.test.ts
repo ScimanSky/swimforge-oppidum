@@ -54,7 +54,7 @@ describe("efficiencySummary", () => {
     expect(result.latest).toBe(2.4);
     expect(result.avg28).toBeCloseTo((2.2 + 2.4 + 2.4) / 3, 9);
     expect(result.baseline).toBe(2.1); // median of 2.0, 2.2, 2.1
-    expect(result.deltaPct).toBeCloseTo((((2.2 + 2.4 + 2.4) / 3 - 2.1) / 2.1) * 100, 9); // +6.3%
+    expect(result.deltaPct).toBeCloseTo((((2.2 + 2.4 + 2.4) / 3 - 2.1) / 2.1) * 100, 9); // (2.333 − 2.1) / 2.1 = +11.1%
     expect(result.missing).toBeNull();
   });
 
