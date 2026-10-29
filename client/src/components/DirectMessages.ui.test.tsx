@@ -250,6 +250,17 @@ describe("DirectMessages (Corsia)", () => {
       expect(state.marks).toEqual([{ senderId: 5 }]);
     });
 
+    it("the message log can be reached and scrolled by keyboard, between the chat's name and the field", async () => {
+      renderIn(<DirectMessages mode="page" />);
+      const log = screen.getByRole("log", { name: "Messaggi con Ada Rossi" });
+      expect(log).toHaveAttribute("tabindex", "0");
+      screen.getByRole("link", { name: "Ada Rossi" }).focus();
+      await userEvent.tab();
+      expect(log).toHaveFocus();
+      await userEvent.tab();
+      expect(screen.getByRole("textbox", { name: "Messaggio" })).toHaveFocus();
+    });
+
     it("no fake tabs or call buttons: only what works", () => {
       renderIn(<DirectMessages mode="page" />);
       for (const name of ["Primary", "General", "Richieste", "Chiama", "Videochiamata", "Info"]) {
@@ -469,6 +480,8 @@ describe("DirectMessages (Corsia)", () => {
 
       const dialog = screen.getByRole("dialog", { name: "Ada Rossi" });
       expect(dialog).toHaveAccessibleDescription(/eliminati automaticamente dal server dopo \d+ giorni/);
+      // Focus starts in the message field, not on the (focusable) message log above it.
+      await waitFor(() => expect(within(dialog).getByRole("textbox", { name: "Messaggio" })).toHaveFocus());
       expect(within(dialog).getByRole("log", { name: "Messaggi con Ada Rossi" })).toHaveTextContent("Ci sei domani?");
       await userEvent.type(within(dialog).getByRole("textbox", { name: "Messaggio" }), "Sì!{Enter}");
       expect(state.sends).toEqual([{ receiverId: 5, content: "Sì!" }]);

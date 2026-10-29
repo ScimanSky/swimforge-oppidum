@@ -413,7 +413,14 @@ function ConversationView({
     body = <p className="p-6 text-center text-sm text-muted-foreground">Nessun messaggio: scrivi il primo.</p>;
   } else {
     body = (
-      <div role="log" aria-label={`Messaggi con ${partner.name}`}>
+      // Focusable, so the keyboard can scroll it (arrows, Pag↑/Pag↓): it sits between the chat's
+      // name and the message field in the tab order.
+      <div
+        role="log"
+        aria-label={`Messaggi con ${partner.name}`}
+        tabIndex={0}
+        className="rounded-xl outline-none focus-visible:ring-[3px] focus-visible:ring-inset focus-visible:ring-ring/50"
+      >
         <ul className="space-y-3 p-4">
           {messages.map((msg) => (
             <MessageBubble key={msg.message.id} message={msg.message} own={msg.message.senderId !== partner.id} />
@@ -453,6 +460,7 @@ function PersonAvatar({ name, src, className }: { name: string; src?: string | n
 
 function MessageDialog({ recipientId, recipientName }: { recipientId: number; recipientName?: string }) {
   const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const name = recipientName?.trim() || "Nuotatore";
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -462,13 +470,21 @@ function MessageDialog({ recipientId, recipientName }: { recipientId: number; re
           Messaggio
         </Button>
       </DialogTrigger>
-      <DialogContent className="flex h-[600px] max-h-[80dvh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
+      <DialogContent
+        className="flex h-[600px] max-h-[80dvh] max-w-2xl flex-col gap-0 overflow-hidden p-0"
+        // The message field, not the first focusable (the message log once loaded): the dialog
+        // was opened to write.
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          inputRef.current?.focus();
+        }}
+      >
         <DialogHeader className="border-b border-border p-4 pr-12 text-left">
           <DialogTitle>{name}</DialogTitle>
           <DialogDescription className="text-xs">{RETENTION_NOTE}</DialogDescription>
         </DialogHeader>
         <div className="min-h-0 flex-1">
-          <ConversationView partner={{ id: recipientId, name }} active={open} limit={50} />
+          <ConversationView partner={{ id: recipientId, name }} active={open} limit={50} inputRef={inputRef} />
         </div>
       </DialogContent>
     </Dialog>
