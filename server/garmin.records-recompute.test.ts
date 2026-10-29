@@ -37,6 +37,7 @@ vi.mock("./personal_records", async (importOriginal) => ({
 }));
 
 import { syncGarminActivities } from "./garmin";
+import { invalidateSwimMetrics } from "./swim_metrics";
 import {
   garminActivityLaps,
   garminTokens,
@@ -75,6 +76,8 @@ type Scenario = {
   records?: Array<Record<string, unknown>>;
   /** Activity ids that already have stored laps. */
   storedLapActivityIds?: number[];
+  /** Full details Garmin returns per activity id (null: none); default FULL_DETAILS for «g-enrich». */
+  details?: Record<string, unknown | null>;
 };
 
 function garminActivity(activityId: string, overrides: Record<string, unknown> = {}) {
@@ -160,8 +163,12 @@ function setup(scenario: Scenario) {
     if (url.endsWith("/sync")) {
       return new Response(JSON.stringify({ success: true, activities: scenario.garminActivities }), { status: 200 });
     }
-    if (url.endsWith("/activity/g-enrich/full")) {
-      return new Response(JSON.stringify(FULL_DETAILS), { status: 200 });
+    const full = url.match(/\/activity\/([^/]+)\/full$/);
+    if (full) {
+      const details = scenario.details && full[1] in scenario.details
+        ? scenario.details[full[1]]
+        : full[1] === "g-enrich" ? FULL_DETAILS : null;
+      if (details) return new Response(JSON.stringify(details), { status: 200 });
     }
     return new Response(JSON.stringify({ detail: "not found" }), { status: 404 });
   }) as typeof fetch;
@@ -253,6 +260,44 @@ describe("syncGarminActivities recomputes records from stored laps", () => {
     await syncGarminActivities(USER, 30);
 
     expect(h.recompute).not.toHaveBeenCalled();
+  });
+
+  describe("merge of a stored swim with what the re-enrichment brings", () => {
+    // A stored swim without Garmin details and without laps: the sync asks for its full details.
+    const stored = { garminActivityId: "g-merge", id: 21, strokeType: "freestyle", rawData: {}, avgSwolf: null };
+
+    it("no details from Garmin: nothing changed, no metrics dropped, no records recomputed", async () => {
+      setup({ garminActivities: [garminActivity("g-merge")], existing: [stored], records: [EXISTING_RECORD], details: { "g-merge": null } });
+      await syncGarminActivities(USER, 30);
+      expect(invalidateSwimMetrics).not.toHaveBeenCalled();
+      expect(h.recompute).not.toHaveBeenCalled();
+    });
+
+    it("details with no laps: the swim changed (metrics dropped) but there is nothing to recompute", async () => {
+      const state = setup({
+        garminActivities: [garminActivity("g-merge")],
+        existing: [stored],
+        records: [EXISTING_RECORD],
+        details: { "g-merge": { activity: { summaryDTO: { averageSwolf: 35 } } } },
+      });
+      await syncGarminActivities(USER, 30);
+      expect(state.insertedLapActivityIds).toEqual([]);
+      expect(invalidateSwimMetrics).toHaveBeenCalledWith(USER);
+      expect(h.recompute).not.toHaveBeenCalled();
+    });
+
+    it("details with laps: the swim changed and its records are recomputed from the new laps", async () => {
+      const state = setup({
+        garminActivities: [garminActivity("g-merge")],
+        existing: [stored],
+        records: [EXISTING_RECORD],
+        details: { "g-merge": FULL_DETAILS },
+      });
+      await syncGarminActivities(USER, 30);
+      expect(state.insertedLapActivityIds).toEqual([21, 21]);
+      expect(invalidateSwimMetrics).toHaveBeenCalledWith(USER);
+      expect(h.recompute).toHaveBeenCalledWith(USER, { activityIds: [21] });
+    });
   });
 
   it("fills all records of a user who has none yet, before judging the new swims", async () => {
