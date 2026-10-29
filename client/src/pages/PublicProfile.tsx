@@ -146,7 +146,8 @@ export default function PublicProfile() {
           </div>
         </section>
 
-        <PersonalRecordsBoard userId={userId} limit={12} emptyText="Nessun record pubblico." />
+        {/* Keyed by swimmer: another profile starts from «Uomini», never with the last one's records. */}
+        <PersonalRecordsBoard key={userId} userId={userId} limit={12} emptyText="Nessun record pubblico." />
       </div>
     </AppLayout>
   )

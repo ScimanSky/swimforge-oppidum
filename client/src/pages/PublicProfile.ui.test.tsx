@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -75,6 +75,7 @@ function renderProfile(path = "/u/9") {
       <Route path="/u/:id" component={PublicProfile} />
     </Router>
   );
+  return location;
 }
 
 describe("PublicProfile (Corsia)", () => {
@@ -142,6 +143,19 @@ describe("PublicProfile (Corsia)", () => {
     await userEvent.click(within(board).getByRole("radio", { name: "Donne" }));
     expect(state.recordInputs.at(-1)?.finaGender).toBe("female");
     expect(localStorage.getItem("swimforge:finaGender")).toBeNull();
+  });
+
+  it("another swimmer's profile starts again from the men's tables and asks for their records", async () => {
+    const location = renderProfile();
+    await userEvent.click(screen.getByRole("radio", { name: "Donne" }));
+    expect(state.recordInputs.at(-1)).toEqual({ userId: 9, finaGender: "female" });
+
+    state.profile = { ...state.profile, userId: 10, name: "Bruno Neri", username: "bruno" };
+    act(() => location.navigate("/u/10"));
+    expect(screen.getByRole("heading", { level: 2, name: "Bruno Neri" })).toBeInTheDocument();
+    const board = screen.getByRole("region", { name: "Record personali" });
+    expect(within(board).getByRole("radio", { name: "Uomini" })).toBeChecked();
+    expect(state.recordInputs.at(-1)).toEqual({ userId: 10, finaGender: "male" });
   });
 
   it("no records: «Nessun record pubblico.»", () => {
