@@ -13,11 +13,26 @@ import {
   formatSignedInteger,
   formatWeekdayDayMonth,
   paceSecondsPer100m,
+  toFiniteNumber,
 } from "./format";
 
 const monday = new Date(2026, 9, 26, 10, 47); // lun 26 ott 2026, ora locale
 
 describe("formatter Corsia", () => {
+  it("numero finito da numero o stringa numerica (bigint di Postgres), altrimenti null", () => {
+    expect(toFiniteNumber(1234)).toBe(1234);
+    expect(toFiniteNumber("1234")).toBe(1234);
+    expect(toFiniteNumber(" 12.5 ")).toBe(12.5);
+    expect(toFiniteNumber("")).toBeNull();
+    expect(toFiniteNumber("  ")).toBeNull();
+    expect(toFiniteNumber("abc")).toBeNull();
+    expect(toFiniteNumber(Number.NaN)).toBeNull();
+    expect(toFiniteNumber(Number.POSITIVE_INFINITY)).toBeNull();
+    expect(toFiniteNumber(null)).toBeNull();
+    expect(toFiniteNumber(undefined)).toBeNull();
+    expect(toFiniteNumber(true)).toBeNull();
+    expect(toFiniteNumber({})).toBeNull();
+  });
   it("intero con segno: «+12», «−4», «0»; null senza numero", () => {
     expect(formatSignedInteger(12.4)).toBe("+12");
     expect(formatSignedInteger(-3.6)).toBe("−4");

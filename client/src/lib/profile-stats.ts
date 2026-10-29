@@ -3,6 +3,8 @@
  * snake_case), stroke/source labels and the Mon/Wed/Fri training streak.
  */
 
+import { toFiniteNumber } from "@/lib/format"
+
 export type ActivityLike = Record<string, any>
 
 export const STROKE_LABELS: Record<string, string> = {
@@ -23,12 +25,6 @@ const TRAINING_DAYS = new Set([1, 3, 5])
 /** How far back the streak looks. */
 const STREAK_WINDOW_DAYS = 365
 
-const toNumber = (value: unknown) => {
-  if (value === null || value === undefined) return 0
-  const num = Number(value)
-  return Number.isFinite(num) ? num : 0
-}
-
 /** Date or null; «2026-10-26 23:30:00» (no zone) is read as local time. */
 export const parseActivityDate = (value?: string | Date | null) => {
   if (!value) return null
@@ -45,7 +41,7 @@ export const getActivityDateValue = (activity: ActivityLike) =>
   activity?.activityDate ?? activity?.activity_date ?? activity?.createdAt ?? activity?.created_at ?? null
 
 export const getActivityAvgSwolf = (activity: ActivityLike) =>
-  toNumber(activity?.avgSwolf ?? activity?.avg_swolf ?? 0)
+  toFiniteNumber(activity?.avgSwolf ?? activity?.avg_swolf) ?? 0
 
 export const getActivityStroke = (activity: ActivityLike): string =>
   activity?.strokeType ?? activity?.stroke_type ?? activity?.stroke ?? "mixed"

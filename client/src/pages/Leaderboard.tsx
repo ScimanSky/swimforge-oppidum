@@ -7,7 +7,7 @@ import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { Metric } from "@/components/corsia/Metric";
 import { Pager } from "@/components/corsia/Pager";
 import { RankBadge, RankRow, RankValue } from "@/components/corsia/RankRow";
-import { NO_VALUE, formatInteger, getInitials } from "@/lib/format";
+import { NO_VALUE, formatInteger, getInitials, toFiniteNumber } from "@/lib/format";
 import { rankEntries } from "@/lib/ranking";
 import { cn } from "@/lib/utils";
 import { Award, TrendingUp, Trophy, Zap } from "lucide-react";
@@ -35,10 +35,7 @@ interface NormalizedEntry {
 }
 
 /** Postgres bigint SUM/COUNT arrive as strings («"1234"»): every number goes through here. */
-const toNumber = (value: unknown, fallback = 0) => {
-  const number = typeof value === "string" && value.trim() === "" ? Number.NaN : Number(value);
-  return value != null && Number.isFinite(number) ? number : fallback;
-};
+const toNumber = (value: unknown, fallback = 0) => toFiniteNumber(value) ?? fallback;
 
 function normalizeEntry(entry: any): NormalizedEntry {
   // Handle both formats: { profile: {...}, userName } and flat { userId, name, level, ... }

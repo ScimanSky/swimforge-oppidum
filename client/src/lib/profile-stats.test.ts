@@ -3,7 +3,13 @@
 process.env.TZ = "Europe/Rome";
 
 import { describe, expect, it } from "vitest";
-import { activityDays, getStreaks, localDayKey, primaryStrokeLabel } from "./profile-stats";
+import {
+  activityDays,
+  getActivityAvgSwolf,
+  getStreaks,
+  localDayKey,
+  primaryStrokeLabel,
+} from "./profile-stats";
 
 /** Local date in October 2026 (26 = Monday). */
 const oct = (day: number, hour = 10, minute = 0) => new Date(2026, 9, day, hour, minute);
@@ -11,6 +17,14 @@ const oct = (day: number, hour = 10, minute = 0) => new Date(2026, 9, day, hour,
 describe("profile stats (Europe/Rome)", () => {
   it("the timezone is applied", () => {
     expect(oct(26, 0, 30).getTimezoneOffset()).toBe(-60);
+  });
+
+  it("SWOLF from a number or a numeric string, camelCase or snake_case; 0 otherwise", () => {
+    expect(getActivityAvgSwolf({ avgSwolf: 38 })).toBe(38);
+    expect(getActivityAvgSwolf({ avg_swolf: "41" })).toBe(41);
+    expect(getActivityAvgSwolf({ avgSwolf: "" })).toBe(0);
+    expect(getActivityAvgSwolf({ avgSwolf: null })).toBe(0);
+    expect(getActivityAvgSwolf({})).toBe(0);
   });
 
   it("local day keys, also just after midnight", () => {
