@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { Link } from "wouter";
 import { formatInteger } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -58,11 +59,14 @@ function Bar({
 /** Profile level card (Corsia «Season» board without season and missions). */
 export function LevelCard(props: LevelCardProps) {
   const { level, totalXp, nextLevelXp, xpToNextLevel } = props;
+  const titleId = useId();
   return (
-    <section className="surface-panel p-5" aria-label="Livello">
+    <section className="surface-panel p-5" aria-labelledby={titleId}>
       <div className="flex items-end justify-between gap-4">
         <div>
-          <p className="text-sm font-medium text-muted-foreground">Livello</p>
+          <h2 id={titleId} className="text-sm font-medium text-muted-foreground">
+            Livello
+          </h2>
           <p className="font-display text-[64px] font-bold leading-none tabular-nums">
             {level}
           </p>

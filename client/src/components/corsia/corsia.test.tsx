@@ -119,6 +119,12 @@ describe("primitivi Corsia", () => {
     expect(bar).toHaveAttribute("aria-valuetext", "580 XP mancanti");
   });
 
+  it("LevelCard: «Livello» è un titolo h2 che dà il nome alla sezione", () => {
+    render(<LevelCard {...level12} />);
+    const heading = screen.getByRole("heading", { level: 2, name: "Livello" });
+    expect(screen.getByRole("region", { name: "Livello" })).toContainElement(heading);
+  });
+
   it("LevelCard al livello massimo non mostra il prossimo livello", () => {
     render(
       <LevelCard

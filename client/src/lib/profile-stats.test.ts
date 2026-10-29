@@ -3,7 +3,7 @@
 process.env.TZ = "Europe/Rome";
 
 import { describe, expect, it } from "vitest";
-import { activityDays, getStreaks, localDayKey } from "./profile-stats";
+import { activityDays, getStreaks, localDayKey, primaryStrokeLabel } from "./profile-stats";
 
 /** Local date in October 2026 (26 = Monday). */
 const oct = (day: number, hour = 10, minute = 0) => new Date(2026, 9, day, hour, minute);
@@ -54,5 +54,14 @@ describe("profile stats (Europe/Rome)", () => {
       {},
     ]);
     expect(days.map(localDayKey)).toEqual(["2026-10-26", "2026-10-28"]);
+  });
+
+  it("primary stroke: the most frequent known one, null when unknown", () => {
+    expect(
+      primaryStrokeLabel([{ strokeType: "backstroke" }, { stroke_type: "backstroke" }, { strokeType: "freestyle" }])
+    ).toBe("Dorso");
+    expect(primaryStrokeLabel([{}])).toBe("Misti");
+    expect(primaryStrokeLabel([{ strokeType: "doggy" }])).toBeNull();
+    expect(primaryStrokeLabel([])).toBeNull();
   });
 });

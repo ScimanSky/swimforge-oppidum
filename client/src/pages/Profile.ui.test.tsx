@@ -19,6 +19,8 @@ const badge = (id: number, earned: boolean, earnedAt?: Date) => ({
 
 const state = vi.hoisted(() => ({
   profile: undefined as any,
+  profileLoading: false,
+  badgesLoading: false,
   badges: [] as any[],
   achievementDefinitions: [] as any[],
   userAchievementBadges: [] as any[],
@@ -31,15 +33,29 @@ const state = vi.hoisted(() => ({
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     auth: { me: { useQuery: () => ({ data: { id: 7, name: "Marta", email: "marta@example.com" } }) } },
-    profile: { get: { useQuery: () => ({ data: state.profile }) } },
+    profile: {
+      get: {
+        useQuery: () => ({
+          data: state.profileLoading ? undefined : state.profile,
+          isLoading: state.profileLoading,
+        }),
+      },
+    },
     records: {
       getByUser: { useQuery: () => ({ data: { records: state.records }, isLoading: false }) },
     },
     activities: { list: { useQuery: () => ({ data: state.activities }) } },
     badges: {
-      progress: { useQuery: () => ({ data: state.badges }) },
+      progress: {
+        useQuery: () => ({ data: state.badgesLoading ? undefined : state.badges, isLoading: state.badgesLoading }),
+      },
       getAchievementBadgeDefinitions: { useQuery: () => ({ data: state.achievementDefinitions }) },
-      getUserAchievementBadges: { useQuery: () => ({ data: state.userAchievementBadges }) },
+      getUserAchievementBadges: {
+        useQuery: () => ({
+          data: state.badgesLoading ? undefined : state.userAchievementBadges,
+          isLoading: state.badgesLoading,
+        }),
+      },
     },
   },
 }));
@@ -85,12 +101,17 @@ describe("Profilo (Corsia)", () => {
     state.userAchievementBadges = [];
     state.activities = [];
     state.records = [];
+    state.profileLoading = false;
+    state.badgesLoading = false;
     state.theme = "dark";
     state.setTheme = vi.fn();
   });
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
+
+  const badgesRegion = () => screen.getByRole("region", { name: "Badge" });
 
   it("no h1 (the title is in the shell header): the name is an h2, with profile badge and social counters", () => {
     renderProfile();
@@ -101,6 +122,33 @@ describe("Profilo (Corsia)", () => {
     expect(screen.getByText("31").parentElement).toHaveTextContent("31 Follower");
     expect(screen.getByText("9").parentElement).toHaveTextContent("9 Seguiti");
     expect(screen.getByRole("link", { name: /Modifica profilo/ })).toHaveAttribute("href", "/settings");
+    expect(screen.getByText("Iscritto dal 12 mar 2025")).toBeInTheDocument();
+    // No activities: the primary stroke is unknown and left out.
+    expect(screen.queryByText(/Stile principale/)).toBeNull();
+    expect(screen.queryByText("Non disponibile")).toBeNull();
+  });
+
+  it("primary stroke from the activities, with its label", () => {
+    state.activities = [{ strokeType: "backstroke" }, { strokeType: "backstroke" }, { strokeType: "freestyle" }];
+    renderProfile();
+    expect(screen.getByText("Stile principale: Dorso")).toBeInTheDocument();
+  });
+
+  it("while profile.get loads: skeletons, no placeholders", () => {
+    state.profileLoading = true;
+    renderProfile();
+    expect(screen.getAllByRole("status").some(el => el.textContent?.includes("Caricamento…"))).toBe(true);
+    expect(screen.queryByText("Aggiungi una bio dalle impostazioni.")).toBeNull();
+    expect(screen.queryByText("Località non impostata")).toBeNull();
+    expect(screen.queryByText(/Sessioni totali/)).toBeNull();
+    expect(screen.queryByRole("region", { name: "Livello" })).toBeNull();
+  });
+
+  it("while the badges load: no empty state yet", () => {
+    state.badgesLoading = true;
+    renderProfile();
+    expect(badgesRegion()).not.toHaveTextContent("Ancora nessun badge");
+    expect(within(badgesRegion()).getByRole("status")).toHaveTextContent("Caricamento dei badge…");
   });
 
   it("LevelCard shows the level from profile.get and the progress within the level", () => {
@@ -126,8 +174,8 @@ describe("Profilo (Corsia)", () => {
 
     renderProfile();
 
-    const preview = document.querySelector('[data-tour="badges-nav"]') as HTMLElement;
-    expect(preview).not.toBeNull();
+    const preview = badgesRegion();
+    expect(preview).toHaveAttribute("data-tour", "badges-nav");
     const items = within(preview).getAllByRole("listitem");
     expect(items).toHaveLength(6);
     expect(items[0]).toHaveTextContent("Prima gara");
@@ -140,8 +188,8 @@ describe("Profilo (Corsia)", () => {
   it("badge preview stays with zero badges: «Ancora nessun badge · Vedi tutti»", () => {
     state.badges = [badge(1, false), badge(2, false)];
     renderProfile();
-    const preview = document.querySelector('[data-tour="badges-nav"]') as HTMLElement;
-    expect(preview).not.toBeNull();
+    const preview = badgesRegion();
+    expect(preview).toHaveAttribute("data-tour", "badges-nav");
     expect(preview).toHaveTextContent("Ancora nessun badge");
     expect(within(preview).queryAllByRole("listitem")).toHaveLength(0);
     expect(within(preview).getByRole("link", { name: /Vedi tutti/ })).toHaveAttribute("href", "/badges");
@@ -149,14 +197,34 @@ describe("Profilo (Corsia)", () => {
 
   it("stats section is the tour anchor and uses metrics, never a «—»", () => {
     renderProfile();
-    const stats = document.querySelector('[data-tour="profile-stats"]') as HTMLElement;
-    expect(stats).not.toBeNull();
+    const stats = screen.getByRole("region", { name: "Riepilogo" });
+    expect(stats).toHaveAttribute("data-tour", "profile-stats");
     expect(stats).toHaveTextContent("3,2 km Distanza totale");
     expect(stats).toHaveTextContent("1:02 h Tempo totale");
     expect(stats).toHaveTextContent("2 Sessioni");
     expect(stats).not.toHaveTextContent("—");
     // Without SWOLF data the SWOLF metrics are left out.
     expect(stats).not.toHaveTextContent("SWOLF");
+  });
+
+  it("SWOLF and streaks are scoped to the recent swims; lifetime totals are not", () => {
+    // Wednesday 28 October 2026, 18:00: swims on Fri 23, Mon 26 and Wed 28.
+    vi.useFakeTimers({ now: new Date(2026, 9, 28, 18), toFake: ["Date"] });
+    state.activities = [
+      { activityDate: new Date(2026, 9, 23, 10), avgSwolf: 40 },
+      { activityDate: new Date(2026, 9, 26, 10), avgSwolf: 36 },
+      { activityDate: new Date(2026, 9, 28, 10), avgSwolf: 38 },
+    ];
+    renderProfile();
+
+    const stats = screen.getByRole("region", { name: "Riepilogo" });
+    const recent = within(stats).getByRole("region", { name: "Ultime 3 nuotate" });
+    expect(recent).toHaveTextContent("38 SWOLF medio");
+    expect(recent).toHaveTextContent("36 SWOLF migliore");
+    expect(recent).toHaveTextContent("3 g Serie attuale");
+    expect(recent).toHaveTextContent("3 g Serie migliore");
+    expect(recent).not.toHaveTextContent("Distanza totale");
+    expect(stats).toHaveTextContent("3,2 km Distanza totale");
   });
 
   it("links to Statistiche and Impostazioni", () => {
@@ -182,6 +250,13 @@ describe("Profilo (Corsia)", () => {
     screen.getByRole("radio", { name: "Scuro" }).focus();
     await userEvent.keyboard("{ArrowRight}");
     expect(state.setTheme).toHaveBeenCalledWith("light");
+  });
+
+  it("«Aspetto» is disabled when the theme cannot be switched", () => {
+    state.setTheme = undefined;
+    renderProfile();
+    expect(screen.getByRole("radio", { name: "Scuro" })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "Chiaro" })).toBeDisabled();
   });
 
   it("«Aspetto» reflects the light theme", () => {

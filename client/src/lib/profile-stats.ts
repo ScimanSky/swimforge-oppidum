@@ -93,3 +93,14 @@ export const getStreaks = (swims: Date[], now: Date = new Date()) => {
 
   return { current, best }
 }
+
+/** Label of the most frequent stroke of the activities; null without activities or when unknown. */
+export const primaryStrokeLabel = (activities: ActivityLike[]) => {
+  const counts = new Map<string, number>()
+  for (const activity of activities) {
+    const stroke = getActivityStroke(activity) || "mixed"
+    counts.set(stroke, (counts.get(stroke) ?? 0) + 1)
+  }
+  const [top] = Array.from(counts).sort((a, b) => b[1] - a[1])
+  return top ? (STROKE_LABELS[top[0]] ?? null) : null
+}
