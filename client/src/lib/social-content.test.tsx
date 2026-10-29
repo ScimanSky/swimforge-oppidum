@@ -82,6 +82,26 @@ describe("LinkPreviewCard", () => {
     expect(await screen.findByText("Secondo titolo")).toBeInTheDocument();
   });
 
+  it("an unsafe address from the server is never the link: the post's own address instead", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          requestedUrl: "x",
+          resolvedUrl: "javascript:alert(1)",
+          host: "four.example",
+          siteName: "Quattro",
+          title: "Pagina quattro",
+          description: null,
+        }),
+      })
+    );
+    render(<LinkPreviewCard url="https://four.example/d" />);
+    expect(await screen.findByText("Pagina quattro")).toBeInTheDocument();
+    expect(screen.getByRole("link")).toHaveAttribute("href", "https://four.example/d");
+  });
+
   it("an unsafe link renders nothing, also after a valid one", () => {
     vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise(() => {})));
     const { container, rerender } = render(<LinkPreviewCard url="https://three.example/c" />);

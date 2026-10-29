@@ -237,7 +237,9 @@ export function LinkPreviewCard({
   const remotePreview =
     fetched?.href === preview.href ? fetched.data : (linkPreviewCache.get(preview.href) ?? null);
 
-  const href = remotePreview?.resolvedUrl ?? preview.href;
+  // Where the server says the link ends up, when that is still an http(s) address.
+  const resolvedUrl = remotePreview?.resolvedUrl;
+  const href = resolvedUrl && isSafeHttpUrl(resolvedUrl) ? resolvedUrl : preview.href;
   const title = remotePreview?.title ?? preview.pathLabel;
   const description = remotePreview?.description;
   const siteName = remotePreview?.siteName ?? preview.host;
