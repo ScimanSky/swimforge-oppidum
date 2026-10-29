@@ -119,10 +119,10 @@ export function AIChatBox({
   messages,
   onSendMessage,
   isLoading = false,
-  placeholder = "Type your message...",
+  placeholder = "Scrivi un messaggio…",
   className,
   height = "600px",
-  emptyStateMessage = "Start a conversation with AI",
+  emptyStateMessage = "Inizia una conversazione",
   suggestedPrompts,
   maxInputLength = 2000,
 }: AIChatBoxProps) {
@@ -197,29 +197,35 @@ export function AIChatBox({
     <div
       ref={containerRef}
       className={cn(
-        "flex flex-col bg-card text-card-foreground rounded-lg border shadow-sm",
+        "flex flex-col overflow-hidden rounded-2xl border border-border bg-card text-card-foreground",
         className
       )}
       style={{ height }}
     >
+      {/* Always mounted so screen readers hear the change; only the text changes. */}
+      <div role="status" className="sr-only">
+        {isLoading ? "Risposta in arrivo" : ""}
+      </div>
+
       {/* Messages Area */}
       <div ref={scrollAreaRef} className="flex-1 overflow-hidden">
         {displayMessages.length === 0 ? (
           <div className="flex h-full flex-col p-4">
             <div className="flex flex-1 flex-col items-center justify-center gap-6 text-muted-foreground">
               <div className="flex flex-col items-center gap-3">
-                <Sparkles className="size-12 opacity-20" />
+                <Sparkles className="size-10" aria-hidden />
                 <p className="text-sm">{emptyStateMessage}</p>
               </div>
 
               {suggestedPrompts && suggestedPrompts.length > 0 && (
-                <div className="flex max-w-2xl flex-wrap justify-center gap-2">
+                <div className="flex max-w-2xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
                   {suggestedPrompts.map((prompt, index) => (
                     <button
                       key={index}
+                      type="button"
                       onClick={() => onSendMessage(prompt)}
                       disabled={isLoading}
-                      className="rounded-lg border border-border bg-card px-4 py-2 text-sm transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                      className="min-h-11 rounded-xl border border-border px-4 py-2 text-left text-sm text-foreground transition-colors hover:bg-raised disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {prompt}
                     </button>
@@ -230,7 +236,8 @@ export function AIChatBox({
           </div>
         ) : (
           <ScrollArea className="h-full">
-            <div className="flex flex-col space-y-4 p-4">
+            {/* New messages are read out politely; each bubble says who is speaking. */}
+            <div role="log" aria-live="polite" className="flex flex-col space-y-4 p-4">
               {displayMessages.map((message, index) => {
                 // Apply min-height to last message only if NOT loading (when loading, the loading indicator gets it)
                 const isLastMessage = index === displayMessages.length - 1;
@@ -253,19 +260,23 @@ export function AIChatBox({
                     }
                   >
                     {message.role === "assistant" && (
-                      <div className="size-8 shrink-0 mt-1 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Sparkles className="size-4 text-primary" />
+                      <div className="size-8 shrink-0 mt-1 rounded-full bg-raised flex items-center justify-center">
+                        <Sparkles className="size-4 text-muted-foreground" aria-hidden />
                       </div>
                     )}
 
                     <div
+                      data-chat-message
                       className={cn(
-                        "max-w-[80%] rounded-lg px-4 py-2.5",
+                        "max-w-[80%] rounded-2xl px-4 py-2.5",
                         message.role === "user"
                           ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-foreground"
+                          : "bg-raised text-foreground"
                       )}
                     >
+                      <span className="sr-only">
+                        {message.role === "assistant" ? "Coach: " : "Tu: "}
+                      </span>
                       {message.role === "assistant" ? (
                         <div className="prose prose-sm dark:prose-invert max-w-none">
                           <Streamdown>{message.content}</Streamdown>
@@ -279,7 +290,7 @@ export function AIChatBox({
 
                     {message.role === "user" && (
                       <div className="size-8 shrink-0 mt-1 rounded-full bg-secondary flex items-center justify-center">
-                        <User className="size-4 text-secondary-foreground" />
+                        <User className="size-4 text-secondary-foreground" aria-hidden />
                       </div>
                     )}
                   </div>
@@ -295,11 +306,11 @@ export function AIChatBox({
                       : undefined
                   }
                 >
-                  <div className="size-8 shrink-0 mt-1 rounded-full bg-primary/10 flex items-center justify-center">
-                    <Sparkles className="size-4 text-primary" />
+                  <div className="size-8 shrink-0 mt-1 rounded-full bg-raised flex items-center justify-center">
+                    <Sparkles className="size-4 text-muted-foreground" aria-hidden />
                   </div>
-                  <div className="rounded-lg bg-muted px-4 py-2.5">
-                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                  <div className="rounded-2xl bg-raised px-4 py-2.5">
+                    <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
                   </div>
                 </div>
               )}
@@ -312,7 +323,7 @@ export function AIChatBox({
       <form
         ref={inputAreaRef}
         onSubmit={handleSubmit}
-        className="flex gap-2 p-4 border-t bg-background/50 items-end"
+        className="flex items-end gap-2 border-t border-border p-3"
       >
         <Textarea
           ref={textareaRef}
@@ -320,20 +331,22 @@ export function AIChatBox({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
+          aria-label="Messaggio"
           maxLength={maxInputLength}
-          className="flex-1 max-h-32 resize-none min-h-9"
+          className="max-h-32 min-h-11 flex-1 resize-none"
           rows={1}
         />
         <Button
           type="submit"
           size="icon"
           disabled={!input.trim() || isLoading}
-          className="shrink-0 h-[38px] w-[38px]"
+          className="shrink-0"
+          aria-label="Invia"
         >
           {isLoading ? (
-            <Loader2 className="size-4 animate-spin" />
+            <Loader2 className="size-4 animate-spin" aria-hidden />
           ) : (
-            <Send className="size-4" />
+            <Send className="size-4" aria-hidden />
           )}
         </Button>
       </form>

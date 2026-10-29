@@ -1,6 +1,7 @@
-import { COOKIE_NAME, CSRF_COOKIE_NAME, NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
+import { COOKIE_NAME, CSRF_COOKIE_NAME, CSRF_ERR_MSG, NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from '@shared/const';
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
+import { ZodError, z } from "zod";
 import type { TrpcContext } from "./context";
 import { handleError } from "../lib/errors";
 import { parse as parseCookieHeader } from "cookie";
@@ -9,6 +10,13 @@ import { shouldEnforceCsrf } from "./csrf";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
+  // Input validation errors carry their messages per field (error.data.zodError.fieldErrors),
+  // so forms can show each one under its input. Only the messages: never the input values.
+  errorFormatter({ shape, error }) {
+    const zodError =
+      error.code === "BAD_REQUEST" && error.cause instanceof ZodError ? z.flattenError(error.cause) : null;
+    return { ...shape, data: { ...shape.data, zodError } };
+  },
 });
 
 export const router = t.router;
@@ -34,7 +42,7 @@ const csrfProtection = t.middleware(async (opts) => {
   const csrfHeaderRaw = opts.ctx.req.headers["x-csrf-token"];
   const csrfHeader = Array.isArray(csrfHeaderRaw) ? csrfHeaderRaw[0] : csrfHeaderRaw;
   if (!csrfCookie || !csrfHeader || csrfHeader !== csrfCookie) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "CSRF validation failed" });
+    throw new TRPCError({ code: "FORBIDDEN", message: CSRF_ERR_MSG });
   }
   return opts.next();
 });

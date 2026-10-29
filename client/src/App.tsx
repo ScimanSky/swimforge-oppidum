@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, type ComponentType } from "react";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
@@ -12,161 +12,60 @@ import AutoSync from "./components/AutoSync";
 import ActivityInsightNotification from "./components/ActivityInsightNotification";
 import PbCelebrationNotification from "./components/PbCelebrationNotification";
 import CookieBanner from "./components/CookieBanner";
-import { UI_FEATURE_FLAGS } from "./lib/feature-flags";
 import { hideSplash, initNativeRuntime } from "./lib/native-runtime";
+import { PUBLIC_PATHS, type PublicPath } from "./lib/navigation";
 import { isNativePlatform } from "./lib/platform";
 import { registerPushToken } from "./lib/push";
 import { getNativeSessionToken } from "./lib/session-token";
 import { trpc } from "./lib/trpc";
 
-// Lazy like every other page: it pulls in AppLayout → app-shell → supabase-js.
-const NotFound = lazy(() => import("@/pages/NotFound"));
+// Lazy like every other page: public pages here, signed-in pages in ShellRoutes (which pulls in
+// app-shell → supabase-js, kept out of the entry chunk).
 const Home = lazy(() => import("./pages/Home"));
-const Badges = lazy(() => import("./pages/Badges"));
-const Challenges = lazy(() => import("./pages/Challenges"));
-const ChallengeDetail = lazy(() => import("./pages/ChallengeDetail"));
-const Leaderboard = lazy(() => import("./pages/Leaderboard"));
-const Activities = lazy(() => import("./pages/Activities"));
-const ActivityDetail = lazy(() => import("./pages/ActivityDetail"));
-const Goals = lazy(() => import("./pages/Goals"));
-const Profile = lazy(() => import("./pages/Profile"));
-const PublicProfile = lazy(() => import("./pages/PublicProfile"));
-const Statistics = lazy(() => import("./pages/Statistics"));
-const Coach = lazy(() => import("./pages/Coach"));
-const SocialFeed = lazy(() => import("./pages/SocialFeed"));
-const Messages = lazy(() => import("./pages/Messages"));
-const PostDetail = lazy(() => import("./pages/PostDetail"));
-const ReportPost = lazy(() => import("./pages/ReportPost"));
-const Community = lazy(() => import("./pages/Community"));
-const ClubInvite = lazy(() => import("./pages/ClubInvite"));
-const ClubDetail = lazy(() => import("./pages/ClubDetailEnhanced"));
-const ClubCoachModeration = lazy(() => import("./pages/ClubCoachModeration"));
-const ClubDocumentsPage = lazy(() => import("./pages/ClubDocumentsPage"));
-const ClubEventDetail = lazy(() => import("./pages/ClubEventDetail"));
-const ClubMeetDetail = lazy(() => import("./pages/ClubMeetDetail"));
-const ClubMeetProgramBuilder = lazy(() => import("./pages/ClubMeetProgramBuilder"));
-const ClubHistoryAthletesPage = lazy(() => import("./pages/ClubHistoryAthletesPage"));
-const ClubHistoryMeetsPage = lazy(() => import("./pages/ClubHistoryMeetsPage"));
-const ClubWorkoutsPage = lazy(() => import("./pages/ClubWorkoutsPage"));
-const ClubWorkoutDetailPage = lazy(() => import("./pages/ClubWorkoutDetailPage"));
-const ClubPbLeaderboardPage = lazy(() => import("./pages/ClubPbLeaderboardPage"));
-const AdminReports = lazy(() => import("./pages/AdminReports"));
 const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const StravaConnect = lazy(() => import("./pages/StravaConnect"));
-const Settings = lazy(() => import("./pages/Settings"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 const Terms = lazy(() => import("./pages/Terms"));
 const CookiePolicy = lazy(() => import("./pages/CookiePolicy"));
 const OnboardingFlow = lazy(() => import("./components/onboarding/OnboardingFlow"));
+const ShellRoutes = lazy(() => import("./components/app/ShellRoutes"));
 
-function Router() {
-  const clubMeetsV1Enabled = UI_FEATURE_FLAGS.clubMeetsV1;
-  const clubHistoryV1Enabled = UI_FEATURE_FLAGS.clubHistoryV1;
+const AuthRedirect = () => <Redirect to="/login" />;
 
+/** One page per public path: typed on PUBLIC_PATHS so the two cannot drift apart. */
+const PUBLIC_PAGES: Record<PublicPath, ComponentType> = {
+  "/": Home,
+  "/auth": AuthRedirect,
+  "/auth/callback": AuthCallback,
+  "/strava/callback": StravaConnect,
+  "/login": Login,
+  "/register": Register,
+  "/signup": Register,
+  "/forgot-password": ForgotPassword,
+  "/reset-password": ResetPassword,
+  "/privacy": Privacy,
+  "/terms": Terms,
+  "/cookies": CookiePolicy,
+};
+
+/** Public routes; everything else goes to the persistent shell. */
+export function AppRoutes() {
   return (
     <Suspense fallback={<div className="flex items-center justify-center h-screen"><Spinner /></div>}>
     <Switch>
-      <Route path="/" component={Home} />
-      <Route path="/auth">
-        <Redirect to="/login" />
-      </Route>
-      <Route path="/auth/callback" component={AuthCallback} />
-      <Route path="/strava/callback" component={StravaConnect} />
-      <Route path="/login" component={Login} />
-      <Route path="/register" component={Register} />
-      <Route path="/signup" component={Register} />
-      <Route path="/forgot-password" component={ForgotPassword} />
-      <Route path="/reset-password" component={ResetPassword} />
-      <Route path="/home" component={SocialFeed} />
-      <Route path="/messages" component={Messages} />
-      <Route path="/home/messages">
-        <Redirect to="/messages" />
-      </Route>
-      <Route path="/post/:postId" component={PostDetail} />
-      <Route path="/home/post/:postId">{(params: { postId: string }) => <Redirect to={`/post/${params.postId}`} />}</Route>
-      <Route path="/home/report/post/:postId" component={ReportPost} />
-      <Route path="/dashboard">
-        <Redirect to="/track" />
-      </Route>
-      <Route path="/report/post/:postId">{(params: { postId: string }) => <Redirect to={`/home/report/post/${params.postId}`} />}</Route>
-      <Route path="/admin/reports" component={AdminReports} />
-      <Route path="/home/admin/reports">
-        <Redirect to="/admin/reports" />
-      </Route>
-      <Route path="/home/dashboard">
-        <Redirect to="/track" />
-      </Route>
-      <Route path="/badges" component={Badges} />
-      <Route path="/challenges" component={Challenges} />
-      <Route path="/season/challenges">
-        <Redirect to="/challenges" />
-      </Route>
-      <Route path="/challenges/:id" component={ChallengeDetail} />
-      <Route path="/season/challenges/:id">{(params: { id: string }) => <Redirect to={`/challenges/${params.id}`} />}</Route>
-      <Route path="/leaderboard" component={Leaderboard} />
-      <Route path="/season/leaderboard">
-        <Redirect to="/leaderboard" />
-      </Route>
-      <Route path="/track/:id" component={ActivityDetail} />
-      <Route path="/activities/:id">{(params: { id: string }) => <Redirect to={`/track/${params.id}`} />}</Route>
-      <Route path="/track" component={Activities} />
-      <Route path="/activities">
-        <Redirect to="/track" />
-      </Route>
-      <Route path="/goals" component={Goals} />
-      <Route path="/season/objectives">
-        <Redirect to="/goals" />
-      </Route>
-      <Route path="/season">
-        <Redirect to="/track" />
-      </Route>
-      <Route path="/profile/performance" component={Statistics} />
-      <Route path="/statistics">
-        <Redirect to="/profile/performance" />
-      </Route>
-      <Route path="/coach" component={Coach} />
-      <Route path="/coach-dryland">
-        <Redirect to="/coach?tab=workouts&workout=dryland" />
-      </Route>
-      <Route path="/session-iq">
-        <Redirect to="/coach?tab=session-iq" />
-      </Route>
-      <Route path="/community/invite/:code" component={ClubInvite} />
-      <Route path="/community/club/:clubId/event/:eventId" component={ClubEventDetail} />
-      {clubMeetsV1Enabled ? (
-        <Route path="/community/club/:clubId/meet/:meetId/program" component={ClubMeetProgramBuilder} />
-      ) : null}
-      {clubMeetsV1Enabled ? (
-        <Route path="/community/club/:clubId/meet/:meetId" component={ClubMeetDetail} />
-      ) : null}
-      {clubHistoryV1Enabled ? (
-        <Route path="/community/club/:clubId/history/athletes" component={ClubHistoryAthletesPage} />
-      ) : null}
-      {clubHistoryV1Enabled ? (
-        <Route path="/community/club/:clubId/history/meets" component={ClubHistoryMeetsPage} />
-      ) : null}
-      <Route path="/community/club/:clubId/workouts/:workoutId" component={ClubWorkoutDetailPage} />
-      <Route path="/community/club/:clubId/workouts" component={ClubWorkoutsPage} />
-      <Route path="/community/club/:clubId/pb" component={ClubPbLeaderboardPage} />
-      <Route path="/community/club/:clubId/documents" component={ClubDocumentsPage} />
-      <Route path="/community/club/:id/coach" component={ClubCoachModeration} />
-      <Route path="/community/club/:id" component={ClubDetail} />
-      <Route path="/home/community" component={Community} />
-      <Route path="/community">
-        <Redirect to="/home/community" />
-      </Route>
-      <Route path="/profile" component={Profile} />
-      <Route path="/u/:id" component={PublicProfile} />
-      <Route path="/settings" component={Settings} />
-      <Route path="/privacy" component={Privacy} />
-      <Route path="/terms" component={Terms} />
-      <Route path="/cookies" component={CookiePolicy} />
-      <Route path="/404" component={NotFound} />
-      <Route component={NotFound} />
+      {PUBLIC_PATHS.map((path) => {
+        const Page = PUBLIC_PAGES[path];
+        return (
+          <Route key={path} path={path}>
+            <Page />
+          </Route>
+        );
+      })}
+      <Route component={ShellRoutes} />
     </Switch>
     </Suspense>
   );
@@ -236,7 +135,7 @@ function App() {
           <AutoSync />
           <BadgeUnlockWatcher />
           <ScrollToTop />
-          <Router />
+          <AppRoutes />
           <ActivityInsightNotification />
           <PbCelebrationNotification />
           <CookieBanner />

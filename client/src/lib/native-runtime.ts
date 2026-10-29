@@ -1,20 +1,19 @@
 import { App } from "@capacitor/app";
-import type { PluginListenerHandle } from "@capacitor/core";
+import { SystemBars, SystemBarsStyle, type PluginListenerHandle } from "@capacitor/core";
 import { SplashScreen } from "@capacitor/splash-screen";
-import { StatusBar, Style } from "@capacitor/status-bar";
 import { resolveDeepLink } from "./deep-links";
+import { canGoBackInApp } from "./in-app-history";
+import { inPageParentPath, isPublicPath, normalizePath, TODAY_PATH } from "./navigation";
 import { isNativePlatform } from "./platform";
 import { setPushNavigate } from "./push";
 
 export type NativeAuthCallback = { code: string | null; error: string | null };
 
 export type NativeRuntimeOptions = {
-  navigate: (path: string) => void;
+  navigate: (path: string, options?: { replace?: boolean }) => void;
   onAuthCallback: (callback: NativeAuthCallback) => unknown;
 };
 
-const NATIVE_BACKGROUND = "#0A1520";
-const HOME_PATH = "/home";
 /** appUrlOpen may repeat the launch URL on a cold start: the same URL within this window is ignored. */
 const DUPLICATE_URL_WINDOW_MS = 2000;
 /**
@@ -35,13 +34,32 @@ export function claimLaunchUrl(url: string): boolean {
   return true;
 }
 
+export type BackButtonAction = "back" | "parent" | "home" | "exit";
+
 /**
- * Android back button: go back in the WebView history when there is somewhere to go and we
- * are not on the home; otherwise close the app.
+ * Android back button (`location`: path and query): on the native home (Oggi) close the app;
+ * elsewhere go back in the history when the previous entry belongs to the app. Without such an
+ * entry a page whose query holds a sub-view (a chat opened from a notification) goes up to its
+ * own page (`parent`, see inPageParentPath), another shell page lands on Oggi (replacing the
+ * current entry) instead of closing the app from a deep page, while a public page (login,
+ * privacy…) closes the app: signed out, Oggi would bounce back to the login.
  */
-export function shouldExitOnBack(path: string, canGoBack: boolean): boolean {
-  const normalized = path.replace(/\/+$/, "") || "/";
-  return !canGoBack || normalized === HOME_PATH;
+export function backButtonAction(location: string, canGoBack: boolean): BackButtonAction {
+  if (normalizePath(location) === TODAY_PATH) return "exit";
+  if (canGoBack) return "back";
+  if (inPageParentPath(location)) return "parent";
+  return isPublicPath(location) ? "exit" : "home";
+}
+
+/**
+ * Icons of the status bar and of the navigation bar follow the app theme (light icons on the
+ * dark theme, dark icons on the light one), whatever the system night mode. The bars are
+ * transparent (edge-to-edge, MainActivity): their background is the page's own header and
+ * bottom navigation, padded with env(safe-area-inset-*). No-op on the web.
+ */
+export function syncNativeSystemBars(theme: "dark" | "light"): void {
+  if (!isNativePlatform()) return;
+  SystemBars.setStyle({ style: theme === "dark" ? SystemBarsStyle.Dark : SystemBarsStyle.Light }).catch(() => {});
 }
 
 /**
@@ -78,7 +96,7 @@ export function hideSplash(): void {
 }
 
 /**
- * Native only (no-op on the web): status bar style, Android back button, deep links
+ * Native only (no-op on the web): Android back button, deep links
  * (including the URL the app was cold-started with), in-app navigation for notification
  * taps. Returns a cleanup function.
  */
@@ -87,18 +105,17 @@ export function initNativeRuntime(options: NativeRuntimeOptions): () => void {
 
   setPushNavigate(options.navigate);
 
-  StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
-  StatusBar.setBackgroundColor({ color: NATIVE_BACKGROUND }).catch(() => {});
-
   const handleUrl = createDeepLinkHandler(options);
   const handles: Promise<PluginListenerHandle>[] = [
     App.addListener("backButton", ({ canGoBack }) => {
-      const canGoBackInHistory = canGoBack ?? window.history.length > 1;
-      if (shouldExitOnBack(window.location.pathname, canGoBackInHistory)) {
-        App.exitApp().catch(() => {});
-      } else {
-        window.history.back();
-      }
+      // Only entries created by the app: never back to the login page or a pre-app entry.
+      const canGoBackInHistory = canGoBack !== false && canGoBackInApp();
+      const location = window.location.pathname + window.location.search;
+      const action = backButtonAction(location, canGoBackInHistory);
+      if (action === "exit") App.exitApp().catch(() => {});
+      else if (action === "back") window.history.back();
+      else if (action === "parent") options.navigate(inPageParentPath(location) ?? TODAY_PATH, { replace: true });
+      else options.navigate(TODAY_PATH, { replace: true });
     }),
     App.addListener("appUrlOpen", ({ url }) => {
       handleUrl(url);

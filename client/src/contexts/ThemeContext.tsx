@@ -1,10 +1,13 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { syncNativeSystemBars } from "@/lib/native-runtime";
 
 type Theme = "light" | "dark";
 
 interface ThemeContextType {
   theme: Theme;
   toggleTheme?: () => void;
+  /** Picks a theme (the «Aspetto» selector); undefined when the theme is not switchable. */
+  setTheme?: (theme: Theme) => void;
   switchable: boolean;
 }
 
@@ -36,6 +39,7 @@ export function ThemeProvider({
     } else {
       root.classList.remove("dark");
     }
+    syncNativeSystemBars(theme);
 
     if (switchable) {
       localStorage.setItem("theme", theme);
@@ -49,7 +53,14 @@ export function ThemeProvider({
     : undefined;
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, switchable }}>
+    <ThemeContext.Provider
+      value={{
+        theme,
+        toggleTheme,
+        setTheme: switchable ? setTheme : undefined,
+        switchable,
+      }}
+    >
       {children}
     </ThemeContext.Provider>
   );

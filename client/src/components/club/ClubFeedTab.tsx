@@ -1,11 +1,9 @@
 /**
- * Club Feed Tab - Il feed dei post del club
+ * Club feed: composer and the club's posts (Corsia cards).
  */
 
-import { assetUrl } from "@/lib/asset-base";
-import { ReactNode, useMemo, useRef, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
-import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -13,9 +11,11 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { MessageCircle, Plus, ImagePlus, X, AtSign, Hash, Trash2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { errorToastMessage } from "@/lib/trpc-errors";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import PostReactions from "@/components/PostReactions";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import {
   extractHashtags,
   isVideoUrl,
@@ -25,11 +25,11 @@ import {
 } from "@/lib/post-media";
 import { uploadVideoToCloudinary } from "@/lib/cloudinary-upload";
 import { extractFirstUrl, LinkPreviewCard, normalizeTagSearchQuery, renderSocialText } from "@/lib/social-content";
+import { formatTimeAgo } from "@/lib/format";
 
 interface ClubFeedTabProps {
   clubId: number;
   isMember?: boolean;
-  afterComposerSlot?: ReactNode;
 }
 
 type SelectedMedia = {
@@ -73,7 +73,9 @@ function parseTaggedUsers(raw: unknown): Array<{ user_id: number; name?: string 
   return [];
 }
 
-export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: ClubFeedTabProps) {
+export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
+  const composerTitleId = useId();
+  const tagInputId = useId();
   const [postText, setPostText] = useState("");
   const [openCommentsId, setOpenCommentsId] = useState<number | null>(null);
   const [commentTextByPost, setCommentTextByPost] = useState<Record<number, string>>({});
@@ -116,11 +118,11 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
       resetComposer();
       utils.community.clubs.feed.invalidate({ clubId });
       if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
-        toast.success(`+${data.actionXp.awardedXp} XP Action`);
+        toast.success(`+${data.actionXp.awardedXp} XP`);
       }
     },
     onError: (error) => {
-      toast.error(error.message || "Errore nella pubblicazione");
+      toast.error(errorToastMessage(error, "Errore nella pubblicazione"));
     },
   });
 
@@ -131,7 +133,7 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
       utils.community.comments.invalidate();
       utils.community.clubs.feed.invalidate({ clubId });
       if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
-        toast.success(`+${data.actionXp.awardedXp} XP Action`);
+        toast.success(`+${data.actionXp.awardedXp} XP`);
       }
     },
   });
@@ -146,7 +148,7 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
     },
     onError: (error) => {
       setDeletingPostId(null);
-      toast.error(error.message || "Impossibile eliminare il post");
+      toast.error(errorToastMessage(error, "Impossibile eliminare il post"));
     },
   });
 
@@ -310,182 +312,172 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
 
   if (!isMember) {
     return (
-      <Surface>
-        <SurfaceContent className="p-8 text-center">
-          <MessageCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">
-            Unisciti al club per vedere il feed
-          </p>
-        </SurfaceContent>
-      </Surface>
+      <p className="surface-panel p-4 text-center text-sm text-muted-foreground">
+        Unisciti al club per vedere il feed.
+      </p>
     );
   }
 
   return (
     <div className="space-y-4">
-      <Surface>
-        <SurfaceContent className="p-4 space-y-3">
-          <Textarea
-            placeholder="Condividi qualcosa con il club..."
-            value={postText}
-            onChange={(e) => setPostText(e.target.value)}
-            className="min-h-[100px]"
-          />
+      <section aria-labelledby={composerTitleId} className="surface-panel space-y-3 p-4">
+        <h3 id={composerTitleId} className="sr-only">
+          Nuovo post nel club
+        </h3>
+        <Textarea
+          aria-label="Testo del post"
+          placeholder="Condividi qualcosa con il club…"
+          value={postText}
+          onChange={(e) => setPostText(e.target.value)}
+          className="min-h-[100px]"
+        />
 
-          {postFirstLink ? <LinkPreviewCard url={postFirstLink} className="mb-1" /> : null}
+        {postFirstLink ? <LinkPreviewCard url={postFirstLink} className="mb-1" /> : null}
 
-          <div className="flex items-center justify-between gap-2">
-            <Button type="button" variant="outline-neon" size="sm" className="gap-2" onClick={() => mediaInputRef.current?.click()}>
-              <ImagePlus className="size-4" />
-              Aggiungi foto/video
-            </Button>
-            <span className="text-xs text-muted-foreground">{mediaItems.length}/{MAX_POST_MEDIA_ITEMS} media</span>
+        <div className="flex items-center justify-between gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => mediaInputRef.current?.click()}>
+            <ImagePlus className="size-4" />
+            Aggiungi foto/video
+          </Button>
+          <span className="text-xs text-muted-foreground tabular-nums">{mediaItems.length}/{MAX_POST_MEDIA_ITEMS} media</span>
+        </div>
+        <input
+          ref={mediaInputRef}
+          type="file"
+          multiple
+          accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,video/x-m4v"
+          className="hidden"
+          onChange={(e) => {
+            handlePickMedia(e.target.files);
+            if (mediaInputRef.current) mediaInputRef.current.value = "";
+          }}
+        />
+
+        {mediaItems.length > 0 && (
+          <div className="grid grid-cols-2 gap-2">
+            {mediaItems.map((item) => (
+              <div key={item.id} className="relative overflow-hidden rounded-xl bg-raised">
+                {item.kind === "video" || isVideoUrl(item.previewUrl) ? (
+                  <video src={item.previewUrl} className="h-28 w-full object-cover" muted controls playsInline />
+                ) : (
+                  <img src={item.previewUrl} alt="Anteprima media" className="h-28 w-full object-cover" loading="lazy" />
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeMedia(item.id)}
+                  className="absolute right-2 top-2 rounded-full bg-background/80 p-1.5 text-foreground"
+                  aria-label="Rimuovi media"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            ))}
           </div>
-          <input
-            ref={mediaInputRef}
-            type="file"
-            multiple
-            accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime,video/x-m4v"
-            className="hidden"
-            onChange={(e) => {
-              handlePickMedia(e.target.files);
-              if (mediaInputRef.current) mediaInputRef.current.value = "";
-            }}
-          />
+        )}
 
-          {mediaItems.length > 0 && (
-            <div className="grid grid-cols-2 gap-2">
-              {mediaItems.map((item) => (
-                <div key={item.id} className="relative overflow-hidden rounded-xl border border-border/70 bg-background/40">
-                  {item.kind === "video" || isVideoUrl(item.previewUrl) ? (
-                    <video src={item.previewUrl} className="h-28 w-full object-cover" muted controls playsInline />
-                  ) : (
-                    <img src={item.previewUrl} alt="Anteprima media" className="h-28 w-full object-cover" loading="lazy" />
-                  )}
+        <div className="space-y-2">
+          <label htmlFor={tagInputId} className="flex items-center gap-1 text-sm font-medium text-muted-foreground">
+            <AtSign className="size-4" aria-hidden />
+            Tagga amici
+          </label>
+          <Input
+            id={tagInputId}
+            placeholder="Cerca per nome o username"
+            value={tagQuery}
+            onChange={(e) => setTagQuery(e.target.value)}
+          />
+          {tagSearchQuery.data && normalizedTagQuery.length >= 2 ? (
+            <div className="max-h-36 overflow-y-auto rounded-xl border border-border bg-card">
+              {(tagSearchQuery.data as any[]).length === 0 ? (
+                <p className="px-3 py-2 text-sm text-muted-foreground">Nessun utente trovato.</p>
+              ) : (
+                (tagSearchQuery.data as any[]).map((user) => (
+                  <button
+                    key={user.userId}
+                    type="button"
+                    onClick={() => addTaggedUser(user)}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-raised"
+                  >
+                    <Avatar className="size-7">
+                      <AvatarImage src={user.avatarUrl || undefined} />
+                      <AvatarFallback>{(user.name || user.username || "U").slice(0, 1).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{user.name || "Utente"}</p>
+                      <p className="truncate text-xs text-muted-foreground">@{user.username || `u${user.userId}`}</p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          ) : null}
+
+          {taggedUsers.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {taggedUsers.map((user) => (
+                <span key={user.userId} className="inline-flex h-7 items-center gap-1 rounded-full bg-raised pl-3 pr-1.5 text-xs font-semibold">
+                  @{user.username || user.name || `u${user.userId}`}
                   <button
                     type="button"
-                    onClick={() => removeMedia(item.id)}
-                    className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white"
-                    aria-label="Rimuovi media"
+                    aria-label={`Togli @${user.username || user.name || `u${user.userId}`}`}
+                    onClick={() => removeTaggedUser(user.userId)}
+                    className="rounded-full p-0.5 text-muted-foreground hover:text-foreground"
                   >
-                    <X className="size-3.5" />
+                    <X className="size-3.5" aria-hidden />
                   </button>
-                </div>
+                </span>
               ))}
             </div>
           )}
+        </div>
 
-          <div className="space-y-2">
-            <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-              <AtSign className="size-3.5" />
-              Tagga amici
-            </label>
-            <Input
-              placeholder="Cerca per nome o username"
-              value={tagQuery}
-              onChange={(e) => setTagQuery(e.target.value)}
-            />
-            {tagSearchQuery.data && normalizedTagQuery.length >= 2 ? (
-              <div className="max-h-36 overflow-y-auto rounded-xl border border-border/70 bg-background/60">
-                {(tagSearchQuery.data as any[]).length === 0 ? (
-                  <p className="px-3 py-2 text-xs text-muted-foreground">Nessun utente trovato</p>
-                ) : (
-                  (tagSearchQuery.data as any[]).map((user) => (
-                    <button
-                      key={user.userId}
-                      type="button"
-                      onClick={() => addTaggedUser(user)}
-                      className="flex w-full items-center gap-2 px-3 py-2 text-left transition-colors hover:bg-card/70"
-                    >
-                      <Avatar className="size-7">
-                        <AvatarImage src={user.avatarUrl || undefined} />
-                        <AvatarFallback>{(user.name || user.username || "U").slice(0, 1).toUpperCase()}</AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-medium">{user.name || "Utente"}</p>
-                        <p className="truncate text-[11px] text-muted-foreground">@{user.username || `u${user.userId}`}</p>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-            ) : null}
-
-            {taggedUsers.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {taggedUsers.map((user) => (
-                  <span key={user.userId} className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-card/50 px-2 py-1 text-xs">
-                    @{user.username || user.name || `u${user.userId}`}
-                    <button type="button" onClick={() => removeTaggedUser(user.userId)} className="text-muted-foreground hover:text-foreground">
-                      <X className="size-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {hashtags.length > 0 && (
-            <div className="rounded-xl border border-border/70 bg-background/40 p-2">
-              <p className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
-                <Hash className="size-3.5" />
-                Hashtag rilevati
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {hashtags.map((tag) => (
-                  <span key={tag} className="rounded-full bg-card/60 px-2 py-0.5 text-[11px] text-[var(--electric-cyan)]">
-                    #{tag}
-                  </span>
-                ))}
-              </div>
+        {hashtags.length > 0 && (
+          <div className="rounded-xl bg-raised p-3">
+            <p className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
+              <Hash className="size-3.5" aria-hidden />
+              Hashtag rilevati
+            </p>
+            <div className="flex flex-wrap gap-x-2 gap-y-1">
+              {hashtags.map((tag) => (
+                <span key={tag} className="text-sm font-medium text-action-text">
+                  #{tag}
+                </span>
+              ))}
             </div>
-          )}
-
-          <div className="flex justify-end">
-            <Button
-              onClick={() => void handlePostSubmit()}
-              disabled={
-                (!postText.trim() && mediaItems.length === 0) ||
-                createPostMutation.isPending ||
-                imageKitAuth.isPending ||
-                cloudinaryVideoAuth.isPending
-              }
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              {createPostMutation.isPending || imageKitAuth.isPending || cloudinaryVideoAuth.isPending
-                ? "Pubblicazione..."
-                : "Pubblica"}
-            </Button>
           </div>
-        </SurfaceContent>
-      </Surface>
+        )}
 
-      {afterComposerSlot ? <div className="space-y-3">{afterComposerSlot}</div> : null}
+        <div className="flex justify-end">
+          <Button
+            onClick={() => void handlePostSubmit()}
+            disabled={
+              (!postText.trim() && mediaItems.length === 0) ||
+              createPostMutation.isPending ||
+              imageKitAuth.isPending ||
+              cloudinaryVideoAuth.isPending
+            }
+          >
+            <Plus aria-hidden />
+            {createPostMutation.isPending || imageKitAuth.isPending || cloudinaryVideoAuth.isPending
+              ? "Pubblicazione…"
+              : "Pubblica"}
+          </Button>
+        </div>
+      </section>
 
       {feedQuery.isLoading ? (
-        <Surface>
-          <SurfaceContent className="p-8 flex justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-          </SurfaceContent>
-        </Surface>
+        <LoadingSkeleton label="Caricamento dei post…" count={2} itemClassName="h-40 w-full rounded-2xl" />
+      ) : !feedQuery.data && feedQuery.isError ? (
+        <LoadError onRetry={() => void feedQuery.refetch()} />
       ) : !feedQuery.data || feedQuery.data.length === 0 ? (
-        <Surface>
-          <SurfaceContent className="p-8 text-center">
-            <MessageCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground">Nessun post ancora</p>
-            <p className="text-sm text-muted-foreground mt-2">
-              Sii il primo a condividere qualcosa!
-            </p>
-          </SurfaceContent>
-        </Surface>
+        <div className="surface-panel p-4 text-center">
+          <p className="text-sm font-semibold">Nessun post ancora.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Scrivi il primo post del club.</p>
+        </div>
       ) : (
         <div className="space-y-4">
           {feedQuery.data.map((post: any, index: number) => {
             const isOwnPost = Number(profileQuery.data?.userId ?? 0) === Number(post.user_id);
-            const isActivityPost =
-              Boolean(post.activity_id) ||
-              Number(post.activity_distance_meters ?? 0) > 0 ||
-              Number(post.activity_duration_seconds ?? 0) > 0;
             const mediaUrls = normalizeArrayField(post.media_urls);
             const allMedia = mediaUrls.length > 0
               ? mediaUrls
@@ -501,170 +493,156 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.05 }}
               >
-                <Surface className={isActivityPost ? "overflow-hidden" : undefined}>
-                  {isActivityPost && (
-                    <>
-                      <img
-                        src={assetUrl("/images/theme-v3/landing-tour-poster.png")}
-                        alt=""
-                        aria-hidden="true"
-                        className="pointer-events-none !absolute inset-0 h-full w-full object-cover object-center !z-0 opacity-[0.32] saturate-[0.95] contrast-[1.04]"
-                        loading="lazy"
-                      />
-                      <div className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(104deg,color-mix(in_oklch,var(--background)_86%,transparent)_0%,color-mix(in_oklch,var(--background)_72%,transparent)_46%,color-mix(in_oklch,var(--background)_50%,transparent)_100%)]" />
-                      <div className="pointer-events-none !absolute inset-0 !z-0 bg-[radial-gradient(circle_at_18%_14%,color-mix(in_oklch,var(--electric-cyan)_18%,transparent),transparent_40%),radial-gradient(circle_at_86%_12%,color-mix(in_oklch,var(--electric-lime)_14%,transparent),transparent_44%)]" />
-                      <div className="pointer-events-none !absolute inset-[1px] rounded-[25px] !z-0 border border-white/10" />
-                    </>
-                  )}
-                  <SurfaceContent className="p-6">
-                    <div className="flex items-start gap-3 mb-4">
-                      <Avatar>
-                        <AvatarImage src={post.user_avatar || undefined} />
-                        <AvatarFallback>
-                          {post.user_name?.[0]?.toUpperCase() || "U"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <p className="font-semibold">{post.user_name || "Utente"}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(post.created_at).toLocaleDateString("it-IT")}
-                        </p>
-                      </div>
-                      {isOwnPost ? (
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          className="text-muted-foreground hover:text-destructive"
-                          disabled={deletePostMutation.isPending && deletingPostId === post.id}
-                          onClick={() => {
-                            const confirmed = window.confirm("Eliminare questo post?");
-                            if (!confirmed) return;
-                            setDeletingPostId(post.id);
-                            deletePostMutation.mutate({ postId: post.id });
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      ) : null}
+                <article className="surface-panel p-4">
+                  <div className="mb-3 flex items-center gap-3">
+                    <Avatar className="size-11">
+                      <AvatarImage src={post.user_avatar || undefined} alt="" />
+                      <AvatarFallback className="text-sm font-semibold">
+                        {post.user_name?.[0]?.toUpperCase() || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-[15px] font-semibold">{post.user_name || "Utente"}</p>
+                      <p className="text-sm text-muted-foreground">{formatTimeAgo(post.created_at)}</p>
                     </div>
-                    {post.content && (
-                      <p className="text-sm mb-3 whitespace-pre-wrap">{renderSocialText(post.content)}</p>
-                    )}
-                    {firstLinkForPost ? (
-                      <LinkPreviewCard url={firstLinkForPost} className="mb-3" />
-                    ) : null}
-
-                    {taggedUsersForPost.length > 0 && (
-                      <div className="mb-3 flex flex-wrap gap-2">
-                        {taggedUsersForPost.map((user) => (
-                          <Link
-                            key={user.user_id}
-                            href={`/u/${user.user_id}`}
-                            className="rounded-full border border-border/70 bg-card/40 px-2 py-1 text-xs text-[var(--electric-lime)] hover:bg-card/70"
-                          >
-                            @{user.username || user.name || `u${user.user_id}`}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-
-                    {allMedia.length > 0 && (
-                      <div className={`mb-3 grid gap-1 overflow-hidden rounded-xl ${allMedia.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
-                        {allMedia.map((url, mediaIndex) => (
-                          <div key={`${url}-${mediaIndex}`} className="bg-black/30">
-                            {isVideoUrl(url) ? (
-                              <video
-                                src={url}
-                                className="max-h-[360px] w-full object-cover"
-                                controls
-                                playsInline
-                                preload="metadata"
-                                autoPlay={autoplayVideos}
-                                muted={autoplayVideos}
-                                loop={autoplayVideos}
-                              />
-                            ) : (
-                              <button
-                                type="button"
-                                className="block w-full cursor-zoom-in"
-                                onClick={() => setOpenMediaUrl(url)}
-                              >
-                                <img
-                                  src={url}
-                                  alt="Media del post"
-                                  className="max-h-[360px] w-full object-cover"
-                                  loading="lazy"
-                                />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {!post.content && hashtagsForPost.length > 0 && (
-                      <div className="mb-3 flex flex-wrap gap-1.5">
-                        {hashtagsForPost.map((tag) => (
-                          <span key={tag} className="rounded-full bg-card/40 px-2 py-1 text-[11px] text-[var(--electric-cyan)]">
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-4">
+                    {isOwnPost ? (
                       <Button
                         variant="ghost"
-                        size="sm"
-                        onClick={() => setOpenCommentsId(openCommentsId === post.id ? null : post.id)}
-                      >
-                        <MessageCircle className="mr-1 h-4 w-4" />
-                        {post.comment_count || 0}
-                      </Button>
-                      <PostReactions
-                        postId={post.id}
-                        onReactionChange={() => {
-                          utils.community.clubs.feed.invalidate({ clubId });
+                        size="icon-sm"
+                        aria-label="Elimina post"
+                        className="text-muted-foreground hover:text-danger"
+                        disabled={deletePostMutation.isPending && deletingPostId === post.id}
+                        onClick={() => {
+                          const confirmed = window.confirm("Eliminare questo post?");
+                          if (!confirmed) return;
+                          setDeletingPostId(post.id);
+                          deletePostMutation.mutate({ postId: post.id });
                         }}
-                      />
-                    </div>
+                      >
+                        <Trash2 aria-hidden />
+                      </Button>
+                    ) : null}
+                  </div>
+                  {post.content && (
+                    <p className="mb-3 whitespace-pre-wrap text-[15px]">{renderSocialText(post.content)}</p>
+                  )}
+                  {firstLinkForPost ? (
+                    <LinkPreviewCard url={firstLinkForPost} className="mb-3" />
+                  ) : null}
 
-                    {openCommentsId === post.id && (
-                      <div className="mt-4 pt-4 border-t space-y-3">
-                        {commentsQuery.data?.map((comment: any) => (
-                          <div key={comment.id} className="flex gap-2">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src={comment.user_avatar || undefined} />
-                              <AvatarFallback>
-                                {comment.user_name?.[0]?.toUpperCase() || "U"}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <p className="text-sm font-semibold">{comment.user_name}</p>
-                              <p className="text-sm">{comment.content}</p>
-                            </div>
-                          </div>
-                        ))}
-                        <div className="flex gap-2">
-                          <Textarea
-                            placeholder="Aggiungi un commento..."
-                            value={commentTextByPost[post.id] || ""}
-                            onChange={(e) =>
-                              setCommentTextByPost({ ...commentTextByPost, [post.id]: e.target.value })
-                            }
-                            className="min-h-[60px]"
-                          />
-                          <Button
-                            onClick={() => handleAddComment(post.id)}
-                            disabled={!commentTextByPost[post.id]?.trim()}
-                          >
-                            Invia
-                          </Button>
+                  {taggedUsersForPost.length > 0 && (
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {taggedUsersForPost.map((user) => (
+                        <Link
+                          key={user.user_id}
+                          href={`/u/${user.user_id}`}
+                          className="inline-flex h-7 items-center rounded-full bg-raised px-3 text-xs font-semibold text-action-text hover:bg-raised/70"
+                        >
+                          @{user.username || user.name || `u${user.user_id}`}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+
+                  {allMedia.length > 0 && (
+                    <div className={`mb-3 grid gap-1 overflow-hidden rounded-xl ${allMedia.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                      {allMedia.map((url, mediaIndex) => (
+                        <div key={`${url}-${mediaIndex}`} className="bg-raised">
+                          {isVideoUrl(url) ? (
+                            <video
+                              src={url}
+                              className="max-h-[360px] w-full object-cover"
+                              controls
+                              playsInline
+                              preload="metadata"
+                              autoPlay={autoplayVideos}
+                              muted={autoplayVideos}
+                              loop={autoplayVideos}
+                            />
+                          ) : (
+                            <button
+                              type="button"
+                              className="block w-full cursor-zoom-in"
+                              onClick={() => setOpenMediaUrl(url)}
+                            >
+                              <img
+                                src={url}
+                                alt="Media del post"
+                                className="max-h-[360px] w-full object-cover"
+                                loading="lazy"
+                              />
+                            </button>
+                          )}
                         </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {!post.content && hashtagsForPost.length > 0 && (
+                    <div className="mb-3 flex flex-wrap gap-x-2 gap-y-1">
+                      {hashtagsForPost.map((tag) => (
+                        <span key={tag} className="text-sm font-medium text-action-text">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Commenti: ${post.comment_count || 0}`}
+                      aria-expanded={openCommentsId === post.id}
+                      onClick={() => setOpenCommentsId(openCommentsId === post.id ? null : post.id)}
+                    >
+                      <MessageCircle aria-hidden />
+                      <span className="tabular-nums">{post.comment_count || 0}</span>
+                    </Button>
+                    <PostReactions
+                      postId={post.id}
+                      onReactionChange={() => {
+                        utils.community.clubs.feed.invalidate({ clubId });
+                      }}
+                    />
+                  </div>
+
+                  {openCommentsId === post.id && (
+                    <div className="mt-3 space-y-3 border-t border-border pt-3">
+                      {commentsQuery.data?.map((comment: any) => (
+                        <div key={comment.id} className="flex gap-2">
+                          <Avatar className="size-8">
+                            <AvatarImage src={comment.user_avatar || undefined} alt="" />
+                            <AvatarFallback>
+                              {comment.user_name?.[0]?.toUpperCase() || "U"}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold">{comment.user_name}</p>
+                            <p className="text-sm">{comment.content}</p>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="flex gap-2">
+                        <Textarea
+                          aria-label="Commento"
+                          placeholder="Aggiungi un commento…"
+                          value={commentTextByPost[post.id] || ""}
+                          onChange={(e) =>
+                            setCommentTextByPost({ ...commentTextByPost, [post.id]: e.target.value })
+                          }
+                          className="min-h-[60px]"
+                        />
+                        <Button
+                          onClick={() => handleAddComment(post.id)}
+                          disabled={!commentTextByPost[post.id]?.trim()}
+                        >
+                          Invia
+                        </Button>
                       </div>
-                    )}
-                  </SurfaceContent>
-                </Surface>
+                    </div>
+                  )}
+                </article>
               </motion.div>
             );
           })}
@@ -672,14 +650,14 @@ export default function ClubFeedTab({ clubId, isMember, afterComposerSlot }: Clu
       )}
 
       <Dialog open={Boolean(openMediaUrl)} onOpenChange={(open) => !open && setOpenMediaUrl(null)}>
-        <DialogContent className="max-w-5xl border-border/80 bg-background/95 p-2">
+        <DialogContent className="max-w-5xl border-border bg-background p-2">
           <DialogTitle className="sr-only">Anteprima immagine</DialogTitle>
           <DialogDescription className="sr-only">Visualizzazione dell'immagine del post.</DialogDescription>
           {openMediaUrl ? (
             <img
               src={openMediaUrl}
               alt="Anteprima immagine del post club"
-              className="max-h-[82vh] w-full rounded-lg object-contain"
+              className="max-h-[82vh] w-full rounded-xl object-contain"
             />
           ) : null}
         </DialogContent>

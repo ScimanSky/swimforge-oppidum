@@ -9,185 +9,13 @@ import { trpc } from "@/lib/trpc";
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
 import { toast } from "sonner";
 import { ArrowLeft, Upload, Plus, Trash2, MessageCircle, Printer } from "lucide-react";
-
-function formatDate(value?: string | Date | null) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString("it-IT", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatTimeCs(value?: number | null) {
-  if (!Number.isFinite(value ?? null)) return "-";
-  const cs = Number(value);
-  const minutes = Math.floor(cs / 6000);
-  const seconds = Math.floor((cs % 6000) / 100);
-  const centis = cs % 100;
-  return `${minutes}:${String(seconds).padStart(2, "0")}.${String(centis).padStart(2, "0")}`;
-}
-
-function escapeHtml(value: unknown) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
-function buildMeetEntriesPrintHtml({
-  meet,
-  events,
-  groupedEntries,
-}: {
-  meet: any;
-  events: any[];
-  groupedEntries: Map<number, any[]>;
-}) {
-  const activeStatuses = new Set(["pending", "confirmed", "waitlist"]);
-  const sections = events
-    .map((event) => {
-      const rows = (groupedEntries.get(Number(event.id)) ?? [])
-        .filter((row: any) => activeStatuses.has(String(row?.entry?.status ?? "")))
-        .sort((a: any, b: any) => {
-          const aName = String(a?.user?.name || a?.user?.username || a?.user?.email || "").toLowerCase();
-          const bName = String(b?.user?.name || b?.user?.username || b?.user?.email || "").toLowerCase();
-          return aName.localeCompare(bName, "it");
-        });
-
-      if (rows.length === 0) return "";
-
-      const body = rows
-        .map((row: any, index: number) => {
-          const athlete = row?.user?.name || row?.user?.username || row?.user?.email || "Atleta";
-          const status = String(row?.entry?.status ?? "-");
-          const seed = Number.isFinite(Number(row?.entry?.seedTimeCs))
-            ? formatTimeCs(Number(row.entry.seedTimeCs))
-            : "-";
-          return `
-            <tr>
-              <td>${index + 1}</td>
-              <td>${escapeHtml(athlete)}</td>
-              <td>${escapeHtml(status)}</td>
-              <td>${escapeHtml(seed)}</td>
-            </tr>
-          `;
-        })
-        .join("");
-
-      const eventMeta = `${event.distanceMeters ? `${event.distanceMeters}m` : "distanza n/d"} ${event.stroke ?? ""}`.trim();
-
-      return `
-        <section class="event-section">
-          <h3>${escapeHtml(event.label)} <span class="meta">(${escapeHtml(eventMeta)})</span></h3>
-          <p class="meta">Iscritti attivi: ${rows.length}</p>
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Atleta</th>
-                <th>Stato</th>
-                <th>Seed time</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${body}
-            </tbody>
-          </table>
-        </section>
-      `;
-    })
-    .filter(Boolean)
-    .join("");
-
-  return `
-    <!doctype html>
-    <html lang="it">
-      <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Lista iscritti - ${escapeHtml(meet?.name ?? "Meeting")}</title>
-        <style>
-          :root { color-scheme: light; }
-          * { box-sizing: border-box; }
-          body {
-            margin: 20px;
-            font-family: Arial, sans-serif;
-            color: #0f172a;
-            line-height: 1.35;
-          }
-          h1, h2, h3 { margin: 0; }
-          .header { margin-bottom: 18px; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }
-          .header h1 { font-size: 22px; margin-bottom: 4px; }
-          .meta { color: #475569; font-size: 12px; }
-          .event-section { margin-bottom: 18px; page-break-inside: avoid; }
-          .event-section h3 { font-size: 16px; margin-bottom: 6px; }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 8px;
-          }
-          th, td {
-            border: 1px solid #cbd5e1;
-            padding: 6px 8px;
-            text-align: left;
-            font-size: 12px;
-          }
-          th { background: #e2e8f0; font-weight: 700; }
-          tbody tr:nth-child(even) { background: #f8fafc; }
-          .footer {
-            margin-top: 16px;
-            border-top: 1px solid #e2e8f0;
-            padding-top: 8px;
-            font-size: 11px;
-            color: #64748b;
-          }
-          @media print {
-            body { margin: 12mm; }
-            .event-section { page-break-inside: avoid; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>Lista iscritti gare</h1>
-          <h2>${escapeHtml(meet?.name ?? "Meeting")}</h2>
-          <p class="meta">${escapeHtml(meet?.venue ?? "Impianto n/d")} • ${escapeHtml(formatDate(meet?.startDate))} - ${escapeHtml(formatDate(meet?.endDate))}</p>
-          <p class="meta">Generato il ${escapeHtml(formatDate(new Date()))}</p>
-        </div>
-        ${sections || "<p>Nessun iscritto attivo da stampare.</p>"}
-        <div class="footer">SwimForge Club Suite</div>
-      </body>
-    </html>
-  `;
-}
-
-function injectAutoPrintScript(html: string) {
-  const script = `<script>(function(){const run=function(){setTimeout(function(){try{window.focus();window.print();}catch(_err){}},260);};if(document.readyState==="complete"){run();}else{window.addEventListener("load",run,{once:true});}window.addEventListener("afterprint",function(){setTimeout(function(){try{window.close();}catch(_err){}},120);});})();</script>`;
-  return html.includes("</body>") ? html.replace("</body>", `${script}</body>`) : `${html}${script}`;
-}
-
-function openPrintTab(html: string) {
-  try {
-    const blob = new Blob([injectAutoPrintScript(html)], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const popup = window.open(url, "_blank");
-    if (popup) {
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      return true;
-    }
-    URL.revokeObjectURL(url);
-    return false;
-  } catch {
-    return false;
-  }
-}
+import {
+  buildMeetEntriesPrintHtml,
+  formatPrintDate as formatDate,
+  formatTimeCs,
+  openPrintTab,
+  printInHiddenFrame,
+} from "@/lib/club-print";
 
 type ManualResultRow = {
   meetEventId?: number;
@@ -393,65 +221,7 @@ export default function ClubMeetDetail() {
 
     const html = buildMeetEntriesPrintHtml({ meet, events, groupedEntries });
     if (openPrintTab(html)) return;
-
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.left = "-9999px";
-    iframe.style.top = "0";
-    iframe.style.width = "794px";
-    iframe.style.height = "1123px";
-    iframe.style.border = "0";
-    iframe.style.opacity = "0";
-    iframe.setAttribute("aria-hidden", "true");
-    document.body.appendChild(iframe);
-
-    const frameWindow = iframe.contentWindow;
-    const frameDocument = frameWindow?.document;
-    if (!frameWindow || !frameDocument) {
-      document.body.removeChild(iframe);
-      toast.error("Stampa non disponibile su questo browser");
-      return;
-    }
-
-    const cleanup = () => {
-      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-    };
-
-    iframe.onload = () => {
-      frameWindow.onafterprint = cleanup;
-      setTimeout(() => {
-        try {
-          frameWindow.focus();
-          frameWindow.print();
-        } catch {
-          cleanup();
-          toast.error("Stampa non disponibile su questo browser");
-        }
-      }, 350);
-    };
-
-    try {
-      iframe.srcdoc = html;
-    } catch {
-      try {
-        frameDocument.open();
-        frameDocument.write(html);
-        frameDocument.close();
-        frameWindow.onafterprint = cleanup;
-        setTimeout(() => {
-          try {
-            frameWindow.focus();
-            frameWindow.print();
-          } catch {
-            cleanup();
-            toast.error("Stampa non disponibile su questo browser");
-          }
-        }, 500);
-      } catch {
-        cleanup();
-        toast.error("Stampa non disponibile su questo browser");
-      }
-    }
+    printInHiddenFrame(html, () => toast.error("Stampa non disponibile su questo browser"));
   };
 
   if (!match || !Number.isFinite(meetId) || !Number.isFinite(clubId)) {
@@ -498,7 +268,7 @@ export default function ClubMeetDetail() {
             <Link href={`/community/club/${clubId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-4 w-4" /> Torna al club
             </Link>
-            <h1 className="mt-1 text-2xl font-display font-bold">{meet.name}</h1>
+            <h2 className="mt-1 text-2xl font-display font-bold">{meet.name}</h2>
             <p className="text-sm text-muted-foreground">
               {meet.venue ? `${meet.venue} • ` : ""}
               {formatDate(meet.startDate)} - {formatDate(meet.endDate)}
@@ -506,7 +276,7 @@ export default function ClubMeetDetail() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">{meet.status}</Badge>
-            <Button variant="outline-neon" size="sm" onClick={() => setMyEntriesOpen(true)}>
+            <Button variant="outline" size="sm" onClick={() => setMyEntriesOpen(true)}>
               Le mie gare
             </Button>
           </div>
@@ -514,10 +284,10 @@ export default function ClubMeetDetail() {
 
         {isStaff ? (
           <section className="surface-panel p-3 space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Controlli staff</h2>
+            <h2 className="text-sm font-semibold text-muted-foreground">Controlli staff</h2>
             <div className="flex flex-wrap gap-2">
               <Button
-                variant="outline-neon"
+                variant="outline"
                 size="sm"
                 onClick={() => publishMutation.mutate({ meetId })}
                 disabled={!canPublish || statusMutationPending}
@@ -525,7 +295,7 @@ export default function ClubMeetDetail() {
                 Pubblica
               </Button>
               <Button
-                variant="outline-neon"
+                variant="outline"
                 size="sm"
                 onClick={() => openEntriesMutation.mutate({ meetId })}
                 disabled={!canOpenEntries || statusMutationPending}
@@ -533,7 +303,7 @@ export default function ClubMeetDetail() {
                 Apri iscrizioni
               </Button>
               <Button
-                variant="outline-neon"
+                variant="outline"
                 size="sm"
                 onClick={() => closeEntriesMutation.mutate({ meetId })}
                 disabled={!canCloseEntries || statusMutationPending}
@@ -541,7 +311,7 @@ export default function ClubMeetDetail() {
                 Chiudi iscrizioni
               </Button>
               <Button
-                variant="outline-neon"
+                variant="outline"
                 size="sm"
                 onClick={handlePrintEntries}
               >
@@ -560,7 +330,7 @@ export default function ClubMeetDetail() {
                 {deleteMeetMutation.isPending ? "Cancellazione..." : "Cancella convocazione"}
               </Button>
               <Button
-                variant="outline-neon"
+                variant="outline"
                 size="sm"
                 onClick={async () => {
                   const res = await waAllQuery.refetch();
@@ -571,7 +341,7 @@ export default function ClubMeetDetail() {
                 <MessageCircle className="mr-1 h-4 w-4" /> WhatsApp (tutti)
               </Button>
               <Button
-                variant="outline-neon"
+                variant="outline"
                 size="sm"
                 onClick={async () => {
                   const res = await waEnteredQuery.refetch();
@@ -582,7 +352,7 @@ export default function ClubMeetDetail() {
                 WhatsApp (iscritti)
               </Button>
               <Button
-                variant="outline-neon"
+                variant="outline"
                 size="sm"
                 onClick={async () => {
                   const res = await waStaffQuery.refetch();
@@ -598,10 +368,10 @@ export default function ClubMeetDetail() {
 
         <section className="surface-panel p-3 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Programma gare</h2>
+            <h2 className="text-sm font-semibold text-muted-foreground">Programma gare</h2>
             {isStaff ? (
               <Link href={`/community/club/${clubId}/meet/${meetId}/program`}>
-                <Button variant="outline-neon" size="sm">
+                <Button variant="outline" size="sm">
                   Modifica programma
                 </Button>
               </Link>
@@ -629,7 +399,7 @@ export default function ClubMeetDetail() {
                         {meet.status === "open" ? (
                           myEntry?.entry?.status === "pending" || myEntry?.entry?.status === "confirmed" ? (
                             <Button
-                              variant="outline-neon"
+                              variant="outline"
                               size="sm"
                               onClick={() => selfSetEntryMutation.mutate({ meetEventId: event.id, status: "withdrawn" })}
                             >
@@ -637,7 +407,7 @@ export default function ClubMeetDetail() {
                             </Button>
                           ) : (
                             <Button
-                              variant="neon"
+                              variant="default"
                               size="sm"
                               onClick={() => selfSetEntryMutation.mutate({ meetEventId: event.id, status: "pending" })}
                             >
@@ -687,11 +457,11 @@ export default function ClubMeetDetail() {
 
         {isStaff ? (
           <section className="surface-panel p-3 space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Import risultati</h2>
+            <h2 className="text-sm font-semibold text-muted-foreground">Import risultati</h2>
             <div className="flex flex-wrap items-center gap-2">
               <Input type="file" accept=".csv,text/csv" onChange={(e) => setCsvFile(e.target.files?.[0] ?? null)} />
               <Button
-                variant="outline-neon"
+                variant="outline"
                 size="sm"
                 disabled={!csvFile || importCsvMutation.isPending}
                 onClick={async () => {
@@ -769,11 +539,11 @@ export default function ClubMeetDetail() {
                 </div>
               ))}
               <div className="flex gap-2">
-                <Button variant="outline-neon" size="sm" onClick={() => setManualRows((prev) => [...prev, {}])}>
+                <Button variant="outline" size="sm" onClick={() => setManualRows((prev) => [...prev, {}])}>
                   <Plus className="mr-1 h-4 w-4" /> Riga
                 </Button>
                 <Button
-                  variant="neon"
+                  variant="default"
                   size="sm"
                   disabled={manualRows.length === 0 || importManualMutation.isPending}
                   onClick={() => importManualMutation.mutate({ meetId, rows: manualRows as any })}
@@ -786,7 +556,7 @@ export default function ClubMeetDetail() {
         ) : null}
 
         <section className="surface-panel p-3 space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Classifica meeting</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground">Classifica meeting</h2>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-xl border border-border/60 bg-card/35 p-3">
               <p className="text-xs text-muted-foreground">Eventi</p>
@@ -830,7 +600,7 @@ export default function ClubMeetDetail() {
         </section>
 
         <section className="surface-panel p-3 space-y-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Risultati gara</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground">Risultati gara</h2>
           {resultsQuery.isLoading ? (
             <p className="text-sm text-muted-foreground">Caricamento risultati...</p>
           ) : (

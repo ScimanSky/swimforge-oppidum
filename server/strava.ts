@@ -16,12 +16,14 @@
  * - Step 3: Auto-sync activities on login (every 6h)
  */
 
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { getDb } from "./db";
 import { stravaTokens, swimmingActivities, swimmerProfiles, xpTransactions } from "../drizzle/schema";
 import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
 import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
 import { invalidateUserCache } from "./lib/cache";
+import { invalidateSwimMetrics } from "./swim_metrics";
 import { calculateActivityXp } from "./lib/utils";
 import { logger } from "./middleware/logger";
 import { config } from "./config";
@@ -70,7 +72,7 @@ type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>;
 
 async function requireDb(): Promise<DbClient> {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
   return db;
 }
 
@@ -661,8 +663,9 @@ export async function syncStravaActivities(
       // Auto-update challenge progress for active challenges
       await updateActiveChallengesProgress(userId);
 
-      // Invalidate cached data for this user
+      // Invalidate cached data for this user (and the Coach page insights).
       await invalidateUserCache(String(userId));
+      await invalidateSwimMetrics(userId);
 
       try {
         const { trackProductEvent } = await import("./product_analytics");

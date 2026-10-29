@@ -3,6 +3,7 @@
  * Generates personalized swimming workouts (pool and dryland) using Google Gemini AI
  */
 
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getDb } from "./db";
 import { aiCoachWorkouts, swimmerProfiles, swimmingActivities } from "../drizzle/schema";
@@ -10,47 +11,29 @@ import { eq, and, gt, gte, desc, sql } from "drizzle-orm";
 import { logger } from "./middleware/logger";
 import { ENV } from "./_core/env";
 import { withErrorHandling } from "./lib/withErrorHandling";
+import { AppError } from "./lib/errors";
 import { config } from "./config";
+import { getSwimMetrics } from "./swim_metrics";
 import {
-  calculateSEI,
-  calculateTCI,
-  calculateSER,
-  calculateACS,
-  calculateRRS
-} from "./advanced_metrics";
+  SWIM_METRICS_COACH_RULES,
+  paceZoneCoachRules,
+  swimMetricsForCoach,
+  swimMetricsGlossary,
+  zonePaceOrPlaceholder,
+} from "./swim_metrics/coach-context";
+import { finalizePoolWorkout, generateZonedPoolWorkout, parseWorkoutJson, safeWorkout } from "./ai_coach_zones";
+import { minRestSeconds, poolHistoryOf, totalCapMeters, type PoolHistory, type SafetyContext } from "./ai_coach_safety";
+import type { SwimZones } from "@shared/swimMetrics";
+import { formatRestSeconds, formatSendoff, type CoachWorkout } from "@shared/coachWorkout";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const GEMINI_MODEL = ENV.geminiTextModel;
 const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
-interface WorkoutSection {
-  title: string;
-  exercises: WorkoutExercise[];
-  notes?: string;
-}
+/** A generated workout (shared with the client): pool reps carry a pace zone A1–C3. */
+export type GeneratedWorkout = CoachWorkout;
 
-interface WorkoutExercise {
-  name: string;
-  sets?: string;
-  reps?: string;
-  distance?: string;
-  duration?: string;
-  rest?: string;
-  intensity?: string;
-  notes?: string;
-}
-
-export interface GeneratedWorkout {
-  type: "pool" | "dryland";
-  title: string;
-  description: string;
-  duration: string;
-  difficulty: string;
-  sections: WorkoutSection[];
-  coachNotes: string[];
-}
-
-type UserStatsForCoach = {
+export type UserStatsForCoach = {
   profile: {
     aiSkillLabel: string | null;
     level: number;
@@ -66,14 +49,14 @@ type UserStatsForCoach = {
     avgSwolf: string;
     sessionsPerWeek: string;
   };
-  advancedMetrics: {
-    sei: number;
-    tci: number;
-    ser: number;
-    acs: number;
-    rrs: number;
-    poi: number;
-  };
+  /** The swim metrics block and glossary (coach-context), or a line saying they are missing. */
+  swimMetricsText: string;
+  /** The athlete's zones A1–C3 in effect: the server checks the reps and adds the paces. */
+  paceZones: SwimZones | null;
+  /** The last pool swims: the median distance caps the total, the usual pool length shapes C3. */
+  poolHistory: PoolHistory | null;
+  /** Average pace of the recent swims (s/100 m): rep times for the rests when there are no zones. */
+  referencePace: number | null;
   hrZones: {
     hasData: boolean;
     activitiesWithHR: number;
@@ -142,21 +125,21 @@ function buildDefaultWorkout(workoutType: "pool" | "dryland"): GeneratedWorkout 
       {
         title: "Riscaldamento",
         exercises: [
-          { name: "200m stile facile", distance: "200m", rest: "20s" },
-          { name: "4x50m tecnica (catch-up / sculling)", distance: "4x50m", rest: "20s" },
+          { name: "200m stile facile", distance: "200m", rest: "20s", zone: "A1", stroke: "stile libero" },
+          { name: "4x50m tecnica (catch-up / sculling)", distance: "4x50m", rest: "20s", zone: "A1", stroke: "tecnica" },
         ],
       },
       {
         title: "Serie Principale",
         exercises: [
-          { name: "6x100m a ritmo controllato", distance: "6x100m", rest: "20-30s", intensity: "RPE 6-7" },
-          { name: "4x50m forte", distance: "4x50m", rest: "30-40s", intensity: "RPE 8" },
+          { name: "6x100m a ritmo controllato", distance: "6x100m", rest: "20-30s", intensity: "RPE 5", zone: "B1", stroke: "stile libero" },
+          { name: "4x50m forte", distance: "4x50m", rest: "1′30″", intensity: "RPE 8-9", zone: "C2", stroke: "stile libero" },
         ],
       },
       {
         title: "Defaticamento",
         exercises: [
-          { name: "200m facile", distance: "200m", rest: "0-20s" },
+          { name: "200m facile", distance: "200m", rest: "0-20s", zone: "A1", stroke: "stile libero" },
         ],
       },
     ],
@@ -213,7 +196,7 @@ export interface WorkoutsResponse {
 async function getUserSwimmingActivityCount(userId: number): Promise<number> {
   const db = await getDb();
   if (!db) {
-    throw new Error("Database not available");
+    throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
 
   const result = await db
@@ -232,7 +215,7 @@ async function getUserSwimmingActivityCount(userId: number): Promise<number> {
 export async function getExistingWorkouts(userId: number): Promise<WorkoutsResponse> {
   const db = await getDb();
   if (!db) {
-    throw new Error("Database not available");
+    throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
   const activityCount = await getUserSwimmingActivityCount(userId);
   const hasMinimumActivities = activityCount >= MIN_SWIMMING_ACTIVITIES_FOR_GENERATION;
@@ -280,17 +263,33 @@ export async function getExistingWorkouts(userId: number): Promise<WorkoutsRespo
   };
 }
 
+const ROME_DAY_MONTH = new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", day: "numeric", month: "long" });
+const ROME_TIME = new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+/**
+ * «Potrai generare nuovi allenamenti dal 5 novembre alle 18:30.» (Rome time): the end of the
+ * cooldown, shown as the toast of «Genera». «dall'8», «dall'11», «dal 1°».
+ */
+export function workoutCooldownMessage(end: Date): string {
+  const [day, ...month] = ROME_DAY_MONTH.format(end).split(" ");
+  const from = day === "1" ? "dal 1°" : day === "8" || day === "11" ? `dall'${day}` : `dal ${day}`;
+  return `Potrai generare nuovi allenamenti ${from} ${month.join(" ")} alle ${ROME_TIME.format(end)}.`;
+}
+
 /**
  * Generate both pool + dryland workouts (7-day cooldown)
  */
 export async function generateBothWorkouts(userId: number): Promise<WorkoutsResponse> {
   const db = await getDb();
   if (!db) {
-    throw new Error("Database not available");
+    throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
   const activityCount = await getUserSwimmingActivityCount(userId);
   if (activityCount < MIN_SWIMMING_ACTIVITIES_FOR_GENERATION) {
-    throw new Error(`Servono almeno ${MIN_SWIMMING_ACTIVITIES_FOR_GENERATION} attività di nuoto sincronizzate per generare i workout AI.`);
+    throw new AppError(
+      `Servono almeno ${MIN_SWIMMING_ACTIVITIES_FOR_GENERATION} attività di nuoto sincronizzate per generare i workout AI.`,
+      "PRECONDITION_FAILED",
+    );
   }
 
   // Check cooldown: find the most recent generation
@@ -304,7 +303,7 @@ export async function generateBothWorkouts(userId: number): Promise<WorkoutsResp
   if (latest.length > 0) {
     const cooldownEnd = new Date(latest[0].generatedAt.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
     if (cooldownEnd > new Date()) {
-      throw new Error(`Workout generation is on cooldown until ${cooldownEnd.toISOString()}`);
+      throw new AppError(workoutCooldownMessage(cooldownEnd), "PRECONDITION_FAILED");
     }
   }
 
@@ -405,7 +404,10 @@ async function generateWorkout(
 ): Promise<GeneratedWorkout> {
   const context = `ai_coach:generateWorkout user=${userId} type=${workoutType}`;
   const fallback =
-    (await getLatestCachedWorkout(userId, workoutType)) ?? buildDefaultWorkout(workoutType);
+    (await getLatestCachedWorkout(userId, workoutType)) ??
+    (workoutType === "pool"
+      ? safeWorkout(finalizePoolWorkout(buildDefaultWorkout("pool"), null).workout, { zones: null, history: null })
+      : buildDefaultWorkout(workoutType));
 
   return withErrorHandling(
     async () => {
@@ -421,29 +423,24 @@ async function generateWorkout(
 
       const userStats = await fetchUserStats(userId);
 
-      const prompt =
+      // Pool reps are checked against the athlete's zones (maximum rep, zone codes) and the
+      // safety limits, fixed or asked again once (then trimmed), and completed with level,
+      // target pace and the total.
+      const safety: SafetyContext = {
+        zones: userStats.paceZones,
+        history: userStats.poolHistory,
+        referencePace: userStats.referencePace,
+      };
+      const workout =
         workoutType === "pool"
-          ? buildPoolWorkoutPrompt(userStats)
-          : buildDrylandWorkoutPrompt(userStats);
-
-      // Call Gemini API with timeout
-      const result = (await Promise.race([
-        model.generateContent(prompt),
-        new Promise((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(`Gemini API timeout after ${config.GEMINI_API_TIMEOUT_MS}ms`)
-              ),
-            config.GEMINI_API_TIMEOUT_MS
-          )
-        ),
-      ])) as any;
-
-      const response = result.response;
-      const text = response.text();
-
-      const workout = parseWorkoutResponse(text, workoutType);
+          ? await generateZonedPoolWorkout({
+              prompt: buildPoolWorkoutPrompt(userStats),
+              generate: generateText,
+              zones: userStats.paceZones,
+              fallback: createFallbackWorkout("pool"),
+              safety,
+            })
+          : parseWorkoutResponse(await generateText(buildDrylandWorkoutPrompt(userStats)), workoutType);
 
       logger.info(`[AI Coach] Workout generated successfully for user ${userId}`, {
         event: "ai_coach:generate_success",
@@ -459,13 +456,32 @@ async function generateWorkout(
   );
 }
 
+/** One Gemini answer, with the configured timeout. */
+async function generateText(prompt: string): Promise<string> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = (await Promise.race([
+      model.generateContent(prompt),
+      new Promise((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`Gemini API timeout after ${config.GEMINI_API_TIMEOUT_MS}ms`)),
+          config.GEMINI_API_TIMEOUT_MS
+        );
+      }),
+    ])) as any;
+    return result.response.text();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Fetch comprehensive user statistics for workout generation
  */
 async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
   const db = await getDb();
   if (!db) {
-    throw new Error("Database not available");
+    throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
 
   // Get swimmer profile
@@ -485,17 +501,30 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const recentActivities = await db
-    .select()
-    .from(swimmingActivities)
-    .where(
-      and(
-        eq(swimmingActivities.userId, userId),
-        gte(swimmingActivities.activityDate, thirtyDaysAgo)
+  const [recentActivities, lastPoolSwims] = await Promise.all([
+    db
+      .select()
+      .from(swimmingActivities)
+      .where(
+        and(
+          eq(swimmingActivities.userId, userId),
+          gte(swimmingActivities.activityDate, thirtyDaysAgo)
+        )
       )
-    )
-    .orderBy(desc(swimmingActivities.activityDate))
-    .limit(20);
+      .orderBy(desc(swimmingActivities.activityDate))
+      .limit(20),
+    // The last pool swims, whatever their age: their median caps the workout's total.
+    db
+      .select({
+        distanceMeters: swimmingActivities.distanceMeters,
+        isOpenWater: swimmingActivities.isOpenWater,
+        poolLengthMeters: swimmingActivities.poolLengthMeters,
+      })
+      .from(swimmingActivities)
+      .where(and(eq(swimmingActivities.userId, userId), eq(swimmingActivities.isOpenWater, false)))
+      .orderBy(desc(swimmingActivities.activityDate))
+      .limit(10),
+  ]);
 
   // Calculate aggregate metrics
   const totalDistance = recentActivities.reduce(
@@ -517,43 +546,11 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
     recentActivities.reduce((sum, a) => sum + (a.avgSwolf || 0), 0) /
     (recentActivities.length || 1);
 
-  // Calculate advanced metrics using same functions as Statistics
-  // SEI: Average across all activities
-  const seiScores = recentActivities
-    .map(a => calculateSEI(a))
-    .filter((s): s is number => s !== null);
-  const avgSEI = seiScores.length > 0
-    ? Math.round(seiScores.reduce((sum, s) => sum + s, 0) / seiScores.length)
-    : 0;
-
-  // TCI: Consistency across activities
-  const avgTCI = calculateTCI(recentActivities) || 0;
-
-  // SER: Average across all activities
-  const serScores = recentActivities
-    .map(a => calculateSER(a))
-    .filter((s): s is number => s !== null);
-  const avgSER = serScores.length > 0
-    ? Math.round(serScores.reduce((sum, s) => sum + s, 0) / serScores.length)
-    : 0;
-
-  // ACS: Average across all activities
-  const acsScores = recentActivities
-    .map(a => calculateACS(a))
-    .filter((s): s is number => s !== null);
-  const avgACS = acsScores.length > 0
-    ? Math.round(acsScores.reduce((sum, s) => sum + s, 0) / acsScores.length)
-    : 0;
-
-  // RRS: based on time since last workout (resting HR baseline not available in this context)
-  const lastWorkoutAt = recentActivities[0]?.activityDate ?? null;
-  const hoursSinceLastWorkout = lastWorkoutAt
-    ? (Date.now() - lastWorkoutAt.getTime()) / (1000 * 60 * 60)
-    : 999;
-  const avgRRS = calculateRRS(null, 60, hoursSinceLastWorkout) ?? 0;
-
-  // POI: Simplified (would need previous period for proper calculation)
-  const avgPOI = 0;
+  // The swim metrics shared with Statistics and the coach chat.
+  const swimMetrics = await getSwimMetrics(userId).catch(() => null);
+  const swimMetricsText = swimMetrics
+    ? `${swimMetricsForCoach(swimMetrics)}\n\n${swimMetricsGlossary()}`
+    : "Metriche di nuoto non disponibili in questo momento.";
 
   // HR zones analysis - only from activities with HR data (using hrZoneXSeconds)
   const activitiesWithHR = recentActivities.filter(a =>
@@ -596,14 +593,10 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
       avgSwolf: avgSwolf.toFixed(1),
       sessionsPerWeek: sessionsPerWeek.toFixed(1),
     },
-    advancedMetrics: {
-      sei: avgSEI,
-      tci: avgTCI,
-      ser: avgSER,
-      acs: avgACS,
-      rrs: avgRRS,
-      poi: avgPOI,
-    },
+    swimMetricsText,
+    paceZones: swimMetrics?.zones ?? null,
+    poolHistory: poolHistoryOf(lastPoolSwims),
+    referencePace: avgPace > 0 ? avgPace : null,
     hrZones: {
       hasData: hasHRData,
       activitiesWithHR: activitiesWithHR.length,
@@ -626,9 +619,42 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
 }
 
 /**
+ * The volume the workout should aim at: near the athlete's usual pool swims and never over the
+ * safety cap, split in phases as shares (a fixed 2-4 km would be too much for many swimmers).
+ */
+function volumeGuide(userStats: UserStatsForCoach): string {
+  const history = userStats.poolHistory;
+  const cap = totalCapMeters(history);
+  if (!history?.medianMeters || cap === null) {
+    return "   - Totale: adatto alle nuotate recenti dell'atleta (vedi la distanza media); senza storico in vasca resta prudente.";
+  }
+  return `   - Totale: vicino alle nuotate abituali in vasca (mediana delle ultime ${history.swims}: ${history.medianMeters} m), mai oltre ${cap} m.`;
+}
+
+/**
  * Build prompt for pool workout generation
  */
-function buildPoolWorkoutPrompt(userStats: UserStatsForCoach): string {
+export function buildPoolWorkoutPrompt(userStats: UserStatsForCoach): string {
+  const zones = userStats.paceZones;
+  const history = userStats.poolHistory;
+  const pool = history?.usualPoolLengthMeters ?? null;
+  const longPool = pool !== null && pool >= 45;
+  const b2 = zones?.source ? zones.ranges.find((range) => range.code === "B2") : undefined;
+  // The example send-off for 6×100 B2: the slow end of B2 plus about 20 s, from the athlete's own zones.
+  const b2Sendoff = b2?.slowPace ? formatSendoff(Math.ceil((b2.slowPace + 20) / 5) * 5) : "a m:ss";
+  const sprintMeters = longPool ? 50 : 25;
+  const sprintRest = formatRestSeconds(
+    minRestSeconds("C3", { name: "", repMeters: sprintMeters, sprintMeters: longPool ? 25 : undefined }, {
+      zones,
+      history,
+      referencePace: userStats.referencePace,
+    }) ?? 90,
+  );
+  const sprintName = longPool ? "8x50 (25 m sprint + 25 m facile)" : "8x25 sprint";
+  const averageDistance =
+    userStats.recent.activitiesCount > 0
+      ? `${(userStats.recent.totalDistance / userStats.recent.activitiesCount).toFixed(0)}m per sessione`
+      : "n/d";
   return `Sei un ALLENATORE OLIMPICO DI NUOTO con 20+ anni di esperienza nell'allenamento di atleti di livello mondiale. Genera un allenamento personalizzato IN VASCA completo e vario per un nuotatore basato sulle sue statistiche.
 
 **STATISTICHE NUOTATORE:**
@@ -637,17 +663,22 @@ function buildPoolWorkoutPrompt(userStats: UserStatsForCoach): string {
 - Sessioni totali: ${userStats.profile.totalSessions}
 - Distanza totale: ${(userStats.profile.totalDistanceMeters / 1000).toFixed(1)} km
 - Ultimi 30 giorni: ${userStats.recent.activitiesCount} sessioni (${userStats.recent.sessionsPerWeek} a settimana)
-- Distanza media: ${(userStats.recent.totalDistance / userStats.recent.activitiesCount).toFixed(0)}m per sessione
+- Distanza media: ${averageDistance}
 - Passo medio: ${userStats.recent.avgPace} sec/100m
 - SWOLF medio: ${userStats.recent.avgSwolf}
+- Vasca abituale: ${pool === null ? "non indicata" : `${pool} m`}
 
-**METRICHE AVANZATE:**
-- SEI (Stroke Efficiency Index): ${userStats.advancedMetrics.sei} - Efficienza bracciata
-- TCI (Technical Consistency Index): ${userStats.advancedMetrics.tci} - Consistenza tecnica
-- SER (Stroke Efficiency Ratio): ${userStats.advancedMetrics.ser} - Rapporto efficienza
-- ACS (Aerobic Capacity Score): ${userStats.advancedMetrics.acs} - Capacità aerobica
-- RRS (Recovery Readiness Score): ${userStats.advancedMetrics.rrs} - Prontezza al recupero
-- POI (Performance Optimization Index): ${userStats.advancedMetrics.poi} - Ottimizzazione performance
+**METRICHE DI NUOTO:**
+${userStats.swimMetricsText}
+
+**USO DELLE METRICHE:**
+${SWIM_METRICS_COACH_RULES}
+
+**ZONE DI PASSO A1–C3 E LIMITI DI SICUREZZA (OBBLIGATORIO):**
+${paceZoneCoachRules(zones, history)}
+- in "zone" metti solo il codice (A1, A2, B1, B2, C1, C2, C3) e in "intensity" il livello della zona; il server controlla la ripetuta massima e i limiti di sicurezza e aggiunge il passo dalle zone dell'atleta;
+- "name", "sets", "distance", "repeats" e "repMeters" dicono le stesse ripetute e gli stessi metri;
+- nelle "notes" di ogni serie con una zona, o nei "coachNotes", spiega ogni zona usata in una riga: sensazione, passo e a cosa serve.
 
 **ZONE FREQUENZA CARDIACA:**
 ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
@@ -660,10 +691,11 @@ ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
 **ISTRUZIONI FONDAMENTALI:**
 
 1. **STRUTTURA ALLENAMENTO** (4 fasi obbligatorie):
-   - **Riscaldamento** (400-600m): Nuoto facile, mobilità articolare
-   - **Attivazione** (200-400m): Esercizi tecnici, drill, progressivi
-   - **Allenamento Principale** (1500-2500m): Serie intensive con obiettivi specifici
-   - **Defaticamento** (200-400m): Nuoto lento, stretching in acqua
+${volumeGuide(userStats)}
+   - **Riscaldamento** (circa il 20% del totale, almeno 200 m in A1): Nuoto facile, mobilità articolare
+   - **Attivazione** (circa il 15%): Esercizi tecnici, drill, progressivi
+   - **Allenamento Principale** (circa il 50%): Serie con obiettivi specifici, entro i limiti di sicurezza
+   - **Defaticamento** (circa il 15%): Nuoto lento, stretching in acqua
 
 2. **VARIETÀ DI STILI** (OBBLIGATORIO):
    - Includi ALMENO 3 stili diversi nell'allenamento: Stile Libero, Dorso, Rana, Farfalla
@@ -672,14 +704,14 @@ ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
    - Focus principale su Stile Libero, ma integra altri stili per completezza
 
 3. **ANALISI METRICHE**:
-   - Se SEI, TCI, SER sono 0 o bassi: NON menzionare negativamente, concentrati su tecnica base e costruzione fondamentali
-   - Se metriche > 0: Usa per personalizzare esercizi tecnici specifici
-   - Bilancia intensità basandoti su ACS, RRS${userStats.hrZones.hasData ? ', zone HR' : ''}
+   - Se una metrica non è disponibile: NON menzionarlo negativamente, concentrati su tecnica di base e costruzione dei fondamentali
+   - Efficienza della bracciata e regolarità nelle ripetute: usale per scegliere gli esercizi tecnici
+   - Bilancia volume e intensità con l'equilibrio tra forma e fatica e con la distribuzione dell'intensità${userStats.hrZones.hasData ? ' (e le zone HR)' : ''}
 
 4. **TEMPI DI RIPARTENZA** (OBBLIGATORIO):
    - Per ogni serie con ripetizioni (es. 4x100), specifica SEMPRE il tempo di ripartenza
-   - Formato: "a 1:50", "a 1:20", "a 0:50"
-   - Calcolo: Passo medio (${userStats.recent.avgPace} sec/100m) + 10-20 sec (tecnica) o + 5-10 sec (resistenza)
+   - Formato: "a 1:50", "a 1:20", "a 0:50"; in C2 e C3 puoi scrivere il recupero ("1′30″"), che rispetta i limiti di sicurezza
+   - Calcolo: se ci sono le zone, imposta il passo delle serie con i passi delle zone A1–C3 in m:ss/100 m del blocco ZONE DI PASSO (valgono per lo stile libero) e aggiungi il recupero; altrimenti passo medio (${userStats.recent.avgPace} sec/100m) + 10-20 sec (tecnica) o + 5-10 sec (resistenza)
 
 5. **ATTREZZI** (usa frequentemente):
    - **Pinne**: Propulsione, tecnica gambe (specialmente venerdì)
@@ -689,7 +721,7 @@ ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
 
 6. **NOTE TECNICHE**: Fornisci indicazioni dettagliate per ogni serie (focus, respirazione, ritmo)
 
-7. **LIVELLO**: Allenamento sfidante ma adatto al nuotatore
+7. **LIVELLO**: Allenamento sfidante ma adatto al nuotatore, sempre entro i limiti di sicurezza
 
 **FORMATO RICHIESTO (JSON):**
 {
@@ -703,39 +735,50 @@ ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
       "title": "Riscaldamento",
       "exercises": [
         {
-          "name": "Nome esercizio",
+          "name": "400 stile libero sciolto",
+          "repeats": 1,
+          "repMeters": 400,
           "distance": "400m",
+          "stroke": "stile libero",
+          "zone": "A1",
           "intensity": "Facile",
-          "notes": "Note tecniche specifiche"
+          "notes": "A1 · Facile, ${zonePaceOrPlaceholder(zones, "A1")}: respiro tranquillo, potresti parlare; scalda e prepara alla serie"
         }
       ]
     },
     {
-      "title": "Serie Principale 1: Tecnica",
+      "title": "Serie Principale 1: Soglia",
       "exercises": [
         {
-          "name": "Esercizio tecnico",
-          "sets": "4x",
+          "name": "6x100 stile libero",
+          "repeats": 6,
+          "repMeters": 100,
+          "sets": "6x",
           "distance": "100m",
-          "rest": "a 1:50" (tempo di ripartenza basato sul passo),
-          "intensity": "Moderata",
-          "equipment": "Palette" (opzionale: Pinne, Palette, Pull buoy, Tavoletta),
-          "notes": "Focus su aspetto tecnico specifico"
+          "stroke": "stile libero",
+          "zone": "B2",
+          "intensity": "Soglia",
+          "rest": "${b2Sendoff}" (tempo di ripartenza basato sul passo della zona),
+          "equipment": "" (opzionale: Pinne, Palette, Pull buoy, Tavoletta; con gli attrezzi niente passo),
+          "notes": "B2 · Soglia, ${zonePaceOrPlaceholder(zones, "B2")}: respiro impegnato, poche parole tra una vasca e l'altra; alza la soglia"
         }
       ],
       "notes": "Obiettivo della serie"
     },
     {
-      "title": "Serie Principale 2: Velocità/Resistenza",
+      "title": "Serie Principale 2: Velocità",
       "exercises": [
         {
-          "name": "Serie principale",
+          "name": "${sprintName}",
+          "repeats": 8,
+          "repMeters": ${sprintMeters},
           "sets": "8x",
-          "distance": "50m",
-          "rest": "a 0:50" (tempo di ripartenza),
-          "intensity": "Alta - Zona 4",
-          "equipment": "Pinne" (se venerdì),
-          "notes": "Mantenere ritmo costante"
+          "distance": "${sprintMeters}m",
+          "stroke": "stile libero",
+          "zone": "C3",
+          "intensity": "Sopra soglia",
+          "rest": "${sprintRest}" (in C3 almeno 3 volte la ripetuta),
+          "notes": "C3 · Sopra soglia, ${zonePaceOrPlaceholder(zones, "C3")}: ${longPool ? "25 m a tutta, poi finisci la vasca piano" : "a tutta, pochissimi respiri; velocità pura (mai oltre 25 m)"}"
         }
       ]
     },
@@ -743,20 +786,26 @@ ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
       "title": "Defaticamento",
       "exercises": [
         {
-          "name": "Nuoto facile",
+          "name": "200 misti facili",
+          "repeats": 1,
+          "repMeters": 200,
           "distance": "200m",
-          "intensity": "Molto facile",
+          "stroke": "misti",
+          "zone": "A1",
+          "intensity": "Facile",
           "notes": "Recupero attivo"
         }
       ]
     }
   ],
   "coachNotes": [
-    "Nota importante 1 basata sulle metriche",
-    "Nota importante 2 su aspetto da migliorare",
-    "Nota importante 3 su punti di forza da sfruttare"
+    "Le zone di oggi: una riga per ogni zona usata (sensazione, passo, a cosa serve)",
+    "Nota importante basata sulle metriche",
+    "Nota importante su aspetto da migliorare"
   ]
 }
+
+In ogni esercizio in vasca "repeats" (numero di ripetute) e "repMeters" (metri di ciascuna) sono numeri; "stroke" è uno tra: stile libero, dorso, rana, farfalla, misti, tecnica, gambe. Non scrivere il totale dei metri: lo calcola il server.
 
 Rispondi SOLO con il JSON valido, senza testo aggiuntivo.`;
 }
@@ -764,7 +813,7 @@ Rispondi SOLO con il JSON valido, senza testo aggiuntivo.`;
 /**
  * Build prompt for dryland workout generation
  */
-function buildDrylandWorkoutPrompt(userStats: UserStatsForCoach): string {
+export function buildDrylandWorkoutPrompt(userStats: UserStatsForCoach): string {
   return `Sei un allenatore olimpico di nuoto e preparatore atletico esperto. Genera un allenamento FUORI VASCA (dryland) personalizzato per un nuotatore basato sulle sue statistiche.
 
 **STATISTICHE NUOTATORE:**
@@ -775,13 +824,11 @@ function buildDrylandWorkoutPrompt(userStats: UserStatsForCoach): string {
 - Passo medio: ${userStats.recent.avgPace} sec/100m
 - SWOLF medio: ${userStats.recent.avgSwolf}
 
-**METRICHE AVANZATE:**
-- SEI (Stroke Efficiency Index): ${userStats.advancedMetrics.sei} - Efficienza bracciata
-- TCI (Technical Consistency Index): ${userStats.advancedMetrics.tci} - Consistenza tecnica
-- SER (Stroke Efficiency Ratio): ${userStats.advancedMetrics.ser} - Rapporto efficienza
-- ACS (Aerobic Capacity Score): ${userStats.advancedMetrics.acs} - Capacità aerobica
-- RRS (Recovery Readiness Score): ${userStats.advancedMetrics.rrs} - Prontezza al recupero
-- POI (Performance Optimization Index): ${userStats.advancedMetrics.poi} - Ottimizzazione performance
+**METRICHE DI NUOTO:**
+${userStats.swimMetricsText}
+
+**USO DELLE METRICHE:**
+${SWIM_METRICS_COACH_RULES}
 
 **ZONE FREQUENZA CARDIACA:**
 ${userStats.hrZones.hasData ? `- Zona 1-2 (Aerobica): ${(parseFloat(userStats.hrZones.zone1) + parseFloat(userStats.hrZones.zone2)).toFixed(1)}%
@@ -792,7 +839,7 @@ ${userStats.hrZones.hasData ? `- Zona 1-2 (Aerobica): ${(parseFloat(userStats.hr
 1. Analizza le metriche per identificare aree da rafforzare
 2. Crea allenamento con: Riscaldamento → Forza → Core → Mobilità/Stretching
 3. Includi esercizi specifici per nuotatori (spalle, core, gambe, mobilità)
-4. Considera RRS per dosare volume e intensità
+4. Considera l'equilibrio tra forma e fatica per dosare volume e intensità
 5. Bilancia forza, potenza, resistenza, mobilità
 6. Fornisci varianti per diversi livelli di fitness
 
@@ -876,44 +923,14 @@ function parseWorkoutResponse(
   text: string,
   workoutType: "pool" | "dryland"
 ): GeneratedWorkout {
-  try {
-    // Remove markdown code blocks if present
-    let cleanText = text.trim();
-
-    // More robust markdown block removal
-    const jsonMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/) ||
-      cleanText.match(/```\s*([\s\S]*?)\s*```/);
-
-    if (jsonMatch) {
-      cleanText = jsonMatch[1];
-    } else {
-      // Fallback: strip any backticks and common text before/after
-      cleanText = cleanText.replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim();
-    }
-
-    // Parse JSON
-    const workout = JSON.parse(cleanText);
-
-    // Validate structure
-    if (!workout.title || !workout.sections || !Array.isArray(workout.sections)) {
-      throw new Error("Invalid workout structure");
-    }
-
-    return workout;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.warn(`Failed to parse workout response: ${message}`, {
-      event: "ai_coach:parse_failed",
-      message,
-      // Keep logs bounded; raw model output can be large and may contain junk.
-      rawPreview: typeof text === "string" ? text.slice(0, 800) : undefined,
-    });
-
-    // Return fallback workout
-    return createFallbackWorkout(workoutType);
-  }
+  const workout = parseWorkoutJson(text);
+  if (workout) return workout;
+  logger.warn("Failed to parse workout response", {
+    event: "ai_coach:parse_failed",
+    // Keep logs bounded; raw model output can be large and may contain junk.
+    rawPreview: typeof text === "string" ? text.slice(0, 800) : undefined,
+  });
+  return createFallbackWorkout(workoutType);
 }
 
 /**
@@ -935,6 +952,8 @@ function createFallbackWorkout(workoutType: "pool" | "dryland"): GeneratedWorkou
               name: "Nuoto libero facile",
               distance: "400m",
               intensity: "Facile",
+              zone: "A1",
+              stroke: "stile libero",
               notes: "Focus sulla respirazione e rilassamento",
             },
           ],
@@ -947,7 +966,9 @@ function createFallbackWorkout(workoutType: "pool" | "dryland"): GeneratedWorkou
               sets: "4x",
               distance: "100m",
               rest: "20 sec",
-              intensity: "Moderata",
+              intensity: "Aerobico",
+              zone: "A2",
+              stroke: "tecnica",
               notes: "Concentrati sulla fase di presa e trazione",
             },
           ],
@@ -956,11 +977,13 @@ function createFallbackWorkout(workoutType: "pool" | "dryland"): GeneratedWorkou
           title: "Serie Principale",
           exercises: [
             {
-              name: "Intervalli misti",
+              name: "Intervalli a stile libero",
               sets: "6x",
               distance: "100m",
               rest: "30 sec",
-              intensity: "Moderata-Alta",
+              intensity: "Medio",
+              zone: "B1",
+              stroke: "stile libero",
               notes: "Mantieni ritmo costante",
             },
           ],
@@ -971,7 +994,9 @@ function createFallbackWorkout(workoutType: "pool" | "dryland"): GeneratedWorkou
             {
               name: "Nuoto facile",
               distance: "200m",
-              intensity: "Molto facile",
+              intensity: "Facile",
+              zone: "A1",
+              stroke: "stile libero",
               notes: "Recupero attivo",
             },
           ],

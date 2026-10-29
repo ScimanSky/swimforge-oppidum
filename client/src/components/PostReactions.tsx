@@ -11,8 +11,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { formatInteger } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
-import { Droplet } from "lucide-react";
+import { errorToastMessage } from "@/lib/trpc-errors";
+import { Droplet, Heart } from "lucide-react";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -21,19 +23,25 @@ interface PostReactionsProps {
   initialReactions?: any[];
   userReaction?: any;
   onReactionChange?: () => void;
+  /**
+   * "heart" (Corsia feed): one heart, filled in the XP colour when you reacted, with the
+   * total count; the picker is the same. "emoji" (default): the reaction and the grouped emoji.
+   */
+  variant?: "emoji" | "heart";
 }
 
+// The emoji carry their own colours: no colour classes around them (Corsia tokens only).
 const reactionEmojis = {
-  splash: { emoji: "💧", label: "Splash", color: "text-blue-500" },
-  fire: { emoji: "🔥", label: "Fuoco", color: "text-orange-500" },
-  strong: { emoji: "💪", label: "Forza", color: "text-purple-500" },
-  clap: { emoji: "👏", label: "Applauso", color: "text-yellow-500" },
-  wave: { emoji: "🌊", label: "Onda", color: "text-cyan-500" },
-  love: { emoji: "❤️", label: "Love", color: "text-rose-500" },
-  rocket: { emoji: "🚀", label: "Razzo", color: "text-emerald-500" },
-  wow: { emoji: "🤯", label: "Wow", color: "text-fuchsia-500" },
-  laugh: { emoji: "😂", label: "Risata", color: "text-amber-500" },
-  cry: { emoji: "😢", label: "Pianto", color: "text-sky-500" },
+  splash: { emoji: "💧", label: "Splash" },
+  fire: { emoji: "🔥", label: "Fuoco" },
+  strong: { emoji: "💪", label: "Forza" },
+  clap: { emoji: "👏", label: "Applauso" },
+  wave: { emoji: "🌊", label: "Onda" },
+  love: { emoji: "❤️", label: "Cuore" },
+  rocket: { emoji: "🚀", label: "Razzo" },
+  wow: { emoji: "🤯", label: "Wow" },
+  laugh: { emoji: "😂", label: "Risata" },
+  cry: { emoji: "😢", label: "Pianto" },
 };
 
 type FloatingReaction = {
@@ -47,9 +55,10 @@ type FloatingReaction = {
 
 export default function PostReactions({
   postId,
-  initialReactions = [],
+  initialReactions,
   userReaction,
   onReactionChange,
+  variant = "emoji",
 }: PostReactionsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [burstReactions, setBurstReactions] = useState<FloatingReaction[]>([]);
@@ -58,8 +67,9 @@ export default function PostReactions({
   const reactionsQuery = trpc.community.reactions.list.useQuery(
     { postId },
     {
-      enabled: true,
-      initialData: initialReactions,
+      // Seed only real data: an empty default would count as fresh for staleTime and the
+      // reactions would never be fetched on mount.
+      ...(initialReactions ? { initialData: initialReactions } : {}),
       staleTime: 15_000,
     }
   );
@@ -79,9 +89,10 @@ export default function PostReactions({
       utils.community.clubs.feed.invalidate();
       if (onReactionChange) onReactionChange();
       if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
-        toast.success(`+${data.actionXp.awardedXp} XP Action`);
+        toast.success(`+${formatInteger(data.actionXp.awardedXp)} XP`);
       }
     },
+    onError: (error) => toast.error(errorToastMessage(error, "Reazione non riuscita, riprova")),
   });
 
   const handleReaction = (reactionType: keyof typeof reactionEmojis) => {
@@ -109,23 +120,47 @@ export default function PostReactions({
     ? reactionEmojis[currentUserReaction as keyof typeof reactionEmojis]
     : null;
   const triggerAnimationKey = useMemo(() => `${currentUserReaction ?? "none"}`, [currentUserReaction]);
+  const totalReactions = (reactionsQuery.data ?? []).reduce(
+    (sum: number, reaction: any) => sum + (Number(reaction?.count) || 0),
+    0
+  );
+  const isHeart = variant === "heart";
 
   return (
     <div className="relative flex items-center gap-2">
       {/* Picker delle reazioni */}
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
+          {isHeart ? (
+            <button
+              type="button"
+              aria-label={`${currentUserReaction ? "Cambia reazione" : "Reagisci"}, ${totalReactions} ${totalReactions === 1 ? "reazione" : "reazioni"}`}
+              className="flex min-h-[44px] items-center gap-1.5 rounded-xl px-2 text-sm font-semibold text-foreground transition-colors hover:bg-raised"
+            >
+              <Heart
+                aria-hidden
+                className={cn(
+                  "size-[22px]",
+                  currentUserReaction ? "fill-current text-action-text" : "text-muted-foreground"
+                )}
+              />
+              {totalReactions > 0 ? <span className="tabular-nums">{formatInteger(totalReactions)}</span> : null}
+            </button>
+          ) : (
           <Button
             variant="ghost"
             size="sm"
-            className={cn(
-              "gap-1 hover:scale-110 transition-transform",
-              currentUserReaction && currentReactionConfig?.color
-            )}
+            aria-label={
+              currentReactionConfig
+                ? `La tua reazione: ${currentReactionConfig.label}. Cambia reazione`
+                : "Reagisci"
+            }
+            className="gap-1 transition-transform hover:scale-110"
           >
             {currentUserReaction && currentReactionConfig ? (
               <motion.span
                 key={triggerAnimationKey}
+                aria-hidden
                 className="text-lg"
                 initial={{ scale: 0.75, rotate: -14, y: 3 }}
                 animate={{ scale: 1, rotate: 0, y: 0 }}
@@ -134,25 +169,30 @@ export default function PostReactions({
                 {currentReactionConfig.emoji}
               </motion.span>
             ) : (
-              <Droplet className="h-4 w-4" />
+              <Droplet aria-hidden className="size-4" />
             )}
           </Button>
+          )}
         </PopoverTrigger>
         <PopoverContent className="w-auto p-2" align="start">
           <div className="flex gap-1">
             {Object.entries(reactionEmojis).map(([type, { emoji, label }]) => (
               <motion.button
                 key={type}
+                type="button"
+                aria-label={label}
+                aria-pressed={currentUserReaction === type}
                 onClick={() => handleReaction(type as keyof typeof reactionEmojis)}
                 className={cn(
-                  "flex flex-col items-center gap-1 p-2 rounded-lg hover:bg-accent transition-all hover:scale-110",
-                  currentUserReaction === type && "bg-accent"
+                  "flex flex-col items-center gap-1 rounded-lg p-2 transition-all hover:scale-110 hover:bg-raised",
+                  currentUserReaction === type && "bg-raised"
                 )}
                 title={label}
                 whileHover={{ scale: 1.12, y: -2 }}
                 whileTap={{ scale: 0.92 }}
               >
                 <motion.span
+                  aria-hidden
                   className="text-2xl"
                   animate={currentUserReaction === type ? { y: [0, -2, 0] } : { y: 0 }}
                   transition={{ duration: 0.35 }}
@@ -165,25 +205,30 @@ export default function PostReactions({
         </PopoverContent>
       </Popover>
 
-      {/* Mostra le reazioni raggruppate */}
-      {reactionsQuery.data && reactionsQuery.data.length > 0 && (
-        <div className="flex gap-1">
-          {reactionsQuery.data.map((reaction: any) => (
-            <motion.div
-              key={reaction.reactionType}
-              className="flex items-center gap-1 text-xs bg-accent/50 rounded-full px-2 py-1"
-              title={`${reaction.count} ${reactionEmojis[reaction.reactionType as keyof typeof reactionEmojis]?.label || ""}`}
-              initial={{ opacity: 0.75, y: 3 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2 }}
-            >
-              <span>{reactionEmojis[reaction.reactionType as keyof typeof reactionEmojis]?.emoji}</span>
-            </motion.div>
-          ))}
-        </div>
+      {/* Grouped reactions: emoji and count, read as «Fuoco 2». */}
+      {!isHeart && reactionsQuery.data && reactionsQuery.data.length > 0 && (
+        <ul aria-label="Reazioni" className="flex gap-1">
+          {reactionsQuery.data.map((reaction: any) => {
+            const config = reactionEmojis[reaction.reactionType as keyof typeof reactionEmojis];
+            if (!config) return null;
+            return (
+              <motion.li
+                key={reaction.reactionType}
+                className="flex h-7 items-center gap-1 rounded-full bg-raised px-2 text-xs font-semibold"
+                initial={{ opacity: 0.75, y: 3 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+              >
+                <span aria-hidden>{config.emoji}</span>
+                <span className="sr-only">{config.label}</span>{" "}
+                <span className="tabular-nums">{formatInteger(reaction.count)}</span>
+              </motion.li>
+            );
+          })}
+        </ul>
       )}
 
-      <div className="pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2">
+      <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2">
         <AnimatePresence>
           {burstReactions.map((item) => (
             <motion.span

@@ -3,7 +3,12 @@ import {
     TRPCError,
     listPostReports, updatePostReportStatus,
     getPendingActivityInsights, listActivityInsights, markActivityInsightSeen,
+    logger,
 } from "./_shared";
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
+import { AppError } from "../lib/errors";
+import { cssTestSchema } from "../swim_metrics/css-test";
+import { paceZonesSchema } from "../swim_metrics/pace-zones";
 
 // Seed function for badges and levels
 export async function seedBadgesAndLevels() {
@@ -192,15 +197,65 @@ export const statisticsRouter = router({
             return await getPerformanceAnalysis(ctx.user.id, input.days);
         }),
 
-    // Get advanced metrics
-    getAdvanced: protectedProcedure
-        .input(z.object({
-            days: z.number().default(30),
-        }))
-        .query(async ({ ctx, input }) => {
-            const { getAdvancedMetrics } = await import("../db_statistics");
-            return await getAdvancedMetrics(ctx.user.id, input.days);
+    // Swim metrics (CSS, load and form, intensity, Stroke Index, pacing, volume) of the caller.
+    getMetrics: protectedProcedure.query(async ({ ctx }) => {
+        const { getSwimMetrics } = await import("../swim_metrics");
+        return await getSwimMetrics(ctx.user.id);
+    }),
+
+    // Removed advanced statistics. Kept only for the installed builds 1.0.0.2/1.0.0.3 and the tabs
+    // left open on the old web app, which still ask for it: null instead of a 404 that they would
+    // retry behind a spinner. Remove once the testers have updated.
+    getAdvanced: protectedProcedure.input(z.any()).query(() => null),
+
+    // AI insights of the Coach page, from the caller's swim metrics (cached 24 hours, regenerated
+    // at most every 6 hours after new swims and 4 times an hour; the client sends it outside the
+    // batch, so the page never waits for Gemini).
+    getInsights: protectedProcedure.query(async ({ ctx }) => {
+        const { getSwimMetrics } = await import("../swim_metrics");
+        const { generateAIInsights } = await import("../ai_insights");
+        return await generateAIInsights(await getSwimMetrics(ctx.user.id), ctx.user.id);
+    }),
+
+    // The caller's 400/200 CSS test, saved in the profile preferences. Validation errors are in
+    // Italian, each on its field (error.data.zodError.fieldErrors).
+    setCssTest: protectedProcedure
+        .input(cssTestSchema())
+        .mutation(async ({ ctx, input }) => {
+            const { updateCssTest } = await import("../swim_metrics/css-test");
+            if (!(await updateCssTest(ctx.user.id, input))) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
+            }
+            return { success: true };
         }),
+
+    clearCssTest: protectedProcedure.mutation(async ({ ctx }) => {
+        const { updateCssTest } = await import("../swim_metrics/css-test");
+        if (!(await updateCssTest(ctx.user.id, null))) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
+        }
+        return { success: true };
+    }),
+
+    // The caller's own zone bounds («Le tue zone»), seconds per 100 m from A1|A2 to C1|C2: they
+    // win over the ones from the CSS. Errors in Italian, each on its field.
+    setPaceZones: protectedProcedure
+        .input(paceZonesSchema)
+        .mutation(async ({ ctx, input }) => {
+            const { updatePaceZones } = await import("../swim_metrics/pace-zones");
+            if (!(await updatePaceZones(ctx.user.id, input))) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
+            }
+            return { success: true };
+        }),
+
+    clearPaceZones: protectedProcedure.mutation(async ({ ctx }) => {
+        const { updatePaceZones } = await import("../swim_metrics/pace-zones");
+        if (!(await updatePaceZones(ctx.user.id, null))) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
+        }
+        return { success: true };
+    }),
 });
 
 // AI Coach
@@ -212,21 +267,31 @@ export const aiCoachRouter = router({
             return await getExistingWorkouts(ctx.user.id);
         }),
 
-    // Generate both pool + dryland workouts (7-day cooldown)
+    // Generate both pool + dryland workouts (7-day cooldown, at most 5 requests an hour per user)
     generateWorkouts: protectedProcedure
         .mutation(async ({ ctx }) => {
+            const { aiWorkoutsRateLimit, AI_RATE_LIMIT_MESSAGE } = await import("../lib/ai-rate-limit");
+            if (!(await aiWorkoutsRateLimit.consume(ctx.user.id))) {
+                throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: AI_RATE_LIMIT_MESSAGE });
+            }
             const { generateBothWorkouts } = await import("../ai_coach");
             try {
                 return await generateBothWorkouts(ctx.user.id);
             } catch (error) {
-                const message = error instanceof Error ? error.message : "Generazione workout non riuscita";
-                if (
-                    message.includes("almeno 3 attività di nuoto sincronizzate") ||
-                    message.includes("cooldown")
-                ) {
-                    throw new TRPCError({ code: "PRECONDITION_FAILED", message });
+                // Preconditions (fewer than 3 swims, cooldown) carry their code and Italian text.
+                if (error instanceof AppError) {
+                    throw new TRPCError({ code: error.code, message: error.message });
                 }
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+                const message = error instanceof Error ? error.message : String(error);
+                if (message === DB_UNAVAILABLE_ERR_MSG) {
+                    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+                }
+                logger.error("[AI Coach] Workout generation failed", {
+                    event: "ai_coach:generate_workouts_failed",
+                    userId: ctx.user.id,
+                    message,
+                });
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Generazione degli allenamenti non riuscita, riprova più tardi." });
             }
         }),
 

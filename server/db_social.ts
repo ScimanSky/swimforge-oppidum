@@ -1,3 +1,4 @@
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { ensureUserPresenceSchema, getOnlineIntervalSql } from "./user_presence";
@@ -138,7 +139,7 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
 
 export async function hidePostForUser(userId: number, postId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const post = await db
     .select({ id: socialPosts.id })
@@ -165,7 +166,7 @@ export async function hidePostForUser(userId: number, postId: number) {
 
 export async function unhidePostForUser(userId: number, postId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   await db
     .delete(socialHiddenPosts)
@@ -176,7 +177,7 @@ export async function unhidePostForUser(userId: number, postId: number) {
 
 export async function deleteOwnPost(userId: number, postId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const post = await db
     .select({
@@ -224,7 +225,7 @@ export async function deleteOwnPost(userId: number, postId: number) {
 
 export async function reportPost(userId: number, input: { postId: number; reason: PostReportReason; details?: string | null }) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const post = await db
     .select({
@@ -338,7 +339,7 @@ export async function updatePostReportStatus(input: {
   adminNote?: string | null;
 }) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const now = new Date();
   const handledAt = input.status === "resolved" || input.status === "rejected" ? now : null;
@@ -406,7 +407,7 @@ export async function upsertActivityPost(
   }
 ) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const activity = await db
     .select({
@@ -514,7 +515,7 @@ export async function upsertActivityPost(
 
 export async function setActivityShare(userId: number, activityId: number, share: boolean) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const activity = await db
     .select({ id: swimmingActivities.id })
@@ -544,7 +545,7 @@ export async function setActivityShare(userId: number, activityId: number, share
 
 export async function toggleSplash(userId: number, postId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const postMeta = await db.execute(sql`
     SELECT user_id, club_id FROM social_posts WHERE id = ${postId} LIMIT 1
@@ -601,7 +602,7 @@ export async function toggleSplash(userId: number, postId: number) {
 
 export async function addComment(userId: number, postId: number, content: string) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const inserted = await db
     .insert(socialComments)

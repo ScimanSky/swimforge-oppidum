@@ -11,58 +11,60 @@ body,
 }
 
 :root {
-  /* Electric Ice Light Contrast: less bright, better readability over photos */
-  --background: oklch(0.87 0.022 232);
-  --foreground: oklch(0.21 0.038 255);
-  --card: oklch(0.90 0.014 232);
-  --card-foreground: oklch(0.18 0.040 255);
-  --popover: oklch(0.90 0.014 232);
-  --popover-foreground: oklch(0.18 0.040 255);
+  /* Corsia · tema chiaro «Cloro» (docs/plans/2026-10-28-android-phase-2-design.md §3.1) */
+  color-scheme: light;
+  --background: #F4F7F9;
+  --foreground: #0D1B27;
+  --card: #FFFFFF;
+  --card-foreground: #0D1B27;
+  --popover: #FFFFFF;
+  --popover-foreground: #0D1B27;
+  --raised: #E7EDF2;
+  --card-elevated: #E7EDF2;
+  --border: #DCE4EA;
+  --input: #DCE4EA;
+  /* Scrim behind dialogs and sheets: the ink at half opacity. */
+  --overlay: rgb(13 27 39 / 0.5);
 
-  /* Stronger neons (UI accents, not body text) */
-  --electric-cyan: oklch(0.84 0.190 205);
-  --electric-lime: oklch(0.90 0.235 142);
-  --electric-coral: oklch(0.76 0.195 25);
-  --forge-orange: oklch(0.78 0.21 48);
-  --forge-orange-soft: oklch(0.78 0.21 48 / 0.24);
-  --electric-violet: oklch(0.78 0.210 315);
-  --ink: oklch(0.18 0.040 255);
+  --primary: #34C6EB;
+  --primary-foreground: #062030;
+  --action-text: #056A96;
+  --ring: #056A96;
+  --secondary: #E7EDF2;
+  --secondary-foreground: #0D1B27;
+  --muted: #E7EDF2;
+  --muted-foreground: #556677;
+  --accent: #E7EDF2;
+  --accent-foreground: #0D1B27;
 
-  --primary: var(--electric-cyan);
-  --primary-foreground: var(--ink);
-  --secondary: oklch(0.84 0.020 232);
-  --secondary-foreground: oklch(0.22 0.040 255);
-  --muted: oklch(0.83 0.018 232);
-  --muted-foreground: oklch(0.42 0.030 255);
-  --accent: var(--electric-lime);
-  --accent-foreground: var(--ink);
-  --destructive: var(--electric-coral);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.66 0.026 232);
-  --input: oklch(0.88 0.016 232);
-  --ring: var(--electric-cyan);
+  --xp: #983F0C;
+  --success: #116846;
+  --warning: #785400;
+  --danger: #A62B2B;
+  --destructive: #A62B2B;
+  --destructive-foreground: #FFFFFF;
+  --gold: #74570E;
 
-  --chart-1: var(--electric-cyan);
-  --chart-2: var(--electric-lime);
-  --chart-3: oklch(0.84 0.120 225);
-  --chart-4: oklch(0.84 0.140 85);
-  --chart-5: var(--electric-coral);
-
-  --success: var(--electric-lime);
-  --warning: oklch(0.84 0.140 85);
-  --danger: var(--electric-coral);
-
-  --neon-glow: oklch(0.84 0.190 205 / 0.46);
-  --neon-soft: oklch(0.84 0.190 205 / 0.22);
-  --forge-glow: oklch(0.78 0.21 48 / 0.35);
-  --chip-cyan: oklch(0.82 0.14 192);
-  --chip-emerald: oklch(0.78 0.15 160);
-  --chip-amber: oklch(0.82 0.14 75);
-  --chip-rose: oklch(0.72 0.17 15);
-  --chip-sky: oklch(0.76 0.11 230);
-  --chip-violet: oklch(0.7 0.16 300);
-  --card-elevated: oklch(0.92 0.014 232);
-  --surface-glow: oklch(0.78 0.14 192 / 0.06);
+  --chart-1: #34C6EB;
+  --chart-2: #2C8FB8;
+  --chart-3: #5CD6A0;
+  --chart-4: #FFB27A;
+  --chart-5: #FF8B47;
+  --zone-1: #3D5770;
+  --zone-2: #2C8FB8;
+  --zone-3: #34C6EB;
+  --zone-4: #FFB27A;
+  --zone-5: #FF8B47;
+  /* Pace zones A1–C3, cool to warm (slate, blue, cyan, teal, amber-yellow, coral red,
+     magenta-crimson): fills only, never under text; 3:1 against every surface. Never orange:
+     Corsia keeps orange for XP and records. Heart-rate zones keep --zone-1..5. */
+  --pace-a1: #5E6E82;
+  --pace-a2: #3466CC;
+  --pace-b1: #0A87A8;
+  --pace-b2: #0B8A70;
+  --pace-c1: #8F7200;
+  --pace-c2: #D2443F;
+  --pace-c3: #B0246E;
 
   --z-base: 1;
   --z-nav: 40;
@@ -71,98 +73,68 @@ body,
   --z-modal: 70;
   --z-toast: 80;
 
-  --radius: 0.625rem;
-  --sidebar: oklch(0.89 0.014 230);
-  --sidebar-foreground: var(--foreground);
-  --sidebar-primary: var(--electric-cyan);
-  --sidebar-primary-foreground: var(--ink);
-  --sidebar-accent: oklch(0.85 0.016 230);
-  --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: oklch(0.72 0.020 230);
-  --sidebar-ring: var(--electric-cyan);
-  --navy: oklch(0.90 0.014 230);
-  --navy-light: oklch(0.85 0.016 230);
-  --azure: var(--electric-cyan);
-  --gold: oklch(0.84 0.140 85);
-  --gold-light: oklch(0.90 0.120 85);
-  --badge-spotlight: oklch(0.89 0.016 230);
-  --badge-ring: oklch(0.78 0.022 230);
-  --badge-shadow: oklch(0.28 0.055 255 / 0.12);
+  --radius: 0.75rem;
 }
 
 .dark {
-  /* Dark Precision: True deep darks, higher contrast, sharper edges */
-  --background: oklch(0.12 0.015 255);
-  --foreground: oklch(0.96 0.010 255);
-  --card: oklch(0.18 0.02 245);
-  /* More distinct from background */
-  --card-foreground: var(--foreground);
-  --popover: oklch(0.18 0.02 245);
-  --popover-foreground: var(--foreground);
+  /* Corsia · tema scuro (default) */
+  color-scheme: dark;
+  --background: #0A1520;
+  --foreground: #ECF3F8;
+  --card: #111E2B;
+  --card-foreground: #ECF3F8;
+  --popover: #111E2B;
+  --popover-foreground: #ECF3F8;
+  --raised: #182838;
+  --card-elevated: #182838;
+  --border: #233649;
+  --input: #233649;
+  --overlay: rgb(0 0 0 / 0.5);
 
-  --primary: var(--electric-cyan);
-  --primary-foreground: oklch(0.10 0.010 255);
-  --secondary: oklch(0.24 0.03 250);
-  /* Lighter secondary for contrast */
-  --secondary-foreground: var(--foreground);
-  --muted: oklch(0.20 0.02 250);
-  --muted-foreground: oklch(0.75 0.010 255);
-  /* Brighter muted text */
-  --accent: var(--electric-lime);
-  --accent-foreground: oklch(0.10 0.010 255);
-  --destructive: var(--electric-coral);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.35 0.02 245);
-  /* Brighter, sharper explicit borders */
-  --input: oklch(0.24 0.02 245);
-  --ring: var(--electric-cyan);
+  --primary: #34C6EB;
+  --primary-foreground: #062030;
+  --action-text: #34C6EB;
+  --ring: #34C6EB;
+  --secondary: #182838;
+  --secondary-foreground: #ECF3F8;
+  --muted: #182838;
+  --muted-foreground: #93A6B8;
+  --accent: #182838;
+  --accent-foreground: #ECF3F8;
 
-  --chart-1: var(--electric-cyan);
-  --chart-2: var(--electric-lime);
-  --chart-3: oklch(0.82 0.120 225);
-  --chart-4: oklch(0.84 0.140 85);
-  --chart-5: var(--electric-coral);
+  --xp: #FF8B47;
+  --success: #5CD6A0;
+  --warning: #F2C14E;
+  --danger: #FF7B7B;
+  --destructive: #FF7B7B;
+  --destructive-foreground: #0A1520;
+  --gold: #E8B84A;
 
-  --success: var(--electric-lime);
-  --warning: oklch(0.84 0.140 85);
-  --danger: var(--electric-coral);
+  --pace-a1: #8193A8;
+  --pace-a2: #5B8DEF;
+  --pace-b1: #2FB7D6;
+  --pace-b2: #2BC4A0;
+  --pace-c1: #E8C440;
+  --pace-c2: #E9534B;
+  --pace-c3: #E3549E;
+}
 
-  --neon-glow: oklch(0.84 0.190 205 / 0.95);
-  /* Much more intense glow */
-  --neon-soft: oklch(0.84 0.190 205 / 0.35);
-  /* Increased soft base */
-  --forge-glow: oklch(0.78 0.21 48 / 0.80);
-  --chip-cyan: oklch(0.82 0.14 192);
-  --chip-emerald: oklch(0.78 0.15 160);
-  --chip-amber: oklch(0.82 0.14 75);
-  --chip-rose: oklch(0.72 0.17 15);
-  --chip-sky: oklch(0.76 0.11 230);
-  --chip-violet: oklch(0.7 0.16 300);
-  --card-elevated: oklch(0.20 0.02 245);
-  /* Definite step up in elevation */
-  --surface-glow: oklch(0.78 0.14 192 / 0.1);
-
-  --sidebar: oklch(0.15 0.015 255);
+/* Derived tokens: recomputed in every scope, so a nested .dark (e.g. Badges) gets dark values. */
+:root,
+.dark {
+  --sidebar: var(--card);
   --sidebar-foreground: var(--foreground);
-  --sidebar-primary: var(--electric-cyan);
-  --sidebar-primary-foreground: oklch(0.10 0.010 255);
-  --sidebar-accent: oklch(0.22 0.02 245);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--raised);
   --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: oklch(0.35 0.02 245);
-  --sidebar-ring: var(--electric-cyan);
-  --navy: oklch(0.15 0.015 255);
-  --navy-light: oklch(0.245 0.022 255);
-  --azure: var(--electric-cyan);
-  --gold: oklch(0.84 0.140 85);
-  --gold-light: oklch(0.90 0.120 85);
-  --badge-spotlight: oklch(0.84 0.190 205 / 0.22);
-  --badge-ring: oklch(0.44 0.028 255 / 0.55);
-  --badge-shadow: oklch(0.58 0.070 255 / 0.24);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
 }
 
 @theme inline {
-  --font-sans: "Manrope", "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
-  --font-display: "Rajdhani", "Barlow Condensed", "Manrope", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Manrope", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Barlow Condensed", "Manrope", "Segoe UI", Arial, sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -182,6 +154,7 @@ body,
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-overlay: var(--overlay);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -191,16 +164,22 @@ body,
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
-  --color-neon-glow: var(--neon-glow);
-  --color-neon-soft: var(--neon-soft);
-  --color-chip-cyan: var(--chip-cyan);
-  --color-chip-emerald: var(--chip-emerald);
-  --color-chip-amber: var(--chip-amber);
-  --color-chip-rose: var(--chip-rose);
-  --color-chip-sky: var(--chip-sky);
-  --color-chip-violet: var(--chip-violet);
+  --color-raised: var(--raised);
+  --color-action-text: var(--action-text);
+  --color-xp: var(--xp);
+  --color-zone-1: var(--zone-1);
+  --color-zone-2: var(--zone-2);
+  --color-zone-3: var(--zone-3);
+  --color-zone-4: var(--zone-4);
+  --color-zone-5: var(--zone-5);
+  --color-pace-a1: var(--pace-a1);
+  --color-pace-a2: var(--pace-a2);
+  --color-pace-b1: var(--pace-b1);
+  --color-pace-b2: var(--pace-b2);
+  --color-pace-c1: var(--pace-c1);
+  --color-pace-c2: var(--pace-c2);
+  --color-pace-c3: var(--pace-c3);
   --color-card-elevated: var(--card-elevated);
-  --color-surface-glow: var(--surface-glow);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -220,39 +199,21 @@ body,
     @apply border-border outline-ring/50;
   }
 
+  /* Native app (edge-to-edge, viewport-fit=cover): the page scrolls under the system bars, so
+     scrollIntoView lands below the taller fixed header (targets add their own scroll-margin for
+     the header) and, in landscape, content stays clear of the side bar and the camera cutout.
+     The insets are 0 on the web. */
+  html {
+    scroll-padding-top: env(safe-area-inset-top);
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-size: 15px;
+    line-height: 1.5;
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
-}
-
-@keyframes swimforge-badge-spin {
-  from {
-    transform: perspective(800px) rotateY(0deg);
-  }
-
-  to {
-    transform: perspective(800px) rotateY(360deg);
-  }
-}
-
-.badge-hero-spin {
-  animation: swimforge-badge-spin 10s linear infinite;
-  transform-style: preserve-3d;
-  backface-visibility: hidden;
-}
-
-.badge-spotlight {
-  position: absolute;
-  inset: 12%;
-  border-radius: 9999px;
-  background: radial-gradient(circle at 30% 30%,
-      var(--badge-spotlight),
-      transparent 70%);
-  box-shadow:
-    0 10px 30px var(--badge-shadow),
-    0 0 0 1px var(--badge-ring);
-  z-index: 0;
-  pointer-events: none;
 }
 
 @layer utilities {
@@ -266,15 +227,6 @@ body,
     height: 100dvh;
   }
 
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-
   .sf-page-root {
     min-width: 0;
     overflow-x: hidden;
@@ -284,88 +236,18 @@ body,
     .sf-page-root>* {
       min-width: 0;
     }
-
-    .sf-page-root .stream-shell {
-      gap: 0.9rem;
-    }
-
-    .sf-page-root .stream-main {
-      gap: 0.75rem;
-    }
-
-    .sf-page-root .stream-card {
-      padding: 0.85rem;
-      border-radius: 18px;
-    }
   }
+}
 
+/* Shared component classes: in the components layer, so utilities on the same element win. */
+@layer components {
+  /* Corsia card: flat surface, 1px border, 16px radius (design §3.3). */
   .surface-panel {
     position: relative;
-    isolation: isolate;
-    border-radius: 20px;
-    border: 1px solid color-mix(in oklch, var(--border) 95%, transparent);
-    /* Powerful solid border */
-    background: linear-gradient(150deg,
-        color-mix(in oklch, var(--card) 98%, transparent),
-        /* Almost totally solid back */
-        color-mix(in oklch, var(--card) 90%, transparent));
-    box-shadow: 0 8px 32px color-mix(in oklch, black 65%, transparent), inset 0 1px 1px color-mix(in oklch, white 8%, transparent);
-    /* Sharp elevation */
-    backdrop-filter: blur(4px);
-    /* Very low blur to stop muddying */
-    transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms ease, box-shadow 150ms ease;
-  }
-
-  .surface-panel::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: linear-gradient(180deg,
-        color-mix(in oklch, white 8%, transparent),
-        transparent 15%);
-    opacity: 0.9;
-    z-index: 0;
-    border-radius: inherit;
-  }
-
-  .surface-panel>* {
-    position: relative;
-    z-index: 1;
-  }
-
-  /* Intense dashboard specific styles */
-  .dashboard-shell .surface-panel,
-  .compact-shell .surface-panel {
-    border-color: color-mix(in oklch, var(--border) 100%, transparent);
-    background: linear-gradient(160deg,
-        color-mix(in oklch, var(--background) 99%, transparent),
-        color-mix(in oklch, var(--card) 96%, transparent));
-    box-shadow:
-      0 12px 30px color-mix(in oklch, black 80%, transparent),
-      0 0 0 1px color-mix(in oklch, var(--electric-cyan) 60%, transparent);
-    /* Stronger neon rim */
-    backdrop-filter: blur(8px) saturate(1.4);
-  }
-
-  .dashboard-shell .surface-panel::before,
-  .compact-shell .surface-panel::before {
-    opacity: 0.4;
-    background: linear-gradient(180deg,
-        color-mix(in oklch, white 15%, transparent),
-        transparent 35%);
-  }
-
-  .dashboard-shell .stream-card,
-  .compact-shell .stream-card {
-    background: color-mix(in oklch, var(--card) 100%, transparent);
-    border-color: color-mix(in oklch, var(--border) 100%, transparent);
-  }
-
-  .dashboard-shell .stream-card:hover,
-  .compact-shell .stream-card:hover {
-    border-color: color-mix(in oklch, var(--electric-cyan) 80%, var(--border));
-    /* Stark interaction */
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    transition: border-color 150ms ease;
   }
 
   [data-slot="surface-header"]+[data-slot="surface-content"] {
@@ -377,330 +259,6 @@ body,
     padding-top: 0.8rem;
     border-top: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
   }
-
-  @media (max-width: 767px) {
-    .surface-panel {
-      border-radius: 20px;
-    }
-  }
-
-  .neon-gradient-text {
-    background: linear-gradient(135deg,
-        var(--electric-cyan),
-        var(--electric-lime) 90%);
-    /* Punchier gradient */
-    -webkit-background-clip: text;
-    color: transparent;
-    text-shadow: 0 0 12px color-mix(in oklch, var(--electric-cyan) 40%, transparent);
-    /* Add glow */
-  }
-
-  .sf-wordmark {
-    letter-spacing: 0.12em;
-    /* More tech-like spacing */
-    text-transform: uppercase;
-    font-weight: 800;
-    /* Bolder */
-  }
-
-  .sf-brand-anchor {
-    position: relative;
-    isolation: isolate;
-    background:
-      linear-gradient(130deg,
-        color-mix(in oklch, var(--card) 90%, transparent),
-        color-mix(in oklch, var(--card) 85%, transparent)) padding-box,
-      linear-gradient(130deg,
-        color-mix(in oklch, var(--electric-cyan) 90%, transparent),
-        color-mix(in oklch, var(--forge-orange) 70%, transparent)) border-box;
-    /* Starker box border glow */
-    border: 1px solid transparent;
-    box-shadow:
-      0 0 0 1px color-mix(in oklch, var(--electric-cyan) 40%, transparent),
-      0 12px 28px color-mix(in oklch, black 60%, transparent);
-    /* True black shadow */
-  }
-
-  .sf-brand-anchor:hover {
-    box-shadow:
-      0 0 0 1px color-mix(in oklch, var(--electric-cyan) 60%, transparent),
-      0 14px 36px color-mix(in oklch, black 70%, transparent),
-      0 0 32px var(--neon-glow);
-    /* Switch to intense glow */
-  }
-
-  .sf-activity-card {
-    border-radius: 16px;
-    border: 1px solid color-mix(in oklch, var(--electric-cyan) 80%, transparent);
-    /* Sharper border */
-    background:
-      linear-gradient(142deg, rgba(4, 4, 4, 0.98), rgba(8, 8, 8, 0.95));
-    /* Near pitch black */
-    box-shadow:
-      0 12px 34px rgba(0, 0, 0, 0.95),
-      0 0 0 1px color-mix(in oklch, var(--electric-cyan) 60%, transparent);
-  }
-
-  .sf-social-card {
-    border-radius: 16px;
-    border: 1px solid color-mix(in oklch, var(--border) 100%, transparent);
-    background:
-      linear-gradient(148deg,
-        color-mix(in oklch, var(--card) 98%, transparent),
-        color-mix(in oklch, var(--card) 92%, transparent));
-    box-shadow: 0 12px 30px color-mix(in oklch, black 65%, transparent);
-  }
-
-  .sf-activity-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    border-radius: 999px;
-    border: 1px solid color-mix(in oklch, var(--forge-orange) 60%, transparent);
-    /* Starker orange */
-    background: color-mix(in oklch, var(--forge-orange) 20%, transparent);
-    /* Less muddy back */
-    color: var(--forge-orange);
-    /* Pure high contrast text */
-    padding: 0.3rem 0.55rem;
-    font-size: 0.65rem;
-    font-weight: 800;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-  }
-
-  .glass-panel {
-    background: linear-gradient(135deg,
-        color-mix(in oklch, var(--card) 85%, transparent),
-        color-mix(in oklch, var(--electric-cyan) 20%, transparent) 46%,
-        color-mix(in oklch, var(--electric-lime) 15%, transparent) 72%,
-        color-mix(in oklch, var(--card) 80%, transparent));
-    border: 1px solid color-mix(in oklch, var(--border) 100%, transparent);
-    box-shadow:
-      0 22px 70px color-mix(in oklch, black 50%, transparent),
-      0 0 0 1px color-mix(in oklch, var(--electric-cyan) 50%, transparent),
-      0 0 24px var(--neon-soft);
-    backdrop-filter: blur(32px);
-  }
-
-  .ei-border-gradient {
-    background:
-      linear-gradient(135deg,
-        color-mix(in oklch, var(--card) 70%, transparent),
-        color-mix(in oklch, var(--card) 58%, transparent)) padding-box,
-      linear-gradient(135deg,
-        var(--electric-cyan),
-        var(--electric-lime)) border-box;
-    border: 1px solid transparent;
-  }
-
-  .bento-surface {
-    background: linear-gradient(135deg,
-        color-mix(in oklch, var(--accent) 20%, transparent),
-        color-mix(in oklch, var(--primary) 15%, transparent) 55%,
-        transparent 80%);
-  }
-
-  .neon-outline {
-    box-shadow: 0 0 0 1px var(--border), 0 0 40px var(--neon-soft);
-  }
-
-  .ei-bg-grid {
-    background-image:
-      linear-gradient(to right, color-mix(in oklch, var(--foreground) 10%, transparent) 1px, transparent 1px),
-      linear-gradient(to bottom, color-mix(in oklch, var(--foreground) 10%, transparent) 1px, transparent 1px);
-    background-size: 72px 72px;
-    mask-image: radial-gradient(circle at 40% 20%, black, transparent 60%);
-  }
-
-  .ei-blob {
-    background: radial-gradient(circle at 30% 30%,
-        color-mix(in oklch, var(--electric-cyan) 55%, transparent),
-        transparent 70%);
-    filter: blur(22px);
-    opacity: 0.55;
-    animation: ei-float 12s ease-in-out infinite;
-  }
-
-  .ei-blob-lime {
-    background: radial-gradient(circle at 30% 30%,
-        color-mix(in oklch, var(--electric-lime) 45%, transparent),
-        transparent 72%);
-    filter: blur(24px);
-    opacity: 0.45;
-    animation: ei-float 14s ease-in-out infinite reverse;
-  }
-
-  .ei-blob-coral {
-    background: radial-gradient(circle at 30% 30%,
-        color-mix(in oklch, var(--electric-coral) 35%, transparent),
-        transparent 72%);
-    filter: blur(26px);
-    opacity: 0.35;
-    animation: ei-float 16s ease-in-out infinite;
-  }
-
-  .orb-lane {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
-    gap: 12px;
-    min-width: 0;
-  }
-
-  .orb-lane>* {
-    min-width: 0;
-  }
-
-  .shimmer-bg {
-    background: linear-gradient(90deg,
-        transparent 0%,
-        color-mix(in oklch, var(--foreground) 6%, transparent) 40%,
-        color-mix(in oklch, var(--foreground) 6%, transparent) 60%,
-        transparent 100%);
-    background-size: 200% 100%;
-    animation: shimmer 1.8s ease-in-out infinite;
-  }
-
-  .stream-shell {
-    display: grid;
-    gap: 1.5rem;
-    min-width: 0;
-  }
-
-  .stream-main {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    min-width: 0;
-  }
-
-  .stream-node {
-    position: relative;
-  }
-
-  .stream-card {
-    border-radius: 16px;
-    border: 1px solid color-mix(in oklch, var(--border) 100%, transparent);
-    background: color-mix(in oklch, var(--card) 100%, transparent);
-    padding: 1rem;
-    transition: border-color 150ms ease, transform 150ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 150ms ease;
-  }
-
-  .stream-card:hover {
-    transform: translateY(-2px);
-    border-color: var(--electric-cyan);
-    box-shadow: 0 4px 12px color-mix(in oklch, black 20%, transparent), 0 0 0 1px color-mix(in oklch, var(--electric-cyan) 50%, transparent);
-  }
-
-  @media (min-width: 1024px) {
-    .stream-main {
-      padding-left: 1.5rem;
-    }
-
-    .stream-main::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 0.25rem;
-      bottom: 0.25rem;
-      width: 1px;
-      background: linear-gradient(180deg,
-          color-mix(in oklch, var(--electric-cyan) 52%, transparent),
-          color-mix(in oklch, var(--electric-cyan) 10%, transparent));
-      opacity: 0.75;
-    }
-
-    .stream-node::before {
-      content: "";
-      position: absolute;
-      left: -1.82rem;
-      top: 1.2rem;
-      width: 11px;
-      height: 11px;
-      border-radius: 999px;
-      background: linear-gradient(135deg,
-          color-mix(in oklch, var(--electric-cyan) 90%, white),
-          color-mix(in oklch, var(--electric-lime) 86%, white));
-      box-shadow: 0 0 0 4px color-mix(in oklch, var(--background) 82%, transparent);
-    }
-
-    /* Home feed (Stitch layout): no external status dot near cards. */
-    .social-feed-shell .stream-node::before {
-      content: none;
-    }
-  }
-
-  @media (min-width: 1280px) {
-    .stream-shell {
-      grid-template-columns: minmax(0, 1fr) 22rem;
-      align-items: start;
-    }
-
-    .orb-lane {
-      grid-template-columns: repeat(auto-fit, minmax(142px, 1fr));
-    }
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-@keyframes splash-particle {
-  0% {
-    opacity: 1;
-    transform: translate(0, 0) scale(1);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translate(var(--tx), var(--ty)) scale(0.3);
-  }
-}
-
-@keyframes ei-float {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-
-  50% {
-    transform: translate3d(22px, -18px, 0) scale(1.05);
-  }
-
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-}
-
-:root {
-  --landing-accent: #25d1f4;
-}
-
-.landing-shell {
-  font-family: "Rajdhani", "Barlow Condensed", "Manrope", "Segoe UI", sans-serif;
-}
-
-.landing-grain {
-  position: relative;
-}
-
-.landing-grain::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.2;
-  mix-blend-mode: soft-light;
-  background-image: radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.1) 0 1px, transparent 2px),
-    radial-gradient(circle at 80% 60%, rgba(255, 255, 255, 0.08) 0 1px, transparent 2px);
-  background-size: 3px 3px, 4px 4px;
 }
 
 .landing-reveal {
@@ -724,5 +282,66 @@ body,
   .landing-reveal {
     opacity: 1;
     animation: none;
+  }
+}
+
+/* Legal documents (rendered Markdown): no typography plugin, so the spacing is set here. */
+@layer components {
+  .legal-prose {
+    font-size: 15px;
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+  }
+
+  .legal-prose > :first-child {
+    margin-top: 0;
+  }
+
+  .legal-prose h2 {
+    margin-top: 2rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  .legal-prose h3 {
+    margin-top: 1.5rem;
+    font-size: 1.0625rem;
+    font-weight: 700;
+  }
+
+  .legal-prose h4 {
+    margin-top: 1.25rem;
+    font-weight: 600;
+  }
+
+  .legal-prose p,
+  .legal-prose ul {
+    margin-top: 0.75rem;
+  }
+
+  .legal-prose ul {
+    padding-left: 1.25rem;
+    list-style: disc;
+  }
+
+  .legal-prose li + li {
+    margin-top: 0.25rem;
+  }
+
+  .legal-prose strong {
+    font-weight: 700;
+  }
+
+  .legal-prose code {
+    border-radius: 0.375rem;
+    background: var(--raised);
+    padding: 0.1rem 0.3rem;
+    font-size: 0.875em;
+  }
+
+  .legal-prose hr {
+    margin: 2rem 0;
+    border-color: var(--border);
   }
 }

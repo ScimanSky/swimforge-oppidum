@@ -26,15 +26,15 @@ export type FeedSidebarVm = {
 }
 
 const FEED_FOOTER_LINKS: FeedSidebarFooterLinkVm[] = [
-  { label: "About", href: "/terms" },
-  { label: "Help", href: "/terms" },
+  { label: "Info", href: "/terms" },
+  { label: "Aiuto", href: "/terms" },
   { label: "Privacy", href: "/privacy" },
-  { label: "Terms", href: "/terms" },
+  { label: "Termini", href: "/terms" },
 ]
 
 function mapRealSuggestedUser(user: FeedSidebarSuggestedUserInput): FeedSidebarProfileVm {
   const displayName = user.username || user.name || `#${user.userId}`
-  const subtitle = user.level != null ? `Level ${user.level}` : "Swimmer"
+  const subtitle = user.level != null ? `Livello ${user.level}` : "Nuotatore"
 
   return {
     id: `real-${user.userId}`,

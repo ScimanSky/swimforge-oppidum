@@ -17,9 +17,7 @@
     "types": ["node", "vite/client"],
     "paths": {
       "@/*": ["./client/src/*"],
-      "@shared/*": ["./shared/*"],
-      "next/link": ["./client/src/next/link.tsx"],
-      "next/image": ["./client/src/next/image.tsx"]
+      "@shared/*": ["./shared/*"]
     }
   }
 }

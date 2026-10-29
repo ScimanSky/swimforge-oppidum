@@ -9,10 +9,14 @@ const state = vi.hoisted(() => ({
   syncOptions: null as any,
   toastSuccess: vi.fn(),
   toastInfo: vi.fn(),
+  /** Paths invalidated through useUtils («statistics», «activities.list»…). */
+  invalidated: [] as string[],
 }));
 
 vi.mock("wouter", () => ({
-  useLocation: () => ["/settings?onboarding=1&tab=connections", vi.fn()],
+  // wouter 3: the pathname comes from useLocation, the query from useSearch (see useSettingsTab).
+  useLocation: () => ["/settings", vi.fn()],
+  useSearch: () => "onboarding=1&tab=connections",
   Link: ({ children }: any) => <a>{children}</a>,
 }));
 vi.mock("sonner", () => ({
@@ -47,7 +51,31 @@ vi.mock("@/lib/trpc", () => {
     },
     invalidate: vi.fn(),
   });
-  const utils: any = new Proxy({}, { get: () => new Proxy({}, { get: () => procedure("utils") }) });
+  // utils.<router>.invalidate() and utils.<router>.<procedure>.invalidate() record their path.
+  const utils: any = new Proxy(
+    {},
+    {
+      get: (_target, router: string) =>
+        new Proxy(
+          {},
+          {
+            get: (_t, name: string) =>
+              name === "invalidate"
+                ? () => {
+                    state.invalidated.push(router);
+                    return Promise.resolve();
+                  }
+                : {
+                    ...procedure(`utils.${router}.${name}`),
+                    invalidate: () => {
+                      state.invalidated.push(`${router}.${name}`);
+                      return Promise.resolve();
+                    },
+                  },
+          },
+        ),
+    },
+  );
   return {
     trpc: new Proxy(
       {},
@@ -64,6 +92,7 @@ vi.mock("@/lib/trpc", () => {
 describe("Settings onboarding Garmin sync", () => {
   beforeEach(() => {
     state.syncCalls = [];
+    state.invalidated = [];
     vi.clearAllMocks();
   });
 
@@ -110,5 +139,15 @@ describe("Settings onboarding Garmin sync", () => {
     state.syncOptions.onSuccess({ synced: 2, newXp: 0, detectedPbs: [] });
 
     expect(state.toastSuccess).toHaveBeenCalledWith("2 attività sincronizzate!");
+  });
+
+  it("refreshes the swims, the profile, the swim metrics and the records after a sync", () => {
+    render(<Settings />);
+
+    state.syncOptions.onSuccess({ synced: 2, newXp: 0, detectedPbs: [] });
+
+    expect(state.invalidated).toEqual(
+      expect.arrayContaining(["activities.list", "profile.get", "statistics", "records"]),
+    );
   });
 });

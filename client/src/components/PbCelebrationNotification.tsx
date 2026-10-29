@@ -1,10 +1,14 @@
-import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Trophy } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { Chip } from "@/components/corsia/Chip";
+import { Metric } from "@/components/corsia/Metric";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { formatSwimCentiseconds } from "@/lib/swimTime";
+import { cn } from "@/lib/utils";
+import { CELEBRATION_LAYER, useCelebrationsAllowed } from "@/hooks/useCelebrationGate";
 
 type PbCelebrationEvent = {
   id: number;
@@ -51,8 +55,14 @@ function setLastSeenId(nextId: number) {
   window.localStorage.setItem(LAST_SEEN_KEY, String(value));
 }
 
+/**
+ * «Nuovo record personale» after a sync, one dialog per PB. Only its buttons and Esc (as
+ * «Chiudi») close it: a stray tap outside does not mark the record seen. Queued while the
+ * cookie banner or the onboarding is open (useCelebrationsAllowed).
+ */
 export default function PbCelebrationNotification() {
   const { isAuthenticated } = useAuth();
+  const allowed = useCelebrationsAllowed();
   const [queue, setQueue] = useState<PbCelebrationEvent[]>([]);
   const openedEventIdsRef = useRef<Set<number>>(new Set());
   const trackCelebrationAction = trpc.records.trackCelebrationAction.useMutation();
@@ -78,7 +88,8 @@ export default function PbCelebrationNotification() {
     }
   }, [pendingQuery.data, queue.length]);
 
-  const current = queue[0];
+  // Only a record on screen counts: none while it waits behind the banner or the tour.
+  const current = allowed ? queue[0] : undefined;
 
   useEffect(() => {
     if (!current) return;
@@ -152,57 +163,53 @@ export default function PbCelebrationNotification() {
   if (!current) return null;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm px-4"
+    <Dialog open onOpenChange={(open) => { if (!open) markCurrentAsSeenAndAdvance(); }}>
+      <DialogContent
+        showCloseButton={false}
+        overlayClassName={CELEBRATION_LAYER}
+        className={cn("rounded-2xl bg-card p-6 shadow-none sm:max-w-md", CELEBRATION_LAYER)}
+        onInteractOutside={(event) => event.preventDefault()}
       >
-        <motion.div
-          initial={{ scale: 0.92, y: 24 }}
-          animate={{ scale: 1, y: 0 }}
-          exit={{ scale: 0.95, y: 24 }}
-          transition={{ type: "spring", stiffness: 220, damping: 24 }}
-          className="w-full max-w-md rounded-3xl border border-amber-400/40 bg-gradient-to-br from-[oklch(0.20_0.05_220)] to-[oklch(0.11_0.03_220)] p-6 shadow-2xl"
-        >
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-amber-500/10 px-3 py-1 text-xs uppercase tracking-wide text-amber-200">
-            <Trophy className="h-3.5 w-3.5" />
-            Nuovo personal best
-          </div>
+        <Chip tone="xp" className="justify-self-start">
+          <Trophy className="size-4" aria-hidden />
+          Nuovo record personale
+        </Chip>
 
-          <h2 className="text-2xl font-display font-bold text-white">{title}</h2>
-          <p className="mt-1 text-sm text-white/70">
-            Vasca {current.poolLengthMeters}m · import da sync Garmin
-          </p>
+        <div>
+          <DialogTitle className="font-display text-[30px] font-bold leading-tight">{title}</DialogTitle>
+          <DialogDescription className="mt-1 text-sm text-muted-foreground">
+            Vasca {current.poolLengthMeters}m · dalla sincronizzazione Garmin
+          </DialogDescription>
+        </div>
 
-          <div className="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
-            <p className="text-xs uppercase tracking-wide text-white/60">Nuovo tempo</p>
-            <p className="mt-1 text-3xl font-display font-bold text-amber-300">
-              {formatSwimCentiseconds(current.newTimeCs)}
+        <div className="rounded-xl bg-raised p-4">
+          <Metric
+            value={formatSwimCentiseconds(current.newTimeCs)}
+            label="Nuovo tempo"
+            tone="xp"
+            size="lg"
+          />
+          {current.previousTimeCs ? (
+            <p className="mt-3 text-sm text-muted-foreground">
+              Da {formatSwimCentiseconds(current.previousTimeCs)} a {formatSwimCentiseconds(current.newTimeCs)}
+              {current.improvementCs && current.improvementCs > 0
+                ? ` (−${formatSwimCentiseconds(current.improvementCs)})`
+                : ""}
             </p>
-            {current.previousTimeCs ? (
-              <p className="mt-2 text-sm text-white/75">
-                Da {formatSwimCentiseconds(current.previousTimeCs)} a {formatSwimCentiseconds(current.newTimeCs)}
-                {current.improvementCs && current.improvementCs > 0
-                  ? ` (-${formatSwimCentiseconds(current.improvementCs)})`
-                  : ""}
-              </p>
-            ) : (
-              <p className="mt-2 text-sm text-white/75">Primo PB registrato per questa distanza.</p>
-            )}
-          </div>
+          ) : (
+            <p className="mt-3 text-sm text-muted-foreground">Primo record registrato per questa distanza.</p>
+          )}
+        </div>
 
-          <div className="mt-5 space-y-2">
-            <Button className="w-full" variant="neon" onClick={handleShareToFeed}>
-              Condividi nel feed
-            </Button>
-            <Button className="w-full" variant="outline-neon" onClick={markCurrentAsSeenAndAdvance}>
-              {queue.length > 1 ? "Prossimo PB" : "Chiudi"}
-            </Button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+        <div className="space-y-2">
+          <Button className="w-full" onClick={handleShareToFeed}>
+            Condividi nel feed
+          </Button>
+          <Button className="w-full" variant="outline" onClick={markCurrentAsSeenAndAdvance}>
+            {queue.length > 1 ? "Prossimo record" : "Chiudi"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

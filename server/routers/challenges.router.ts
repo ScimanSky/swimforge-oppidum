@@ -1,3 +1,4 @@
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import {
     protectedProcedure, router, z, getDb, sql,
     TRPCError,
@@ -87,7 +88,7 @@ export const challengesRouter = router({
         }
 
         const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: DB_UNAVAILABLE_ERR_MSG });
 
         // Get all active challenges
         const result = await db.execute(sql`

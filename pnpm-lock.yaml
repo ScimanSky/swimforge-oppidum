@@ -62,9 +62,12 @@ importers:
       '@capacitor/splash-screen':
         specifier: 8.0.2
         version: 8.0.2(@capacitor/core@8.5.3)
-      '@capacitor/status-bar':
-        specifier: 8.0.4
-        version: 8.0.4(@capacitor/core@8.5.3)
+      '@fontsource/barlow-condensed':
+        specifier: 5.3.0
+        version: 5.3.0
+      '@fontsource/manrope':
+        specifier: 5.3.0
+        version: 5.3.0
       '@google/genai':
         specifier: ^1.42.0
         version: 1.42.0
@@ -585,11 +588,6 @@ packages:
 
   '@capacitor/splash-screen@8.0.2':
     resolution: {integrity: sha512-0C6rYScr13WfAE9nPl4ScOQynmjFv9NT3Th+RZkD4ezYHmER6mcl1/lDYsv7jg3Rj3FOvLrlTlmNkUrr83kZzQ==}
-    peerDependencies:
-      '@capacitor/core': '>=8.0.0'
-
-  '@capacitor/status-bar@8.0.4':
-    resolution: {integrity: sha512-ZMzBUyHBzwDUxcHadEhvOvmoPmMQGMZgaMRJu8ohELeI6IaxoVH9ZhdF/OHnY3/yykv3Glev8Tnbh4aZY/0B0w==}
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
 
@@ -1185,6 +1183,12 @@ packages:
 
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
+
+  '@fontsource/barlow-condensed@5.3.0':
+    resolution: {integrity: sha512-RA7MmIx0v3eQ6Gcf74qLVLOwLB0GpPOzx+eU9iG/AmCnSJGcIWYeU8y6CEMGZ210MGwGg5CZhzLkkvyZdTTk1g==}
+
+  '@fontsource/manrope@5.3.0':
+    resolution: {integrity: sha512-obJ1Dv3+uCA6HlHgW8u4BGYxJR9In2HW7gjJhlflEvkrj1X1iSEwu0fToL+JYGC/FEKFfIz1sBuPduvcL2gIAA==}
 
   '@gerrit0/mini-shiki@3.22.0':
     resolution: {integrity: sha512-jMpciqEVUBKE1QwU64S4saNMzpsSza6diNCk4MWAeCxO2+LFi2FIFmL2S0VDLzEJCxuvCbU783xi8Hp/gkM5CQ==}
@@ -6546,10 +6550,6 @@ snapshots:
     dependencies:
       '@capacitor/core': 8.5.3
 
-  '@capacitor/status-bar@8.0.4(@capacitor/core@8.5.3)':
-    dependencies:
-      '@capacitor/core': 8.5.3
-
   '@chevrotain/cst-dts-gen@11.0.3':
     dependencies:
       '@chevrotain/gast': 11.0.3
@@ -6924,6 +6924,10 @@ snapshots:
       react-dom: 19.2.1(react@19.2.1)
 
   '@floating-ui/utils@0.2.10': {}
+
+  '@fontsource/barlow-condensed@5.3.0': {}
+
+  '@fontsource/manrope@5.3.0': {}
 
   '@gerrit0/mini-shiki@3.22.0':
     dependencies:

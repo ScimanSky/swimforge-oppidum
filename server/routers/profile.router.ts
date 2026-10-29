@@ -4,6 +4,7 @@ import {
     normalizeBooleanRecord, coerceBoolean, detectImageType,
     logger, getUserPublicProfile,
 } from "./_shared";
+import { mergeSwimmerPreferences, preferencesPatch } from "../lib/preferences";
 import type { SwimmingActivityInsert } from "./_shared";
 import { uploadImageToMediaProviders } from "../lib/image_upload";
 
@@ -14,7 +15,10 @@ export const profileRouter = router({
             throw new TRPCError({ code: "NOT_FOUND", message: "Profile not found" });
         }
 
-        const nextLevel = await db.getNextLevelThreshold(profile.level);
+        const [nextLevel, currentLevel] = await Promise.all([
+            db.getNextLevelThreshold(profile.level),
+            db.getLevelThreshold(profile.level),
+        ]);
         const currentLevelInfo = await db.getLevelForXp(profile.totalXp);
 
         // Get profile badge
@@ -47,6 +51,7 @@ export const profileRouter = router({
             xpLevelTitle: currentLevelInfo.title,
             xpLevelColor: currentLevelInfo.color,
             xpLevel: profile.level,
+            currentLevelXp: currentLevel?.xpRequired ?? 0,
             nextLevelXp: nextLevel?.xpRequired || null,
             xpToNextLevel: nextLevel ? nextLevel.xpRequired - profile.totalXp : 0,
             profileBadge,
@@ -124,10 +129,17 @@ export const profileRouter = router({
                 }
             }
 
+            // Settings sends only its own preference keys: one SQL merge into the stored ones, so
+            // other keys (e.g. cssTest and paceZones, saved by statistics.setCssTest and
+            // statistics.setPaceZones) survive concurrent saves.
+            // Keys sent as undefined stay as stored.
+            if (preferences) {
+                await mergeSwimmerPreferences(ctx.user.id, preferencesPatch(preferences));
+            }
+
             await db.updateSwimmerProfile(ctx.user.id, {
                 ...profilePayload,
                 notificationSettings,
-                preferences,
                 privacySettings,
             });
             return { success: true };

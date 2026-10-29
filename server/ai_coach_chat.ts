@@ -1,6 +1,23 @@
 import { invokeLLM } from "./_core/llm";
 import { getSwimmerProfile, getActivities } from "./db";
-import { getAdvancedMetrics } from "./db_statistics";
+import { getSwimMetrics } from "./swim_metrics";
+import {
+  SWIM_METRICS_COACH_RULES,
+  paceZoneCoachRules,
+  swimMetricsForCoach,
+  swimMetricsGlossary,
+  zonePaceText,
+} from "./swim_metrics/coach-context";
+import {
+  PACE_ZONE_BY_CODE,
+  PACE_ZONE_CODES,
+  TSB_READING_LABELS,
+  type PaceZoneCode,
+  type PaceZoneRange,
+  type SwimMetrics,
+} from "@shared/swimMetrics";
+import { formatRestSeconds, parseRest } from "@shared/coachWorkout";
+import { minRestSeconds, poolHistoryOf, type SafetyContext } from "./ai_coach_safety";
 import { getExistingWorkouts } from "./ai_coach";
 import { listActivityInsights } from "./ai_activity_insights";
 import { logger } from "./middleware/logger";
@@ -26,22 +43,23 @@ export type CoachChatPreferences = {
 
 type CoachContext = {
   profile: Awaited<ReturnType<typeof getSwimmerProfile>>;
-  advanced: Awaited<ReturnType<typeof getAdvancedMetrics>> | null;
+  swimMetrics: SwimMetrics | null;
   recentActivities: Awaited<ReturnType<typeof getActivities>>;
   workouts: Awaited<ReturnType<typeof getExistingWorkouts>> | null;
   latestInsights: Awaited<ReturnType<typeof listActivityInsights>>;
 };
 
-function formatPace(secPer100m: number | null | undefined) {
+/** «m:ss/100m»; the total is rounded first, so 119.6 s is 2:00 and never 1:60. */
+export function formatPace(secPer100m: number | null | undefined) {
   if (!secPer100m || secPer100m <= 0) return "n/d";
-  const mins = Math.floor(secPer100m / 60);
-  const secs = Math.round(secPer100m % 60);
+  const total = Math.round(secPer100m);
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
   return `${mins}:${String(secs).padStart(2, "0")}/100m`;
 }
 
 function contextToPrompt(ctx: CoachContext) {
   const profile = ctx.profile;
-  const advanced = ctx.advanced;
 
   const recentSummary = ctx.recentActivities.slice(0, 5).map((activity, index) => {
     const date = activity.activityDate instanceof Date
@@ -69,15 +87,9 @@ CONTESTO ATLETA SWIMFORGE
 - Stile preferito: ${profile?.preferredStroke ?? "n/d"}
 - Skill label AI: ${profile?.aiSkillLabel ?? "n/d"}
 
-METRICHE ULTIMI 30 GIORNI
-- Performance Index: ${advanced?.performanceIndex ?? "n/d"}
-- Consistency Score: ${advanced?.consistencyScore ?? "n/d"}
-- Recovery Readiness: ${advanced?.recoveryReadinessScore ?? "n/d"}
-- SEI: ${advanced?.swimmingEfficiencyIndex ?? "n/d"}
-- TCI: ${advanced?.technicalConsistencyIndex ?? "n/d"}
-- SER: ${advanced?.strokeEfficiencyRating ?? "n/d"}
-- ACS: ${advanced?.aerobicCapacityScore ?? "n/d"}
-- POI: ${advanced?.progressiveOverloadIndex ?? "n/d"}
+${ctx.swimMetrics ? swimMetricsForCoach(ctx.swimMetrics) : "METRICHE DI NUOTO: non disponibili in questo momento."}
+
+${swimMetricsGlossary()}
 
 ULTIME ATTIVITA
 ${recentSummary.length ? recentSummary.join("\n") : "- Nessuna attività recente disponibile"}
@@ -106,14 +118,17 @@ Regole:
 - evita diagnosi mediche e sostituzione di professionisti sanitari;
 - se l'utente riferisce dolore/infortunio, raccomanda stop e valutazione specialistica;
 - niente testo motivazionale generico.
+${SWIM_METRICS_COACH_RULES}
+${paceZoneCoachRules(ctx.swimMetrics?.zones ?? null, poolHistoryOf(ctx.recentActivities))}
 - se l'utente dice che oggi e' stanco/lento, riduci volume/intensita' e proponi una seduta di qualita' tecnica;
 - se l'obiettivo e' 50/100 stile, inserisci lavoro specifico di velocita' e partenze/virate.
 
 Formato di risposta preferito:
-1) "Lettura dati" (max 3 bullet)
-2) "Cosa fare adesso" (max 4 bullet con target concreti)
-3) "Check prossimo" (1 bullet: cosa monitorare nella prossima sessione)
-4) "Domanda mirata" (1 domanda breve per affinare il piano)
+1) "Lettura dati" (max 2 bullet)
+2) "Cosa fare adesso" (max 3 bullet con target concreti)
+3) "Le zone di oggi" (ogni volta che nella risposta ci sono zone: una riga per ogni zona usata, con codice, livello, passo e sensazione; senza zone ometti la sezione)
+4) "Check prossimo" (1 bullet: cosa monitorare nella prossima sessione)
+5) "Domanda mirata" (1 domanda breve per affinare il piano)
 
 PREFERENZE UTENTE
 - Obiettivo attuale: ${goal && goal.length > 0 ? goal : "n/d"}
@@ -155,14 +170,57 @@ function extractLastUserMessage(history: CoachChatMessage[]): string {
   return "";
 }
 
+/** A rep of the rule-based sessions: «8×100 B1 · Medio 1:50–1:56, rec. 20″». */
+type FallbackRep = {
+  meters: number;
+  code: PaceZoneCode;
+  count?: number;
+  /** Groups of the rep: «2 serie di 6×25». */
+  sets?: number;
+  label?: string;
+  rest?: string;
+  /** False for drill or other strokes: the zone paces hold for freestyle only. */
+  freestyle?: boolean;
+};
+
+/**
+ * The rest of a rule-based rep: the one written, or longer when the safety limits want it (C2 at
+ * least the rep time, C3 three times, at the athlete's zone pace).
+ */
+function safeRest(rep: FallbackRep, safety: SafetyContext): string | undefined {
+  if (!rep.rest) return rep.rest;
+  const min = minRestSeconds(rep.code, { name: "", repMeters: rep.meters }, safety);
+  const written = parseRest(rep.rest)?.seconds ?? 0;
+  return min !== null && written < min ? formatRestSeconds(min) : rep.rest;
+}
+
+function repText(rep: FallbackRep, safety: SafetyContext): string {
+  const ranges = safety.zones?.ranges ?? [];
+  const range = rep.freestyle === false ? undefined : ranges.find((candidate) => candidate.code === rep.code);
+  const paceText = range ? zonePaceText(range) : null;
+  const pace = !range ? "" : range.fastPace !== null && range.slowPace !== null ? ` ${paceText}` : ` (${paceText})`;
+  const reps = rep.count ? `${rep.sets ? `${rep.sets} serie di ` : ""}${rep.count}×${rep.meters}` : `${rep.meters}`;
+  const rest = safeRest(rep, safety);
+  return `${reps}${rep.label ? ` ${rep.label}` : ""} ${rep.code} · ${PACE_ZONE_BY_CODE[rep.code].level}${pace}${rest ? `, rec. ${rest}` : ""}`;
+}
+
+const sessionText = (reps: FallbackRep[], safety: SafetyContext) => reps.map((rep) => repText(rep, safety)).join(" + ");
+
+/** «B1 · Medio (1:50–1:56/100 m): ritmo sostenuto, …», the pace only when the zones are known. */
+function zoneLine(code: PaceZoneCode, ranges: PaceZoneRange[]): string {
+  const zone = PACE_ZONE_BY_CODE[code];
+  const range = ranges.find((candidate) => candidate.code === code);
+  return `- ${code} · ${zone.level}${range ? ` (${zonePaceText(range)}/100 m)` : ""}: ${zone.explanation}`;
+}
+
 function fallbackMessage(
   ctx: CoachContext,
   history: CoachChatMessage[],
   preferences?: CoachChatPreferences
 ) {
-  const performance = ctx.advanced?.performanceIndex;
-  const consistency = ctx.advanced?.consistencyScore;
-  const recovery = ctx.advanced?.recoveryReadinessScore;
+  const metrics = ctx.swimMetrics;
+  const css = metrics?.css.current ?? null;
+  const loadToday = metrics?.load.today ?? null;
   const latest = ctx.recentActivities[0];
   const lastUserMessage = extractLastUserMessage(history).toLowerCase();
   const goal = preferences?.goal?.trim() ?? "";
@@ -177,31 +235,69 @@ function fallbackMessage(
   );
 
   const nextFocus =
-    recovery !== null && recovery !== undefined && recovery < 45
+    loadToday?.reading === "carico_alto"
       ? "recupero + tecnica pulita"
-      : consistency !== null && consistency !== undefined && consistency < 50
-        ? "regolarità (3 sedute/settimana)"
+      : metrics && metrics.volume.avgSessions4 < 2
+        ? "regolarità (almeno 2 nuotate a settimana)"
         : "progressione controllata del volume";
+
+  const metricsLine = metrics
+    ? [
+        css ? `Passo soglia ${formatPace(css.paceSecondsPer100)} (${css.source === "test" ? "test" : `stima, affidabilità ${css.confidence}`})` : "Passo soglia n/d",
+        loadToday
+          ? `equilibrio ${loadToday.tsb > 0 ? "+" : loadToday.tsb < 0 ? "−" : ""}${Math.abs(loadToday.tsb).toFixed(1).replace(".", ",")} (${TSB_READING_LABELS[loadToday.reading]})`
+          : "equilibrio n/d",
+        `${metrics.volume.avgKm4.toFixed(1).replace(".", ",")} km/settimana`,
+      ].join(" · ")
+    : "Metriche non disponibili";
 
   const latestLine = latest
     ? `Ultima sessione: ${latest.distanceMeters}m in ${Math.round(latest.durationSeconds / 60)} min, passo ${formatPace(latest.avgPacePer100m ?? null)}.`
     : "Non vedo sessioni recenti, quindi parto da una base conservativa.";
 
-  let sessionBullet = "- Sessione oggi: 300 sciolti + 8x100 ritmo controllato + 6x50 progressivi + 200 defaticamento.";
+  // Every rep with zone, level and the athlete's pace (rules of paceZoneCoachRules), rests
+  // within the safety limits.
+  const ranges = metrics?.zones.ranges ?? [];
+  const safety: SafetyContext = { zones: metrics?.zones ?? null, history: null, referencePace: latest?.avgPacePer100m ?? null };
+  let today: FallbackRep[] = [
+    { meters: 300, code: "A1" },
+    { count: 8, meters: 100, code: "B1", rest: "20″" },
+    { count: 6, meters: 50, code: "B2", rest: "20″" },
+    { meters: 200, code: "A1" },
+  ];
+  let sessionLabel = "Sessione oggi";
   let checkBullet = "- Monitora passo medio/100m e sensazione di fatica (RPE) a fine seduta.";
   let questionBullet = "- Quante sedute reali puoi fare nei prossimi 7 giorni (2/3/4)?";
 
   if (mentionsFatigue) {
-    sessionBullet =
-      "- Sessione oggi (scarico): 200 sciolti + 10x50 tecnica con 20\" rec + 6x75 aerobici facili + 150 defaticamento.";
+    sessionLabel = "Sessione oggi (scarico)";
+    today = [
+      { meters: 200, code: "A1" },
+      { count: 10, meters: 50, label: "tecnica", code: "A1", rest: "20″", freestyle: false },
+      { count: 6, meters: 75, code: "A2", rest: "20″" },
+      { meters: 150, code: "A1" },
+    ];
     checkBullet = "- Se RPE supera 6/10 o il passo peggiora oltre 3\"/100m, chiudi la serie principale.";
     questionBullet = "- Domani vuoi seduta breve tecnica (35-40') o riposo completo?";
   } else if (speedGoal) {
-    sessionBullet =
-      "- Sessione oggi (focus 50/100): 300 warm-up + 2x(6x25 veloce con 30\" rec) + 4x50 a ritmo gara + 200 sciolti.";
+    sessionLabel = "Sessione oggi (focus 50/100)";
+    today = [
+      { meters: 300, code: "A1" },
+      { sets: 2, count: 6, meters: 25, code: "C3", rest: "30″" },
+      { count: 4, meters: 50, code: "C2", rest: "1′" },
+      { meters: 200, code: "A1" },
+    ];
     checkBullet = "- Monitora tempo medio sui 25 veloci e mantenimento tecnica nelle ultime ripetute.";
     questionBullet = "- Hai riferimenti cronometrici attuali su 25m o 50m per calibrare i target?";
   }
+  const next: FallbackRep[] = [
+    { count: 3, meters: 400, code: "A2", rest: "30″" },
+    { count: 6, meters: 50, code: "B1", rest: "15″" },
+  ];
+  const sessionBullet = `- ${sessionLabel}: ${sessionText(today, safety)}.`;
+  const used = new Set([...today, ...next].map((rep) => rep.code));
+  const zoneLines = PACE_ZONE_CODES.filter((code) => used.has(code)).map((code) => zoneLine(code, ranges));
+  if (ranges.length === 0) zoneLines.push("- Passi delle zone non disponibili: servono il passo soglia o le tue zone.");
 
   const shoulderLine = mentionsShoulder
     ? "- Vincolo spalla: evita palette/farfalla e interrompi se dolore >3/10, valutando un professionista."
@@ -209,15 +305,18 @@ function fallbackMessage(
 
   return [
     "Lettura dati",
-    `- Performance: ${performance ?? "n/d"} · Consistency: ${consistency ?? "n/d"} · Recovery: ${recovery ?? "n/d"}`,
+    `- ${metricsLine}`,
     `- ${latestLine}`,
     `- Obiettivo: ${goal || "n/d"} · Vincoli: ${constraints || "n/d"}`,
     "",
     "Cosa fare adesso",
     `- Focus prossime 2 sedute: ${nextFocus}.`,
     sessionBullet,
-    "- Sessione successiva: lavoro aerobico continuo + 6x50 progressivi in controllo tecnico.",
+    `- Sessione successiva: ${sessionText(next, safety)}, curando la tecnica.`,
     shoulderLine,
+    "",
+    "Le zone di oggi",
+    ...zoneLines,
     "",
     "Check prossimo",
     checkBullet,
@@ -258,10 +357,10 @@ export async function generateCoachChatReply(
   history: CoachChatMessage[],
   preferences?: CoachChatPreferences
 ): Promise<CoachChatResult> {
-  const [profile, advancedResult, recentActivities, workoutsResult, insights] =
+  const [profile, swimMetrics, recentActivities, workoutsResult, insights] =
     await Promise.all([
       getSwimmerProfile(userId),
-      getAdvancedMetrics(userId, 30).catch(() => null),
+      getSwimMetrics(userId).catch(() => null),
       getActivities(userId, 10, 0),
       getExistingWorkouts(userId).catch(() => null),
       listActivityInsights(userId, 5, 0).catch(() => []),
@@ -269,7 +368,7 @@ export async function generateCoachChatReply(
 
   const context: CoachContext = {
     profile,
-    advanced: advancedResult,
+    swimMetrics,
     recentActivities,
     workouts: workoutsResult,
     latestInsights: insights,

@@ -1,51 +1,28 @@
-import { Button } from "@/components/ui/button";
-import { Surface, SurfaceContent } from "@/components/ui/surface";
-import { AlertCircle, Home } from "lucide-react";
-import { useLocation } from "wouter";
+import { useId } from "react";
+import { Link } from "wouter";
+import { SearchX } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
+import { Button } from "@/components/ui/button";
+import { homePathForPlatform } from "@/lib/navigation";
+import { isNativePlatform } from "@/lib/platform";
 
+/** Unknown path inside the shell (the shell's h1 says «SwimForge»): a card and the way home. */
 export default function NotFound() {
-  const [, setLocation] = useLocation();
-
-  const handleGoHome = () => {
-    setLocation("/");
-  };
-
+  const titleId = useId();
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low" className="flex items-center justify-center p-4" withShell={false}>
-      <Surface className="w-full max-w-lg mx-4 shadow-2xl border border-[oklch(0.25_0.05_220)] bg-[oklch(0.15_0.03_220_/_0.7)] backdrop-blur-lg">
-        <SurfaceContent className="pt-8 pb-8 text-center">
-          <div className="flex justify-center mb-6">
-            <div className="relative">
-              <div className="absolute inset-0 bg-red-500/20 rounded-full animate-pulse" />
-              <AlertCircle className="relative h-16 w-16 text-red-400" />
-            </div>
-          </div>
-
-          <h1 className="text-4xl font-bold text-white mb-2">404</h1>
-
-          <h2 className="text-xl font-semibold text-[oklch(0.75_0.04_220)] mb-4">
-            Pagina non trovata
-          </h2>
-
-          <p className="text-[oklch(0.65_0.03_220)] mb-8 leading-relaxed">
-            La pagina che cerchi non esiste o è stata spostata.
-          </p>
-
-          <div
-            id="not-found-button-group"
-            className="flex flex-col sm:flex-row gap-3 justify-center"
-          >
-            <Button
-              onClick={handleGoHome}
-              className="bg-gradient-to-r from-[oklch(0.70_0.18_220)] to-[oklch(0.70_0.15_195)] text-white px-6 py-2.5 rounded-lg transition-all duration-200 shadow-lg hover:opacity-90"
-            >
-              <Home className="w-4 h-4 mr-2" />
-              Torna alla home
-            </Button>
-          </div>
-        </SurfaceContent>
-      </Surface>
+    <AppLayout>
+      <section aria-labelledby={titleId} className="surface-panel mx-auto max-w-lg p-6 text-center">
+        <SearchX className="mx-auto size-10 text-muted-foreground" aria-hidden />
+        <h2 id={titleId} className="mt-3 text-[17px] font-bold">
+          Pagina non trovata
+        </h2>
+        <p className="mt-1 text-[15px] text-muted-foreground">
+          La pagina che cerchi non esiste o è stata spostata.
+        </p>
+        <Button asChild className="mt-5">
+          <Link href={homePathForPlatform(isNativePlatform())}>Torna alla home</Link>
+        </Button>
+      </section>
     </AppLayout>
   );
 }

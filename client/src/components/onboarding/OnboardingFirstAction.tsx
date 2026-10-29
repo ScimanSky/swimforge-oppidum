@@ -1,4 +1,5 @@
 import { useLocation } from "wouter";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { type OnboardingRole } from "@/lib/onboarding";
 
@@ -7,6 +8,12 @@ type Props = {
   onDismiss: () => void;
 };
 
+/** Title of the last onboarding step (the dialog's title): it depends on the role. */
+export function firstActionTitle(role: OnboardingRole): string {
+  return role === "coach" ? "Crea il tuo club adesso" : "Registra la tua prima nuotata";
+}
+
+/** Last onboarding step: one suggested first action, or «Lo farò dopo». */
 export function OnboardingFirstAction({ role, onDismiss }: Props) {
   const [, setLocation] = useLocation();
 
@@ -18,21 +25,19 @@ export function OnboardingFirstAction({ role, onDismiss }: Props) {
   if (role === "coach") {
     return (
       <div className="flex flex-col gap-4">
-        <h3 className="font-display text-xl font-semibold text-foreground">
-          Crea il tuo club adesso
-        </h3>
         <p className="text-sm text-muted-foreground">
-          O unisciti ad uno esistente con un codice invito.
+          O unisciti a uno esistente con un codice invito.
         </p>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Button variant="neon" onClick={() => handleAction("/home/community?create=1")}>
-            → Crea club
+          <Button onClick={() => handleAction("/home/community?create=1")}>
+            Crea club
+            <ArrowRight aria-hidden />
           </Button>
-          <Button variant="outline-neon" onClick={() => handleAction("/home/community")}>
+          <Button variant="outline" onClick={() => handleAction("/home/community")}>
             Ho un codice invito
           </Button>
         </div>
-        <Button variant="ghost-neon" className="mt-1 text-xs" onClick={onDismiss}>
+        <Button variant="ghost" className="self-start" onClick={onDismiss}>
           Lo farò dopo
         </Button>
       </div>
@@ -41,18 +46,16 @@ export function OnboardingFirstAction({ role, onDismiss }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
-      <h3 className="font-display text-xl font-semibold text-foreground">
-        Logga la tua prima vasca
-      </h3>
       <p className="text-sm text-muted-foreground">
-        Ci vogliono 30 secondi. Sblocchi subito il badge &ldquo;Benvenuto&rdquo; e +50 XP.
+        Ci vogliono 30 secondi. Sblocchi subito il badge «Benvenuto» e <span className="font-semibold text-xp">+50 XP</span>.
       </p>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Button variant="neon" onClick={() => handleAction("/track")}>
-          → Log attività
+        <Button onClick={() => handleAction("/track")}>
+          Vai alle attività
+          <ArrowRight aria-hidden />
         </Button>
       </div>
-      <Button variant="ghost-neon" className="mt-1 text-xs" onClick={onDismiss}>
+      <Button variant="ghost" className="self-start" onClick={onDismiss}>
         Lo farò dopo
       </Button>
     </div>

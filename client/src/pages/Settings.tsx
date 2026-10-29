@@ -1,13 +1,14 @@
-"use client"
-
 import { assetUrl } from "@/lib/asset-base";
 import AppLayout from "@/components/AppLayout"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
-import { MetricOrb } from "@/components/metrics/MetricOrb"
+import { Metric, type MetricProps } from "@/components/corsia/Metric"
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState"
+import { FieldError, fieldAria } from "@/components/auth/form-fields"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
@@ -26,18 +27,11 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  User,
-  Bell,
-  Link,
-  Shield,
-  Palette,
-  Globe,
   Camera,
   Check,
-  ExternalLink,
+  Download,
   Trash2,
   LogOut,
-  Smartphone,
   AlertTriangle,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
@@ -46,6 +40,13 @@ import { registerPushToken, unregisterPushToken } from "@/lib/push"
 import { clearNativeSessionToken } from "@/lib/session-token"
 import { UNAUTHED_ERR_MSG } from "@shared/const"
 import { ONBOARDING_FORCE_QUERY_PARAM } from "@/lib/onboarding"
+import { useSettingsTab } from "@/hooks/useSettingsTab"
+import { prefersReducedMotion } from "@/hooks/usePrefersReducedMotion"
+import { homePathForPlatform } from "@/lib/navigation"
+import { isNativePlatform } from "@/lib/platform"
+import { formatInteger } from "@/lib/format"
+import { errorToastMessage } from "@/lib/trpc-errors"
+import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
 import { it } from "date-fns/locale"
 import { toast } from "sonner"
@@ -57,56 +58,56 @@ import { Link as RouterLink, useLocation } from "wouter"
 const notificationSettings = [
   {
     id: "in_app_notifications",
-    title: "Notifiche in App",
+    title: "Notifiche nell'app",
     description: "Mostra la campanella e gli avvisi direttamente dentro SwimForge",
     enabled: true,
   },
   {
     id: "activity_sync",
-    title: "Sincronizzazione Attivita",
-    description: "Notifica quando nuove attivita vengono sincronizzate",
+    title: "Sincronizzazione attività",
+    description: "Notifica quando nuove attività vengono sincronizzate",
     enabled: true,
   },
   {
     id: "weekly_summary",
-    title: "Riepilogo Settimanale",
-    description: "Ricevi un report delle tue performance ogni lunedi",
+    title: "Riepilogo settimanale",
+    description: "Ricevi un riepilogo delle tue prestazioni ogni lunedì",
     enabled: true,
   },
   {
     id: "ai_insights",
-    title: "Insights AI",
+    title: "Suggerimenti AI",
     description: "Notifiche quando l'AI ha nuovi suggerimenti per te",
     enabled: true,
   },
   {
     id: "challenges",
-    title: "Sfide e Competizioni",
+    title: "Sfide e competizioni",
     description: "Aggiornamenti sulle sfide a cui partecipi",
     enabled: true,
   },
   {
     id: "social",
-    title: "Attivita Social",
-    description: "Quando qualcuno ti segue o reagisce alle tue attivita",
+    title: "Attività social",
+    description: "Quando qualcuno ti segue o reagisce alle tue attività",
     enabled: false,
   },
   {
     id: "friends_activity",
-    title: "Attivita Amici",
+    title: "Attività degli amici",
     description: "Quando i tuoi amici completano un allenamento",
     enabled: false,
   },
   {
     id: "badges",
-    title: "Badge e Achievement",
+    title: "Badge e traguardi",
     description: "Quando sblocchi nuovi badge o livelli",
     enabled: true,
   },
   {
     id: "marketing",
-    title: "Novita e Aggiornamenti",
-    description: "News su nuove funzionalita di SwimForge",
+    title: "Novità e aggiornamenti",
+    description: "Notizie sulle nuove funzioni di SwimForge",
     enabled: false,
   },
 ]
@@ -145,12 +146,12 @@ const consentItems = [
   },
   {
     type: "garmin_sync",
-    title: "Consenso Garmin Sync",
+    title: "Sincronizzazione Garmin",
     description: "Autorizza l'importazione e il trattamento dei dati da Garmin Connect.",
   },
   {
     type: "strava_sync",
-    title: "Consenso Strava Sync",
+    title: "Sincronizzazione Strava",
     description: "Autorizza l'importazione e il trattamento dei dati da Strava.",
   },
   {
@@ -160,10 +161,13 @@ const consentItems = [
   },
   {
     type: "cookie_analytics",
-    title: "Cookie analytics",
+    title: "Cookie analitici",
     description: "Consenso ai cookie analitici opzionali.",
   },
 ] as const
+
+/** A query with no data and no error: still loading, or paused offline (isLoading is false then). */
+const awaitingData = (query: { data?: unknown; isError: boolean }) => query.data === undefined && !query.isError
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null
@@ -196,7 +200,7 @@ const normalizeNotificationSettings = (
 }
 
 const strokeOptions = [
-  { value: "auto", label: "Auto (da attivita)" },
+  { value: "auto", label: "Automatico (dalle attività)" },
   { value: "freestyle", label: "Stile libero" },
   { value: "backstroke", label: "Dorso" },
   { value: "breaststroke", label: "Rana" },
@@ -205,35 +209,12 @@ const strokeOptions = [
 ]
 
 export default function Settings() {
-  const [location, setLocation] = useLocation()
+  const [, setLocation] = useLocation()
+  const { activeTab, selectTab: updateTabInUrl, onboarding } = useSettingsTab()
 
-  const urlParams = useMemo(() => {
-    const query = location.split("?")[1] ?? ""
-    return new URLSearchParams(query)
-  }, [location])
-
-  const onboarding = urlParams.get("onboarding") === "1"
-
-  const tabFromUrl = useMemo(() => {
-    const tab = urlParams.get("tab")
-    const allowed = new Set(["profile", "connections", "notifications", "preferences", "privacy"])
-    return tab && allowed.has(tab) ? tab : "profile"
-  }, [urlParams])
-
-  const [activeTab, setActiveTab] = useState(tabFromUrl)
-
-  useEffect(() => {
-    setActiveTab(tabFromUrl)
-  }, [tabFromUrl])
-
-  const updateTabInUrl = (nextTab: string) => {
-    const basePath = location.split("?")[0] || "/settings"
-    const nextParams = new URLSearchParams(urlParams)
-    nextParams.set("tab", nextTab)
-    setActiveTab(nextTab)
-    setLocation(`${basePath}?${nextParams.toString()}`)
-  }
-
+  const garminHeadingRef = useRef<HTMLHeadingElement | null>(null)
+  // «Collega/Gestisci Garmin Connect»: scroll to the Garmin card (at once with reduced motion)
+  // and move the focus to its title, so keyboard and screen reader users land there too.
   const scrollToGarminControls = () => {
     if (activeTab !== "connections") {
       updateTabInUrl("connections")
@@ -241,17 +222,23 @@ export default function Settings() {
     if (typeof window === "undefined") return
     window.setTimeout(() => {
       const target = document.getElementById("garmin-connection-controls")
-      target?.scrollIntoView({ behavior: "smooth", block: "start" })
+      target?.scrollIntoView?.({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" })
+      garminHeadingRef.current?.focus({ preventScroll: true })
     }, 120)
   }
 
   const utils = trpc.useUtils()
-  const { data: me } = trpc.auth.me.useQuery()
+  const meQuery = trpc.auth.me.useQuery()
+  const me = meQuery.data
   const deleteAccountStatusQuery = trpc.auth.deleteAccountStatus.useQuery()
-  const { data: profile } = trpc.profile.get.useQuery()
-  const { data: activities } = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
-  const { data: garminStatus } = trpc.garmin.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 })
-  const { data: stravaStatus } = trpc.strava.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 })
+  const profileQuery = trpc.profile.get.useQuery()
+  const profile = profileQuery.data
+  const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
+  const activities = activitiesQuery.data
+  const garminStatusQuery = trpc.garmin.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 })
+  const garminStatus = garminStatusQuery.data
+  const stravaStatusQuery = trpc.strava.status.useQuery(undefined, { staleTime: 5 * 60 * 1000 })
+  const stravaStatus = stravaStatusQuery.data
   const consentsQuery = trpc.consent.list.useQuery(undefined, { staleTime: 30_000 })
 
   type GarminSyncResult = { synced?: number; error?: string; detectedPbs?: unknown[] }
@@ -273,9 +260,12 @@ export default function Settings() {
       }
       utils.activities.list.invalidate()
       utils.profile.get.invalidate()
+      // Swim metrics (Statistiche, Coach, the profile's streak) and personal records.
+      void utils.statistics.invalidate()
+      void utils.records.invalidate()
     },
     onError: (error) => {
-      toast.error("Errore nella sincronizzazione: " + error.message)
+      toast.error(errorToastMessage(error, "Sincronizzazione non riuscita."))
     },
   })
 
@@ -300,7 +290,7 @@ export default function Settings() {
   }, [activities])
 
   const favoriteStroke = useMemo(() => {
-    if (!activities || activities.length === 0) return "Non disponibile"
+    if (!activities || activities.length === 0) return null
     const counts: Record<string, number> = {}
     activities.forEach((activity) => {
       const stroke = activity.strokeType || "mixed"
@@ -309,7 +299,7 @@ export default function Settings() {
     const [top] = Object.entries(counts).sort((a, b) => b[1] - a[1])
     const strokeKey = top?.[0] || "mixed"
     const labels: Record<string, string> = {
-      freestyle: "Stile Libero",
+      freestyle: "Stile libero",
       backstroke: "Dorso",
       breaststroke: "Rana",
       butterfly: "Farfalla",
@@ -317,53 +307,33 @@ export default function Settings() {
     }
     return labels[strokeKey] || "Misto"
   }, [activities])
-  const settingsOrbs = useMemo(() => {
-    const totalActivities =
-      (activitiesBySource.garmin || 0) + (activitiesBySource.strava || 0) + (activitiesBySource.manual || 0)
-    const totalXp = Number(profile?.totalXp ?? 0)
-    const levelTarget = Number(profile?.nextLevelXp ?? 0)
-    const connected = Number(Boolean(garminStatus?.connected)) + Number(Boolean(stravaStatus?.connected))
-
-    return [
-      {
-        label: "XP totale",
-        value: totalXp.toLocaleString(),
-        progress: levelTarget > 0 ? Math.min(100, Math.round((totalXp / levelTarget) * 100)) : 0,
-        helper: levelTarget > 0 ? `Target ${levelTarget.toLocaleString()}` : "Profilo",
-        icon: <Check className="size-4" />,
-        tone: "cyan" as const,
-      },
-      {
-        label: "Integrazioni",
-        value: `${connected}/2`,
-        progress: Math.round((connected / 2) * 100),
-        helper: "Garmin + Strava",
-        icon: <Smartphone className="size-4" />,
-        tone: "lime" as const,
-      },
-      {
-        label: "Attività importate",
-        value: totalActivities,
-        progress: Math.min(100, Math.round((totalActivities / 250) * 100)),
-        helper: `${activitiesBySource.garmin} G • ${activitiesBySource.strava} S • ${activitiesBySource.manual} M`,
-        icon: <Globe className="size-4" />,
-        tone: "amber" as const,
-      },
-      {
-        label: "Stile preferito",
-        value: favoriteStroke,
-        progress: totalActivities > 0 ? 100 : 0,
-        helper: "Basato su storico",
-        icon: <Palette className="size-4" />,
-        tone: "sky" as const,
-      },
-    ]
-  }, [activitiesBySource, profile?.totalXp, profile?.nextLevelXp, garminStatus?.connected, stravaStatus?.connected, favoriteStroke])
+  // Summary at the top: only the figures that have data (Corsia: a metric without data is not shown).
+  const summaryMetrics = useMemo(() => {
+    const metrics: MetricProps[] = []
+    if (profile) {
+      metrics.push({ value: formatInteger(Number(profile.totalXp ?? 0)), label: "XP totale", tone: "xp" })
+    }
+    if (garminStatus && stravaStatus) {
+      const connected = Number(Boolean(garminStatus.connected)) + Number(Boolean(stravaStatus.connected))
+      metrics.push({ value: String(connected), unit: "di 2", label: "Integrazioni attive" })
+    }
+    if (activities) {
+      const totalActivities = activitiesBySource.garmin + activitiesBySource.strava + activitiesBySource.manual
+      metrics.push({ value: formatInteger(totalActivities), label: "Attività importate" })
+    }
+    if (favoriteStroke) metrics.push({ value: favoriteStroke, label: "Stile più nuotato" })
+    return metrics
+  }, [activities, activitiesBySource, favoriteStroke, garminStatus, profile, stravaStatus])
+  const summaryLoading =
+    awaitingData(profileQuery) ||
+    awaitingData(activitiesQuery) ||
+    awaitingData(garminStatusQuery) ||
+    awaitingData(stravaStatusQuery)
 
   const preferredPool = useMemo(() => {
     const length = activities?.[0]?.poolLengthMeters
     if (!length) return "Non disponibile"
-    return `${length}m ${length === 50 ? "(Olimpica)" : "(Corta)"}`
+    return `${length}m ${length === 50 ? "(olimpica)" : "(corta)"}`
   }, [activities])
 
   const formatLastSync = (value?: Date | string | null) => {
@@ -433,11 +403,11 @@ export default function Settings() {
   }, [])
 
   const updateProfileMutation = trpc.profile.update.useMutation({
-		onSuccess: () => {
-			void utils.profile.get.invalidate()
-			void utils.auth.me.invalidate()
-		},
-	})
+    onSuccess: () => {
+      void utils.profile.get.invalidate()
+      void utils.auth.me.invalidate()
+    },
+  })
   const uploadMediaMutation = trpc.profile.uploadMedia.useMutation()
   const logoutAllDevicesMutation = trpc.auth.logoutAllDevices.useMutation({
     onSuccess: async () => {
@@ -456,7 +426,7 @@ export default function Settings() {
       // Still signed in (not an expired session): restore the push registration removed
       // before the call. A wrong password is UNAUTHORIZED too, but keeps the session.
       if (error.message !== UNAUTHED_ERR_MSG) void registerPushToken()
-      toast.error(error.message || "Impossibile disconnettere tutte le sessioni.")
+      toast.error(errorToastMessage(error, "Impossibile disconnettere tutte le sessioni."))
     },
   })
   const deleteAccountMutation = trpc.auth.deleteAccount.useMutation({
@@ -480,11 +450,16 @@ export default function Settings() {
       // Still signed in (not an expired session): restore the push registration removed
       // before the call. A wrong password is UNAUTHORIZED too, but keeps the session.
       if (error.message !== UNAUTHED_ERR_MSG) void registerPushToken()
-      toast.error(error.message || "Impossibile eliminare l'account.")
+      // A wrong password is UNAUTHORIZED with its own Italian message: shown under the field.
+      if (error.data?.code === "UNAUTHORIZED" && error.message !== UNAUTHED_ERR_MSG) {
+        setDeletePasswordError(error.message || "Password non corretta")
+        return
+      }
+      toast.error(errorToastMessage(error, "Impossibile eliminare l'account."))
     },
   })
   const setConsentMutation = trpc.consent.set.useMutation({
-    onError: (error) => toast.error(error.message || "Impossibile aggiornare il consenso."),
+    onError: (error) => toast.error(errorToastMessage(error, "Impossibile aggiornare il consenso.")),
   })
   const resetAppForLaunchMutation = trpc.auth.resetAppForLaunch.useMutation({
     onSuccess: async () => {
@@ -498,13 +473,18 @@ export default function Settings() {
       window.location.href = "/"
     },
     onError: (error) => {
-      toast.error(error.message || "Reset non riuscito.")
+      toast.error(errorToastMessage(error, "Reset non riuscito."))
     },
   })
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   // True while the push token is removed before logout-all / delete (buttons disabled).
   const [isUnregistering, setIsUnregistering] = useState(false)
   const [deletePassword, setDeletePassword] = useState("")
+  const [deletePasswordError, setDeletePasswordError] = useState<string | null>(null)
+  const deletePasswordId = useId()
+  useEffect(() => {
+    if (deletePasswordError) document.getElementById(deletePasswordId)?.focus()
+  }, [deletePasswordError, deletePasswordId])
   const [resetDialogOpen, setResetDialogOpen] = useState(false)
   const [resetConfirmationText, setResetConfirmationText] = useState("")
   const [consentState, setConsentState] = useState<Record<string, boolean>>({})
@@ -607,9 +587,7 @@ export default function Settings() {
           return null
         }
       }
-      toast.error(
-        message || "Upload fallito: controlla le policy di Supabase Storage."
-      )
+      toast.error(errorToastMessage(error, "Caricamento non riuscito. Riprova."))
       return null
     }
   }
@@ -617,25 +595,35 @@ export default function Settings() {
   const handleAvatarUpload = async (file?: File | null) => {
     if (!file) return
     setIsUploadingAvatar(true)
-    const url = await uploadToProfileBucket(file, "avatar")
-    if (url) {
-      setProfileDraft((prev) => ({ ...prev, avatarUrl: url }))
-      await updateProfileMutation.mutateAsync({ avatarUrl: url })
-      toast.success("Avatar aggiornato.")
+    try {
+      const url = await uploadToProfileBucket(file, "avatar")
+      if (url) {
+        setProfileDraft((prev) => ({ ...prev, avatarUrl: url }))
+        await updateProfileMutation.mutateAsync({ avatarUrl: url })
+        toast.success("Avatar aggiornato.")
+      }
+    } catch (error: unknown) {
+      toast.error(errorToastMessage(error, "Impossibile aggiornare la foto profilo."))
+    } finally {
+      setIsUploadingAvatar(false)
     }
-    setIsUploadingAvatar(false)
   }
 
   const handleCoverUpload = async (file?: File | null) => {
     if (!file) return
     setIsUploadingCover(true)
-    const url = await uploadToProfileBucket(file, "cover")
-    if (url) {
-      setProfileDraft((prev) => ({ ...prev, coverUrl: url }))
-      await updateProfileMutation.mutateAsync({ coverUrl: url })
-      toast.success("Cover aggiornata.")
+    try {
+      const url = await uploadToProfileBucket(file, "cover")
+      if (url) {
+        setProfileDraft((prev) => ({ ...prev, coverUrl: url }))
+        await updateProfileMutation.mutateAsync({ coverUrl: url })
+        toast.success("Cover aggiornata.")
+      }
+    } catch (error: unknown) {
+      toast.error(errorToastMessage(error, "Impossibile aggiornare la cover."))
+    } finally {
+      setIsUploadingCover(false)
     }
-    setIsUploadingCover(false)
   }
 
   const handleSaveProfile = async () => {
@@ -643,16 +631,20 @@ export default function Settings() {
       .trim()
       .replace(/^@+/, "")
     const normalizedEmail = profileDraft.email.trim()
-    await updateProfileMutation.mutateAsync({
-      name: profileDraft.name.trim() || undefined,
-      email: normalizedEmail || undefined,
-      bio: profileDraft.bio || undefined,
-      location: profileDraft.location || undefined,
-      lastName: profileDraft.lastName.trim() || undefined,
-      username: normalizedUsername || undefined,
-      birthDate: profileDraft.birthDate || null,
-    })
-    toast.success("Profilo aggiornato.")
+    try {
+      await updateProfileMutation.mutateAsync({
+        name: profileDraft.name.trim() || undefined,
+        email: normalizedEmail || undefined,
+        bio: profileDraft.bio || undefined,
+        location: profileDraft.location || undefined,
+        lastName: profileDraft.lastName.trim() || undefined,
+        username: normalizedUsername || undefined,
+        birthDate: profileDraft.birthDate || null,
+      })
+      toast.success("Profilo aggiornato.")
+    } catch (error: unknown) {
+      toast.error(errorToastMessage(error, "Impossibile salvare il profilo."))
+    }
   }
 
   const handleSaveSwimmerProfile = async () => {
@@ -661,20 +653,24 @@ export default function Settings() {
       ? Math.round(poolLengthValue)
       : null
 
-    await updateProfileMutation.mutateAsync({
-      preferredStroke:
-        profileDraft.preferredStroke === "auto"
-          ? null
-          : (profileDraft.preferredStroke as
-              | "freestyle"
-              | "backstroke"
-              | "breaststroke"
-              | "butterfly"
-              | "mixed"),
-      preferredPoolLengthMeters,
-      masterCategory: profileDraft.masterCategory.trim() || undefined,
-    })
-    toast.success("Profilo nuotatore aggiornato.")
+    try {
+      await updateProfileMutation.mutateAsync({
+        preferredStroke:
+          profileDraft.preferredStroke === "auto"
+            ? null
+            : (profileDraft.preferredStroke as
+                | "freestyle"
+                | "backstroke"
+                | "breaststroke"
+                | "butterfly"
+                | "mixed"),
+        preferredPoolLengthMeters,
+        masterCategory: profileDraft.masterCategory.trim() || undefined,
+      })
+      toast.success("Profilo nuotatore aggiornato.")
+    } catch (error: unknown) {
+      toast.error(errorToastMessage(error, "Impossibile salvare il profilo nuotatore."))
+    }
   }
 
   const [notifications, setNotifications] = useState(defaultNotificationState)
@@ -739,8 +735,7 @@ export default function Settings() {
     try {
       await updateProfileMutation.mutateAsync(payload)
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : undefined
-      toast.error(message || "Impossibile salvare le impostazioni.")
+      toast.error(errorToastMessage(error, "Impossibile salvare le impostazioni."))
     }
   }
 
@@ -764,7 +759,13 @@ export default function Settings() {
     }
   }
 
+  // The marketing consent also saves the notification settings: never from the defaults, only
+  // once the profile's own settings are here (the switch is disabled until then).
+  const consentNeedsProfile = (consentType: typeof consentItems[number]["type"]) =>
+    consentType === "marketing_communications" && !profile
+
   const toggleConsent = async (consentType: typeof consentItems[number]["type"], granted: boolean) => {
+    if (consentNeedsProfile(consentType)) return
     setConsentState((prev) => ({ ...prev, [consentType]: granted }))
     try {
       await setConsentMutation.mutateAsync({ consentType, granted })
@@ -797,8 +798,7 @@ export default function Settings() {
       URL.revokeObjectURL(url)
       toast.success("Esportazione completata.")
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : undefined
-      toast.error(message || "Impossibile esportare i dati.")
+      toast.error(errorToastMessage(error, "Impossibile esportare i dati."))
     }
   }
 
@@ -814,12 +814,16 @@ export default function Settings() {
     logoutAllDevicesMutation.mutate()
   }
 
+  const isDeletingAccount = isUnregistering || deleteAccountMutation.isPending
+
   const handleDeleteAccount = async () => {
     if (deleteRequiresPassword && !deletePassword.trim()) {
-      toast.error("Inserisci la password per confermare l'eliminazione.")
+      setDeletePasswordError("Inserisci la password per confermare l'eliminazione.")
+      document.getElementById(deletePasswordId)?.focus()
       return
     }
-    if (isUnregistering || deleteAccountMutation.isPending) return
+    setDeletePasswordError(null)
+    if (isDeletingAccount) return
     // Before the server call: push.unregister needs the session.
     setIsUnregistering(true)
     try {
@@ -832,954 +836,984 @@ export default function Settings() {
     )
   }
 
+  // No data yet and no error: loading, or paused offline (isLoading is false then).
+  const profileLoading = awaitingData(meQuery) || awaitingData(profileQuery)
+  const profileFailed = (meQuery.isError && !me) || (profileQuery.isError && !profile)
+  const retryProfile = () => {
+    if (meQuery.isError) void meQuery.refetch()
+    if (profileQuery.isError) void profileQuery.refetch()
+  }
+  // Tabs whose values come from profile.get: never shown with defaults that a toggle would save.
+  const profileGate = (label: string): ReactNode =>
+    profileLoading ? (
+      <LoadingSkeleton label={label} count={3} itemClassName="h-24 w-full rounded-2xl" />
+    ) : profileFailed ? (
+      <LoadError onRetry={retryProfile} />
+    ) : null
+
+  const statusesLoading = awaitingData(garminStatusQuery) || awaitingData(stravaStatusQuery)
+  const statusesFailed = (garminStatusQuery.isError && !garminStatus) || (stravaStatusQuery.isError && !stravaStatus)
+  const accounts = [
+    {
+      name: "Garmin Connect",
+      connected: garminStatus?.connected ?? false,
+      lastSync: garminStatus?.lastSync ?? null,
+      activities: activitiesBySource.garmin,
+      // Connect, sync and disconnect are in the Garmin card below.
+      manage: true,
+    },
+    {
+      name: "Strava",
+      connected: stravaStatus?.connected ?? false,
+      lastSync: stravaStatus?.lastSync ?? null,
+      activities: activitiesBySource.strava,
+    },
+    {
+      name: "Apple Health",
+      connected: false,
+      lastSync: null,
+      activities: 0,
+      comingSoon: true,
+    },
+  ]
+
   return (
     <AppLayout>
-    <div className="compact-shell space-y-4 lg:space-y-2">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-display font-bold neon-gradient-text">Impostazioni</h1>
-        <p className="text-muted-foreground">Gestisci il tuo account e le preferenze</p>
-      </div>
+      <div className="space-y-4">
+        <SummarySection metrics={summaryMetrics} loading={summaryLoading} />
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-        {settingsOrbs.map((item) => (
-          <MetricOrb
-            key={item.label}
-            label={item.label}
-            value={item.value}
-            progress={item.progress}
-            helper={item.helper}
-            icon={item.icon}
-            tone={item.tone}
-            size="sm"
-          />
-        ))}
-      </div>
-
-      {onboarding && (
-        <section className="surface-panel p-6">
-          <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="space-y-1">
-              <p className="font-medium text-foreground">Benvenuto su SwimForge</p>
-              {activeTab === "profile" ? (
-                <p className="text-sm text-muted-foreground">
-                  Step 1: completa il profilo (foto, cover e dati). Poi passa a Connessioni per collegare Garmin.
-                </p>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Step 2: collega Garmin Connect e avvia la prima sincronizzazione.
-                </p>
-              )}
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
+        {onboarding && (
+          <Section title="Benvenuto su SwimForge">
+            <p className="mt-1 text-[15px] text-muted-foreground">
+              {activeTab === "profile"
+                ? "Passo 1 di 2: completa il profilo (foto, cover e dati). Poi passa a Connessioni per collegare Garmin."
+                : "Passo 2 di 2: collega Garmin Connect e avvia la prima sincronizzazione."}
+            </p>
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               {activeTab !== "connections" ? (
-                <Button variant="neon" onClick={() => updateTabInUrl("connections")}>
-                  Vai a Connessioni
-                </Button>
+                <Button onClick={() => updateTabInUrl("connections")}>Vai a Connessioni</Button>
               ) : (
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <>
                   <GarminSyncCountPicker
                     value={garminSyncCount}
                     onChange={setGarminSyncCount}
                     disabled={!garminStatus?.connected || garminSyncMutation.isPending}
                   />
                   <Button
-                    variant="neon"
                     onClick={() => garminSyncMutation.mutate({ daysBack: 30, maxActivities: garminSyncCount })}
                     disabled={!garminStatus?.connected || garminSyncMutation.isPending}
                   >
-                    {garminSyncMutation.isPending ? "Sincronizzazione..." : garminSyncButtonLabel(garminSyncCount)}
+                    {garminSyncMutation.isPending ? "Sincronizzazione…" : garminSyncButtonLabel(garminSyncCount)}
                   </Button>
-                </div>
+                </>
               )}
-              <Button variant="outline-neon" onClick={() => (window.location.href = "/home")}>
-                Vai alla Home
+              <Button asChild variant="outline">
+                <RouterLink href={homePathForPlatform(isNativePlatform())}>Vai alla home</RouterLink>
               </Button>
             </div>
-          </div>
-        </section>
-      )}
+          </Section>
+        )}
 
-      <Tabs value={activeTab} onValueChange={updateTabInUrl}>
-        <div className="grid gap-6 xl:grid-cols-[minmax(240px,320px)_minmax(0,1fr)]">
-          <div className="xl:sticky xl:top-24 h-fit">
-            <section className="surface-panel p-6 glass-panel">
-              <div>
-                <h3 className="font-display text-base">Sezioni</h3>
-                <p>Scegli l&apos;area da aggiornare</p>
-              </div>
-              <div>
-                <TabsList className="flex h-auto w-full flex-col items-stretch gap-2">
-                  <TabsTrigger value="profile" className="h-auto w-full flex-none justify-start gap-2">
-                    <User className="w-4 h-4" />
-                    Profilo
-                  </TabsTrigger>
-                  <TabsTrigger value="connections" className="h-auto w-full flex-none justify-start gap-2">
-                    <Link className="w-4 h-4" />
-                    Connessioni
-                  </TabsTrigger>
-                  <TabsTrigger value="notifications" className="h-auto w-full flex-none justify-start gap-2">
-                    <Bell className="w-4 h-4" />
-                    Notifiche
-                  </TabsTrigger>
-                  <TabsTrigger value="preferences" className="h-auto w-full flex-none justify-start gap-2">
-                    <Palette className="w-4 h-4" />
-                    Preferenze
-                  </TabsTrigger>
-                  <TabsTrigger value="privacy" className="h-auto w-full flex-none justify-start gap-2">
-                    <Shield className="w-4 h-4" />
-                    Privacy
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-            </section>
-          </div>
+        <Tabs value={activeTab} onValueChange={updateTabInUrl} className="gap-4">
+          <TabsList aria-label="Sezioni delle impostazioni">
+            <TabsTrigger value="profile">Profilo</TabsTrigger>
+            <TabsTrigger value="connections">Connessioni</TabsTrigger>
+            <TabsTrigger value="notifications">Notifiche</TabsTrigger>
+            <TabsTrigger value="preferences">Preferenze</TabsTrigger>
+            <TabsTrigger value="privacy">Privacy</TabsTrigger>
+          </TabsList>
 
-          <div className="min-w-0">
-            {/* Profile Tab */}
-            <TabsContent value="profile" className="space-y-6">
-          <section className="surface-panel p-6">
-            <div>
-              <h3 className="font-display">Informazioni Profilo</h3>
-              <p>Aggiorna le informazioni del tuo profilo pubblico</p>
-            </div>
-            <div className="space-y-6">
-              {/* Cover Image */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-foreground">Cover profilo</p>
-                    <p className="text-sm text-muted-foreground">
-                    JPG/PNG/WEBP · max 20MB
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline-neon"
-                    size="sm"
-                    onClick={() => coverInputRef.current?.click()}
-                    disabled={isUploadingCover}
-                  >
-                    <Camera className="w-4 h-4 mr-2" />
-                    {isUploadingCover ? "Caricamento..." : "Cambia cover"}
-                  </Button>
-                </div>
-                <input
-                  ref={coverInputRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  onChange={(event) => handleCoverUpload(event.target.files?.[0])}
-                />
-                <div className="relative h-36 rounded-xl overflow-hidden bg-background/60">
-                  {profileDraft.coverUrl ? (
-                    <img
-                      src={profileDraft.coverUrl}
-                      alt="Cover profilo"
-                      className="h-full w-full object-cover"
+          {/* Profile Tab */}
+          <TabsContent value="profile" className="space-y-4">
+            {profileGate("Caricamento del profilo…") ?? (
+              <>
+                <Section title="Informazioni profilo" description="Aggiorna le informazioni del tuo profilo pubblico.">
+                  <div className="mt-4 space-y-5">
+                    {/* Cover Image */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="font-semibold">Cover profilo</p>
+                          <p className="text-sm text-muted-foreground">JPG, PNG o WEBP · max 20 MB</p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => coverInputRef.current?.click()}
+                          disabled={isUploadingCover}
+                        >
+                          <Camera aria-hidden />
+                          {isUploadingCover ? "Caricamento…" : "Cambia cover"}
+                        </Button>
+                      </div>
+                      <input
+                        ref={coverInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                        aria-hidden
+                        tabIndex={-1}
+                        onChange={(event) => handleCoverUpload(event.target.files?.[0])}
+                      />
+                      <div className="h-36 overflow-hidden rounded-xl bg-raised">
+                        {profileDraft.coverUrl ? (
+                          <img src={profileDraft.coverUrl} alt="Cover profilo" className="h-full w-full object-cover" />
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* Avatar */}
+                    <div className="flex items-center gap-5">
+                      <div className="relative">
+                        <Avatar className="size-24 border border-border">
+                          <AvatarImage src={profileDraft.avatarUrl || assetUrl("/images/ai_coach_avatar.webp")} alt="" />
+                          <AvatarFallback>{initials}</AvatarFallback>
+                        </Avatar>
+                        <Button
+                          size="icon"
+                          className="absolute -bottom-1 -right-1 rounded-full"
+                          aria-label="Cambia foto profilo"
+                          onClick={() => avatarInputRef.current?.click()}
+                          disabled={isUploadingAvatar}
+                        >
+                          <Camera aria-hidden />
+                        </Button>
+                        <input
+                          ref={avatarInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          className="hidden"
+                          aria-hidden
+                          tabIndex={-1}
+                          onChange={(event) => handleAvatarUpload(event.target.files?.[0])}
+                        />
+                      </div>
+                      <div>
+                        <p className="font-semibold">Foto profilo</p>
+                        <p className="text-sm text-muted-foreground">
+                          {isUploadingAvatar ? "Caricamento…" : "JPG, PNG o WEBP · max 20 MB"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Form Fields */}
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <TextField
+                        label="Nome"
+                        autoComplete="given-name"
+                        value={profileDraft.name}
+                        onChange={(value) => setProfileDraft((prev) => ({ ...prev, name: value }))}
+                      />
+                      <TextField
+                        label="Cognome"
+                        autoComplete="family-name"
+                        value={profileDraft.lastName}
+                        onChange={(value) => setProfileDraft((prev) => ({ ...prev, lastName: value }))}
+                      />
+                      <TextField
+                        label="Username"
+                        autoComplete="username"
+                        value={profileDraft.username}
+                        onChange={(value) => setProfileDraft((prev) => ({ ...prev, username: value }))}
+                      />
+                      <SelectField
+                        label="Nome da mostrare"
+                        value={displayNamePreference}
+                        onChange={(value) => {
+                          const next = value === "nickname" ? "nickname" : "full"
+                          setDisplayNamePreference(next)
+                          localStorage.setItem("swimforge:dashboardDisplayName", next)
+                          toast.success("Preferenza aggiornata.")
+                        }}
+                        options={[
+                          { value: "full", label: "Nome e cognome" },
+                          { value: "nickname", label: "Username" },
+                        ]}
+                      />
+                      <TextField
+                        label="Email"
+                        type="email"
+                        autoComplete="email"
+                        value={profileDraft.email}
+                        onChange={(value) => setProfileDraft((prev) => ({ ...prev, email: value }))}
+                      />
+                      <TextField
+                        label="Città"
+                        autoComplete="address-level2"
+                        value={profileDraft.location}
+                        onChange={(value) => setProfileDraft((prev) => ({ ...prev, location: value }))}
+                      />
+                      <TextField
+                        label="Data di nascita"
+                        type="date"
+                        autoComplete="bday"
+                        value={profileDraft.birthDate}
+                        onChange={(value) => setProfileDraft((prev) => ({ ...prev, birthDate: value }))}
+                      />
+                    </div>
+
+                    <BioField
+                      value={profileDraft.bio}
+                      onChange={(value) => setProfileDraft((prev) => ({ ...prev, bio: value }))}
                     />
-                  ) : (
-                    <div className="h-full w-full bg-[linear-gradient(132deg,#122636_0%,#1f3d54_52%,#102334_100%)]" />
-                  )}
-                </div>
-              </div>
 
-              {/* Avatar */}
-              <div className="flex items-center gap-6">
-                <div className="relative">
-                  <Avatar className="h-24 w-24 border border-border">
-                    <AvatarImage src={profileDraft.avatarUrl || assetUrl("/images/ai_coach_avatar.webp")} alt={displayName} />
-                    <AvatarFallback>{initials}</AvatarFallback>
-                  </Avatar>
-                  <Button
-                    size="icon"
-                    variant="neon"
-                    className="absolute bottom-0 right-0 h-8 w-8 rounded-full"
-                    onClick={() => avatarInputRef.current?.click()}
-                    disabled={isUploadingAvatar}
-                  >
-                    <Camera className="w-4 h-4" />
-                  </Button>
-                  <input
-                    ref={avatarInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    className="hidden"
-                    onChange={(event) => handleAvatarUpload(event.target.files?.[0])}
-                  />
-                </div>
-                <div>
-                  <p className="font-medium text-foreground">Foto Profilo</p>
-                  <p className="text-sm text-muted-foreground">JPG/PNG/WEBP · max 20MB</p>
-                </div>
-              </div>
-
-              {/* Form Fields */}
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Nome</Label>
-                  <Input
-                    value={profileDraft.name}
-                    onChange={(event) =>
-                      setProfileDraft((prev) => ({ ...prev, name: event.target.value }))
-                    }
-                    className="bg-background/60"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Cognome</Label>
-                  <Input
-                    value={profileDraft.lastName}
-                    onChange={(event) =>
-                      setProfileDraft((prev) => ({ ...prev, lastName: event.target.value }))
-                    }
-                    className="bg-background/60"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Username</Label>
-                  <Input
-                    value={profileDraft.username}
-                    onChange={(event) =>
-                      setProfileDraft((prev) => ({ ...prev, username: event.target.value }))
-                    }
-                    className="bg-background/60"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Nome in dashboard</Label>
-                  <Select
-                    value={displayNamePreference}
-                    onValueChange={(value) => {
-                      const next = value === "nickname" ? "nickname" : "full"
-                      setDisplayNamePreference(next)
-                      localStorage.setItem("swimforge:dashboardDisplayName", next)
-                      toast.success("Preferenza aggiornata.")
-                    }}
-                  >
-                    <SelectTrigger className="bg-background/60">
-                      <SelectValue placeholder="Seleziona preferenza" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="full">Nome e Cognome</SelectItem>
-                      <SelectItem value="nickname">Nickname</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input
-                    type="email"
-                    value={profileDraft.email}
-                    onChange={(event) =>
-                      setProfileDraft((prev) => ({ ...prev, email: event.target.value }))
-                    }
-                    className="bg-background/60"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Citta</Label>
-                  <Input
-                    value={profileDraft.location}
-                    onChange={(event) =>
-                      setProfileDraft((prev) => ({ ...prev, location: event.target.value }))
-                    }
-                    className="bg-background/60"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Data di Nascita</Label>
-                  <Input
-                    type="date"
-                    value={profileDraft.birthDate}
-                    onChange={(event) =>
-                      setProfileDraft((prev) => ({ ...prev, birthDate: event.target.value }))
-                    }
-                    className="bg-background/60"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Bio</Label>
-                <textarea
-                  className="h-24 w-full resize-none rounded-lg bg-background/60 p-3 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  value={profileDraft.bio}
-                  onChange={(event) =>
-                    setProfileDraft((prev) => ({ ...prev, bio: event.target.value }))
-                  }
-                />
-              </div>
-
-              <Button variant="neon" onClick={handleSaveProfile} disabled={updateProfileMutation.isPending}>
-                {updateProfileMutation.isPending ? "Salvataggio..." : "Salva Modifiche"}
-              </Button>
-            </div>
-          </section>
-
-          {/* Swimming Profile */}
-          <section className="surface-panel p-6">
-            <div>
-              <h3 className="font-display">Profilo Nuotatore</h3>
-              <p>Informazioni specifiche per il nuoto</p>
-            </div>
-            <div className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Livello</Label>
-                  <Input
-                    value={profile?.aiSkillLabel || profile?.levelTitle || "Non disponibile"}
-                    className="bg-background/60"
-                    disabled
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Stile Preferito</Label>
-                  <Select
-                    value={profileDraft.preferredStroke || "auto"}
-                    onValueChange={(value) =>
-                      setProfileDraft((prev) => ({ ...prev, preferredStroke: value }))
-                    }
-                  >
-                    <SelectTrigger className="bg-background/60">
-                      <SelectValue placeholder="Seleziona stile" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {strokeOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Suggerito: {favoriteStroke}
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label>Lunghezza Piscina Preferita</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={profileDraft.preferredPoolLengthMeters}
-                    onChange={(event) =>
-                      setProfileDraft((prev) => ({
-                        ...prev,
-                        preferredPoolLengthMeters: event.target.value,
-                      }))
-                    }
-                    placeholder={preferredPool}
-                    className="bg-background/60"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Categoria Master</Label>
-                  <Input
-                    value={profileDraft.masterCategory}
-                    onChange={(event) =>
-                      setProfileDraft((prev) => ({ ...prev, masterCategory: event.target.value }))
-                    }
-                    className="bg-background/60"
-                  />
-                </div>
-              </div>
-              <Button variant="neon" onClick={handleSaveSwimmerProfile} disabled={updateProfileMutation.isPending}>
-                {updateProfileMutation.isPending ? "Salvataggio..." : "Salva Profilo Nuotatore"}
-              </Button>
-            </div>
-          </section>
-        </TabsContent>
-
-        {/* Connections Tab */}
-        <TabsContent value="connections" className="space-y-4">
-          <section className="surface-panel p-6">
-            <div>
-              <h3 className="font-display">Account Collegati</h3>
-              <p>
-                Collega i tuoi dispositivi e app per sincronizzare automaticamente le attivita
-              </p>
-            </div>
-            <div className="space-y-4">
-              {[
-                {
-                  name: "Garmin Connect",
-                  connected: garminStatus?.connected ?? false,
-                  lastSync: garminStatus?.lastSync ?? null,
-                  activities: activitiesBySource.garmin,
-                },
-                {
-                  name: "Strava",
-                  connected: stravaStatus?.connected ?? false,
-                  lastSync: stravaStatus?.lastSync ?? null,
-                  activities: activitiesBySource.strava,
-                },
-                {
-                  name: "Apple Health",
-                  connected: false,
-                  lastSync: null,
-                  activities: 0,
-                  disabled: true,
-                },
-              ].map((account) => (
-                <div
-                  key={account.name}
-                  className="flex flex-col gap-3 rounded-lg border border-border bg-background/60 p-4 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="flex min-w-0 flex-1 items-center gap-4">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary/40">
-                      <Globe className="w-6 h-6 text-muted-foreground" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-foreground">{account.name}</p>
-                      {account.connected ? (
-                        <p className="text-sm text-muted-foreground break-words">
-                          Ultimo sync {formatLastSync(account.lastSync)} · {account.activities} attivita
-                        </p>
-                      ) : (
-                        <p className="text-sm text-muted-foreground break-words">
-                          {account.disabled ? "Disponibile prossimamente" : "Non connesso"}
-                        </p>
-                      )}
-                    </div>
+                    <Button onClick={handleSaveProfile} disabled={updateProfileMutation.isPending}>
+                      {updateProfileMutation.isPending ? "Salvataggio…" : "Salva modifiche"}
+                    </Button>
                   </div>
-                  {account.connected ? (
-                    <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end">
-                      <div className="flex items-center gap-2 text-sm text-accent">
-                        <Check className="w-4 h-4" />
-                        Connesso
+                </Section>
+
+                {/* Swimming Profile */}
+                <Section title="Profilo nuotatore" description="Informazioni specifiche per il nuoto.">
+                  <div className="mt-4 space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">Livello</p>
+                        <p className="text-[15px]">{profile?.aiSkillLabel || profile?.levelTitle || "Non disponibile"}</p>
+                      </div>
+                      <SelectField
+                        label="Stile preferito"
+                        value={profileDraft.preferredStroke || "auto"}
+                        onChange={(value) => setProfileDraft((prev) => ({ ...prev, preferredStroke: value }))}
+                        options={strokeOptions}
+                        hint={favoriteStroke ? `Il più nuotato: ${favoriteStroke}` : undefined}
+                      />
+                      <TextField
+                        label="Lunghezza della piscina preferita (m)"
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        placeholder={preferredPool}
+                        value={profileDraft.preferredPoolLengthMeters}
+                        onChange={(value) =>
+                          setProfileDraft((prev) => ({ ...prev, preferredPoolLengthMeters: value }))
+                        }
+                      />
+                      <TextField
+                        label="Categoria master"
+                        value={profileDraft.masterCategory}
+                        onChange={(value) => setProfileDraft((prev) => ({ ...prev, masterCategory: value }))}
+                      />
+                    </div>
+                    <Button onClick={handleSaveSwimmerProfile} disabled={updateProfileMutation.isPending}>
+                      {updateProfileMutation.isPending ? "Salvataggio…" : "Salva profilo nuotatore"}
+                    </Button>
+                  </div>
+                </Section>
+              </>
+            )}
+          </TabsContent>
+
+          {/* Connections Tab */}
+          <TabsContent value="connections" className="space-y-4">
+            <Section
+              title="Account collegati"
+              description="Collega i tuoi dispositivi e le tue app per sincronizzare le attività in automatico."
+            >
+              {statusesLoading ? (
+                <LoadingSkeleton
+                  label="Caricamento degli account collegati…"
+                  count={3}
+                  className="mt-4 space-y-2"
+                  itemClassName="h-16 w-full rounded-xl"
+                />
+              ) : statusesFailed ? (
+                <LoadError
+                  variant="inline"
+                  className="mt-4"
+                  onRetry={() => {
+                    if (garminStatusQuery.isError) void garminStatusQuery.refetch()
+                    if (stravaStatusQuery.isError) void stravaStatusQuery.refetch()
+                  }}
+                />
+              ) : (
+                <ul className="mt-4 divide-y divide-border">
+                  {accounts.map((account) => (
+                    <li
+                      key={account.name}
+                      className="flex flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold">{account.name}</p>
+                        <p className="break-words text-sm text-muted-foreground">
+                          {account.connected
+                            ? `Ultima sincronizzazione ${formatLastSync(account.lastSync)} · ${formatInteger(account.activities)} attività`
+                            : account.comingSoon
+                              ? "Disponibile prossimamente"
+                              : "Non collegato"}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-3">
+                        {account.connected ? (
+                          <span className="inline-flex items-center gap-1 text-sm font-semibold text-success">
+                            <Check className="size-4" aria-hidden />
+                            Collegato
+                          </span>
+                        ) : null}
+                        {account.manage ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            type="button"
+                            onClick={scrollToGarminControls}
+                            aria-label={account.connected ? "Gestisci Garmin Connect" : "Collega Garmin Connect"}
+                          >
+                            {account.connected ? "Gestisci" : "Collega"}
+                          </Button>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Section>
+
+            <div id="garmin-connection-controls" className="scroll-mt-20">
+              <GarminSection garminConnected={garminStatus?.connected ?? false} headingRef={garminHeadingRef} />
+            </div>
+          </TabsContent>
+
+          {/* Notifications Tab */}
+          <TabsContent value="notifications" className="space-y-4">
+            {profileGate("Caricamento delle notifiche…") ?? (
+              <Section title="Notifiche" description="Scegli quali notifiche ricevere.">
+                <div className="mt-2 divide-y divide-border">
+                  {notificationSettings.map((setting) => (
+                    <SwitchRow
+                      key={setting.id}
+                      title={setting.title}
+                      description={setting.description}
+                      checked={Boolean(notifications[setting.id])}
+                      onChange={() => toggleNotification(setting.id)}
+                    />
+                  ))}
+                </div>
+              </Section>
+            )}
+          </TabsContent>
+
+          {/* Preferences Tab */}
+          <TabsContent value="preferences" className="space-y-4">
+            {profileGate("Caricamento delle preferenze…") ?? (
+              <>
+                <Section title="Unità e video">
+                  <div className="mt-2 divide-y divide-border">
+                    <SelectRow
+                      title="Unità di misura"
+                      description="Chilometri e metri, oppure miglia e iarde"
+                      value={preferences.units}
+                      onChange={(value) => {
+                        const next = { ...preferences, units: value as "metric" | "imperial" }
+                        setPreferences(next)
+                        void persistSettings({ preferences: next })
+                      }}
+                      options={[
+                        { value: "metric", label: "Metrico" },
+                        { value: "imperial", label: "Imperiale" },
+                      ]}
+                    />
+                    <SelectRow
+                      title="Formato del passo"
+                      description="Come mostrare il ritmo"
+                      value={preferences.paceFormat}
+                      onChange={(value) => {
+                        const next = { ...preferences, paceFormat: value as "100m" | "100y" }
+                        setPreferences(next)
+                        void persistSettings({ preferences: next })
+                      }}
+                      options={[
+                        { value: "100m", label: "min/100m" },
+                        { value: "100y", label: "min/100yd" },
+                      ]}
+                    />
+                    <SwitchRow
+                      title="Riproduzione automatica dei video"
+                      description="Avvia automaticamente i video nel feed quando sono visibili."
+                      checked={preferences.autoplayVideos}
+                      onChange={(value) => {
+                        const next = { ...preferences, autoplayVideos: value }
+                        setPreferences(next)
+                        void persistSettings({ preferences: next })
+                      }}
+                    />
+                    <div className="flex flex-col gap-3 py-3 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="font-semibold">Tour guidato dell&apos;app</p>
+                        <p className="text-sm text-muted-foreground">
+                          Rivedi il video introduttivo e il tour interattivo dei punti principali.
+                        </p>
                       </div>
                       <Button
-                        variant="outline-neon"
+                        variant="outline"
                         size="sm"
-                        className="shrink-0"
-                        type="button"
-                        onClick={scrollToGarminControls}
+                        className="shrink-0 self-start sm:self-auto"
+                        onClick={() => {
+                          if (typeof window !== "undefined") {
+                            window.dispatchEvent(new CustomEvent("swimforge:onboarding:start"))
+                          }
+                          setLocation(`${homePathForPlatform(isNativePlatform())}?${ONBOARDING_FORCE_QUERY_PARAM}=1`)
+                        }}
                       >
-                        Gestisci
+                        Rivedi il tour
                       </Button>
                     </div>
-                  ) : (
-                    <Button
-                      variant="neon"
-                      size="sm"
-                      className="w-full sm:w-auto sm:shrink-0"
-                      disabled={account.disabled}
-                      asChild={!account.disabled}
-                    >
-                      {account.disabled ? "In arrivo" : <a href="/profile">Connetti</a>}
+                  </div>
+                </Section>
+
+                <Section title="Lingua e regione">
+                  <div className="mt-2 divide-y divide-border">
+                    <SelectRow
+                      title="Lingua"
+                      value={preferences.language}
+                      onChange={(value) => {
+                        const next = { ...preferences, language: value as "it" | "en" | "es" | "fr" }
+                        setPreferences(next)
+                        void persistSettings({ preferences: next })
+                      }}
+                      options={[
+                        { value: "it", label: "Italiano" },
+                        { value: "en", label: "English" },
+                        { value: "es", label: "Español" },
+                        { value: "fr", label: "Français" },
+                      ]}
+                    />
+                    <SelectRow
+                      title="Fuso orario"
+                      value={preferences.timezone}
+                      onChange={(value) => {
+                        const next = { ...preferences, timezone: value }
+                        setPreferences(next)
+                        void persistSettings({ preferences: next })
+                      }}
+                      options={[
+                        { value: "Europe/Rome", label: "Europe/Rome (UTC+1)" },
+                        { value: "Europe/London", label: "Europe/London (UTC)" },
+                        { value: "America/New_York", label: "America/New_York (UTC-5)" },
+                      ]}
+                    />
+                  </div>
+                </Section>
+              </>
+            )}
+          </TabsContent>
+
+          {/* Privacy Tab */}
+          <TabsContent value="privacy" className="space-y-4">
+            {profileGate("Caricamento della privacy…") ?? (
+              <Section title="Privacy del profilo">
+                <div className="mt-2 divide-y divide-border">
+                  <SwitchRow
+                    title="Profilo pubblico"
+                    description="Permetti ad altri utenti di vedere il tuo profilo"
+                    checked={privacySettings.profilePublic}
+                    onChange={(value) => {
+                      const next = { ...privacySettings, profilePublic: value }
+                      setPrivacySettings(next)
+                      void persistSettings({ privacySettings: next })
+                    }}
+                  />
+                  <SwitchRow
+                    title="Attività pubbliche"
+                    description="Mostra le tue attività nel feed della community"
+                    checked={privacySettings.activitiesPublic}
+                    onChange={(value) => {
+                      const next = { ...privacySettings, activitiesPublic: value }
+                      setPrivacySettings(next)
+                      void persistSettings({ privacySettings: next })
+                    }}
+                  />
+                  <SwitchRow
+                    title="Mostra nelle classifiche"
+                    description="Partecipa alle classifiche pubbliche"
+                    checked={privacySettings.showLeaderboards}
+                    onChange={(value) => {
+                      const next = { ...privacySettings, showLeaderboards: value }
+                      setPrivacySettings(next)
+                      void persistSettings({ privacySettings: next })
+                    }}
+                  />
+                  <SwitchRow
+                    title="Consenti inoltri privati"
+                    description="Permetti che i post vengano inoltrati in chat privata"
+                    checked={privacySettings.allowPrivateForwards}
+                    onChange={(value) => {
+                      const next = {
+                        ...privacySettings,
+                        allowPrivateForwards: value,
+                      }
+                      setPrivacySettings(next)
+                      void persistSettings({ privacySettings: next })
+                    }}
+                  />
+                  <SwitchRow
+                    title="Inoltri solo ai follower"
+                    description="Limita gli inoltri privati ai soli utenti che ti seguono"
+                    checked={privacySettings.forwardsFollowersOnly}
+                    disabled={!privacySettings.allowPrivateForwards}
+                    onChange={(value) => {
+                      const next = { ...privacySettings, forwardsFollowersOnly: value }
+                      setPrivacySettings(next)
+                      void persistSettings({ privacySettings: next })
+                    }}
+                  />
+                </div>
+              </Section>
+            )}
+
+            <Section
+              title="Consensi GDPR"
+              description="Gestisci i consensi opzionali. Termini e Privacy sono obbligatori per usare il servizio."
+            >
+              {consentsQuery.isLoading ? (
+                <LoadingSkeleton
+                  label="Caricamento dei consensi…"
+                  count={4}
+                  className="mt-4 space-y-2"
+                  itemClassName="h-12 w-full rounded-xl"
+                />
+              ) : consentsQuery.isError && !consentsQuery.data ? (
+                <LoadError variant="inline" className="mt-4" onRetry={() => void consentsQuery.refetch()} />
+              ) : (
+                <div className="mt-4 space-y-3">
+                  <div className="space-y-2">
+                    <RequiredConsent
+                      title="Termini di Servizio"
+                      status="Obbligatorio · accettato"
+                      version={(consentsQuery.data as any)?.versions?.terms_acceptance ?? "v1.1"}
+                    />
+                    <RequiredConsent
+                      title="Privacy Policy"
+                      status="Obbligatorio · accettata"
+                      version={(consentsQuery.data as any)?.versions?.privacy_policy ?? "v1.1"}
+                    />
+                  </div>
+                  <div className="divide-y divide-border">
+                    {consentItems.map((item) => (
+                      <SwitchRow
+                        key={item.type}
+                        title={item.title}
+                        description={item.description}
+                        checked={Boolean(consentState[item.type])}
+                        disabled={setConsentMutation.isPending || consentNeedsProfile(item.type)}
+                        onChange={(value) => void toggleConsent(item.type, value)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" asChild>
+                  <RouterLink href="/privacy">Apri la Privacy Policy</RouterLink>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <RouterLink href="/terms">Apri i Termini</RouterLink>
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <RouterLink href="/cookies">Cookie Policy</RouterLink>
+                </Button>
+              </div>
+            </Section>
+
+            <Section title="Dati e account">
+              <div className="mt-2 divide-y divide-border">
+                <ActionRow
+                  title="Esporta i dati"
+                  description="Scarica tutti i tuoi dati in formato JSON"
+                  action={
+                    <Button variant="outline" onClick={handleExportData}>
+                      <Download aria-hidden />
+                      Esporta
                     </Button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <div id="garmin-connection-controls">
-            <GarminSection garminConnected={garminStatus?.connected ?? false} />
-          </div>
-        </TabsContent>
-
-        {/* Notifications Tab */}
-        <TabsContent value="notifications">
-          <section className="surface-panel p-6">
-            <div>
-              <h3 className="font-display">Preferenze Notifiche</h3>
-              <p>Scegli quali notifiche ricevere</p>
-            </div>
-            <div className="space-y-6">
-              {notificationSettings.map((setting) => (
-                <div
-                  key={setting.id}
-                  className="flex items-center justify-between py-3 border-b border-border last:border-0"
-                >
-                  <div>
-                    <p className="font-medium text-foreground">{setting.title}</p>
-                    <p className="text-sm text-muted-foreground">{setting.description}</p>
-                  </div>
-                  <Switch
-                    checked={Boolean(notifications[setting.id])}
-                    onCheckedChange={() => toggleNotification(setting.id)}
+                  }
+                />
+                <ActionRow
+                  title="Esci da tutti i dispositivi"
+                  description="Disconnetti tutte le sessioni attive"
+                  action={
+                    <Button
+                      variant="outline"
+                      className="text-danger"
+                      onClick={() => void handleLogoutAllDevices()}
+                      disabled={isUnregistering || logoutAllDevicesMutation.isPending}
+                    >
+                      <LogOut aria-hidden />
+                      {isUnregistering || logoutAllDevicesMutation.isPending ? "Uscita…" : "Esci ovunque"}
+                    </Button>
+                  }
+                />
+                <ActionRow
+                  title="Elimina account"
+                  titleClassName="text-danger"
+                  description="Elimina per sempre il tuo account e tutti i dati"
+                  action={
+                    <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
+                      <Trash2 aria-hidden />
+                      Elimina
+                    </Button>
+                  }
+                />
+                {isDevResetAccount ? (
+                  <ActionRow
+                    title="Reset dell'app per il lancio (solo dev)"
+                    titleClassName="text-warning"
+                    description="Cancella tutti i dati di test (attività, club, post, notifiche, chat, sfide). L'account dev resta attivo."
+                    action={
+                      <Button variant="outline" className="text-warning" onClick={() => setResetDialogOpen(true)}>
+                        <AlertTriangle aria-hidden />
+                        Reset app
+                      </Button>
+                    }
                   />
-                </div>
-              ))}
-            </div>
-          </section>
-        </TabsContent>
+                ) : null}
+              </div>
+            </Section>
+          </TabsContent>
+        </Tabs>
 
-        {/* Preferences Tab */}
-        <TabsContent value="preferences" className="space-y-4">
-          <section className="surface-panel p-6">
-            <div>
-              <h3 className="font-display">Unita di Misura</h3>
-            </div>
-            <div className="space-y-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-medium text-foreground">Sistema Metrico</p>
-                  <p className="text-sm text-muted-foreground">Chilometri, metri, kg</p>
-                </div>
-                <Select
-                  value={preferences.units}
-                  onValueChange={(value) => {
-                    const next = { ...preferences, units: value as "metric" | "imperial" }
-                    setPreferences(next)
-                    void persistSettings({ preferences: next })
+        <Dialog
+          open={deleteDialogOpen}
+          onOpenChange={(open) => {
+            // While the deletion runs, Esc, a tap outside and the X do not close it.
+            if (!open && isDeletingAccount) return
+            setDeleteDialogOpen(open)
+            if (!open) {
+              setDeletePassword("")
+              setDeletePasswordError(null)
+            }
+          }}
+        >
+          <DialogContent className="rounded-2xl bg-card shadow-none" showCloseButton={!isDeletingAccount}>
+            <DialogHeader>
+              <DialogTitle className="text-[17px] font-bold text-danger">Conferma eliminazione account</DialogTitle>
+              <DialogDescription>
+                {deleteRequiresPassword
+                  ? "Questa azione è irreversibile. Inserisci la password per confermare."
+                  : "Questa azione è irreversibile. Conferma per eliminare definitivamente l'account."}
+              </DialogDescription>
+            </DialogHeader>
+            {deleteRequiresPassword ? (
+              <div className="space-y-2">
+                <Label htmlFor={deletePasswordId}>Password</Label>
+                <Input
+                  id={deletePasswordId}
+                  type="password"
+                  value={deletePassword}
+                  onChange={(event) => {
+                    setDeletePassword(event.target.value)
+                    setDeletePasswordError(null)
                   }}
-                >
-                  <SelectTrigger className="w-32 bg-background/60">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="metric">Metrico</SelectItem>
-                    <SelectItem value="imperial">Imperiale</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-medium text-foreground">Formato Pace</p>
-                  <p className="text-sm text-muted-foreground">Come visualizzare il ritmo</p>
-                </div>
-                <Select
-                  value={preferences.paceFormat}
-                  onValueChange={(value) => {
-                    const next = { ...preferences, paceFormat: value as "100m" | "100y" }
-                    setPreferences(next)
-                    void persistSettings({ preferences: next })
-                  }}
-                >
-                  <SelectTrigger className="w-32 bg-background/60">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="100m">min/100m</SelectItem>
-                    <SelectItem value="100y">min/100yd</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between py-3 border-t border-border/60">
-                <div>
-                  <p className="font-medium text-foreground">Riproduzione automatica video</p>
-                  <p className="text-sm text-muted-foreground">
-                    Avvia automaticamente i video nei feed quando visibili.
-                  </p>
-                </div>
-                <Switch
-                  checked={preferences.autoplayVideos}
-                  onCheckedChange={(value) => {
-                    const next = { ...preferences, autoplayVideos: value }
-                    setPreferences(next)
-                    void persistSettings({ preferences: next })
-                  }}
+                  autoComplete="current-password"
+                  {...fieldAria(deletePasswordId, deletePasswordError ?? undefined)}
                 />
+                <FieldError fieldId={deletePasswordId} error={deletePasswordError ?? undefined} />
+                <p className="text-sm text-muted-foreground">
+                  Dopo l&apos;eliminazione riceverai un&apos;email di conferma.
+                </p>
               </div>
-              <div className="flex items-center justify-between py-3 border-t border-border/60">
-                <div>
-                  <p className="font-medium text-foreground">Onboarding guidato app</p>
-                  <p className="text-sm text-muted-foreground">
-                    Rivedi intro video + tour interattivo dei punti principali.
-                  </p>
-                </div>
-                <Button
-                  variant="outline-neon"
-                  size="sm"
-                  onClick={() => {
-                    if (typeof window !== "undefined") {
-                      window.dispatchEvent(new CustomEvent("swimforge:onboarding:start"))
-                    }
-                    setLocation(`/home?${ONBOARDING_FORCE_QUERY_PARAM}=1`)
-                  }}
-                >
-                  Rivedi onboarding
-                </Button>
-              </div>
-            </div>
-          </section>
-
-          <section className="surface-panel p-6">
-            <div>
-              <h3 className="font-display">Lingua e Regione</h3>
-            </div>
-            <div className="space-y-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-medium text-foreground">Lingua</p>
-                </div>
-                <Select
-                  value={preferences.language}
-                  onValueChange={(value) => {
-                    const next = { ...preferences, language: value as "it" | "en" | "es" | "fr" }
-                    setPreferences(next)
-                    void persistSettings({ preferences: next })
-                  }}
-                >
-                  <SelectTrigger className="w-40 bg-background/60">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="it">Italiano</SelectItem>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="es">Espanol</SelectItem>
-                    <SelectItem value="fr">Francais</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="font-medium text-foreground">Fuso Orario</p>
-                </div>
-                <Select
-                  value={preferences.timezone}
-                  onValueChange={(value) => {
-                    const next = { ...preferences, timezone: value }
-                    setPreferences(next)
-                    void persistSettings({ preferences: next })
-                  }}
-                >
-                  <SelectTrigger className="w-48 bg-background/60">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Europe/Rome">Europe/Rome (UTC+1)</SelectItem>
-                    <SelectItem value="Europe/London">Europe/London (UTC)</SelectItem>
-                    <SelectItem value="America/New_York">America/New_York (UTC-5)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </section>
-        </TabsContent>
-
-        {/* Privacy Tab */}
-        <TabsContent value="privacy" className="space-y-4">
-          <section className="surface-panel p-6">
-            <div>
-              <h3 className="font-display">Privacy Profilo</h3>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between py-3">
-                <div>
-                  <p className="font-medium text-foreground">Profilo Pubblico</p>
-                  <p className="text-sm text-muted-foreground">
-                    Permetti ad altri utenti di vedere il tuo profilo
-                  </p>
-                </div>
-                <Switch
-                  checked={privacySettings.profilePublic}
-                  onCheckedChange={(value) => {
-                    const next = { ...privacySettings, profilePublic: value }
-                    setPrivacySettings(next)
-                    void persistSettings({ privacySettings: next })
-                  }}
-                />
-              </div>
-              <div className="flex items-center justify-between py-3">
-                <div>
-                  <p className="font-medium text-foreground">Attivita Pubbliche</p>
-                  <p className="text-sm text-muted-foreground">
-                    Mostra le tue attivita nel feed della community
-                  </p>
-                </div>
-                <Switch
-                  checked={privacySettings.activitiesPublic}
-                  onCheckedChange={(value) => {
-                    const next = { ...privacySettings, activitiesPublic: value }
-                    setPrivacySettings(next)
-                    void persistSettings({ privacySettings: next })
-                  }}
-                />
-              </div>
-              <div className="flex items-center justify-between py-3">
-                <div>
-                  <p className="font-medium text-foreground">Mostra nelle Classifiche</p>
-                  <p className="text-sm text-muted-foreground">
-                    Partecipa alle classifiche pubbliche
-                  </p>
-                </div>
-                <Switch
-                  checked={privacySettings.showLeaderboards}
-                  onCheckedChange={(value) => {
-                    const next = { ...privacySettings, showLeaderboards: value }
-                    setPrivacySettings(next)
-                    void persistSettings({ privacySettings: next })
-                  }}
-                />
-              </div>
-              <div className="flex items-center justify-between py-3">
-                <div>
-                  <p className="font-medium text-foreground">Consenti inoltri privati</p>
-                  <p className="text-sm text-muted-foreground">
-                    Permetti che i post vengano inoltrati in chat privata
-                  </p>
-                </div>
-                <Switch
-                  checked={privacySettings.allowPrivateForwards}
-                  onCheckedChange={(value) => {
-                    const next = {
-                      ...privacySettings,
-                      allowPrivateForwards: value,
-                    }
-                    setPrivacySettings(next)
-                    void persistSettings({ privacySettings: next })
-                  }}
-                />
-              </div>
-              <div className="flex items-center justify-between py-3">
-                <div>
-                  <p className="font-medium text-foreground">Inoltri solo ai follower</p>
-                  <p className="text-sm text-muted-foreground">
-                    Limita gli inoltri privati ai soli utenti che ti seguono
-                  </p>
-                </div>
-                <Switch
-                  checked={privacySettings.forwardsFollowersOnly}
-                  disabled={!privacySettings.allowPrivateForwards}
-                  onCheckedChange={(value) => {
-                    const next = { ...privacySettings, forwardsFollowersOnly: value }
-                    setPrivacySettings(next)
-                    void persistSettings({ privacySettings: next })
-                  }}
-                />
-              </div>
-            </div>
-          </section>
-
-          <section className="surface-panel p-6">
-            <div className="space-y-1">
-              <h3 className="font-display">Consensi GDPR</h3>
+            ) : (
               <p className="text-sm text-muted-foreground">
-                Gestisci i consensi opzionali. Termini e Privacy sono obbligatori per usare il servizio.
-              </p>
-            </div>
-            <div className="mt-4 space-y-3">
-              <div className="rounded-lg border border-border/60 bg-background/40 p-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-foreground">Termini di Servizio</p>
-                  <span className="text-xs text-accent">Obbligatorio · accettato</span>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Versione: {(consentsQuery.data as any)?.versions?.terms_acceptance ?? "v1.1"}
-                </p>
-              </div>
-              <div className="rounded-lg border border-border/60 bg-background/40 p-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-foreground">Privacy Policy</p>
-                  <span className="text-xs text-accent">Obbligatorio · accettata</span>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Versione: {(consentsQuery.data as any)?.versions?.privacy_policy ?? "v1.1"}
-                </p>
-              </div>
-
-              {consentItems.map((item) => (
-                <div key={item.type} className="flex items-center justify-between gap-4 py-3 border-b border-border/40 last:border-0">
-                  <div>
-                    <p className="font-medium text-foreground">{item.title}</p>
-                    <p className="text-sm text-muted-foreground">{item.description}</p>
-                  </div>
-                  <Switch
-                    checked={Boolean(consentState[item.type])}
-                    disabled={setConsentMutation.isPending}
-                    onCheckedChange={(value) => void toggleConsent(item.type, value)}
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <Button variant="outline-neon" size="sm" asChild>
-                <RouterLink href="/privacy">Apri Privacy Policy</RouterLink>
-              </Button>
-              <Button variant="outline-neon" size="sm" asChild>
-                <RouterLink href="/terms">Apri Termini</RouterLink>
-              </Button>
-              <Button variant="outline-neon" size="sm" asChild>
-                <RouterLink href="/cookies">Cookie Policy</RouterLink>
-              </Button>
-            </div>
-          </section>
-
-          <section className="surface-panel p-6 border-destructive/50">
-            <div>
-              <h3 className="font-display text-destructive">Zona Pericolosa</h3>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-lg bg-destructive/5">
-                <div>
-                  <p className="font-medium text-foreground">Esporta Dati</p>
-                  <p className="text-sm text-muted-foreground">
-                    Scarica tutti i tuoi dati in formato JSON
-                  </p>
-                </div>
-                <Button
-                  variant="outline-neon"
-                  className="gap-2 bg-transparent"
-                  onClick={handleExportData}
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  Esporta
-                </Button>
-              </div>
-              <div className="flex items-center justify-between p-4 rounded-lg bg-destructive/5">
-                <div>
-                  <p className="font-medium text-foreground">Logout da Tutti i Dispositivi</p>
-                  <p className="text-sm text-muted-foreground">
-                    Disconnetti tutte le sessioni attive
-                  </p>
-                </div>
-                <Button
-                  variant="outline-neon"
-                  className="gap-2 text-destructive bg-transparent"
-                  onClick={() => void handleLogoutAllDevices()}
-                  disabled={isUnregistering || logoutAllDevicesMutation.isPending}
-                >
-                  <LogOut className="w-4 h-4" />
-                  {isUnregistering || logoutAllDevicesMutation.isPending ? "Logout..." : "Logout"}
-                </Button>
-              </div>
-              <div className="flex items-center justify-between p-4 rounded-lg bg-destructive/10">
-                <div>
-                  <p className="font-medium text-destructive">Elimina Account</p>
-                  <p className="text-sm text-muted-foreground">
-                    Elimina permanentemente il tuo account e tutti i dati
-                  </p>
-                </div>
-                <Button
-                  variant="destructive"
-                  className="gap-2"
-                  onClick={() => setDeleteDialogOpen(true)}
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Elimina
-                </Button>
-              </div>
-              {isDevResetAccount ? (
-                <div className="flex items-center justify-between p-4 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                  <div>
-                    <p className="font-medium text-amber-300">Reset App per Lancio (solo dev)</p>
-                    <p className="text-sm text-muted-foreground">
-                      Cancella tutti i dati di test (attivita, club, post, notifiche, chat, sfide). L&apos;account dev resta attivo.
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline-neon"
-                    className="gap-2 text-amber-300 border-amber-400/40"
-                    onClick={() => setResetDialogOpen(true)}
-                  >
-                    <AlertTriangle className="w-4 h-4" />
-                    Reset app
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          </section>
-        </TabsContent>
-          </div>
-        </div>
-      </Tabs>
-
-      <Dialog
-        open={deleteDialogOpen}
-        onOpenChange={(open) => {
-          setDeleteDialogOpen(open)
-          if (!open) {
-            setDeletePassword("")
-          }
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-destructive">Conferma eliminazione account</DialogTitle>
-            <DialogDescription>
-              {deleteRequiresPassword
-                ? "Questa azione è irreversibile. Inserisci la password per confermare."
-                : "Questa azione è irreversibile. Conferma per eliminare definitivamente l'account."}
-            </DialogDescription>
-          </DialogHeader>
-          {deleteRequiresPassword ? (
-            <div className="space-y-2">
-              <Label htmlFor="delete-account-password">Password</Label>
-              <Input
-                id="delete-account-password"
-                type="password"
-                value={deletePassword}
-                onChange={(event) => setDeletePassword(event.target.value)}
-                placeholder="Inserisci la tua password"
-                autoComplete="current-password"
-              />
-              <p className="text-xs text-muted-foreground">
+                Questo account usa un accesso esterno (Google, Apple o simili): non serve una password.
                 Dopo l&apos;eliminazione riceverai un&apos;email di conferma.
               </p>
-            </div>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Questo account usa accesso esterno (Google/Apple o simile): non serve password locale.
-              Dopo l&apos;eliminazione riceverai un&apos;email di conferma.
-            </p>
-          )}
-          <DialogFooter>
-            <Button
-              variant="outline-neon"
-              onClick={() => setDeleteDialogOpen(false)}
-              disabled={isUnregistering || deleteAccountMutation.isPending}
-            >
-              Annulla
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={() => void handleDeleteAccount()}
-              disabled={
-                isUnregistering ||
-                deleteAccountMutation.isPending ||
-                (deleteRequiresPassword && deletePassword.trim().length === 0)
-              }
-            >
-              {isUnregistering || deleteAccountMutation.isPending ? "Eliminazione..." : "Conferma eliminazione"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            )}
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setDeleteDialogOpen(false)}
+                disabled={isDeletingAccount}
+              >
+                Annulla
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => void handleDeleteAccount()}
+                disabled={isDeletingAccount || (deleteRequiresPassword && deletePassword.trim().length === 0)}
+              >
+                {isDeletingAccount ? "Eliminazione…" : "Conferma eliminazione"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      <Dialog
-        open={resetDialogOpen}
-        onOpenChange={(open) => {
-          setResetDialogOpen(open)
-          if (!open) setResetConfirmationText("")
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="text-amber-300">Conferma reset completo app (dev only)</DialogTitle>
-            <DialogDescription>
-              Operazione irreversibile: verranno eliminati tutti i dati di test. L&apos;account dev rimane attivo.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="reset-app-confirmation">Scrivi esattamente: <span className="font-mono">RESET APP</span></Label>
-            <Input
-              id="reset-app-confirmation"
-              value={resetConfirmationText}
-              onChange={(event) => setResetConfirmationText(event.target.value)}
-              placeholder="RESET APP"
-              autoComplete="off"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setResetDialogOpen(false)}>
-              Annulla
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={resetConfirmationText.trim() !== "RESET APP" || resetAppForLaunchMutation.isPending}
-              onClick={() => {
-                resetAppForLaunchMutation.mutate({ confirmation: resetConfirmationText.trim() })
-              }}
-            >
-              {resetAppForLaunchMutation.isPending ? "Reset in corso..." : "Conferma reset"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        <Dialog
+          open={resetDialogOpen}
+          onOpenChange={(open) => {
+            setResetDialogOpen(open)
+            if (!open) setResetConfirmationText("")
+          }}
+        >
+          <DialogContent className="rounded-2xl bg-card shadow-none">
+            <DialogHeader>
+              <DialogTitle className="text-[17px] font-bold text-warning">Conferma reset completo app (solo dev)</DialogTitle>
+              <DialogDescription>
+                Operazione irreversibile: verranno eliminati tutti i dati di test. L&apos;account dev rimane attivo.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <Label htmlFor="reset-app-confirmation">
+                Scrivi esattamente: <span className="font-mono">RESET APP</span>
+              </Label>
+              <Input
+                id="reset-app-confirmation"
+                value={resetConfirmationText}
+                onChange={(event) => setResetConfirmationText(event.target.value)}
+                placeholder="RESET APP"
+                autoComplete="off"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setResetDialogOpen(false)}>
+                Annulla
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={resetConfirmationText.trim() !== "RESET APP" || resetAppForLaunchMutation.isPending}
+                onClick={() => {
+                  resetAppForLaunchMutation.mutate({ confirmation: resetConfirmationText.trim() })
+                }}
+              >
+                {resetAppForLaunchMutation.isPending ? "Reset in corso…" : "Conferma reset"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </AppLayout>
+  )
+}
+
+const sectionTitle = "text-[17px] font-bold"
+
+/** A settings card: h2 title (the page title is the shell's «Impostazioni»), optional line. */
+function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
+  const titleId = useId()
+  return (
+    <section aria-labelledby={titleId} className="surface-panel p-4">
+      <h2 id={titleId} className={sectionTitle}>
+        {title}
+      </h2>
+      {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
+      {children}
+    </section>
+  )
+}
+
+/** XP, integrations, imported swims and favourite stroke as Corsia metrics. */
+function SummarySection({ metrics, loading }: { metrics: MetricProps[]; loading: boolean }) {
+  if (metrics.length === 0 && loading) {
+    return (
+      <LoadingSkeleton
+        label="Caricamento del riepilogo…"
+        count={4}
+        className="surface-panel grid grid-cols-2 gap-4 p-4 sm:grid-cols-4"
+        itemClassName="h-12"
+      />
+    )
+  }
+  if (metrics.length === 0) return null
+  return (
+    <section aria-label="Riepilogo" className="surface-panel p-4">
+      <ul className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
+        {metrics.map((metric) => (
+          <li key={metric.label}>
+            <Metric {...metric} size="sm" />
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+/** A setting with a switch: the title names the switch, the line describes it. */
+function SwitchRow({
+  title,
+  description,
+  checked,
+  disabled,
+  onChange,
+}: {
+  title: string
+  description?: string
+  checked: boolean
+  disabled?: boolean
+  onChange: (value: boolean) => void
+}) {
+  const titleId = useId()
+  const descriptionId = useId()
+  return (
+    <div className="flex items-center justify-between gap-4 py-3 last:pb-0">
+      <div>
+        <p id={titleId} className="font-semibold">
+          {title}
+        </p>
+        {description ? (
+          <p id={descriptionId} className="text-sm text-muted-foreground">
+            {description}
+          </p>
+        ) : null}
+      </div>
+      <Switch
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
+        checked={checked}
+        disabled={disabled}
+        onCheckedChange={onChange}
+      />
+    </div>
+  )
+}
+
+/** A setting with a choice: the title names the select. */
+function SelectRow({
+  title,
+  description,
+  value,
+  onChange,
+  options,
+}: {
+  title: string
+  description?: string
+  value: string
+  onChange: (value: string) => void
+  options: ReadonlyArray<{ value: string; label: string }>
+}) {
+  const titleId = useId()
+  const descriptionId = useId()
+  return (
+    <div className="flex flex-col gap-2 py-3 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p id={titleId} className="font-semibold">
+          {title}
+        </p>
+        {description ? (
+          <p id={descriptionId} className="text-sm text-muted-foreground">
+            {description}
+          </p>
+        ) : null}
+      </div>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger
+          aria-labelledby={titleId}
+          aria-describedby={description ? descriptionId : undefined}
+          className="w-full sm:w-56"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+
+/** A labelled text field of the profile form. */
+function TextField({
+  label,
+  value,
+  onChange,
+  ...input
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+} & Omit<ComponentProps<typeof Input>, "id" | "value" | "onChange">) {
+  const id = useId()
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Input id={id} value={value} onChange={(event) => onChange(event.target.value)} {...input} />
+    </div>
+  )
+}
+
+/** A labelled select of the profile form, with an optional hint below. */
+function SelectField({
+  label,
+  value,
+  onChange,
+  options,
+  hint,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: ReadonlyArray<{ value: string; label: string }>
+  hint?: string
+}) {
+  const id = useId()
+  const hintId = useId()
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger id={id} aria-describedby={hint ? hintId : undefined} className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {hint ? (
+        <p id={hintId} className="text-sm text-muted-foreground">
+          {hint}
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
+function BioField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const id = useId()
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>Bio</Label>
+      <Textarea id={id} rows={4} className="resize-none" value={value} onChange={(event) => onChange(event.target.value)} />
+    </div>
+  )
+}
+
+/** Terms and Privacy: always accepted to use the service, with the accepted version. */
+function RequiredConsent({ title, status, version }: { title: string; status: string; version: string }) {
+  return (
+    <div className="rounded-xl bg-raised p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-semibold">{title}</p>
+        <span className="text-sm font-semibold text-success">{status}</span>
+      </div>
+      <p className="mt-1 text-sm text-muted-foreground">Versione: {version}</p>
+    </div>
+  )
+}
+
+/** An account action: title and line on the left, its button on the right (below on phones). */
+function ActionRow({
+  title,
+  titleClassName,
+  description,
+  action,
+}: {
+  title: string
+  titleClassName?: string
+  description: string
+  action: ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-3 py-3 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <p className={cn("font-semibold", titleClassName)}>{title}</p>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      <div className="shrink-0">{action}</div>
+    </div>
   )
 }

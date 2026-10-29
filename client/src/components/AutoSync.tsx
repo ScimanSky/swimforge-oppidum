@@ -3,10 +3,13 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
+import { normalizePath, TODAY_PATH } from "@/lib/navigation";
 
 const AUTO_SYNC_DEBOUNCE_MS = 2 * 60 * 1000;
 const LAST_AUTO_SYNC_KEY = "swimforge:autoSync:last";
 const DASHBOARD_READY_KEY = "swimforge:autoSync:dashboardReady";
+/** Landing pages after sign-in: visiting one arms the automatic sync. */
+const SYNC_READY_PATHS = new Set([TODAY_PATH, "/home", "/track", "/dashboard"]);
 
 export function AutoSync() {
   const { isAuthenticated } = useAuth();
@@ -19,7 +22,7 @@ export function AutoSync() {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    if (location === "/home" || location === "/track" || location === "/dashboard") {
+    if (SYNC_READY_PATHS.has(normalizePath(location))) {
       localStorage.setItem(DASHBOARD_READY_KEY, "1");
       setIsReady(true);
       return;
@@ -55,6 +58,9 @@ export function AutoSync() {
             void utils.badges.progress.invalidate();
             void utils.badges.getUserAchievementBadges.invalidate();
             void utils.badges.checkNewBadges.invalidate();
+            // Swim metrics (Statistiche, Coach, the profile's streak) and personal records.
+            void utils.statistics.invalidate();
+            void utils.records.invalidate();
           },
           onError: () => {
             toast.error("Errore nella sincronizzazione", { id: toastId });

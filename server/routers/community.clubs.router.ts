@@ -268,7 +268,19 @@ export function createCommunityClubsRouter(deps: CommunityClubsDeps) {
             .input(z.object({ clubId: z.number() }))
             .query(async ({ ctx, input }) => {
                 const { listClubInvites } = await import("../db_clubs");
-                return listClubInvites(ctx.user.id, input.clubId);
+                const rows = (await listClubInvites(ctx.user.id, input.clubId)) as Array<Record<string, unknown>>;
+                // Raw SQL rows are snake_case; the client reads camelCase (no client reads the
+                // snake_case names, so they are not passed on).
+                return rows.map((row) => ({
+                    id: Number(row.id),
+                    code: String(row.code ?? ""),
+                    role: String(row.role ?? "member"),
+                    status: String(row.status ?? "active"),
+                    maxUses: Number(row.max_uses ?? 0),
+                    usedCount: Number(row.used_count ?? 0),
+                    expiresAt: (row.expires_at ?? null) as Date | string | null,
+                    createdAt: (row.created_at ?? null) as Date | string | null,
+                }));
             }),
 
         createInvite: protectedProcedure

@@ -262,6 +262,9 @@ async function ensureGarminSegmentData(activity: Record<string, unknown>) {
     const details = await garmin.getGarminActivityFullDetails(userId, String(garminActivityId));
     if (!details) return;
     const storedLaps = await garmin.persistGarminLapDetails(db, activityId, details);
+    // New laps change the swim metrics (and the Coach page insights written from them).
+    const { invalidateSwimMetrics } = await import("./swim_metrics");
+    await invalidateSwimMetrics(userId);
     log.debug("[AI Insights] Garmin segment details fetched and persisted", {
       event: "ai_activity_insights:garmin_segments_persisted",
       userId,

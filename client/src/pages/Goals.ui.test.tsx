@@ -1,0 +1,156 @@
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { toast } from "sonner";
+import Goals from "./Goals";
+
+const state = vi.hoisted(() => ({
+  goals: [] as any[],
+  badges: [] as any[],
+  timeline: [] as any[],
+  createCalls: [] as any[],
+  removeCalls: [] as any[],
+}));
+
+const mutation = vi.hoisted(() => (calls: any[]) => () => ({
+  mutate: (vars: any) => calls.push(vars),
+  mutateAsync: async (vars: any) => calls.push(vars),
+  isPending: false,
+}));
+
+vi.mock("@/lib/trpc", () => ({
+  trpc: {
+    profile: {
+      get: { useQuery: () => ({ data: { xpLevel: 4, totalXp: 450, nextLevelXp: 1000 } }) },
+    },
+    statistics: {
+      getTimeline: { useQuery: () => ({ data: state.timeline }) },
+      getPerformance: { useQuery: () => ({ data: { swolfAvg: null } }) },
+    },
+    activities: { list: { useQuery: () => ({ data: [] }) } },
+    badges: { userBadges: { useQuery: () => ({ data: state.badges }) } },
+    goals: {
+      list: { useQuery: () => ({ data: state.goals, isSuccess: true }) },
+      create: { useMutation: mutation(state.createCalls) },
+      update: { useMutation: mutation([]) },
+      remove: { useMutation: mutation(state.removeCalls) },
+    },
+    useUtils: () => ({ goals: { list: { invalidate: vi.fn() } } }),
+  },
+}));
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() } }));
+
+vi.mock("@/components/AppLayout", () => ({
+  default: ({ children }: any) => <div>{children}</div>,
+}));
+
+describe("Obiettivi", () => {
+  afterEach(cleanup);
+  beforeEach(() => {
+    state.goals = [];
+    state.badges = [];
+    state.timeline = [];
+    state.createCalls.length = 0;
+    state.removeCalls.length = 0;
+    localStorage.clear();
+    vi.mocked(toast.error).mockClear();
+  });
+
+  it("non ripete il titolo della pagina e mostra le sezioni", () => {
+    render(<Goals />);
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    for (const name of ["Riepilogo", "I tuoi obiettivi", "Obiettivi completati", "Obiettivi suggeriti"]) {
+      expect(screen.getByRole("heading", { level: 2, name })).toBeTruthy();
+    }
+    const summary = screen.getByRole("region", { name: "Riepilogo" });
+    expect(within(summary).getByText("Verso il livello 5")).toBeTruthy();
+    // XP context next to the percentage; short labels that fit a 360px column.
+    expect(within(summary).getByText("450 / 1.000 XP")).toBeTruthy();
+    expect(within(summary).getAllByText("Ultimi 7 giorni")).toHaveLength(2);
+    expect(within(summary).getByText("Obiettivo 10 km")).toBeTruthy();
+    expect(within(summary).getByText("Obiettivo 3 nuotate")).toBeTruthy();
+    expect(within(summary).getByText("Obiettivi attivi")).toBeTruthy();
+    expect(screen.getByText(/Nessun obiettivo creato/)).toBeTruthy();
+  });
+
+  it("somma la distanza settimanale in km (la timeline è già in km)", () => {
+    state.timeline = [
+      { date: "2026-10-27", distance: 4.5, pace: 120, sessions: 1 },
+      { date: "2026-10-28", distance: 4.7, pace: 118, sessions: 1 },
+    ];
+    render(<Goals />);
+    const summary = screen.getByRole("region", { name: "Riepilogo" });
+    expect(within(summary).getByText("9,2")).toBeTruthy();
+    // 9,2 km is above the 8 km threshold: no «more volume» suggestion.
+    expect(screen.queryByText("Aumenta il volume settimanale")).toBeNull();
+  });
+
+  it("suggerisce più volume sotto gli 8 km settimanali", () => {
+    state.timeline = [{ date: "2026-10-28", distance: 3.2, pace: 120, sessions: 1 }];
+    render(<Goals />);
+    const summary = screen.getByRole("region", { name: "Riepilogo" });
+    expect(within(summary).getByText("3,2")).toBeTruthy();
+    expect(screen.getAllByText("Aumenta il volume settimanale").length).toBeGreaterThan(0);
+  });
+
+  it("mostra un obiettivo con progresso e lo elimina", async () => {
+    state.goals = [
+      { id: 9, title: "12 km a settimana", category: "distance", currentValue: 6, targetValue: 12, unit: "km" },
+    ];
+    render(<Goals />);
+    const goal = screen.getByRole("heading", { level: 3, name: "12 km a settimana" }).closest("li")!;
+    expect(within(goal).getByText("Distanza")).toBeTruthy();
+    expect(within(goal).getByText("6 / 12 km")).toBeTruthy();
+    expect(within(goal).getByRole("progressbar", { name: "Progresso: 12 km a settimana" })).toBeTruthy();
+    expect(within(goal).getByText("Completamento")).toBeTruthy();
+    // No placeholder status or deadline chips; nothing to edit or delete is ever disabled.
+    for (const text of ["Indietro", "In linea", "Da iniziare", "Raggiunto", "Tappe"]) {
+      expect(within(goal).queryByText(text)).toBeNull();
+    }
+    expect(within(goal).getByRole("button", { name: "Modifica obiettivo" })).toBeEnabled();
+
+    await userEvent.click(within(goal).getByRole("button", { name: "Elimina obiettivo" }));
+    expect(state.removeCalls).toEqual([{ id: 9 }]);
+  });
+
+  it("segna come raggiunto un obiettivo completato", () => {
+    state.goals = [
+      { id: 3, title: "100 vasche", category: "milestone", currentValue: 100, targetValue: 100, unit: "vasche" },
+    ];
+    render(<Goals />);
+    const goal = screen.getByRole("heading", { level: 3, name: "100 vasche" }).closest("li")!;
+    expect(within(goal).getByText("Raggiunto")).toBeTruthy();
+  });
+
+  it("accetta la virgola nel valore obiettivo e rifiuta un valore non numerico", async () => {
+    const user = userEvent.setup({ delay: null });
+    render(<Goals />);
+    await user.click(screen.getByRole("button", { name: "Crea obiettivo" }));
+    await user.type(screen.getByLabelText("Titolo"), "Dorso");
+    await user.type(screen.getByLabelText("Valore obiettivo"), "abc");
+    await user.click(screen.getByRole("button", { name: "Aggiungi obiettivo" }));
+    expect(state.createCalls).toEqual([]);
+    expect(toast.error).toHaveBeenCalledWith("Inserisci un numero valido, ad esempio 2,5");
+
+    await user.clear(screen.getByLabelText("Valore obiettivo"));
+    await user.type(screen.getByLabelText("Valore obiettivo"), "2,5");
+    await user.type(screen.getByLabelText("Unità"), "km");
+    await user.click(screen.getByRole("button", { name: "Aggiungi obiettivo" }));
+    expect(state.createCalls).toEqual([{ title: "Dorso", category: "distance", targetValue: 2.5, unit: "km" }]);
+  });
+
+  it("crea un obiettivo dal dialogo", async () => {
+    // No per-keystroke delay: the default setTimeout per character times out under full-suite load.
+    const user = userEvent.setup({ delay: null });
+    render(<Goals />);
+    await user.click(screen.getByRole("button", { name: "Crea obiettivo" }));
+    await user.type(screen.getByLabelText("Titolo"), "Delfino 200 m");
+    await user.type(screen.getByLabelText("Valore obiettivo"), "200");
+    await user.type(screen.getByLabelText("Unità"), "m");
+    await user.click(screen.getByRole("button", { name: "Aggiungi obiettivo" }));
+    expect(state.createCalls).toEqual([
+      { title: "Delfino 200 m", category: "distance", targetValue: 200, unit: "m" },
+    ]);
+  });
+});

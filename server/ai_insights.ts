@@ -1,9 +1,16 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getDb } from "./db";
-import { aiInsightsCache } from "../drizzle/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { aiInsightsCache, swimmingActivities } from "../drizzle/schema";
+import { eq, and } from "drizzle-orm";
 import { logger } from "./middleware/logger";
 import { ENV } from "./_core/env";
+import { aiInsightsRateLimit } from "./lib/ai-rate-limit";
+import type { SwimMetrics } from "@shared/swimMetrics";
+import {
+  SWIM_METRICS_COACH_RULES,
+  swimMetricsForCoach,
+  swimMetricsGlossary,
+} from "./swim_metrics/coach-context";
 
 // Initialize Gemini AI
 let genAI: GoogleGenerativeAI | null = null;
@@ -12,6 +19,11 @@ const INSIGHT_EMOJI_REGEX = /^[🔥⚡💪🎯📈🏊🔄🌟🚀💯🏆❤️
 const INSIGHT_EMOJIS = ["🔥", "⚡", "💪", "🎯", "📈", "🏊", "🔄", "🌟", "🚀", "💯", "🏆", "❤️", "📊", "🎉", "👍", "💬", "🤯", "😂", "😢", "🌊"] as const;
 const MIN_INSIGHTS_FOR_VALID_CACHE = 6;
 const GEMINI_MODEL = ENV.geminiTextModel;
+/**
+ * Window of the swim metrics behind the insights. It is also the cache key: rows cached with
+ * the old 30-day window came from the removed invented scores and are never read again.
+ */
+const INSIGHTS_PERIOD_DAYS = 90;
 
 function getGeminiClient() {
   if (!genAI && process.env.GEMINI_API_KEY) {
@@ -101,278 +113,205 @@ function parseInsightsFromAiText(text: string): string[] {
   return picked.slice(0, 8);
 }
 
-export interface UserStatsData {
-  level: number;
-  totalXp: number;
-  currentStreak: number;
-  recordStreak: number;
-  avgPaceSeconds: number;
-  totalDistanceMeters: number;
-  sessions: number;
-  hrZones?: {
-    zone1: number;
-    zone2: number;
-    zone3: number;
-    zone4: number;
-    zone5: number;
-  };
-  trend: "up" | "down" | "stable";
-  trendPercentage: number;
-  performanceIndex: number;
-  consistencyScore: number;
-  periodDays: number;
-  swolfAvg?: number;
-  caloriesTotal?: number;
-  // New advanced metrics
-  swimmingEfficiencyIndex?: number;
-  technicalConsistencyIndex?: number;
-  strokeEfficiencyRating?: number;
-  aerobicCapacityScore?: number;
-  recoveryReadinessScore?: number;
-  progressiveOverloadIndex?: number;
+type Db = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+type CachedInsights = { insights: string[]; generatedAt?: Date | null; expiresAt: Date };
+
+/** The cached insights live 24 hours. */
+const INSIGHTS_TTL_MS = 24 * 60 * 60 * 1000;
+/**
+ * New swims make the insights stale, but they are regenerated at most once every 6 hours: until
+ * then the last ones are served (each regeneration is a Gemini call).
+ */
+export const INSIGHTS_MIN_REGENERATION_MS = 6 * 60 * 60 * 1000;
+/** The Gemini call gives up after this: the last insights (or none) are served instead. */
+export const INSIGHTS_GEMINI_TIMEOUT_MS = 25_000;
+
+/** Insights of a user who never swam (analysis and direction, no workouts). */
+const ONBOARDING_INSIGHTS = [
+  "📈 Progressione: Sei in una fase perfetta per creare una base. La cosa piu' importante adesso e' costruire regolarita' prima di inseguire la velocita'.",
+  "🔄 Recupero: Parti con calma. Sessioni leggere e costanti ti aiutano a rendere sostenibile l'abitudine senza accumulare fatica.",
+  "🏊 Tecnica: All'inizio i miglioramenti piu' rapidi arrivano dalla tecnica. Concentrarti su scivolamento e controllo del ritmo ti dara' vantaggi immediati.",
+  "💪 Intensita': Prima base, poi intensita'. Quando avrai qualche sessione registrata, potremo capire se e quando alzare il ritmo.",
+  "⚡ Efficienza: Anche a bassa intensita' puoi migliorare l'efficienza. Piccoli progressi sessione dopo sessione fanno una grande differenza nel tempo.",
+  "🎯 Obiettivi: Imposta un obiettivo semplice e misurabile (frequenza settimanale). Una volta che i dati arrivano, potremo renderlo piu' ambizioso.",
+];
+
+const isOnboardingInsights = (insights: string[]) => insights[0] === ONBOARDING_INSIGHTS[0];
+
+/**
+ * New swims or laps: the user's Coach page insights become stale, but stay served until 6 hours
+ * have passed since they were generated (expiry moved to that moment, or to now when it has
+ * already passed). Best effort: a failure is logged, never thrown.
+ */
+export async function markAIInsightsStale(userId: number, now: Date = new Date()): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    const rows = await db
+      .select({ generatedAt: aiInsightsCache.generatedAt, expiresAt: aiInsightsCache.expiresAt })
+      .from(aiInsightsCache)
+      .where(eq(aiInsightsCache.userId, userId))
+      .limit(1);
+    const row = rows[0];
+    if (!row) return;
+    const regenerateFrom = new Date(
+      Math.max(now.getTime(), new Date(row.generatedAt).getTime() + INSIGHTS_MIN_REGENERATION_MS),
+    );
+    if (regenerateFrom.getTime() >= new Date(row.expiresAt).getTime()) return;
+    await db.update(aiInsightsCache).set({ expiresAt: regenerateFrom }).where(eq(aiInsightsCache.userId, userId));
+  } catch (error) {
+    log.warn("[AI Insights] Could not mark the cached insights stale", {
+      event: "ai_insights:mark_stale_failed",
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
+/** True when the user has at least one swim, ever (not only in the metrics' 90 days). */
+async function hasAnySwim(db: Db, userId: number): Promise<boolean> {
+  const rows = await db
+    .select({ id: swimmingActivities.id })
+    .from(swimmingActivities)
+    .where(eq(swimmingActivities.userId, userId))
+    .limit(1);
+  return rows.length > 0;
+}
+
+/** The user's cached insights of the 90-day metrics, expired or not; null when none or unreadable. */
+async function readCachedInsights(db: Db, userId: number): Promise<CachedInsights | null> {
+  try {
+    const rows = await db
+      .select()
+      .from(aiInsightsCache)
+      .where(and(eq(aiInsightsCache.userId, userId), eq(aiInsightsCache.periodDays, INSIGHTS_PERIOD_DAYS)))
+      .limit(1);
+    return rows[0] ?? null;
+  } catch (error) {
+    log.warn("[AI Insights] Cache check failed, proceeding without it", {
+      event: "ai_insights:cache_check_failed",
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+/** Replaces the user's cached insights (valid 24 hours from `now`). Best effort. */
+async function saveInsights(db: Db, userId: number, insights: string[], now: Date, kind: "onboarding" | "ai"): Promise<void> {
+  try {
+    await db.delete(aiInsightsCache).where(eq(aiInsightsCache.userId, userId));
+    await db.insert(aiInsightsCache).values({
+      userId,
+      insights,
+      periodDays: INSIGHTS_PERIOD_DAYS,
+      generatedAt: now,
+      expiresAt: new Date(now.getTime() + INSIGHTS_TTL_MS),
+    });
+    log.debug("[AI Insights] Cached insights", {
+      event: kind === "onboarding" ? "ai_insights:onboarding_cache_saved" : "ai_insights:cache_saved",
+      userId,
+      count: insights.length,
+    });
+  } catch (cacheError) {
+    log.warn("[AI Insights] Cache table not available, skipping cache save", {
+      event: kind === "onboarding" ? "ai_insights:onboarding_cache_save_skipped" : "ai_insights:cache_save_skipped",
+      userId,
+      message: cacheError instanceof Error ? cacheError.message : String(cacheError),
+    });
+  }
+}
+
+/** One Gemini answer, given up (and the request aborted) after INSIGHTS_GEMINI_TIMEOUT_MS. */
+async function generateInsightsText(client: GoogleGenerativeAI, prompt: string): Promise<string> {
+  const model = client.getGenerativeModel({ model: GEMINI_MODEL });
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = await Promise.race([
+      model.generateContent(prompt, { signal: controller.signal }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new Error(`Gemini API timeout after ${INSIGHTS_GEMINI_TIMEOUT_MS}ms`));
+          controller.abort();
+        }, INSIGHTS_GEMINI_TIMEOUT_MS);
+      }),
+    ]);
+    return result.response.text();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * 6-8 insights for the Coach page from the swim metrics, cached 24 hours. When Gemini fails,
+ * times out, is not configured or the user is over the hourly limit, the last cached insights are
+ * served (expired or not), otherwise none (the page shows its own message).
+ */
 export async function generateAIInsights(
-  userData: UserStatsData,
-  userId: number
+  metrics: SwimMetrics,
+  userId: number,
+  now: Date = new Date(),
 ): Promise<string[]> {
   const db = await getDb();
   if (!db) {
     return [];
   }
 
-  // New users (no synced activities) shouldn't trigger AI generation/parsing noise.
-  // Provide a small set of onboarding insights (analysis + direction, no workouts).
-  if ((userData.sessions ?? 0) <= 0 || (userData.totalDistanceMeters ?? 0) <= 0) {
-    const insights = [
-      "📈 Progressione: Sei in una fase perfetta per creare una base. La cosa piu' importante adesso e' costruire regolarita' prima di inseguire la velocita'.",
-      "🔄 Recupero: Parti con calma. Sessioni leggere e costanti ti aiutano a rendere sostenibile l'abitudine senza accumulare fatica.",
-      "🏊 Tecnica: All'inizio i miglioramenti piu' rapidi arrivano dalla tecnica. Concentrarti su scivolamento e controllo del ritmo ti dara' vantaggi immediati.",
-      "💪 Intensita': Prima base, poi intensita'. Quando avrai qualche sessione registrata, potremo capire se e quando alzare il ritmo.",
-      "⚡ Efficienza: Anche a bassa intensita' puoi migliorare l'efficienza. Piccoli progressi sessione dopo sessione fanno una grande differenza nel tempo.",
-      "🎯 Obiettivi: Imposta un obiettivo semplice e misurabile (frequenza settimanale). Una volta che i dati arrivano, potremo renderlo piu' ambizioso.",
-    ];
-
-    // Cache these insights so the UI stays stable and we avoid repeated generation attempts.
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
-    try {
-      await db.delete(aiInsightsCache).where(eq(aiInsightsCache.userId, userId));
-      await db.insert(aiInsightsCache).values({
-        userId,
-        insights,
-        periodDays: userData.periodDays,
-        expiresAt,
-      });
-      log.debug("[AI Insights] Cached onboarding insights (no activities yet)", {
-        event: "ai_insights:onboarding_cache_saved",
-        userId,
-      });
-    } catch (cacheError) {
-      log.debug("[AI Insights] Skipping onboarding cache save", {
-        event: "ai_insights:onboarding_cache_save_skipped",
-        userId,
-        message: cacheError instanceof Error ? cacheError.message : String(cacheError),
-      });
-    }
-
-    return insights;
+  // New users (no swim ever) shouldn't trigger AI generation/parsing noise: onboarding insights
+  // (analysis + direction, no workouts). Someone back after a break gets real insights.
+  if (metrics.sessions.length === 0 && !(await hasAnySwim(db, userId))) {
+    // Cached so the UI stays stable and we avoid repeated generation attempts.
+    await saveInsights(db, userId, ONBOARDING_INSIGHTS, now, "onboarding");
+    return [...ONBOARDING_INSIGHTS];
   }
 
-  // 🔥 PRIORITY: Check cache FIRST (before API call)
-  try {
-    const cached = await db
-      .select()
-      .from(aiInsightsCache)
-      .where(
-        and(
-          eq(aiInsightsCache.userId, userId),
-          eq(aiInsightsCache.periodDays, userData.periodDays),
-          gt(aiInsightsCache.expiresAt, new Date()) // Not expired
-        )
-      )
-      .limit(1);
-
-    if (cached.length > 0 && cached[0].insights.length > 0) {
-      if (cached[0].insights.length >= MIN_INSIGHTS_FOR_VALID_CACHE) {
-        log.debug("[AI Insights] Using valid cached insights", {
-          event: "ai_insights:cache_hit",
-          userId,
-          expiresAt: cached[0].expiresAt,
-          count: cached[0].insights.length,
-        });
-        return cached[0].insights;
-      }
-
-      log.warn("[AI Insights] Cache hit with incomplete insights, forcing regeneration", {
-        event: "ai_insights:cache_hit_incomplete",
+  // Cache first. The onboarding insights of a user who swims now are never served from it.
+  const cached = await readCachedInsights(db, userId);
+  const lastInsights = cached?.insights ?? [];
+  if (cached && new Date(cached.expiresAt).getTime() > now.getTime() && lastInsights.length > 0 && !isOnboardingInsights(lastInsights)) {
+    if (lastInsights.length >= MIN_INSIGHTS_FOR_VALID_CACHE) {
+      log.debug("[AI Insights] Using valid cached insights", {
+        event: "ai_insights:cache_hit",
         userId,
-        count: cached[0].insights.length,
+        expiresAt: cached.expiresAt,
+        count: lastInsights.length,
       });
+      return lastInsights;
     }
-    
+    log.warn("[AI Insights] Cache hit with incomplete insights, forcing regeneration", {
+      event: "ai_insights:cache_hit_incomplete",
+      userId,
+      count: lastInsights.length,
+    });
+  } else {
     log.debug("[AI Insights] No valid cache found, generating new insights", {
       event: "ai_insights:cache_miss",
       userId,
     });
-  } catch (cacheError) {
-    log.warn("[AI Insights] Cache check failed, proceeding with generation", {
-      event: "ai_insights:cache_check_failed",
-      userId,
-      message: cacheError instanceof Error ? cacheError.message : String(cacheError),
-    });
   }
 
   const client = getGeminiClient();
-  
-  // If no API key, try to use ANY cache as fallback (even expired)
   if (!client) {
-    log.warn("[AI Insights] No Gemini API key configured, trying ANY cache fallback", {
+    log.warn("[AI Insights] No Gemini API key configured, serving the last insights", {
       event: "ai_insights:no_api_key",
       userId,
+      cached: lastInsights.length,
     });
-    try {
-      const anyCached = await db
-        .select()
-        .from(aiInsightsCache)
-        .where(
-          and(
-            eq(aiInsightsCache.userId, userId),
-            eq(aiInsightsCache.periodDays, userData.periodDays)
-          )
-        )
-        .limit(1);
+    return lastInsights;
+  }
 
-      if (anyCached.length > 0 && anyCached[0].insights.length > 0) {
-        log.debug("[AI Insights] Using ANY cached insights (no API key)", {
-          event: "ai_insights:any_cache_hit",
-          userId,
-        });
-        return anyCached[0].insights;
-      }
-    } catch (cacheError) {
-      log.warn("[AI Insights] Cache table not available", {
-        event: "ai_insights:cache_table_unavailable",
-        userId,
-        message: cacheError instanceof Error ? cacheError.message : String(cacheError),
-      });
-    }
-    return [];
+  if (!(await aiInsightsRateLimit.consume(userId))) {
+    log.warn("[AI Insights] Hourly generation limit reached, serving the last insights", {
+      event: "ai_insights:rate_limited",
+      userId,
+      cached: lastInsights.length,
+    });
+    return lastInsights;
   }
 
   try {
-    const model = client.getGenerativeModel({ model: GEMINI_MODEL });
-
-    const prompt = `Sei un analista di performance di nuoto esperto. Analizza questi dati di un nuotatore e genera 6-8 insights analitici, identificando TENDENZE, PATTERN e AREE DI MIGLIORAMENTO in italiano, CATEGORIZZATI per argomento.
-
-⚠️ IMPORTANTE: NON fornire allenamenti specifici o workout dettagliati (quello è il ruolo dell'AI Coach). Focus su ANALISI e DIREZIONE GENERALE.
-
-Dati nuotatore (ultimi ${userData.periodDays} giorni):
-
-📊 DATI BASE:
-- Livello: ${userData.level}
-- XP Totali: ${userData.totalXp}
-- Streak attuale: ${userData.currentStreak} giorni (record: ${userData.recordStreak})
-- Distanza totale: ${(userData.totalDistanceMeters / 1000).toFixed(1)} km
-- Sessioni: ${userData.sessions}
-- Pace medio: ${formatPace(userData.avgPaceSeconds)}/100m
-- Trend: ${userData.trend === "up" ? "crescita" : userData.trend === "down" ? "calo" : "stabile"} ${userData.trendPercentage}%
-
-📈 INDICI GENERALI:
-- Performance Index: ${userData.performanceIndex}/100
-- Consistency Score: ${userData.consistencyScore}/100
-${userData.swolfAvg ? `- SWOLF medio: ${userData.swolfAvg}` : ""}
-${userData.caloriesTotal ? `- Calorie totali: ${userData.caloriesTotal}` : ""}
-
-🏊 METRICHE AVANZATE:
-${userData.swimmingEfficiencyIndex ? `- SEI (Swimming Efficiency): ${userData.swimmingEfficiencyIndex}/100` : ""}
-${userData.technicalConsistencyIndex ? `- TCI (Technical Consistency): ${userData.technicalConsistencyIndex}/100` : ""}
-${userData.strokeEfficiencyRating ? `- SER (Stroke Efficiency): ${userData.strokeEfficiencyRating}/100` : ""}
-${userData.aerobicCapacityScore ? `- ACS (Aerobic Capacity): ${userData.aerobicCapacityScore}/100` : ""}
-${userData.recoveryReadinessScore ? `- RRS (Recovery Readiness): ${userData.recoveryReadinessScore}/100` : ""}
-${userData.progressiveOverloadIndex !== undefined ? `- POI (Progressive Overload): ${userData.progressiveOverloadIndex > 0 ? '+' : ''}${userData.progressiveOverloadIndex}%` : ""}
-
-❤️ ZONE FREQUENZA CARDIACA:
-${userData.hrZones ? `Z1=${userData.hrZones.zone1}%, Z2=${userData.hrZones.zone2}%, Z3=${userData.hrZones.zone3}%, Z4=${userData.hrZones.zone4}%, Z5=${userData.hrZones.zone5}%` : "Non disponibili"}
-
-REGOLE FONDAMENTALI:
-
-1. ❌ NON RIPETERE I DATI VISIBILI
-   - L'utente vede già distanza, sessioni, pace, streak
-   - NON dire "Hai nuotato X km in Y sessioni"
-   - NON dire "Il tuo pace medio è X:XX/100m"
-   - NON dire "Hai un Performance Index di X/100"
-
-2. ✅ INTERPRETA E COLLEGA I DATI
-   - Calcola medie (es. km per sessione, frequenza settimanale)
-   - Confronta con standard (principiante/intermedio/avanzato)
-   - Identifica pattern nascosti (es. "nuoti più veloce ma meno costante")
-   - Trova correlazioni (es. "le tue zone HR indicano che potresti spingere di più")
-
-3. ✅ DAI INDICAZIONI GENERALI (NON ALLENAMENTI SPECIFICI)
-   - Identifica aree da migliorare (es. "la tua tecnica varia troppo tra sessioni")
-   - Suggerisci direzioni generali (es. "considera di lavorare sulla consistenza del ritmo")
-   - Proponi focus generali (es. "potrebbe essere utile dedicare più tempo al recupero")
-   - ❌ NON dare serie/ripetizioni specifiche (es. NO "4x100m in Z3", NO "500m di tecnica")
-
-4. ✅ USA CONTESTO E PSICOLOGIA
-   - Se streak = 0 ma record > 0: motivazione per ripartire
-   - Se Performance Index alto ma Consistency basso: focus su regolarità
-   - Se trend negativo: incoraggiamento senza giudizio
-   - Se trend positivo: celebrazione + sfida successiva
-
-5. 📝 FORMATO E CATEGORIZZAZIONE
-   - Genera 6-8 insights totali
-   - Ogni insight inizia con emoji CATEGORIZZATO:
-     * 🏊 Tecnica (SEI, TCI, SER, SWOLF)
-     * 💪 Intensità (Zone HR, ACS, pace)
-     * 📈 Progressione (POI, trend, livello)
-     * 🔄 Recupero (RRS, streak)
-     * ⚡ Efficienza (SEI, SER, calorie)
-     * 🎯 Obiettivi (predictions, consistency)
-   - 1-2 frasi max per insight
-   - Tono amichevole e motivazionale
-   - Usa "tu" e linguaggio diretto
-
-ESEMPI DI INSIGHTS BUONI PER CATEGORIA:
-
-🏊 TECNICA:
-✅ "Il tuo SEI di 72/100 indica buona efficienza, ma c'è margine di miglioramento: lavorare sulla riduzione delle bracciate potrebbe portarti sopra 80."
-✅ "TCI a 65 suggerisce variazioni nel ritmo tra sessioni. Maggiore focus sulla consistenza tecnica potrebbe stabilizzare le tue performance."
-
-💪 INTENSITÀ:
-✅ "Passi solo il 15% in Z3-Z4: ottima base aerobica costruita! Il prossimo step naturale è integrare più lavoro ad alta intensità per sviluppare velocità."
-✅ "ACS di 78 indica solida capacità aerobica. Mantenere sessioni lunghe in Z2 ti aiuterà a consolidare questa base."
-
-📈 PROGRESSIONE:
-✅ "POI a +18% è perfetto! Stai progredendo al ritmo giusto senza rischio sovrallenamento. Questo trend è sostenibile per altre 2-3 settimane."
-✅ "Trend +12% con Performance Index 85: crescita costante e sana. Puntare a 50km totali nel prossimo mese consoliderebbe questi progressi."
-
-🔄 RECUPERO:
-✅ "RRS a 55 indica recupero parziale. Potrebbe essere utile considerare più giorni di riposo o sessioni più leggere."
-✅ "Streak di 12 giorni è ottimo, ma RRS basso suggerisce accumulo di fatica. Bilanciare intensità e recupero diventa prioritario."
-
-⚡ EFFICIENZA:
-✅ "SER di 81 con SWOLF 42: stai scivolando bene! C'è potenziale per portare SWOLF sotto 40 lavorando sulla fase di presa."
-✅ "Consumi 450 cal/sessione con pace 1:45: ottimo rapporto efficienza/intensità! Aumentare gradualmente l'intensità potrebbe migliorare il metabolismo."
-
-🎯 OBIETTIVI:
-✅ "Al ritmo attuale (2.8 km/sessione), raggiungerai 50km in 18 giorni. Una sessione extra a settimana anticiperebbe l'obiettivo a 14 giorni."
-✅ "Consistency 88 con solo 3 sessioni/settimana: quando nuoti, nuoti bene! Aumentare la frequenza a 4/settimana sbloccherebbe il livello successivo più velocemente."
-
-ESEMPI CATTIVI (DA EVITARE):
-❌ "Hai nuotato 16.3 km in 6 sessioni" (RIPETE I DATI)
-❌ "Il tuo SEI è 72/100" (RIPETE I DATI)
-❌ "Continua così!" (TROPPO GENERICO)
-❌ "Il tuo pace medio è 1:40/100m" (RIPETE I DATI)
-❌ "Nella prossima sessione fai 4x100m in Z3" (TROPPO SPECIFICO - È COMPITO DEL COACH)
-❌ "Aggiungi 500m di tecnica ogni 3 sessioni" (ALLENAMENTO SPECIFICO - NON È IL TUO RUOLO)
-
-Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
-
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const text = response.text();
+    const text = await generateInsightsText(client, buildInsightsPrompt(metrics));
 
     log.debug("[AI Insights] Raw response from Gemini (first 500 chars)", {
       event: "ai_insights:raw_response",
@@ -387,128 +326,89 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
       userId,
       count: insights.length,
     });
-    if (insights.length === 0) {
-      log.warn("[AI Insights] No insights matched regex", {
-        event: "ai_insights:regex_no_match",
-        userId,
-        preview: text.substring(0, 500),
-      });
-    }
 
-    // Return first 8 insights and save to cache
     if (insights.length > 0) {
       const finalInsights = insights.slice(0, 8);
-      
-      // Save to cache (expires in 24 hours as per user preference)
-      const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + 24);
-      
-      try {
-        // Delete old cache
-        await db.delete(aiInsightsCache).where(eq(aiInsightsCache.userId, userId));
-        
-        // Insert new cache
-        await db.insert(aiInsightsCache).values({
-          userId,
-          insights: finalInsights,
-          periodDays: userData.periodDays,
-          expiresAt,
-        });
-        
-        log.debug("[AI Insights] Cached insights", {
-          event: "ai_insights:cache_saved",
-          userId,
-          count: finalInsights.length,
-        });
-      } catch (cacheError) {
-        log.warn("[AI Insights] Cache table not available yet, skipping cache save", {
-          event: "ai_insights:cache_save_skipped",
-          userId,
-          message: cacheError instanceof Error ? cacheError.message : String(cacheError),
-        });
-      }
-      
+      await saveInsights(db, userId, finalInsights, now, "ai");
       return finalInsights;
     }
 
-    // If parsing fails, try to use cache as fallback
+    // Nothing parsed: the last complete insights, if any.
     log.warn("[AI Insights] Failed to parse AI response, trying cache fallback", {
       event: "ai_insights:parse_failed",
       userId,
+      preview: text.substring(0, 500),
     });
-    try {
-      const cached = await db
-        .select()
-        .from(aiInsightsCache)
-        .where(
-          and(
-            eq(aiInsightsCache.userId, userId),
-            eq(aiInsightsCache.periodDays, userData.periodDays)
-          )
-        )
-        .limit(1);
-
-      if (cached.length > 0 && cached[0].insights.length >= MIN_INSIGHTS_FOR_VALID_CACHE) {
-        log.debug("[AI Insights] Using cached insights (parsing failed)", {
-          event: "ai_insights:parse_failed_cache_hit",
-          userId,
-          count: cached[0].insights.length,
-        });
-        return cached[0].insights;
-      }
-    } catch (cacheError) {
-      log.warn("[AI Insights] Cache table not available for fallback", {
-        event: "ai_insights:cache_fallback_unavailable",
-        userId,
-        message: cacheError instanceof Error ? cacheError.message : String(cacheError),
-      });
-    }
-    
-    return [];
+    return lastInsights.length >= MIN_INSIGHTS_FOR_VALID_CACHE ? lastInsights : [];
   } catch (error) {
     log.error("[AI Insights] Error generating AI insights", {
       event: "ai_insights:generate_error",
       userId,
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
+      cached: lastInsights.length,
     });
-    
-    // Try to return cached insights even if expired
-    try {
-      const anyCached = await db
-        .select()
-        .from(aiInsightsCache)
-        .where(
-          and(
-            eq(aiInsightsCache.userId, userId),
-            eq(aiInsightsCache.periodDays, userData.periodDays)
-          )
-        )
-        .limit(1);
-      
-      if (anyCached.length > 0 && anyCached[0].insights.length > 0) {
-        log.warn("[AI Insights] Using expired cache due to error", {
-          event: "ai_insights:expired_cache_fallback",
-          userId,
-        });
-        return anyCached[0].insights;
-      }
-    } catch (fallbackError) {
-      log.warn("[AI Insights] Cache table not available for fallback", {
-        event: "ai_insights:expired_cache_fallback_unavailable",
-        userId,
-        message: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
-      });
-    }
-    
-    return [];
+    // The last insights even if expired (or none).
+    return lastInsights;
   }
 }
 
+function buildInsightsPrompt(metrics: SwimMetrics): string {
+  return `Sei un analista di performance di nuoto esperto. Analizza le metriche di questo nuotatore e genera 6-8 insights analitici in italiano, identificando TENDENZE, PATTERN e AREE DI MIGLIORAMENTO, CATEGORIZZATI per argomento.
 
+⚠️ IMPORTANTE: NON fornire allenamenti specifici o workout dettagliati (quello è il ruolo dell'AI Coach). Focus su ANALISI e DIREZIONE GENERALE.
 
-function formatPace(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${minutes}:${secs.toString().padStart(2, "0")}`;
+${swimMetricsForCoach(metrics)}
+
+${swimMetricsGlossary()}
+
+REGOLE FONDAMENTALI:
+
+0. METRICHE
+${SWIM_METRICS_COACH_RULES}
+
+1. ❌ NON RIPETERE I DATI VISIBILI
+   - L'utente vede già i valori nella pagina Statistiche
+   - NON dire "Il tuo passo soglia è 1:44/100 m" o "Hai fatto 7,4 km a settimana"
+
+2. ✅ INTERPRETA E COLLEGA I DATI
+   - Confronta con la base personale e con le settimane precedenti, mai con altri nuotatori
+   - Collega le metriche tra loro (es. equilibrio negativo e volume in crescita; quota media alta e regolarità nelle ripetute)
+   - Spiega cosa significa una lettura (es. "in costruzione", "molto lavoro in zona B")
+
+3. ✅ DAI INDICAZIONI GENERALI (NON ALLENAMENTI SPECIFICI)
+   - Identifica aree da migliorare e suggerisci direzioni generali
+   - ❌ NON dare serie/ripetizioni specifiche (es. NO "4x100 in B2", NO "500 m di tecnica")
+
+4. ✅ USA CONTESTO E PSICOLOGIA
+   - Serie di settimane a 0: motivazione per ripartire, senza giudizio
+   - Equilibrio molto negativo: priorità al recupero
+   - Dati scarsi o stime con affidabilità media: dillo e indica quali nuotate servono
+
+5. 📝 FORMATO E CATEGORIZZAZIONE
+   - Genera 6-8 insights totali
+   - Ogni insight inizia con emoji CATEGORIZZATO:
+     * 🏊 Tecnica (Stroke Index, distanza per ciclo, frequenza, SWOLF)
+     * 💪 Intensità (passo soglia, zone di passo)
+     * 📈 Progressione (forma, volume, passo soglia nel tempo)
+     * 🔄 Recupero (equilibrio tra forma e fatica)
+     * ⚡ Efficienza (Stroke Index rispetto alla tua base, regolarità nelle ripetute)
+     * 🎯 Obiettivi (costanza, serie di settimane)
+   - 1-2 frasi max per insight
+   - Tono amichevole e diretto, usa "tu"
+
+ESEMPI DI INSIGHTS BUONI:
+✅ "🔄 Recupero: il tuo equilibrio è in costruzione da due settimane mentre la forma sale: stai caricando bene, ma una settimana più leggera ogni 3-4 ti aiuterà ad assorbire il lavoro."
+✅ "💪 Intensità: quasi metà del volume cade in zona B; gli studi indicano che spostarne una parte in zona A, tenendo pochi tratti in zona C, rende di più."
+✅ "🏊 Tecnica: lo Stroke Index è sopra la tua base nella vasca da 25 m e anche la distanza per bracciata è salita: fai più strada per bracciata, non vai solo più veloce." (dillo solo se sale la distanza per bracciata; se sale solo il passo, il merito è della velocità)
+✅ "⚡ Efficienza: nelle ripetute la distanza per bracciata cala nel finale: la fatica ti accorcia la bracciata, e lì c'è margine con un lavoro di resistenza graduale."
+✅ "🎯 Obiettivi: la stima del passo soglia ha affidabilità media; una nuotata con un tratto continuo lungo (800 m o più) la renderebbe più solida."
+
+ESEMPI CATTIVI (DA EVITARE):
+❌ "Il tuo passo soglia è 1:44/100 m" (RIPETE I DATI)
+❌ "Continua così!" (TROPPO GENERICO)
+❌ "Hai un indice di efficienza di 72/100" (INDICE INVENTATO)
+❌ "Nella prossima sessione fai 4x100 in B2" (ALLENAMENTO SPECIFICO - NON È IL TUO RUOLO)
+
+Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
 }

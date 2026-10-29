@@ -2,13 +2,17 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => {
   process.env.GARMIN_SERVICE_SECRET = "test-secret";
-  return { getDb: vi.fn() };
+  return { getDb: vi.fn(), deleteCached: vi.fn(async () => {}) };
 });
 
 vi.mock("./db", () => ({ getDb: h.getDb, upsertPersonalRecord: vi.fn() }));
+vi.mock("./lib/cache", async () => {
+  const actual = await vi.importActual<typeof import("./lib/cache")>("./lib/cache");
+  return { ...actual, deleteCached: h.deleteCached };
+});
 
-import { syncGarminActivities } from "./garmin";
-import { garminTokens, swimmerProfiles } from "../drizzle/schema";
+import { invalidateAfterGarminSync, syncGarminActivities } from "./garmin";
+import { aiInsightsCache, garminTokens, swimmerProfiles } from "../drizzle/schema";
 
 const originalFetch = global.fetch;
 
@@ -135,5 +139,59 @@ describe("syncGarminActivities auto-sync timestamp", () => {
     expect(updates.some((u) => u.table === swimmerProfiles && "lastGarminSyncAt" in u.values)).toBe(false);
     // The "last sync" shown in Settings still reflects the manual sync.
     expect(updates.some((u) => u.table === garminTokens && "lastSyncAt" in u.values)).toBe(true);
+  });
+
+  it("a sync that changed nothing leaves the swim metrics and insights cached", async () => {
+    mockDbRecordingUpdates();
+
+    await syncGarminActivities(7, 30);
+
+    expect(h.deleteCached).not.toHaveBeenCalled();
+  });
+});
+
+describe("invalidateAfterGarminSync", () => {
+  const deleted: unknown[] = [];
+  const updated: unknown[] = [];
+  beforeEach(() => {
+    vi.clearAllMocks();
+    deleted.length = 0;
+    updated.length = 0;
+    // Cached insights generated 7 hours ago: past the 6-hour minimum, so they expire now.
+    const generatedAt = new Date(Date.now() - 7 * 3600_000);
+    h.getDb.mockResolvedValue({
+      select: () => ({
+        from: () => ({
+          where: () => ({ limit: async () => [{ generatedAt, expiresAt: new Date(generatedAt.getTime() + 24 * 3600_000) }] }),
+        }),
+      }),
+      update: (table: unknown) => ({
+        set: () => {
+          updated.push(table);
+          return { where: async () => undefined };
+        },
+      }),
+      delete: (table: unknown) => {
+        deleted.push(table);
+        return { where: async () => undefined };
+      },
+    });
+  });
+
+  it.each([
+    [{ syncedCount: 2, existingSwimsChanged: false }, true],
+    [{ syncedCount: 0, existingSwimsChanged: true }, true],
+    [{ syncedCount: 0, existingSwimsChanged: false }, false],
+  ] as const)("%o → drops metrics and marks the insights stale: %s", async (changes, dropped) => {
+    await invalidateAfterGarminSync(7, changes);
+    // The insights are kept (served until 6 hours after their generation), never deleted.
+    expect(deleted).toEqual([]);
+    if (dropped) {
+      expect(h.deleteCached).toHaveBeenCalledWith(expect.stringMatching(/^swim-metrics:v4:7:\d{4}-\d{2}-\d{2}$/));
+      expect(updated).toEqual([aiInsightsCache]);
+    } else {
+      expect(h.deleteCached).not.toHaveBeenCalled();
+      expect(updated).toEqual([]);
+    }
   });
 });

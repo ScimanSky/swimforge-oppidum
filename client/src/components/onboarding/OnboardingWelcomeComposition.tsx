@@ -10,7 +10,7 @@ const scenes = [
     subtitle: "Il tuo hub per allenamenti, club e progressi.",
   },
   {
-    title: "Condividi post e attivita",
+    title: "Condividi post e attività",
     subtitle: "Feed completo con foto, video, tag e reazioni.",
   },
   {
@@ -29,6 +29,8 @@ export const ONBOARDING_WELCOME_FPS = 30;
 export const ONBOARDING_WELCOME_DURATION_FRAMES = SCENE_DURATION * scenes.length;
 export const ONBOARDING_WELCOME_WIDTH = 1280;
 export const ONBOARDING_WELCOME_HEIGHT = 720;
+/** The still shown instead of the video with reduced motion: the first scene, settled. */
+export const ONBOARDING_WELCOME_STILL_FRAME = 60;
 
 function SceneCard({ title, subtitle, frameOffset }: { title: string; subtitle: string; frameOffset: number }) {
   const frame = useCurrentFrame() - frameOffset;
@@ -74,47 +76,45 @@ function SceneCard({ title, subtitle, frameOffset }: { title: string; subtitle: 
           maxWidth: 900,
           borderRadius: 28,
           padding: "44px 52px",
-          border: "1px solid rgba(96, 255, 189, 0.34)",
-          background:
-            "linear-gradient(135deg, rgba(2,12,33,0.92), rgba(2,20,45,0.74) 55%, rgba(8,60,63,0.45))",
-          boxShadow: "0 0 42px rgba(0, 244, 255, 0.18)",
-          backdropFilter: "blur(12px)",
+          border: "2px solid var(--border)",
+          background: "var(--card)",
         }}
       >
         <div
           style={{
             display: "inline-flex",
             alignItems: "center",
-            border: "1px solid rgba(0,245,255,0.35)",
             borderRadius: 999,
-            padding: "7px 14px",
-            fontSize: 20,
-            color: "rgba(190,249,255,0.9)",
+            padding: "8px 18px",
+            fontSize: 22,
+            fontWeight: 600,
+            color: "var(--action-text)",
+            background: "color-mix(in oklch, var(--primary) 15%, transparent)",
             marginBottom: 26,
-            letterSpacing: 0.3,
           }}
         >
-          SwimForge Tour
+          Tour di SwimForge
         </div>
-        <h1
+        {/* Inside the welcome dialog (its title is the h2): a heading of the video. */}
+        <h3
           style={{
-            fontSize: 72,
-            lineHeight: 1.05,
+            fontFamily: "var(--font-display)",
+            fontSize: 76,
+            lineHeight: 1.02,
             margin: 0,
             marginBottom: 16,
-            color: "#ecffff",
-            fontWeight: 800,
-            letterSpacing: 0.2,
+            color: "var(--foreground)",
+            fontWeight: 700,
           }}
         >
           {title}
-        </h1>
+        </h3>
         <p
           style={{
             margin: 0,
             fontSize: 34,
-            lineHeight: 1.28,
-            color: "rgba(219, 245, 255, 0.87)",
+            lineHeight: 1.3,
+            color: "var(--muted-foreground)",
             maxWidth: 760,
           }}
         >
@@ -125,6 +125,7 @@ function SceneCard({ title, subtitle, frameOffset }: { title: string; subtitle: 
   );
 }
 
+/** The welcome video (Remotion): Corsia surfaces from the page's own tokens, so both themes work. */
 export function OnboardingWelcomeComposition({ userName }: OnboardingWelcomeCompositionProps) {
   const frame = useCurrentFrame();
   const pulse = interpolate(Math.sin(frame / 18), [-1, 1], [0.2, 0.55]);
@@ -135,32 +136,18 @@ export function OnboardingWelcomeComposition({ userName }: OnboardingWelcomeComp
   return (
     <AbsoluteFill
       style={{
-        background:
-          "radial-gradient(circle at 18% 18%, rgba(22, 189, 255, 0.18), transparent 44%), radial-gradient(circle at 88% 24%, rgba(98, 255, 169, 0.16), transparent 42%), linear-gradient(160deg, #020817 0%, #03152d 48%, #042037 100%)",
-        fontFamily: "'Rajdhani', 'Segoe UI', sans-serif",
+        background: "var(--background)",
+        fontFamily: "var(--font-sans)",
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          inset: "8% 6%",
-          borderRadius: 32,
-          border: "1px solid rgba(120, 255, 210, 0.2)",
-          boxShadow: "inset 0 0 70px rgba(0, 233, 255, 0.06), 0 0 70px rgba(0, 233, 255, 0.09)",
-          pointerEvents: "none",
-        }}
-      />
-
       <div
         style={{
           position: "absolute",
           top: 48,
           left: 62,
           fontSize: 34,
-          letterSpacing: 0.35,
-          color: "rgba(219, 250, 255, 0.9)",
+          color: "var(--foreground)",
           fontWeight: 600,
-          textShadow: "0 0 18px rgba(0, 245, 255, 0.24)",
         }}
       >
         {greeting}
@@ -188,12 +175,11 @@ export function OnboardingWelcomeComposition({ userName }: OnboardingWelcomeComp
       >
         <div
           style={{
-            color: "rgba(198, 238, 255, 0.86)",
+            color: "var(--muted-foreground)",
             fontSize: 24,
-            letterSpacing: 0.2,
           }}
         >
-          Preparazione tour interattivo
+          Preparazione del tour interattivo
         </div>
 
         <div style={{ display: "flex", gap: 10 }}>
@@ -206,10 +192,8 @@ export function OnboardingWelcomeComposition({ userName }: OnboardingWelcomeComp
                   width: active ? 42 : 14,
                   height: 14,
                   borderRadius: 999,
-                  background: active
-                    ? `rgba(0, 245, 255, ${0.42 + pulse})`
-                    : "rgba(165, 210, 233, 0.36)",
-                  boxShadow: active ? "0 0 20px rgba(0, 245, 255, 0.44)" : "none",
+                  background: active ? "var(--primary)" : "var(--border)",
+                  opacity: active ? 0.45 + pulse : 1,
                   transition: "all 220ms ease",
                 }}
               />

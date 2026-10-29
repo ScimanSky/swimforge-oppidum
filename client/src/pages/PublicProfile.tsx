@@ -1,279 +1,153 @@
-"use client"
-
+import { useId } from "react"
+import { useParams } from "wouter"
+import { toast } from "sonner"
+import { MapPin, UserCheck, UserPlus } from "lucide-react"
 import AppLayout from "@/components/AppLayout"
-import { Surface, SurfaceContent } from "@/components/ui/surface"
+import DirectMessages from "@/components/DirectMessages"
+import { LoadError, LoadingSkeleton, Notice } from "@/components/corsia/LoadState"
+import { Metric } from "@/components/corsia/Metric"
+import { PersonalRecordsBoard } from "@/components/corsia/PersonalRecordsBoard"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { MetricOrb } from "@/components/metrics/MetricOrb"
+import { formatInteger, getInitials, toFiniteNumber } from "@/lib/format"
 import { trpc } from "@/lib/trpc"
-import { useMemo, useState } from "react"
-import { useLocation, useParams } from "wouter"
-import { UserPlus, UserCheck, ArrowLeft, MapPin, Zap, MessageCircle } from "lucide-react"
-import DirectMessages from "@/components/DirectMessages"
-import { formatSwimCentiseconds } from "@/lib/swimTime"
+import { errorToastMessage } from "@/lib/trpc-errors"
 
-const getInitials = (name: string) =>
-  name
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "SF"
+const text = (value: unknown) => (typeof value === "string" ? value.trim() : "")
 
-const strokeLabels: Record<string, string> = {
-  freestyle: "Stile Libero",
-  backstroke: "Dorso",
-  breaststroke: "Rana",
-  butterfly: "Farfalla",
-  mixed: "Misti",
-}
-
-const sourceLabels: Record<string, string> = {
-  official: "Gara",
-  training: "Allenamento",
-}
-
-const formatDate = (value?: string | Date | null) => {
-  if (!value) return "--"
-  const parsed = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(parsed.getTime())) return "--"
-  return parsed.toLocaleDateString("it-IT", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  })
-}
-
+/**
+ * Someone's public profile (`/u/:id`): name, level, followers, «Segui» and «Messaggio», then
+ * their personal records. The shell header carries the «Profilo» title and the back button.
+ */
 export default function PublicProfile() {
-  const [, setLocation] = useLocation()
   const params = useParams<{ id: string }>()
-  const userId = Number.parseInt(params.id || "0", 10)
-  const [finaGender, setFinaGender] = useState<"male" | "female">("male")
-  const fromParam =
-    typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("from") : null
-  const safeFromPath = fromParam && fromParam.startsWith("/") ? fromParam : null
+  const userId = Number(params.id)
+  const validId = Number.isInteger(userId) && userId > 0
+  const nameId = useId()
 
   const meQuery = trpc.auth.me.useQuery()
   const profileQuery = trpc.community.users.getPublicProfile.useQuery(
     { userId },
-    { enabled: Number.isFinite(userId) && userId > 0 }
+    { enabled: validId }
   )
-  const pbBoardQuery = trpc.records.getByUser.useQuery(
-    { userId, finaGender },
-    { enabled: Number.isFinite(userId) && userId > 0 && Boolean(profileQuery.data) }
-  )
-
   const toggleFollowMutation = trpc.community.users.toggleFollow.useMutation({
     onSuccess: () => profileQuery.refetch(),
+    onError: (error) => toast.error(errorToastMessage(error, "Operazione non riuscita, riprova")),
   })
 
-  const isSelf = (meQuery.data?.id ?? 0) === userId
-
-  const displayName = useMemo(() => {
-    const p: any = profileQuery.data
-    return (p?.name as string) || (p?.username as string) || "Nuotatore"
-  }, [profileQuery.data])
-
-  const avatarUrl = useMemo(() => {
-    const p: any = profileQuery.data
-    return (p?.avatarUrl as string) || (p?.avatar_url as string) || ""
-  }, [profileQuery.data])
-
-  const coverUrl = useMemo(() => {
-    const p: any = profileQuery.data
-    return (p?.coverUrl as string) || (p?.cover_url as string) || ""
-  }, [profileQuery.data])
-
-  const bio = ((profileQuery.data as any)?.bio as string) || ""
-  const location = ((profileQuery.data as any)?.location as string) || ""
-  const level = Number((profileQuery.data as any)?.level ?? 1)
-  const totalXp = Number((profileQuery.data as any)?.totalXp ?? 0)
-  const followerCount = Number((profileQuery.data as any)?.followerCount ?? 0)
-  const followingCount = Number((profileQuery.data as any)?.followingCount ?? 0)
-  const isFollowing = Boolean((profileQuery.data as any)?.isFollowing)
-  const pbRows = useMemo(() => {
-    const rows = ((pbBoardQuery.data as any)?.records as Array<any> | undefined) ?? []
-    return rows.slice(0, 12)
-  }, [pbBoardQuery.data])
-
-  const handleBack = () => {
-    if (safeFromPath) {
-      setLocation(safeFromPath)
-      return
-    }
-
-    if (window.history.length > 1) {
-      window.history.back()
-      return
-    }
-
-    setLocation("/home")
+  if (!validId) {
+    return (
+      <AppLayout>
+        <Notice backHref="/home" backLabel="Torna al feed">Profilo non trovato.</Notice>
+      </AppLayout>
+    )
   }
+
+  if (profileQuery.isPending) {
+    return (
+      <AppLayout>
+        <LoadingSkeleton
+          label="Caricamento del profilo…"
+          count={2}
+          className="max-w-3xl space-y-4"
+          itemClassName="h-48 w-full rounded-2xl"
+        />
+      </AppLayout>
+    )
+  }
+
+  if (profileQuery.isError || !profileQuery.data) {
+    const code = profileQuery.error?.data?.code
+    return (
+      <AppLayout>
+        {code === "NOT_FOUND" || !profileQuery.error ? (
+          <Notice backHref="/home" backLabel="Torna al feed">Profilo non trovato.</Notice>
+        ) : code === "FORBIDDEN" ? (
+          <Notice backHref="/home" backLabel="Torna al feed">Questo profilo è privato.</Notice>
+        ) : (
+          <LoadError onRetry={() => void profileQuery.refetch()} />
+        )}
+      </AppLayout>
+    )
+  }
+
+  const profile = profileQuery.data as Record<string, unknown>
+  const name = text(profile.name)
+  const username = text(profile.username).replace(/^@+/, "")
+  const displayName = name || username || "Nuotatore"
+  const avatarUrl = text(profile.avatarUrl) || text(profile.avatar_url)
+  const coverUrl = text(profile.coverUrl) || text(profile.cover_url)
+  const bio = text(profile.bio)
+  const location = text(profile.location)
+  const level = toFiniteNumber(profile.level)
+  const totalXp = toFiniteNumber(profile.totalXp)
+  const isFollowing = Boolean(profile.isFollowing)
+  // The actions wait for auth.me: following yourself is refused by the server.
+  const canAct = Boolean(meQuery.data) && meQuery.data?.id !== userId
+
+  const metrics = [
+    level !== null ? { value: formatInteger(level), label: "Livello", tone: "xp" as const } : null,
+    totalXp !== null ? { value: formatInteger(totalXp), label: "XP", tone: "xp" as const } : null,
+    { value: formatInteger(toFiniteNumber(profile.followerCount) ?? 0), label: "Follower" },
+    { value: formatInteger(toFiniteNumber(profile.followingCount) ?? 0), label: "Seguiti" },
+  ].filter((metric) => metric !== null)
 
   return (
     <AppLayout>
-      <div className="compact-shell space-y-4 lg:space-y-2">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost-neon" size="icon" onClick={handleBack}>
-            <ArrowLeft className="size-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-display font-bold neon-gradient-text">Profilo pubblico</h1>
-            <p className="text-muted-foreground text-sm">Scopri e segui altri nuotatori.</p>
-          </div>
-        </div>
-
-        {profileQuery.isLoading ? (
-          <Surface className="bg-card border-border glass-panel">
-            <SurfaceContent className="p-6 text-muted-foreground">Caricamento profilo...</SurfaceContent>
-          </Surface>
-        ) : profileQuery.isError ? (
-          <Surface className="bg-card border-border glass-panel">
-            <SurfaceContent className="p-6">
-              <p className="text-foreground font-medium">Impossibile caricare il profilo</p>
-              <p className="text-muted-foreground text-sm mt-1">{profileQuery.error.message}</p>
-            </SurfaceContent>
-          </Surface>
-        ) : !profileQuery.data ? (
-          <Surface className="bg-card border-border glass-panel">
-            <SurfaceContent className="p-6 text-muted-foreground">Profilo non trovato.</SurfaceContent>
-          </Surface>
-        ) : (
-          <Surface className="bg-card border-border glass-panel overflow-hidden">
-            <div className="relative h-40 bg-muted">
-              {coverUrl ? (
-                <img src={coverUrl} alt="Cover profilo" className="h-full w-full object-cover" />
-              ) : (
-                <div className="h-full w-full bg-gradient-to-br from-primary/25 via-background/60 to-accent/15" />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-card/80 to-transparent" />
-            </div>
-            <SurfaceContent className="p-6">
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex items-center gap-4">
-                  <Avatar className="size-20 border border-border">
-                    <AvatarImage src={avatarUrl || ""} alt={displayName} />
-                    <AvatarFallback className="text-xl">{getInitials(displayName)}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-xl font-display font-bold text-foreground">{displayName}</h2>
-                      <Badge variant="neon" className="gap-1">
-                        <Zap className="size-3" />
-                        Livello {Number.isFinite(level) ? level : 1}
-                      </Badge>
-                      <Badge variant="outline" className="border-primary/40 text-primary">
-                        {totalXp.toLocaleString()} XP
-                      </Badge>
-                    </div>
-                    {location ? (
-                      <p className="mt-1 text-sm text-muted-foreground flex items-center gap-1">
-                        <MapPin className="size-4" />
-                        {location}
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-
-                {!isSelf ? (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant={isFollowing ? "outline-neon" : "neon"}
-                      className="gap-2"
-                      onClick={() => toggleFollowMutation.mutate({ userId })}
-                      disabled={toggleFollowMutation.isPending}
-                    >
-                      {isFollowing ? <UserCheck className="size-4" /> : <UserPlus className="size-4" />}
-                      {isFollowing ? "Seguito" : "Segui"}
-                    </Button>
-                    <DirectMessages recipientId={userId} recipientName={displayName} />
-                  </div>
+      <div className="max-w-3xl space-y-4">
+        <section aria-labelledby={nameId} className="surface-panel overflow-hidden">
+          {coverUrl ? <img src={coverUrl} alt="" className="h-28 w-full object-cover sm:h-36" /> : null}
+          <div className="p-4">
+            <div className="flex items-center gap-4">
+              <Avatar className="size-16 border border-border">
+                <AvatarImage src={avatarUrl || undefined} alt="" className="object-cover" />
+                <AvatarFallback className="text-xl font-semibold">{getInitials(displayName)}</AvatarFallback>
+              </Avatar>
+              <div className="min-w-0 flex-1">
+                <h2 id={nameId} className="truncate font-display text-[30px] font-bold leading-tight">
+                  {displayName}
+                </h2>
+                {/* @username only under a real name: alone it is already the title. */}
+                {name && username ? (
+                  <p className="truncate text-sm text-muted-foreground">@{username}</p>
                 ) : null}
               </div>
+            </div>
 
-              {bio ? <p className="mt-4 text-foreground">{bio}</p> : null}
+            {bio ? <p className="mt-3 text-[15px]">{bio}</p> : null}
+            {location ? (
+              <p className="mt-3 flex items-center gap-1.5 text-sm text-muted-foreground">
+                <MapPin className="size-4" aria-hidden />
+                {location}
+              </p>
+            ) : null}
 
-              <div className="mt-5 grid grid-cols-2 gap-4 sm:max-w-md">
-                <MetricOrb
-                  label="Following"
-                  value={followingCount}
-                  progress={Math.min(100, Math.round((followingCount / 400) * 100))}
-                  helper="Profili seguiti"
-                  icon={<UserCheck className="size-4" />}
-                  tone="cyan"
-                  size="sm"
-                />
-                <MetricOrb
-                  label="Follower"
-                  value={followerCount}
-                  progress={Math.min(100, Math.round((followerCount / 400) * 100))}
-                  helper="Crescita community"
-                  icon={<UserPlus className="size-4" />}
-                  tone="lime"
-                  size="sm"
-                />
+            <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-5 border-t border-border pt-4 sm:grid-cols-4">
+              {metrics.map((metric) => (
+                <li key={metric.label}>
+                  <Metric size="responsive" {...metric} />
+                </li>
+              ))}
+            </ul>
+
+            {canAct ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  variant={isFollowing ? "outline" : "default"}
+                  onClick={() => toggleFollowMutation.mutate({ userId })}
+                  disabled={toggleFollowMutation.isPending}
+                >
+                  {isFollowing ? <UserCheck aria-hidden /> : <UserPlus aria-hidden />}
+                  {isFollowing ? "Seguito" : "Segui"}
+                </Button>
+                <DirectMessages recipientId={userId} recipientName={displayName} />
               </div>
+            ) : null}
+          </div>
+        </section>
 
-              <div className="mt-6 rounded-xl border border-border/60 bg-background/35 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-foreground">PB Board</p>
-                  <div className="inline-flex items-center gap-1 rounded-lg border border-border/60 bg-background/40 p-1">
-                    <Button
-                      size="sm"
-                      variant={finaGender === "male" ? "neon" : "ghost"}
-                      className="h-7 px-2 text-xs"
-                      onClick={() => setFinaGender("male")}
-                    >
-                      FINA M
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={finaGender === "female" ? "neon" : "ghost"}
-                      className="h-7 px-2 text-xs"
-                      onClick={() => setFinaGender("female")}
-                    >
-                      FINA F
-                    </Button>
-                  </div>
-                </div>
-                {pbBoardQuery.isLoading ? (
-                  <p className="mt-2 text-sm text-muted-foreground">Caricamento personal best...</p>
-                ) : pbRows.length === 0 ? (
-                  <p className="mt-2 text-sm text-muted-foreground">Nessun personal best pubblico disponibile.</p>
-                ) : (
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {pbRows.map((row: any) => (
-                      <div key={row.id} className="rounded-lg border border-border/50 bg-card/40 p-2.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-semibold text-foreground">
-                            {strokeLabels[String(row.strokeType)] ?? "Stile"} {Number(row.distanceMeters)}m
-                          </p>
-                          <Badge variant="outline" className="text-[10px]">
-                            {Number(row.poolLengthMeters)}m
-                          </Badge>
-                        </div>
-                        <p className="mt-1 font-display text-base font-bold text-primary">
-                          {formatSwimCentiseconds(row.timeCs)}
-                        </p>
-                        <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                          <span>{sourceLabels[String(row.source)] ?? "PB"}</span>
-                          <span>{formatDate(row.achievedAt)}</span>
-                        </div>
-                        {Number.isFinite(Number(row.finaPoints)) ? (
-                          <p className="mt-1 text-[11px] font-semibold text-amber-300">
-                            {Math.round(Number(row.finaPoints))} pt FINA
-                          </p>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </SurfaceContent>
-          </Surface>
-        )}
+        {/* Keyed by swimmer: another profile starts from «Uomini», never with the last one's records. */}
+        <PersonalRecordsBoard key={userId} userId={userId} limit={12} emptyText="Nessun record pubblico." />
       </div>
     </AppLayout>
   )

@@ -155,14 +155,14 @@ export function ForwardContentDialog({
                           <div className="min-w-0">
                             <p className="truncate text-sm font-medium">{displayName}</p>
                             {user.level != null ? (
-                              <p className="text-xs text-muted-foreground">Lv.{user.level}</p>
+                              <p className="text-xs text-muted-foreground">Livello {user.level}</p>
                             ) : null}
                           </div>
                         </div>
                         <Button
                           type="button"
                           size="sm"
-                          variant={isSelected ? "ghost" : "outline-neon"}
+                          variant={isSelected ? "ghost" : "outline"}
                           onClick={() => (isSelected ? removeRecipient(user.userId) : addRecipient(user))}
                         >
                           {isSelected ? "Selezionato" : "Aggiungi"}
@@ -176,7 +176,7 @@ export function ForwardContentDialog({
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Destinatari</p>
+            <p className="text-sm font-semibold text-muted-foreground">Destinatari</p>
             <div className="flex min-h-11 flex-wrap gap-2 rounded-md border border-border/60 bg-background/40 p-2">
               {selectedRecipients.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nessun destinatario selezionato.</p>
@@ -189,10 +189,10 @@ export function ForwardContentDialog({
                       <button
                         type="button"
                         onClick={() => removeRecipient(recipient.userId)}
-                        className="rounded-full p-0.5 hover:bg-black/10"
+                        className="rounded-full p-0.5 hover:bg-raised"
                         aria-label={`Rimuovi ${label}`}
                       >
-                        <X className="size-3" />
+                        <X className="size-3" aria-hidden />
                       </button>
                     </Badge>
                   )
@@ -202,7 +202,7 @@ export function ForwardContentDialog({
           </div>
 
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <p className="text-sm font-semibold text-muted-foreground">
               Nota (opzionale)
             </p>
             <Textarea
@@ -211,7 +211,7 @@ export function ForwardContentDialog({
               placeholder="Aggiungi un messaggio per il destinatario..."
               rows={3}
             />
-            <p className="text-right text-[11px] text-muted-foreground">{note.length}/500</p>
+            <p className="text-right text-xs text-muted-foreground tabular-nums">{note.length}/500</p>
           </div>
         </div>
 
@@ -220,7 +220,7 @@ export function ForwardContentDialog({
             Annulla
           </Button>
           <Button
-            variant="neon"
+            variant="default"
             onClick={handleForward}
             disabled={selectedRecipients.length === 0 || forwardMutation.isPending}
           >

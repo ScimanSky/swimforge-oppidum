@@ -1,41 +1,23 @@
-import { AnimatePresence, motion } from "framer-motion";
-import { useEffect, useMemo, useState } from "react";
-import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { Link } from "wouter";
+import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { Metric } from "@/components/corsia/Metric";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { distanceParts, formatDayMonthYear, formatDurationParts, NO_VALUE } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import { CELEBRATION_LAYER, useCelebrationsAllowed } from "@/hooks/useCelebrationGate";
 
-function formatDistance(meters?: number | null) {
-  if (!meters) return null;
-  if (meters >= 1000) return `${(meters / 1000).toFixed(1)} km`;
-  return `${meters} m`;
-}
-
-function formatTime(seconds?: number | null) {
-  if (!seconds) return null;
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, "0")}:${secs
-      .toString()
-      .padStart(2, "0")}`;
-  }
-  return `${minutes}:${secs.toString().padStart(2, "0")}`;
-}
-
-function formatDate(date?: string | null) {
-  if (!date) return null;
-  return new Date(date).toLocaleDateString("it-IT", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
-
+/**
+ * «Analisi pronta» after a sync: the newest pending analyses, marked seen when the dialog closes
+ * (Esc, a tap outside, «Chiudi» or «Apri l'analisi»). Queued while the cookie banner or the
+ * onboarding is open (useCelebrationsAllowed).
+ */
 export default function ActivityInsightNotification() {
   const { isAuthenticated } = useAuth();
+  const allowed = useCelebrationsAllowed();
   const [queue, setQueue] = useState<any[]>([]);
   const [isVisible, setIsVisible] = useState(false);
 
@@ -73,80 +55,68 @@ export default function ActivityInsightNotification() {
     }, 250);
   };
 
-  if (!newest) return null;
+  if (!newest || !allowed) return null;
 
-  const distance = formatDistance(newest.activity_distance_meters);
-  const duration = formatTime(newest.activity_duration_seconds);
-  const date = formatDate(newest.activity_date);
+  const distance = distanceParts(newest.activity_distance_meters);
+  const duration = formatDurationParts(newest.activity_duration_seconds);
+  const date = newest.activity_date ? formatDayMonthYear(newest.activity_date) : NO_VALUE;
+  const metrics = [
+    distance.unit ? { value: distance.value, unit: distance.unit, label: "Distanza" } : null,
+    duration ? { ...duration, label: "Durata" } : null,
+  ].filter((metric): metric is { value: string; unit: string; label: string } => metric !== null);
 
   return (
-    <AnimatePresence>
-      {isVisible && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
-          onClick={handleClose}
-        >
-          <motion.div
-            initial={{ scale: 0.9, y: 30 }}
-            animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.9, y: 30 }}
-            transition={{ type: "spring", stiffness: 200, damping: 20 }}
-            className="relative max-w-lg w-full mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/20 via-blue-500/10 to-purple-500/20 rounded-3xl blur-2xl" />
-            <div className="relative bg-gradient-to-br from-[oklch(0.23_0.07_220)] to-[oklch(0.12_0.05_220)] rounded-3xl border border-cyan-400/30 shadow-2xl max-h-[70vh] flex flex-col">
-              <div className="p-6 pb-2">
-                <div className="flex items-center gap-2 text-cyan-200 text-xs uppercase tracking-wider mb-4">
-                  <Sparkles className="h-4 w-4" />
-                  Analisi pronta
-                </div>
-                <h2 className="text-xl font-bold text-white mb-2">
-                  Analisi della tua ultima nuotata pronta
-                </h2>
-                <p className="text-white/70 text-sm leading-relaxed mb-4">
-                  Abbiamo generato una nuova analisi della sessione appena importata.
-                  Apri Session IQ per leggerla e confrontarla con le altre.
-                </p>
+    <Dialog open={isVisible} onOpenChange={(open) => { if (!open) handleClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        overlayClassName={CELEBRATION_LAYER}
+        className={cn("max-h-[85dvh] overflow-y-auto rounded-2xl bg-card p-6 shadow-none sm:max-w-lg", CELEBRATION_LAYER)}
+      >
+        <div className="flex items-start gap-3">
+          <span aria-hidden className="rounded-full bg-raised p-2 text-action-text">
+            <Sparkles className="size-5" />
+          </span>
+          <div>
+            <DialogTitle className="text-[17px] font-bold leading-snug">
+              Analisi della tua ultima nuotata pronta
+            </DialogTitle>
+            <DialogDescription className="mt-1 text-sm text-muted-foreground">
+              Abbiamo generato una nuova analisi della sessione appena importata. Aprila nel Coach AI per leggerla e
+              confrontarla con le altre.
+            </DialogDescription>
+          </div>
+        </div>
 
-                {(distance || duration || date) && (
-                  <div className="flex flex-wrap gap-3 text-xs text-white/60 mb-2">
-                    {distance && <span>🏊 {distance}</span>}
-                    {duration && <span>⏱ {duration}</span>}
-                    {date && <span>📅 {date}</span>}
-                  </div>
-                )}
+        {metrics.length > 0 || date !== NO_VALUE ? (
+          <div className="rounded-xl bg-raised p-4">
+            {date !== NO_VALUE ? <p className="text-sm text-muted-foreground">Nuotata del {date}</p> : null}
+            {metrics.length > 0 ? (
+              <ul className="mt-3 grid grid-cols-2 gap-4">
+                {metrics.map((metric) => (
+                  <li key={metric.label}>
+                    <Metric {...metric} size="sm" />
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
 
-                {pendingCount > 1 && (
-                  <div className="text-xs text-white/50">
-                    {pendingCount} nuove analisi disponibili
-                  </div>
-                )}
-              </div>
-              <div className="p-6 pt-2">
-                <Link href="/coach?tab=session-iq">
-                  <Button
-                    className="w-full bg-[var(--gold)] text-slate-900 dark:text-[var(--navy)] hover:bg-[var(--gold-light)]"
-                    onClick={handleClose}
-                  >
-                    Apri Session IQ
-                  </Button>
-                </Link>
-                <Button
-                  variant="ghost"
-                  className="w-full mt-2 text-white/70 hover:text-white hover:bg-white/10"
-                  onClick={handleClose}
-                >
-                  Chiudi
-                </Button>
-              </div>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+        {pendingCount > 1 ? (
+          <p className="text-sm text-muted-foreground">{pendingCount} nuove analisi disponibili</p>
+        ) : null}
+
+        <div className="space-y-2">
+          <Button asChild className="w-full">
+            <Link href="/coach?tab=session-iq" onClick={handleClose}>
+              Apri l&apos;analisi
+            </Link>
+          </Button>
+          <Button variant="outline" className="w-full" onClick={handleClose}>
+            Chiudi
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -1,9 +1,11 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import { AnimatePresence, motion } from "framer-motion";
-import { useLocation } from "wouter";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { motion } from "framer-motion";
+import { useLocation, useSearch } from "wouter";
 
 import { trpc } from "@/lib/trpc";
+import { homePathForPlatform, isPublicPath } from "@/lib/navigation";
+import { isNativePlatform } from "@/lib/platform";
 import {
   ONBOARDING_CONSENT_TYPE,
   ONBOARDING_CONSENT_VERSION,
@@ -14,16 +16,27 @@ import {
   getOnboardingIdentityLocally,
   type OnboardingRole,
 } from "@/lib/onboarding";
+import { useHoldCelebrations } from "@/hooks/useCelebrationGate";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogDescription,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 import {
   OnboardingWelcomeComposition,
   ONBOARDING_WELCOME_DURATION_FRAMES,
   ONBOARDING_WELCOME_FPS,
   ONBOARDING_WELCOME_HEIGHT,
+  ONBOARDING_WELCOME_STILL_FRAME,
   ONBOARDING_WELCOME_WIDTH,
 } from "./OnboardingWelcomeComposition";
 import { OnboardingIdentitySetup } from "./OnboardingIdentitySetup";
-import { OnboardingFirstAction } from "./OnboardingFirstAction";
+import { OnboardingFirstAction, firstActionTitle } from "./OnboardingFirstAction";
 
 type Stage = "hidden" | "welcome" | "identity" | "tour" | "first-action";
 
@@ -37,12 +50,17 @@ const OnboardingPlayer = lazy(async () => {
   const mod = await import("@remotion/player");
   return { default: mod.Player };
 });
+// With reduced motion: one still frame of the video, nothing plays by itself.
+const OnboardingStill = lazy(async () => {
+  const mod = await import("@remotion/player");
+  return { default: mod.Thumbnail };
+});
 
 const ATHLETE_TOUR_STEPS: TourStep[] = [
   {
     selector: '[data-tour="main-navigation"]',
     title: "Navigazione principale",
-    body: "Quattro sezioni, tutto ciò che ti serve: Feed, Traccia, Club e Profilo.",
+    body: "Cinque voci: Oggi, Feed, il tasto +, Allena e Community.",
   },
   {
     selector: '[data-tour="create-post"]',
@@ -51,23 +69,23 @@ const ATHLETE_TOUR_STEPS: TourStep[] = [
   },
   {
     selector: '[data-tour="track-section"]',
-    title: "Traccia le tue vasche",
-    body: "Log la tua prima vasca manualmente, o connetti Garmin/Strava per il sync automatico.",
+    title: "Allena",
+    body: "Allena raccoglie attività, obiettivi, statistiche e Coach AI.",
   },
   {
-    selector: '[data-tour="challenges-list"]',
-    title: "Sfide settimanali",
-    body: "Partecipa alle sfide attive e scala la classifica in tempo reale.",
+    selector: '[data-tour="club-directory"]',
+    title: "Sfide",
+    body: "Le sfide sono in Community, accanto ai club e alle classifiche.",
   },
   {
-    selector: '[data-tour="ai-coach-btn"]',
-    title: "AI Coach",
+    selector: '[data-tour="track-section"]',
+    title: "Coach AI",
     body: "Il tuo coach AI genera allenamenti personalizzati in secondi. Prova il primo oggi.",
   },
   {
     selector: '[data-tour="badges-nav"]',
-    title: "Badge e Achievement",
-    body: "Ogni milestone sblocca un badge. Già ne hai uno — dai un'occhiata!",
+    title: "Badge",
+    body: "I badge sono nel tuo profilo.",
   },
   {
     selector: '[data-tour="club-directory"]',
@@ -77,7 +95,7 @@ const ATHLETE_TOUR_STEPS: TourStep[] = [
   {
     selector: '[data-tour="profile-stats"]',
     title: "Il tuo profilo",
-    body: "Stats, badge, attività e follower — tutto il tuo percorso in un posto.",
+    body: "Statistiche, badge, attività e follower — tutto il tuo percorso in un posto.",
   },
 ];
 
@@ -94,13 +112,13 @@ const COACH_TOUR_STEPS: TourStep[] = [
   },
   {
     selector: '[data-tour="club-members"]',
-    title: "Roster atleti",
+    title: "Membri",
     body: "Gestisci iscrizioni, ruoli e inviti per il tuo club.",
   },
   {
     selector: '[data-tour="club-events"]',
     title: "Gare ed eventi",
-    body: "Programma eventi, meet e raduni del club.",
+    body: "Programma eventi, gare e raduni del club.",
   },
   {
     selector: '[data-tour="club-announcements"]',
@@ -109,27 +127,10 @@ const COACH_TOUR_STEPS: TourStep[] = [
   },
   {
     selector: '[data-tour="coach-panel"]',
-    title: "Dashboard coach",
+    title: "Area coach",
     body: "La panoramica completa: membri, eventi, statistiche del club.",
   },
 ];
-
-const PUBLIC_PATHS = [
-  "/",
-  "/auth",
-  "/login",
-  "/register",
-  "/signup",
-  "/forgot-password",
-  "/reset-password",
-  "/privacy",
-  "/terms",
-  "/cookies",
-] as const;
-
-function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATHS.some((base) => pathname === base || pathname.startsWith(`${base}/`));
-}
 
 function getTooltipPosition(rect: DOMRect | null) {
   const viewportWidth = window.innerWidth;
@@ -168,11 +169,16 @@ export default function OnboardingFlow() {
   const [currentStep, setCurrentStep] = useState(0);
   const [highlightRect, setHighlightRect] = useState<DOMRect | null>(null);
   const [manualRunNonce, setManualRunNonce] = useState(0);
+  // A forced run («Rivedi il tour», ?onboarding=1, ?tour=1) on a finished onboarding: its trigger
+  // is gone once the tour starts (startTour strips the query and resets the nonce), so this
+  // keeps it open until completeOnboarding.
+  const [replaying, setReplaying] = useState(false);
   const [pendingTourLaunch, setPendingTourLaunch] = useState(false);
   const [welcomeCompleted, setWelcomeCompleted] = useState(false);
   const [resumePathAfterTour, setResumePathAfterTour] = useState<string | null>(null);
   const [onboardingRole, setOnboardingRole] = useState<OnboardingRole>("athlete");
   const onboardingUserId = meQuery.data?.id ? String(meQuery.data.id) : null;
+  const reduceMotion = usePrefersReducedMotion();
 
   const TOUR_STEPS = useMemo(
     () => (onboardingRole === "coach" ? COACH_TOUR_STEPS : ATHLETE_TOUR_STEPS),
@@ -181,8 +187,12 @@ export default function OnboardingFlow() {
 
   const syncAttemptedRef = useRef(false);
 
-  const pathname = useMemo(() => location.split("?")[0] || "/", [location]);
-  const queryParams = useMemo(() => new URLSearchParams(location.split("?")[1] ?? ""), [location]);
+  // wouter: useLocation() is the pathname, the query string comes from useSearch().
+  const search = useSearch();
+  const pathname = location || "/";
+  const fullLocation = search ? `${pathname}?${search}` : pathname;
+  const queryParams = useMemo(() => new URLSearchParams(search), [search]);
+  const tourPath = homePathForPlatform(isNativePlatform());
 
   const forceFromQuery = queryParams.get(ONBOARDING_FORCE_QUERY_PARAM) === "1" || queryParams.get("tour") === "1";
   const shouldForce = forceFromQuery || manualRunNonce > 0;
@@ -190,6 +200,11 @@ export default function OnboardingFlow() {
   const serverDone = Boolean((consentsQuery.data as any)?.byType?.[ONBOARDING_CONSENT_TYPE]?.granted);
   const canEvaluate = Boolean(meQuery.data?.id) && !consentsQuery.isLoading;
   const shouldRender = stage !== "hidden";
+
+  // New badges and records wait while the onboarding is open, about to open (on the way to the
+  // tour page) or not decided yet: they would sit under its overlay and be dismissed unseen.
+  const deciding = Boolean(meQuery.data?.id) && !canEvaluate && !isPublicPath(pathname);
+  useHoldCelebrations("onboarding", shouldRender || pendingTourLaunch || deciding);
 
   useEffect(() => {
     const handler = () => {
@@ -204,6 +219,7 @@ export default function OnboardingFlow() {
     if (!meQuery.data?.id) {
       setStage("hidden");
       setHighlightRect(null);
+      setReplaying(false);
       return;
     }
 
@@ -221,9 +237,12 @@ export default function OnboardingFlow() {
       if (stage === "hidden") {
         setStage("welcome");
         setWelcomeCompleted(false);
+        setReplaying(true);
       }
       return;
     }
+
+    if (replaying) return;
 
     if (!serverDone && !localDone) {
       // Open welcome only when idle; do not interrupt an already-started interactive tour.
@@ -238,7 +257,7 @@ export default function OnboardingFlow() {
       setStage("hidden");
       setHighlightRect(null);
     }
-  }, [canEvaluate, meQuery.data?.id, onboardingUserId, pathname, pendingTourLaunch, serverDone, shouldForce, stage]);
+  }, [canEvaluate, meQuery.data?.id, onboardingUserId, pathname, pendingTourLaunch, replaying, serverDone, shouldForce, stage]);
 
   useEffect(() => {
     if (!canEvaluate || !meQuery.data?.id) return;
@@ -260,7 +279,7 @@ export default function OnboardingFlow() {
   }, [canEvaluate, meQuery.data?.id, onboardingUserId, serverDone, setConsentMutation, utils.consent.list]);
 
   useEffect(() => {
-    if (!pendingTourLaunch || pathname !== "/home") return;
+    if (!pendingTourLaunch || pathname !== tourPath) return;
 
     const timer = window.setTimeout(() => {
       setCurrentStep(0);
@@ -268,12 +287,12 @@ export default function OnboardingFlow() {
       setPendingTourLaunch(false);
       setWelcomeCompleted(false);
       setManualRunNonce(0);
-      const cleanLocation = stripOnboardingParams(location);
-      if (cleanLocation !== location) setLocation(cleanLocation);
+      const cleanLocation = stripOnboardingParams(fullLocation);
+      if (cleanLocation !== fullLocation) setLocation(cleanLocation);
     }, 220);
 
     return () => window.clearTimeout(timer);
-  }, [location, pathname, pendingTourLaunch, setLocation]);
+  }, [fullLocation, pathname, pendingTourLaunch, setLocation, tourPath]);
 
   useEffect(() => {
     if (stage !== "welcome") return;
@@ -298,7 +317,11 @@ export default function OnboardingFlow() {
         return;
       }
 
-      const element = document.querySelector(step.selector) as HTMLElement | null;
+      // Same anchor in the bottom bar and the desktop rail: highlight the one on screen.
+      const element =
+        Array.from(document.querySelectorAll<HTMLElement>(step.selector)).find(
+          (candidate) => candidate.getClientRects().length > 0,
+        ) ?? null;
       if (!element) {
         setHighlightRect(null);
         return;
@@ -310,7 +333,7 @@ export default function OnboardingFlow() {
       const topGuard = 96;
       const bottomGuard = 170;
       if (rect.top < topGuard || rect.bottom > window.innerHeight - bottomGuard) {
-        element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+        element.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "center", inline: "nearest" });
       }
     };
 
@@ -328,7 +351,7 @@ export default function OnboardingFlow() {
       window.removeEventListener("resize", scheduleUpdate);
       window.removeEventListener("scroll", scheduleUpdate, true);
     };
-  }, [currentStep, stage, TOUR_STEPS]);
+  }, [currentStep, reduceMotion, stage, TOUR_STEPS]);
 
   const completeOnboarding = async () => {
     const targetAfterCompletion = resumePathAfterTour;
@@ -337,18 +360,22 @@ export default function OnboardingFlow() {
     setCurrentStep(0);
     setHighlightRect(null);
     setManualRunNonce(0);
+    setReplaying(false);
     setPendingTourLaunch(false);
     setResumePathAfterTour(null);
 
-    const cleanLocation = stripOnboardingParams(location);
+    const cleanLocation = stripOnboardingParams(fullLocation);
     const nextLocation =
-      targetAfterCompletion && cleanLocation.startsWith("/home")
+      targetAfterCompletion && pathname === tourPath
         ? targetAfterCompletion
         : cleanLocation;
-    if (nextLocation !== location) setLocation(nextLocation);
+    if (nextLocation !== fullLocation) setLocation(nextLocation);
 
     if (!meQuery.data?.id || serverDone) return;
 
+    // Before the call: the sync effect below would otherwise send the same consent again
+    // (the local flag is already set and the mutation re-renders as it starts).
+    syncAttemptedRef.current = true;
     try {
       await setConsentMutation.mutateAsync({
         consentType: ONBOARDING_CONSENT_TYPE,
@@ -357,26 +384,27 @@ export default function OnboardingFlow() {
       });
       await utils.consent.list.invalidate();
     } catch {
-      // Retry will happen automatically when local state is checked on next session.
+      // The sync effect retries it (now, or on the next session).
+      syncAttemptedRef.current = false;
     }
   };
 
   const startTour = () => {
     setManualRunNonce(0);
-    if (pathname !== "/home") {
-      setResumePathAfterTour(stripOnboardingParams(location));
+    if (pathname !== tourPath) {
+      setResumePathAfterTour(stripOnboardingParams(fullLocation));
       setPendingTourLaunch(true);
       setStage("hidden");
       setHighlightRect(null);
-      setLocation("/home?tour=1");
+      setLocation(`${tourPath}?tour=1`);
       return;
     }
 
     setCurrentStep(0);
     setStage("tour");
     setWelcomeCompleted(false);
-    const cleanLocation = stripOnboardingParams(location);
-    if (cleanLocation !== location) setLocation(cleanLocation);
+    const cleanLocation = stripOnboardingParams(fullLocation);
+    if (cleanLocation !== fullLocation) setLocation(cleanLocation);
   };
 
   const skipWelcome = async () => {
@@ -415,188 +443,190 @@ export default function OnboardingFlow() {
 
   const step = TOUR_STEPS[currentStep];
   const tooltip = getTooltipPosition(highlightRect);
+  // With reduced motion there is no video to wait for: the still is all there is.
+  const canStartTour = welcomeCompleted || reduceMotion;
+  const welcomeVideo = {
+    component: OnboardingWelcomeComposition,
+    durationInFrames: ONBOARDING_WELCOME_DURATION_FRAMES,
+    fps: ONBOARDING_WELCOME_FPS,
+    compositionHeight: ONBOARDING_WELCOME_HEIGHT,
+    compositionWidth: ONBOARDING_WELCOME_WIDTH,
+    inputProps: { userName: meQuery.data?.name ?? null },
+    style: {
+      width: "100%",
+      borderRadius: 16,
+      aspectRatio: `${ONBOARDING_WELCOME_WIDTH} / ${ONBOARDING_WELCOME_HEIGHT}`,
+    },
+  };
 
-  return createPortal(
-    <AnimatePresence>
+  return (
+    <>
       {stage === "welcome" && (
-        <motion.div
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(2,8,24,0.82)] px-4 py-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+        <OnboardingDialog
+          title="Benvenuto nel tour guidato"
+          description="Un video rapido e poi una guida interattiva sui punti chiave dell'app."
+          onDismiss={() => void skipWelcome()}
+          className="max-w-4xl"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.98 }}
-            transition={{ duration: 0.24, ease: "easeOut" }}
-            className="w-full max-w-4xl overflow-hidden rounded-3xl border border-[color-mix(in_oklch,var(--electric-cyan)_26%,transparent)] bg-[color-mix(in_oklch,var(--background)_82%,transparent)] shadow-[0_0_52px_var(--neon-soft)]"
-          >
-            <div className="border-b border-border/70 px-5 py-4 sm:px-6">
-              <h2 className="font-display text-xl font-bold text-foreground">Benvenuto nel tour guidato</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Un video rapido e poi una guida interattiva sui punti chiave dell'app.
-              </p>
-            </div>
-
-            <div className="bg-black/25 p-3 sm:p-4">
-              <Suspense
-                fallback={(
-                  <div
-                    className="w-full animate-pulse rounded-2xl bg-black/40"
-                    style={{ aspectRatio: `${ONBOARDING_WELCOME_WIDTH} / ${ONBOARDING_WELCOME_HEIGHT}` }}
-                  />
-                )}
-              >
-                <OnboardingPlayer
-                  component={OnboardingWelcomeComposition}
-                  durationInFrames={ONBOARDING_WELCOME_DURATION_FRAMES}
-                  fps={ONBOARDING_WELCOME_FPS}
-                  compositionHeight={ONBOARDING_WELCOME_HEIGHT}
-                  compositionWidth={ONBOARDING_WELCOME_WIDTH}
-                  controls={false}
-                  autoPlay
-                  loop={false}
-                  inputProps={{ userName: meQuery.data?.name ?? null }}
-                  style={{
-                    width: "100%",
-                    borderRadius: 16,
-                    aspectRatio: `${ONBOARDING_WELCOME_WIDTH} / ${ONBOARDING_WELCOME_HEIGHT}`,
-                  }}
+          {/* The video repeats the dialog's title and line: hidden from screen readers. */}
+          <div className="bg-raised p-3 sm:p-4" aria-hidden>
+            <Suspense
+              fallback={(
+                <div
+                  className="w-full animate-pulse rounded-2xl bg-card"
+                  style={{ aspectRatio: `${ONBOARDING_WELCOME_WIDTH} / ${ONBOARDING_WELCOME_HEIGHT}` }}
                 />
-              </Suspense>
-            </div>
+              )}
+            >
+              {reduceMotion ? (
+                <OnboardingStill {...welcomeVideo} frameToDisplay={ONBOARDING_WELCOME_STILL_FRAME} />
+              ) : (
+                <OnboardingPlayer {...welcomeVideo} controls={false} autoPlay loop={false} />
+              )}
+            </Suspense>
+          </div>
 
-            <div className="flex flex-col gap-2 border-t border-border/70 px-5 py-4 sm:flex-row sm:justify-between sm:px-6">
-              <Button variant="ghost-neon" onClick={() => void skipWelcome()}>
-                Salta tour
-              </Button>
-              <Button variant="neon" onClick={handleWelcomeContinue} disabled={!welcomeCompleted}>
-                {welcomeCompleted ? "Inizia tour interattivo" : "Attendi fine intro..."}
-              </Button>
-            </div>
-          </motion.div>
-        </motion.div>
+          <div className="flex flex-col gap-2 border-t border-border px-5 py-4 sm:flex-row sm:justify-between sm:px-6">
+            <Button variant="ghost" onClick={() => void skipWelcome()}>
+              Salta tour
+            </Button>
+            <Button onClick={handleWelcomeContinue} disabled={!canStartTour}>
+              {canStartTour ? "Inizia tour interattivo" : "Attendi la fine dell'intro…"}
+            </Button>
+          </div>
+        </OnboardingDialog>
       )}
 
       {stage === "identity" && onboardingUserId && (
-        <motion.div
-          key="identity"
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(2,8,24,0.82)] px-4 py-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+        <OnboardingDialog
+          title="Configura il tuo profilo"
+          description="Due minuti per personalizzare SwimForge."
+          onDismiss={() => void completeOnboarding()}
+          className="max-w-lg"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.98 }}
-            transition={{ duration: 0.24, ease: "easeOut" }}
-            className="w-full max-w-lg overflow-hidden rounded-3xl border border-[color-mix(in_oklch,var(--electric-cyan)_26%,transparent)] bg-[color-mix(in_oklch,var(--background)_90%,transparent)] p-6 shadow-[0_0_52px_var(--neon-soft)]"
-          >
-            <div className="mb-4 border-b border-border/70 pb-4">
-              <h2 className="font-display text-xl font-bold text-foreground">Configura il tuo profilo</h2>
-              <p className="mt-1 text-sm text-muted-foreground">Due minuti per personalizzare SwimForge.</p>
-            </div>
+          <div className="p-5 sm:p-6">
             <OnboardingIdentitySetup
               userId={onboardingUserId}
               onComplete={handleIdentityComplete}
               onSkip={() => void completeOnboarding()}
             />
-          </motion.div>
-        </motion.div>
+          </div>
+        </OnboardingDialog>
       )}
 
       {stage === "tour" && (
-        <motion.div
-          className="fixed inset-0 z-[120]"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <div className="absolute inset-0 bg-[rgba(2,8,24,0.72)]" />
+        <Dialog open onOpenChange={(open) => { if (!open) void completeOnboarding(); }}>
+          <DialogPortal>
+            {/* Transparent: blocks the page; the dim comes from the highlight's cut-out shadow. */}
+            <DialogOverlay className="z-[120] bg-transparent" />
+            <motion.div
+              aria-hidden
+              className="pointer-events-none fixed z-[120] rounded-2xl border-2 border-action-text"
+              animate={
+                highlightRect
+                  ? {
+                      top: Math.max(8, highlightRect.top - 8),
+                      left: Math.max(8, highlightRect.left - 8),
+                      width: Math.max(24, highlightRect.width + 16),
+                      height: Math.max(24, highlightRect.height + 16),
+                    }
+                  : {
+                      top: window.innerHeight / 2 - 80,
+                      left: window.innerWidth / 2 - 150,
+                      width: 300,
+                      height: 160,
+                    }
+              }
+              transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 220, damping: 28, mass: 0.8 }}
+              style={{ boxShadow: "0 0 0 9999px color-mix(in oklch, var(--background) 72%, transparent)" }}
+            />
+            <DialogPrimitive.Content
+              onInteractOutside={(event) => event.preventDefault()}
+              className="fixed z-[121] rounded-2xl border border-border bg-card p-4 outline-none"
+              style={{ width: tooltip.width, left: tooltip.left, top: tooltip.top }}
+            >
+              <p className="text-xs font-semibold text-muted-foreground">
+                Passo {currentStep + 1} di {TOUR_STEPS.length}
+              </p>
+              <DialogTitle className="mt-1 text-[17px] font-bold leading-snug">{step?.title ?? "Tour"}</DialogTitle>
+              <DialogDescription className="mt-2 text-sm text-muted-foreground">{step?.body}</DialogDescription>
 
-          <motion.div
-            className="pointer-events-none absolute rounded-2xl border border-[color-mix(in_oklch,var(--electric-cyan)_58%,transparent)]"
-            animate={
-              highlightRect
-                ? {
-                    top: Math.max(8, highlightRect.top - 8),
-                    left: Math.max(8, highlightRect.left - 8),
-                    width: Math.max(24, highlightRect.width + 16),
-                    height: Math.max(24, highlightRect.height + 16),
-                  }
-                : {
-                    top: window.innerHeight / 2 - 80,
-                    left: window.innerWidth / 2 - 150,
-                    width: 300,
-                    height: 160,
-                  }
-            }
-            transition={{ type: "spring", stiffness: 220, damping: 28, mass: 0.8 }}
-            style={{
-              boxShadow: "0 0 0 9999px rgba(2,8,24,0.65), 0 0 0 1px rgba(0,245,255,0.35), 0 0 28px rgba(0,245,255,0.34)",
-            }}
-          />
-
-          <motion.div
-            className="absolute rounded-2xl border border-border/70 bg-[color-mix(in_oklch,var(--background)_84%,transparent)] p-4 shadow-[0_0_34px_var(--neon-soft)]"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 12 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            style={{
-              width: tooltip.width,
-              left: tooltip.left,
-              top: tooltip.top,
-            }}
-          >
-            <div className="mb-2 text-xs uppercase tracking-[0.16em] text-[var(--electric-cyan)]">
-              Step {currentStep + 1} di {TOUR_STEPS.length}
-            </div>
-            <h3 className="font-display text-lg font-semibold text-foreground">{step?.title ?? "Tour"}</h3>
-            <p className="mt-2 text-sm text-muted-foreground">{step?.body}</p>
-
-            <div className="mt-4 flex items-center justify-between gap-2">
-              <Button variant="ghost-neon" onClick={() => void completeOnboarding()}>
-                Chiudi
-              </Button>
-              <div className="flex items-center gap-2">
-                <Button variant="outline-neon" onClick={handleBackStep} disabled={currentStep === 0}>
-                  Indietro
+              <div className="mt-4 flex items-center justify-between gap-2">
+                <Button variant="ghost" onClick={() => void completeOnboarding()}>
+                  Chiudi
                 </Button>
-                <Button variant="neon" onClick={handleNextStep}>
-                  {currentStep >= TOUR_STEPS.length - 1 ? "Fine" : "Avanti"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={handleBackStep} disabled={currentStep === 0}>
+                    Indietro
+                  </Button>
+                  <Button onClick={handleNextStep}>
+                    {currentStep >= TOUR_STEPS.length - 1 ? "Fine" : "Avanti"}
+                  </Button>
+                </div>
               </div>
-            </div>
-          </motion.div>
-        </motion.div>
+            </DialogPrimitive.Content>
+          </DialogPortal>
+        </Dialog>
       )}
 
       {stage === "first-action" && (
-        <motion.div
-          key="first-action"
-          className="fixed inset-0 z-[120] flex items-center justify-center bg-[rgba(2,8,24,0.82)] px-4 py-6"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+        <OnboardingDialog
+          title={firstActionTitle(onboardingRole)}
+          onDismiss={() => void completeOnboarding()}
+          className="max-w-md"
         >
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.98 }}
-            transition={{ duration: 0.24, ease: "easeOut" }}
-            className="w-full max-w-md overflow-hidden rounded-3xl border border-[color-mix(in_oklch,var(--electric-cyan)_26%,transparent)] bg-[color-mix(in_oklch,var(--background)_90%,transparent)] p-6 shadow-[0_0_52px_var(--neon-soft)]"
-          >
+          <div className="p-5 sm:p-6">
             <OnboardingFirstAction
               role={onboardingRole}
               onDismiss={() => void completeOnboarding()}
             />
-          </motion.div>
-        </motion.div>
+          </div>
+        </OnboardingDialog>
       )}
-    </AnimatePresence>,
-    document.body,
+    </>
+  );
+}
+
+/**
+ * A step of the onboarding as a modal dialog (focus kept inside and given back, Escape = the
+ * step's own «skip»): title and optional line in a header, the step below. Above the cookie
+ * banner (z-[85]); a click outside does not close it.
+ */
+function OnboardingDialog({
+  title,
+  description,
+  onDismiss,
+  className,
+  children,
+}: {
+  title: string;
+  description?: string;
+  onDismiss: () => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onDismiss(); }}>
+      <DialogPortal>
+        <DialogOverlay className="z-[120] bg-background/80" />
+        <DialogPrimitive.Content
+          // Without a description line, say so (Radix otherwise warns about a missing one).
+          {...(description ? {} : { "aria-describedby": undefined })}
+          onInteractOutside={(event) => event.preventDefault()}
+          className={cn(
+            "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 motion-reduce:data-[state=open]:zoom-in-100 fixed left-1/2 top-1/2 z-[120] max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border border-border bg-card outline-none",
+            className,
+          )}
+        >
+          <div className="border-b border-border px-5 py-4 sm:px-6">
+            <DialogTitle className="text-[17px] font-bold">{title}</DialogTitle>
+            {description ? (
+              <DialogDescription className="mt-1 text-sm text-muted-foreground">{description}</DialogDescription>
+            ) : null}
+          </div>
+          {children}
+        </DialogPrimitive.Content>
+      </DialogPortal>
+    </Dialog>
   );
 }

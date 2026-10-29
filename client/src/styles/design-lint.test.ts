@@ -1,0 +1,125 @@
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import path from "node:path";
+import { describe, expect, it } from "vitest";
+
+// Not new URL(.., import.meta.url): under vitest/jsdom Vite rewrites it into an asset URL.
+const SRC = path.resolve(import.meta.dirname, "..");
+
+function sourceFiles(dir = SRC): string[] {
+  return readdirSync(dir).flatMap(name => {
+    const full = path.join(dir, name);
+    if (statSync(full).isDirectory()) return sourceFiles(full);
+    if (!/\.(tsx|ts|css)$/.test(name) || /\.test\.tsx?$/.test(name)) return [];
+    return [path.relative(SRC, full).split(path.sep).join("/")];
+  });
+}
+
+const RULES = {
+  // Under 12px, also decimal px and rem (0.75rem = 12px stays allowed).
+  "testo-piccolo":
+    /text-\[(?:[5-9]|10|11)(?:\.\d+)?px\]|text-\[0\.(?:[5-6]\d*|7[0-4]\d*|7)rem\]/,
+  "alone-neon": /neon-glow|neon-soft|forge-glow|shadow-\[0_0_/,
+  "maiuscolo-spaziato":
+    /\buppercase\b[^"'`\n]*\btracking-(?:\[[^\]]+\]|wide|wider|widest)|\btracking-(?:\[[^\]]+\]|wide|wider|widest)[^"'`\n]*\buppercase\b/,
+  "testo-gradiente": /neon-gradient-text|bg-clip-text/,
+  // The aliases deleted in Task 22: an unknown var() or colour class fails silently.
+  "token-legacy":
+    /electric-(?:cyan|lime|coral|violet)|forge-orange|chip-(?:cyan|emerald|amber|rose|sky|violet)|surface-glow/,
+  "variante-neon": /variant=["'](?:neon|outline-neon|ghost-neon)["']/,
+  "testo-primario": /(?<![\w-])text-primary(?![\w-])/,
+  "accento-lime": /(?<![\w-])(?:text|border|ring|from|to|via)-accent(?![\w-])/,
+  gradiente:
+    /bg-gradient-to-|bg-(?:linear|radial|conic)-|(?:linear|radial|conic)-gradient\(/,
+  sfocatura: /backdrop-blur|backdrop-filter/,
+  // Pages inside the shell have no h1: the page title is the h1 in the shell header.
+  "titolo-pagina": /<h1[\s>]/,
+  // Fixed colours in classes: photo veils and text on destructive use tokens instead.
+  "colore-fisso":
+    /-\[(?:#|rgba?\(|hsla?\(|oklch\()|(?<![\w-])(?:text-white|bg-white|bg-black)(?![\w-])/,
+} as const;
+type Rule = keyof typeof RULES;
+
+/** Files allowed to match a rule for good (justify each entry). */
+const EXEMPT: Partial<Record<Rule, readonly string[]>> = {
+  // The shell header owns the page title. Public pages render outside the shell (no header), so
+  // their own title is the h1: the landing (Home), StravaConnect, the sign-in, sign-up and
+  // password pages (AuthLayout), the return from Google and the email link (AuthCallback) and the
+  // legal documents (LegalPage). club-print builds standalone print documents (own tab or
+  // hidden iframe).
+  "titolo-pagina": [
+    "components/app/ShellHeader.tsx",
+    "components/auth/AuthLayout.tsx",
+    "components/legal/LegalPage.tsx",
+    "lib/club-print.ts",
+    "pages/AuthCallback.tsx",
+    "pages/Home.tsx",
+    "pages/StravaConnect.tsx",
+  ],
+};
+
+/**
+ * Files still to clean, per rule. Ratchet: a file leaves the list in the task that cleans it
+ * and can never come back. Every list has been empty since the end of phase 2 (Task 22): a
+ * lasting exception goes in EXEMPT with its reason.
+ */
+const PENDING: Record<Rule, string[]> = {
+  "testo-piccolo": [],
+  "alone-neon": [],
+  "maiuscolo-spaziato": [],
+  "testo-gradiente": [],
+  "token-legacy": [],
+  "variante-neon": [],
+  "testo-primario": [],
+  "accento-lime": [],
+  gradiente: [],
+  sfocatura: [],
+  "titolo-pagina": [],
+  "colore-fisso": [],
+};
+
+const contents = new Map(
+  sourceFiles().map(file => [file, readFileSync(path.join(SRC, file), "utf8")])
+);
+const offenders = (rule: Rule) =>
+  [...contents]
+    .filter(
+      ([file, text]) => RULES[rule].test(text) && !EXEMPT[rule]?.includes(file)
+    )
+    .map(([file]) => file)
+    .sort();
+
+describe("design-lint Corsia", () => {
+  it("testo-piccolo: px e rem decimali sotto i 12px, 0.75rem ammesso", () => {
+    const rule = RULES["testo-piccolo"];
+    for (const bad of ["text-[10px]", "text-[11.5px]", "text-[9.75px]", "text-[0.7rem]", "text-[0.74rem]", "text-[0.625rem]", "text-[0.6rem]"]) {
+      expect(rule.test(bad), bad).toBe(true);
+    }
+    for (const ok of ["text-[12px]", "text-[0.75rem]", "text-[0.8rem]", "text-[15px]", "text-[17px]"]) {
+      expect(rule.test(ok), ok).toBe(false);
+    }
+  });
+
+  it("ogni esenzione corrisponde ancora alla sua regola", () => {
+    const stale = (Object.entries(EXEMPT) as Array<[Rule, readonly string[]]>).flatMap(
+      ([rule, files]) =>
+        files
+          .filter(file => !RULES[rule].test(contents.get(file) ?? ""))
+          .map(file => `${rule}: ${file}`)
+    );
+    expect(stale).toEqual([]);
+  });
+
+  for (const rule of Object.keys(RULES) as Rule[]) {
+    it(`${rule}: nessun file fuori elenco`, () => {
+      expect(
+        offenders(rule).filter(file => !PENDING[rule].includes(file))
+      ).toEqual([]);
+    });
+    it(`${rule}: elenco aggiornato (togliere i file ripuliti)`, () => {
+      const current = offenders(rule);
+      expect(PENDING[rule].filter(file => !current.includes(file))).toEqual(
+        []
+      );
+    });
+  }
+});

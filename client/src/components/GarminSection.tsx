@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useId, useState, type Ref } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
-import { Surface, SurfaceContent } from "@/components/ui/surface";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -12,14 +12,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { motion } from "framer-motion";
+import { LoadError } from "@/components/corsia/LoadState";
 import { Link as LinkIcon, RefreshCw, Unlink, Loader2, Mail, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import GarminSyncCountPicker from "@/components/GarminSyncCountPicker";
+import { formatSessionDate } from "@/lib/format";
 import { garminSyncButtonLabel, useGarminSyncCount } from "@/lib/garmin-sync-count";
+import { errorToastMessage } from "@/lib/trpc-errors";
 
 interface GarminSectionProps {
   garminConnected: boolean;
+  /** The card's title, focusable from code (Settings moves the focus here from the list above). */
+  headingRef?: Ref<HTMLHeadingElement>;
 }
 
 type AuthStep = "credentials" | "mfa";
@@ -47,17 +51,23 @@ function formatGarminErrorMessage(message: string): string {
   return message;
 }
 
-export default function GarminSection({ garminConnected }: GarminSectionProps) {
+/**
+ * Garmin Connect in Impostazioni › Connessioni: state of the link, connect (with the MFA code
+ * step), disconnect, and the sync of the last 1/5/10 swims.
+ */
+export default function GarminSection({ garminConnected, headingRef }: GarminSectionProps) {
   const [isConnectDialogOpen, setIsConnectDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mfaCode, setMfaCode] = useState("");
   const [authStep, setAuthStep] = useState<AuthStep>("credentials");
   const [syncCount, setSyncCount] = useGarminSyncCount();
+  const titleId = useId();
 
   const utils = trpc.useUtils();
 
-  const { data: garminStatus } = trpc.garmin.status.useQuery();
+  const statusQuery = trpc.garmin.status.useQuery();
+  const garminStatus = statusQuery.data;
 
   const connectMutation = trpc.garmin.connect.useMutation({
     onSuccess: (data) => {
@@ -75,7 +85,7 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
       }
     },
     onError: (error) => {
-      toast.error("Errore: " + formatGarminErrorMessage(error.message));
+      toast.error(formatGarminErrorMessage(errorToastMessage(error, "Collegamento a Garmin non riuscito.")));
     },
   });
 
@@ -91,7 +101,7 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
       }
     },
     onError: (error) => {
-      toast.error("Errore: " + formatGarminErrorMessage(error.message));
+      toast.error(formatGarminErrorMessage(errorToastMessage(error, "Verifica del codice non riuscita.")));
     },
   });
 
@@ -101,8 +111,8 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
       utils.garmin.status.invalidate();
       utils.profile.get.invalidate();
     },
-    onError: () => {
-      toast.error("Errore nello scollegamento");
+    onError: (error) => {
+      toast.error(errorToastMessage(error, "Errore nello scollegamento"));
     },
   });
 
@@ -121,10 +131,13 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
         }
         utils.activities.list.invalidate();
         utils.profile.get.invalidate();
+        // Swim metrics (Statistiche, Coach, the profile's streak) and personal records.
+        void utils.statistics.invalidate();
+        void utils.records.invalidate();
       }
     },
     onError: (error) => {
-      toast.error("Errore nella sincronizzazione: " + error.message);
+      toast.error(errorToastMessage(error, "Sincronizzazione non riuscita."));
     },
   });
 
@@ -163,217 +176,212 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
 
   const isConnected = garminStatus?.connected || garminConnected;
   const isLoading = connectMutation.isPending || mfaMutation.isPending;
+  // Not known yet (or unknown after an error): never offer «Collega» to someone who may be linked.
+  const statusUnknown = !isConnected && !garminStatus;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.4 }}
-    >
-      <Surface>
-        <SurfaceContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                isConnected ? "bg-green-500/10" : "bg-orange-500/10"
-              }`}>
-                <LinkIcon className={`h-5 w-5 ${
-                  isConnected ? "text-green-500" : "text-orange-500"
-                }`} />
-              </div>
-              <div>
-                <p className="font-medium text-card-foreground">Garmin Connect</p>
-                <p className="text-xs text-muted-foreground">
-                  {isConnected 
-                    ? `Collegato${garminStatus?.email ? ` (${garminStatus.email})` : ""}`
-                    : "Non collegato"
-                  }
-                </p>
-                {isConnected && garminStatus?.lastSync && (
-                  <p className="text-xs text-muted-foreground">
-                    Ultimo sync: {new Date(garminStatus.lastSync).toLocaleDateString("it-IT")}
-                  </p>
-                )}
-              </div>
-            </div>
+    <section aria-labelledby={titleId} className="surface-panel p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <span
+            aria-hidden
+            className={`flex size-10 shrink-0 items-center justify-center rounded-full ${
+              isConnected ? "bg-success/15 text-success" : "bg-raised text-muted-foreground"
+            }`}
+          >
+            <LinkIcon className="size-5" />
+          </span>
+          <div className="min-w-0">
+            <h2 id={titleId} ref={headingRef} tabIndex={-1} className="text-[17px] font-bold outline-none">
+              Garmin Connect
+            </h2>
+            {statusUnknown ? null : (
+              <p className="break-words text-sm text-muted-foreground">
+                {isConnected
+                  ? `Collegato${garminStatus?.email ? ` come ${garminStatus.email}` : ""}`
+                  : "Non collegato"}
+              </p>
+            )}
+            {isConnected && garminStatus?.lastSync ? (
+              <p className="text-sm text-muted-foreground">
+                Ultima sincronizzazione: {formatSessionDate(garminStatus.lastSync)}
+              </p>
+            ) : null}
+          </div>
+        </div>
 
-            <div className="flex gap-2">
-              {isConnected ? (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => disconnectMutation.mutate()}
-                    disabled={disconnectMutation.isPending}
-                    className="text-destructive hover:text-destructive"
-                    title="Scollega Garmin"
-                  >
-                    <Unlink className="h-4 w-4" />
-                  </Button>
-                </>
-              ) : (
-                <Dialog open={isConnectDialogOpen} onOpenChange={handleDialogClose}>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      Collega
+        <div className="flex shrink-0 gap-2">
+          {statusUnknown ? null : isConnected ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => disconnectMutation.mutate()}
+              disabled={disconnectMutation.isPending}
+              className="text-danger"
+            >
+              <Unlink aria-hidden />
+              Scollega
+            </Button>
+          ) : (
+            <Dialog open={isConnectDialogOpen} onOpenChange={handleDialogClose}>
+              <DialogTrigger asChild>
+                <Button size="sm">Collega</Button>
+              </DialogTrigger>
+              <DialogContent className="rounded-2xl bg-card shadow-none">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2 text-[17px] font-bold">
+                    {authStep === "credentials" ? (
+                      <>
+                        <LinkIcon className="size-5 text-action-text" aria-hidden />
+                        Collega Garmin Connect
+                      </>
+                    ) : (
+                      <>
+                        <KeyRound className="size-5 text-action-text" aria-hidden />
+                        Verifica il codice
+                      </>
+                    )}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {authStep === "credentials"
+                      ? "Inserisci le credenziali del tuo account Garmin Connect per sincronizzare automaticamente le tue attività di nuoto."
+                      : "Abbiamo inviato un codice di verifica alla tua email. Inseriscilo qui sotto per completare il collegamento."}
+                  </DialogDescription>
+                </DialogHeader>
+
+                {/* Keyed: a new form per step, so the code field mounts afresh and takes the focus. */}
+                {authStep === "credentials" ? (
+                  <form key="credentials" onSubmit={handleConnect} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="garmin-email">Email Garmin</Label>
+                      <Input
+                        id="garmin-email"
+                        type="email"
+                        inputMode="email"
+                        placeholder="email@esempio.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        autoComplete="email"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="garmin-password">Password Garmin</Label>
+                      <Input
+                        id="garmin-password"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="current-password"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <p>Le tue credenziali sono crittografate e utilizzate solo per sincronizzare le attività.</p>
+                      <p className="flex items-start gap-2">
+                        <Mail className="mt-0.5 size-4 shrink-0" aria-hidden />
+                        Se hai la verifica in due passaggi, riceverai un codice via email nel passaggio successivo.
+                      </p>
+                    </div>
+                    <Button type="submit" className="w-full" disabled={isLoading}>
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="animate-spin" aria-hidden />
+                          Collegamento…
+                        </>
+                      ) : (
+                        "Collega account"
+                      )}
                     </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle className="flex items-center gap-2">
-                        {authStep === "credentials" ? (
+                  </form>
+                ) : (
+                  <form key="mfa" onSubmit={handleMfaSubmit} className="space-y-4">
+                    <p className="flex items-center gap-2 rounded-xl bg-raised p-3 text-sm">
+                      <Mail className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                      <span>
+                        Controlla la tua email <span className="font-semibold">{email}</span>
+                      </span>
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="mfa-code">Codice di verifica</Label>
+                      <Input
+                        id="mfa-code"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="123456"
+                        value={mfaCode}
+                        onChange={(e) => setMfaCode(e.target.value)}
+                        maxLength={10}
+                        className="text-center font-mono text-2xl tracking-widest tabular-nums"
+                        autoComplete="one-time-code"
+                        aria-describedby="mfa-code-hint"
+                        autoFocus
+                        required
+                      />
+                      <p id="mfa-code-hint" className="text-sm text-muted-foreground">
+                        Inserisci il codice a 6 cifre ricevuto via email da Garmin.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => setAuthStep("credentials")}
+                        disabled={isLoading}
+                      >
+                        Indietro
+                      </Button>
+                      <Button type="submit" className="flex-1" disabled={isLoading || mfaCode.length < 4}>
+                        {isLoading ? (
                           <>
-                            <LinkIcon className="h-5 w-5" />
-                            Collega Garmin Connect
+                            <Loader2 className="animate-spin" aria-hidden />
+                            Verifica…
                           </>
                         ) : (
-                          <>
-                            <KeyRound className="h-5 w-5" />
-                            Verifica Codice MFA
-                          </>
+                          "Verifica codice"
                         )}
-                      </DialogTitle>
-                      <DialogDescription>
-                        {authStep === "credentials" 
-                          ? "Inserisci le credenziali del tuo account Garmin Connect per sincronizzare automaticamente le tue attività di nuoto."
-                          : "Abbiamo inviato un codice di verifica alla tua email. Inseriscilo qui sotto per completare il collegamento."
-                        }
-                      </DialogDescription>
-                    </DialogHeader>
-
-                    {authStep === "credentials" ? (
-                      <form onSubmit={handleConnect} className="space-y-4 mt-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="garmin-email">Email Garmin</Label>
-                          <Input
-                            id="garmin-email"
-                            type="email"
-                            placeholder="email@esempio.com"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            autoComplete="email"
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="garmin-password">Password</Label>
-                          <Input
-                            id="garmin-password"
-                            type="password"
-                            placeholder="••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            autoComplete="current-password"
-                            required
-                          />
-                        </div>
-                        <div className="text-xs text-muted-foreground space-y-2">
-                          <p>
-                            Le tue credenziali sono crittografate e utilizzate solo per sincronizzare le attività.
-                          </p>
-                          <p className="text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            Se hai MFA attivo, riceverai un codice via email nel passaggio successivo.
-                          </p>
-                        </div>
-                        <Button
-                          type="submit"
-                          className="w-full bg-[var(--navy)] text-foreground hover:bg-[var(--navy-light)]"
-                          disabled={isLoading}
-                        >
-                          {isLoading ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Collegamento...
-                            </>
-                          ) : (
-                            "Collega Account"
-                          )}
-                        </Button>
-                      </form>
-                    ) : (
-                      <form onSubmit={handleMfaSubmit} className="space-y-4 mt-4">
-                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                          <p className="text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
-                            <Mail className="h-4 w-4" />
-                            Controlla la tua email <strong>{email}</strong>
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="mfa-code">Codice di Verifica</Label>
-                          <Input
-                            id="mfa-code"
-                            type="text"
-                            placeholder="123456"
-                            value={mfaCode}
-                            onChange={(e) => setMfaCode(e.target.value)}
-                            maxLength={10}
-                            className="text-center text-2xl tracking-widest font-mono"
-                            autoComplete="one-time-code"
-                            autoFocus
-                            required
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Inserisci il codice a 6 cifre ricevuto via email da Garmin
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="flex-1"
-                            onClick={() => setAuthStep("credentials")}
-                            disabled={isLoading}
-                          >
-                            Indietro
-                          </Button>
-                          <Button
-                            type="submit"
-                            className="flex-1 bg-[var(--navy)] text-foreground hover:bg-[var(--navy-light)]"
-                            disabled={isLoading || mfaCode.length < 4}
-                          >
-                            {isLoading ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Verifica...
-                              </>
-                            ) : (
-                              "Verifica Codice"
-                            )}
-                          </Button>
-                        </div>
-                      </form>
-                    )}
-                  </DialogContent>
-                </Dialog>
-              )}
-            </div>
-          </div>
-
-          {isConnected && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <GarminSyncCountPicker
-                value={syncCount}
-                onChange={setSyncCount}
-                disabled={syncMutation.isPending}
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => syncMutation.mutate({ daysBack: 30, maxActivities: syncCount })}
-                disabled={syncMutation.isPending}
-              >
-                {syncMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </form>
                 )}
-                {syncMutation.isPending ? "Sincronizzazione..." : garminSyncButtonLabel(syncCount)}
-              </Button>
-            </div>
+              </DialogContent>
+            </Dialog>
           )}
-        </SurfaceContent>
-      </Surface>
-    </motion.div>
+        </div>
+      </div>
+
+      {statusUnknown && statusQuery.isError ? (
+        <LoadError variant="inline" className="mt-3" onRetry={() => void statusQuery.refetch()} />
+      ) : statusUnknown ? (
+        <div role="status" className="mt-3">
+          <span className="sr-only">Caricamento dello stato di Garmin…</span>
+          <Skeleton className="h-4 w-40" aria-hidden />
+        </div>
+      ) : null}
+
+      {isConnected && (
+        <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-border pt-4">
+          <GarminSyncCountPicker
+            value={syncCount}
+            onChange={setSyncCount}
+            disabled={syncMutation.isPending}
+          />
+          <Button
+            onClick={() => syncMutation.mutate({ daysBack: 30, maxActivities: syncCount })}
+            disabled={syncMutation.isPending}
+          >
+            {syncMutation.isPending ? (
+              <Loader2 className="animate-spin" aria-hidden />
+            ) : (
+              <RefreshCw aria-hidden />
+            )}
+            {syncMutation.isPending ? "Sincronizzazione…" : garminSyncButtonLabel(syncCount)}
+          </Button>
+        </div>
+      )}
+    </section>
   );
 }

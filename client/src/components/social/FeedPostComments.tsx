@@ -49,17 +49,17 @@ export default function FeedPostComments({ postId, isOpen }: FeedPostCommentsPro
           transition={{ duration: 0.25, ease: "easeOut" }}
           className="overflow-hidden"
         >
-          <div className="px-4 pb-3 space-y-2.5">
+          <div className="space-y-2.5 pb-3">
             {/* Comment previews - inline, no border */}
             {commentsQuery.isLoading ? (
-              <div className="text-xs text-muted-foreground py-1">Caricamento...</div>
+              <div className="py-1 text-sm text-muted-foreground">Caricamento…</div>
             ) : comments.length > 0 ? (
               <>
                 {comments.slice(0, 2).map((comment) => (
                   <div key={comment.id} className="flex items-start gap-2">
-                    <Avatar className="size-6 border border-border/60 shrink-0 mt-0.5">
-                      <AvatarImage src={comment.user_avatar || ""} />
-                      <AvatarFallback className="text-[9px]">
+                    <Avatar className="mt-0.5 size-7 shrink-0">
+                      <AvatarImage src={comment.user_avatar || ""} alt="" />
+                      <AvatarFallback className="text-xs">
                         {getInitials(comment.user_name || comment.user_username || "SW")}
                       </AvatarFallback>
                     </Avatar>
@@ -72,24 +72,25 @@ export default function FeedPostComments({ postId, isOpen }: FeedPostCommentsPro
                   </div>
                 ))}
                 {comments.length > 2 && (
-                  <p className="text-xs text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                  <p className="text-sm text-muted-foreground">
                     Vedi tutti i {comments.length} commenti
                   </p>
                 )}
               </>
             ) : (
-              <div className="text-xs text-muted-foreground">Nessun commento ancora.</div>
+              <div className="text-sm text-muted-foreground">Nessun commento ancora.</div>
             )}
 
             {/* Comment input - always visible */}
             <div className="flex items-center gap-2 mt-1">
-              <Avatar className="size-6 border border-border/60 shrink-0">
-                <AvatarFallback className="text-[9px]">Tu</AvatarFallback>
+              <Avatar className="size-7 shrink-0">
+                <AvatarFallback className="text-xs">Tu</AvatarFallback>
               </Avatar>
               <div className="flex-1 relative">
                 <input
                   type="text"
-                  placeholder="Aggiungi un commento..."
+                  placeholder="Aggiungi un commento…"
+                  aria-label="Aggiungi un commento"
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                   onKeyDown={(e) => {
@@ -98,16 +99,17 @@ export default function FeedPostComments({ postId, isOpen }: FeedPostCommentsPro
                       submitComment()
                     }
                   }}
-                  className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 border-b border-border/40 py-1.5 pr-8 outline-none focus:border-[var(--electric-cyan)]/50 transition-colors"
+                  className="w-full border-b border-border bg-transparent py-2 pr-9 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-action-text"
                 />
                 {commentText.trim() && (
                   <button
                     type="button"
                     onClick={submitComment}
                     disabled={addComment.isPending}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 text-[var(--electric-cyan)] hover:text-[var(--electric-lime)] transition-colors disabled:opacity-40"
+                    aria-label="Invia commento"
+                    className="absolute right-0 top-1/2 -translate-y-1/2 p-1 text-action-text transition-opacity hover:opacity-80 disabled:opacity-40"
                   >
-                    <Send className="size-4" />
+                    <Send className="size-4" aria-hidden />
                   </button>
                 )}
               </div>

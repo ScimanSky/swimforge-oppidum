@@ -39,7 +39,7 @@ function SuggestedUserRow({
       <Link href={userProfileHref}>
         <Avatar className="size-8 border border-border/60 cursor-pointer shrink-0">
           <AvatarImage src={user.avatarUrl || ""} alt={displayName} />
-          <AvatarFallback className="text-[10px] font-semibold">
+          <AvatarFallback className="text-xs font-semibold">
             {getInitials(displayName)}
           </AvatarFallback>
         </Avatar>
@@ -48,12 +48,12 @@ function SuggestedUserRow({
         <Link href={userProfileHref} className="text-sm font-semibold text-foreground truncate block hover:underline">
           {displayName}
         </Link>
-        <p className="text-[10px] text-muted-foreground">{user.subtitle}</p>
+        <p className="truncate text-xs text-muted-foreground">{user.subtitle}</p>
       </div>
       <Button
-        variant={isFollowing ? "ghost-neon" : "outline-neon"}
+        variant={isFollowing ? "ghost" : "outline"}
         size="sm"
-        className="h-7 text-[10px] gap-1 px-2 shrink-0"
+        className="h-8 gap-1 px-2.5 text-xs shrink-0"
         onClick={() => {
           if (!user.userId) return
           toggleFollow.mutate({ userId: user.userId })
@@ -62,12 +62,12 @@ function SuggestedUserRow({
       >
         {isFollowing ? (
           <>
-            <UserCheck className="size-3" />
+            <UserCheck className="size-3" aria-hidden />
             Seguendo
           </>
         ) : (
           <>
-            <UserPlus className="size-3" />
+            <UserPlus className="size-3" aria-hidden />
             Segui
           </>
         )}
@@ -85,20 +85,17 @@ export default function FeedSidebar() {
     { scope: "all", limit: 4 },
     { staleTime: 60_000 }
   )
-  const profileQuery = trpc.profile.get.useQuery()
   const suggestedUsers = suggestedQuery.data ?? []
   const recentClubs = ((recentClubsQuery.data as any[] | undefined) ?? []).slice(0, 3)
   const vm = buildFeedSidebarVm({ suggestedUsers })
-  const profileName = profileQuery.data?.username || "You"
-  const profileAvatar = profileQuery.data?.avatarUrl || null
 
   return (
     <div className="space-y-4">
       <div className="surface-panel p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-display font-semibold text-foreground">Club Recenti</h3>
-          <Link href="/home/community" className="text-xs font-semibold text-[var(--electric-cyan)] hover:underline">
-            View All
+          <h2 className="text-[15px] font-bold text-foreground">Club recenti</h2>
+          <Link href="/home/community" className="text-sm font-semibold text-action-text hover:underline">
+            Vedi tutti
           </Link>
         </div>
         {recentClubsQuery.isLoading ? (
@@ -111,9 +108,9 @@ export default function FeedSidebar() {
               <Link
                 key={club.id}
                 href={`/community/club/${club.id}`}
-                className="flex items-center gap-2.5 rounded-xl border border-border/55 bg-background/35 p-2 transition-colors hover:border-[var(--electric-cyan)]/55"
+                className="flex items-center gap-2.5 rounded-xl p-2 transition-colors hover:bg-raised"
               >
-                <div className="size-10 shrink-0 overflow-hidden rounded-lg border border-border/60 bg-card/50">
+                <div className="size-10 shrink-0 overflow-hidden rounded-xl bg-raised">
                   {club.cover_image_url ? (
                     <img
                       src={club.cover_image_url}
@@ -121,17 +118,15 @@ export default function FeedSidebar() {
                       className="h-full w-full object-cover"
                       loading="lazy"
                     />
-                  ) : (
-                    <div className="h-full w-full bg-[linear-gradient(132deg,#163047_0%,#1f3f5c_50%,#11283b_100%)]" />
-                  )}
+                  ) : null}
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-foreground">{club.name || "Club"}</p>
-                  <p className="truncate text-[11px] text-muted-foreground">
+                  <p className="truncate text-xs text-muted-foreground">
                     {club.member_count ?? 0} membri
                   </p>
                 </div>
-                <ChevronRight className="size-4 text-muted-foreground" />
+                <ChevronRight className="size-4 text-muted-foreground" aria-hidden />
               </Link>
             ))}
           </div>
@@ -139,9 +134,9 @@ export default function FeedSidebar() {
       </div>
 
       <div className="surface-panel p-4">
-        <h3 className="mb-3 text-sm font-display font-semibold text-foreground">
-          Who to Follow
-        </h3>
+        <h2 className="mb-3 text-[15px] font-bold text-foreground">
+          Chi seguire
+        </h2>
         {vm.whoToFollow.length > 0 ? (
           <div className="space-y-2.5">
             {vm.whoToFollow.map((user) => (
@@ -153,13 +148,13 @@ export default function FeedSidebar() {
             Acqua piatta: nessun suggerimento ora. Torna dopo nuovi follow.
           </p>
         )}
-        <Button variant="ghost-neon" size="sm" className="mt-3 w-full" asChild>
-          <Link href="/home/community">Show More</Link>
+        <Button variant="ghost" size="sm" className="mt-3 w-full text-action-text" asChild>
+          <Link href="/home/community">Mostra altri</Link>
         </Button>
       </div>
 
       <div className="px-1">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground/80">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
           {vm.footerLinks.map((item) => (
             <Link
               key={`${item.label}-${item.href}`}
@@ -170,7 +165,7 @@ export default function FeedSidebar() {
             </Link>
           ))}
         </div>
-        <p className="mt-1 text-[11px] text-muted-foreground/60">© 2026 SwimForge</p>
+        <p className="mt-1 text-xs text-muted-foreground">© 2026 SwimForge</p>
       </div>
     </div>
   )

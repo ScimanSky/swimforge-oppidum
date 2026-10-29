@@ -1,22 +1,56 @@
 import { assetUrl } from "@/lib/asset-base";
-import { useParams, useLocation } from "wouter";
+import { useParams } from "wouter";
+import { useEffect, useId, useState, type ReactNode } from "react";
+import { Clock } from "lucide-react";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface";
-import { MetricOrb } from "@/components/metrics/MetricOrb";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { motion } from "framer-motion";
-import { Trophy, ArrowLeft, Calendar, Target, Users, Medal, Clock } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { AppLayout } from "@/components/AppLayout";
+import { Chip } from "@/components/corsia/Chip";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
+import { Metric } from "@/components/corsia/Metric";
+import { RankRow } from "@/components/corsia/RankRow";
+import {
+  CHALLENGE_DURATION_LABELS,
+  CHALLENGE_TYPE_LABELS,
+  averageChallengeProgress,
+  bestChallengeProgress,
+  challengeObjectiveLabel,
+  challengeProgressParts,
+  compareChallengeProgress,
+} from "@/lib/challenges";
+import { formatInteger } from "@/lib/format";
+import { rankEntries } from "@/lib/ranking";
+
+const sectionTitle = "text-[17px] font-bold";
+
+function Notice({ children }: { children: ReactNode }) {
+  return (
+    <AppLayout>
+      <p className="surface-panel p-4 text-center text-sm text-muted-foreground">{children}</p>
+    </AppLayout>
+  );
+}
+
+/** Profile badge tooltip: «Delfino (Livello 3)», without the parts that are missing. */
+const profileBadgeTitle = (name?: string | null, level?: number | string | null) => {
+  const label = name || "Badge";
+  return level != null && level !== "" ? `${label} (Livello ${level})` : label;
+};
 
 export default function ChallengeDetail() {
   const params = useParams<{ id: string }>();
-  const [, setLocation] = useLocation();
-  const challengeId = parseInt(params.id || "0");
+  const challengeId = Number(params.id);
+  // «/challenges/abc» is not a challenge: never sent to the server (a BAD_REQUEST there).
+  const validId = Number.isInteger(challengeId) && challengeId > 0;
+  const titleId = useId();
+  const rankingId = useId();
+  const { user } = useAuth();
 
-  const { data: challenge, isLoading } = trpc.challenges.getById.useQuery({ id: challengeId });
+  const challengeQuery = trpc.challenges.getById.useQuery(
+    { id: challengeId },
+    { enabled: validId }
+  );
+  const challenge = challengeQuery.data;
 
   // Countdown timer
   const [timeLeft, setTimeLeft] = useState<string>("");
@@ -94,308 +128,134 @@ export default function ChallengeDetail() {
     return () => clearInterval(interval);
   }, [challenge]);
 
-  if (isLoading) {
+  // Before `isPending`: a disabled query stays pending for ever.
+  if (!validId) return <Notice>Sfida non trovata</Notice>;
+  if (challengeQuery.isPending) {
     return (
       <AppLayout>
-        <div className="compact-shell max-w-5xl mx-auto">
-          <Surface>
-            <SurfaceContent className="p-6 text-center text-muted-foreground">Caricamento...</SurfaceContent>
-          </Surface>
-        </div>
+        <LoadingSkeleton
+          label="Caricamento della sfida…"
+          count={3}
+          itemClassName="h-24 w-full rounded-2xl"
+        />
       </AppLayout>
     );
   }
-
-  if (!challenge) {
+  const errorCode = challengeQuery.error?.data?.code;
+  if (!challenge && challengeQuery.isError && errorCode !== "NOT_FOUND" && errorCode !== "BAD_REQUEST") {
     return (
       <AppLayout>
-        <div className="compact-shell max-w-5xl mx-auto">
-          <Surface>
-            <SurfaceContent className="p-6 text-center text-muted-foreground">Sfida non trovata</SurfaceContent>
-          </Surface>
-        </div>
+        <LoadError onRetry={() => void challengeQuery.refetch()} />
       </AppLayout>
     );
   }
+  if (!challenge) return <Notice>Sfida non trovata</Notice>;
 
-  const typeLabels = {
-    pool: "Piscina",
-    open_water: "Acque Libere",
-    both: "Entrambi",
-  };
+  // Best first, whatever the server order (for pace the lowest wins, no data goes last).
+  const compare = compareChallengeProgress(challenge.objective);
+  const progressOf = (participant: { progress?: number | string | null }) =>
+    Number(participant.progress ?? 0);
+  const participants = [...(challenge.participants ?? [])].sort((a, b) =>
+    compare(progressOf(a), progressOf(b))
+  );
+  const progressValues = participants.map(progressOf);
+  // Ties share a position; who has no result yet (0, a pace without data) has none.
+  const ranking = rankEntries(participants, (participant) => progressOf(participant));
+  const bestProgress = bestChallengeProgress(challenge.objective, progressValues);
+  const averageProgress = averageChallengeProgress(challenge.objective, progressValues);
 
-  const objectiveLabels = {
-    total_distance: "Distanza Totale",
-    total_sessions: "Numero Sessioni",
-    consistency: "Costanza",
-    avg_pace: "Pace Medio",
-    total_time: "Tempo Totale",
-    longest_session: "Sessione Più Lunga",
-  };
-
-  const durationLabels = {
-    "3_days": "3 Giorni",
-    "1_week": "1 Settimana",
-    "2_weeks": "2 Settimane",
-    "1_month": "1 Mese",
-  };
-
-  const formatPace = (seconds: number) => {
-    if (!Number.isFinite(seconds) || seconds <= 0) return "0:00 /100m";
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.round(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, "0")} /100m`;
-  };
-
-  const formatProgress = (value: number) => {
-    switch (challenge.objective) {
-      case "total_distance":
-      case "longest_session":
-        return `${(value / 1000).toFixed(2)} km`;
-      case "total_time":
-        return `${(value / 3600).toFixed(2)} h`;
-      case "avg_pace":
-        return formatPace(value);
-      case "total_sessions":
-      case "consistency":
-        return `${Math.round(value)}`;
-      default:
-        return value.toFixed(2);
-    }
-  };
-
-  const handleOpenUserProfile = (userId: number) => {
-    if (!Number.isFinite(userId) || userId <= 0) return;
-    setLocation(`/u/${userId}`);
-  };
-
-  const participantsCount = challenge.participants?.length ?? 0;
-  const progressValues = (challenge.participants ?? []).map((p) => Number(p.progress ?? 0));
-  const bestProgress = progressValues.length ? Math.max(...progressValues) : 0;
-  const averageProgress = progressValues.length
-    ? progressValues.reduce((sum, value) => sum + value, 0) / progressValues.length
-    : 0;
-  const targetValue = Number((challenge as any).targetValue ?? (challenge as any).target_value ?? 0);
-
-  const normalizeObjectiveProgress = (value: number) => {
-    if (!Number.isFinite(value) || value <= 0) return 0;
-    if (targetValue > 0) {
-      if (challenge.objective === "avg_pace") {
-        return Math.max(0, Math.min(100, Math.round((targetValue / value) * 100)));
-      }
-      return Math.max(0, Math.min(100, Math.round((value / targetValue) * 100)));
-    }
-    return Math.max(0, Math.min(100, Math.round(value)));
-  };
-
-  const challengeOrbs = [
-    {
-      label: "Partecipanti",
-      value: participantsCount,
-      progress: Math.min(100, Math.round((participantsCount / 24) * 100)),
-      helper: "In gara",
-      icon: <Users className="h-4 w-4" />,
-      tone: "cyan" as const,
-    },
-    {
-      label: "Miglior risultato",
-      value: formatProgress(bestProgress || 0),
-      progress: normalizeObjectiveProgress(bestProgress),
-      helper: "Top score",
-      icon: <Trophy className="h-4 w-4" />,
-      tone: "lime" as const,
-    },
-    {
-      label: "Media gruppo",
-      value: formatProgress(averageProgress || 0),
-      progress: normalizeObjectiveProgress(averageProgress),
-      helper: "Andamento",
-      icon: <Target className="h-4 w-4" />,
-      tone: "amber" as const,
-    },
-    {
-      label: "Stato sfida",
-      value: challenge.status === "active" ? "Attiva" : challenge.status === "pending" ? "Pending" : "Chiusa",
-      progress: challenge.status === "active" ? 100 : challenge.status === "pending" ? 40 : 0,
-      helper: timeLeft && challenge.status === "active" ? timeLeft : "Timeline",
-      icon: <Clock className="h-4 w-4" />,
-      tone: "sky" as const,
-    },
-  ];
+  const progressParts = (value: number) => challengeProgressParts(challenge.objective, value);
+  const statusLabel =
+    challenge.status === "active" ? "Attiva" : challenge.status === "pending" ? "In arrivo" : "Conclusa";
+  const showCountdown = challenge.status === "active" && timeLeft && timeLeft !== "Terminata";
 
   return (
     <AppLayout>
-      <div className="compact-shell max-w-5xl mx-auto pb-10 lg:pb-2 space-y-8 lg:space-y-3">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost-neon"
-            size="icon"
-            onClick={() => setLocation("/challenges")}
+      <div className="space-y-6">
+        <section aria-labelledby={titleId} className="surface-panel p-4">
+          <div className="flex flex-wrap gap-2">
+            <Chip tone={challenge.status === "active" ? "action" : "neutral"}>{statusLabel}</Chip>
+            {CHALLENGE_TYPE_LABELS[challenge.type] ? <Chip>{CHALLENGE_TYPE_LABELS[challenge.type]}</Chip> : null}
+            {CHALLENGE_DURATION_LABELS[challenge.duration] ? (
+              <Chip>{CHALLENGE_DURATION_LABELS[challenge.duration]}</Chip>
+            ) : null}
+          </div>
+          <h2
+            id={titleId}
+            className="mt-3 break-words font-display text-[32px] font-bold leading-none text-foreground"
           >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-3xl font-display font-bold neon-gradient-text">
             {challenge.name}
-          </h1>
-        </div>
+          </h2>
+          <p className="mt-2 text-sm font-semibold text-muted-foreground">
+            {challengeObjectiveLabel(challenge.objective)}
+          </p>
+          {challenge.description ? (
+            <p className="mt-3 text-sm text-foreground">{challenge.description}</p>
+          ) : null}
 
-        {/* Challenge Info */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-4"
-        >
-          <Surface className="bg-card border-border glass-panel">
-            <SurfaceContent className="space-y-4 p-6">
-              <p className="text-muted-foreground">{challenge.description}</p>
+          {showCountdown ? (
+            <p className="mt-4 flex items-baseline gap-2 rounded-xl bg-raised px-3 py-2">
+              <Clock className="size-4 shrink-0 self-center text-muted-foreground" aria-hidden />
+              <span className="font-display text-xl font-bold tabular-nums">{timeLeft}</span>
+              <span className="text-sm text-muted-foreground">rimanenti</span>
+            </p>
+          ) : null}
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Target className="h-4 w-4 text-primary" />
-                  <span className="text-sm">
-                    {typeLabels[challenge.type as keyof typeof typeLabels]}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Trophy className="h-4 w-4 text-primary" />
-                  <span className="text-sm">
-                    {objectiveLabels[challenge.objective as keyof typeof objectiveLabels]}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Calendar className="h-4 w-4 text-primary" />
-                  <span className="text-sm">
-                    {durationLabels[challenge.duration as keyof typeof durationLabels]}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Users className="h-4 w-4 text-primary" />
-                  <span className="text-sm">{challenge.participants?.length || 0} Partecipanti</span>
-                </div>
-              </div>
+          <div className="mt-4 grid grid-cols-3 gap-4 border-t border-border pt-4">
+            <Metric size="responsive" value={formatInteger(participants.length)} label="Partecipanti" />
+            {participants.length > 0 ? (
+              <>
+                <Metric size="responsive" {...progressParts(bestProgress)} label="Miglior risultato" />
+                <Metric size="responsive" {...progressParts(averageProgress)} label="Media del gruppo" />
+              </>
+            ) : null}
+          </div>
+        </section>
 
-              {/* Countdown Timer */}
-              {challenge.status === "active" && timeLeft && timeLeft !== "Terminata" && (
-                <div className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-primary/15 px-4 py-3">
-                  <Clock className="h-5 w-5 text-primary" />
-                  <span className="text-lg font-bold text-foreground">{timeLeft}</span>
-                  <span className="text-sm text-muted-foreground">rimanenti</span>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-2 pt-2 sm:grid-cols-3 lg:grid-cols-4">
-                {challengeOrbs.map((item) => (
-                  <MetricOrb
-                    key={item.label}
-                    label={item.label}
-                    value={item.value}
-                    progress={item.progress}
-                    helper={item.helper}
-                    icon={item.icon}
-                    tone={item.tone}
-                    size="sm"
-                  />
-                ))}
-              </div>
-            </SurfaceContent>
-          </Surface>
-        </motion.div>
-
-        {/* Leaderboard */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="space-y-4"
-        >
-          <Surface className="bg-card border-border">
-            <SurfaceHeader>
-              <SurfaceTitle className="flex items-center gap-2 font-display">
-                <Medal className="h-5 w-5 text-primary" />
-                Classifica
-              </SurfaceTitle>
-            </SurfaceHeader>
-            <SurfaceContent>
-              <div className="space-y-3">
-                {challenge.participants && challenge.participants.length > 0 ? (
-                  challenge.participants.map((participant, index) => (
-                    <motion.div
-                      key={participant.userId}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      className="flex items-center gap-4 rounded-lg border border-border bg-background/60 p-4 cursor-pointer hover:bg-background/75 transition-colors"
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleOpenUserProfile(participant.userId)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          handleOpenUserProfile(participant.userId);
-                        }
-                      }}
-                    >
-                      <Badge
-                        variant={
-                          index === 0
-                            ? "rank-gold"
-                            : index === 1
-                            ? "rank-silver"
-                            : index === 2
-                            ? "rank-bronze"
-                            : "neon"
-                        }
-                        className="h-8 w-8 justify-center p-0 text-xs"
-                      >
-                        {index + 1}
-	                      </Badge>
-
-	                      <div className="flex items-center gap-2">
-	                        <Avatar className="h-10 w-10">
-	                          <AvatarImage
-	                            src={participant.avatarUrl || participant.avatar_url || ""}
-	                            alt={participant.username || "Nuotatore"}
-	                          />
-	                          <AvatarFallback>
-	                            {participant.username?.[0]?.toUpperCase() || "U"}
-	                          </AvatarFallback>
-	                        </Avatar>
-	                        {participant.profileBadgeUrl ? (
-	                          <img
-	                            src={assetUrl(participant.profileBadgeUrl)}
-	                            alt={participant.profileBadgeName || "Badge"}
-	                            className="h-7 w-7 object-contain opacity-90"
-	                            title={`${participant.profileBadgeName} (Livello ${participant.profileBadgeLevel})`}
-	                          />
-	                        ) : (
-	                          <div
-	                            className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground"
-	                            title="Novizio (Livello 1)"
-	                          >
-	                            1
-	                          </div>
-	                        )}
-	                      </div>
-
-                      <span className="flex-1 font-medium text-foreground">
-                        {participant.username}
-                      </span>
-
-                      <span className="font-bold text-primary">
-                        {formatProgress(participant.progress || 0)}
-                      </span>
-                    </motion.div>
-                  ))
-                ) : (
-                  <p className="py-8 text-center text-muted-foreground">
-                    Nessun partecipante ancora
-                  </p>
-                )}
-              </div>
-            </SurfaceContent>
-          </Surface>
-        </motion.div>
+        <section aria-labelledby={rankingId}>
+          <h2 id={rankingId} className={sectionTitle}>
+            Classifica
+          </h2>
+          {participants.length > 0 ? (
+            <ol aria-labelledby={rankingId} className="mt-3 space-y-2">
+              {ranking.map(({ entry: participant, rank }) => {
+                const userId = Number(participant.userId);
+                const name = participant.username || "Nuotatore";
+                const { value, unit } = progressParts(progressOf(participant));
+                return (
+                  <li key={participant.userId} value={rank ?? undefined}>
+                    <RankRow
+                      rank={rank}
+                      name={name}
+                      avatarUrl={participant.avatarUrl || participant.avatar_url}
+                      value={value}
+                      unit={unit}
+                      href={Number.isFinite(userId) && userId > 0 ? `/u/${userId}` : undefined}
+                      isCurrentUser={user != null && Number(user.id) === userId}
+                      extra={
+                        participant.profileBadgeUrl ? (
+                          <img
+                            src={assetUrl(participant.profileBadgeUrl)}
+                            alt={participant.profileBadgeName || "Badge"}
+                            title={profileBadgeTitle(
+                              participant.profileBadgeName,
+                              participant.profileBadgeLevel
+                            )}
+                            className="size-7 shrink-0 object-contain"
+                          />
+                        ) : null
+                      }
+                    />
+                  </li>
+                );
+              })}
+            </ol>
+          ) : (
+            <p className="mt-3 surface-panel p-4 text-center text-sm text-muted-foreground">
+              Nessun partecipante ancora
+            </p>
+          )}
+        </section>
       </div>
     </AppLayout>
   );

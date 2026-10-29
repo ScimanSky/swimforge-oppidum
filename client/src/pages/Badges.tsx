@@ -1,100 +1,104 @@
 import { assetUrl } from "@/lib/asset-base";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { motion, AnimatePresence } from "framer-motion";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Trophy,
-  Lock,
-  X,
-  Sparkles,
-} from "lucide-react";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Chip } from "@/components/corsia/Chip";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
+import { Metric } from "@/components/corsia/Metric";
+import { Pager } from "@/components/corsia/Pager";
+import { Lock } from "lucide-react";
 import { Redirect } from "wouter";
-import { useState, useRef, useCallback, useMemo, useEffect } from "react";
+import { useState, useRef, useCallback, useMemo, useId } from "react";
+import { usePaged } from "@/hooks/usePaged";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
 import { AppLayout } from "@/components/AppLayout";
-import { createPortal } from "react-dom";
-
-// Badge images are now handled by getBadgeImageUrl from badgeImages.ts
+import { formatDayMonthYear, formatInteger } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 const categoryLabels: Record<string, string> = {
   all: "Tutti",
   distance: "Distanza",
-  session: "Sessione",
+  session: "Nuotata",
   consistency: "Costanza",
-  open_water: "Acque Libere",
+  open_water: "Acque libere",
   special: "Speciali",
   milestone: "Traguardi",
-  achievement: "Achievement",
+  achievement: "Imprese",
 };
 
 const rarityLabels: Record<string, string> = {
   common: "Comune",
-  uncommon: "Non Comune",
+  uncommon: "Non comune",
   rare: "Raro",
   epic: "Epico",
   legendary: "Leggendario",
 };
 
-const rarityColors: Record<string, { border: string; glow: string; bg: string; text: string }> = {
-  common: {
-    border: "oklch(0.5 0.03 250)",
-    glow: "oklch(0.5 0.03 250 / 0.3)",
-    bg: "oklch(0.22 0.03 250)",
-    text: "oklch(0.65 0.03 250)",
-  },
-  uncommon: {
-    border: "oklch(0.70 0.20 145)",
-    glow: "oklch(0.70 0.20 145 / 0.5)",
-    bg: "oklch(0.25 0.08 145 / 0.3)",
-    text: "oklch(0.70 0.20 145)",
-  },
-  rare: {
-    border: "oklch(0.70 0.18 220)",
-    glow: "oklch(0.70 0.18 220 / 0.6)",
-    bg: "oklch(0.25 0.08 220 / 0.3)",
-    text: "oklch(0.70 0.18 220)",
-  },
-  epic: {
-    border: "oklch(0.65 0.22 300)",
-    glow: "oklch(0.65 0.22 300 / 0.6)",
-    bg: "oklch(0.25 0.10 300 / 0.3)",
-    text: "oklch(0.65 0.22 300)",
-  },
-  legendary: {
-    border: "oklch(0.85 0.18 85)",
-    glow: "oklch(0.85 0.18 85 / 0.7)",
-    bg: "oklch(0.30 0.10 85 / 0.3)",
-    text: "oklch(0.85 0.18 85)",
-  },
+const kmFormat = new Intl.NumberFormat("it-IT", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** API image when present, otherwise the bundled one; both via `assetUrl` (the website in the app). */
+const badgeImage = (badge: any) =>
+  assetUrl(
+    (typeof badge?.image_url === "string" && badge.image_url ? badge.image_url : null) ||
+      getBadgeImageUrl(badge?.code)
+  );
+
+/** Tile name for screen readers: locked badges add «da sbloccare» and the progress when started. */
+const badgeTileLabel = (badge: any) => {
+  if (badge.earned) return badge.name;
+  const progress = Math.round(Number(badge.progress) || 0);
+  return progress > 0 ? `${badge.name}, da sbloccare, ${progress}%` : `${badge.name}, da sbloccare`;
 };
 
-// Badge code is now directly available from badge.code
+/** A locked badge: padlock on a dashed raised disc (the artwork stays a surprise). */
+function LockedBadge({ className, iconClassName }: { className: string; iconClassName: string }) {
+  return (
+    <span
+      className={cn(
+        "flex items-center justify-center rounded-full border-2 border-dashed border-border bg-raised",
+        className
+      )}
+    >
+      <Lock className={cn("text-muted-foreground", iconClassName)} aria-hidden />
+    </span>
+  );
+}
 
 export default function Badges() {
   const { isAuthenticated, loading: authLoading } = useAuth();
+  const titleId = useId();
   const [selectedCategory, setSelectedCategory] = useState("all");
+  // The last opened badge stays rendered while the dialog animates out; `detailOpen` drives it.
   const [selectedBadge, setSelectedBadge] = useState<any | null>(null);
-  const [showUnlockAnimation, setShowUnlockAnimation] = useState(false);
-  const [portalReady, setPortalReady] = useState(false);
-  const [badgePage, setBadgePage] = useState(1);
+  const [detailOpen, setDetailOpen] = useState(false);
+  // The tile that opened the dialog: focus goes back to it on close (or to the selected
+  // category tab, if a refetch removed the tile meanwhile).
+  const openerRef = useRef<HTMLButtonElement | null>(null);
+  const selectedTabRef = useRef<HTMLButtonElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const [currentSoundUrl, setCurrentSoundUrl] = useState<string>("");
 
-  const { data: badgeProgress, isLoading } = trpc.badges.progress.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
+  const progressQuery = trpc.badges.progress.useQuery(undefined, { enabled: isAuthenticated });
+  const definitionsQuery = trpc.badges.getAchievementBadgeDefinitions.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+  const userAchievementsQuery = trpc.badges.getUserAchievementBadges.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+  const badgeProgress = progressQuery.data;
+  const achievementDefinitions = definitionsQuery.data;
+  const userAchievementBadges = userAchievementsQuery.data;
+  const failedQueries = [progressQuery, definitionsQuery, userAchievementsQuery].filter(
+    (query) => query.data === undefined && query.isError
   );
-  const { data: achievementDefinitions, isLoading: achievementsLoading } =
-    trpc.badges.getAchievementBadgeDefinitions.useQuery(undefined, { enabled: isAuthenticated });
-  const { data: userAchievementBadges } =
-    trpc.badges.getUserAchievementBadges.useQuery(undefined, { enabled: isAuthenticated });
-
-  // Redirect if not authenticated
-  if (!authLoading && !isAuthenticated) {
-    return <Redirect to="/" />;
-  }
 
   const achievementBadges = useMemo(() => {
     if (!achievementDefinitions) return [];
@@ -128,16 +132,18 @@ export default function Badges() {
   const filteredBadges = allBadges.filter(
     (b) => selectedCategory === "all" || b.category === selectedCategory
   );
-  const badgePageSize = 10;
-  const badgeTotalPages = Math.max(1, Math.ceil(filteredBadges.length / badgePageSize));
-  const pagedBadges = useMemo(() => {
-    const start = (badgePage - 1) * badgePageSize;
-    return filteredBadges.slice(start, start + badgePageSize);
-  }, [filteredBadges, badgePage]);
+  const {
+    page: badgePage,
+    setPage: setBadgePage,
+    totalPages: badgeTotalPages,
+    pageItems: pagedBadges,
+  } = usePaged(filteredBadges, 10, [selectedCategory]);
+  const badgeListRef = useRef<HTMLUListElement>(null);
 
   // Count earned badges
   const earnedCount = allBadges.filter((b) => b.earned).length || 0;
   const totalCount = allBadges.length || 0;
+  const collectionPercent = Math.round((earnedCount / Math.max(totalCount, 1)) * 100);
 
   const soundBasePath = "/sounds/badges_new";
   const badgeSounds = [
@@ -171,454 +177,200 @@ export default function Badges() {
     }
   }, []);
 
-  const handleBadgeClick = (badge: any, badgeIndex: number) => {
+  const handleBadgeClick = (badge: any, badgeIndex: number, opener: HTMLButtonElement) => {
+    openerRef.current = opener;
     setSelectedBadge(badge);
+    setDetailOpen(true);
     if (badge.earned) {
-      const soundUrl = getBadgeSoundUrl(badgeIndex + 1);
-      playSound(soundUrl);
-      setShowUnlockAnimation(true);
-      setTimeout(() => setShowUnlockAnimation(false), 1200);
+      playSound(getBadgeSoundUrl(badgeIndex + 1));
     }
   };
 
-  useEffect(() => {
-    setPortalReady(true);
-  }, []);
+  // After every hook: an early return between hooks breaks the rules of hooks.
+  if (!authLoading && !isAuthenticated) {
+    return <Redirect to="/" />;
+  }
 
-  useEffect(() => {
-    setBadgePage(1);
-  }, [selectedCategory]);
-
-  useEffect(() => {
-    if (badgePage > badgeTotalPages) setBadgePage(badgeTotalPages);
-  }, [badgePage, badgeTotalPages]);
-
-  useEffect(() => {
-    if (!selectedBadge) return;
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [selectedBadge]);
+  // `isPending` also covers the queries still disabled while auth loads.
+  const loading =
+    authLoading ||
+    progressQuery.isPending ||
+    definitionsQuery.isPending ||
+    userAchievementsQuery.isPending;
+  const failed = !loading && failedQueries.length > 0;
 
   return (
-    <AppLayout showBubbles={true} bubbleIntensity="low">
-      <div className="compact-shell dark space-y-4 lg:space-y-3 pb-20 lg:pb-4">
-      {/* Hidden audio element for badge sounds (dynamic source) */}
-      <audio ref={audioRef} preload="auto" />
+    <AppLayout>
+      <div className="space-y-4">
+        {/* Hidden audio element for badge sounds (dynamic source) */}
+        <audio ref={audioRef} preload="auto" />
 
-      {/* Custom CSS for 3D rotation and unlock animations */}
-      <style>{`
-        @keyframes badge-rotate {
-          0% { transform: rotateY(0deg); }
-          100% { transform: rotateY(360deg); }
-        }
-
-        @keyframes badge-unlock {
-          0% { 
-            transform: scale(0.5) rotate(0deg); 
-            opacity: 0;
-          }
-          50% { 
-            transform: scale(1.2) rotate(180deg); 
-            opacity: 1;
-          }
-          100% { 
-            transform: scale(1) rotate(360deg); 
-            opacity: 1;
-          }
-        }
-
-        @keyframes sparkle {
-          0%, 100% { 
-            transform: scale(0) rotate(0deg); 
-            opacity: 0;
-          }
-          50% { 
-            transform: scale(1) rotate(180deg); 
-            opacity: 1;
-          }
-        }
-
-        .badge-3d {
-          transform-style: preserve-3d;
-          transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-        }
-
-        .badge-3d:hover {
-          animation: badge-rotate 1s ease-in-out;
-        }
-
-        .badge-unlock-animation {
-          animation: badge-unlock 1.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        .sparkle-particle {
-          position: absolute;
-          width: 8px;
-          height: 8px;
-          background: radial-gradient(circle, #fff 0%, transparent 70%);
-          border-radius: 50%;
-          pointer-events: none;
-          animation: sparkle 1s ease-out forwards;
-        }
-
-        .sparkle-particle:nth-child(1) { top: 10%; left: 10%; animation-delay: 0s; }
-        .sparkle-particle:nth-child(2) { top: 20%; right: 15%; animation-delay: 0.1s; }
-        .sparkle-particle:nth-child(3) { bottom: 20%; left: 20%; animation-delay: 0.2s; }
-        .sparkle-particle:nth-child(4) { bottom: 15%; right: 10%; animation-delay: 0.15s; }
-        .sparkle-particle:nth-child(5) { top: 50%; left: 5%; animation-delay: 0.25s; }
-        .sparkle-particle:nth-child(6) { top: 50%; right: 5%; animation-delay: 0.3s; }
-
-        .xp-bar-container {
-          width: 100%;
-          height: 10px;
-          border-radius: 999px;
-          overflow: hidden;
-          background: color-mix(in oklch, var(--card) 88%, black 12%);
-          border: 1px solid color-mix(in oklch, var(--border) 85%, transparent);
-          box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--border) 60%, transparent);
-        }
-
-        .xp-bar-fill {
-          height: 100%;
-          border-radius: 999px;
-          background:
-            linear-gradient(
-              90deg,
-              color-mix(in oklch, var(--electric-cyan) 90%, white 10%) 0%,
-              color-mix(in oklch, var(--chart-3) 92%, white 8%) 50%,
-              color-mix(in oklch, var(--electric-lime) 90%, white 10%) 100%
-            );
-          box-shadow:
-            0 0 18px color-mix(in oklch, var(--electric-cyan) 45%, transparent),
-            0 0 28px color-mix(in oklch, var(--electric-lime) 35%, transparent);
-          transition: width 0.45s ease;
-        }
-      `}</style>
-
-      <div className="space-y-5">
-        {/* Progress Overview Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="neon-card p-4"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Trophy className="h-5 w-5 text-[oklch(0.82_0.18_85)]" />
-              <span className="text-sm font-medium text-[oklch(0.95_0.01_220)]">Progresso Collezione</span>
+        {loading ? (
+          <Skeleton className="h-[132px] w-full rounded-2xl" aria-hidden />
+        ) : failed ? null : (
+          <section aria-labelledby={titleId} className="surface-panel p-4">
+            <h2 id={titleId} className="text-sm font-medium text-muted-foreground">
+              Collezione
+            </h2>
+            <div className="mt-2 flex items-end justify-between gap-4">
+              <Metric
+                size="lg"
+                value={formatInteger(earnedCount)}
+                unit={`di ${formatInteger(totalCount)}`}
+                label="Badge sbloccati"
+              />
+              <span className="font-display text-[28px] font-bold leading-none tabular-nums">
+                {collectionPercent}%
+              </span>
             </div>
-            <span className="text-sm font-bold text-[oklch(0.70_0.18_220)]">
-              {Math.round((earnedCount / Math.max(totalCount, 1)) * 100)}%
-            </span>
-          </div>
-          <div className="xp-bar-container">
-            <div 
-              className="xp-bar-fill" 
-              style={{ width: `${(earnedCount / Math.max(totalCount, 1)) * 100}%` }}
-            />
-          </div>
-        </motion.div>
+            <Progress value={collectionPercent} className="mt-4 h-2" aria-label="Collezione completata" />
+          </section>
+        )}
 
-        {/* Category Tabs */}
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(categoryLabels).map(([key, label]) => (
-            <button
-              key={key}
-              onClick={() => setSelectedCategory(key)}
-              className={`rounded-full px-2.5 py-1.5 text-xs font-medium border transition-colors sm:px-3 sm:py-2 sm:text-sm ${
-                selectedCategory === key
-                  ? "bg-primary text-primary-foreground border-primary/60 shadow-sm"
-                  : "bg-card/60 text-foreground/80 border-border/60 hover:bg-accent/40 hover:text-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Badge Grid */}
-        {isLoading || achievementsLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
-            {[...Array(12)].map((_, i) => (
-              <div key={i} className="flex flex-col items-center gap-3">
-                <Skeleton className="w-24 h-24 rounded-full bg-[oklch(0.20_0.03_250_/_0.55)]" />
-                <Skeleton className="h-4 w-24 bg-[oklch(0.20_0.03_250_/_0.55)]" />
-              </div>
+        <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
+          <TabsList aria-label="Categoria">
+            {Object.entries(categoryLabels).map(([key, label]) => (
+              <TabsTrigger
+                key={key}
+                value={key}
+                ref={key === selectedCategory ? selectedTabRef : undefined}
+              >
+                {label}
+              </TabsTrigger>
             ))}
-          </div>
-        ) : (
-          <motion.div 
-            layout
-            className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"
-          >
-            <AnimatePresence mode="popLayout">
-	              {pagedBadges?.map((badge, index) => {
-	                const isEarned = badge.earned;
-	                const colors = rarityColors[badge.rarity] || rarityColors.common;
-	                const badgeImageUrl =
-	                  typeof (badge as { image_url?: unknown }).image_url === "string"
-	                    ? (badge as { image_url: string }).image_url
-	                    : null;
-	                const pngPath = assetUrl(badgeImageUrl || getBadgeImageUrl(badge.code));
+          </TabsList>
+        </Tabs>
 
-                return (
-                  <motion.div
-                    key={badge.id}
-                    layout
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.8 }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => handleBadgeClick(badge, allBadges.indexOf(badge) >= 0 ? allBadges.indexOf(badge) : index)}
-                    className="cursor-pointer flex flex-col items-center"
+        {loading ? (
+          <LoadingSkeleton
+            label="Caricamento dei badge…"
+            count={10}
+            className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+            itemClassName="h-44 rounded-2xl"
+          />
+        ) : failed ? (
+          <LoadError onRetry={() => failedQueries.forEach((query) => void query.refetch())} />
+        ) : filteredBadges.length === 0 ? (
+          <p className="surface-panel p-4 text-sm text-muted-foreground">
+            Nessun badge in questa categoria.
+          </p>
+        ) : (
+          <ul ref={badgeListRef} aria-label="Badge" className="scroll-mt-20 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {pagedBadges.map((badge, index) => {
+              const isEarned = Boolean(badge.earned);
+              const position = allBadges.indexOf(badge);
+              return (
+                <li key={badge.id}>
+                  <button
+                    type="button"
+                    onClick={(event) =>
+                      handleBadgeClick(badge, position >= 0 ? position : index, event.currentTarget)
+                    }
+                    aria-label={badgeTileLabel(badge)}
+                    className="flex h-full w-full flex-col items-center gap-2 rounded-2xl border border-border bg-card p-3 text-center transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   >
-                    {/* Badge Container */}
-                    <div 
-                      className="w-32 h-32 sm:w-36 sm:h-36 flex items-center justify-center relative flex-shrink-0"
-                      style={isEarned ? {
-                        filter: `drop-shadow(0 0 20px ${colors.glow}) drop-shadow(0 0 40px ${colors.glow})`,
-                      } : {
-                        opacity: 0.4,
-                        filter: 'grayscale(100%)',
-                      }}
-                    >
-                      {isEarned && <div className="badge-spotlight" />}
-                      {/* Badge Image with 3D rotation */}
-                      <div className="relative z-10 w-full h-full flex items-center justify-center">
-                        {isEarned && pngPath ? (
-                          <img 
-                            src={pngPath} 
-                            alt={badge.name}
-                            className={`w-[86%] h-[86%] object-contain ${isEarned ? 'badge-3d' : ''}`}
-                            onContextMenu={(e) => e.preventDefault()}
-                            draggable={false}
-                            style={{ 
-                              WebkitTouchCallout: 'none',
-                              WebkitUserSelect: 'none',
-                              userSelect: 'none',
-                              touchAction: 'manipulation'
-                            }}
-                          />
-                        ) : (
-                          <div 
-                            className="w-20 h-20 rounded-full flex items-center justify-center relative"
-                            style={{
-                              background: 'oklch(0.18 0.03 250)',
-                              border: '2px dashed oklch(0.35 0.02 250)',
-                            }}
-                          >
-                            <Lock className="w-8 h-8 text-[oklch(0.40_0.02_250)]" />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    
-                    {/* Badge Name */}
-                    <p 
-                      className="text-center font-medium mt-3 text-sm leading-tight max-w-[100px]"
-                      style={{ 
-                        color: isEarned ? colors.text : 'oklch(0.45 0.02 250)',
-                      }}
+                    <span className="flex size-24 items-center justify-center">
+                      {isEarned ? (
+                        <img
+                          src={badgeImage(badge)}
+                          alt=""
+                          loading="lazy"
+                          draggable={false}
+                          onContextMenu={(e) => e.preventDefault()}
+                          className="size-full select-none object-contain"
+                        />
+                      ) : (
+                        <LockedBadge className="size-16" iconClassName="size-7" />
+                      )}
+                    </span>
+                    <span
+                      className={cn(
+                        "line-clamp-2 text-sm font-semibold leading-tight",
+                        isEarned ? "text-foreground" : "text-muted-foreground"
+                      )}
                     >
                       {badge.name}
-                    </p>
-                    
-                    {/* Progress Bar for Locked Badges */}
-                    {!isEarned && badge.progress > 0 && (
-                      <div className="w-16 mt-2">
-                        <div className="h-1 bg-[oklch(0.20_0.03_250_/_0.55)] rounded-full overflow-hidden">
-                          <div 
-                            className="h-full rounded-full"
-                            style={{ 
-                              width: `${badge.progress}%`,
-                              background: 'oklch(0.50 0.08 220)',
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </motion.div>
+                    </span>
+                    {!isEarned && badge.progress > 0 ? (
+                      <Progress value={badge.progress} className="h-1.5 w-16" aria-hidden />
+                    ) : null}
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         )}
-        {!isLoading && !achievementsLoading && filteredBadges.length > badgePageSize && (
-          <div className="mt-4 flex items-center justify-between rounded-xl border border-border/60 bg-card/50 px-3 py-2">
-            <p className="text-xs text-muted-foreground">
-              Pagina {badgePage} di {badgeTotalPages}
-            </p>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline-neon"
-                onClick={() => setBadgePage((prev) => Math.max(1, prev - 1))}
-                disabled={badgePage === 1}
-              >
-                Indietro
-              </Button>
-              <Button
-                size="sm"
-                variant="outline-neon"
-                onClick={() => setBadgePage((prev) => Math.min(badgeTotalPages, prev + 1))}
-                disabled={badgePage === badgeTotalPages}
-              >
-                Avanti
-              </Button>
-            </div>
-          </div>
-        )}
+        {!loading && !failed ? (
+          <Pager
+            page={badgePage}
+            totalPages={badgeTotalPages}
+            onChange={setBadgePage}
+            listRef={badgeListRef}
+            label="Pagine dei badge"
+          />
+        ) : null}
 
-        {/* Badge Detail Modal (rendered in portal to stay centered in viewport) */}
-        {portalReady &&
-          createPortal(
-            <AnimatePresence>
-              {selectedBadge && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-                  onClick={() => setSelectedBadge(null)}
-                >
-                  <motion.div
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.8, opacity: 0 }}
-                    className="neon-card p-6 max-w-sm w-full relative overflow-hidden"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {/* Sparkle particles for unlock animation */}
-                    {selectedBadge.earned && showUnlockAnimation && (
-                      <>
-                        <div className="sparkle-particle" />
-                        <div className="sparkle-particle" />
-                        <div className="sparkle-particle" />
-                        <div className="sparkle-particle" />
-                        <div className="sparkle-particle" />
-                        <div className="sparkle-particle" />
-                      </>
-                    )}
-
-                    {/* Close button */}
-                    <button
-                      onClick={() => setSelectedBadge(null)}
-                      className="absolute top-4 right-4 text-[oklch(0.60_0.03_220)] hover:text-[oklch(0.80_0.03_220)] z-10"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-
-                    {/* Badge Display */}
-                    <div className="flex flex-col items-center text-center relative">
-                      {/* Large Badge */}
-                      <div className="w-48 h-48 flex items-center justify-center relative mb-4">
-                        <div
-                          className={`w-full h-full flex items-center justify-center ${
-                            selectedBadge.earned && showUnlockAnimation ? "badge-unlock-animation" : ""
-                          }`}
-                          style={
-                            selectedBadge.earned
-                              ? {
-                                  filter: `drop-shadow(0 0 30px ${rarityColors[selectedBadge.rarity]?.glow || rarityColors.common.glow}) drop-shadow(0 0 60px ${rarityColors[selectedBadge.rarity]?.glow || rarityColors.common.glow})`,
-                                }
-                              : {}
-                          }
-                        >
-                          {selectedBadge.earned ? (
-                            <img
-                              src={assetUrl(
-                                (typeof (selectedBadge as { image_url?: unknown }).image_url === "string"
-                                  ? (selectedBadge as { image_url: string }).image_url
-                                  : null) || getBadgeImageUrl(selectedBadge.code),
-                              )}
-                              alt={selectedBadge.name}
-                              className="w-full h-full object-contain"
-                              onContextMenu={(e) => e.preventDefault()}
-                              draggable={false}
-                              style={{
-                                WebkitTouchCallout: "none",
-                                WebkitUserSelect: "none",
-                                userSelect: "none",
-                                touchAction: "manipulation",
-                              }}
-                            />
-                          ) : (
-                            <div
-                              className="w-32 h-32 rounded-full flex items-center justify-center"
-                              style={{
-                                background: "oklch(0.18 0.03 250)",
-                                border: "3px dashed oklch(0.35 0.02 250)",
-                              }}
-                            >
-                              <Lock className="w-16 h-16 text-[oklch(0.40_0.02_250)]" />
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Badge Info */}
-                      <h3
-                        className="text-xl font-bold mb-1"
-                        style={{ color: rarityColors[selectedBadge.rarity]?.text || rarityColors.common.text }}
-                      >
-                        {selectedBadge.name}
-                      </h3>
-
-                      <span
-                        className="text-xs font-medium px-3 py-1 rounded-full mb-3 flex items-center gap-1"
-                        style={{
-                          background: rarityColors[selectedBadge.rarity]?.bg || rarityColors.common.bg,
-                          color: rarityColors[selectedBadge.rarity]?.text || rarityColors.common.text,
-                        }}
-                      >
-                        {selectedBadge.rarity === "legendary" && <Sparkles className="w-3 h-3" />}
-                        {rarityLabels[selectedBadge.rarity] || "Comune"}
-                        {selectedBadge.rarity === "legendary" && <Sparkles className="w-3 h-3" />}
-                      </span>
-
-                      <p className="text-[oklch(0.70_0.03_220)] text-sm mb-2">{selectedBadge.description}</p>
-                      {selectedBadge.requirementType === "single_session_distance_km" &&
-                        typeof selectedBadge.bestSessionKm === "number" && (
-                          <p className="text-[oklch(0.55_0.03_220)] text-xs mb-3">
-                            Miglior sessione: {selectedBadge.bestSessionKm.toFixed(2)} km
-                          </p>
-                        )}
-
-                      {/* Progress or Earned Date */}
-                      {selectedBadge.earned ? (
-                        <div className="text-[oklch(0.60_0.03_220)] text-xs">
-                          Sbloccato il {new Date(selectedBadge.earnedAt).toLocaleDateString("it-IT")}
-                        </div>
-                      ) : (
-                        <div className="w-full">
-                          <div className="flex justify-between text-xs mb-1">
-                            <span className="text-[oklch(0.60_0.03_220)]">Progresso</span>
-                            <span className="text-[oklch(0.70_0.18_220)]">{selectedBadge.progress}%</span>
-                          </div>
-                          <div className="h-2 bg-[oklch(0.20_0.03_250_/_0.55)] rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all duration-500"
-                              style={{
-                                width: `${selectedBadge.progress}%`,
-                                background: "linear-gradient(90deg, oklch(0.50 0.08 220), oklch(0.70 0.18 220))",
-                              }}
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                </motion.div>
+        <Dialog open={detailOpen && selectedBadge != null} onOpenChange={setDetailOpen}>
+          {selectedBadge ? (
+            <DialogContent
+              className="max-w-sm"
+              onCloseAutoFocus={(event) => {
+                // Opened from a tile, not a DialogTrigger: give focus back to that tile.
+                event.preventDefault();
+                const opener = openerRef.current;
+                (opener?.isConnected ? opener : selectedTabRef.current)?.focus();
+              }}
+            >
+              <DialogHeader className="items-center text-center sm:text-center">
+                <span className="mb-2 flex size-40 items-center justify-center">
+                  {selectedBadge.earned ? (
+                    <img
+                      src={badgeImage(selectedBadge)}
+                      alt=""
+                      draggable={false}
+                      onContextMenu={(e) => e.preventDefault()}
+                      className="size-full select-none object-contain"
+                    />
+                  ) : (
+                    <LockedBadge className="size-28" iconClassName="size-12" />
+                  )}
+                </span>
+                <DialogTitle className="text-xl font-bold">{selectedBadge.name}</DialogTitle>
+                <Chip tone={selectedBadge.rarity === "legendary" ? "xp" : "neutral"}>
+                  {rarityLabels[selectedBadge.rarity] || "Comune"}
+                </Chip>
+                <DialogDescription>{selectedBadge.description}</DialogDescription>
+              </DialogHeader>
+              {selectedBadge.requirementType === "single_session_distance_km" &&
+              typeof selectedBadge.bestSessionKm === "number" ? (
+                <p className="text-center text-sm text-muted-foreground">
+                  Miglior nuotata: {kmFormat.format(selectedBadge.bestSessionKm)} km
+                </p>
+              ) : null}
+              {selectedBadge.earned ? (
+                selectedBadge.earnedAt ? (
+                  <p className="text-center text-sm text-muted-foreground">
+                    Sbloccato il {formatDayMonthYear(selectedBadge.earnedAt)}
+                  </p>
+                ) : null
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-baseline justify-between text-sm">
+                    <span className="text-muted-foreground">Progresso</span>
+                    <span className="font-display text-lg font-bold tabular-nums">
+                      {Math.round(Number(selectedBadge.progress) || 0)}%
+                    </span>
+                  </div>
+                  <Progress
+                    value={Number(selectedBadge.progress) || 0}
+                    className="h-2"
+                    aria-label={`Progresso: ${selectedBadge.name}`}
+                  />
+                </div>
               )}
-            </AnimatePresence>,
-            document.body
-          )}
-      </div>
-
+            </DialogContent>
+          ) : null}
+        </Dialog>
       </div>
     </AppLayout>
   );

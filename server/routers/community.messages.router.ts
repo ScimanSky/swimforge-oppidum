@@ -1,3 +1,4 @@
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { protectedProcedure, router, TRPCError, z } from "./_shared";
 import {
   checkForwardRecipientAllowed,
@@ -64,7 +65,7 @@ export function createCommunityMessagesRouter(input: { requirePostReadable: Requ
         const { sql } = await import("drizzle-orm");
         const db = await getDb();
         if (!db) {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: DB_UNAVAILABLE_ERR_MSG });
         }
 
         await requirePostReadable(ctx.user.id, input.targetId);

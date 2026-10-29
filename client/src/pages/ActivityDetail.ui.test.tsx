@@ -1,0 +1,455 @@
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import ActivityDetail from "./ActivityDetail";
+
+const state = vi.hoisted(() => ({
+  activity: null as any,
+  isLoading: false,
+  invalidateGet: vi.fn(),
+  invalidateList: vi.fn(),
+  invalidateFeed: vi.fn(),
+  invalidateUnshared: vi.fn(),
+  toggleShareCalls: [] as Array<{ activityId: number; share: boolean }>,
+  toggleShareOptions: null as any,
+}));
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+vi.mock("@/components/ui/switch", () => ({
+  Switch: ({ id, checked, onCheckedChange, disabled }: any) => (
+    <input
+      id={id}
+      type="checkbox"
+      role="switch"
+      checked={!!checked}
+      disabled={!!disabled}
+      onChange={e => onCheckedChange?.(e.currentTarget.checked)}
+    />
+  ),
+}));
+
+vi.mock("@/lib/trpc", () => ({
+  trpc: {
+    activities: {
+      get: {
+        useQuery: () => ({ data: state.activity, isLoading: state.isLoading }),
+      },
+    },
+    community: {
+      toggleShare: {
+        useMutation: (options: any) => {
+          state.toggleShareOptions = options;
+          return {
+            mutate: (vars: { activityId: number; share: boolean }) => {
+              state.toggleShareCalls.push(vars);
+            },
+            isPending: false,
+          };
+        },
+      },
+    },
+    useUtils: () => ({
+      activities: {
+        get: { invalidate: state.invalidateGet },
+        list: { invalidate: state.invalidateList },
+      },
+      community: {
+        feed: { invalidate: state.invalidateFeed },
+        unsharedActivities: { invalidate: state.invalidateUnshared },
+      },
+    }),
+  },
+}));
+
+vi.mock("wouter", () => ({
+  useRoute: (pattern: string) => (pattern === "/track/:id" ? [true, { id: "5" }] : [false, null]),
+  Link: ({ href, children, ...rest }: any) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}));
+
+vi.mock("@/components/AppLayout", () => ({
+  default: ({ children }: any) => <div data-testid="app-layout">{children}</div>,
+}));
+
+vi.mock("@/components/social/ShareActivityPicker", () => ({
+  ShareActivityPicker: ({ open, initialActivityId, onShared }: any) => (
+    <div data-testid="share-picker-state">
+      {`open:${String(open)}|id:${initialActivityId ?? "null"}`}
+      <button type="button" onClick={() => onShared?.(initialActivityId)}>
+        simulate-shared
+      </button>
+    </div>
+  ),
+}));
+
+const lap = (id: number, lapIndex: number, distanceMeters: number, durationSeconds: number) => ({
+  id,
+  lapIndex,
+  distanceMeters,
+  durationSeconds,
+  movingDurationSeconds: null,
+  elapsedDurationSeconds: null,
+  averageSpeedMps: null,
+  maxSpeedMps: null,
+  averageMovingSpeedMps: null,
+  averageSwolf: null,
+  averageStrokes: null,
+  totalNumberOfStrokes: null,
+  averageSwimCadence: null,
+  calories: null,
+  avgHeartRate: null,
+  maxHeartRate: null,
+  numberOfActiveLengths: distanceMeters > 0 ? 2 : 0,
+  strokeType: distanceMeters > 0 ? "FREESTYLE" : null,
+  startTimeGmt: null,
+});
+
+const length = (lapId: number, lengthIndex: number, durationSeconds: number) => ({
+  lapId,
+  lengthIndex,
+  distanceMeters: 50,
+  durationSeconds,
+  averageSpeedMps: null,
+  maxSpeedMps: null,
+  averageSwolf: null,
+  totalNumberOfStrokes: null,
+  avgHeartRate: null,
+  maxHeartRate: null,
+  strokeType: "FREESTYLE",
+  startTimeGmt: null,
+});
+
+const session = (overrides: Record<string, unknown> = {}) => ({
+  id: 5,
+  activityName: "Soglia 10×200",
+  activityDate: new Date(2026, 9, 26, 10, 47),
+  activitySource: "garmin",
+  isOpenWater: false,
+  poolLengthMeters: 25,
+  distanceMeters: 3200,
+  durationSeconds: 3720,
+  avgPacePer100m: 112,
+  avgHeartRate: 142,
+  maxHeartRate: null,
+  calories: 540,
+  xpEarned: 180,
+  shareToFeed: false,
+  hrZone1Seconds: 80,
+  hrZone2Seconds: 220,
+  hrZone3Seconds: 380,
+  hrZone4Seconds: 240,
+  hrZone5Seconds: 80,
+  rawData: null,
+  garminLaps: [lap(11, 1, 100, 110), lap(12, 2, 100, 100), lap(13, 3, 0, 30)],
+  garminLengths: [length(11, 1, 55), length(11, 2, 55), length(12, 1, 50), length(12, 2, 50)],
+  ...overrides,
+});
+
+describe("ActivityDetail (Corsia)", () => {
+  beforeEach(() => {
+    state.activity = session();
+    state.isLoading = false;
+    state.invalidateGet.mockReset();
+    state.invalidateList.mockReset();
+    state.invalidateFeed.mockReset();
+    state.invalidateUnshared.mockReset();
+    state.toggleShareCalls = [];
+    state.toggleShareOptions = null;
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it("header: date, place and source, the name as h2 (no h1), XP chip", () => {
+    render(<ActivityDetail />);
+
+    expect(screen.getByText("lun 26 ott · 10:47 · Vasca 25 m · Garmin")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Soglia 10×200" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    expect(screen.getByText("+180 XP")).toBeInTheDocument();
+  });
+
+  const metricCells = () =>
+    within(screen.getByRole("list", { name: "Metriche della sessione" }))
+      .getAllByRole("listitem")
+      .map(cell => cell.textContent);
+
+  it("metric grid shows only the metrics with data, never a «—»", () => {
+    render(<ActivityDetail />);
+
+    expect(metricCells()).toEqual([
+      "3,2 km Distanza",
+      "1:02 h Durata",
+      "1:52 /100 Passo medio",
+      "142 bpm FC media",
+      "540 kcal Calorie",
+    ]);
+    expect(screen.queryByText("FC massima")).not.toBeInTheDocument();
+    expect(screen.queryByText("—")).not.toBeInTheDocument();
+  });
+
+  it("SWOLF joins the grid in order; at most six cells (2×3), so Calorie goes with all seven", () => {
+    state.activity = session({ avgSwolf: 38, maxHeartRate: 171 });
+
+    render(<ActivityDetail />);
+
+    expect(metricCells()).toEqual([
+      "3,2 km Distanza",
+      "1:02 h Durata",
+      "1:52 /100 Passo medio",
+      "38 SWOLF",
+      "142 bpm FC media",
+      "171 bpm FC massima",
+    ]);
+    expect(screen.queryByText("Calorie")).not.toBeInTheDocument();
+  });
+
+  it("without heart-rate zones or lap paces the charts are not drawn", () => {
+    state.activity = session({
+      hrZone1Seconds: null,
+      hrZone2Seconds: 0,
+      hrZone3Seconds: null,
+      hrZone4Seconds: null,
+      hrZone5Seconds: null,
+      garminLaps: [],
+      garminLengths: [],
+    });
+
+    render(<ActivityDetail />);
+
+    expect(screen.queryByText("Zone cardio")).not.toBeInTheDocument();
+    expect(screen.queryByText("Passo per ripetuta")).not.toBeInTheDocument();
+  });
+
+  it("cardio zones: percentages per zone, the dominant one strong and announced", () => {
+    render(<ActivityDetail />);
+
+    const zones = screen.getByRole("region", { name: "Zone cardio" });
+    const items = within(zones).getAllByRole("listitem");
+    expect(items.map(item => item.textContent)).toEqual([
+      "Z1 8%",
+      "Z2 22%",
+      "Z3 38%, prevalente",
+      "Z4 24%",
+      "Z5 8%",
+    ]);
+    expect(items[2].querySelector("strong")).toHaveTextContent("Z3 38%, prevalente");
+  });
+
+  it("pace per repeat names the fastest repeat (recovery left out)", () => {
+    render(<ActivityDetail />);
+
+    const pace = screen.getByRole("region", { name: "Passo per ripetuta" });
+    expect(within(pace).getByText("Più veloce: rip. 2 · 1:40")).toBeInTheDocument();
+  });
+
+  it("the feed switch toggles sharing of this activity and refreshes it", async () => {
+    render(<ActivityDetail />);
+
+    const toggle = screen.getByRole("switch", { name: "Condividi nel feed" });
+    expect(toggle).not.toBeChecked();
+    await userEvent.click(toggle);
+    expect(state.toggleShareCalls).toEqual([{ activityId: 5, share: true }]);
+
+    await state.toggleShareOptions.onSuccess(undefined, { activityId: 5, share: true });
+    expect(state.invalidateGet).toHaveBeenCalledWith({ id: 5 });
+    expect(state.invalidateList).toHaveBeenCalled();
+    expect(state.invalidateFeed).toHaveBeenCalled();
+    expect(state.invalidateUnshared).toHaveBeenCalled();
+  });
+
+  it("a shared activity can be un-shared from the switch", async () => {
+    state.activity = session({ shareToFeed: true });
+
+    render(<ActivityDetail />);
+
+    const toggle = screen.getByRole("switch", { name: "Condividi nel feed" });
+    expect(toggle).toBeChecked();
+    await userEvent.click(toggle);
+    expect(state.toggleShareCalls).toEqual([{ activityId: 5, share: false }]);
+  });
+
+  it("«Condividi con foto o commento» opens the picker on this activity, only when not shared", async () => {
+    render(<ActivityDetail />);
+
+    expect(screen.getByTestId("share-picker-state")).toHaveTextContent("open:false|id:5");
+    await userEvent.click(screen.getByRole("button", { name: "Condividi con foto o commento" }));
+    expect(screen.getByTestId("share-picker-state")).toHaveTextContent("open:true|id:5");
+
+    await userEvent.click(screen.getByRole("button", { name: "simulate-shared" }));
+    expect(state.invalidateGet).toHaveBeenCalledWith({ id: 5 });
+    expect(state.invalidateList).toHaveBeenCalled();
+
+    cleanup();
+    state.activity = session({ shareToFeed: true });
+    render(<ActivityDetail />);
+    expect(
+      screen.queryByRole("button", { name: "Condividi con foto o commento" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("«Coach AI» is a labelled link to the coach, not to a session it would not analyse", () => {
+    render(<ActivityDetail />);
+
+    const coach = screen.getByRole("link", { name: "Coach AI" });
+    expect(coach).toHaveAttribute("href", "/coach");
+    expect(coach).toHaveTextContent("Coach AI");
+    expect(coach.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  it("laps are selectable and the repeats view lists repeats and their lengths", async () => {
+    render(<ActivityDetail />);
+
+    const second = screen.getByRole("button", { name: /Giro 2/ });
+    await userEvent.click(second);
+    expect(second).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Giro 2 selezionato")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("tab", { name: "Ripetute" }));
+    const repeat = screen.getByRole("button", { name: /^Ripetuta 1(?!\d)/, expanded: false });
+    await userEvent.click(repeat);
+    expect(repeat).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByRole("button", { name: /Vasca 1\.2/ }).length).toBeGreaterThan(0);
+  });
+
+  it("segments: distances always in metres and the «/100» pace of the metrics, rounded on total seconds", () => {
+    state.activity = session({
+      garminLaps: [lap(11, 1, 100, 119.6), lap(12, 2, 1500, 1500), lap(13, 3, 0, 30)],
+      garminLengths: [],
+    });
+
+    render(<ActivityDetail />);
+
+    const laps = screen.getByRole("region", { name: "Giri" });
+    expect(within(laps).getByRole("button", { name: /^Giro 1/ })).toHaveTextContent(
+      "100 m · 2:00 · 2:00 /100"
+    );
+    expect(within(laps).getByRole("button", { name: /^Giro 2/ })).toHaveTextContent(
+      "1.500 m · 25:00 · 1:40 /100"
+    );
+    expect(screen.queryByText(/1:60|\/100m|1,50 km|1,5 km/)).not.toBeInTheDocument();
+  });
+
+  it("a segment of 1.250 m is never rounded to 0.1 km: rows, panel and repeats table", async () => {
+    state.activity = session({
+      garminLaps: [lap(11, 1, 1250, 1250), lap(13, 2, 0, 30)],
+      garminLengths: [],
+    });
+
+    render(<ActivityDetail />);
+
+    const laps = screen.getByRole("region", { name: "Giri" });
+    expect(within(laps).getByRole("button", { name: /^Giro 1/ })).toHaveTextContent("1.250 m");
+    expect(within(laps).getByText("Giro 1 selezionato").parentElement).toHaveTextContent(
+      /1\.250\s*m\s*Distanza/
+    );
+    expect(screen.getByRole("region", { name: "Frazioni" })).toHaveTextContent("1.250 m");
+
+    await userEvent.click(screen.getByRole("tab", { name: "Ripetute" }));
+    expect(screen.getAllByText(/1\.250 m/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/1,3 km|1,2 km/)).not.toBeInTheDocument();
+    // The session summary keeps the km rule.
+    expect(metricCells()[0]).toBe("3,2 km Distanza");
+  });
+
+  it("summary distance below 1 km is in metres", () => {
+    state.activity = session({ distanceMeters: 800 });
+
+    render(<ActivityDetail />);
+
+    expect(metricCells()[0]).toBe("800 m Distanza");
+  });
+
+  it("«Passo migliore» is never the average pace: «—» in the table, left out of the panel", async () => {
+    render(<ActivityDetail />);
+    await userEvent.click(screen.getByRole("tab", { name: "Ripetute" }));
+
+    const table = screen.getByRole("table");
+    const headers = within(table)
+      .getAllByRole("columnheader")
+      .map(header => header.textContent);
+    const cell = (row: HTMLElement, column: string) =>
+      within(row).getAllByRole("cell")[headers.indexOf(column)];
+    const firstRepeat = within(table).getAllByRole("row")[1];
+    expect(cell(firstRepeat, "Distanza")).toHaveTextContent("100 m");
+    expect(cell(firstRepeat, "Passo medio")).toHaveTextContent("1:50 /100");
+    expect(cell(firstRepeat, "Passo migliore")).toHaveTextContent("—");
+
+    const panel = screen.getByRole("region", { name: "Metriche selezionate" });
+    expect(within(panel).queryByText("Passo migliore")).not.toBeInTheDocument();
+  });
+
+  it("«Passo migliore» from the top speed when present", async () => {
+    state.activity = session({
+      garminLaps: [{ ...lap(11, 1, 100, 110), maxSpeedMps: 1 }, lap(12, 2, 100, 100)],
+      garminLengths: [],
+    });
+
+    render(<ActivityDetail />);
+    await userEvent.click(screen.getByRole("tab", { name: "Ripetute" }));
+
+    const panel = screen.getByRole("region", { name: "Metriche selezionate" });
+    expect(within(panel).getByText("Passo migliore")).toBeInTheDocument();
+    expect(within(panel).getByText("1:40 /100")).toBeInTheDocument();
+  });
+
+  it("table rows are selectable by keyboard: a button in the first cell, pressed when selected", async () => {
+    const user = userEvent.setup();
+    render(<ActivityDetail />);
+    await user.click(screen.getByRole("tab", { name: "Ripetute" }));
+
+    const table = within(screen.getByRole("table"));
+    const first = table.getByRole("button", { name: "Ripetuta 1" });
+    const second = table.getByRole("button", { name: "Ripetuta 2" });
+    expect(first).toHaveAttribute("aria-pressed", "true");
+    expect(second).toHaveAttribute("aria-pressed", "false");
+
+    second.focus();
+    await user.keyboard("{Enter}");
+    expect(second).toHaveAttribute("aria-pressed", "true");
+    expect(first).toHaveAttribute("aria-pressed", "false");
+    const panel = screen.getByRole("region", { name: "Metriche selezionate" });
+    expect(within(panel).getByText("Ripetuta 2")).toBeInTheDocument();
+
+    await user.click(table.getByRole("button", { name: "Vasche della ripetuta 2" }));
+    const length = table.getByRole("button", { name: "Vasca 2.1" });
+    length.focus();
+    await user.keyboard(" ");
+    expect(length).toHaveAttribute("aria-pressed", "true");
+    expect(second).toHaveAttribute("aria-pressed", "false");
+    expect(within(panel).getByText("Vasca 2.1")).toBeInTheDocument();
+  });
+
+  it("recovery repeats are titled «Recupero», never «Ripetuta N»", async () => {
+    render(<ActivityDetail />);
+    await userEvent.click(screen.getByRole("tab", { name: "Ripetute" }));
+
+    const recovery = screen.getByRole("button", { name: /^Recupero/, expanded: false });
+    expect(recovery).toHaveTextContent(/^Recupero0:30$/);
+    expect(screen.queryByRole("button", { name: /^Ripetuta 3/ })).not.toBeInTheDocument();
+  });
+
+  it("segment rows show the stroke once (title or chip, not both)", () => {
+    render(<ActivityDetail />);
+
+    const splits = within(screen.getByRole("region", { name: "Frazioni" }));
+    const split = splits.getByRole("button", { name: /^Frazione 1/ });
+    expect(within(split).getAllByText(/Stile libero/)).toHaveLength(1);
+    const laps = within(screen.getByRole("region", { name: "Giri" }));
+    const recovery = laps.getByRole("button", { name: /^Recupero/ });
+    expect(within(recovery).getAllByText(/Recupero/)).toHaveLength(1);
+  });
+
+  it("shows the not-found state", () => {
+    state.activity = null;
+
+    render(<ActivityDetail />);
+
+    expect(screen.getByText("Attività non trovata.")).toBeInTheDocument();
+  });
+});

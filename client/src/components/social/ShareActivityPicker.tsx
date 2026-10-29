@@ -275,10 +275,11 @@ export function ShareActivityPicker({
                   resetComposer()
                 }}
                 className="text-muted-foreground hover:text-foreground"
+                aria-label="Torna alle attività"
               >
-                <ChevronLeft className="size-5" />
+                <ChevronLeft className="size-5" aria-hidden />
               </button>
-              <SheetTitle>Condividi attivita</SheetTitle>
+              <SheetTitle>Condividi attività</SheetTitle>
             </div>
           ) : (
             <>
@@ -309,8 +310,8 @@ export function ShareActivityPicker({
             {firstLinkInCaption ? <LinkPreviewCard url={firstLinkInCaption} /> : null}
 
             <div className="flex items-center justify-between gap-2">
-              <Button type="button" variant="outline-neon" size="sm" className="gap-2" onClick={() => mediaInputRef.current?.click()}>
-                <ImagePlus className="size-4" />
+              <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => mediaInputRef.current?.click()}>
+                <ImagePlus className="size-4" aria-hidden />
                 Aggiungi foto/video
               </Button>
               <span className="text-xs text-muted-foreground">
@@ -341,10 +342,10 @@ export function ShareActivityPicker({
                     <button
                       type="button"
                       onClick={() => removeMedia(item.id)}
-                      className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white"
+                      className="absolute right-1 top-1 rounded-full border border-border bg-background/90 p-1 text-foreground"
                       aria-label="Rimuovi media"
                     >
-                      <X className="size-3.5" />
+                      <X className="size-3.5" aria-hidden />
                     </button>
                   </div>
                 ))}
@@ -353,7 +354,7 @@ export function ShareActivityPicker({
 
             <div className="space-y-2">
               <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                <AtSign className="size-3.5" />
+                <AtSign className="size-3.5" aria-hidden />
                 Tagga amici
               </label>
               <Input
@@ -379,7 +380,7 @@ export function ShareActivityPicker({
                         </Avatar>
                         <div className="min-w-0">
                           <p className="truncate text-xs font-medium">{user.name || "Utente"}</p>
-                          <p className="truncate text-[11px] text-muted-foreground">@{user.username || `u${user.userId}`}</p>
+                          <p className="truncate text-xs text-muted-foreground">@{user.username || `u${user.userId}`}</p>
                         </div>
                       </button>
                     ))
@@ -391,8 +392,13 @@ export function ShareActivityPicker({
                   {taggedUsers.map((user) => (
                     <span key={user.userId} className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-card/50 px-2 py-1 text-xs">
                       @{user.username || user.name || `u${user.userId}`}
-                      <button type="button" onClick={() => removeTaggedUser(user.userId)} className="text-muted-foreground hover:text-foreground">
-                        <X className="size-3" />
+                      <button
+                        type="button"
+                        onClick={() => removeTaggedUser(user.userId)}
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label={`Rimuovi @${user.username || user.name || `u${user.userId}`}`}
+                      >
+                        <X className="size-3" aria-hidden />
                       </button>
                     </span>
                   ))}
@@ -403,12 +409,12 @@ export function ShareActivityPicker({
             {hashtags.length > 0 && (
               <div className="rounded-xl border border-border/70 bg-background/40 p-2">
                 <p className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
-                  <Hash className="size-3.5" />
+                  <Hash className="size-3.5" aria-hidden />
                   Hashtag rilevati
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {hashtags.map((tag) => (
-                    <span key={tag} className="rounded-full bg-card/60 px-2 py-0.5 text-[11px] text-[var(--electric-cyan)]">
+                    <span key={tag} className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-action-text">
                       #{tag}
                     </span>
                   ))}
@@ -417,7 +423,7 @@ export function ShareActivityPicker({
             )}
 
             <Button
-              variant="neon"
+              variant="default"
               onClick={() => void handleShare()}
               disabled={isPending}
               className="w-full"
@@ -431,8 +437,8 @@ export function ShareActivityPicker({
               <div className="flex justify-center py-8 text-muted-foreground">Caricamento...</div>
             ) : !activities?.length ? (
               <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
-                <Waves className="size-8 opacity-50" />
-                <p>Nessuna attivita recente da condividere</p>
+                <Waves className="size-8 opacity-50" aria-hidden />
+                <p>Nessuna attività recente da condividere</p>
               </div>
             ) : (
               <div className="flex flex-col gap-2">
@@ -444,10 +450,10 @@ export function ShareActivityPicker({
                       setSelectedId(activity.id)
                       resetComposer()
                     }}
-                    className="flex items-center gap-3 rounded-2xl border border-border/80 bg-background/60 p-4 text-left transition-colors hover:bg-card/60"
+                    className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 text-left transition-colors hover:bg-raised"
                   >
-                    <div className="flex size-10 items-center justify-center rounded-xl bg-[color-mix(in_oklch,var(--electric-cyan)_15%,transparent)]">
-                      <Waves className="size-5 text-[var(--electric-cyan)]" />
+                    <div className="flex size-10 items-center justify-center rounded-xl bg-primary/15">
+                      <Waves className="size-5 text-action-text" aria-hidden />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-medium">

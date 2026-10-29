@@ -61,21 +61,26 @@ describe("buildNotificationPush", () => {
 });
 
 describe("buildDirectMessagePush", () => {
-  it("uses the sender name as title and a 100 char preview as body", () => {
+  it("uses the sender name as title and a 100 char preview as body; a tap opens that chat", () => {
     const long = "a".repeat(150);
-    const push = buildDirectMessagePush({ senderName: "Ada", content: long, messageType: "text" });
+    const push = buildDirectMessagePush({ senderId: 3, senderName: "Ada", content: long, messageType: "text" });
     expect(push.title).toBe("Ada");
     expect(push.body).toBe(`${"a".repeat(100)}…`);
-    expect(push.url).toBe("/messages");
+    expect(push.url).toBe("/messages?con=3");
   });
 
   it("describes forwarded posts and falls back when the name is missing", () => {
-    expect(buildDirectMessagePush({ senderName: null, content: "{}", messageType: "forward_post" })).toEqual({
+    expect(buildDirectMessagePush({ senderId: 3, senderName: null, content: "{}", messageType: "forward_post" })).toEqual({
       title: "Nuovo messaggio",
       body: "Ti ha inoltrato un post",
-      url: "/messages",
+      url: "/messages?con=3",
       tag: "dm",
     });
+  });
+
+  it("opens the conversation list when the sender id is not a valid id", () => {
+    expect(buildDirectMessagePush({ senderId: 0, senderName: "Ada", content: "ciao" }).url).toBe("/messages");
+    expect(buildDirectMessagePush({ senderId: Number.NaN, senderName: "Ada", content: "ciao" }).url).toBe("/messages");
   });
 });
 

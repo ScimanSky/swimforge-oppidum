@@ -10,6 +10,7 @@
  * - Reazioni avanzate ai post
  */
 
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { getDb } from "./db"
 import { 
   clubEvents, 
@@ -32,7 +33,7 @@ type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>
 
 async function requireDb(): Promise<DbClient> {
   const db = await getDb()
-  if (!db) throw new Error("Database not available")
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG)
   return db
 }
 
@@ -367,7 +368,12 @@ function pushDirectMessage(params: {
     const senderName = (sender?.rows[0] as { name?: string | null } | undefined)?.name ?? null
     await sendPushToUser(
       params.receiverId,
-      buildDirectMessagePush({ senderName, content: params.content, messageType: params.messageType })
+      buildDirectMessagePush({
+        senderId: params.senderId,
+        senderName,
+        content: params.content,
+        messageType: params.messageType,
+      })
     )
   })().catch(() => {
     // Push is best-effort.

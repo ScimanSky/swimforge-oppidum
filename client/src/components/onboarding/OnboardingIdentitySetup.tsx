@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { trpc } from "@/lib/trpc";
 import { type OnboardingRole, setOnboardingIdentityLocally } from "@/lib/onboarding";
 
@@ -83,56 +85,73 @@ export function OnboardingIdentitySetup({ userId, onComplete, onSkip }: Props) {
     onComplete(role);
   };
 
+  // Steps 2 and 3 appear after a choice: their title takes the focus (the chosen button is gone).
+  // A stable callback: React calls it when a title mounts, not again on every render.
+  const focusOnMount = useCallback(
+    (element: HTMLHeadingElement | null) => element?.focus({ preventScroll: true }),
+    [],
+  );
+
+  // The steps slide in from the side; with reduced motion they just swap.
+  const reduceMotion = usePrefersReducedMotion();
+  const stepMotion = reduceMotion
+    ? { initial: false as const, transition: { duration: 0 } }
+    : {
+        initial: { opacity: 0, x: 24 },
+        animate: { opacity: 1, x: 0 },
+        exit: { opacity: 0, x: -24 },
+        transition: { duration: 0.22 },
+      };
+
+  const optionClass =
+    "min-h-11 rounded-xl border border-border bg-raised px-4 py-3 text-left text-sm transition-colors hover:border-action-text focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
+
   return (
     <div className="flex flex-col gap-4">
-      {/* Progress bar */}
-      <div className="flex gap-1.5 px-1">
-        {STEP_LABELS.map((_, idx) => (
-          <div
-            key={idx}
-            className="h-1 flex-1 rounded-full transition-all duration-300"
-            style={{
-              background:
-                idx <= currentStep
-                  ? "var(--electric-cyan)"
-                  : "color-mix(in oklch, var(--border) 60%, transparent)",
-            }}
+      <div
+        role="progressbar"
+        aria-label="Configurazione"
+        aria-valuemin={1}
+        aria-valuemax={STEP_LABELS.length}
+        aria-valuenow={currentStep + 1}
+        aria-valuetext={`Passo ${currentStep + 1} di ${STEP_LABELS.length}: ${STEP_LABELS[currentStep]}`}
+        className="flex gap-1.5"
+      >
+        {STEP_LABELS.map((label, idx) => (
+          <span
+            key={label}
+            className={`h-1 flex-1 rounded-full transition-colors ${idx <= currentStep ? "bg-primary" : "bg-border"}`}
           />
         ))}
       </div>
 
-      <div className="text-xs uppercase tracking-[0.16em] text-[var(--electric-cyan)]">
-        Setup {currentStep + 1} di {STEP_LABELS.length}
-      </div>
+      <p className="text-xs font-semibold text-muted-foreground">
+        Passo {currentStep + 1} di {STEP_LABELS.length}
+      </p>
 
       <AnimatePresence mode="wait">
         {currentStep === 0 && (
           <motion.div
             key="role"
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.22 }}
+            {...stepMotion}
             className="flex flex-col gap-3"
           >
-            <h3 className="font-display text-xl font-semibold text-foreground">Chi sei?</h3>
+            <h3 className="text-[17px] font-bold">Chi sei?</h3>
             <p className="text-sm text-muted-foreground">
               Personalizziamo l&apos;app in base al tuo ruolo.
             </p>
             <div className="mt-2 flex flex-col gap-2">
-              <button
-                onClick={() => handleRoleSelect("athlete")}
-                className="rounded-xl border border-border/60 bg-surface-panel/40 px-4 py-3 text-left transition hover:border-[var(--electric-cyan)] hover:bg-[color-mix(in_oklch,var(--electric-cyan)_8%,transparent)]"
-              >
-                <div className="font-medium text-foreground">🏊 Atleta</div>
-                <div className="text-xs text-muted-foreground">Voglio tracciare e gareggiare</div>
+              <button type="button" onClick={() => handleRoleSelect("athlete")} className={optionClass}>
+                <span className="block font-semibold">
+                  <span aria-hidden>🏊 </span>Atleta
+                </span>
+                <span className="block text-xs text-muted-foreground">Voglio tracciare e gareggiare</span>
               </button>
-              <button
-                onClick={() => handleRoleSelect("coach")}
-                className="rounded-xl border border-border/60 bg-surface-panel/40 px-4 py-3 text-left transition hover:border-[var(--electric-cyan)] hover:bg-[color-mix(in_oklch,var(--electric-cyan)_8%,transparent)]"
-              >
-                <div className="font-medium text-foreground">🎽 Allenatore</div>
-                <div className="text-xs text-muted-foreground">Gestisco un club o una squadra</div>
+              <button type="button" onClick={() => handleRoleSelect("coach")} className={optionClass}>
+                <span className="block font-semibold">
+                  <span aria-hidden>🎽 </span>Allenatore
+                </span>
+                <span className="block text-xs text-muted-foreground">Gestisco un club o una squadra</span>
               </button>
             </div>
           </motion.div>
@@ -141,26 +160,27 @@ export function OnboardingIdentitySetup({ userId, onComplete, onSkip }: Props) {
         {currentStep === 1 && (
           <motion.div
             key="stroke"
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.22 }}
+            {...stepMotion}
             className="flex flex-col gap-3"
           >
-            <h3 className="font-display text-xl font-semibold text-foreground">Stile preferito</h3>
+            <h3 ref={focusOnMount} tabIndex={-1} className="text-[17px] font-bold outline-none">
+              Stile preferito
+            </h3>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {STROKES.map((s) => (
                 <button
                   key={s.value}
+                  type="button"
                   onClick={() => handleStrokeSelect(s.value)}
-                  className="rounded-xl border border-border/60 bg-surface-panel/40 px-3 py-2.5 text-sm text-foreground transition hover:border-[var(--electric-cyan)]"
+                  className={`${optionClass} text-center`}
                 >
                   {s.label}
                 </button>
               ))}
             </div>
-            <Button variant="ghost-neon" className="mt-1 self-start text-xs" onClick={() => setCurrentStep(2)}>
-              Salta →
+            <Button variant="ghost" className="self-start" onClick={() => setCurrentStep(2)}>
+              Salta
+              <ArrowRight aria-hidden />
             </Button>
           </motion.div>
         )}
@@ -168,39 +188,34 @@ export function OnboardingIdentitySetup({ userId, onComplete, onSkip }: Props) {
         {currentStep === 2 && (
           <motion.div
             key="pool"
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.22 }}
+            {...stepMotion}
             className="flex flex-col gap-3"
           >
-            <h3 className="font-display text-xl font-semibold text-foreground">Tipo di vasca</h3>
+            <h3 ref={focusOnMount} tabIndex={-1} className="text-[17px] font-bold outline-none">
+              Tipo di vasca
+            </h3>
             <div className="mt-2 flex flex-col gap-2">
               {POOL_LENGTHS.map((p) => (
                 <button
                   key={p.value}
+                  type="button"
                   onClick={() => void handlePoolSelect(p.value)}
-                  className="rounded-xl border border-border/60 bg-surface-panel/40 px-4 py-3 text-left text-sm text-foreground transition hover:border-[var(--electric-cyan)]"
+                  className={optionClass}
                 >
                   {p.label}
                 </button>
               ))}
             </div>
-            <div className="mt-1 flex items-center gap-2">
-              <Button
-                variant="ghost-neon"
-                className="text-xs"
-                onClick={() => void handleSkipPool()}
-              >
-                Salta →
-              </Button>
-            </div>
+            <Button variant="ghost" className="self-start" onClick={() => void handleSkipPool()}>
+              Salta
+              <ArrowRight aria-hidden />
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <div className="mt-2 border-t border-border/40 pt-3">
-        <Button variant="ghost-neon" className="text-xs text-muted-foreground" onClick={onSkip}>
+      <div className="border-t border-border pt-3">
+        <Button variant="ghost" className="text-muted-foreground" onClick={onSkip}>
           Salta configurazione
         </Button>
       </div>

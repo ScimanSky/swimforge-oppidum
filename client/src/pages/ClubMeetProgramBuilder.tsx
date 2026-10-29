@@ -241,7 +241,7 @@ export default function ClubMeetProgramBuilder() {
 
   const renderTemplateGroup = (title: string, rows: typeof MEET_PROGRAM_TEMPLATE) => (
     <section className="surface-panel p-3 space-y-2">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title}</h3>
+      <h3 className="text-sm font-semibold text-muted-foreground">{title}</h3>
       <div className="space-y-1">
         {rows.map((row) => {
           const checked = Boolean(selectedTemplate[row.key]);
@@ -276,13 +276,13 @@ export default function ClubMeetProgramBuilder() {
             <Link href={`/community/club/${clubId}/meet/${meetId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
               <ArrowLeft className="h-4 w-4" /> Torna al meeting
             </Link>
-            <h1 className="mt-1 text-2xl font-display font-bold">Builder Programma Gare</h1>
+            <h2 className="mt-1 text-2xl font-display font-bold">Builder Programma Gare</h2>
             <p className="text-sm text-muted-foreground">Seleziona con check le gare del meeting (M/F) e salva.</p>
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="outline">{selectedCount} selezionate</Badge>
             <Button
-              variant="neon"
+              variant="default"
               size="sm"
               disabled={saveEventsMutation.isPending}
               onClick={handleSave}
@@ -309,7 +309,7 @@ export default function ClubMeetProgramBuilder() {
 
         {matching.extras.length > 0 ? (
           <section className="surface-panel p-3 space-y-2">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Eventi Fuori Template</h3>
+            <h3 className="text-sm font-semibold text-muted-foreground">Eventi Fuori Template</h3>
             <p className="text-xs text-muted-foreground">
               Eventi già presenti nel meeting non riconosciuti come standard. Lasciali spuntati per mantenerli.
             </p>

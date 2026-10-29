@@ -6,6 +6,7 @@
  */
 
 import { createClient } from 'redis';
+import { dayKey } from "@shared/swimMetrics";
 import { logger } from '../middleware/logger';
 import { randomUUID } from 'node:crypto';
 import { getRedisPolicy } from './redis-policy';
@@ -476,6 +477,9 @@ export const cacheKeys = {
     `user:activities:${key}:${limit}:${offset}`,
   search: (query: string) => `search:${query}`,
   badgeDefinitions: () => 'badge:definitions',
+  // Per Rome day (today's load rolls at midnight). v4: the best streak, and manual zones as the
+  // threshold of the load.
+  swimMetrics: (userId: string, romeDay: string) => `swim-metrics:v4:${userId}:${romeDay}`,
 };
 
 /**
@@ -496,6 +500,7 @@ export async function invalidateUserCache(userId: string): Promise<void> {
       cacheKeys.userStats(userId),
       cacheKeys.userProfile(userId),
       cacheKeys.badges(userId),
+      cacheKeys.swimMetrics(userId, dayKey(new Date())),
       // REMOVED: `user:activities:${userId}:*` — DEL doesn't support wildcards
     ];
 

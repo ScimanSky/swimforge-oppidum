@@ -2,7 +2,33 @@ import { cn } from "@/lib/utils";
 import { AlertTriangle, RotateCcw } from "lucide-react";
 import { Component, ReactNode } from "react";
 
-const CHUNK_RELOAD_SESSION_KEY = "swimforge:chunk-reload-attempted";
+export const CHUNK_RELOAD_SESSION_KEY = "swimforge:chunk-reload-attempted";
+/**
+ * After this long without an error the page counts as loaded: the flag of the automatic reload
+ * is cleared, so a tab left open reloads once again at the next deploy instead of showing the
+ * error page.
+ */
+export const CHUNK_RELOAD_RESET_MS = 30_000;
+
+/** sessionStorage can throw (storage blocked): the flag is then simply not kept. */
+function readChunkReloadFlag(): boolean {
+  try {
+    return window.sessionStorage.getItem(CHUNK_RELOAD_SESSION_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** False when the storage is blocked. */
+function writeChunkReloadFlag(set: boolean): boolean {
+  try {
+    if (set) window.sessionStorage.setItem(CHUNK_RELOAD_SESSION_KEY, "1");
+    else window.sessionStorage.removeItem(CHUNK_RELOAD_SESSION_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 interface Props {
   children: ReactNode;
@@ -14,6 +40,8 @@ interface State {
 }
 
 class ErrorBoundary extends Component<Props, State> {
+  private loadedTimer: ReturnType<typeof setTimeout> | undefined;
+
   constructor(props: Props) {
     super(props);
     this.state = { hasError: false, error: null };
@@ -23,8 +51,21 @@ class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
+  componentDidMount() {
+    if (typeof window === "undefined") return;
+    this.loadedTimer = setTimeout(() => {
+      if (!this.state.hasError) writeChunkReloadFlag(false);
+    }, CHUNK_RELOAD_RESET_MS);
+  }
+
+  componentWillUnmount() {
+    clearTimeout(this.loadedTimer);
+  }
+
   componentDidCatch(error: Error) {
     if (typeof window === "undefined") return;
+    // Not loaded: the flag stays, so a chunk that keeps failing never reloads in a loop.
+    clearTimeout(this.loadedTimer);
 
     const message = `${error?.name ?? ""} ${error?.message ?? ""}`.toLowerCase();
     const isDynamicImportFailure =
@@ -35,10 +76,9 @@ class ErrorBoundary extends Component<Props, State> {
 
     if (!isDynamicImportFailure) return;
 
-    const hasReloaded = window.sessionStorage.getItem(CHUNK_RELOAD_SESSION_KEY) === "1";
-    if (hasReloaded) return;
+    // Without a stored flag (storage blocked) never reload: it could not stop at one.
+    if (readChunkReloadFlag() || !writeChunkReloadFlag(true)) return;
 
-    window.sessionStorage.setItem(CHUNK_RELOAD_SESSION_KEY, "1");
     const url = new URL(window.location.href);
     url.searchParams.set("__chunk_reload", String(Date.now()));
     window.location.replace(url.toString());
@@ -72,7 +112,7 @@ class ErrorBoundary extends Component<Props, State> {
             <button
               onClick={() => {
                 if (typeof window !== "undefined") {
-                  window.sessionStorage.removeItem(CHUNK_RELOAD_SESSION_KEY);
+                  writeChunkReloadFlag(false);
                 }
                 window.location.reload();
               }}

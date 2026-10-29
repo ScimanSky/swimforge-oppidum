@@ -1,3 +1,4 @@
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { and, eq, ilike, sql } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import { getDb } from "./db";
@@ -239,7 +240,7 @@ export async function createClubPost(
   }
 ) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const isMember = await db
     .select({ id: communityClubMembers.id })
@@ -286,7 +287,7 @@ export function clubPrivacy(input: { isPrivate?: boolean; visibility?: "public" 
 
 export async function createClub(userId: number, input: { name: string; description?: string | null; coverImageUrl?: string | null; websiteUrl?: string | null; isPrivate?: boolean; visibility?: "public" | "private" | "invite"; rules?: string | null }) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const existing = await db
     .select({ id: communityClubs.id })
@@ -329,7 +330,7 @@ export async function createClub(userId: number, input: { name: string; descript
 
 export async function joinClub(userId: number, clubId: number, options: { acceptRules?: boolean } = {}) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const club = await db
     .select({
@@ -385,7 +386,7 @@ export async function joinClub(userId: number, clubId: number, options: { accept
 
 export async function leaveClub(userId: number, clubId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const existing = await db
     .select({
@@ -449,7 +450,7 @@ export async function leaveClub(userId: number, clubId: number) {
 
 export async function approveJoinRequest(actorId: number, clubId: number, userId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const actor = await getClubMemberRole(actorId, clubId);
   if (!actor || actor.status !== "active" || !["owner", "admin", "moderator"].includes(actor.role)) {
@@ -470,7 +471,7 @@ export async function approveJoinRequest(actorId: number, clubId: number, userId
 
 export async function rejectJoinRequest(actorId: number, clubId: number, userId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const actor = await getClubMemberRole(actorId, clubId);
   if (!actor || actor.status !== "active" || !["owner", "admin", "moderator"].includes(actor.role)) {
@@ -490,7 +491,7 @@ export async function rejectJoinRequest(actorId: number, clubId: number, userId:
 
 export async function banMember(actorId: number, clubId: number, userId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const actor = await getClubMemberRole(actorId, clubId);
   if (!actor || actor.status !== "active" || !["owner", "admin", "moderator"].includes(actor.role)) {
@@ -511,7 +512,7 @@ export async function banMember(actorId: number, clubId: number, userId: number)
 
 export async function unbanMember(actorId: number, clubId: number, userId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const actor = await getClubMemberRole(actorId, clubId);
   if (!actor || actor.status !== "active" || !["owner", "admin", "moderator"].includes(actor.role)) {
@@ -528,7 +529,7 @@ export async function unbanMember(actorId: number, clubId: number, userId: numbe
 
 export async function updateMemberRole(actorId: number, clubId: number, userId: number, role: "member" | "moderator" | "admin") {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const actor = await getClubMemberRole(actorId, clubId);
   if (!actor || actor.status !== "active" || actor.role !== "owner") {
@@ -576,7 +577,7 @@ export async function listClubInvites(actorId: number, clubId: number) {
 
 export async function createClubInvite(actorId: number, clubId: number, input: { role?: "member" | "moderator"; maxUses?: number; expiresAt?: Date | null }) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const actor = await getClubMemberRole(actorId, clubId);
   if (!actor || actor.status !== "active" || !["owner", "admin", "moderator"].includes(actor.role)) {
@@ -610,7 +611,7 @@ export async function createClubInvite(actorId: number, clubId: number, input: {
 
 export async function revokeClubInvite(actorId: number, clubId: number, inviteId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const actor = await getClubMemberRole(actorId, clubId);
   if (!actor || actor.status !== "active" || !["owner", "admin", "moderator"].includes(actor.role)) {
@@ -627,7 +628,7 @@ export async function revokeClubInvite(actorId: number, clubId: number, inviteId
 
 export async function acceptClubInvite(userId: number, code: string) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   return db.transaction(async (tx) => {
     const inviteResult = await tx.execute(sql`
@@ -706,7 +707,7 @@ export async function acceptClubInvite(userId: number, code: string) {
 
 export async function updateClub(userId: number, clubId: number, input: { name?: string; description?: string | null; coverImageUrl?: string | null; websiteUrl?: string | null; visibility?: "public" | "private" | "invite"; rules?: string | null; themeColor?: string; logoUrl?: string | null; tagline?: string | null }) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const club = await db
     .select({ id: communityClubs.id, ownerId: communityClubs.ownerId })
@@ -739,7 +740,7 @@ export async function updateClub(userId: number, clubId: number, input: { name?:
 
 export async function deleteClub(userId: number, clubId: number) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const club = await db
     .select({ id: communityClubs.id, ownerId: communityClubs.ownerId })

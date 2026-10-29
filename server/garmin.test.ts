@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 
 // Mock database functions
 vi.mock("./db", () => ({
@@ -76,7 +77,7 @@ describe("Garmin Integration", () => {
       const result = await connectGarmin(1, "test@email.com", "password");
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe("Database not available");
+      expect(result.error).toBe(DB_UNAVAILABLE_ERR_MSG);
     });
   });
 
@@ -101,7 +102,7 @@ describe("Garmin Integration", () => {
       const result = await syncGarminActivities(1, 30);
 
       expect(result.synced).toBe(0);
-      expect(result.error).toBe("Database not available");
+      expect(result.error).toBe(DB_UNAVAILABLE_ERR_MSG);
     });
 
     it("returns error when Garmin not connected", async () => {

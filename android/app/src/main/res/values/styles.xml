@@ -13,6 +13,11 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:background">@null</item>
+        <!-- Behind the system bars when Capacitor pads the decor view (WebView older than 140,
+             typically Android 14 and earlier): the app's dark background instead of the theme's
+             white band, so the light status bar icons stay visible. With an up-to-date WebView
+             the WebView covers the whole window and this is never seen. -->
+        <item name="android:windowBackground">#0A1520</item>
     </style>
 
 

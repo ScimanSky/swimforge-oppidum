@@ -1,13 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc";
 import {
   LineChart,
   Line,
   BarChart,
   Bar,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -15,12 +13,16 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { BarChart3, Gauge, Info, Sparkles } from "lucide-react";
-import { motion } from "framer-motion";
-import { metricsDefinitions } from "@/data/metricsDefinitions";
+import { Activity, BarChart3, Gauge } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
+import { Metric } from "@/components/corsia/Metric";
+import { ZoneBar } from "@/components/corsia/ZoneBar";
+import { MetricCards } from "@/components/stats/MetricCards";
+import { formatDayMonth, formatInteger, formatPaceValue } from "@/lib/format";
 
 const PERIOD_OPTIONS = [
   { value: 7, label: "7 giorni" },
@@ -29,734 +31,287 @@ const PERIOD_OPTIONS = [
   { value: 365, label: "1 anno" },
 ];
 
-const HR_ZONE_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-];
+const tooltipStyle = {
+  background: "var(--card)",
+  border: "1px solid var(--border)",
+  borderRadius: "12px",
+  color: "var(--foreground)",
+};
+const axisTick = { fill: "var(--muted-foreground)", fontSize: 12 };
 
-function MetricInfoButton({ info }: { info: any }) {
-  const [open, setOpen] = useState(false);
-  const contentRef = useRef<HTMLDivElement | null>(null);
+const kmNumber = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 });
+const formatKmNumber = (km: number) => kmNumber.format(km);
 
-  useEffect(() => {
-    if (open && contentRef.current) {
-      contentRef.current.scrollTop = 0;
-    }
-  }, [open]);
+/** Tooltip values of the «Andamento» chart: «2,5 km», «1:52 /100 m». */
+const timelineTooltipValue = (value: unknown, name: string, item: { dataKey?: unknown }) => {
+  const number = Number(value);
+  if (item.dataKey === "passo") return [`${formatPaceValue(number)} /100 m`, name];
+  return [`${formatKmNumber(number)} km`, name];
+};
 
-  return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        className="p-1 rounded-md hover:bg-muted/60 transition-colors"
-        title="Info"
-      >
-        <Info className="w-4 h-4 text-muted-foreground" />
-      </button>
-      {open && (
-        <div
-          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            className="rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto bg-card border border-border"
-            ref={contentRef}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div
-              className="sticky top-0 border-b border-border p-6 bg-card"
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-foreground">
-                  {info.title}
-                </h2>
-                <button
-                  onClick={() => setOpen(false)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-            <div className="p-6 space-y-4 text-sm text-muted-foreground">
-              <p>{info.description}</p>
-              <div className="rounded-lg p-3 bg-secondary border border-border text-xs whitespace-pre-line text-foreground">
-                {info.formula}
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground mb-2">Interpretazione</h3>
-                <ul className="space-y-1">
-                  <li><strong>Ottimo:</strong> {info.interpretation.excellent}</li>
-                  <li><strong>Buono:</strong> {info.interpretation.good}</li>
-                  <li><strong>Discreto:</strong> {info.interpretation.fair}</li>
-                  <li><strong>Scarso:</strong> {info.interpretation.poor}</li>
-                </ul>
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground mb-2">Come migliorare</h3>
-                <ul className="list-disc pl-5 space-y-1">
-                  {info.howToImprove.map((tip: string, idx: number) => (
-                    <li key={idx}>{tip}</li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
+const accordionTrigger =
+  "rounded-2xl border border-border bg-card px-4 py-3 text-left text-[15px] font-semibold hover:no-underline";
+const cardTitle = "text-base font-bold text-foreground";
 
-function RingMetric({
-  label,
-  value,
-  max = 100,
-  color,
-  info,
-}: {
-  label: string;
-  value: number | null;
-  max?: number;
-  color: string;
-  info: any;
-}) {
-  const safeValue = value ?? null;
-  const hasValue = safeValue !== null && Number.isFinite(safeValue);
-  const pct = hasValue ? Math.max(0, Math.min(100, (safeValue / max) * 100)) : 0;
-  const radius = 32;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference * (1 - pct / 100);
-
-  return (
-    <div className="rounded-2xl p-4 bg-card/80 border border-border/60 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-        <MetricInfoButton info={info} />
-      </div>
-      <div className="flex items-center gap-4">
-        <div className="relative w-20 h-20">
-          <svg viewBox="0 0 100 100" className="w-full h-full">
-            <circle
-              cx="50"
-              cy="50"
-              r={radius}
-              stroke="var(--border)"
-              strokeWidth="7"
-              fill="none"
-            />
-            {hasValue && (
-              <motion.circle
-                cx="50"
-                cy="50"
-                r={radius}
-                stroke={color}
-                strokeWidth="7"
-                fill="none"
-                strokeDasharray={circumference}
-                strokeDashoffset={offset}
-                strokeLinecap="round"
-                transform="rotate(-90 50 50)"
-                initial={{ strokeDashoffset: circumference }}
-                animate={{ strokeDashoffset: offset }}
-                transition={{ duration: 0.8, ease: [0.2, 0.9, 0.2, 1] }}
-                style={{ filter: `drop-shadow(0 0 10px ${color})` }}
-              />
-            )}
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div className="text-xl font-bold text-foreground">
-            {hasValue ? Math.round(safeValue) : "N/D"}
-            </div>
-            <div className="text-[10px] text-muted-foreground">/{max}</div>
-          </div>
-        </div>
-        <div className="text-xs text-muted-foreground leading-snug">
-          {hasValue ? `${Math.round(pct)}%` : "Dato non disponibile"}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function GaugeMetric({
-  label,
-  value,
-  min = -100,
-  max = 100,
-  neutralRange = 0,
-  info,
-}: {
-  label: string;
-  value: number | null;
-  min?: number;
-  max?: number;
-  neutralRange?: number;
-  info: any;
-}) {
-  const safeValue = value ?? null;
-  const hasValue = safeValue !== null && Number.isFinite(safeValue);
-  const rounded = hasValue ? Math.round(safeValue) : null;
-  const clamped = rounded !== null ? Math.max(min, Math.min(max, rounded)) : null;
-  const isNeutral =
-    clamped !== null &&
-    (Math.abs(clamped) <= neutralRange || Math.round(clamped) === 0);
-  const pct = clamped !== null && !isNeutral ? ((clamped - min) / (max - min)) * 100 : 0;
-  const color =
-    clamped === null || isNeutral
-      ? "var(--muted-foreground)"
-      : clamped > 20
-      ? "var(--chart-2)"
-      : clamped > 0
-      ? "var(--chart-4)"
-      : "var(--destructive)";
-
-  return (
-    <div className="rounded-2xl p-4 bg-card/80 border border-border/60 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-        <MetricInfoButton info={info} />
-      </div>
-      <div className="relative">
-        <svg viewBox="0 0 200 120" className="w-full h-28">
-          <path
-            d="M10 110 A90 90 0 0 1 190 110"
-            fill="none"
-            stroke="var(--border)"
-            strokeWidth="12"
-            pathLength={100}
-            strokeLinecap="round"
-          />
-          {clamped !== null && !isNeutral ? (
-            <path
-              d="M10 110 A90 90 0 0 1 190 110"
-              fill="none"
-              stroke={color}
-              strokeWidth="12"
-              pathLength={100}
-              strokeDasharray={100}
-              strokeDashoffset={100 - pct}
-              strokeLinecap="round"
-              style={{ filter: `drop-shadow(0 0 12px ${color})` }}
-            />
-          ) : null}
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center pt-6">
-          <div className="text-2xl font-bold text-foreground">
-            {rounded !== null ? `${rounded}%` : "N/D"}
-          </div>
-          <div className="text-[10px] text-muted-foreground">
-            {min}% — {max}%
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StreakRing({
-  current,
-  record,
-}: {
-  current: number;
-  record: number;
-}) {
-  const max = Math.max(record || 0, 7);
-  return (
-    <div className="rounded-2xl p-4 bg-card/80 border border-border/60 shadow-sm">
-      <div className="flex items-center justify-between mb-3">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">Streak</div>
-        <div className="text-[10px] text-muted-foreground">Record {record}g</div>
-      </div>
-      <div className="flex items-center gap-4">
-        <div className="relative w-20 h-20">
-          <svg viewBox="0 0 100 100" className="w-full h-full">
-            <circle
-              cx="50"
-              cy="50"
-              r={32}
-              stroke="var(--border)"
-              strokeWidth="7"
-              fill="none"
-            />
-            <circle
-              cx="50"
-              cy="50"
-              r={32}
-              stroke="var(--chart-5)"
-              strokeWidth="7"
-              fill="none"
-              strokeDasharray={2 * Math.PI * 32}
-              strokeDashoffset={(2 * Math.PI * 32) * (1 - Math.min(1, current / max))}
-              strokeLinecap="round"
-              transform="rotate(-90 50 50)"
-              style={{ filter: "drop-shadow(0 0 10px var(--chart-5))" }}
-            />
-          </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <div className="text-lg font-bold text-foreground">{current}</div>
-            <div className="text-[10px] text-muted-foreground">giorni</div>
-          </div>
-        </div>
-        <div className="text-xs text-muted-foreground leading-snug">
-          🔥 Consecutivi attuali
-        </div>
-      </div>
-    </div>
-  );
-}
+const HR_ZONE_NAMES = ["Recupero", "Aerobica", "Soglia", "Anaerobica", "Massima"] as const;
 
 export default function Statistics() {
   const [period, setPeriod] = useState(30);
+  // Controlled, so the open section survives the loading state of a new period.
+  const [openSection, setOpenSection] = useState("timeline");
+  // Keep showing the previous period while the new one loads.
+  const queryOptions = { staleTime: 5 * 60 * 1000, placeholderData: keepPreviousData };
 
   const { data: timeline, isLoading: timelineLoading } = trpc.statistics.getTimeline.useQuery(
     { days: period },
-    { staleTime: 5 * 60 * 1000 } // Cache for 5 minutes
+    queryOptions
   );
   const { data: performance, isLoading: performanceLoading } = trpc.statistics.getPerformance.useQuery(
     { days: period },
-    { staleTime: 5 * 60 * 1000 } // Cache for 5 minutes
+    queryOptions
   );
-	  const { data: advanced, isLoading: advancedLoading } = trpc.statistics.getAdvanced.useQuery(
-	    { days: period },
-	    { 
-	      staleTime: 5 * 60 * 1000, // Server-side insights remain cached; keep client cache short.
-	    }
-	  );
+  // Swim metrics have their own windows (28 and 90 days): not tied to the period, loaded apart.
+  const metricsQuery = trpc.statistics.getMetrics.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
 
-  const isLoading = timelineLoading || performanceLoading || advancedLoading;
+  const isLoading = timelineLoading || performanceLoading;
 
-  // Prepare HR Zones data for pie chart
-  const hrZonesData = performance
+  // Percent of time in zones 1-5 (ZoneBar only needs the proportions).
+  const hrZones = performance
     ? [
-        { name: "Z1 Recupero", value: performance.hrZones.zone1, color: HR_ZONE_COLORS[0] },
-        { name: "Z2 Aerobica", value: performance.hrZones.zone2, color: HR_ZONE_COLORS[1] },
-        { name: "Z3 Soglia", value: performance.hrZones.zone3, color: HR_ZONE_COLORS[2] },
-        { name: "Z4 Anaerobica", value: performance.hrZones.zone4, color: HR_ZONE_COLORS[3] },
-        { name: "Z5 Massima", value: performance.hrZones.zone5, color: HR_ZONE_COLORS[4] },
-      ].filter((zone) => zone.value > 0)
+        performance.hrZones.zone1,
+        performance.hrZones.zone2,
+        performance.hrZones.zone3,
+        performance.hrZones.zone4,
+        performance.hrZones.zone5,
+      ]
     : [];
+  const hasHrZones = hrZones.some((value) => value > 0);
 
-  // Format timeline data for chart
+  // Chart data: distance in km, pace in seconds per 100 m (formatted as mm:ss on axis and tooltip).
   const timelineChartData = timeline?.map((point) => ({
-    date: new Date(point.date).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" }),
+    date: formatDayMonth(point.date),
     distanza: point.distance,
-    pace: point.pace ? point.pace / 60 : null, // convert to minutes
+    passo: point.pace ?? null,
     sessioni: point.sessions,
   }));
-
-  const progressiveOverloadValue =
-    advanced?.poiBaseline === false ? null : advanced?.progressiveOverloadIndex ?? null;
-
-  const trendValue =
-    advanced?.trendBaseline && advanced?.trendIndicator
-      ? advanced.trendIndicator.direction === "down"
-        ? -advanced.trendIndicator.percentage
-        : advanced.trendIndicator.percentage
+  const timelineSummary = (() => {
+    if (!timeline || timeline.length === 0) return null;
+    const totalKm = timeline.reduce((sum, point) => sum + (point.distance || 0), 0);
+    const sessions = timeline.reduce((sum, point) => sum + (point.sessions || 0), 0);
+    const paced = timeline.filter((point) => point.pace);
+    const pacedSessions = paced.reduce((sum, point) => sum + (point.sessions || 1), 0);
+    const avgPace = pacedSessions
+      ? paced.reduce((sum, point) => sum + point.pace! * (point.sessions || 1), 0) / pacedSessions
+      : null;
+    return [
+      `Nel periodo ${formatKmNumber(totalKm)} km in ${formatInteger(sessions)} ${sessions === 1 ? "nuotata" : "nuotate"}`,
+      avgPace ? `, passo medio ${formatPaceValue(avgPace)} /100 m` : "",
+      ".",
+    ].join("");
+  })();
+  const paceDistributionSummary =
+    performance && performance.paceDistribution.length > 0
+      ? `Nuotate per fascia di passo: ${performance.paceDistribution
+          .map((band) => `${band.range} ${formatInteger(band.count)}`)
+          .join(", ")}.`
       : null;
 
-
   return (
-    <AppLayout className="text-foreground">
-      <div className="compact-shell space-y-6 lg:space-y-3 pb-12 lg:pb-2">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Progressi</p>
-            <h1 className="text-3xl font-semibold text-foreground">Statistiche</h1>
-            <p className="text-sm text-muted-foreground">
-              Metriche avanzate e trend sulle tue sessioni recenti.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {PERIOD_OPTIONS.map((option) => (
-              <Button
-                key={option.value}
-                size="sm"
-                variant={period === option.value ? "default" : "secondary"}
-                onClick={() => setPeriod(option.value)}
-              >
-                {option.label}
-              </Button>
-            ))}
-          </div>
+    <AppLayout>
+      <div className="space-y-4">
+        <div role="group" aria-label="Periodo" className="flex flex-wrap gap-2">
+          {PERIOD_OPTIONS.map((option) => (
+            <Button
+              key={option.value}
+              size="sm"
+              variant={period === option.value ? "default" : "secondary"}
+              aria-pressed={period === option.value}
+              onClick={() => setPeriod(option.value)}
+            >
+              {option.label}
+            </Button>
+          ))}
         </div>
 
-        <div className="space-y-6 lg:space-y-3">
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20 space-y-4">
-            <div className="relative w-16 h-16">
-              <div className="absolute inset-0 border-4 border-border rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-            </div>
-            <div className="text-center space-y-2">
-              <p className="text-lg font-semibold text-foreground">Caricamento statistiche...</p>
-              <p className="text-sm text-muted-foreground">Analisi dati in corso</p>
-            </div>
+          <div role="status" className="flex flex-col items-center justify-center gap-3 py-20">
+            <Spinner aria-hidden className="size-8 text-muted-foreground" />
+            <p className="text-sm text-muted-foreground">Caricamento statistiche…</p>
           </div>
         ) : (
           <Accordion
             type="single"
             collapsible
-            defaultValue="timeline"
+            value={openSection}
+            onValueChange={setOpenSection}
             className="space-y-3"
           >
             <AccordionItem value="timeline" className="border-0">
-              <AccordionTrigger className="rounded-xl border border-border/70 bg-card/60 px-4 py-3 text-left font-medium hover:no-underline">
+              <AccordionTrigger headingLevel={2} className={accordionTrigger}>
                 <span className="inline-flex items-center gap-2">
-                  <BarChart3 className="size-4 text-primary" />
-                  Progress Timeline
+                  <BarChart3 className="size-4 text-muted-foreground" aria-hidden />
+                  Andamento
                 </span>
               </AccordionTrigger>
-              <AccordionContent>
-                {/* Progress Timeline */}
-                <motion.section 
-              className="space-y-3"
-              initial={{ opacity: 0, y: 30, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
-            >
-              <section className="surface-panel p-6">
-                <div className="pb-2">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h3 className="text-base">Progress Timeline</h3>
-                      <p>
-                        Distanza e ritmo medio nel periodo selezionato.
+              <AccordionContent className="pt-3">
+                <section className="surface-panel p-4">
+                  <p className="text-sm text-muted-foreground">
+                    Distanza e passo medio nel periodo scelto.
+                  </p>
+                  <div className="mt-4">
+                    {timelineChartData && timelineChartData.length > 0 ? (
+                      <>
+                        {timelineSummary ? <p className="sr-only">{timelineSummary}</p> : null}
+                        <ResponsiveContainer width="100%" height={250}>
+                          <LineChart data={timelineChartData} accessibilityLayer>
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                            <XAxis dataKey="date" stroke="var(--border)" tick={axisTick} />
+                            <YAxis
+                              yAxisId="distance"
+                              stroke="var(--border)"
+                              tick={axisTick}
+                              width={36}
+                              tickFormatter={(value: number) => formatKmNumber(value)}
+                            />
+                            <YAxis
+                              yAxisId="pace"
+                              orientation="right"
+                              stroke="var(--border)"
+                              tick={axisTick}
+                              width={40}
+                              domain={["auto", "auto"]}
+                              tickFormatter={(value: number) => formatPaceValue(value)}
+                            />
+                            <Tooltip contentStyle={tooltipStyle} formatter={timelineTooltipValue} />
+                            <Legend wrapperStyle={{ fontSize: 12 }} />
+                            <Line
+                              yAxisId="distance"
+                              type="monotone"
+                              dataKey="distanza"
+                              stroke="var(--chart-1)"
+                              strokeWidth={2}
+                              name="Distanza"
+                              dot={{ fill: "var(--chart-1)" }}
+                            />
+                            <Line
+                              yAxisId="pace"
+                              type="monotone"
+                              dataKey="passo"
+                              stroke="var(--chart-2)"
+                              strokeWidth={2}
+                              name="Passo"
+                              dot={{ fill: "var(--chart-2)" }}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </>
+                    ) : (
+                      <p className="py-8 text-center text-sm text-muted-foreground">
+                        Nessun dato in questo periodo
                       </p>
-                    </div>
-                    <div className="group relative mt-1">
-                      <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                      <div className="absolute right-0 top-6 w-64 rounded-lg border border-border bg-card/95 p-2 text-xs text-foreground opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none z-50">
-                        Visualizza l'andamento della distanza percorsa e del pace medio nel periodo selezionato. Utile per identificare trend e progressi nel tempo.
-                      </div>
-                    </div>
+                    )}
                   </div>
-                </div>
-                <div>
-                  {timelineChartData && timelineChartData.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={250}>
-                      <LineChart data={timelineChartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                        <XAxis dataKey="date" stroke="var(--muted-foreground)" style={{ fontSize: "12px" }} />
-                        <YAxis stroke="var(--muted-foreground)" style={{ fontSize: "12px" }} />
-                        <Tooltip
-                          contentStyle={{
-                            background: "var(--card)",
-                            border: "1px solid var(--border)",
-                            borderRadius: "8px",
-                            color: "var(--foreground)",
-                          }}
-                        />
-                        <Legend />
-                        <Line
-                          type="monotone"
-                          dataKey="distanza"
-                          stroke="var(--chart-1)"
-                          strokeWidth={2}
-                          name="Distanza (km)"
-                          dot={{ fill: "var(--chart-1)" }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="pace"
-                          stroke="var(--chart-2)"
-                          strokeWidth={2}
-                          name="Pace (min/100m)"
-                          dot={{ fill: "var(--chart-2)" }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <p className="text-center text-muted-foreground py-8">
-                      Nessun dato disponibile per questo periodo
-                    </p>
-                  )}
-                </div>
-              </section>
-            </motion.section>
+                </section>
               </AccordionContent>
             </AccordionItem>
 
             <AccordionItem value="performance" className="border-0">
-              <AccordionTrigger className="rounded-xl border border-border/70 bg-card/60 px-4 py-3 text-left font-medium hover:no-underline">
+              <AccordionTrigger headingLevel={2} className={accordionTrigger}>
                 <span className="inline-flex items-center gap-2">
-                  <Gauge className="size-4 text-primary" />
+                  <Gauge className="size-4 text-muted-foreground" aria-hidden />
                   Analisi prestazioni
                 </span>
               </AccordionTrigger>
-              <AccordionContent>
-                {/* Analisi Prestazioni */}
-                <motion.section 
-              className="space-y-3"
-              initial={{ opacity: 0, y: 30, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-            >
-              {/* HR Zones */}
-              {hrZonesData.length > 0 && (
-                <section className="surface-panel p-6">
-                  <div className="pb-2">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="text-base">Zone frequenza cardiaca</h3>
-                        <p>
-                          Distribuzione del tempo nelle diverse zone.
-                        </p>
-                      </div>
-                      <div className="group relative mt-1">
-                        <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                        <div className="absolute right-0 top-6 w-72 rounded-lg border border-border bg-card/95 p-2 text-xs text-foreground opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none z-50">
-                          Mostra la distribuzione percentuale del tempo trascorso in ciascuna zona di frequenza cardiaca. Z1: Recupero, Z2: Aerobica, Z3: Soglia, Z4: Anaerobica, Z5: Massima.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex flex-col md:flex-row items-center gap-4">
-                      <ResponsiveContainer width="100%" height={200}>
-                        <PieChart>
-                          <Pie
-                            data={hrZonesData}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={50}
-                            outerRadius={80}
-                            paddingAngle={2}
-                            dataKey="value"
-                          >
-                            {hrZonesData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip
-                            contentStyle={{
-                              background: "var(--card)",
-                              border: "1px solid var(--border)",
-                              borderRadius: "8px",
-                              color: "var(--foreground)",
-                            }}
-                            formatter={(value: number) => `${value}%`}
-                          />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div className="space-y-2 text-sm">
-                        {hrZonesData.map((zone) => (
-                          <div key={zone.name} className="flex items-center gap-2">
-                            <div
-                              className="w-3 h-3 rounded-full"
-                              style={{ background: zone.color }}
-                            />
-                            <span>
-                              {zone.name}: {zone.value}%
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </section>
-              )}
-
-              {/* Pace Distribution */}
-              {performance && performance.paceDistribution.length > 0 && (
-                <section className="surface-panel p-6">
-                  <div className="pb-2">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="text-base">Distribuzione pace</h3>
-                        <p>
-                          Sessioni per fascia di ritmo (min/100m).
-                        </p>
-                      </div>
-                      <div className="group relative mt-1">
-                        <Info className="w-4 h-4 text-muted-foreground cursor-help" />
-                        <div className="absolute right-0 top-6 w-72 rounded-lg border border-border bg-card/95 p-2 text-xs text-foreground opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none z-50">
-                          Mostra quante sessioni hai completato in ciascun range di pace (min/100m). Ti aiuta a capire a quale velocità nuoti più frequentemente.
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <BarChart data={performance.paceDistribution}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                        <XAxis dataKey="range" stroke="var(--muted-foreground)" style={{ fontSize: "12px" }} />
-                        <YAxis stroke="var(--muted-foreground)" style={{ fontSize: "12px" }} />
-                        <Tooltip
-                          contentStyle={{
-                            background: "var(--card)",
-                            border: "1px solid var(--border)",
-                            borderRadius: "8px",
-                            color: "var(--foreground)",
-                          }}
-                        />
-                        <Bar dataKey="count" fill="var(--chart-1)" name="Sessioni" />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </section>
-              )}
-
-              {/* Calories & SWOLF */}
-              {performance && (
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <section className="surface-panel p-6">
-                    <div className="pb-2">
-                      <h3 className="text-base">Calorie totali</h3>
-                      <p>Energia spesa nel periodo</p>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-foreground">
-                        {performance.caloriesTotal.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Media: {performance.avgCaloriesPerSession}/sessione
-                      </div>
-                    </div>
+              <AccordionContent className="space-y-3 pt-3">
+                {hasHrZones && (
+                  <section className="surface-panel p-4">
+                    <h3 className={cardTitle}>Zone cardio</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Tempo nelle cinque zone di frequenza cardiaca.
+                    </p>
+                    <ZoneBar seconds={hrZones} names={HR_ZONE_NAMES} className="mt-4" />
                   </section>
-                  {performance.swolfAvg && (
-                    <section className="surface-panel p-6">
-                      <div className="pb-2">
-                        <h3 className="text-base">SWOLF medio</h3>
-                        <p>Efficienza nuotata</p>
-                      </div>
-                      <div>
-                        <div className="text-2xl font-bold text-foreground">
-                          {performance.swolfAvg}
-                        </div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Valore più basso = migliore efficienza
-                        </div>
-                      </div>
-                    </section>
-                  )}
-                </div>
-              )}
-              </motion.section>
-              </AccordionContent>
-            </AccordionItem>
+                )}
 
-            {/* Analisi Avanzate */}
-            {advanced && (
-              <AccordionItem value="advanced" className="border-0">
-                <AccordionTrigger className="rounded-xl border border-border/70 bg-card/60 px-4 py-3 text-left font-medium hover:no-underline">
-                  <span className="inline-flex items-center gap-2">
-                    <Sparkles className="size-4 text-primary" />
-                    Analisi avanzate
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <motion.section 
-                className="space-y-3"
-                initial={{ opacity: 0, y: 30, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
-              >
-                {/* Core Rings */}
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                  <RingMetric
-                    label="Performance"
-                    value={advanced.performanceIndex}
-                    color="var(--chart-1)"
-                    info={metricsDefinitions.performanceIndex}
-                  />
-                  <RingMetric
-                    label="Consistency"
-                    value={advanced.consistencyScore}
-                    color="var(--chart-2)"
-                    info={metricsDefinitions.consistencyScore}
-                  />
-                  <RingMetric
-                    label="Recovery"
-                    value={advanced.recoveryReadinessScore}
-                    color="var(--chart-3)"
-                    info={metricsDefinitions.rrs}
-                  />
-                  <StreakRing current={advanced.streak.current} record={advanced.streak.record} />
-                </div>
-
-                {/* Advanced Swimming Metrics */}
-                <div className="space-y-3">
-                  <h3 className="text-sm font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Metriche avanzate
-                  </h3>
-                  <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                    <RingMetric
-                      label="SEI"
-                      value={advanced.swimmingEfficiencyIndex}
-                      color="var(--chart-5)"
-                      info={metricsDefinitions.sei}
-                    />
-                    <RingMetric
-                      label="TCI"
-                      value={advanced.technicalConsistencyIndex}
-                      color="var(--chart-4)"
-                      info={metricsDefinitions.tci}
-                    />
-                    <RingMetric
-                      label="SER"
-                      value={advanced.strokeEfficiencyRating}
-                      color="var(--chart-3)"
-                      info={metricsDefinitions.ser}
-                    />
-                    <RingMetric
-                      label="ACS"
-                      value={advanced.aerobicCapacityScore}
-                      color="var(--chart-2)"
-                      info={metricsDefinitions.acs}
-                    />
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <GaugeMetric
-                      label="Progressive Overload"
-                      value={progressiveOverloadValue}
-                      info={metricsDefinitions.poi}
-                    />
-                    <GaugeMetric
-                      label="Trend"
-                      value={trendValue}
-                      min={-50}
-                      max={50}
-                      neutralRange={2}
-                      info={metricsDefinitions.trend}
-                    />
-                  </div>
-                </div>
-
-                {/* Predictions */}
-                {advanced.predictions && (
-                  <section className="surface-panel p-6">
-                    <div className="pb-2">
-                      <h3 className="text-base">Previsioni</h3>
-                      <p>Stima di obiettivi al ritmo attuale.</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">
-                        Al ritmo attuale raggiungerai{" "}
-                        <span className="font-bold text-foreground">
-                          {advanced.predictions.targetKm}km
-                        </span>{" "}
-                        entro il{" "}
-                        <span className="font-bold text-foreground">
-                          {new Date(advanced.predictions.estimatedDate).toLocaleDateString("it-IT")}
-                        </span>
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        ({advanced.predictions.daysRemaining} giorni rimasti)
-                      </p>
+                {performance && performance.paceDistribution.length > 0 && (
+                  <section className="surface-panel p-4">
+                    <h3 className={cardTitle}>Distribuzione del passo</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Nuotate per fascia di passo (min/100 m).
+                    </p>
+                    {paceDistributionSummary ? (
+                      <p className="sr-only">{paceDistributionSummary}</p>
+                    ) : null}
+                    <div className="mt-4">
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={performance.paceDistribution} accessibilityLayer>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                          <XAxis dataKey="range" stroke="var(--border)" tick={axisTick} />
+                          <YAxis stroke="var(--border)" tick={axisTick} width={36} allowDecimals={false} />
+                          <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "var(--raised)" }} />
+                          <Bar dataKey="count" fill="var(--chart-1)" name="Nuotate" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
                   </section>
                 )}
-              </motion.section>
-                </AccordionContent>
-              </AccordionItem>
-            )}
+
+                {performance && (performance.caloriesTotal > 0 || performance.swolfAvg) ? (
+                  <section className="surface-panel grid grid-cols-2 gap-x-4 gap-y-5 p-4">
+                    {performance.caloriesTotal > 0 ? (
+                      <div>
+                        <Metric
+                          value={formatInteger(performance.caloriesTotal)}
+                          unit="kcal"
+                          label="Calorie totali"
+                          size="responsive"
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Media {formatInteger(performance.avgCaloriesPerSession)} kcal a nuotata
+                        </p>
+                      </div>
+                    ) : null}
+                    {performance.swolfAvg ? (
+                      <div>
+                        <Metric
+                          value={formatInteger(performance.swolfAvg)}
+                          label="SWOLF medio"
+                          size="responsive"
+                        />
+                        <p className="mt-1 text-xs text-muted-foreground">Più basso è, meglio è</p>
+                      </div>
+                    ) : null}
+                  </section>
+                ) : null}
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="metrics" className="border-0">
+              <AccordionTrigger headingLevel={2} className={accordionTrigger}>
+                <span className="inline-flex items-center gap-2">
+                  <Activity className="size-4 text-muted-foreground" aria-hidden />
+                  Metriche
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-3 pt-3">
+                <p className="text-sm text-muted-foreground">
+                  Ogni metrica usa i suoi giorni, indicati nel riquadro: il periodo scelto sopra non le cambia.
+                </p>
+                {metricsQuery.data ? (
+                  <MetricCards metrics={metricsQuery.data} />
+                ) : metricsQuery.isError ? (
+                  <LoadError onRetry={() => void metricsQuery.refetch()} />
+                ) : (
+                  <LoadingSkeleton
+                    label="Caricamento delle metriche…"
+                    count={6}
+                    itemClassName="h-[76px] w-full rounded-2xl"
+                  />
+                )}
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
         )}
-        </div>
       </div>
     </AppLayout>
   );

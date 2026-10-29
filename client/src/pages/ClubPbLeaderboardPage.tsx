@@ -1,17 +1,33 @@
-import { useEffect, useMemo, useState } from "react";
+/**
+ * Club records: the members' best time on one event (stroke, distance, pool, race or training),
+ * as a ranking (members only; the shell header carries the «Club» title and the back button).
+ */
+
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
-import AppLayout from "@/components/AppLayout";
-import { trpc } from "@/lib/trpc";
-import { Surface, SurfaceContent } from "@/components/ui/surface";
+import { Dumbbell, Medal } from "lucide-react";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Medal, Trophy } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
+import { Pager } from "@/components/corsia/Pager";
+import { RankRow } from "@/components/corsia/RankRow";
+import { ClubAccessState, ClubNotice } from "@/components/club/ClubPageState";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { usePaged } from "@/hooks/usePaged";
+import { clubAccess } from "@/lib/club-access";
+import { NO_VALUE, formatDayMonthYear, toFiniteNumber } from "@/lib/format";
+import { rankEntries } from "@/lib/ranking";
 import { formatSwimCentiseconds } from "@/lib/swimTime";
+import { trpc } from "@/lib/trpc";
+import { cn } from "@/lib/utils";
 
 const STROKES = [
-  { value: "freestyle", label: "Stile Libero" },
+  { value: "freestyle", label: "Stile libero" },
   { value: "backstroke", label: "Dorso" },
   { value: "breaststroke", label: "Rana" },
   { value: "butterfly", label: "Farfalla" },
@@ -26,23 +42,23 @@ const DISTANCES_BY_STROKE: Record<string, number[]> = {
   mixed: [200],
 };
 
-function rankTone(rank: number) {
-  if (rank === 1) return "text-amber-300";
-  if (rank === 2) return "text-slate-200";
-  if (rank === 3) return "text-orange-300";
-  return "text-muted-foreground";
-}
-
-function formatDate(value?: string | Date | null) {
-  if (!value) return "--";
-  const parsed = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "--";
-  return parsed.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
+/** The server accepts a master category up to 32 characters. */
+const MASTER_CATEGORY_MAX = 32;
+const PAGE_SIZE = 20;
+/** The category box asks the server once the typing pauses. */
+const CATEGORY_DEBOUNCE_MS = 300;
 
 export default function ClubPbLeaderboardPage() {
   const [match, params] = useRoute("/community/club/:clubId/pb");
   const clubId = Number(params?.clubId);
+  const { user } = useAuth();
+  const rankingTitleId = useId();
+  const strokeId = useId();
+  const distanceId = useId();
+  const poolId = useId();
+  const sourceId = useId();
+  const categoryId = useId();
+  const listRef = useRef<HTMLOListElement>(null);
 
   const [strokeType, setStrokeType] = useState<(typeof STROKES)[number]["value"]>("freestyle");
   const [distanceMeters, setDistanceMeters] = useState<number>(100);
@@ -63,6 +79,9 @@ export default function ClubPbLeaderboardPage() {
     { enabled: match && Number.isFinite(clubId) }
   );
 
+  // Members only (the server answers FORBIDDEN otherwise): not even asked for before.
+  const isMember = Boolean((clubQuery.data as any)?.is_member);
+  const category = useDebouncedValue(masterCategory.trim(), CATEGORY_DEBOUNCE_MS);
   const leaderboardQuery = trpc.records.clubLeaderboard.useQuery(
     {
       clubId,
@@ -70,49 +89,136 @@ export default function ClubPbLeaderboardPage() {
       distanceMeters,
       poolLengthMeters,
       source,
-      ...(masterCategory.trim().length > 0 ? { masterCategory: masterCategory.trim() } : {}),
+      ...(category.length > 0 ? { masterCategory: category } : {}),
       limit: 80,
     },
-    { enabled: match && Number.isFinite(clubId) && clubId > 0 }
+    {
+      enabled: match && Number.isFinite(clubId) && clubId > 0 && isMember,
+      // A new filter keeps the current ranking on screen (marked busy) instead of a skeleton.
+      placeholderData: keepPreviousData,
+    }
   );
+
+  const rows = useMemo(
+    () => ((leaderboardQuery.data as any)?.leaderboard as Array<any> | undefined) ?? [],
+    [leaderboardQuery.data]
+  );
+  // Fastest first from the server: equal times share a position, a row without a time has none.
+  const ranked = useMemo(() => rankEntries(rows, (row) => toFiniteNumber(row.timeCs) ?? 0), [rows]);
+  const paging = usePaged(ranked, PAGE_SIZE, [strokeType, distanceMeters, poolLengthMeters, source, category]);
 
   if (!match || !Number.isFinite(clubId) || clubId <= 0) return null;
 
+  const access = clubAccess(clubQuery);
+  if (access !== "member") {
+    return (
+      <AppLayout>
+        <ClubAccessState
+          access={access}
+          clubId={clubId}
+          loadingLabel="Caricamento dei record del club…"
+          notMemberText="Iscriviti al club per vedere i suoi record."
+          onRetry={() => void clubQuery.refetch()}
+        />
+      </AppLayout>
+    );
+  }
+
   const club = clubQuery.data as any;
-  const rows = ((leaderboardQuery.data as any)?.leaderboard as Array<any> | undefined) ?? [];
   const selectedStrokeLabel = STROKES.find((entry) => entry.value === strokeType)?.label ?? strokeType;
+  const leaderboardErrorCode = leaderboardQuery.error?.data?.code;
+  const leaderboardFailed = !leaderboardQuery.data && leaderboardQuery.isError;
+  // The previous filter's ranking while the new one loads.
+  const showingPrevious = leaderboardQuery.isPlaceholderData;
+
+  let ranking: ReactNode;
+  // An empty previous ranking is no answer for the new filter: a skeleton, not «Nessun record».
+  if (leaderboardQuery.isPending || (showingPrevious && rows.length === 0)) {
+    ranking = <LoadingSkeleton label="Caricamento della classifica…" count={5} className="mt-3 space-y-2" />;
+  } else if (leaderboardFailed && leaderboardErrorCode === "FORBIDDEN") {
+    ranking = (
+      <ClubNotice className="mt-3" backHref={`/community/club/${clubId}`}>
+        Iscriviti al club per vedere i suoi record.
+      </ClubNotice>
+    );
+  } else if (leaderboardFailed && leaderboardErrorCode !== "NOT_FOUND") {
+    ranking = <LoadError className="mt-3" onRetry={() => void leaderboardQuery.refetch()} />;
+  } else if (leaderboardFailed) {
+    ranking = (
+      <ClubNotice className="mt-3" backHref="/home/community" backLabel="Torna alla community">
+        Club non trovato.
+      </ClubNotice>
+    );
+  } else if (rows.length === 0) {
+    ranking = (
+      <div className="surface-panel mt-3 flex flex-col items-center gap-2 p-6 text-center">
+        <Medal className="size-8 text-muted-foreground" aria-hidden />
+        <p className="text-sm text-muted-foreground">Nessun record per questi filtri.</p>
+      </div>
+    );
+  } else {
+    ranking = (
+      <>
+        {/* Each `value` keeps the list position equal to the visible rank; no value without one. */}
+        <ol
+          ref={listRef}
+          aria-labelledby={rankingTitleId}
+          aria-busy={showingPrevious || undefined}
+          className={cn("mt-3 scroll-mt-20 space-y-2", showingPrevious && "opacity-60")}
+        >
+          {paging.pageItems.map(({ entry: row, rank }, index) => {
+            const subtitle = [row.masterCategory || null, formatDayMonthYear(row.achievedAt)]
+              .filter((part) => part && part !== NO_VALUE)
+              .join(" · ");
+            return (
+              <li key={`${row.userId}-${paging.offset + index}`} value={rank ?? undefined}>
+                <RankRow
+                  rank={rank}
+                  name={String(row.displayName || row.username || "Nuotatore")}
+                  avatarUrl={row.avatarUrl}
+                  subtitle={subtitle || undefined}
+                  value={formatSwimCentiseconds(row.timeCs)}
+                  href={`/u/${row.userId}`}
+                  isCurrentUser={user != null && Number(user.id) === Number(row.userId)}
+                />
+              </li>
+            );
+          })}
+        </ol>
+        <Pager
+          className="mt-3"
+          page={paging.page}
+          totalPages={paging.totalPages}
+          onChange={paging.setPage}
+          listRef={listRef}
+          label="Pagine della classifica"
+        />
+      </>
+    );
+  }
 
   return (
     <AppLayout>
-      <div className="compact-shell mx-auto max-w-6xl space-y-4 px-3 pb-24 sm:px-4">
-        <section className="surface-panel p-4 sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <Link href={`/community/club/${clubId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-                <ArrowLeft className="h-4 w-4" /> Torna al club
-              </Link>
-              <h1 className="mt-1 text-2xl font-display font-bold">Club PB Leaderboard</h1>
-              <p className="text-sm text-muted-foreground">{club?.name ?? "Club"}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Badge variant="outline">{selectedStrokeLabel} {distanceMeters}m</Badge>
-                <Badge variant="outline">Vasca {poolLengthMeters}m</Badge>
-                <Badge variant="outline">{source === "official" ? "Fonte: Gara" : "Fonte: Allenamento"}</Badge>
-              </div>
-            </div>
-            <Link href={`/community/club/${clubId}/workouts`} className="w-full sm:w-auto">
-              <Button className="w-full sm:w-auto" variant="outline-neon" size="sm">
-                Vai ai workout club
-              </Button>
-            </Link>
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="font-display text-[28px] font-bold leading-none">Record del club</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{club.name}</p>
           </div>
-        </section>
+          <Button variant="outline" size="sm" asChild>
+            <Link href={`/community/club/${clubId}/workouts`}>
+              <Dumbbell aria-hidden />
+              Allenamenti del club
+            </Link>
+          </Button>
+        </div>
 
-        <section className="surface-panel p-4 space-y-3">
-          <p className="text-xs font-display uppercase tracking-wide text-muted-foreground">Filtri leaderboard</p>
-          <div className="grid gap-2 md:grid-cols-5">
+        <section aria-label="Filtri" className="surface-panel grid grid-cols-2 gap-3 p-4 md:grid-cols-5">
+          <div className="space-y-1">
+            <Label htmlFor={strokeId}>Stile</Label>
             <Select value={strokeType} onValueChange={(value) => setStrokeType(value as typeof strokeType)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Stile" />
+              <SelectTrigger id={strokeId} className="w-full">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {STROKES.map((stroke) => (
@@ -122,84 +228,75 @@ export default function ClubPbLeaderboardPage() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
 
+          <div className="space-y-1">
+            <Label htmlFor={distanceId}>Distanza</Label>
             <Select value={String(distanceMeters)} onValueChange={(value) => setDistanceMeters(Number(value))}>
-              <SelectTrigger>
-                <SelectValue placeholder="Distanza" />
+              <SelectTrigger id={distanceId} className="w-full">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {distanceOptions.map((distance) => (
                   <SelectItem key={distance} value={String(distance)}>
-                    {distance}m
+                    {distance} m
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+          </div>
 
-            <Select value={String(poolLengthMeters)} onValueChange={(value) => setPoolLengthMeters(Number(value) as 25 | 50)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Vasca" />
+          <div className="space-y-1">
+            <Label htmlFor={poolId}>Vasca</Label>
+            <Select
+              value={String(poolLengthMeters)}
+              onValueChange={(value) => setPoolLengthMeters(Number(value) as 25 | 50)}
+            >
+              <SelectTrigger id={poolId} className="w-full">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="25">25m</SelectItem>
-                <SelectItem value="50">50m</SelectItem>
+                <SelectItem value="25">25 m</SelectItem>
+                <SelectItem value="50">50 m</SelectItem>
               </SelectContent>
             </Select>
+          </div>
 
+          <div className="space-y-1">
+            <Label htmlFor={sourceId}>Fonte</Label>
             <Select value={source} onValueChange={(value) => setSource(value as "official" | "training")}>
-              <SelectTrigger>
-                <SelectValue placeholder="Fonte" />
+              <SelectTrigger id={sourceId} className="w-full">
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="training">Allenamento</SelectItem>
                 <SelectItem value="official">Gara ufficiale</SelectItem>
               </SelectContent>
             </Select>
+          </div>
 
+          <div className="col-span-2 space-y-1 md:col-span-1">
+            <Label htmlFor={categoryId}>Categoria master</Label>
             <Input
-              placeholder="Categoria master (opz.)"
+              id={categoryId}
+              placeholder="Facoltativa"
+              maxLength={MASTER_CATEGORY_MAX}
               value={masterCategory}
               onChange={(event) => setMasterCategory(event.target.value)}
             />
           </div>
         </section>
 
-        <Surface className="bg-card border-border">
-          <SurfaceContent className="p-0">
-            {clubQuery.isLoading || leaderboardQuery.isLoading ? (
-              <div className="p-6 text-sm text-muted-foreground">Caricamento leaderboard...</div>
-            ) : rows.length === 0 ? (
-              <div className="p-6 text-sm text-muted-foreground">Nessun personal best disponibile per i filtri selezionati.</div>
-            ) : (
-              <div className="divide-y divide-border/60">
-                {rows.map((row) => (
-                  <div key={`${row.rank}-${row.userId}`} className="flex items-center justify-between gap-3 px-4 py-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className={`flex w-8 items-center justify-center text-sm font-bold ${rankTone(Number(row.rank))}`}>
-                        {Number(row.rank) <= 3 ? <Trophy className="h-4 w-4" /> : <Medal className="h-4 w-4" />}
-                      </div>
-                      <div className="min-w-0">
-                        <Link
-                          href={`/u/${row.userId}?from=${encodeURIComponent(`/community/club/${clubId}/pb`)}`}
-                          className="truncate text-sm font-semibold text-foreground hover:text-primary"
-                        >
-                          {String(row.displayName ?? `User ${row.userId}`)}
-                        </Link>
-                        <div className="text-xs text-muted-foreground">
-                          {row.masterCategory ? `${row.masterCategory} • ` : ""}{formatDate(row.achievedAt)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-display text-lg font-bold text-primary">{formatSwimCentiseconds(row.timeCs)}</p>
-                      <p className="text-[11px] text-muted-foreground">PB</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </SurfaceContent>
-        </Surface>
+        <section aria-labelledby={rankingTitleId}>
+          <h3 id={rankingTitleId} className="text-[17px] font-bold">
+            {selectedStrokeLabel} {distanceMeters} m · vasca {poolLengthMeters} m
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            {source === "official" ? "Tempi di gara" : "Tempi di allenamento"}
+            {category ? ` · categoria ${category}` : ""}
+          </p>
+          {ranking}
+        </section>
       </div>
     </AppLayout>
   );

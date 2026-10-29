@@ -1,7 +1,5 @@
 import { useState } from "react"
-import { motion } from "framer-motion"
 import { Link } from "wouter"
-import { ShieldCheck } from "lucide-react"
 import FeedPostHeader from "./FeedPostHeader"
 import FeedPostMetrics from "./FeedPostMetrics"
 import FeedPostActions from "./FeedPostActions"
@@ -14,7 +12,6 @@ import type { FeedPostRecord } from "./feed-types"
 interface FeedPostProps {
   post: FeedPostRecord
   currentUserId?: number
-  index?: number
   autoplayVideos?: boolean
 }
 
@@ -45,7 +42,17 @@ function parseTaggedUsers(raw: unknown): Array<{ user_id: number; name?: string 
   return []
 }
 
-export default function FeedPost({ post, currentUserId, index = 0, autoplayVideos = true }: FeedPostProps) {
+/** «Nuotata in vasca» / «Nuotata in acque libere»; just «Nuotata» when the type is unknown. */
+function activityTitle(isOpenWater: boolean | null | undefined) {
+  if (isOpenWater == null) return "Nuotata"
+  return isOpenWater ? "Nuotata in acque libere" : "Nuotata in vasca"
+}
+
+/**
+ * One feed post (Corsia, `renders/Feed.png`): header, text, compact activity card, media at
+ * full width (never text on top), reactions; posts are separated by a rule, not boxed.
+ */
+export default function FeedPost({ post, currentUserId, autoplayVideos = true }: FeedPostProps) {
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [openMediaUrl, setOpenMediaUrl] = useState<string | null>(null)
   const isOwner = !!(currentUserId && post.user_id === currentUserId)
@@ -59,181 +66,116 @@ export default function FeedPost({ post, currentUserId, index = 0, autoplayVideo
   const allMedia = mediaUrls.length > 0
     ? mediaUrls
     : (post.media_url ? [String(post.media_url)] : [])
+  /** « 1 di 3» when the post has several media, nothing for a single one. */
+  const mediaPosition = (idx: number, separator = "") =>
+    allMedia.length > 1 ? `${separator} ${idx + 1} di ${allMedia.length}` : ""
   const taggedUsers = parseTaggedUsers(post.tagged_users)
   const hashtags = normalizeArrayField(post.hashtags)
   const firstLink = post.content ? extractFirstUrl(post.content) : null
 
   return (
-    <motion.div
-      className="stream-node mb-4"
-      initial={{ opacity: 0, y: 18 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{
-        duration: 0.5,
-        type: "spring",
-        stiffness: 260,
-        damping: 24,
-        delay: Math.min(index * 0.05, 0.25),
-      }}
-    >
-      <div
-        className={`surface-panel overflow-hidden p-0 transition-all duration-300 ${
-          isActivityPost
-            ? "sf-activity-card relative isolate hover:shadow-[0_18px_44px_rgba(2,6,23,0.6)]"
-            : "sf-social-card"
-        }`}
-      >
-        {isActivityPost && (
-          <>
-            <div
-              aria-hidden="true"
-              className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(135deg,#132230_0%,#1b2e3c_54%,#122130_100%)]"
-            />
-            <div className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(106deg,rgba(2,6,23,0.72)_0%,rgba(3,24,45,0.5)_45%,rgba(2,6,23,0.26)_100%)]" />
-            <div className="pointer-events-none !absolute inset-0 !z-0 bg-[radial-gradient(circle_at_14%_14%,color-mix(in_oklch,var(--electric-cyan)_24%,transparent),transparent_40%),radial-gradient(circle_at_88%_10%,color-mix(in_oklch,var(--electric-lime)_19%,transparent),transparent_45%)]" />
-            <div className="pointer-events-none !absolute inset-[1px] rounded-[25px] !z-0 border border-white/12" />
-          </>
-        )}
-        {!isActivityPost && (
-          <>
-            <div
-              aria-hidden="true"
-              className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(132deg,#101820_0%,#182733_52%,#101920_100%)]"
-            />
-            <div className="pointer-events-none !absolute inset-0 !z-0 bg-[linear-gradient(124deg,color-mix(in_oklch,var(--background)_74%,transparent)_0%,color-mix(in_oklch,var(--background)_52%,transparent)_44%,color-mix(in_oklch,var(--background)_66%,transparent)_100%)]" />
-            <div className="pointer-events-none !absolute inset-0 !z-0 bg-[radial-gradient(circle_at_92%_8%,color-mix(in_oklch,var(--electric-cyan)_14%,transparent),transparent_40%),radial-gradient(circle_at_14%_84%,color-mix(in_oklch,var(--forge-orange)_10%,transparent),transparent_38%)]" />
-          </>
-        )}
+    <article className="border-b border-border pb-1">
+      <FeedPostHeader post={post} isOwner={isOwner} isFollowing={post.is_following} />
 
-        <div className={isActivityPost ? "relative !z-10" : undefined}>
-          <FeedPostHeader post={post} isOwner={isOwner} isFollowing={post.is_following} />
+      <div className="space-y-3 pt-2">
+        {post.content ? (
+          <p className="whitespace-pre-wrap text-[15px] text-foreground">
+            {renderSocialText(post.content)}
+          </p>
+        ) : null}
+        {firstLink ? <LinkPreviewCard url={firstLink} /> : null}
 
-          {isActivityPost ? (
-            <div className="px-4">
-              <span className="sf-activity-badge">
-                <ShieldCheck className="size-3" />
-                Allenamento certificato
-              </span>
-            </div>
-          ) : null}
-
-          {isActivityPost ? (
-            <FeedPostMetrics
-              distanceMeters={post.activity_distance_meters}
-              durationSeconds={post.activity_duration_seconds}
-              calories={post.activity_calories}
-              heartRate={post.activity_heart_rate}
-              swolf={post.activity_swolf}
-            />
-          ) : null}
-
-          {post.content && (
-            <p
-              className={`px-4 mt-3 text-sm whitespace-pre-wrap ${
-                isActivityPost ? "text-white/90" : "text-foreground"
-              }`}
-            >
-              {renderSocialText(post.content)}
-            </p>
-          )}
-          {firstLink ? (
-            <div className="mt-2 px-4">
-              <LinkPreviewCard url={firstLink} />
-            </div>
-          ) : null}
-
-          {taggedUsers.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2 px-4">
-              {taggedUsers.map((user) => (
-                <Link
-                  key={user.user_id}
-                  href={`/u/${user.user_id}`}
-                  className={`rounded-full px-2 py-1 text-xs text-[var(--electric-lime)] ${
-                    isActivityPost
-                      ? "border border-white/15 bg-white/5 backdrop-blur-sm hover:bg-white/10"
-                      : "border border-border/70 bg-card/40 hover:bg-card/70"
-                  }`}
-                >
-                  @{user.username || user.name || `u${user.user_id}`}
-                </Link>
-              ))}
-            </div>
-          )}
-
-          {allMedia.length > 0 && (
-            <div
-              className={`mt-3 grid gap-1.5 overflow-hidden ${
-                isActivityPost ? "px-2 pb-2" : ""
-              } ${allMedia.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
-            >
-              {allMedia.map((url, idx) => (
-                <div
-                  key={`${url}-${idx}`}
-                  className={`${isActivityPost ? "overflow-hidden rounded-2xl border border-white/8 bg-black/35" : "bg-black/30"}`}
-                >
-                  {isVideoUrl(url) ? (
-                    <video
-                      src={url}
-                      className="max-h-[420px] w-full object-cover"
-                      controls
-                      playsInline
-                      preload="metadata"
-                      autoPlay={autoplayVideos}
-                      muted={autoplayVideos}
-                      loop={autoplayVideos}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      className="block w-full cursor-zoom-in"
-                      onClick={() => setOpenMediaUrl(url)}
-                    >
-                      <img
-                        src={url}
-                        alt="Post media"
-                        className="max-h-[420px] w-full object-cover"
-                        loading="lazy"
-                      />
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {!post.content && hashtags.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1.5 px-4">
-              {hashtags.map((tag) => (
-                <span key={tag} className="rounded-full bg-card/40 px-2 py-1 text-[11px] text-[var(--electric-cyan)]">
-                  #{tag}
-                </span>
-              ))}
-            </div>
-          )}
-
-          <FeedPostActions
-            post={post}
-            onToggleComments={() => setCommentsOpen(!commentsOpen)}
-            commentsOpen={commentsOpen}
+        {isActivityPost ? (
+          <FeedPostMetrics
+            title={activityTitle(post.activity_is_open_water)}
+            distanceMeters={post.activity_distance_meters}
+            durationSeconds={post.activity_duration_seconds}
+            heartRate={post.activity_heart_rate}
+            swolf={post.activity_swolf}
           />
+        ) : null}
 
-          <FeedPostComments postId={post.id} isOpen={commentsOpen} />
-        </div>
+        {taggedUsers.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {taggedUsers.map((user) => (
+              <Link
+                key={user.user_id}
+                href={`/u/${user.user_id}`}
+                className="inline-flex h-7 items-center rounded-full bg-raised px-3 text-xs font-semibold text-action-text hover:bg-raised/70"
+              >
+                @{user.username || user.name || `u${user.user_id}`}
+              </Link>
+            ))}
+          </div>
+        ) : null}
+
+        {allMedia.length > 0 ? (
+          <div className={`grid gap-1.5 ${allMedia.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+            {allMedia.map((url, idx) => (
+              <div key={`${url}-${idx}`} className="overflow-hidden rounded-xl bg-raised">
+                {isVideoUrl(url) ? (
+                  <video
+                    src={url}
+                    className="max-h-[420px] w-full object-cover"
+                    controls
+                    playsInline
+                    preload="metadata"
+                    autoPlay={autoplayVideos}
+                    muted={autoplayVideos}
+                    loop={autoplayVideos}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="block w-full cursor-zoom-in"
+                    onClick={() => setOpenMediaUrl(url)}
+                    aria-label={`Apri la foto${mediaPosition(idx)}`}
+                  >
+                    <img
+                      src={url}
+                      alt={`Foto del post${mediaPosition(idx, ",")}`}
+                      className="max-h-[420px] w-full object-cover"
+                      loading="lazy"
+                    />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {!post.content && hashtags.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {hashtags.map((tag) => (
+              <span key={tag} className="text-sm font-medium text-action-text">
+                #{tag}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
 
+      <FeedPostActions
+        post={post}
+        onToggleComments={() => setCommentsOpen(!commentsOpen)}
+        commentsOpen={commentsOpen}
+      />
+
+      <FeedPostComments postId={post.id} isOpen={commentsOpen} />
+
       <Dialog open={Boolean(openMediaUrl)} onOpenChange={(open) => !open && setOpenMediaUrl(null)}>
-        <DialogContent className="max-w-5xl border-border/80 bg-background/95 p-2">
+        <DialogContent className="max-w-5xl border-border bg-background p-2">
           <DialogTitle className="sr-only">Anteprima immagine</DialogTitle>
           <DialogDescription className="sr-only">Visualizzazione dell'immagine del post.</DialogDescription>
           {openMediaUrl ? (
             <img
               src={openMediaUrl}
               alt="Anteprima immagine del post"
-              className="max-h-[82vh] w-full rounded-lg object-contain"
+              className="max-h-[82vh] w-full rounded-xl object-contain"
             />
           ) : null}
         </DialogContent>
       </Dialog>
-    </motion.div>
+    </article>
   )
 }
