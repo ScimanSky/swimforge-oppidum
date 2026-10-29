@@ -9,11 +9,21 @@ export const SWIM_METRICS_TIMEZONE = "Europe/Rome";
 // ─── Result types (server → clients) ────────────────────────────────────────
 
 export type Zones5 = [number, number, number, number, number]; // metres in Z1..Z5
-export type CssPoint = { distanceMeters: number; seconds: number; date: string };
+export type CssPoint = {
+  distanceMeters: number; seconds: number; date: string;
+  /** The CSS distance the lap matched, in the pool's unit (e.g. 200 yd is 182.9 m): for labels. */
+  nominalDistance?: number; distanceUnit?: "m" | "yd";
+};
+/** A best effort left out of the estimate: slower per 100 m than a longer one, so submaximal. */
+export type CssDroppedPoint = CssPoint & { slowerThan: CssPoint };
 export type CssResult = {
   paceSecondsPer100: number; speedMps: number;
   source: "stima" | "test"; confidence: "alta" | "media" | null; // null for a test
   points: CssPoint[]; testDate: string | null;
+  /** Estimate only: the fitted reserve D′ (m) and R² of distance = CS × time + D′. */
+  dPrimeMeters?: number | null; r2?: number | null;
+  /** Estimate only: best efforts dropped («scartato: più lento del tuo 400»). */
+  droppedPoints?: CssDroppedPoint[];
 };
 export type TsbReading = "molto_riposato" | "fresco" | "neutro" | "in_costruzione" | "carico_alto";
 export type SessionMetrics = {
@@ -85,15 +95,15 @@ export const SWIM_METRIC_DEFINITIONS: Record<SwimMetricKey, SwimMetricDefinition
     measures:
       "Il passo per 100 m che puoi tenere a lungo senza andare in debito: separa il lavoro aerobico da quello intenso.",
     formula:
-      "Velocità critica: retta distanza = velocità critica × tempo + riserva (D′), stimata sui tuoi migliori tratti continui a stile libero in vasca tra 200 e 1500 m (tra 2 e 30 minuti) degli ultimi 90 giorni. Con un test: velocità = 200 / (tempo sui 400 − tempo sui 200).",
+      "Velocità critica: retta distanza = velocità critica × tempo + riserva (D′), stimata con i minimi quadrati sui tuoi migliori tratti continui a stile libero in vasca tra 200 e 1500 m (tra 2 e 30 minuti, ±3% sulla distanza; in vasca da 25 yd conta la distanza in yard) degli ultimi 90 giorni. Un tratto più lento per 100 m di uno più lungo non era a tutta e viene scartato; se D′ esce negativo la retta passa per l'origine. Serve un tratto lungo almeno il doppio del più corto. Con un test: velocità = 200 / (tempo sui 400 − tempo sui 200).",
     source:
       "Velocità critica (Wakayoshi et al., 1992); versione 400/200 (Ginn, 1993). È il riferimento di Swim Smooth, British Triathlon e TrainingPeaks.",
     howToRead:
       "Più basso è, più sei veloce in soglia. Confrontalo con te stesso nel tempo: le stime da allenamento sono di solito un po' più lente del vero, perché raramente si nuota a tutta.",
     conventions: [
-      "Affidabilità alta con almeno 3 distanze che coprono un rapporto di almeno 3 (es. 200 e 600 m); media con 2.",
-      "Un test degli ultimi 90 giorni vale più della stima.",
-      "Il passo soglia accettato sta tra 1:00 e 3:30 per 100 m.",
+      "Affidabilità alta con almeno 3 distanze che coprono un rapporto di almeno 3 (es. 200 e 600 m), riserva D′ tra 0 e 50 m e R² di almeno 0,98; media negli altri casi.",
+      "Un test vale per 90 giorni dalla sua data (quel giorno compreso) e solo in avanti: le nuotate prima del test usano la stima del loro mese.",
+      "Il passo soglia accettato sta tra 1:00 e 3:30 per 100 m e non è più veloce del tratto più corto usato.",
     ],
   },
   load: {
@@ -218,6 +228,19 @@ export function pacingCvReading(cv: number): "molto regolare" | "regolare" | "ir
   if (cv < 2) return "molto regolare";
   if (cv <= 4) return "regolare";
   return "irregolare";
+}
+
+// ─── Pools ──────────────────────────────────────────────────────────────────
+
+/** A 25-yard pool (22.86 m; the database keeps whole metres, so 23). */
+export function isYardPool(poolLengthMeters: number | null | undefined): boolean {
+  return typeof poolLengthMeters === "number" && Math.abs(poolLengthMeters - 22.86) <= 0.5;
+}
+
+/** «25 m», «50 m», or «25 yd» for a 22.86 m pool. */
+export function poolLengthLabel(poolLengthMeters: number | null | undefined): string {
+  if (poolLengthMeters === null || poolLengthMeters === undefined) return "vasca non indicata";
+  return isYardPool(poolLengthMeters) ? "25 yd" : `${poolLengthMeters} m`;
 }
 
 // ─── Calendar helpers ───────────────────────────────────────────────────────

@@ -12,7 +12,7 @@ import {
   type SwimMetrics,
   type Zones5,
 } from "@shared/swimMetrics";
-import { cssFromTest, cssHistory, CSS_WINDOW_DAYS, type CssEstimate } from "./css";
+import { cssFromTest, cssHistory, cssLapsOf, CSS_WINDOW_DAYS, type CssEstimate } from "./css";
 import { efficiencySummary, sessionEfficiency } from "./efficiency";
 import { activeLaps, isPoolSwim, type MetricActivity } from "./laps";
 import { loadSeries, rampPerWeek, sessionLoad, tsbReading } from "./load";
@@ -38,8 +38,8 @@ const SHOWN_DAYS = 90;
 const INTENSITY_WEEKS = 8;
 
 export const MISSING = {
-  css: "Servono almeno due nuotate continue a stile libero, una fino a 400 m e una da 400 m in su, negli ultimi 90 giorni. Oppure inserisci un test.",
-  load: "Serve il passo soglia: inserisci un test o nuota tratti continui a stile libero (una fino a 400 m e una da 400 m in su).",
+  css: "Servono almeno due tratti continui a stile libero in vasca negli ultimi 90 giorni, tra 2 e 30 minuti, uno lungo almeno il doppio dell'altro (es. 200 e 400 m), nuotati a buon ritmo. Oppure inserisci un test.",
+  load: "Serve il passo soglia: inserisci un test o nuota due tratti continui a stile libero, uno lungo almeno il doppio dell'altro (es. 200 e 400 m).",
   intensity: "Servono il passo soglia e nuotate con i giri.",
   intensityNoLaps: "Nessuna nuotata in vasca con i giri negli ultimi 28 giorni.",
 } as const;
@@ -71,6 +71,9 @@ function cssResultFromEstimate(estimate: CssEstimate): CssResult {
     confidence: estimate.confidence,
     points: estimate.points,
     testDate: null,
+    dPrimeMeters: round(estimate.dPrimeMeters, 1),
+    r2: round(estimate.r2, 3),
+    droppedPoints: estimate.dropped,
   };
 }
 
@@ -177,7 +180,7 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
 
   // ── CSS ──
   // Seven months cover the 180 days; the chart shows the last six.
-  const history = cssHistory(activities, now, 7);
+  const history = cssHistory(cssLapsOf(activities), now, 7);
   const test = input.cssTest;
   const testIsCurrent =
     test !== null && test.date <= today && daysBetweenKeys(test.date, today) < CSS_WINDOW_DAYS;

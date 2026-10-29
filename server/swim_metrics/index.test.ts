@@ -198,7 +198,7 @@ describe("getSwimMetrics", () => {
     expect(metrics.sessions).toEqual([]);
     expect(metrics.css.current).toBeNull();
     expect(metrics.css.missing).toBe(
-      "Servono almeno due nuotate continue a stile libero, una fino a 400 m e una da 400 m in su, negli ultimi 90 giorni. Oppure inserisci un test.",
+      "Servono almeno due tratti continui a stile libero in vasca negli ultimi 90 giorni, tra 2 e 30 minuti, uno lungo almeno il doppio dell'altro (es. 200 e 400 m), nuotati a buon ritmo. Oppure inserisci un test.",
     );
     expect(metrics.load).toMatchObject({ today: null, rampPerWeek: null, days: [] });
     expect(metrics.load.missing).toMatch(/passo soglia/);

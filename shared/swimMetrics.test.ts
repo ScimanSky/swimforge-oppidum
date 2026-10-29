@@ -8,6 +8,8 @@ import {
   TSB_READING_LABELS,
   addDaysToKey,
   dayKey,
+  isYardPool,
+  poolLengthLabel,
   pacingCvReading,
   weekStartKey,
   weeklyStreak,
@@ -151,5 +153,18 @@ describe("readings shared by the interface and the coach", () => {
 
   it("conventional thresholds", () => {
     expect(SWIM_METRIC_THRESHOLDS).toEqual({ mediumZonePct: 35, rampPerWeek: 8, pacingFadePct: 5 });
+  });
+});
+
+describe("pool lengths", () => {
+  it("a 22.86 m pool is 25 yards", () => {
+    expect(isYardPool(23)).toBe(true);
+    expect(isYardPool(22.86)).toBe(true);
+    expect(isYardPool(25)).toBe(false);
+    expect(isYardPool(null)).toBe(false);
+    expect(poolLengthLabel(23)).toBe("25 yd");
+    expect(poolLengthLabel(25)).toBe("25 m");
+    expect(poolLengthLabel(50)).toBe("50 m");
+    expect(poolLengthLabel(null)).toBe("vasca non indicata");
   });
 });
