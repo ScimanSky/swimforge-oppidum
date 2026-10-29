@@ -200,6 +200,11 @@ export const statisticsRouter = router({
         return await getSwimMetrics(ctx.user.id);
     }),
 
+    // Removed advanced statistics. Kept only for the installed builds 1.0.0.2/1.0.0.3 and the tabs
+    // left open on the old web app, which still ask for it: null instead of a 404 that they would
+    // retry behind a spinner. Remove once the testers have updated.
+    getAdvanced: protectedProcedure.input(z.any()).query(() => null),
+
     // AI insights of the Coach page, from the caller's swim metrics (cached 24 hours, regenerated
     // at most every 6 hours after new swims and 4 times an hour; the client sends it outside the
     // batch, so the page never waits for Gemini).

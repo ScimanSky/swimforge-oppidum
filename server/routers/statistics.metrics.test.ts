@@ -57,8 +57,20 @@ describe("statistics: swim metrics procedures", () => {
     expect(h.getSwimMetrics.mock.calls.every(([userId]) => userId === 42)).toBe(true);
   });
 
-  it("the old getAdvanced procedure is gone", () => {
-    expect((statisticsRouter as any)._def.procedures.getAdvanced).toBeUndefined();
+  it("getAdvanced is only a stub for the old installed builds: null for a logged-in caller, whatever the input", async () => {
+    const caller = statisticsRouter.createCaller(ctx) as any;
+    expect(await caller.getAdvanced({ days: 30 })).toBeNull();
+    expect(await caller.getAdvanced()).toBeNull();
+    // Through the HTTP handler as the old builds send it (GET, superjson input).
+    const response = await fetchRequestHandler({
+      endpoint: "/trpc",
+      req: new Request(`http://localhost/trpc/getAdvanced?input=${encodeURIComponent(JSON.stringify({ json: { days: 30 } }))}`),
+      router: statisticsRouter,
+      createContext: () => ctx as any,
+    });
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as any).result.data.json).toBeNull();
+    expect(h.getSwimMetrics).not.toHaveBeenCalled();
   });
 
   it("getInsights builds the Coach page insights from the caller's metrics", async () => {
@@ -70,7 +82,7 @@ describe("statistics: swim metrics procedures", () => {
     expect(h.generateAIInsights).toHaveBeenCalledWith(metrics, 42);
   });
 
-  it.each(["getMetrics", "getInsights", "setCssTest", "clearCssTest", "setPaceZones", "clearPaceZones"] as const)(
+  it.each(["getMetrics", "getAdvanced", "getInsights", "setCssTest", "clearCssTest", "setPaceZones", "clearPaceZones"] as const)(
     "%s requires login",
     async (name) => {
       const caller = statisticsRouter.createCaller(anonymous as any) as any;
