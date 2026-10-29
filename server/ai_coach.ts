@@ -13,41 +13,21 @@ import { withErrorHandling } from "./lib/withErrorHandling";
 import { config } from "./config";
 import { getSwimMetrics } from "./swim_metrics";
 import {
+  PACE_ZONE_COACH_RULES,
   SWIM_METRICS_COACH_RULES,
   swimMetricsForCoach,
   swimMetricsGlossary,
 } from "./swim_metrics/coach-context";
+import { finalizePoolWorkout, generateZonedPoolWorkout, parseWorkoutJson } from "./ai_coach_zones";
+import type { SwimZones } from "@shared/swimMetrics";
+import type { CoachWorkout } from "@shared/coachWorkout";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const GEMINI_MODEL = ENV.geminiTextModel;
 const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
 
-interface WorkoutSection {
-  title: string;
-  exercises: WorkoutExercise[];
-  notes?: string;
-}
-
-interface WorkoutExercise {
-  name: string;
-  sets?: string;
-  reps?: string;
-  distance?: string;
-  duration?: string;
-  rest?: string;
-  intensity?: string;
-  notes?: string;
-}
-
-export interface GeneratedWorkout {
-  type: "pool" | "dryland";
-  title: string;
-  description: string;
-  duration: string;
-  difficulty: string;
-  sections: WorkoutSection[];
-  coachNotes: string[];
-}
+/** A generated workout (shared with the client): pool reps carry a pace zone A1–C3. */
+export type GeneratedWorkout = CoachWorkout;
 
 export type UserStatsForCoach = {
   profile: {
@@ -67,6 +47,8 @@ export type UserStatsForCoach = {
   };
   /** The swim metrics block and glossary (coach-context), or a line saying they are missing. */
   swimMetricsText: string;
+  /** The athlete's zones A1–C3 in effect: the server checks the reps and adds the paces. */
+  paceZones: SwimZones | null;
   hrZones: {
     hasData: boolean;
     activitiesWithHR: number;
@@ -135,21 +117,21 @@ function buildDefaultWorkout(workoutType: "pool" | "dryland"): GeneratedWorkout 
       {
         title: "Riscaldamento",
         exercises: [
-          { name: "200m stile facile", distance: "200m", rest: "20s" },
-          { name: "4x50m tecnica (catch-up / sculling)", distance: "4x50m", rest: "20s" },
+          { name: "200m stile facile", distance: "200m", rest: "20s", zone: "A1", stroke: "stile libero" },
+          { name: "4x50m tecnica (catch-up / sculling)", distance: "4x50m", rest: "20s", zone: "A1", stroke: "tecnica" },
         ],
       },
       {
         title: "Serie Principale",
         exercises: [
-          { name: "6x100m a ritmo controllato", distance: "6x100m", rest: "20-30s", intensity: "RPE 6-7" },
-          { name: "4x50m forte", distance: "4x50m", rest: "30-40s", intensity: "RPE 8" },
+          { name: "6x100m a ritmo controllato", distance: "6x100m", rest: "20-30s", intensity: "RPE 5", zone: "B1", stroke: "stile libero" },
+          { name: "4x50m forte", distance: "4x50m", rest: "30-40s", intensity: "RPE 8-9", zone: "C2", stroke: "stile libero" },
         ],
       },
       {
         title: "Defaticamento",
         exercises: [
-          { name: "200m facile", distance: "200m", rest: "0-20s" },
+          { name: "200m facile", distance: "200m", rest: "0-20s", zone: "A1", stroke: "stile libero" },
         ],
       },
     ],
@@ -398,7 +380,10 @@ async function generateWorkout(
 ): Promise<GeneratedWorkout> {
   const context = `ai_coach:generateWorkout user=${userId} type=${workoutType}`;
   const fallback =
-    (await getLatestCachedWorkout(userId, workoutType)) ?? buildDefaultWorkout(workoutType);
+    (await getLatestCachedWorkout(userId, workoutType)) ??
+    (workoutType === "pool"
+      ? finalizePoolWorkout(buildDefaultWorkout("pool"), null).workout
+      : buildDefaultWorkout(workoutType));
 
   return withErrorHandling(
     async () => {
@@ -414,29 +399,17 @@ async function generateWorkout(
 
       const userStats = await fetchUserStats(userId);
 
-      const prompt =
+      // Pool reps are checked against the athlete's zones (maximum rep, zone codes), fixed or
+      // asked again once, and completed with level, target pace and the total.
+      const workout =
         workoutType === "pool"
-          ? buildPoolWorkoutPrompt(userStats)
-          : buildDrylandWorkoutPrompt(userStats);
-
-      // Call Gemini API with timeout
-      const result = (await Promise.race([
-        model.generateContent(prompt),
-        new Promise((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(`Gemini API timeout after ${config.GEMINI_API_TIMEOUT_MS}ms`)
-              ),
-            config.GEMINI_API_TIMEOUT_MS
-          )
-        ),
-      ])) as any;
-
-      const response = result.response;
-      const text = response.text();
-
-      const workout = parseWorkoutResponse(text, workoutType);
+          ? await generateZonedPoolWorkout({
+              prompt: buildPoolWorkoutPrompt(userStats),
+              generate: generateText,
+              zones: userStats.paceZones,
+              fallback: createFallbackWorkout("pool"),
+            })
+          : parseWorkoutResponse(await generateText(buildDrylandWorkoutPrompt(userStats)), workoutType);
 
       logger.info(`[AI Coach] Workout generated successfully for user ${userId}`, {
         event: "ai_coach:generate_success",
@@ -450,6 +423,25 @@ async function generateWorkout(
     fallback,
     context
   );
+}
+
+/** One Gemini answer, with the configured timeout. */
+async function generateText(prompt: string): Promise<string> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const result = (await Promise.race([
+      model.generateContent(prompt),
+      new Promise((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`Gemini API timeout after ${config.GEMINI_API_TIMEOUT_MS}ms`)),
+          config.GEMINI_API_TIMEOUT_MS
+        );
+      }),
+    ])) as any;
+    return result.response.text();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -558,6 +550,7 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
       sessionsPerWeek: sessionsPerWeek.toFixed(1),
     },
     swimMetricsText,
+    paceZones: swimMetrics?.zones ?? null,
     hrZones: {
       hasData: hasHRData,
       activitiesWithHR: activitiesWithHR.length,
@@ -601,6 +594,11 @@ ${userStats.swimMetricsText}
 **USO DELLE METRICHE:**
 ${SWIM_METRICS_COACH_RULES}
 
+**ZONE DI PASSO A1–C3 (OBBLIGATORIO):**
+${PACE_ZONE_COACH_RULES}
+- in "zone" metti solo il codice (A1, A2, B1, B2, C1, C2, C3) e in "intensity" il livello della zona; il server controlla la ripetuta massima e aggiunge il passo dalle zone dell'atleta;
+- nelle "notes" di ogni serie con una zona, o nei "coachNotes", spiega ogni zona usata in una riga: sensazione, passo e a cosa serve.
+
 **ZONE FREQUENZA CARDIACA:**
 ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
 - Zona 2 (Aerobica): ${userStats.hrZones.zone2}%
@@ -631,7 +629,7 @@ ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
 4. **TEMPI DI RIPARTENZA** (OBBLIGATORIO):
    - Per ogni serie con ripetizioni (es. 4x100), specifica SEMPRE il tempo di ripartenza
    - Formato: "a 1:50", "a 1:20", "a 0:50"
-   - Calcolo: se c'è il passo soglia, imposta il passo delle serie con le zone di passo in m:ss/100 m del blocco METRICHE DI NUOTO (aerobico = Z2, soglia = Z4; valgono per lo stile libero) e aggiungi il recupero; altrimenti passo medio (${userStats.recent.avgPace} sec/100m) + 10-20 sec (tecnica) o + 5-10 sec (resistenza)
+   - Calcolo: se ci sono le zone, imposta il passo delle serie con i passi delle zone A1–C3 in m:ss/100 m del blocco ZONE DI PASSO (valgono per lo stile libero) e aggiungi il recupero; altrimenti passo medio (${userStats.recent.avgPace} sec/100m) + 10-20 sec (tecnica) o + 5-10 sec (resistenza)
 
 5. **ATTREZZI** (usa frequentemente):
    - **Pinne**: Propulsione, tecnica gambe (specialmente venerdì)
@@ -655,39 +653,51 @@ ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
       "title": "Riscaldamento",
       "exercises": [
         {
-          "name": "Nome esercizio",
+          "name": "400 stile libero sciolto",
+          "repeats": 1,
+          "repMeters": 400,
           "distance": "400m",
+          "stroke": "stile libero",
+          "zone": "A1",
           "intensity": "Facile",
-          "notes": "Note tecniche specifiche"
+          "notes": "A1: respiro tranquillo, potresti parlare; scalda e prepara alla serie"
         }
       ]
     },
     {
-      "title": "Serie Principale 1: Tecnica",
+      "title": "Serie Principale 1: Soglia",
       "exercises": [
         {
-          "name": "Esercizio tecnico",
-          "sets": "4x",
+          "name": "6x100 stile libero",
+          "repeats": 6,
+          "repMeters": 100,
+          "sets": "6x",
           "distance": "100m",
-          "rest": "a 1:50" (tempo di ripartenza basato sul passo),
-          "intensity": "Moderata",
+          "stroke": "stile libero",
+          "zone": "B2",
+          "intensity": "Soglia",
+          "rest": "a 2:10" (tempo di ripartenza basato sul passo della zona),
           "equipment": "Palette" (opzionale: Pinne, Palette, Pull buoy, Tavoletta),
-          "notes": "Focus su aspetto tecnico specifico"
+          "notes": "B2: respiro impegnato, poche parole tra una vasca e l'altra, al passo della zona; alza la soglia"
         }
       ],
       "notes": "Obiettivo della serie"
     },
     {
-      "title": "Serie Principale 2: Velocità/Resistenza",
+      "title": "Serie Principale 2: Velocità",
       "exercises": [
         {
-          "name": "Serie principale",
+          "name": "8x25 sprint",
+          "repeats": 8,
+          "repMeters": 25,
           "sets": "8x",
-          "distance": "50m",
-          "rest": "a 0:50" (tempo di ripartenza),
-          "intensity": "Alta - Zona 4",
+          "distance": "25m",
+          "stroke": "stile libero",
+          "zone": "C3",
+          "intensity": "Sopra soglia",
+          "rest": "a 0:45" (tempo di ripartenza),
           "equipment": "Pinne" (se venerdì),
-          "notes": "Mantenere ritmo costante"
+          "notes": "C3: a tutta, pochissimi respiri; velocità pura (mai oltre 25 m)"
         }
       ]
     },
@@ -695,20 +705,26 @@ ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
       "title": "Defaticamento",
       "exercises": [
         {
-          "name": "Nuoto facile",
+          "name": "200 misti facili",
+          "repeats": 1,
+          "repMeters": 200,
           "distance": "200m",
-          "intensity": "Molto facile",
+          "stroke": "misti",
+          "zone": "A1",
+          "intensity": "Facile",
           "notes": "Recupero attivo"
         }
       ]
     }
   ],
   "coachNotes": [
-    "Nota importante 1 basata sulle metriche",
-    "Nota importante 2 su aspetto da migliorare",
-    "Nota importante 3 su punti di forza da sfruttare"
+    "Le zone di oggi: una riga per ogni zona usata (sensazione, passo, a cosa serve)",
+    "Nota importante basata sulle metriche",
+    "Nota importante su aspetto da migliorare"
   ]
 }
+
+In ogni esercizio in vasca "repeats" (numero di ripetute) e "repMeters" (metri di ciascuna) sono numeri; "stroke" è uno tra: stile libero, dorso, rana, farfalla, misti, tecnica, gambe. Non scrivere il totale dei metri: lo calcola il server.
 
 Rispondi SOLO con il JSON valido, senza testo aggiuntivo.`;
 }
@@ -826,44 +842,14 @@ function parseWorkoutResponse(
   text: string,
   workoutType: "pool" | "dryland"
 ): GeneratedWorkout {
-  try {
-    // Remove markdown code blocks if present
-    let cleanText = text.trim();
-
-    // More robust markdown block removal
-    const jsonMatch = cleanText.match(/```json\s*([\s\S]*?)\s*```/) ||
-      cleanText.match(/```\s*([\s\S]*?)\s*```/);
-
-    if (jsonMatch) {
-      cleanText = jsonMatch[1];
-    } else {
-      // Fallback: strip any backticks and common text before/after
-      cleanText = cleanText.replace(/```json/g, "")
-        .replace(/```/g, "")
-        .trim();
-    }
-
-    // Parse JSON
-    const workout = JSON.parse(cleanText);
-
-    // Validate structure
-    if (!workout.title || !workout.sections || !Array.isArray(workout.sections)) {
-      throw new Error("Invalid workout structure");
-    }
-
-    return workout;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    logger.warn(`Failed to parse workout response: ${message}`, {
-      event: "ai_coach:parse_failed",
-      message,
-      // Keep logs bounded; raw model output can be large and may contain junk.
-      rawPreview: typeof text === "string" ? text.slice(0, 800) : undefined,
-    });
-
-    // Return fallback workout
-    return createFallbackWorkout(workoutType);
-  }
+  const workout = parseWorkoutJson(text);
+  if (workout) return workout;
+  logger.warn("Failed to parse workout response", {
+    event: "ai_coach:parse_failed",
+    // Keep logs bounded; raw model output can be large and may contain junk.
+    rawPreview: typeof text === "string" ? text.slice(0, 800) : undefined,
+  });
+  return createFallbackWorkout(workoutType);
 }
 
 /**
@@ -885,6 +871,8 @@ function createFallbackWorkout(workoutType: "pool" | "dryland"): GeneratedWorkou
               name: "Nuoto libero facile",
               distance: "400m",
               intensity: "Facile",
+              zone: "A1",
+              stroke: "stile libero",
               notes: "Focus sulla respirazione e rilassamento",
             },
           ],
@@ -897,7 +885,9 @@ function createFallbackWorkout(workoutType: "pool" | "dryland"): GeneratedWorkou
               sets: "4x",
               distance: "100m",
               rest: "20 sec",
-              intensity: "Moderata",
+              intensity: "Aerobico",
+              zone: "A2",
+              stroke: "tecnica",
               notes: "Concentrati sulla fase di presa e trazione",
             },
           ],
@@ -906,11 +896,13 @@ function createFallbackWorkout(workoutType: "pool" | "dryland"): GeneratedWorkou
           title: "Serie Principale",
           exercises: [
             {
-              name: "Intervalli misti",
+              name: "Intervalli a stile libero",
               sets: "6x",
               distance: "100m",
               rest: "30 sec",
-              intensity: "Moderata-Alta",
+              intensity: "Medio",
+              zone: "B1",
+              stroke: "stile libero",
               notes: "Mantieni ritmo costante",
             },
           ],
@@ -921,7 +913,9 @@ function createFallbackWorkout(workoutType: "pool" | "dryland"): GeneratedWorkou
             {
               name: "Nuoto facile",
               distance: "200m",
-              intensity: "Molto facile",
+              intensity: "Facile",
+              zone: "A1",
+              stroke: "stile libero",
               notes: "Recupero attivo",
             },
           ],

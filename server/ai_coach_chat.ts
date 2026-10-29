@@ -2,11 +2,21 @@ import { invokeLLM } from "./_core/llm";
 import { getSwimmerProfile, getActivities } from "./db";
 import { getSwimMetrics } from "./swim_metrics";
 import {
+  PACE_ZONE_COACH_RULES,
   SWIM_METRICS_COACH_RULES,
   swimMetricsForCoach,
   swimMetricsGlossary,
+  zonePaceText,
 } from "./swim_metrics/coach-context";
-import { TSB_READING_LABELS, type SwimMetrics } from "@shared/swimMetrics";
+import {
+  PACE_ZONE_BY_CODE,
+  PACE_ZONE_CODES,
+  TSB_READING_LABELS,
+  zoneOneLine,
+  type PaceZoneCode,
+  type PaceZoneRange,
+  type SwimMetrics,
+} from "@shared/swimMetrics";
 import { getExistingWorkouts } from "./ai_coach";
 import { listActivityInsights } from "./ai_activity_insights";
 import { logger } from "./middleware/logger";
@@ -108,6 +118,7 @@ Regole:
 - se l'utente riferisce dolore/infortunio, raccomanda stop e valutazione specialistica;
 - niente testo motivazionale generico.
 ${SWIM_METRICS_COACH_RULES}
+${PACE_ZONE_COACH_RULES}
 - se l'utente dice che oggi e' stanco/lento, riduci volume/intensita' e proponi una seduta di qualita' tecnica;
 - se l'obiettivo e' 50/100 stile, inserisci lavoro specifico di velocita' e partenze/virate.
 
@@ -157,6 +168,29 @@ function extractLastUserMessage(history: CoachChatMessage[]): string {
   return "";
 }
 
+/** A rep of the rule-based sessions: «8×100 B1 · Medio 1:50–1:56, rec. 20″». */
+type FallbackRep = {
+  meters: number;
+  code: PaceZoneCode;
+  count?: number;
+  /** Groups of the rep: «2 serie di 6×25». */
+  sets?: number;
+  label?: string;
+  rest?: string;
+  /** False for drill or other strokes: the zone paces hold for freestyle only. */
+  freestyle?: boolean;
+};
+
+function repText(rep: FallbackRep, ranges: PaceZoneRange[]): string {
+  const range = rep.freestyle === false ? undefined : ranges.find((candidate) => candidate.code === rep.code);
+  const paceText = range ? zonePaceText(range) : null;
+  const pace = !range ? "" : range.fastPace !== null && range.slowPace !== null ? ` ${paceText}` : ` (${paceText})`;
+  const reps = rep.count ? `${rep.sets ? `${rep.sets} serie di ` : ""}${rep.count}×${rep.meters}` : `${rep.meters}`;
+  return `${reps}${rep.label ? ` ${rep.label}` : ""} ${rep.code} · ${PACE_ZONE_BY_CODE[rep.code].level}${pace}${rep.rest ? `, rec. ${rep.rest}` : ""}`;
+}
+
+const sessionText = (reps: FallbackRep[], ranges: PaceZoneRange[]) => reps.map((rep) => repText(rep, ranges)).join(" + ");
+
 function fallbackMessage(
   ctx: CoachContext,
   history: CoachChatMessage[],
@@ -199,21 +233,47 @@ function fallbackMessage(
     ? `Ultima sessione: ${latest.distanceMeters}m in ${Math.round(latest.durationSeconds / 60)} min, passo ${formatPace(latest.avgPacePer100m ?? null)}.`
     : "Non vedo sessioni recenti, quindi parto da una base conservativa.";
 
-  let sessionBullet = "- Sessione oggi: 300 sciolti + 8x100 ritmo controllato + 6x50 progressivi + 200 defaticamento.";
+  // Every rep with zone, level and the athlete's pace (rules of PACE_ZONE_COACH_RULES).
+  const ranges = metrics?.zones.ranges ?? [];
+  let today: FallbackRep[] = [
+    { meters: 300, code: "A1" },
+    { count: 8, meters: 100, code: "B1", rest: "20″" },
+    { count: 6, meters: 50, code: "B2", rest: "20″" },
+    { meters: 200, code: "A1" },
+  ];
+  let sessionLabel = "Sessione oggi";
   let checkBullet = "- Monitora passo medio/100m e sensazione di fatica (RPE) a fine seduta.";
   let questionBullet = "- Quante sedute reali puoi fare nei prossimi 7 giorni (2/3/4)?";
 
   if (mentionsFatigue) {
-    sessionBullet =
-      "- Sessione oggi (scarico): 200 sciolti + 10x50 tecnica con 20\" rec + 6x75 aerobici facili + 150 defaticamento.";
+    sessionLabel = "Sessione oggi (scarico)";
+    today = [
+      { meters: 200, code: "A1" },
+      { count: 10, meters: 50, label: "tecnica", code: "A1", rest: "20″", freestyle: false },
+      { count: 6, meters: 75, code: "A2", rest: "20″" },
+      { meters: 150, code: "A1" },
+    ];
     checkBullet = "- Se RPE supera 6/10 o il passo peggiora oltre 3\"/100m, chiudi la serie principale.";
     questionBullet = "- Domani vuoi seduta breve tecnica (35-40') o riposo completo?";
   } else if (speedGoal) {
-    sessionBullet =
-      "- Sessione oggi (focus 50/100): 300 warm-up + 2x(6x25 veloce con 30\" rec) + 4x50 a ritmo gara + 200 sciolti.";
+    sessionLabel = "Sessione oggi (focus 50/100)";
+    today = [
+      { meters: 300, code: "A1" },
+      { sets: 2, count: 6, meters: 25, code: "C3", rest: "30″" },
+      { count: 4, meters: 50, code: "C2", rest: "1′" },
+      { meters: 200, code: "A1" },
+    ];
     checkBullet = "- Monitora tempo medio sui 25 veloci e mantenimento tecnica nelle ultime ripetute.";
     questionBullet = "- Hai riferimenti cronometrici attuali su 25m o 50m per calibrare i target?";
   }
+  const next: FallbackRep[] = [
+    { count: 3, meters: 400, code: "A2", rest: "30″" },
+    { count: 6, meters: 50, code: "B1", rest: "15″" },
+  ];
+  const sessionBullet = `- ${sessionLabel}: ${sessionText(today, ranges)}.`;
+  const used = new Set([...today, ...next].map((rep) => rep.code));
+  const zoneLines = PACE_ZONE_CODES.filter((code) => used.has(code)).map((code) => `- ${zoneOneLine(code)}`);
+  if (ranges.length === 0) zoneLines.push("- Passi delle zone non disponibili: servono il passo soglia o le tue zone.");
 
   const shoulderLine = mentionsShoulder
     ? "- Vincolo spalla: evita palette/farfalla e interrompi se dolore >3/10, valutando un professionista."
@@ -228,8 +288,11 @@ function fallbackMessage(
     "Cosa fare adesso",
     `- Focus prossime 2 sedute: ${nextFocus}.`,
     sessionBullet,
-    "- Sessione successiva: lavoro aerobico continuo + 6x50 progressivi in controllo tecnico.",
+    `- Sessione successiva: ${sessionText(next, ranges)}, curando la tecnica.`,
     shoulderLine,
+    "",
+    "Le zone di oggi",
+    ...zoneLines,
     "",
     "Check prossimo",
     checkBullet,

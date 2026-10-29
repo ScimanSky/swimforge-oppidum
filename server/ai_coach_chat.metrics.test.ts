@@ -15,6 +15,7 @@ vi.mock("./ai_coach", () => ({ getExistingWorkouts: vi.fn(async () => null) }));
 vi.mock("./ai_activity_insights", () => ({ listActivityInsights: vi.fn(async () => []) }));
 
 import { generateCoachChatReply } from "./ai_coach_chat";
+import { PACE_ZONE_COACH_RULES } from "./swim_metrics/coach-context";
 
 const OLD_NAMES = [/\bSEI\b/, /\bTCI\b/, /\bSER\b/, /\bACS\b/, /\bPOI\b/, /Performance Index/i, /Consistency/i, /Recovery Readiness/i];
 const previousKey = process.env.BUILT_IN_FORGE_API_KEY;
@@ -47,6 +48,43 @@ describe("coach chat context", () => {
     expect(prompt).toContain("GLOSSARIO DELLE METRICHE");
     expect(prompt).toContain("non inventare altri indici");
     for (const name of OLD_NAMES) expect(prompt).not.toMatch(name);
+  });
+
+  it("speaks the zones A1–C3: the athlete's zones and the rules for every rep", async () => {
+    await generateCoachChatReply(7, [{ role: "user", content: "Mi prepari un allenamento?" }]);
+    const prompt = systemPrompt();
+    expect(prompt).toContain("ZONE DI PASSO A1–C3 (zone automatiche dal passo soglia 1:44/100 m, stima;");
+    expect(prompt).toContain("- B2 Fondo medio-alto · livello Soglia: 1:44–1:50/100 m");
+    expect(prompt).toContain(PACE_ZONE_COACH_RULES);
+  });
+
+  it("the rule-based session speaks the zones too, with the athlete's paces and what each zone is", async () => {
+    const reply = await generateCoachChatReply(7, []);
+    expect(reply.message).toContain(
+      "- Sessione oggi: 300 A1 · Facile (più lento di 2:03) + 8×100 B1 · Medio 1:50–1:56, rec. 20″ + 6×50 B2 · Soglia 1:44–1:50, rec. 20″ + 200 A1 · Facile (più lento di 2:03).",
+    );
+    const zones = reply.message.split("Le zone di oggi\n")[1].split("\n\n")[0].split("\n");
+    expect(zones).toEqual([
+      "- A1 · Facile: nuoto sciolto, potresti parlare normalmente; scalda e fa recuperare",
+      "- A2 · Aerobico: ritmo comodo, frasi intere tra una vasca e l'altra; costruisce la base",
+      "- B1 · Medio: ritmo sostenuto, solo frasi brevi; allunga la resistenza",
+      "- B2 · Soglia: respiro impegnato, poche parole tra una vasca e l'altra; alza la soglia",
+    ]);
+  });
+
+  it("the rule-based sprint session stays within 25 m in C3 and 150 m in C2", async () => {
+    const reply = await generateCoachChatReply(7, [], { goal: "migliorare i 50 stile" });
+    expect(reply.message).toContain("2 serie di 6×25 C3 · Sopra soglia (più veloce di 1:40), rec. 30″");
+    expect(reply.message).toContain("4×50 C2 · Sopra soglia (più veloce di 1:40), rec. 1′");
+  });
+
+  it("without zones the rule-based session keeps zones and levels, and says the paces are missing", async () => {
+    const metrics = sampleSwimMetrics();
+    metrics.zones = { source: null, ranges: [], bounds: null, autoBounds: null, manualUpdatedAt: null };
+    h.getSwimMetrics.mockResolvedValue(metrics);
+    const reply = await generateCoachChatReply(7, []);
+    expect(reply.message).toContain("8×100 B1 · Medio, rec. 20″");
+    expect(reply.message).toContain("Passi delle zone non disponibili: servono il passo soglia o le tue zone.");
   });
 
   it("says so when the metrics cannot be read", async () => {
