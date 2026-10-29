@@ -122,8 +122,14 @@ export default function NotificationBell() {
       utils.community.notifications.unreadCount.invalidate();
       utils.community.notifications.list.invalidate();
     },
-    onError: (error) => {
-      toast.error(errorToastMessage(error, "Impossibile segnare le notifiche come lette"));
+    onError: (error, variables) => {
+      const one = variables?.notificationIds?.length === 1;
+      toast.error(
+        errorToastMessage(
+          error,
+          one ? "Impossibile segnare la notifica come letta" : "Impossibile segnare le notifiche come lette"
+        )
+      );
       utils.community.notifications.unreadCount.invalidate();
       utils.community.notifications.list.invalidate();
     },

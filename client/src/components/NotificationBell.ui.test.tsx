@@ -37,11 +37,11 @@ vi.mock("@/lib/trpc", () => {
             },
           },
           markRead: {
-            useMutation: (options?: { onSuccess?: () => void; onError?: (error: unknown) => void }) => ({
+            useMutation: (options?: { onSuccess?: () => void; onError?: (error: unknown, vars: unknown) => void }) => ({
               mutate: (vars: unknown, callOptions?: { onSuccess?: () => void }) => {
                 state.marks.push(vars);
                 if (state.markError) {
-                  options?.onError?.(state.markError);
+                  options?.onError?.(state.markError, vars);
                   return;
                 }
                 options?.onSuccess?.();
@@ -179,6 +179,15 @@ describe("NotificationBell (Corsia)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Notifiche, 2 non lette" }));
     await userEvent.click(screen.getByRole("button", { name: /Nuovo commento/ }));
     expect(state.marks).toEqual([{ notificationIds: [11] }]);
+    expect(location.history?.at(-1)).toBe("/post/5");
+  });
+
+  it("one notification that cannot be marked read says so in the singular, and still opens", async () => {
+    state.markError = Object.assign(new Error("FORBIDDEN"), { data: { code: "FORBIDDEN" } });
+    const location = renderBell();
+    await userEvent.click(screen.getByRole("button", { name: "Notifiche, 2 non lette" }));
+    await userEvent.click(screen.getByRole("button", { name: /Nuovo commento/ }));
+    expect(toast.error).toHaveBeenCalledWith("Impossibile segnare la notifica come letta");
     expect(location.history?.at(-1)).toBe("/post/5");
   });
 
