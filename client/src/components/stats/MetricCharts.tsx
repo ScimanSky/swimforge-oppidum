@@ -72,6 +72,31 @@ const dot = (color: string) => ({ r: 4, fill: color, stroke: "var(--card)", stro
 
 const dayLabel = (key: unknown) => formatKeyDayMonth(String(key));
 
+/**
+ * Round axis bounds and evenly spaced ticks (at most 5) covering `values`: the first step of
+ * `steps` that fits, so the axis reads «1,40 · 1,45 · 1,50» instead of «1,41 · 1,48».
+ */
+export function niceScale(values: number[], steps: readonly number[]): { domain: [number, number]; ticks: number[] } {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const fit = (step: number) => {
+    let lo = Math.floor(min / step) * step;
+    let hi = Math.ceil(max / step) * step;
+    if (hi - lo < step) {
+      lo -= step;
+      hi += step;
+    }
+    return { lo, hi, count: Math.round((hi - lo) / step) };
+  };
+  const step = steps.find((candidate) => fit(candidate).count <= 4) ?? steps[steps.length - 1];
+  const { lo, hi, count } = fit(step);
+  const ticks = Array.from({ length: count + 1 }, (_, index) => Math.round((lo + index * step) * 1e6) / 1e6);
+  return { domain: [lo, hi], ticks };
+}
+
+const SECOND_STEPS = [1, 2, 5, 10, 15, 30, 60] as const;
+const INDEX_STEPS = [0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1] as const;
+
 function ChartFrame({
   title,
   summary,
@@ -130,6 +155,8 @@ export function ChartLegend({ items, className }: { items: LegendItem[]; classNa
 export function CssHistoryChart({ history }: { history: SwimMetrics["css"]["history"] }) {
   if (!history.some((entry) => entry.paceSecondsPer100 !== null)) return null;
   const data = history.map((entry) => ({ month: entry.month, pace: entry.paceSecondsPer100 }));
+  const paces = history.flatMap((entry) => (entry.paceSecondsPer100 === null ? [] : [entry.paceSecondsPer100]));
+  const scale = niceScale([Math.min(...paces) - 1, Math.max(...paces) + 1], SECOND_STEPS);
   return (
     <ChartFrame title="Stima a fine mese (/100 m)" summary={cssChartSummary(history)}>
       <LineChart data={data} margin={MARGIN}>
@@ -137,8 +164,9 @@ export function CssHistoryChart({ history }: { history: SwimMetrics["css"]["hist
         <XAxis dataKey="month" {...X_AXIS} interval={0} tickFormatter={(month) => formatMonthKey(String(month))} />
         <YAxis
           {...Y_AXIS}
-          domain={["dataMin - 2", "dataMax + 2"]}
-          allowDecimals={false}
+          domain={scale.domain}
+          ticks={scale.ticks}
+          interval={0}
           tickFormatter={(value: number) => formatPaceValue(value)}
         />
         <Tooltip
@@ -173,7 +201,7 @@ export function LoadChart({ load }: { load: SwimMetrics["load"] }) {
   return (
     <div>
       <ChartFrame title="Ultimi 90 giorni (punti di carico)" summary={summary} height={200}>
-        <ComposedChart data={data} margin={MARGIN} barCategoryGap={1}>
+        <ComposedChart data={data} margin={MARGIN} barCategoryGap={0}>
           {GRID}
           <XAxis dataKey="date" {...X_AXIS} minTickGap={24} tickFormatter={dayLabel} />
           <YAxis {...Y_AXIS} width={32} allowDecimals={false} />
@@ -250,7 +278,12 @@ export function IntensityChart({ weeks }: { weeks: SwimMetrics["intensity"]["wee
         <BarChart data={data} margin={MARGIN}>
           {GRID}
           <XAxis dataKey="week" {...X_AXIS} tickFormatter={dayLabel} />
-          <YAxis {...Y_AXIS} width={32} tickFormatter={(value: number) => formatKm(value * 1000)} />
+          <YAxis
+            {...Y_AXIS}
+            width={32}
+            allowDecimals={false}
+            tickFormatter={(value: number) => formatKm(value * 1000)}
+          />
           <Tooltip
             {...TOOLTIP}
             cursor={BAR_CURSOR}
@@ -286,6 +319,8 @@ export function EfficiencyChart({ metrics }: { metrics: SwimMetrics }) {
   if (!summary) return null;
   const baseline = metrics.efficiency.baseline;
   const data = efficiencySessions(metrics).map((session) => ({ date: session.date, si: session.strokeIndex }));
+  const values = [...data.map((point) => point.si), ...(baseline === null ? [] : [baseline])];
+  const scale = niceScale([Math.min(...values) - 0.01, Math.max(...values) + 0.01], INDEX_STEPS);
   return (
     <div>
       <ChartFrame title="Stroke Index per nuotata" summary={summary}>
@@ -294,7 +329,9 @@ export function EfficiencyChart({ metrics }: { metrics: SwimMetrics }) {
           <XAxis dataKey="date" {...X_AXIS} tickFormatter={dayLabel} />
           <YAxis
             {...Y_AXIS}
-            domain={["dataMin - 0.05", "dataMax + 0.05"]}
+            domain={scale.domain}
+            ticks={scale.ticks}
+            interval={0}
             tickFormatter={(value: number) => formatDecimal(value, 2)}
           />
           {baseline !== null ? (
@@ -302,7 +339,6 @@ export function EfficiencyChart({ metrics }: { metrics: SwimMetrics }) {
               y={baseline}
               stroke="var(--muted-foreground)"
               strokeDasharray="4 4"
-              ifOverflow="extendDomain"
             />
           ) : null}
           <Tooltip
@@ -340,7 +376,8 @@ export function PacingSetChart({ set }: { set: NonNullable<SwimMetrics["pacing"]
   const data = set.repSeconds.map((seconds, index) => ({ rep: index + 1, seconds }));
   const min = Math.min(...set.repSeconds);
   const max = Math.max(...set.repSeconds);
-  const floor = Math.max(0, Math.floor(min - Math.max(max - min, 2) - 1));
+  // Room under the fastest rep, so even it has a visible bar.
+  const scale = niceScale([Math.max(0, min - Math.max(max - min, 2) - 1), max], SECOND_STEPS);
   return (
     <ChartFrame
       title={`Ultima serie · ${formatKeyDayMonth(set.date)} · ${setTitle(set)}`}
@@ -351,9 +388,10 @@ export function PacingSetChart({ set }: { set: NonNullable<SwimMetrics["pacing"]
         <XAxis dataKey="rep" {...X_AXIS} />
         <YAxis
           {...Y_AXIS}
-          domain={[floor, Math.ceil(max + 1)]}
+          domain={scale.domain}
+          ticks={scale.ticks}
+          interval={0}
           allowDataOverflow
-          allowDecimals={false}
           tickFormatter={(value: number) => formatClock(value)}
         />
         <Tooltip
