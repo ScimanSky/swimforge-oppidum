@@ -1,10 +1,10 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { MetricOrb } from "@/components/metrics/MetricOrb"
+import { Chip } from "@/components/corsia/Chip"
+import { Metric, type MetricProps } from "@/components/corsia/Metric"
 import { Progress } from "@/components/ui/progress"
 import {
   Dialog,
@@ -37,15 +37,15 @@ import {
   Trash2,
 } from "lucide-react"
 import { trpc } from "@/lib/trpc"
+import { formatDayMonthYear, formatInteger, formatKm, NO_VALUE } from "@/lib/format"
 import { toast } from "sonner"
 
-const formatDate = (date?: string | Date | null) => {
-  if (!date) return "—"
-  return new Date(date).toLocaleDateString("it-IT", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  })
+const sectionTitle = "text-[17px] font-bold"
+const goalValueFmt = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 })
+/** Goal values as Italian numbers («2,5»); non-numeric values unchanged. */
+const formatGoalValue = (value: unknown) => {
+  const number = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(number) ? goalValueFmt.format(number) : String(value)
 }
 
 const LEGACY_CUSTOM_GOALS_KEY = "swimforge:customGoals"
@@ -76,14 +76,14 @@ const categoryIcons: Record<string, React.ElementType> = {
   milestone: Trophy,
 }
 
-const categoryColors: Record<string, string> = {
-  speed: "text-chart-5 bg-chart-5/10",
-  distance: "text-action-text bg-primary/10",
-  efficiency: "text-muted-foreground bg-raised",
-  frequency: "text-chart-4 bg-chart-4/10",
-  endurance: "text-chart-3 bg-chart-3/10",
-  technique: "text-chart-2 bg-chart-2/10",
-  milestone: "text-chart-1 bg-chart-1/10",
+const categoryLabels: Record<string, string> = {
+  speed: "Velocità",
+  distance: "Distanza",
+  efficiency: "Efficienza",
+  frequency: "Frequenza",
+  endurance: "Resistenza",
+  technique: "Tecnica",
+  milestone: "Traguardo",
 }
 
 export default function Goals() {
@@ -266,7 +266,7 @@ export default function Goals() {
     if (suggestions.length === 0) {
       suggestions.push({
         title: "Sfida personale",
-        description: "Crea un obiettivo custom legato al tuo prossimo PR",
+        description: "Crea un obiettivo personalizzato legato al tuo prossimo record",
         category: "milestone",
       })
     }
@@ -276,52 +276,45 @@ export default function Goals() {
   const allActiveGoals = useMemo(() => {
     return [...customGoals]
   }, [customGoals])
-  const goalsOrbs = useMemo(() => {
+  const summaryMetrics = useMemo((): Array<MetricProps & { id: string }> => {
     const xpGoal = activeGoals.find((goal) => goal.id === "xp")
     const distanceGoal = activeGoals.find((goal) => goal.id === "weekly-distance")
     const frequencyGoal = activeGoals.find((goal) => goal.id === "weekly-sessions")
+    const nextLevel = profile?.xpLevel ? profile.xpLevel + 1 : 2
 
     return [
       {
-        label: "XP livello",
-        value: xpGoal ? `${Math.round(xpGoal.progress)}%` : "0%",
-        progress: xpGoal?.progress ?? 0,
-        helper: xpGoal ? `${xpGoal.currentValue}/${xpGoal.targetValue} XP` : "N/D",
-        icon: <Zap className="size-4" />,
-        tone: "cyan" as const,
+        id: "xp",
+        value: formatInteger(xpGoal?.progress ?? 0),
+        unit: "%",
+        label: `Verso il livello ${nextLevel}`,
+        tone: "xp",
       },
       {
-        label: "Distanza settimana",
-        value: distanceGoal ? `${distanceGoal.currentValue} km` : "0 km",
-        progress: distanceGoal?.progress ?? 0,
-        helper: distanceGoal ? `Target ${distanceGoal.targetValue} km` : "N/D",
-        icon: <Waves className="size-4" />,
-        tone: "lime" as const,
+        id: "distance",
+        value: formatKm(weeklyDistanceMeters),
+        unit: "km",
+        label: `Settimana, obiettivo ${distanceGoal?.targetValue ?? 10} km`,
       },
       {
-        label: "Frequenza",
-        value: frequencyGoal ? `${frequencyGoal.currentValue} sedute` : "0 sedute",
-        progress: frequencyGoal?.progress ?? 0,
-        helper: frequencyGoal ? `Target ${frequencyGoal.targetValue}/sett` : "N/D",
-        icon: <Calendar className="size-4" />,
-        tone: "amber" as const,
+        id: "sessions",
+        value: formatInteger(weeklySessions),
+        unit: weeklySessions === 1 ? "nuotata" : "nuotate",
+        label: `Settimana, obiettivo ${frequencyGoal?.targetValue ?? 3}`,
       },
       {
-        label: "Obiettivi custom",
-        value: allActiveGoals.length,
-        progress: Math.min(100, Math.round((allActiveGoals.length / 8) * 100)),
-        helper: allActiveGoals.length ? "In lavorazione" : "Crea il primo",
-        icon: <Target className="size-4" />,
-        tone: "sky" as const,
+        id: "custom",
+        value: formatInteger(allActiveGoals.length),
+        label: "Obiettivi attivi",
       },
     ]
-  }, [activeGoals, allActiveGoals.length])
+  }, [activeGoals, allActiveGoals.length, profile?.xpLevel, weeklyDistanceMeters, weeklySessions])
 
   const addSuggestedGoal = (goal: any) => {
     const title = String(goal.title ?? "").trim()
     const exists = customGoals.some((item) => item.title.trim().toLowerCase() === title.toLowerCase())
     if (exists) {
-      toast.info("Obiettivo gia aggiunto")
+      toast.info("Obiettivo già aggiunto")
       return
     }
     createGoalMutation.mutate(
@@ -464,375 +457,384 @@ export default function Goals() {
     )
   }, [goalsQuery.isSuccess])
 
+  const summaryTitleId = useId()
+  const goalsTitleId = useId()
+  const completedTitleId = useId()
+  const suggestedTitleId = useId()
+  const formId = useId()
+
   return (
     <AppLayout>
-      <div className="compact-shell space-y-4 lg:space-y-2">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-display font-bold text-foreground">Obiettivi</h1>
-            <p className="text-muted-foreground">Definisci e traccia i tuoi obiettivi di nuoto</p>
+      <div className="space-y-4">
+        <section aria-labelledby={summaryTitleId} className="surface-panel p-4">
+          <h2 id={summaryTitleId} className={sectionTitle}>
+            Riepilogo
+          </h2>
+          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
+            {summaryMetrics.map(({ id, ...metric }) => (
+              <Metric key={id} size="responsive" {...metric} />
+            ))}
           </div>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button variant="neon" className="gap-2">
-                <Plus className="w-4 h-4" />
-                Crea obiettivo
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Crea obiettivo</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Titolo</label>
-                  <Input
-                    value={customDraft.title}
-                    onChange={(event) =>
-                      setCustomDraft((prev) => ({ ...prev, title: event.target.value }))
-                    }
-                    placeholder="Es. 12 km a settimana"
-                  />
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Categoria</label>
-                    <Select
-                      value={customDraft.category}
-                      onValueChange={(value) =>
-                        setCustomDraft((prev) => ({ ...prev, category: value }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Categoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="distance">Distanza</SelectItem>
-                        <SelectItem value="frequency">Frequenza</SelectItem>
-                        <SelectItem value="efficiency">Efficienza</SelectItem>
-                        <SelectItem value="speed">Velocita</SelectItem>
-                        <SelectItem value="technique">Tecnica</SelectItem>
-                        <SelectItem value="milestone">Milestone</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Target</label>
-                    <Input
-                      value={customDraft.targetValue}
-                      onChange={(event) =>
-                        setCustomDraft((prev) => ({ ...prev, targetValue: event.target.value }))
-                      }
-                      placeholder="Valore obiettivo"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Unita</label>
-                    <Input
-                      value={customDraft.unit}
-                      onChange={(event) =>
-                        setCustomDraft((prev) => ({ ...prev, unit: event.target.value }))
-                      }
-                      placeholder="km, sessioni, sec..."
-                    />
-                  </div>
-                </div>
-                <Button onClick={addCustomGoal} disabled={createGoalMutation.isPending}>Aggiungi obiettivo</Button>
+        </section>
 
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-foreground">Suggeriti per te</p>
+        <section aria-labelledby={goalsTitleId} className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <h2 id={goalsTitleId} className={sectionTitle}>
+              I tuoi obiettivi
+            </h2>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button className="gap-2">
+                  <Plus className="size-4" aria-hidden />
+                  Crea obiettivo
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Crea obiettivo</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
                   <div className="space-y-2">
-                    {suggestedGoals.map((goal) => (
-                      <div
-                        key={goal.title}
-                        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 bg-secondary/30 p-3"
+                    <label htmlFor={`${formId}-create-title`} className="text-sm font-medium text-foreground">
+                      Titolo
+                    </label>
+                    <Input
+                      id={`${formId}-create-title`}
+                      value={customDraft.title}
+                      onChange={(event) =>
+                        setCustomDraft((prev) => ({ ...prev, title: event.target.value }))
+                      }
+                      placeholder="Es. 12 km a settimana"
+                    />
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <label id={`${formId}-create-category`} className="text-sm font-medium text-foreground">
+                        Categoria
+                      </label>
+                      <Select
+                        value={customDraft.category}
+                        onValueChange={(value) =>
+                          setCustomDraft((prev) => ({ ...prev, category: value }))
+                        }
                       >
-                        <div>
-                          <p className="text-sm font-semibold text-foreground">{goal.title}</p>
-                          <p className="text-xs text-muted-foreground">{goal.description}</p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => addSuggestedGoal(goal)}
-                          disabled={createGoalMutation.isPending}
+                        <SelectTrigger aria-labelledby={`${formId}-create-category`}>
+                          <SelectValue placeholder="Categoria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="distance">Distanza</SelectItem>
+                          <SelectItem value="frequency">Frequenza</SelectItem>
+                          <SelectItem value="efficiency">Efficienza</SelectItem>
+                          <SelectItem value="speed">Velocità</SelectItem>
+                          <SelectItem value="technique">Tecnica</SelectItem>
+                          <SelectItem value="milestone">Traguardo</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor={`${formId}-create-target`} className="text-sm font-medium text-foreground">
+                        Valore obiettivo
+                      </label>
+                      <Input
+                        id={`${formId}-create-target`}
+                        value={customDraft.targetValue}
+                        onChange={(event) =>
+                          setCustomDraft((prev) => ({ ...prev, targetValue: event.target.value }))
+                        }
+                        placeholder="Es. 10"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor={`${formId}-create-unit`} className="text-sm font-medium text-foreground">
+                        Unità
+                      </label>
+                      <Input
+                        id={`${formId}-create-unit`}
+                        value={customDraft.unit}
+                        onChange={(event) =>
+                          setCustomDraft((prev) => ({ ...prev, unit: event.target.value }))
+                        }
+                        placeholder="km, nuotate, secondi…"
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={addCustomGoal} disabled={createGoalMutation.isPending}>
+                    Aggiungi obiettivo
+                  </Button>
+
+                  <div className="space-y-2 border-t border-border pt-4">
+                    <p className="text-sm font-semibold text-foreground">Suggeriti per te</p>
+                    <ul className="space-y-2">
+                      {suggestedGoals.map((goal) => (
+                        <li
+                          key={goal.title}
+                          className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-raised p-3"
                         >
-                          Aggiungi
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-          <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Modifica obiettivo</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Titolo</label>
-                  <Input
-                    value={editDraft.title}
-                    onChange={(event) =>
-                      setEditDraft((prev) => ({ ...prev, title: event.target.value }))
-                    }
-                    placeholder="Es. 12 km a settimana"
-                  />
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Categoria</label>
-                    <Select
-                      value={editDraft.category}
-                      onValueChange={(value) =>
-                        setEditDraft((prev) => ({ ...prev, category: value }))
-                      }
-                    >
-                      <SelectTrigger className="bg-background/60">
-                        <SelectValue placeholder="Seleziona categoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="distance">Distanza</SelectItem>
-                        <SelectItem value="speed">Velocita</SelectItem>
-                        <SelectItem value="efficiency">Efficienza</SelectItem>
-                        <SelectItem value="frequency">Frequenza</SelectItem>
-                        <SelectItem value="endurance">Resistenza</SelectItem>
-                        <SelectItem value="technique">Tecnica</SelectItem>
-                        <SelectItem value="milestone">Traguardo</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-foreground">Valore target</label>
-                    <Input
-                      type="number"
-                      value={editDraft.targetValue}
-                      onChange={(event) =>
-                        setEditDraft((prev) => ({ ...prev, targetValue: event.target.value }))
-                      }
-                      placeholder="Es. 10"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Unita</label>
-                  <Input
-                    value={editDraft.unit}
-                    onChange={(event) =>
-                      setEditDraft((prev) => ({ ...prev, unit: event.target.value }))
-                    }
-                    placeholder="Es. km/settimana"
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="ghost" onClick={() => setIsEditOpen(false)}>
-                    Annulla
-                  </Button>
-                  <Button variant="neon" onClick={saveEditGoal} disabled={updateGoalMutation.isPending}>
-                    Salva modifiche
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          {goalsOrbs.map((item) => (
-            <MetricOrb
-              key={item.label}
-              label={item.label}
-              value={item.value}
-              progress={item.progress}
-              helper={item.helper}
-              icon={item.icon}
-              tone={item.tone}
-              size="sm"
-            />
-          ))}
-        </div>
-
-        {/* Active Goals */}
-        <div className="grid gap-6">
-          {allActiveGoals.length === 0 ? (
-            <section className="surface-panel p-6">
-              <div className="p-6 text-sm text-muted-foreground">
-                Nessun obiettivo creato. Usa “Crea obiettivo” o aggiungi un suggerimento.
-              </div>
-            </section>
-          ) : (
-            allActiveGoals.map((goal) => {
-              const Icon = categoryIcons[goal.category] || Target
-              const colorClass = categoryColors[goal.category] || "text-action-text bg-primary/10"
-              const isCustom = customGoals.some((item) => item.id === goal.id)
-              return (
-                <section key={goal.id} className="surface-panel p-6">
-                  <div className="p-6">
-                    <div className="flex flex-col lg:flex-row lg:items-center gap-6">
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg ${colorClass}`}>
-                              <Icon className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <h3 className="text-lg font-display font-bold text-foreground">
-                                {goal.title}
-                              </h3>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge variant="secondary" className="text-xs">
-                                  {goal.category}
-                                </Badge>
-                                <span className="text-xs text-muted-foreground">{goal.deadline}</span>
-                              </div>
-                            </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-foreground">{goal.title}</p>
+                            <p className="text-xs text-muted-foreground">{goal.description}</p>
                           </div>
-                          <Badge
-                            className={
-                              goal.status === "on-track"
-                                ? "bg-primary/20 text-action-text"
-                                : "bg-chart-5/20 text-chart-5"
-                            }
-                          >
-                            {goal.status === "on-track" ? "On Track" : "Behind"}
-                          </Badge>
-                        </div>
-
-                        <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between sm:justify-start sm:gap-3">
-                              <span className="text-sm text-muted-foreground">Progress</span>
-                              <span className="text-sm font-medium text-foreground">
-                                {goal.currentValue} / {goal.targetValue} {goal.unit}
-                              </span>
-                            </div>
-                            <Progress value={goal.progress} className="h-2 sm:w-56" />
-                          </div>
-                          <MetricOrb
-                            label="Completamento"
-                            value={`${Math.round(goal.progress)}%`}
-                            progress={goal.progress}
-                            helper={goal.deadline}
-                            icon={<Icon className="size-4" />}
-                            tone={goal.status === "on-track" ? "lime" : "amber"}
+                          <Button
                             size="sm"
-                          />
+                            variant="outline"
+                            onClick={() => addSuggestedGoal(goal)}
+                            disabled={createGoalMutation.isPending}
+                          >
+                            Aggiungi
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {allActiveGoals.length === 0 ? (
+            <div className="surface-panel p-4 text-sm text-muted-foreground">
+              Nessun obiettivo creato. Tocca «Crea obiettivo» o aggiungi un suggerimento.
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {allActiveGoals.map((goal) => {
+                const Icon = categoryIcons[goal.category] || Target
+                const isCustom = customGoals.some((item) => item.id === goal.id)
+                const hasTarget = typeof goal.targetValue === "number"
+                const onTrack = goal.status === "on-track"
+                return (
+                  <li key={goal.id} className="surface-panel p-4">
+                    <div className="flex items-start gap-3">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-raised text-muted-foreground">
+                        <Icon className="size-5" aria-hidden />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="break-words text-base font-bold text-foreground">{goal.title}</h3>
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                          <Chip>{categoryLabels[goal.category] ?? goal.category}</Chip>
+                          <Chip tone={onTrack ? "success" : "neutral"}>
+                            {onTrack ? "In linea" : "Indietro"}
+                          </Chip>
+                          <span className="text-xs text-muted-foreground">{goal.deadline}</span>
                         </div>
-
-                        {goal.milestones.length > 0 && (
-                          <div className="mt-4">
-                            <h4 className="text-sm font-medium text-foreground mb-2">Milestones</h4>
-                            <div className="grid sm:grid-cols-2 gap-2">
-                              {goal.milestones.map((milestone: { completed: boolean; title: string }, index: number) => (
-                                <div key={index} className="flex items-center gap-2">
-                                  {milestone.completed ? (
-                                    <CheckCircle2 className="w-4 h-4 text-action-text" />
-                                  ) : (
-                                    <Circle className="w-4 h-4 text-muted-foreground" />
-                                  )}
-                                  <span className="text-sm text-muted-foreground">
-                                    {milestone.title}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
-
-                      <div className="flex gap-2">
-                      {isCustom ? (
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => openEditGoal(goal)}
-                          aria-label="Modifica obiettivo"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                      ) : (
-                        <Button variant="outline" size="icon" disabled>
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                      )}
+                      <div className="flex shrink-0 gap-1">
                         {isCustom ? (
                           <Button
-                            variant="outline"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEditGoal(goal)}
+                            aria-label="Modifica obiettivo"
+                          >
+                            <Edit className="size-4" />
+                          </Button>
+                        ) : (
+                          <Button variant="ghost" size="icon" disabled aria-label="Modifica obiettivo">
+                            <Edit className="size-4" />
+                          </Button>
+                        )}
+                        {isCustom ? (
+                          <Button
+                            variant="ghost"
                             size="icon"
                             onClick={() => removeCustomGoal(goal.id)}
                             disabled={removeGoalMutation.isPending}
                             aria-label="Elimina obiettivo"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="size-4" />
                           </Button>
                         ) : (
-                          <Button variant="outline" size="icon" disabled>
-                            <Trash2 className="w-4 h-4" />
+                          <Button variant="ghost" size="icon" disabled aria-label="Elimina obiettivo">
+                            <Trash2 className="size-4" />
                           </Button>
                         )}
                       </div>
                     </div>
-                  </div>
-                </section>
-              )
-            })
-          )}
-        </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Completed Goals */}
-          <section className="surface-panel p-6">
-            <div>
-              <h3 className="text-lg font-display font-bold text-foreground">
-                Obiettivi Completati
-              </h3>
-            </div>
+                    <div className="mt-4 flex items-end justify-between gap-4 border-t border-border pt-4">
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <p className="text-sm text-muted-foreground">
+                          Progresso{" "}
+                          <span className="font-semibold text-foreground tabular-nums">
+                            {formatGoalValue(goal.currentValue)}
+                            {hasTarget ? ` / ${formatGoalValue(goal.targetValue)}` : ""} {goal.unit}
+                          </span>
+                        </p>
+                        {hasTarget ? (
+                          <Progress
+                            value={goal.progress}
+                            aria-label={`Progresso: ${goal.title}`}
+                            className="h-2"
+                          />
+                        ) : null}
+                      </div>
+                      {hasTarget ? (
+                        <Metric
+                          value={formatInteger(goal.progress)}
+                          unit="%"
+                          label="Completamento"
+                          size="sm"
+                          className="shrink-0 text-right"
+                        />
+                      ) : null}
+                    </div>
+
+                    {goal.milestones.length > 0 && (
+                      <div className="mt-4 border-t border-border pt-4">
+                        <h4 className="mb-2 text-sm font-semibold text-foreground">Tappe</h4>
+                        <ul className="grid gap-2 sm:grid-cols-2">
+                          {goal.milestones.map((milestone: { completed: boolean; title: string }, index: number) => (
+                            <li key={index} className="flex items-center gap-2">
+                              {milestone.completed ? (
+                                <CheckCircle2 className="size-4 text-success" aria-label="Raggiunta" />
+                              ) : (
+                                <Circle className="size-4 text-muted-foreground" aria-label="Da raggiungere" />
+                              )}
+                              <span className="text-sm text-muted-foreground">{milestone.title}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
+
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Modifica obiettivo</DialogTitle>
+            </DialogHeader>
             <div className="space-y-4">
-              {completedGoals.length === 0 && (
-                <p className="text-sm text-muted-foreground">Nessun obiettivo completato.</p>
-              )}
-              {completedGoals.map((goal) => (
-                <div key={goal.id} className="flex items-start gap-3 p-4 rounded-lg bg-secondary/30">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <Flag className="w-5 h-5 text-action-text" />
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-foreground">{goal.title}</h4>
-                    <p className="text-xs text-muted-foreground">{formatDate(goal.completedAt)}</p>
-                    <Badge className="mt-2 bg-xp/15 text-xp">{goal.reward}</Badge>
-                  </div>
+              <div className="space-y-2">
+                <label htmlFor={`${formId}-edit-title`} className="text-sm font-medium text-foreground">
+                  Titolo
+                </label>
+                <Input
+                  id={`${formId}-edit-title`}
+                  value={editDraft.title}
+                  onChange={(event) =>
+                    setEditDraft((prev) => ({ ...prev, title: event.target.value }))
+                  }
+                  placeholder="Es. 12 km a settimana"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <label id={`${formId}-edit-category`} className="text-sm font-medium text-foreground">
+                    Categoria
+                  </label>
+                  <Select
+                    value={editDraft.category}
+                    onValueChange={(value) =>
+                      setEditDraft((prev) => ({ ...prev, category: value }))
+                    }
+                  >
+                    <SelectTrigger aria-labelledby={`${formId}-edit-category`}>
+                      <SelectValue placeholder="Scegli la categoria" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="distance">Distanza</SelectItem>
+                      <SelectItem value="speed">Velocità</SelectItem>
+                      <SelectItem value="efficiency">Efficienza</SelectItem>
+                      <SelectItem value="frequency">Frequenza</SelectItem>
+                      <SelectItem value="endurance">Resistenza</SelectItem>
+                      <SelectItem value="technique">Tecnica</SelectItem>
+                      <SelectItem value="milestone">Traguardo</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              ))}
+                <div className="space-y-2">
+                  <label htmlFor={`${formId}-edit-target`} className="text-sm font-medium text-foreground">
+                    Valore obiettivo
+                  </label>
+                  <Input
+                    id={`${formId}-edit-target`}
+                    type="number"
+                    value={editDraft.targetValue}
+                    onChange={(event) =>
+                      setEditDraft((prev) => ({ ...prev, targetValue: event.target.value }))
+                    }
+                    placeholder="Es. 10"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label htmlFor={`${formId}-edit-unit`} className="text-sm font-medium text-foreground">
+                  Unità
+                </label>
+                <Input
+                  id={`${formId}-edit-unit`}
+                  value={editDraft.unit}
+                  onChange={(event) =>
+                    setEditDraft((prev) => ({ ...prev, unit: event.target.value }))
+                  }
+                  placeholder="Es. km/settimana"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => setIsEditOpen(false)}>
+                  Annulla
+                </Button>
+                <Button onClick={saveEditGoal} disabled={updateGoalMutation.isPending}>
+                  Salva modifiche
+                </Button>
+              </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <section aria-labelledby={completedTitleId} className="surface-panel p-4">
+            <h2 id={completedTitleId} className={sectionTitle}>
+              Obiettivi completati
+            </h2>
+            {completedGoals.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">Nessun obiettivo completato.</p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {completedGoals.map((goal) => {
+                  const completedAt = formatDayMonthYear(goal.completedAt)
+                  return (
+                    <li key={goal.id} className="flex items-start gap-3 rounded-xl bg-raised p-3">
+                      <Flag className="mt-0.5 size-5 shrink-0 text-xp" aria-hidden />
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-foreground">{goal.title}</h3>
+                        {completedAt !== NO_VALUE ? (
+                          <p className="text-xs text-muted-foreground">{completedAt}</p>
+                        ) : null}
+                        <Chip tone="xp" className="mt-2">
+                          {goal.reward}
+                        </Chip>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </section>
 
-          {/* Suggested Goals */}
-          <section className="surface-panel p-6">
-            <div>
-              <h3 className="text-lg font-display font-bold text-foreground">
-                Obiettivi Suggeriti
-              </h3>
-            </div>
-            <div className="space-y-4">
+          <section aria-labelledby={suggestedTitleId} className="surface-panel p-4">
+            <h2 id={suggestedTitleId} className={sectionTitle}>
+              Obiettivi suggeriti
+            </h2>
+            <ul className="mt-3 space-y-2">
               {suggestedGoals.map((goal, index) => {
                 const Icon = categoryIcons[goal.category] || Target
                 return (
-                  <div key={index} className="flex items-start gap-3 p-4 rounded-lg bg-secondary/30">
-                    <div className="p-2 rounded-lg bg-secondary">
-                      <Icon className="w-5 h-5 text-foreground" />
+                  <li key={index} className="flex items-start gap-3 rounded-xl bg-raised p-3">
+                    <Icon className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
+                    <div className="min-w-0">
+                      <h3 className="font-semibold text-foreground">{goal.title}</h3>
+                      <p className="mt-1 text-xs text-muted-foreground">{goal.description}</p>
                     </div>
-                    <div>
-                      <h4 className="font-medium text-foreground">{goal.title}</h4>
-                      <p className="text-xs text-muted-foreground mt-1">{goal.description}</p>
-                    </div>
-                  </div>
+                  </li>
                 )
               })}
-            </div>
+            </ul>
           </section>
         </div>
       </div>
