@@ -100,11 +100,11 @@ export const SWIM_METRIC_DEFINITIONS: Record<SwimMetricKey, SwimMetricDefinition
     howToRead:
       "Equilibrio positivo: sei riposato; negativo: stai caricando. Le soglie sono convenzioni di TrainingPeaks, non regole.",
     conventions: [
-      "Equilibrio sopra +15: molto riposato; se dura a lungo, la forma cala.",
-      "Da +5 a +15: fresco.",
+      "Equilibrio sopra +25: molto riposato (rischio di perdere forma se dura).",
+      "Da +5 (escluso) a +25: fresco.",
       "Da −10 a +5: neutro.",
-      "Da −30 a −10: in costruzione.",
-      "Sotto −30: carico alto, valuta un recupero.",
+      "Da −30 a −10 (escluso): in costruzione.",
+      "Sotto −30: carico alto.",
       "Forma che cresce più di 8 punti a settimana: crescita molto rapida.",
     ],
   },
@@ -171,6 +171,30 @@ export const TSB_READING_LABELS: Record<TsbReading, string> = {
   in_costruzione: "in costruzione",
   carico_alto: "carico alto",
 };
+
+/** The reading with its note, for longer texts (coach, card details). */
+export const TSB_READING_DESCRIPTIONS: Record<TsbReading, string> = {
+  molto_riposato: "molto riposato (rischio di perdere forma se dura)",
+  fresco: "fresco",
+  neutro: "neutro",
+  in_costruzione: "in costruzione",
+  carico_alto: "carico alto",
+};
+
+/**
+ * TrainingPeaks bands of the balance (TSB), explicit and non-overlapping:
+ * molto riposato > +25 ≥ fresco > +5 ≥ neutro ≥ −10 > in costruzione ≥ −30 > carico alto.
+ */
+export const TSB_BOUNDS = { veryRestedAbove: 25, freshAbove: 5, neutralFrom: -10, buildingFrom: -30 } as const;
+
+/** Reading of a balance value with the TSB_BOUNDS bands. */
+export function tsbReadingOf(tsb: number): TsbReading {
+  if (tsb > TSB_BOUNDS.veryRestedAbove) return "molto_riposato";
+  if (tsb > TSB_BOUNDS.freshAbove) return "fresco";
+  if (tsb >= TSB_BOUNDS.neutralFrom) return "neutro";
+  if (tsb >= TSB_BOUNDS.buildingFrom) return "in_costruzione";
+  return "carico_alto";
+}
 
 export const SWIM_METRIC_THRESHOLDS = {
   /** Above this share of Z3: «molto lavoro in zona media». */

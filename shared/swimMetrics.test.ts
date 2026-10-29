@@ -3,6 +3,8 @@ import {
   SWIM_METRIC_DEFINITIONS,
   SWIM_METRIC_THRESHOLDS,
   SWIM_METRICS_TIMEZONE,
+  TSB_BOUNDS,
+  TSB_READING_DESCRIPTIONS,
   TSB_READING_LABELS,
   addDaysToKey,
   dayKey,
@@ -120,6 +122,22 @@ describe("readings shared by the interface and the coach", () => {
       in_costruzione: "in costruzione",
       carico_alto: "carico alto",
     });
+  });
+
+  it("TSB bands follow TrainingPeaks, explicit and non-overlapping", () => {
+    expect(TSB_BOUNDS).toEqual({ veryRestedAbove: 25, freshAbove: 5, neutralFrom: -10, buildingFrom: -30 });
+    expect(TSB_READING_DESCRIPTIONS.molto_riposato).toBe("molto riposato (rischio di perdere forma se dura)");
+    expect(TSB_READING_DESCRIPTIONS.carico_alto).toBe("carico alto");
+    expect(SWIM_METRIC_DEFINITIONS.load.conventions).toEqual(
+      expect.arrayContaining([
+        "Equilibrio sopra +25: molto riposato (rischio di perdere forma se dura).",
+        "Da +5 (escluso) a +25: fresco.",
+        "Da −10 a +5: neutro.",
+        "Da −30 a −10 (escluso): in costruzione.",
+        "Sotto −30: carico alto.",
+      ]),
+    );
+    expect(SWIM_METRIC_DEFINITIONS.load.conventions!.join(" ")).not.toMatch(/\+15/);
   });
 
   it.each([

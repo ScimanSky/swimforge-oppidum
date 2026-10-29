@@ -4,7 +4,7 @@
  * TSB = CTL − ATL at the end of the previous day).
  */
 import type { TsbReading } from "@shared/swimMetrics";
-import { addDaysToKey } from "@shared/swimMetrics";
+import { addDaysToKey, tsbReadingOf } from "@shared/swimMetrics";
 
 export const IF_CAP = 1.3;
 export const CTL_DAYS = 42;
@@ -49,11 +49,5 @@ export function rampPerWeek(series: LoadDay[]): number | null {
   return series[series.length - 1].ctl - series[series.length - 8].ctl;
 }
 
-/** TrainingPeaks readings of the balance (conventions, not rules). */
-export function tsbReading(tsb: number): TsbReading {
-  if (tsb > 15) return "molto_riposato";
-  if (tsb > 5) return "fresco";
-  if (tsb >= -10) return "neutro";
-  if (tsb >= -30) return "in_costruzione";
-  return "carico_alto";
-}
+/** TrainingPeaks readings of the balance (conventions, not rules): see TSB_BOUNDS. */
+export const tsbReading = (tsb: number): TsbReading => tsbReadingOf(tsb);

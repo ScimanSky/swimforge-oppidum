@@ -61,9 +61,12 @@ describe("loadSeries (CTL 42 days, ATL 7 days)", () => {
 });
 
 describe("tsbReading (TrainingPeaks conventions)", () => {
+  // > +25 | (+5, +25] | [−10, +5] | [−30, −10) | < −30
   it.each([
-    [15.1, "molto_riposato"],
-    [15, "fresco"],
+    [40, "molto_riposato"],
+    [25.1, "molto_riposato"],
+    [25, "fresco"],
+    [15.1, "fresco"],
     [5.1, "fresco"],
     [5, "neutro"],
     [0, "neutro"],
