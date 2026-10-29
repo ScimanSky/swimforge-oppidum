@@ -1,19 +1,20 @@
-"use client"
-
-import { useMemo, useState } from "react"
-import AppLayout from "@/components/AppLayout"
-import { Surface, SurfaceContent } from "@/components/ui/surface"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { trpc } from "@/lib/trpc"
-import { formatTimeAgo } from "@/lib/format"
+import { useId, useState } from "react"
+import { Link } from "wouter"
 import { toast } from "sonner"
+import AppLayout from "@/components/AppLayout"
+import { Chip } from "@/components/corsia/Chip"
+import { LoadError, LoadingSkeleton, Notice } from "@/components/corsia/LoadState"
+import { Button } from "@/components/ui/button"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { formatInteger, formatTimeAgo, toFiniteNumber } from "@/lib/format"
+import { trpc } from "@/lib/trpc"
+import { errorToastMessage } from "@/lib/trpc-errors"
 
 type ReportStatus = "all" | "open" | "in_review" | "resolved" | "rejected"
+type ItemStatus = Exclude<ReportStatus, "all">
 
-const statusOptions: Array<{ value: ReportStatus; label: string }> = [
+const STATUS_OPTIONS: Array<{ value: ReportStatus; label: string }> = [
   { value: "open", label: "Aperte" },
   { value: "in_review", label: "In revisione" },
   { value: "resolved", label: "Risolte" },
@@ -21,14 +22,14 @@ const statusOptions: Array<{ value: ReportStatus; label: string }> = [
   { value: "all", label: "Tutte" },
 ]
 
-const statusLabel: Record<Exclude<ReportStatus, "all">, string> = {
-  open: "Aperta",
-  in_review: "In revisione",
-  resolved: "Risolta",
-  rejected: "Respinta",
+const STATUS: Record<ItemStatus, { label: string; tone: "action" | "neutral" | "success" }> = {
+  open: { label: "Aperta", tone: "action" },
+  in_review: { label: "In revisione", tone: "neutral" },
+  resolved: { label: "Risolta", tone: "success" },
+  rejected: { label: "Respinta", tone: "neutral" },
 }
 
-const reasonLabel: Record<string, string> = {
+const REASON_LABELS: Record<string, string> = {
   spam: "Spam",
   offensive: "Offensivo",
   harassment: "Molestie",
@@ -36,9 +37,14 @@ const reasonLabel: Record<string, string> = {
   other: "Altro",
 }
 
+/** «1 segnalazione», «12 segnalazioni». */
+const reportsCount = (total: number) => `${formatInteger(total)} ${total === 1 ? "segnalazione" : "segnalazioni"}`
+
+/** `/admin/reports` (admins only): reported posts with their status and the moderation note. */
 export default function AdminReports() {
   const [status, setStatus] = useState<ReportStatus>("open")
   const [noteById, setNoteById] = useState<Record<number, string>>({})
+  const statusLabelId = useId()
 
   const meQuery = trpc.auth.me.useQuery()
   const isAdmin = meQuery.data?.role === "admin"
@@ -54,21 +60,21 @@ export default function AdminReports() {
       toast.success("Segnalazione aggiornata")
       utils.admin.listPostReports.invalidate()
     },
-    onError: (err) => toast.error(err.message || "Aggiornamento fallito"),
+    onError: (error) => toast.error(errorToastMessage(error, "Aggiornamento non riuscito")),
   })
 
-  const items = useMemo(() => {
-    return (reportsQuery.data?.items as Array<any>) ?? []
-  }, [reportsQuery.data?.items])
-
-  if (meQuery.isLoading) {
+  if (meQuery.isPending) {
     return (
       <AppLayout>
-        <div className="compact-shell max-w-4xl mx-auto">
-          <Surface>
-            <SurfaceContent className="p-6 text-muted-foreground">Caricamento...</SurfaceContent>
-          </Surface>
-        </div>
+        <LoadingSkeleton label="Caricamento…" count={2} className="max-w-3xl space-y-3" itemClassName="h-40 w-full rounded-2xl" />
+      </AppLayout>
+    )
+  }
+
+  if (meQuery.isError) {
+    return (
+      <AppLayout>
+        <LoadError onRetry={() => void meQuery.refetch()} className="max-w-3xl" />
       </AppLayout>
     )
   }
@@ -76,170 +82,160 @@ export default function AdminReports() {
   if (!isAdmin) {
     return (
       <AppLayout>
-        <div className="compact-shell max-w-4xl mx-auto">
-          <Surface>
-            <SurfaceContent className="p-6">
-              <h1 className="text-xl font-display font-bold">Moderazione</h1>
-              <p className="text-sm text-muted-foreground mt-2">
-                Accesso riservato agli amministratori.
-              </p>
-            </SurfaceContent>
-          </Surface>
-        </div>
+        <Notice backHref="/home" backLabel="Torna al feed" className="max-w-3xl">
+          Accesso riservato agli amministratori.
+        </Notice>
       </AppLayout>
     )
   }
 
-  const setNote = (reportId: number, value: string) => {
-    setNoteById((prev) => ({ ...prev, [reportId]: value }))
+  const updateStatus = (reportId: number, nextStatus: ItemStatus, savedNote?: string | null) => {
+    if (updateMutation.isPending) return
+    const note = (noteById[reportId] ?? savedNote ?? "").trim()
+    updateMutation.mutate({ reportId, status: nextStatus, adminNote: note || null })
   }
 
-  const updateStatus = (reportId: number, nextStatus: Exclude<ReportStatus, "all">, fallbackNote?: string | null) => {
-    if (updateMutation.isPending) return
-    const note = (noteById[reportId] ?? fallbackNote ?? "").trim()
-    updateMutation.mutate({
-      reportId,
-      status: nextStatus,
-      adminNote: note || null,
-    })
+  const items = (reportsQuery.data?.items as Array<any> | undefined) ?? []
+  const total = toFiniteNumber(reportsQuery.data?.total)
+
+  let list
+  if (reportsQuery.isPending) {
+    list = <LoadingSkeleton label="Caricamento delle segnalazioni…" count={3} className="space-y-3" itemClassName="h-48 w-full rounded-2xl" />
+  } else if (reportsQuery.isError) {
+    list = <LoadError onRetry={() => void reportsQuery.refetch()} />
+  } else if (items.length === 0) {
+    list = <Notice>{status === "all" ? "Nessuna segnalazione." : "Nessuna segnalazione con questo stato."}</Notice>
+  } else {
+    list = (
+      <ul className="space-y-3">
+        {items.map((item) => (
+          <ReportItem
+            key={item.id}
+            item={item}
+            note={noteById[item.id] ?? item.admin_note ?? ""}
+            onNoteChange={(value) => setNoteById((previous) => ({ ...previous, [item.id]: value }))}
+            onStatus={(next) => updateStatus(item.id, next, item.admin_note)}
+            pending={updateMutation.isPending}
+          />
+        ))}
+      </ul>
+    )
   }
 
   return (
     <AppLayout>
-      <div className="compact-shell max-w-5xl mx-auto space-y-4 lg:space-y-3">
-        <Surface>
-          <SurfaceContent className="p-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-display font-bold text-foreground">Moderazione Segnalazioni</h1>
-              <p className="text-sm text-muted-foreground">
-                Totale: {reportsQuery.data?.total ?? 0}
-              </p>
-            </div>
-            <div className="min-w-[180px] space-y-1">
-              <p className="text-xs font-medium text-muted-foreground">Filtro stato</p>
-              <Select
-                value={status}
-                onValueChange={(value) => setStatus(value as ReportStatus)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleziona stato" />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </SurfaceContent>
-        </Surface>
-
-        {reportsQuery.isLoading ? (
-          <Surface>
-            <SurfaceContent className="p-6 text-muted-foreground">Caricamento segnalazioni...</SurfaceContent>
-          </Surface>
-        ) : items.length === 0 ? (
-          <Surface>
-            <SurfaceContent className="p-6 text-muted-foreground">Nessuna segnalazione trovata.</SurfaceContent>
-          </Surface>
-        ) : (
-          <div className="space-y-3">
-            {items.map((item) => {
-              const currentStatus = (item.status as Exclude<ReportStatus, "all">) || "open"
-              const statusText = statusLabel[currentStatus] ?? item.status
-              const noteValue = noteById[item.id] ?? (item.admin_note ?? "")
-              return (
-                <Surface key={item.id}>
-                  <SurfaceContent className="p-5 space-y-3">
-                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="text-sm">
-                        <span className="font-semibold">Report #{item.id}</span>
-                        <span className="text-muted-foreground"> · Post #{item.post_id}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline" className="border-primary/30 text-action-text">
-                          {statusText}
-                        </Badge>
-                        <span>{formatTimeAgo(item.created_at)}</span>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-2 text-sm">
-                      <p>
-                        <span className="text-muted-foreground">Motivo:</span>{" "}
-                        <span className="font-medium">{reasonLabel[item.reason] || item.reason}</span>
-                      </p>
-                      <p>
-                        <span className="text-muted-foreground">Segnalato da:</span>{" "}
-                        {item.reporter_name || `Utente ${item.reporter_user_id}`}
-                      </p>
-                      <p>
-                        <span className="text-muted-foreground">Autore post:</span>{" "}
-                        {item.post_author_name || `Utente ${item.post_author_id}`}
-                      </p>
-                      {item.details ? (
-                        <p>
-                          <span className="text-muted-foreground">Dettagli:</span> {item.details}
-                        </p>
-                      ) : null}
-                      {item.post_content ? (
-                        <p className="text-sm">
-                          <span className="text-muted-foreground">Contenuto post:</span> {item.post_content}
-                        </p>
-                      ) : null}
-                    </div>
-
-                    <Textarea
-                      rows={3}
-                      maxLength={1000}
-                      value={noteValue}
-                      onChange={(event) => setNote(item.id, event.target.value)}
-                      placeholder="Nota admin (opzionale)"
-                    />
-
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline-neon"
-                        onClick={() => updateStatus(item.id, "in_review", item.admin_note)}
-                        disabled={updateMutation.isPending}
-                      >
-                        In revisione
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="neon"
-                        onClick={() => updateStatus(item.id, "resolved", item.admin_note)}
-                        disabled={updateMutation.isPending}
-                      >
-                        Risolta
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost-neon"
-                        onClick={() => updateStatus(item.id, "rejected", item.admin_note)}
-                        disabled={updateMutation.isPending}
-                      >
-                        Respingi
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => updateStatus(item.id, "open", item.admin_note)}
-                        disabled={updateMutation.isPending}
-                      >
-                        Riapri
-                      </Button>
-                    </div>
-                  </SurfaceContent>
-                </Surface>
-              )
-            })}
+      <div className="max-w-3xl space-y-4">
+        <section className="surface-panel flex flex-col gap-3 p-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h2 className="text-[17px] font-bold">Segnalazioni dei post</h2>
+            {/* The count only once loaded: never «0» while loading or after an error. */}
+            {reportsQuery.isSuccess && total !== null ? (
+              <p className="text-sm text-muted-foreground tabular-nums">{reportsCount(total)}</p>
+            ) : null}
           </div>
-        )}
+          <div className="space-y-1 sm:min-w-[180px]">
+            <p id={statusLabelId} className="text-xs font-semibold text-muted-foreground">
+              Stato
+            </p>
+            <Select value={status} onValueChange={(value) => setStatus(value as ReportStatus)}>
+              <SelectTrigger aria-labelledby={statusLabelId} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {STATUS_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </section>
+
+        {list}
       </div>
     </AppLayout>
+  )
+}
+
+function ReportItem({
+  item,
+  note,
+  onNoteChange,
+  onStatus,
+  pending,
+}: {
+  item: any
+  note: string
+  onNoteChange: (value: string) => void
+  onStatus: (status: ItemStatus) => void
+  pending: boolean
+}) {
+  const titleId = useId()
+  const noteId = useId()
+  const current = STATUS[item.status as ItemStatus] ?? STATUS.open
+  const facts: Array<[string, string]> = [
+    ["Motivo", REASON_LABELS[item.reason] ?? String(item.reason ?? "")],
+    ["Segnalata da", item.reporter_name || `Utente ${item.reporter_user_id}`],
+    ["Autore del post", item.post_author_name || `Utente ${item.post_author_id}`],
+    ...(item.details ? ([["Dettagli", String(item.details)]] as Array<[string, string]>) : []),
+    ...(item.post_content ? ([["Contenuto del post", String(item.post_content)]] as Array<[string, string]>) : []),
+  ]
+
+  return (
+    <li>
+      <article aria-labelledby={titleId} className="surface-panel space-y-3 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 id={titleId} className="font-bold">
+            Segnalazione n. {item.id}
+          </h3>
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Chip tone={current.tone}>{current.label}</Chip>
+            <span>{formatTimeAgo(item.created_at)}</span>
+          </div>
+        </div>
+
+        <dl className="grid gap-x-3 gap-y-1 text-sm sm:grid-cols-[auto_minmax(0,1fr)]">
+          {facts.map(([term, value]) => (
+            <div key={term} className="contents">
+              <dt className="text-muted-foreground">{term}</dt>
+              <dd className="mb-1 break-words sm:mb-0">{value}</dd>
+            </div>
+          ))}
+        </dl>
+
+        <Link href={`/post/${item.post_id}`} className="inline-block text-sm font-semibold text-action-text hover:underline">
+          Apri il post n. {item.post_id}
+        </Link>
+
+        <div className="space-y-1">
+          <label htmlFor={noteId} className="text-sm font-semibold">
+            Nota dell'amministratore (facoltativa)
+          </label>
+          <Textarea
+            id={noteId}
+            rows={3}
+            maxLength={1000}
+            value={note}
+            onChange={(event) => onNoteChange(event.target.value)}
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2" role="group" aria-label={`Stato della segnalazione n. ${item.id}`}>
+          <Button size="sm" variant="outline" onClick={() => onStatus("in_review")} disabled={pending}>
+            In revisione
+          </Button>
+          <Button size="sm" onClick={() => onStatus("resolved")} disabled={pending}>
+            Risolta
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => onStatus("rejected")} disabled={pending}>
+            Respingi
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => onStatus("open")} disabled={pending}>
+            Riapri
+          </Button>
+        </div>
+      </article>
+    </li>
   )
 }

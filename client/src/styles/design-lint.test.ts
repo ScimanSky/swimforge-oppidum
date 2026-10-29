@@ -91,7 +91,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/onboarding/OnboardingFirstAction.tsx",
     "components/onboarding/OnboardingFlow.tsx",
     "components/onboarding/OnboardingIdentitySetup.tsx",
-    "pages/AdminReports.tsx",
     "pages/ForgotPassword.tsx",
     "pages/Login.tsx",
     "pages/Register.tsx",
@@ -128,7 +127,6 @@ const PENDING: Record<Rule, string[]> = {
   ],
   "titolo-pagina": [
     "components/onboarding/OnboardingWelcomeComposition.tsx",
-    "pages/AdminReports.tsx",
     "pages/NotFound.tsx",
     "pages/Settings.tsx",
   ],
