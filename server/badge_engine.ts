@@ -8,7 +8,7 @@
 import { getDb } from "./db";
 import { achievementBadgeDefinitions, userAchievementBadges, swimmingActivities, swimmerProfiles } from "../drizzle/schema";
 import { eq, and, gte, gt, sql } from "drizzle-orm";
-import { calculateSEI, calculateSER, calculateTCI } from "./advanced_metrics";
+import { legacyBadgeSei, legacyBadgeSer, legacyBadgeTci } from "./lib/legacy-badge-metrics";
 import { logger } from "./middleware/logger";
 
 interface BadgeCriteria {
@@ -280,7 +280,7 @@ async function evaluateMetricPeakCriteria(criteria: BadgeCriteria, userId: numbe
   if (criteria.metric === "sei") {
     const seiValues = activities
       .map(a =>
-        calculateSEI({
+        legacyBadgeSei({
           distanceMeters: a.distanceMeters,
           durationSeconds: a.durationSeconds,
           avgPacePer100m: a.avgPacePer100m ?? undefined,
@@ -301,7 +301,7 @@ async function evaluateMetricPeakCriteria(criteria: BadgeCriteria, userId: numbe
   if (criteria.metric === "ser") {
     const serValues = activities
       .map(a =>
-        calculateSER({
+        legacyBadgeSer({
           distanceMeters: a.distanceMeters,
           durationSeconds: a.durationSeconds,
           avgPacePer100m: a.avgPacePer100m ?? undefined,
@@ -320,7 +320,7 @@ async function evaluateMetricPeakCriteria(criteria: BadgeCriteria, userId: numbe
   }
 
   if (criteria.metric === "tci") {
-    const tci = calculateTCI(
+    const tci = legacyBadgeTci(
       activities.map(a => ({
         distanceMeters: a.distanceMeters,
         durationSeconds: a.durationSeconds,

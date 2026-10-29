@@ -38,25 +38,6 @@ export interface PerformanceAnalysis {
   swolfAvg: number | null;
 }
 
-export interface TrendIndicator {
-  direction: 'up' | 'down' | 'stable';
-  /** Absolute change in percent (kept for older clients). */
-  percentage: number;
-  /** Signed change in percent: −3 means 3 % less than the previous period, also when «stable». */
-  signedPercentage: number;
-}
-
-/** Distance trend between two equal periods (km); 0 % and stable without a previous period. */
-export function computeTrendIndicator(currentKm: number, previousKm: number): TrendIndicator {
-  const signedPercentage =
-    previousKm > 0 ? Math.round(((currentKm - previousKm) / previousKm) * 100) : 0;
-  return {
-    direction: signedPercentage > 5 ? 'up' : signedPercentage < -5 ? 'down' : 'stable',
-    percentage: Math.abs(signedPercentage),
-    signedPercentage: signedPercentage === 0 ? 0 : signedPercentage,
-  };
-}
-
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
