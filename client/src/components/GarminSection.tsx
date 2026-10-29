@@ -15,6 +15,8 @@ import {
 import { motion } from "framer-motion";
 import { Link as LinkIcon, RefreshCw, Unlink, Loader2, Mail, KeyRound } from "lucide-react";
 import { toast } from "sonner";
+import GarminSyncCountPicker from "@/components/GarminSyncCountPicker";
+import { garminSyncButtonLabel, useGarminSyncCount } from "@/lib/garmin-sync-count";
 
 interface GarminSectionProps {
   garminConnected: boolean;
@@ -51,6 +53,7 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
   const [password, setPassword] = useState("");
   const [mfaCode, setMfaCode] = useState("");
   const [authStep, setAuthStep] = useState<AuthStep>("credentials");
+  const [syncCount, setSyncCount] = useGarminSyncCount();
 
   const utils = trpc.useUtils();
 
@@ -193,19 +196,6 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
             <div className="flex gap-2">
               {isConnected ? (
                 <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => syncMutation.mutate({ daysBack: 30 })}
-                    disabled={syncMutation.isPending}
-                    title="Sincronizza attività"
-                  >
-                    {syncMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4" />
-                    )}
-                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -355,6 +345,29 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
               )}
             </div>
           </div>
+
+          {isConnected && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <GarminSyncCountPicker
+                value={syncCount}
+                onChange={setSyncCount}
+                disabled={syncMutation.isPending}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => syncMutation.mutate({ daysBack: 30, maxActivities: syncCount })}
+                disabled={syncMutation.isPending}
+              >
+                {syncMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                {syncMutation.isPending ? "Sincronizzazione..." : garminSyncButtonLabel(syncCount)}
+              </Button>
+            </div>
+          )}
         </SurfaceContent>
       </Surface>
     </motion.div>
