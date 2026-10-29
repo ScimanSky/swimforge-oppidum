@@ -1,284 +1,294 @@
 # Privacy Policy di SwimForge
 
-**Ultimo aggiornamento:** 29 ottobre 2026
+**Data di entrata in vigore**: 26 Gennaio 2026  
+**Ultimo aggiornamento**: 19 Febbraio 2026
 
 ---
 
-## In breve
+## Introduzione
 
-- SwimForge è un servizio per nuotatori: il sito swimforge.it e l'app Android usano lo stesso server. Il titolare del trattamento è **Fabrizio**, persona fisica. Per qualsiasi domanda scrivi a **admin@swimforge.it**.
-- Raccogliamo i dati del tuo account e del profilo, le nuotate che importi da Garmin Connect e quello che pubblichi: post, commenti, messaggi e contenuti dei club.
-- Frequenza cardiaca, VO2max, recupero e dati simili sono **dati sulla salute**: li importiamo solo se dai il consenso «Trattamento dati salute». Puoi revocarlo quando vuoi.
-- Per le analisi automatiche delle nuotate e per il Coach AI inviamo dati di allenamento a **Google Gemini**.
-- Non vendiamo i tuoi dati, non mostriamo pubblicità e non usiamo cookie o strumenti di analisi di terze parti.
-- Il database è nell'Unione europea, in Svezia, e il server in Italia. Alcuni fornitori, tra cui Google e i servizi che ospitano foto e video, possono trattare dati fuori dall'UE con le garanzie previste dal GDPR.
-- Dall'app puoi scaricare i tuoi dati, cambiare i consensi ed eliminare l'account.
+Benvenuto su **SwimForge** ("noi", "nostro" o "il Servizio"). La tua privacy è importante per noi. Questa Privacy Policy descrive come raccogliamo, utilizziamo, conserviamo e proteggiamo le tue informazioni personali quando utilizzi la nostra piattaforma di gamification per nuotatori.
+
+Utilizzando SwimForge, accetti le pratiche descritte in questa Privacy Policy. Se non accetti questa policy, ti preghiamo di non utilizzare il Servizio.
 
 ---
 
-## 1. Chi è il titolare del trattamento
+## 1. Informazioni che Raccogliamo
 
-Il titolare del trattamento è **Fabrizio**, persona fisica, che gestisce SwimForge.
+### 1.1 Informazioni fornite direttamente da te
 
-**Email per privacy e assistenza:** admin@swimforge.it
+Quando ti registri e utilizzi SwimForge, potresti fornirci:
 
-Non è stato nominato un Responsabile della protezione dei dati (DPO).
+- **Informazioni di account**: Nome, cognome, email, password (criptata), data di nascita
+- **Informazioni di profilo**: Nome visualizzato, avatar, biografia
+- **Dati di attività**: Attività di nuoto inserite manualmente (distanza, durata, data, tipo di vasca, stile)
+- **Preferenze**: Impostazioni di notifica, preferenze di visualizzazione
+- **Interazioni social**: Commenti, reazioni, messaggi diretti e inoltri privati di post (con nota opzionale)
 
----
+### 1.2 Informazioni raccolte automaticamente
 
-## 2. Quali dati raccogliamo
+Quando utilizzi SwimForge, raccogliamo automaticamente:
 
-### 2.1 Account e accesso
+- **Dati di utilizzo**: Pagine visitate, funzionalità utilizzate, tempo trascorso sull'app
+- **Dati tecnici**: Indirizzo IP, tipo di browser, sistema operativo, dispositivo
+- **Cookie e tecnologie simili**: Utilizziamo cookie per mantenere la tua sessione e migliorare l'esperienza utente
 
-- **Registrazione con email:** nome, cognome, email e password. La password è conservata presso Supabase solo in forma cifrata, come hash: nessuno può leggerla.
-- **Accesso con Google:** se scegli «Accedi con Google», Google ci comunica il tuo nome, la tua email e un identificativo del tuo account Google.
-- **Sessione:** quando accedi apriamo una sessione che dura fino a 30 giorni. Sul sito è il cookie `app_session_id`, nell'app Android un token salvato sul telefono.
-- **Date e presenza:** la data di creazione dell'account, quella dell'ultimo accesso e il momento in cui sei stato attivo l'ultima volta. Quest'ultimo serve a mostrare agli altri se sei online.
+### 1.3 Informazioni da servizi di terze parti
 
-### 2.2 Profilo
-
-I dati che scegli di inserire: foto del profilo e di copertina, username, biografia, località (testo libero), data di nascita, categoria master, stile e lunghezza della vasca preferiti. Ci sono anche le preferenze (unità di misura, lingua, fuso orario) e le impostazioni di notifica e di privacy.
-
-Dalle tue nuotate calcoliamo livello, XP, badge, record personali e statistiche settimanali. Conserviamo anche gli obiettivi che crei.
-
-### 2.3 Nuotate e dati di allenamento
+Se scegli di connettere servizi esterni al tuo account SwimForge, raccogliamo:
 
 #### Garmin Connect
+- Email account Garmin
+- Token di autenticazione OAuth
+- Attività di nuoto sincronizzate (distanza, durata, frequenza cardiaca, SWOLF, lunghezza vasca, stile)
+- Data e ora delle attività
 
-Le nuotate arrivano da Garmin Connect, se colleghi il tuo account Garmin. Per ogni nuotata importiamo:
+#### Strava
+- ID atleta Strava
+- Username Strava
+- Token di accesso e refresh OAuth 2.0
+- Attività di nuoto sincronizzate (distanza, durata, frequenza cardiaca, calorie)
+- Data e ora delle attività
 
-- data, ora e nome dell'attività, distanza, durata, passo, lunghezza della vasca, stile, giri e vasche con i loro tempi, bracciate, SWOLF e frequenza di bracciata;
-- frequenza cardiaca media e massima (anche per giro e per vasca), tempo trascorso nelle zone di frequenza cardiaca, frequenza cardiaca a riposo, calorie, VO2max, training effect aerobico e anaerobico, tempo di recupero e stress medio;
-- i dati completi dell'attività così come li fornisce Garmin, per esempio suddivisioni, meteo e attrezzatura. Per le nuotate in acque libere possono contenere la **posizione GPS**: il punto di partenza e, se Garmin la fornisce, la traccia del percorso. Li conserviamo insieme all'attività, ma oggi SwimForge non li mostra su una mappa.
-
-**Come funziona il collegamento.** Per collegare Garmin inserisci l'email e la password del tuo account Garmin Connect e, se Garmin lo chiede, il codice di verifica. Le usiamo una sola volta per accedere a Garmin per tuo conto e **non salviamo la password**. Conserviamo invece l'email Garmin e i token di accesso che Garmin rilascia: grazie ai token sincronizziamo le nuotate senza chiederti di nuovo la password. Nel database i token sono cifrati. Sul nostro server ne resta una copia in un'area riservata al solo servizio di sincronizzazione.
-
-SwimForge non è un'app partner ufficiale di Garmin: il collegamento usa l'accesso al tuo account Garmin Connect. I dati del tuo account Garmin restano trattati da Garmin secondo la sua informativa: www.garmin.com/privacy
-
-#### Dati che inserisci tu
-
-- le note alle nuotate;
-- il test CSS (tempi sui 400 e sui 200 m, con la data) e le zone di passo che imposti a mano;
-- gli obiettivi.
-
-Da questi dati e dalle nuotate calcoliamo metriche come passo soglia (CSS), zone di passo, carico, forma e fatica.
-
-### 2.4 Contenuti social e club
-
-- **Post:** testo, foto, video, hashtag, persone taggate e l'eventuale nuotata collegata. Inoltre commenti, reazioni («splash»), chi segui e chi ti segue, i post che nascondi e le segnalazioni che invii.
-- **Messaggi diretti**, compresi i post che inoltri in privato.
-- **Club:** iscrizione e ruolo, inviti, eventi (luogo, eventuali coordinate e percorso), partecipazioni, annunci, foto, video e PDF del club, allenamenti del club.
-- **Gare e storico del club**, se il club usa queste funzioni: iscrizioni alle gare, tempi di iscrizione e risultati (nome dell'atleta, società, tempi, punteggi). I responsabili del club possono importarli anche da file o da siti pubblici di risultati.
-- **Notifiche nell'app** che ricevi.
-
-### 2.5 Coach AI
-
-- **Chat con il coach:** la conversazione resta salvata **solo sul tuo dispositivo** (gli ultimi 20 messaggi, con l'obiettivo e i vincoli che indichi). A ogni messaggio la inviamo al server, che non la conserva e la passa a Google Gemini per ottenere la risposta (vedi la sezione 5).
-- **Allenamenti generati, analisi delle singole nuotate e consigli della pagina Coach:** li salviamo nel tuo account.
-
-### 2.6 Notifiche push (app Android)
-
-Se attivi le notifiche salviamo un identificativo del dispositivo (il token di Firebase), la piattaforma e la versione dell'app. Il contenuto delle notifiche passa da Firebase Cloud Messaging di Google: per esempio il nome di chi ti scrive e l'inizio del messaggio.
-
-### 2.7 Dati tecnici, sicurezza e statistiche d'uso
-
-- **Log del server:** per ogni richiesta registriamo data e ora, indirizzo della pagina o funzione richiesta, esito, durata e indirizzo IP. Per gli errori registriamo anche dettagli tecnici.
-- **Prova dei consensi:** quando dai o revochi un consenso registriamo la data, la versione del testo, l'indirizzo IP e il tipo di browser o dispositivo (user agent).
-- **Protezione dagli abusi:** usiamo l'indirizzo IP per poco tempo, per bloccare i tentativi ripetuti, per esempio di accesso.
-- **Accessi:** il servizio di autenticazione di Supabase registra per sicurezza gli eventi di accesso, come login e recupero della password.
-- **Statistiche d'uso interne:** registriamo nel nostro database alcuni eventi legati al tuo account. Per esempio: post creato o visto, nuotata sincronizzata, record personale visto o condiviso, profilo di un altro utente aperto, allenamento del club aperto o completato. Ci servono a capire quali funzioni vengono usate. Non usiamo Google Analytics né altri servizi di analisi esterni.
+**Nota importante**: SwimForge accede **solo** ai dati delle tue attività di nuoto. Non accediamo né conserviamo dati di altre attività sportive o informazioni non necessarie al funzionamento del Servizio.
 
 ---
 
-## 3. Perché usiamo i dati e su quale base giuridica
+## 2. Come Utilizziamo le Tue Informazioni
 
-- **Fornirti il servizio:** account e accesso, profilo, importazione delle nuotate, statistiche, badge, sfide, classifiche, feed, messaggi, club, notifiche. La base è l'**esecuzione del contratto**, cioè i Termini di Servizio che accetti alla registrazione (art. 6.1.b GDPR).
-- **Dati sulla salute e analisi con l'IA che li usano:** il tuo **consenso esplicito** (art. 9.2.a e 6.1.a GDPR). Vedi le sezioni 4 e 5.
-- **Comunicazioni promozionali:** il tuo **consenso** (art. 6.1.a GDPR). Oggi non ne inviamo; se lo faremo, le riceverà solo chi ha dato il consenso.
-- **Sicurezza, protezione dagli abusi, log, prova dei consensi, gestione delle segnalazioni e statistiche d'uso interne:** il nostro **legittimo interesse** a proteggere il servizio e chi lo usa e a migliorarlo (art. 6.1.f GDPR). Puoi opporti (sezione 10).
-- **Obblighi di legge**, per esempio le richieste di un'autorità (art. 6.1.c GDPR).
+Utilizziamo le informazioni raccolte per:
 
----
+### 2.1 Fornire e migliorare il Servizio
+- Creare e gestire il tuo account
+- Sincronizzare automaticamente le tue attività di nuoto da Garmin e Strava
+- Calcolare statistiche, progressi e XP (punti esperienza)
+- Assegnare badge e livelli in base ai tuoi risultati
+- Gestire challenge e classifiche
 
-## 4. Dati sulla salute e consenso
+### 2.2 Generare insights personalizzati con AI
+- Analizzare i tuoi dati di allenamento per generare **AI Insights** personalizzati
+- Creare piani di allenamento su misura tramite **AI Coach**
+- Fornire previsioni sui tuoi progressi tramite **Analisi Predittive**
 
-In **Impostazioni > Privacy > Consensi GDPR** trovi due consensi: «Trattamento dati salute» e «Sincronizzazione Garmin». Senza entrambi SwimForge non collega il tuo account Garmin e non importa nuotate. Il consenso «Trattamento dati salute» copre anche le analisi automatiche descritte nella sezione 5, che usano questi dati.
+**Nota**: Gli insights AI vengono generati utilizzando servizi di intelligenza artificiale di terze parti (Google Gemini). I tuoi dati vengono inviati in forma anonimizzata e non vengono conservati dai provider AI oltre il tempo necessario per generare gli insights.
 
-**Revoca.** Puoi revocare i consensi in qualsiasi momento dallo stesso menu. Dalla revoca SwimForge smette di importare nuove nuotate da Garmin. La revoca non cancella le nuotate già importate e non le esclude dalle analisi. Se vuoi che non vengano più usate, elimina l'account o scrivici: le cancelliamo. La revoca non rende illecito quanto fatto prima.
+### 2.3 Comunicare con te
+- Inviare notifiche su nuovi badge, challenge completate, progressi
+- Rispondere alle tue richieste di supporto
+- Inviare aggiornamenti importanti sul Servizio
+- Consentire la messaggistica privata tra utenti e l'inoltro privato di contenuti social
 
-**Dati sulla salute che scrivi tu.** Nelle note o nella chat con il coach potresti scrivere dati sulla tua salute, per esempio un dolore o un infortunio. Li usiamo solo per risponderti: inserisci solo quello che serve.
-
----
-
-## 5. Intelligenza artificiale: cosa inviamo a Google Gemini
-
-### 5.1 Analisi della singola nuotata (automatica)
-
-Dopo l'importazione SwimForge invia a Gemini i dati della nuotata: distanza, tempi, passo, stile, frequenza cardiaca media e massima, SWOLF, bracciate, training effect, VO2max e dati per giro. Invia anche una parte dei dati grezzi ricevuti da Garmin, che possono contenere il nome del tuo profilo Garmin e, per le nuotate all'aperto, le coordinate di partenza. Il risultato (titolo, sintesi e consigli) resta salvato nel tuo account.
-
-### 5.2 Chat con il coach
-
-Quando scrivi al coach inviamo a Gemini:
-
-- gli ultimi messaggi della conversazione, con l'obiettivo e i vincoli che hai indicato;
-- livello e statistiche generali;
-- le ultime nuotate (data, distanza, durata, passo, SWOLF);
-- metriche come passo soglia, zone, carico, forma e fatica;
-- le ultime analisi delle sessioni.
-
-Non inviamo nome, email o data di nascita.
-
-### 5.3 Allenamenti generati
-
-Inviamo statistiche riassuntive delle tue nuotate, compresa la distribuzione del tempo nelle zone di frequenza cardiaca.
-
-### 5.4 Consigli della pagina Coach
-
-Inviamo le tue metriche di nuoto: volumi, passo soglia, zone, carico, forma e fatica. I consigli ottenuti restano salvati nel tuo account finché non vengono sostituiti da quelli nuovi.
-
-### 5.5 Funzioni dei club
-
-Gli allenamenti del club e i contenuti automatici (frasi e immagini motivazionali) partono dalle indicazioni dei responsabili del club, senza dati personali degli iscritti. Il proprietario di un club può far generare logo e copertina a OpenAI. In quel caso inviamo nome, motto, descrizione e colore del club e il testo che il proprietario scrive.
-
-### 5.6 Cosa fa Google con questi dati
-
-Google tratta questi dati come nostro fornitore, per generare la risposta, secondo i termini dell'API Gemini. Le risposte dell'IA sono indicazioni di allenamento e non sostituiscono un medico o un allenatore. Non prendiamo decisioni automatiche che abbiano effetti giuridici o effetti simili su di te.
+### 2.4 Sicurezza e conformità
+- Prevenire frodi, abusi e attività illegali
+- Rispettare obblighi legali e normativi
 
 ---
 
-## 6. Chi può vedere i tuoi dati
+## 3. Condivisione delle Informazioni
 
-- **Altri utenti registrati:** il tuo profilo (nome, username, foto, copertina, biografia, località, livello, XP, numero di follower e di persone seguite). Puoi rendere il profilo non pubblico da **Impostazioni > Privacy**.
-- **Feed:** i post che pubblichi. Se condividi una nuotata, gli altri ne vedono distanza, durata, data, stile, tipo (vasca o acque libere), calorie, frequenza cardiaca media e SWOLF. Vicino al tuo nome può comparire il tuo club e l'indicazione «online».
-- **Classifiche:** nome, foto, livello e XP sono visibili a tutti gli utenti. Per essere escluso dalle classifiche scrivici.
-- **Club:** iscritti e responsabili vedono i contenuti del club; i responsabili gestiscono iscrizioni ed eventi.
-- **Messaggi diretti:** il destinatario. I messaggi non hanno la cifratura end-to-end.
-- **Foto, video e PDF** caricati hanno un indirizzo web diretto: chi ha il link può aprirli anche senza account.
-- **Il titolare**, come amministratore, può accedere ai dati per far funzionare il servizio, per l'assistenza e per gestire le segnalazioni.
-- **Autorità:** solo se la legge lo richiede.
+### 3.1 Non vendiamo i tuoi dati
 
----
+**Non vendiamo, affittiamo o scambiamo le tue informazioni personali con terze parti per scopi di marketing.**
 
-## 7. Fornitori e dove si trovano i dati
+### 3.2 Condivisione con servizi di terze parti
 
-Questi fornitori trattano i dati per nostro conto e solo per le finalità indicate:
+Condividiamo le tue informazioni solo con:
 
-- **Oracle Cloud Infrastructure:** il server che esegue l'applicazione, il servizio di sincronizzazione con Garmin (con i token Garmin) e i log. Si trova in Italia, nell'area di Milano.
-- **Supabase:** database, autenticazione (account, password cifrate, accesso con Google, email di conferma e di recupero della password) e archivio file di riserva. Si trova nell'Unione europea, a Stoccolma (Svezia).
-- **Upstash:** cache (Redis) con copie temporanee di profili, statistiche, elenchi di attività e classifiche, che scadono da sole entro 24 ore.
-- **ImageKit:** conserva e distribuisce le foto (post, profilo, club) e i PDF dei club.
-- **Cloudinary:** conserva e distribuisce i video e, se ImageKit non risponde, anche le foto.
-- **Google:** Gemini API (intelligenza artificiale, sezione 5), Firebase Cloud Messaging (notifiche push) e «Accedi con Google».
-- **OpenAI:** solo per logo e copertina dei club generati con l'IA (sezione 5).
-- **Resend:** invia l'email che conferma l'eliminazione dell'account.
-- **Rollbar:** raccoglie gli errori tecnici del server, che possono contenere dettagli della richiesta.
+#### Provider di servizi
+- **Hosting e database**: Render.com, TiDB Cloud (per archiviare dati dell'app)
+- **Autenticazione**: Manus OAuth (per gestire login e registrazione)
+- **AI Insights**: Google Gemini API (per generare insights personalizzati, dati anonimizzati)
+- **Sincronizzazione attività**: Garmin Connect API, Strava API (per recuperare dati attività)
 
-Altri servizi esterni:
+Questi provider sono contrattualmente obbligati a proteggere i tuoi dati e utilizzarli solo per fornire i servizi richiesti.
 
-- **OpenStreetMap** (OpenStreetMap Foundation, Regno Unito): mappe e ricerca degli indirizzi negli eventi dei club. Il tuo dispositivo scarica le mappe direttamente da OpenStreetMap, che riceve il tuo indirizzo IP e l'indirizzo che cerchi.
-- **Open-Meteo:** previsioni meteo per gli eventi dei club. Riceve solo le coordinate dell'evento.
-- **Anteprime dei link:** quando un post contiene un link, il nostro server scarica titolo e immagine della pagina. Il sito esterno vede il nostro server, non te.
-- **Garmin** non è un nostro fornitore ma la fonte dei dati che scegli di collegare. Tratta i dati del tuo account Garmin in autonomia.
+### 3.3 Condivisione per obblighi legali
 
----
+Potremmo divulgare le tue informazioni se richiesto dalla legge o in risposta a richieste legali valide (es. mandati, ordini del tribunale).
 
-## 8. Trasferimenti fuori dall'Unione europea
+### 3.4 Classifiche pubbliche
 
-Il database (Supabase, Svezia) e il server (Oracle, Italia) sono nell'Unione europea. Google, OpenAI, Cloudinary, Upstash, Resend, Rollbar e Supabase sono società con sede negli Stati Uniti; ImageKit ha sede in India. Questi fornitori possono trattare dati anche fuori dallo Spazio economico europeo, per esempio per erogare il servizio o per l'assistenza tecnica.
+Le classifiche (leaderboard) mostrano pubblicamente:
+- Nome visualizzato
+- Avatar
+- Punteggio XP
+- Livello
 
-In questi casi il trasferimento avviene, ove applicabile, sulla base della decisione di adeguatezza sul quadro UE-USA per la protezione dei dati (EU-US Data Privacy Framework), per le società certificate, oppure delle clausole contrattuali standard approvate dalla Commissione europea. Il Regno Unito, dove ha sede OpenStreetMap Foundation, è coperto da una decisione di adeguatezza.
+**Non condividiamo** email, dati di attività dettagliati o altre informazioni sensibili nelle classifiche.
+
+### 3.5 Inoltri privati di post
+
+Quando inoltri un post in chat privata:
+- Registriamo mittente, destinatario, timestamp, tipo messaggio e metadati minimi del contenuto inoltrato (es. id contenuto, anteprima, autore)
+- L'inoltro viene consentito solo se conforme alle regole privacy dell'autore (es. inoltri consentiti/disabilitati, limitazione ai follower)
+- I destinatari bloccati dalle regole privacy non ricevono l'inoltro
+- Puoi gestire queste impostazioni in **Impostazioni > Privacy**
 
 ---
 
-## 9. Per quanto tempo conserviamo i dati
+## 4. Conservazione dei Dati
 
-- **In generale:** finché il tuo account esiste. Profilo, nuotate, post, commenti e dati dei club non hanno una scadenza automatica.
-- **Messaggi diretti:** cancellati automaticamente dopo 60 giorni.
-- **Notifiche nell'app:** cancellate automaticamente dopo 90 giorni.
-- **Post:** puoi eliminare un tuo post entro 24 ore dalla pubblicazione. Il post sparisce dall'app ma resta nascosto nel database fino all'eliminazione dell'account. Per i post più vecchi e per i commenti scrivici.
-- **Cache:** copie temporanee che scadono da sole entro 24 ore.
-- **Chat con il coach:** resta sul tuo dispositivo finché non la cancelli dall'app o non cancelli i dati del browser o dell'app.
-- **Log del server:** restano sul server per un periodo limitato. Non hanno una scadenza fissa: vengono cancellati quando il servizio viene aggiornato a una nuova versione.
-- **Registro dei consensi:** finché esiste l'account.
-- **Garmin:** se scolleghi Garmin da **Impostazioni > Connessioni**, cancelliamo i token dal database e dal server. Le nuotate già importate restano nel tuo account.
+Conserviamo le tue informazioni personali per il tempo necessario a fornirti il Servizio e rispettare obblighi legali.
 
-### Eliminazione dell'account
-
-Puoi eliminare l'account da **Impostazioni > Privacy > Dati e account > Elimina account**. Cancelliamo subito:
-
-- account, profilo e accesso;
-- nuotate, con giri e vasche;
-- post, commenti, reazioni, chi segui e chi ti segue;
-- messaggi diretti, sia inviati sia ricevuti, e notifiche;
-- iscrizioni ai club, contenuti dei club che hai pubblicato e i club che hai creato;
-- badge, XP, record, statistiche e obiettivi;
-- analisi e allenamenti generati dall'IA;
-- token Garmin nel database, consensi e token per le notifiche push.
-
-Se il servizio email è attivo, ti mandiamo un'email di conferma.
-
-Alcune cose oggi non vengono cancellate in automatico:
-
-- foto, video e PDF che hai caricato restano sui server di ImageKit, Cloudinary o Supabase, anche se l'app non li mostra più. Scrivici e li cancelliamo;
-- la copia dei token Garmin sul server del servizio di sincronizzazione. Prima di eliminare l'account scollega Garmin, oppure scrivici;
-- gli eventi delle statistiche d'uso interne restano con il solo numero dell'account cancellato, senza nome né email;
-- le copie di sicurezza (backup) del database gestite da Supabase, se presenti, che si sovrascrivono a rotazione.
+- **Account attivi**: Conserviamo i dati finché il tuo account è attivo
+- **Account cancellati**: Eliminiamo i dati personali entro **30 giorni** dalla cancellazione dell'account, salvo obblighi legali di conservazione
+- **Messaggi diretti e inoltri privati**: Conservazione operativa con retention automatica lato server (attualmente 60 giorni, salvo configurazioni diverse)
+- **Dati aggregati**: Potremmo conservare dati aggregati e anonimizzati per analisi statistiche
 
 ---
 
-## 10. I tuoi diritti e come esercitarli
+## 5. Sicurezza dei Dati
 
-Il GDPR ti riconosce questi diritti: accesso ai dati, rettifica, cancellazione, limitazione del trattamento, portabilità, opposizione al trattamento basato sul legittimo interesse e revoca del consenso in qualsiasi momento.
+Implementiamo misure di sicurezza tecniche e organizzative per proteggere i tuoi dati:
 
-Nell'app puoi:
+- **Criptazione**: Password criptate con bcrypt, dati sensibili criptati in transito (HTTPS) e a riposo
+- **Accesso limitato**: Solo personale autorizzato ha accesso ai dati personali
+- **Monitoraggio**: Monitoriamo attivamente per rilevare e prevenire accessi non autorizzati
 
-- **scaricare i tuoi dati:** **Impostazioni > Privacy > Dati e account > Esporta i dati**. Ottieni un file JSON con account, profilo, nuotate (compresi i dati ricevuti da Garmin), post, commenti, splash, follower, badge, XP, record, statistiche, obiettivi, notifiche, messaggi diretti, iscrizioni ai club, segnalazioni, post nascosti e consensi. Per una copia completa, per esempio con i dettagli dei giri, le analisi dell'IA e i dati dei club, scrivici;
-- **correggere i dati del profilo:** **Impostazioni > Profilo**;
-- **dare o revocare i consensi:** **Impostazioni > Privacy > Consensi GDPR**. Termini di Servizio e Privacy Policy sono necessari per usare SwimForge;
-- **scegliere chi vede cosa:** **Impostazioni > Privacy** (profilo pubblico, inoltri privati);
-- **gestire le notifiche:** **Impostazioni > Notifiche** e le impostazioni del telefono;
-- **scollegare Garmin:** **Impostazioni > Connessioni**;
-- **uscire da tutti i dispositivi** ed **eliminare l'account:** **Impostazioni > Privacy > Dati e account**.
-
-Per tutto il resto scrivi a **admin@swimforge.it**. Rispondiamo entro un mese.
-
-Se ritieni che il trattamento dei tuoi dati violi il GDPR, puoi presentare un reclamo al **Garante per la protezione dei dati personali**, Piazza Venezia 11, 00187 Roma, www.garanteprivacy.it, o all'autorità di controllo del Paese UE in cui vivi o lavori.
+Tuttavia, nessun sistema è completamente sicuro. Ti incoraggiamo a utilizzare password forti e uniche.
 
 ---
 
-## 11. Sicurezza
+## 6. I Tuoi Diritti
 
-- Le connessioni tra il tuo dispositivo e SwimForge sono cifrate (HTTPS).
-- Le password sono conservate solo come hash. I token Garmin nel database sono cifrati (AES-256), e la copia sul server è accessibile solo al servizio di sincronizzazione.
-- Il cookie di sessione non è leggibile dagli script della pagina. Le richieste sono protette contro gli attacchi CSRF e contro i tentativi ripetuti.
-- Solo il titolare ha accesso amministrativo ai sistemi.
+Hai i seguenti diritti riguardo ai tuoi dati personali:
 
-Nessun sistema è sicuro al 100%: usa una password robusta e diversa da quella degli altri servizi. In caso di violazione dei dati informeremo il Garante e, se previsto dalla legge, anche te.
+### 6.1 Accesso e portabilità
+- Puoi richiedere una copia dei tuoi dati personali
+- Puoi esportare i tuoi dati in formato leggibile
 
----
+### 6.2 Rettifica
+- Puoi correggere informazioni inesatte o incomplete tramite le impostazioni del profilo
 
-## 12. Minori
+### 6.3 Cancellazione
+- Puoi richiedere la cancellazione del tuo account e dei tuoi dati in qualsiasi momento
+- Contattaci a: **privacy@swimforge.com** (o email supporto)
 
-SwimForge non è destinato a chi ha meno di **14 anni**, come previsto dai Termini di Servizio. L'app oggi non verifica l'età. Se scopri che un minore di 14 anni ci ha fornito dati, scrivici e li cancelliamo.
+### 6.4 Revoca consenso
+- Puoi disconnettere Garmin Connect o Strava in qualsiasi momento dalle impostazioni
+- Puoi revocare i consensi opzionali da **Impostazioni > Privacy > Consensi GDPR**
+- Puoi gestire i cookie opzionali dalla nostra Cookie Policy: **/cookies**
 
----
+### 6.5 Opposizione e limitazione
+- Puoi opporti al trattamento dei tuoi dati per scopi specifici (es. marketing)
+- Puoi richiedere la limitazione del trattamento in determinate circostanze
 
-## 13. Cookie e memoria del dispositivo
-
-SwimForge usa solo cookie tecnici (`app_session_id` per la sessione, `csrf_token` per la sicurezza) e la memoria locale del browser o dell'app: l'accesso di Supabase, il tema, le preferenze, la scelta sui cookie e la chat con il coach. Non usiamo cookie di profilazione né cookie di terze parti.
-
-Quando l'app mostra mappe, foto o video, il tuo dispositivo li scarica dai server di OpenStreetMap, ImageKit, Cloudinary o Supabase, che ricevono il tuo indirizzo IP. I dettagli sono nella Cookie Policy, alla pagina /cookies.
-
----
-
-## 14. Modifiche a questa informativa
-
-Se cambiamo questa informativa aggiorniamo la data in alto e, per le modifiche importanti, ti avvisiamo nell'app. Se una modifica riguarda un trattamento basato sul consenso, ti chiediamo un nuovo consenso.
+Per esercitare questi diritti, contattaci all'indirizzo indicato nella sezione "Contatti".
 
 ---
 
-## 15. Contatti
+## 7. Cookie e Tecnologie di Tracciamento
 
-**Titolare del trattamento:** Fabrizio
+Il dettaglio completo dei cookie e delle preferenze è disponibile nella Cookie Policy dedicata: **/cookies**.
 
-**Email:** admin@swimforge.it
+Utilizziamo cookie e tecnologie simili per:
+
+### 7.1 Cookie essenziali
+- **Cookie di sessione**: Per mantenere il tuo login e garantire il funzionamento dell'app
+- **Cookie di sicurezza**: Per proteggere il tuo account da accessi non autorizzati
+
+### 7.2 Cookie opzionali
+- **Analytics**: Per capire come gli utenti utilizzano SwimForge e migliorare il Servizio
+- **Marketing**: Comunicazioni promozionali solo con consenso esplicito
+
+Puoi gestire le preferenze cookie dal banner iniziale o da **Impostazioni > Privacy > Consensi GDPR**.
+
+---
+
+## 8. Servizi di Terze Parti
+
+### 8.1 Garmin Connect
+
+Quando connetti il tuo account Garmin Connect:
+- SwimForge accede alle tue attività di nuoto tramite le API di Garmin
+- Conserviamo i token di autenticazione OAuth per sincronizzare automaticamente le attività
+- Puoi disconnettere Garmin in qualsiasi momento dalle impostazioni
+
+**Garmin Privacy Policy**: https://www.garmin.com/privacy/
+
+### 8.2 Strava
+
+Quando connetti il tuo account Strava:
+- SwimForge accede alle tue attività di nuoto tramite le API di Strava
+- Utilizziamo OAuth 2.0 per autenticare in modo sicuro (non conserviamo la tua password Strava)
+- Conserviamo access token e refresh token per sincronizzare automaticamente le attività
+- Puoi revocare l'accesso in qualsiasi momento dalle impostazioni SwimForge o dal tuo account Strava
+
+**Strava Privacy Policy**: https://www.strava.com/legal/privacy  
+**Strava API Agreement**: https://www.strava.com/legal/api
+
+### 8.3 Google Gemini (AI Insights)
+
+Per generare insights AI personalizzati:
+- Inviamo i tuoi dati di allenamento (anonimizzati) all'API Google Gemini
+- Google non conserva i tuoi dati oltre il tempo necessario per generare la risposta
+- Gli insights vengono memorizzati in cache per 24 ore per ridurre le chiamate API
+
+**Google AI Privacy**: https://ai.google.dev/gemini-api/terms
+
+### 8.4 Altri responsabili del trattamento (processor)
+
+- **ImageKit** (hosting media foto/video)
+- **Resend** (email transazionali)
+- **Rollbar** (monitoring errori)
+
+---
+
+## 9. Trasferimenti Internazionali di Dati
+
+I tuoi dati potrebbero essere trasferiti e conservati su server situati al di fuori del tuo paese di residenza, inclusi Stati Uniti e Unione Europea.
+
+Garantiamo che tali trasferimenti rispettino le normative applicabili sulla protezione dei dati (es. GDPR) tramite:
+- Clausole contrattuali standard
+- Certificazioni di adeguatezza (es. EU-US Data Privacy Framework, dove applicabile)
+
+---
+
+## 10. Minori
+
+In Italia, SwimForge non è destinato a utenti di età inferiore a **14 anni** (art. 2-quinquies Codice Privacy). Non raccogliamo consapevolmente informazioni personali da minori di 14 anni.
+
+Se vieni a conoscenza che un minore ha fornito informazioni personali, contattaci immediatamente per la cancellazione.
+
+---
+
+## 11. Modifiche a Questa Privacy Policy
+
+Potremmo aggiornare questa Privacy Policy periodicamente per riflettere cambiamenti nel Servizio o requisiti legali.
+
+- **Notifiche**: Ti informeremo di modifiche sostanziali tramite email o notifica nell'app
+- **Data di aggiornamento**: La data di "Ultimo aggiornamento" in cima al documento verrà aggiornata
+- **Accettazione**: Continuando a utilizzare SwimForge dopo le modifiche, accetti la nuova Privacy Policy
+
+---
+
+## 12. Contatti
+
+Per domande, richieste o reclami riguardo a questa Privacy Policy o al trattamento dei tuoi dati personali, contattaci:
+
+**Email**: support@swimforge.com  
+**Indirizzo**: [Da inserire se applicabile]
+
+**Data Protection Officer (DPO)**: [Da inserire se applicabile per GDPR]
+
+---
+
+## 13. Conformità GDPR (per utenti UE)
+
+Se risiedi nell'Unione Europea, hai diritti aggiuntivi ai sensi del GDPR:
+
+- **Base giuridica del trattamento**: Consenso, esecuzione del contratto, legittimo interesse
+- **Diritto di reclamo**: Puoi presentare reclamo all'autorità di controllo competente nel tuo paese
+- **Trasferimenti extra-UE**: Garantiamo protezioni adeguate tramite clausole contrattuali standard
+
+Autorità italiana competente:
+
+**Garante per la protezione dei dati personali**  
+Piazza Venezia n. 11, 00187 Roma  
+https://www.garanteprivacy.it
+
+---
+
+**Grazie per aver scelto SwimForge!** 🏊‍♂️
+
+Ci impegniamo a proteggere la tua privacy e a fornirti un'esperienza sicura e trasparente.

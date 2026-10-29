@@ -21,7 +21,7 @@ describe("Pagine legali (Corsia)", () => {
   afterEach(cleanup);
 
   it.each([
-    [Privacy, "Privacy Policy di SwimForge", "In breve"],
+    [Privacy, "Privacy Policy di SwimForge", "Introduzione"],
     [Terms, "Termini di Servizio di SwimForge", "1. Accettazione dei Termini"],
     [CookiePolicy, "Cookie Policy di SwimForge", "1. Cosa sono i cookie"],
   ])("%#: il titolo del documento è l'h1, le sezioni sono h2", (page, title, firstSection) => {
