@@ -85,6 +85,11 @@ const WORKOUT_EQUIPMENT_OPTIONS: Array<{ value: WorkoutEquipment; label: string 
   { value: "snorkel", label: "Snorkel" },
 ];
 
+/** Who may open the coach area (server: meets, workouts and history accept coaches too). */
+const COACH_AREA_ROLES = ["coach", "owner", "admin", "moderator"];
+/** Club staff (server: invites and the AI coach refuse coaches). */
+const CLUB_STAFF_ROLES = ["owner", "admin", "moderator"];
+
 const ROLE_LABELS: Record<string, string> = {
   owner: "Proprietario",
   admin: "Admin",
@@ -374,9 +379,11 @@ export default function ClubCoachModeration() {
     { clubId },
     { enabled: match && Number.isFinite(clubId) }
   );
-  const isCoachStaffFromQuery = ["coach", "owner", "admin", "moderator"].includes(
-    String((clubQuery.data as any)?.member_role ?? "")
-  );
+  const roleFromQuery = String((clubQuery.data as any)?.member_role ?? "");
+  const isCoachStaffFromQuery = COACH_AREA_ROLES.includes(roleFromQuery);
+  // Invites and the AI coach are for the club staff only, not for coaches (server: owner,
+  // admin, moderator): not even asked for otherwise.
+  const isClubStaffFromQuery = CLUB_STAFF_ROLES.includes(roleFromQuery);
   const meetsQuery = trpc.community.clubs.meets.list.useQuery(
     { clubId },
     { enabled: clubMeetsV1Enabled && match && Number.isFinite(clubId) }
@@ -395,7 +402,7 @@ export default function ClubCoachModeration() {
   );
   const invitesQuery = trpc.community.clubs.invites.useQuery(
     { clubId },
-    { enabled: match && Number.isFinite(clubId) }
+    { enabled: match && Number.isFinite(clubId) && isClubStaffFromQuery }
   );
   const historyConfigQuery = trpc.community.clubs.history.config.get.useQuery(
     { clubId },
@@ -415,11 +422,11 @@ export default function ClubCoachModeration() {
   );
   const aiCoachConfigQuery = trpc.community.clubs.aiCoach.getConfig.useQuery(
     { clubId },
-    { enabled: clubAiAutomationV1Enabled && match && Number.isFinite(clubId) && isCoachStaffFromQuery }
+    { enabled: clubAiAutomationV1Enabled && match && Number.isFinite(clubId) && isClubStaffFromQuery }
   );
   const aiCoachRunsQuery = trpc.community.clubs.aiCoach.lastRuns.useQuery(
     { clubId, limit: 12 },
-    { enabled: clubAiAutomationV1Enabled && match && Number.isFinite(clubId) && isCoachStaffFromQuery }
+    { enabled: clubAiAutomationV1Enabled && match && Number.isFinite(clubId) && isClubStaffFromQuery }
   );
 
   const createMeetMutation = trpc.community.clubs.meets.create.useMutation({
@@ -541,7 +548,8 @@ export default function ClubCoachModeration() {
   const club = clubQuery.data as any | undefined;
   const isMember = Boolean(club?.is_member);
   const role = String(club?.member_role ?? "");
-  const isCoachStaff = ["coach", "owner", "admin", "moderator"].includes(role);
+  const isCoachStaff = COACH_AREA_ROLES.includes(role);
+  const isClubStaff = CLUB_STAFF_ROLES.includes(role);
   const meetItems = ((meetsQuery.data as any)?.meets as any[]) ?? [];
   const normalizedMeets = useMemo(
     () =>
@@ -1246,7 +1254,7 @@ export default function ClubCoachModeration() {
           ) : null}
         </CoachSection>
 
-        {clubAiAutomationV1Enabled ? (
+        {clubAiAutomationV1Enabled && isClubStaff ? (
           <CoachSection
             icon={<Bot className="size-4 text-action-text" aria-hidden />}
             title="Coach AI autonomo"
@@ -1427,28 +1435,30 @@ export default function ClubCoachModeration() {
           </CoachSection>
         ) : null}
 
-        <CoachSection icon={<Users className="size-4 text-action-text" aria-hidden />} title="Inviti al club">
-          <Button
-            className="w-full sm:w-auto"
-            disabled={createInviteMutation.isPending}
-            onClick={() => createInviteMutation.mutate({ clubId, maxUses: 10 })}
-          >
-            {createInviteMutation.isPending ? "Generazione..." : "Genera nuovo invito"}
-          </Button>
-          {invitesQuery.isPending ? (
-            <LoadingSkeleton label="Caricamento degli inviti…" count={2} itemClassName="h-11 w-full rounded-xl" />
-          ) : !invites && invitesQuery.isError ? (
-            <LoadError className="border-0 bg-raised" onRetry={() => void invitesQuery.refetch()} />
-          ) : invites?.length ? (
-            <div className="space-y-2">
-              {invites.map((inv: any) => (
-                <InviteRow key={inv.id} invite={inv} />
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Nessun invito attivo.</p>
-          )}
-        </CoachSection>
+        {isClubStaff ? (
+          <CoachSection icon={<Users className="size-4 text-action-text" aria-hidden />} title="Inviti al club">
+            <Button
+              className="w-full sm:w-auto"
+              disabled={createInviteMutation.isPending}
+              onClick={() => createInviteMutation.mutate({ clubId, maxUses: 10 })}
+            >
+              {createInviteMutation.isPending ? "Generazione..." : "Genera nuovo invito"}
+            </Button>
+            {invitesQuery.isPending ? (
+              <LoadingSkeleton label="Caricamento degli inviti…" count={2} itemClassName="h-11 w-full rounded-xl" />
+            ) : !invites && invitesQuery.isError ? (
+              <LoadError className="border-0 bg-raised" onRetry={() => void invitesQuery.refetch()} />
+            ) : invites?.length ? (
+              <div className="space-y-2">
+                {invites.map((inv: any) => (
+                  <InviteRow key={inv.id} invite={inv} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Nessun invito attivo.</p>
+            )}
+          </CoachSection>
+        ) : null}
       </div>
     </AppLayout>
   );

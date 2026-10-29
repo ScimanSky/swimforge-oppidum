@@ -99,6 +99,8 @@ vi.mock("@/lib/trpc", () => {
 });
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
+const flags = vi.hoisted(() => ({ clubMeetsV1: false, clubHistoryV1: false, clubAiAutomationV1: false }));
+vi.mock("@/lib/feature-flags", () => ({ UI_FEATURE_FLAGS: flags }));
 vi.mock("@/components/AppLayout", () => ({
   AppLayout: ({ children }: any) => <div>{children}</div>,
 }));
@@ -132,16 +134,18 @@ describe("Area coach del club (Corsia)", () => {
     state.status = { canGenerate: true, nextAvailableAt: null };
     state.workout = null;
     state.calls = {};
+    flags.clubAiAutomationV1 = false;
     printing.frames.length = 0;
     for (const refetch of Object.values(state.refetch)) refetch.mockClear();
   });
 
   it("senza h1: «Area coach» h2, ruolo in italiano, sezioni h3 (gare, AI e storico spenti)", () => {
+    state.club = { ...state.club, member_role: "admin" };
     renderCoach();
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
     expect(screen.getByRole("heading", { level: 2, name: "Area coach" })).toBeTruthy();
     expect(screen.getByText("Rari Nantes · solo coach e staff")).toBeTruthy();
-    expect(screen.getByText("Coach")).toBeTruthy();
+    expect(screen.getByText("Admin")).toBeTruthy();
     expect(section("Allenamenti in vasca (AI)")).toBeTruthy();
     expect(section("Inviti al club")).toBeTruthy();
     expect(screen.queryByRole("heading", { name: "Convocazioni gare" })).toBeNull();
@@ -202,7 +206,24 @@ describe("Area coach del club (Corsia)", () => {
     expect(printing.frames[0]).toContain("<h1>Soglia lunga</h1>");
   });
 
+  it("il coach prepara gli allenamenti ma non vede inviti e Coach AI, riservati allo staff", () => {
+    flags.clubAiAutomationV1 = true;
+    renderCoach();
+    expect(screen.getByText("Coach")).toBeTruthy();
+    expect(section("Allenamenti in vasca (AI)")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Inviti al club" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Genera nuovo invito" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Coach AI autonomo" })).toBeNull();
+
+    cleanup();
+    state.club = { ...state.club, member_role: "moderator" };
+    renderCoach();
+    expect(section("Inviti al club")).toBeTruthy();
+    expect(section("Coach AI autonomo")).toBeTruthy();
+  });
+
   it("inviti: genera, copia con un nome, errore con Riprova", async () => {
+    state.club = { ...state.club, member_role: "admin" };
     renderCoach();
     const invites = section("Inviti al club");
     expect(within(invites).getByText(/\/community\/invite\/abc123$/)).toBeTruthy();
