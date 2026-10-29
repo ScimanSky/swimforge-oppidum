@@ -5,7 +5,7 @@
 
 import { useId, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
-import { Pin, ArrowLeft, Copy, Check, Upload, X as XIcon, Calendar as CalendarIcon } from "lucide-react";
+import { Pin, ArrowLeft, Upload, X as XIcon, Calendar as CalendarIcon } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,12 +26,12 @@ import ClubHero from "@/components/club/ClubHero";
 import ClubEventsPanel, { type ClubAgendaItem } from "@/components/club/ClubEventsPanel";
 import PulseBar, { type ClubWeeklyStats } from "@/components/club/PulseBar";
 import ClubCreateMenu from "@/components/club/ClubCreateMenu";
+import { ClubInviteRow } from "@/components/club/ClubInviteRow";
 import ClubFeedTab from "@/components/club/ClubFeedTab";
 import ClubMembersTab from "@/components/club/ClubMembersTab";
 import EventMapEditor from "@/components/club/EventMapEditor";
 import { pointsToRouteGeojson, routeDistanceMeters, type RoutePoint } from "@/lib/club-event-map";
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
-import { publicSiteUrl } from "@/lib/public-url";
 
 async function geocodeLocation(query: string): Promise<{ lat: number; lng: number; displayName: string } | null> {
   const q = query.trim();
@@ -918,7 +918,7 @@ export default function ClubDetailEnhanced() {
                 <div className="space-y-2">
                   <p className="text-sm font-medium">Inviti attivi</p>
                   {(invitesQuery.data as any[]).map((inv: any) => (
-                    <InviteRow key={inv.id} invite={inv} />
+                    <ClubInviteRow key={inv.id} invite={inv} />
                   ))}
                 </div>
               )}
@@ -1349,33 +1349,6 @@ function ClubSettingsForm({
           </Button>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-/* ---- Invite Row ---- */
-
-function InviteRow({ invite }: { invite: any }) {
-  const [copied, setCopied] = useState(false);
-  const link = publicSiteUrl(`/community/invite/${invite.code}`);
-
-  return (
-    <div className="flex items-center gap-2 rounded-xl bg-raised py-1 pl-3 pr-1 text-sm">
-      <code className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{link}</code>
-      <span className="text-xs text-muted-foreground tabular-nums">{invite.usedCount}/{invite.maxUses}</span>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={copied ? "Link copiato" : "Copia link"}
-        className="shrink-0"
-        onClick={() => {
-          navigator.clipboard.writeText(link);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        }}
-      >
-        {copied ? <Check className="size-4 text-success" aria-hidden /> : <Copy className="size-4" aria-hidden />}
-      </Button>
     </div>
   );
 }

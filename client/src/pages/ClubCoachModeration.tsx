@@ -18,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Chip } from "@/components/corsia/Chip";
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { ClubAccessState, ClubNotice } from "@/components/club/ClubPageState";
+import { ClubInviteRow } from "@/components/club/ClubInviteRow";
 import { clubAccess } from "@/lib/club-access";
 import {
   buildMeetRosterPrintHtml,
@@ -35,7 +36,7 @@ import { getWorkoutSeriesDisplay, parseWorkoutPlan } from "@/lib/workout-plan";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { publicSiteUrl } from "@/lib/public-url";
-import { Bot, Calendar as CalendarIcon, Check, Clock3, Copy, Database, Flag, PlayCircle, Plus, Printer, RefreshCw, Users, Sparkles } from "lucide-react";
+import { Bot, Calendar as CalendarIcon, Clock3, Database, Flag, PlayCircle, Plus, Printer, RefreshCw, Users, Sparkles } from "lucide-react";
 
 type MeetForm = {
   name: string;
@@ -282,33 +283,6 @@ function toDateInputValue(date: Date) {
 
 function toggleMultiSelect<T extends string>(list: T[], value: T) {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
-}
-
-function InviteRow({ invite }: { invite: any }) {
-  const [copied, setCopied] = useState(false);
-  const link = publicSiteUrl(`/community/invite/${invite.code}`);
-
-  return (
-    <div className="flex min-w-0 items-center gap-2 rounded-xl bg-raised py-1 pl-3 pr-1 text-sm">
-      <code className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{link}</code>
-      <span className="text-xs text-muted-foreground tabular-nums">
-        {invite.usedCount}/{invite.maxUses}
-      </span>
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        aria-label={copied ? "Link copiato" : "Copia link"}
-        className="shrink-0"
-        onClick={() => {
-          navigator.clipboard.writeText(link);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        }}
-      >
-        {copied ? <Check className="size-4 text-success" aria-hidden /> : <Copy className="size-4" aria-hidden />}
-      </Button>
-    </div>
-  );
 }
 
 /** One coach-area card: icon and h3 title, optional extra on the right, content. */
@@ -1451,7 +1425,7 @@ export default function ClubCoachModeration() {
             ) : invites?.length ? (
               <div className="space-y-2">
                 {invites.map((inv: any) => (
-                  <InviteRow key={inv.id} invite={inv} />
+                  <ClubInviteRow key={inv.id} invite={inv} />
                 ))}
               </div>
             ) : (

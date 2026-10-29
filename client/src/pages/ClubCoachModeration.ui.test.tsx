@@ -1,8 +1,9 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
+import { toast } from "sonner";
 import ClubCoachModeration from "./ClubCoachModeration";
 
 const state = vi.hoisted(() => ({
@@ -135,6 +136,7 @@ describe("Area coach del club (Corsia)", () => {
     state.workout = null;
     state.calls = {};
     flags.clubAiAutomationV1 = false;
+    vi.mocked(toast.error).mockClear();
     printing.frames.length = 0;
     for (const refetch of Object.values(state.refetch)) refetch.mockClear();
   });
@@ -227,6 +229,7 @@ describe("Area coach del club (Corsia)", () => {
     renderCoach();
     const invites = section("Inviti al club");
     expect(within(invites).getByText(/\/community\/invite\/abc123$/)).toBeTruthy();
+    expect(within(invites).getByText("2/10")).toBeTruthy();
     expect(within(invites).getByRole("button", { name: "Copia link" })).toBeTruthy();
     await userEvent.setup({ delay: null }).click(within(invites).getByRole("button", { name: "Genera nuovo invito" }));
     expect(state.calls.createInvite).toEqual([{ clubId: 7, maxUses: 10 }]);
@@ -238,6 +241,24 @@ describe("Area coach del club (Corsia)", () => {
     expect(screen.queryByText("Nessun invito attivo.")).toBeNull();
     await userEvent.setup({ delay: null }).click(within(section("Inviti al club")).getByRole("button", { name: "Riprova" }));
     expect(state.refetch.invites).toHaveBeenCalled();
+  });
+
+  it("copia del link: «Link copiato» solo se è riuscita, altrimenti un avviso", async () => {
+    state.club = { ...state.club, member_role: "admin" };
+    const user = userEvent.setup({ delay: null });
+    renderCoach();
+    const invites = section("Inviti al club");
+    const writeText = vi.spyOn(navigator.clipboard, "writeText");
+
+    writeText.mockRejectedValueOnce(new Error("NotAllowedError"));
+    await user.click(within(invites).getByRole("button", { name: "Copia link" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("Non riesco a copiare il link"));
+    expect(within(invites).queryByRole("button", { name: "Link copiato" })).toBeNull();
+
+    await user.click(within(invites).getByRole("button", { name: "Copia link" }));
+    expect(await within(invites).findByRole("button", { name: "Link copiato" })).toBeTruthy();
+    expect(await navigator.clipboard.readText()).toMatch(/\/community\/invite\/abc123$/);
+    expect(toast.error).toHaveBeenCalledTimes(1);
   });
 
   it("un membro senza ruolo di staff torna alla pagina del club", () => {
