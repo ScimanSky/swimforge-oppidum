@@ -65,6 +65,23 @@ async function isAcceptedFollower(followerId: number, followingId: number) {
   return result.rows.length > 0;
 }
 
+async function isActiveClubMember(userId: number, clubId: number) {
+  const { getDb } = await import("../db");
+  const { sql } = await import("drizzle-orm");
+  const db = await getDb();
+  if (!db) return false;
+
+  const result = await db.execute(sql`
+    SELECT 1
+    FROM community_club_members
+    WHERE club_id = ${clubId}
+      AND user_id = ${userId}
+      AND status = 'active'
+    LIMIT 1
+  `);
+  return result.rows.length > 0;
+}
+
 export async function getUsersById(userIds: number[]) {
   const { getDb } = await import("../db");
   const { sql } = await import("drizzle-orm");
@@ -95,7 +112,17 @@ export async function checkForwardRecipientAllowed(input: {
   ownerPrivacy: ForwardPrivacySettings;
   visibility?: string | null;
   isActivityPost?: boolean;
+  /** Set for club posts: they reach only the club's active members, the author included. */
+  clubId?: number | null;
 }) {
+  // Club posts are stored as "public": the club, not the visibility, decides who may read them.
+  if (input.clubId != null && !(await isActiveClubMember(input.recipientId, input.clubId))) {
+    return {
+      allowed: false as const,
+      reason: "Il post è riservato ai membri del club: il destinatario non ne fa parte.",
+    };
+  }
+
   if (input.recipientId === input.ownerId) return { allowed: true as const, reason: null };
 
   if (!input.ownerPrivacy.allowPrivateForwards && input.senderId !== input.ownerId) {
