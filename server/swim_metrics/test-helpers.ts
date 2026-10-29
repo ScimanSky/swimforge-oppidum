@@ -1,4 +1,4 @@
-import { dayKey } from "@shared/swimMetrics";
+import { dayKey, type SessionMetrics, type SwimMetrics } from "@shared/swimMetrics";
 import { normalizeStroke, type MetricActivity, type MetricLap } from "./laps";
 
 /** [distance, seconds, stroke?, strokes?, swolf?]; distance 0 is a rest. */
@@ -34,5 +34,63 @@ export function activity(
     isOpenWater: false,
     laps,
     ...extra,
+  };
+}
+
+/** A complete, hand-written result (values of a regular masters swimmer). */
+export function sampleSwimMetrics(): SwimMetrics {
+  const session = (overrides: Partial<SessionMetrics>): SessionMetrics => ({
+    activityId: 1, date: "2026-10-27", poolLengthMeters: 25, isOpenWater: false,
+    distanceMeters: 2500, movingSeconds: 2600, hasLaps: true,
+    intensityFactor: 0.92, stss: 56.3, zoneMeters: [500, 1000, 500, 400, 100],
+    strokeIndex: 2.15, dpsMeters: 2.05, strokeRate: 30.2, swolf: 36.5,
+    pacingCv: 2.8, pacingFade: 3.1,
+    ...overrides,
+  });
+  return {
+    generatedAt: "2026-10-29T18:00:00.000Z",
+    sessions: [
+      session({ activityId: 1, date: "2026-10-15", distanceMeters: 2000 }),
+      session({ activityId: 2, date: "2026-10-20" }),
+      session({ activityId: 3, date: "2026-10-22" }),
+      session({ activityId: 4, date: "2026-10-24" }),
+      session({ activityId: 5, date: "2026-10-26" }),
+      session({
+        activityId: 6, date: "2026-10-27", poolLengthMeters: null, isOpenWater: true, distanceMeters: 2000,
+        movingSeconds: 2400, hasLaps: false, intensityFactor: 0.86, stss: 42.4, zoneMeters: null,
+        strokeIndex: null, dpsMeters: null, strokeRate: null, swolf: null, pacingCv: null, pacingFade: null,
+      }),
+    ],
+    css: {
+      current: {
+        paceSecondsPer100: 104.3, speedMps: 0.959, source: "stima", confidence: "alta",
+        points: [
+          { distanceMeters: 200, seconds: 175, date: "2026-10-06" },
+          { distanceMeters: 400, seconds: 380, date: "2026-10-06" },
+          { distanceMeters: 800, seconds: 800, date: "2026-10-15" },
+        ],
+        testDate: null,
+      },
+      history: [{ month: "2026-10", paceSecondsPer100: 104.3 }],
+      missing: null,
+    },
+    load: {
+      today: { ctl: 12.3, atl: 20.1, tsb: -7.8, reading: "neutro" },
+      rampPerWeek: 2.1,
+      days: [],
+      missing: null,
+    },
+    intensity: {
+      last28: { zoneMeters: [3000, 4200, 1800, 900, 100], easyPct: 72, mediumPct: 18, hardPct: 10 },
+      weeks: [],
+      missing: null,
+    },
+    efficiency: { poolLengthMeters: 25, latest: 2.15, avg28: 2.1, baseline: 2.02, deltaPct: 4, missing: null },
+    pacing: {
+      cv28: 2.8, fade28: 3.1,
+      latestSet: { date: "2026-10-26", distanceMeters: 100, stroke: "freestyle", repSeconds: [92, 93, 94] },
+      missing: null,
+    },
+    volume: { weeks: [], avgKm4: 7.4, avgSessions4: 2.8, changePct: 12, streakWeeks: 5 },
   };
 }

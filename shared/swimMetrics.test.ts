@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   SWIM_METRIC_DEFINITIONS,
+  SWIM_METRIC_THRESHOLDS,
   SWIM_METRICS_TIMEZONE,
+  TSB_READING_LABELS,
   addDaysToKey,
   dayKey,
+  pacingCvReading,
   weekStartKey,
   weeklyStreak,
 } from "./swimMetrics";
@@ -105,5 +108,30 @@ describe("SWIM_METRIC_DEFINITIONS", () => {
     expect(SWIM_METRIC_DEFINITIONS.css.name).toBe("Passo soglia");
     expect(SWIM_METRIC_DEFINITIONS.css.source).toMatch(/Wakayoshi/);
     expect(SWIM_METRIC_DEFINITIONS.efficiency.source).toMatch(/Costill/);
+  });
+});
+
+describe("readings shared by the interface and the coach", () => {
+  it("TSB labels in Italian", () => {
+    expect(TSB_READING_LABELS).toEqual({
+      molto_riposato: "molto riposato",
+      fresco: "fresco",
+      neutro: "neutro",
+      in_costruzione: "in costruzione",
+      carico_alto: "carico alto",
+    });
+  });
+
+  it.each([
+    [1.9, "molto regolare"],
+    [2, "regolare"],
+    [4, "regolare"],
+    [4.1, "irregolare"],
+  ] as const)("CV %s%% → %s", (cv, reading) => {
+    expect(pacingCvReading(cv)).toBe(reading);
+  });
+
+  it("conventional thresholds", () => {
+    expect(SWIM_METRIC_THRESHOLDS).toEqual({ mediumZonePct: 35, rampPerWeek: 8, pacingFadePct: 5 });
   });
 });

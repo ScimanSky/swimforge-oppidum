@@ -4,6 +4,12 @@ import { aiInsightsCache } from "../drizzle/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { logger } from "./middleware/logger";
 import { ENV } from "./_core/env";
+import type { SwimMetrics } from "@shared/swimMetrics";
+import {
+  SWIM_METRICS_COACH_RULES,
+  swimMetricsForCoach,
+  swimMetricsGlossary,
+} from "./swim_metrics/coach-context";
 
 // Initialize Gemini AI
 let genAI: GoogleGenerativeAI | null = null;
@@ -12,6 +18,11 @@ const INSIGHT_EMOJI_REGEX = /^[🔥⚡💪🎯📈🏊🔄🌟🚀💯🏆❤️
 const INSIGHT_EMOJIS = ["🔥", "⚡", "💪", "🎯", "📈", "🏊", "🔄", "🌟", "🚀", "💯", "🏆", "❤️", "📊", "🎉", "👍", "💬", "🤯", "😂", "😢", "🌊"] as const;
 const MIN_INSIGHTS_FOR_VALID_CACHE = 6;
 const GEMINI_MODEL = ENV.geminiTextModel;
+/**
+ * Window of the swim metrics behind the insights. It is also the cache key: rows cached with
+ * the old 30-day window came from the removed invented scores and are never read again.
+ */
+const INSIGHTS_PERIOD_DAYS = 90;
 
 function getGeminiClient() {
   if (!genAI && process.env.GEMINI_API_KEY) {
@@ -101,39 +112,9 @@ function parseInsightsFromAiText(text: string): string[] {
   return picked.slice(0, 8);
 }
 
-export interface UserStatsData {
-  level: number;
-  totalXp: number;
-  currentStreak: number;
-  recordStreak: number;
-  avgPaceSeconds: number;
-  totalDistanceMeters: number;
-  sessions: number;
-  hrZones?: {
-    zone1: number;
-    zone2: number;
-    zone3: number;
-    zone4: number;
-    zone5: number;
-  };
-  trend: "up" | "down" | "stable";
-  trendPercentage: number;
-  performanceIndex: number;
-  consistencyScore: number;
-  periodDays: number;
-  swolfAvg?: number;
-  caloriesTotal?: number;
-  // New advanced metrics
-  swimmingEfficiencyIndex?: number;
-  technicalConsistencyIndex?: number;
-  strokeEfficiencyRating?: number;
-  aerobicCapacityScore?: number;
-  recoveryReadinessScore?: number;
-  progressiveOverloadIndex?: number;
-}
-
+/** 6-8 insights for the Coach page from the swim metrics (cached 24 hours). */
 export async function generateAIInsights(
-  userData: UserStatsData,
+  metrics: SwimMetrics,
   userId: number
 ): Promise<string[]> {
   const db = await getDb();
@@ -143,7 +124,7 @@ export async function generateAIInsights(
 
   // New users (no synced activities) shouldn't trigger AI generation/parsing noise.
   // Provide a small set of onboarding insights (analysis + direction, no workouts).
-  if ((userData.sessions ?? 0) <= 0 || (userData.totalDistanceMeters ?? 0) <= 0) {
+  if (metrics.sessions.length === 0) {
     const insights = [
       "📈 Progressione: Sei in una fase perfetta per creare una base. La cosa piu' importante adesso e' costruire regolarita' prima di inseguire la velocita'.",
       "🔄 Recupero: Parti con calma. Sessioni leggere e costanti ti aiutano a rendere sostenibile l'abitudine senza accumulare fatica.",
@@ -161,7 +142,7 @@ export async function generateAIInsights(
       await db.insert(aiInsightsCache).values({
         userId,
         insights,
-        periodDays: userData.periodDays,
+        periodDays: INSIGHTS_PERIOD_DAYS,
         expiresAt,
       });
       log.debug("[AI Insights] Cached onboarding insights (no activities yet)", {
@@ -187,7 +168,7 @@ export async function generateAIInsights(
       .where(
         and(
           eq(aiInsightsCache.userId, userId),
-          eq(aiInsightsCache.periodDays, userData.periodDays),
+          eq(aiInsightsCache.periodDays, INSIGHTS_PERIOD_DAYS),
           gt(aiInsightsCache.expiresAt, new Date()) // Not expired
         )
       )
@@ -238,7 +219,7 @@ export async function generateAIInsights(
         .where(
           and(
             eq(aiInsightsCache.userId, userId),
-            eq(aiInsightsCache.periodDays, userData.periodDays)
+            eq(aiInsightsCache.periodDays, INSIGHTS_PERIOD_DAYS)
           )
         )
         .limit(1);
@@ -263,110 +244,60 @@ export async function generateAIInsights(
   try {
     const model = client.getGenerativeModel({ model: GEMINI_MODEL });
 
-    const prompt = `Sei un analista di performance di nuoto esperto. Analizza questi dati di un nuotatore e genera 6-8 insights analitici, identificando TENDENZE, PATTERN e AREE DI MIGLIORAMENTO in italiano, CATEGORIZZATI per argomento.
+    const prompt = `Sei un analista di performance di nuoto esperto. Analizza le metriche di questo nuotatore e genera 6-8 insights analitici in italiano, identificando TENDENZE, PATTERN e AREE DI MIGLIORAMENTO, CATEGORIZZATI per argomento.
 
 ⚠️ IMPORTANTE: NON fornire allenamenti specifici o workout dettagliati (quello è il ruolo dell'AI Coach). Focus su ANALISI e DIREZIONE GENERALE.
 
-Dati nuotatore (ultimi ${userData.periodDays} giorni):
+${swimMetricsForCoach(metrics)}
 
-📊 DATI BASE:
-- Livello: ${userData.level}
-- XP Totali: ${userData.totalXp}
-- Streak attuale: ${userData.currentStreak} giorni (record: ${userData.recordStreak})
-- Distanza totale: ${(userData.totalDistanceMeters / 1000).toFixed(1)} km
-- Sessioni: ${userData.sessions}
-- Pace medio: ${formatPace(userData.avgPaceSeconds)}/100m
-- Trend: ${userData.trend === "up" ? "crescita" : userData.trend === "down" ? "calo" : "stabile"} ${userData.trendPercentage}%
-
-📈 INDICI GENERALI:
-- Performance Index: ${userData.performanceIndex}/100
-- Consistency Score: ${userData.consistencyScore}/100
-${userData.swolfAvg ? `- SWOLF medio: ${userData.swolfAvg}` : ""}
-${userData.caloriesTotal ? `- Calorie totali: ${userData.caloriesTotal}` : ""}
-
-🏊 METRICHE AVANZATE:
-${userData.swimmingEfficiencyIndex ? `- SEI (Swimming Efficiency): ${userData.swimmingEfficiencyIndex}/100` : ""}
-${userData.technicalConsistencyIndex ? `- TCI (Technical Consistency): ${userData.technicalConsistencyIndex}/100` : ""}
-${userData.strokeEfficiencyRating ? `- SER (Stroke Efficiency): ${userData.strokeEfficiencyRating}/100` : ""}
-${userData.aerobicCapacityScore ? `- ACS (Aerobic Capacity): ${userData.aerobicCapacityScore}/100` : ""}
-${userData.recoveryReadinessScore ? `- RRS (Recovery Readiness): ${userData.recoveryReadinessScore}/100` : ""}
-${userData.progressiveOverloadIndex !== undefined ? `- POI (Progressive Overload): ${userData.progressiveOverloadIndex > 0 ? '+' : ''}${userData.progressiveOverloadIndex}%` : ""}
-
-❤️ ZONE FREQUENZA CARDIACA:
-${userData.hrZones ? `Z1=${userData.hrZones.zone1}%, Z2=${userData.hrZones.zone2}%, Z3=${userData.hrZones.zone3}%, Z4=${userData.hrZones.zone4}%, Z5=${userData.hrZones.zone5}%` : "Non disponibili"}
+${swimMetricsGlossary()}
 
 REGOLE FONDAMENTALI:
 
+0. METRICHE
+${SWIM_METRICS_COACH_RULES}
+
 1. ❌ NON RIPETERE I DATI VISIBILI
-   - L'utente vede già distanza, sessioni, pace, streak
-   - NON dire "Hai nuotato X km in Y sessioni"
-   - NON dire "Il tuo pace medio è X:XX/100m"
-   - NON dire "Hai un Performance Index di X/100"
+   - L'utente vede già i valori nella pagina Statistiche
+   - NON dire "Il tuo passo soglia è 1:44/100 m" o "Hai fatto 7,4 km a settimana"
 
 2. ✅ INTERPRETA E COLLEGA I DATI
-   - Calcola medie (es. km per sessione, frequenza settimanale)
-   - Confronta con standard (principiante/intermedio/avanzato)
-   - Identifica pattern nascosti (es. "nuoti più veloce ma meno costante")
-   - Trova correlazioni (es. "le tue zone HR indicano che potresti spingere di più")
+   - Confronta con la base personale e con le settimane precedenti, mai con altri nuotatori
+   - Collega le metriche tra loro (es. equilibrio negativo e volume in crescita; quota media alta e regolarità nelle ripetute)
+   - Spiega cosa significa una lettura (es. "in costruzione", "molto lavoro in zona media")
 
 3. ✅ DAI INDICAZIONI GENERALI (NON ALLENAMENTI SPECIFICI)
-   - Identifica aree da migliorare (es. "la tua tecnica varia troppo tra sessioni")
-   - Suggerisci direzioni generali (es. "considera di lavorare sulla consistenza del ritmo")
-   - Proponi focus generali (es. "potrebbe essere utile dedicare più tempo al recupero")
-   - ❌ NON dare serie/ripetizioni specifiche (es. NO "4x100m in Z3", NO "500m di tecnica")
+   - Identifica aree da migliorare e suggerisci direzioni generali
+   - ❌ NON dare serie/ripetizioni specifiche (es. NO "4x100 in Z3", NO "500 m di tecnica")
 
 4. ✅ USA CONTESTO E PSICOLOGIA
-   - Se streak = 0 ma record > 0: motivazione per ripartire
-   - Se Performance Index alto ma Consistency basso: focus su regolarità
-   - Se trend negativo: incoraggiamento senza giudizio
-   - Se trend positivo: celebrazione + sfida successiva
+   - Serie di settimane a 0: motivazione per ripartire, senza giudizio
+   - Equilibrio molto negativo: priorità al recupero
+   - Dati scarsi o stime con affidabilità media: dillo e indica quali nuotate servono
 
 5. 📝 FORMATO E CATEGORIZZAZIONE
    - Genera 6-8 insights totali
    - Ogni insight inizia con emoji CATEGORIZZATO:
-     * 🏊 Tecnica (SEI, TCI, SER, SWOLF)
-     * 💪 Intensità (Zone HR, ACS, pace)
-     * 📈 Progressione (POI, trend, livello)
-     * 🔄 Recupero (RRS, streak)
-     * ⚡ Efficienza (SEI, SER, calorie)
-     * 🎯 Obiettivi (predictions, consistency)
+     * 🏊 Tecnica (Stroke Index, distanza per ciclo, frequenza, SWOLF)
+     * 💪 Intensità (passo soglia, zone di passo)
+     * 📈 Progressione (forma, volume, passo soglia nel tempo)
+     * 🔄 Recupero (equilibrio tra forma e fatica)
+     * ⚡ Efficienza (Stroke Index rispetto alla tua base, regolarità nelle ripetute)
+     * 🎯 Obiettivi (costanza, serie di settimane)
    - 1-2 frasi max per insight
-   - Tono amichevole e motivazionale
-   - Usa "tu" e linguaggio diretto
+   - Tono amichevole e diretto, usa "tu"
 
-ESEMPI DI INSIGHTS BUONI PER CATEGORIA:
-
-🏊 TECNICA:
-✅ "Il tuo SEI di 72/100 indica buona efficienza, ma c'è margine di miglioramento: lavorare sulla riduzione delle bracciate potrebbe portarti sopra 80."
-✅ "TCI a 65 suggerisce variazioni nel ritmo tra sessioni. Maggiore focus sulla consistenza tecnica potrebbe stabilizzare le tue performance."
-
-💪 INTENSITÀ:
-✅ "Passi solo il 15% in Z3-Z4: ottima base aerobica costruita! Il prossimo step naturale è integrare più lavoro ad alta intensità per sviluppare velocità."
-✅ "ACS di 78 indica solida capacità aerobica. Mantenere sessioni lunghe in Z2 ti aiuterà a consolidare questa base."
-
-📈 PROGRESSIONE:
-✅ "POI a +18% è perfetto! Stai progredendo al ritmo giusto senza rischio sovrallenamento. Questo trend è sostenibile per altre 2-3 settimane."
-✅ "Trend +12% con Performance Index 85: crescita costante e sana. Puntare a 50km totali nel prossimo mese consoliderebbe questi progressi."
-
-🔄 RECUPERO:
-✅ "RRS a 55 indica recupero parziale. Potrebbe essere utile considerare più giorni di riposo o sessioni più leggere."
-✅ "Streak di 12 giorni è ottimo, ma RRS basso suggerisce accumulo di fatica. Bilanciare intensità e recupero diventa prioritario."
-
-⚡ EFFICIENZA:
-✅ "SER di 81 con SWOLF 42: stai scivolando bene! C'è potenziale per portare SWOLF sotto 40 lavorando sulla fase di presa."
-✅ "Consumi 450 cal/sessione con pace 1:45: ottimo rapporto efficienza/intensità! Aumentare gradualmente l'intensità potrebbe migliorare il metabolismo."
-
-🎯 OBIETTIVI:
-✅ "Al ritmo attuale (2.8 km/sessione), raggiungerai 50km in 18 giorni. Una sessione extra a settimana anticiperebbe l'obiettivo a 14 giorni."
-✅ "Consistency 88 con solo 3 sessioni/settimana: quando nuoti, nuoti bene! Aumentare la frequenza a 4/settimana sbloccherebbe il livello successivo più velocemente."
+ESEMPI DI INSIGHTS BUONI:
+✅ "🔄 Recupero: il tuo equilibrio è in costruzione da due settimane mentre la forma sale: stai caricando bene, ma una settimana più leggera ogni 3-4 ti aiuterà ad assorbire il lavoro."
+✅ "💪 Intensità: quasi metà del volume cade in zona media; gli studi indicano che spostarne una parte sul facile, tenendo pochi tratti intensi, rende di più."
+✅ "🏊 Tecnica: lo Stroke Index è sopra la tua base nella vasca da 25 m: a parità di passo fai più strada per bracciata."
+✅ "🎯 Obiettivi: la stima del passo soglia ha affidabilità media; una nuotata con un tratto continuo lungo (800 m o più) la renderebbe più solida."
 
 ESEMPI CATTIVI (DA EVITARE):
-❌ "Hai nuotato 16.3 km in 6 sessioni" (RIPETE I DATI)
-❌ "Il tuo SEI è 72/100" (RIPETE I DATI)
+❌ "Il tuo passo soglia è 1:44/100 m" (RIPETE I DATI)
 ❌ "Continua così!" (TROPPO GENERICO)
-❌ "Il tuo pace medio è 1:40/100m" (RIPETE I DATI)
-❌ "Nella prossima sessione fai 4x100m in Z3" (TROPPO SPECIFICO - È COMPITO DEL COACH)
-❌ "Aggiungi 500m di tecnica ogni 3 sessioni" (ALLENAMENTO SPECIFICO - NON È IL TUO RUOLO)
+❌ "Hai un indice di efficienza di 72/100" (INDICE INVENTATO)
+❌ "Nella prossima sessione fai 4x100 in Z3" (ALLENAMENTO SPECIFICO - NON È IL TUO RUOLO)
 
 Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
 
@@ -411,7 +342,7 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
         await db.insert(aiInsightsCache).values({
           userId,
           insights: finalInsights,
-          periodDays: userData.periodDays,
+          periodDays: INSIGHTS_PERIOD_DAYS,
           expiresAt,
         });
         
@@ -443,7 +374,7 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
         .where(
           and(
             eq(aiInsightsCache.userId, userId),
-            eq(aiInsightsCache.periodDays, userData.periodDays)
+            eq(aiInsightsCache.periodDays, INSIGHTS_PERIOD_DAYS)
           )
         )
         .limit(1);
@@ -481,7 +412,7 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
         .where(
           and(
             eq(aiInsightsCache.userId, userId),
-            eq(aiInsightsCache.periodDays, userData.periodDays)
+            eq(aiInsightsCache.periodDays, INSIGHTS_PERIOD_DAYS)
           )
         )
         .limit(1);
@@ -503,12 +434,4 @@ Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
     
     return [];
   }
-}
-
-
-
-function formatPace(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${minutes}:${secs.toString().padStart(2, "0")}`;
 }

@@ -11,13 +11,12 @@ import { logger } from "./middleware/logger";
 import { ENV } from "./_core/env";
 import { withErrorHandling } from "./lib/withErrorHandling";
 import { config } from "./config";
+import { getSwimMetrics } from "./swim_metrics";
 import {
-  calculateSEI,
-  calculateTCI,
-  calculateSER,
-  calculateACS,
-  calculateRRS
-} from "./advanced_metrics";
+  SWIM_METRICS_COACH_RULES,
+  swimMetricsForCoach,
+  swimMetricsGlossary,
+} from "./swim_metrics/coach-context";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const GEMINI_MODEL = ENV.geminiTextModel;
@@ -50,7 +49,7 @@ export interface GeneratedWorkout {
   coachNotes: string[];
 }
 
-type UserStatsForCoach = {
+export type UserStatsForCoach = {
   profile: {
     aiSkillLabel: string | null;
     level: number;
@@ -66,14 +65,8 @@ type UserStatsForCoach = {
     avgSwolf: string;
     sessionsPerWeek: string;
   };
-  advancedMetrics: {
-    sei: number;
-    tci: number;
-    ser: number;
-    acs: number;
-    rrs: number;
-    poi: number;
-  };
+  /** The swim metrics block and glossary (coach-context), or a line saying they are missing. */
+  swimMetricsText: string;
   hrZones: {
     hasData: boolean;
     activitiesWithHR: number;
@@ -517,43 +510,11 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
     recentActivities.reduce((sum, a) => sum + (a.avgSwolf || 0), 0) /
     (recentActivities.length || 1);
 
-  // Calculate advanced metrics using same functions as Statistics
-  // SEI: Average across all activities
-  const seiScores = recentActivities
-    .map(a => calculateSEI(a))
-    .filter((s): s is number => s !== null);
-  const avgSEI = seiScores.length > 0
-    ? Math.round(seiScores.reduce((sum, s) => sum + s, 0) / seiScores.length)
-    : 0;
-
-  // TCI: Consistency across activities
-  const avgTCI = calculateTCI(recentActivities) || 0;
-
-  // SER: Average across all activities
-  const serScores = recentActivities
-    .map(a => calculateSER(a))
-    .filter((s): s is number => s !== null);
-  const avgSER = serScores.length > 0
-    ? Math.round(serScores.reduce((sum, s) => sum + s, 0) / serScores.length)
-    : 0;
-
-  // ACS: Average across all activities
-  const acsScores = recentActivities
-    .map(a => calculateACS(a))
-    .filter((s): s is number => s !== null);
-  const avgACS = acsScores.length > 0
-    ? Math.round(acsScores.reduce((sum, s) => sum + s, 0) / acsScores.length)
-    : 0;
-
-  // RRS: based on time since last workout (resting HR baseline not available in this context)
-  const lastWorkoutAt = recentActivities[0]?.activityDate ?? null;
-  const hoursSinceLastWorkout = lastWorkoutAt
-    ? (Date.now() - lastWorkoutAt.getTime()) / (1000 * 60 * 60)
-    : 999;
-  const avgRRS = calculateRRS(null, 60, hoursSinceLastWorkout) ?? 0;
-
-  // POI: Simplified (would need previous period for proper calculation)
-  const avgPOI = 0;
+  // The swim metrics shared with Statistics and the coach chat.
+  const swimMetrics = await getSwimMetrics(userId).catch(() => null);
+  const swimMetricsText = swimMetrics
+    ? `${swimMetricsForCoach(swimMetrics)}\n\n${swimMetricsGlossary()}`
+    : "Metriche di nuoto non disponibili in questo momento.";
 
   // HR zones analysis - only from activities with HR data (using hrZoneXSeconds)
   const activitiesWithHR = recentActivities.filter(a =>
@@ -596,14 +557,7 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
       avgSwolf: avgSwolf.toFixed(1),
       sessionsPerWeek: sessionsPerWeek.toFixed(1),
     },
-    advancedMetrics: {
-      sei: avgSEI,
-      tci: avgTCI,
-      ser: avgSER,
-      acs: avgACS,
-      rrs: avgRRS,
-      poi: avgPOI,
-    },
+    swimMetricsText,
     hrZones: {
       hasData: hasHRData,
       activitiesWithHR: activitiesWithHR.length,
@@ -628,7 +582,7 @@ async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
 /**
  * Build prompt for pool workout generation
  */
-function buildPoolWorkoutPrompt(userStats: UserStatsForCoach): string {
+export function buildPoolWorkoutPrompt(userStats: UserStatsForCoach): string {
   return `Sei un ALLENATORE OLIMPICO DI NUOTO con 20+ anni di esperienza nell'allenamento di atleti di livello mondiale. Genera un allenamento personalizzato IN VASCA completo e vario per un nuotatore basato sulle sue statistiche.
 
 **STATISTICHE NUOTATORE:**
@@ -641,13 +595,11 @@ function buildPoolWorkoutPrompt(userStats: UserStatsForCoach): string {
 - Passo medio: ${userStats.recent.avgPace} sec/100m
 - SWOLF medio: ${userStats.recent.avgSwolf}
 
-**METRICHE AVANZATE:**
-- SEI (Stroke Efficiency Index): ${userStats.advancedMetrics.sei} - Efficienza bracciata
-- TCI (Technical Consistency Index): ${userStats.advancedMetrics.tci} - Consistenza tecnica
-- SER (Stroke Efficiency Ratio): ${userStats.advancedMetrics.ser} - Rapporto efficienza
-- ACS (Aerobic Capacity Score): ${userStats.advancedMetrics.acs} - Capacità aerobica
-- RRS (Recovery Readiness Score): ${userStats.advancedMetrics.rrs} - Prontezza al recupero
-- POI (Performance Optimization Index): ${userStats.advancedMetrics.poi} - Ottimizzazione performance
+**METRICHE DI NUOTO:**
+${userStats.swimMetricsText}
+
+**USO DELLE METRICHE:**
+${SWIM_METRICS_COACH_RULES}
 
 **ZONE FREQUENZA CARDIACA:**
 ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
@@ -672,14 +624,14 @@ ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
    - Focus principale su Stile Libero, ma integra altri stili per completezza
 
 3. **ANALISI METRICHE**:
-   - Se SEI, TCI, SER sono 0 o bassi: NON menzionare negativamente, concentrati su tecnica base e costruzione fondamentali
-   - Se metriche > 0: Usa per personalizzare esercizi tecnici specifici
-   - Bilancia intensità basandoti su ACS, RRS${userStats.hrZones.hasData ? ', zone HR' : ''}
+   - Se una metrica non è disponibile: NON menzionarlo negativamente, concentrati su tecnica di base e costruzione dei fondamentali
+   - Efficienza della bracciata e regolarità nelle ripetute: usale per scegliere gli esercizi tecnici
+   - Bilancia volume e intensità con l'equilibrio tra forma e fatica e con la distribuzione dell'intensità${userStats.hrZones.hasData ? ' (e le zone HR)' : ''}
 
 4. **TEMPI DI RIPARTENZA** (OBBLIGATORIO):
    - Per ogni serie con ripetizioni (es. 4x100), specifica SEMPRE il tempo di ripartenza
    - Formato: "a 1:50", "a 1:20", "a 0:50"
-   - Calcolo: Passo medio (${userStats.recent.avgPace} sec/100m) + 10-20 sec (tecnica) o + 5-10 sec (resistenza)
+   - Calcolo: se c'è il passo soglia, imposta il passo delle serie con le sue zone (aerobico 85-92% della velocità soglia, soglia 97-103%) e aggiungi il recupero; altrimenti passo medio (${userStats.recent.avgPace} sec/100m) + 10-20 sec (tecnica) o + 5-10 sec (resistenza)
 
 5. **ATTREZZI** (usa frequentemente):
    - **Pinne**: Propulsione, tecnica gambe (specialmente venerdì)
@@ -764,7 +716,7 @@ Rispondi SOLO con il JSON valido, senza testo aggiuntivo.`;
 /**
  * Build prompt for dryland workout generation
  */
-function buildDrylandWorkoutPrompt(userStats: UserStatsForCoach): string {
+export function buildDrylandWorkoutPrompt(userStats: UserStatsForCoach): string {
   return `Sei un allenatore olimpico di nuoto e preparatore atletico esperto. Genera un allenamento FUORI VASCA (dryland) personalizzato per un nuotatore basato sulle sue statistiche.
 
 **STATISTICHE NUOTATORE:**
@@ -775,13 +727,11 @@ function buildDrylandWorkoutPrompt(userStats: UserStatsForCoach): string {
 - Passo medio: ${userStats.recent.avgPace} sec/100m
 - SWOLF medio: ${userStats.recent.avgSwolf}
 
-**METRICHE AVANZATE:**
-- SEI (Stroke Efficiency Index): ${userStats.advancedMetrics.sei} - Efficienza bracciata
-- TCI (Technical Consistency Index): ${userStats.advancedMetrics.tci} - Consistenza tecnica
-- SER (Stroke Efficiency Ratio): ${userStats.advancedMetrics.ser} - Rapporto efficienza
-- ACS (Aerobic Capacity Score): ${userStats.advancedMetrics.acs} - Capacità aerobica
-- RRS (Recovery Readiness Score): ${userStats.advancedMetrics.rrs} - Prontezza al recupero
-- POI (Performance Optimization Index): ${userStats.advancedMetrics.poi} - Ottimizzazione performance
+**METRICHE DI NUOTO:**
+${userStats.swimMetricsText}
+
+**USO DELLE METRICHE:**
+${SWIM_METRICS_COACH_RULES}
 
 **ZONE FREQUENZA CARDIACA:**
 ${userStats.hrZones.hasData ? `- Zona 1-2 (Aerobica): ${(parseFloat(userStats.hrZones.zone1) + parseFloat(userStats.hrZones.zone2)).toFixed(1)}%
@@ -792,7 +742,7 @@ ${userStats.hrZones.hasData ? `- Zona 1-2 (Aerobica): ${(parseFloat(userStats.hr
 1. Analizza le metriche per identificare aree da rafforzare
 2. Crea allenamento con: Riscaldamento → Forza → Core → Mobilità/Stretching
 3. Includi esercizi specifici per nuotatori (spalle, core, gambe, mobilità)
-4. Considera RRS per dosare volume e intensità
+4. Considera l'equilibrio tra forma e fatica per dosare volume e intensità
 5. Bilancia forza, potenza, resistenza, mobilità
 6. Fornisci varianti per diversi livelli di fitness
 

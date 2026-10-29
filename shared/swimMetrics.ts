@@ -162,6 +162,32 @@ export const SWIM_METRIC_DEFINITIONS: Record<SwimMetricKey, SwimMetricDefinition
   },
 };
 
+// ─── Readings (conventions shared by the interface and the coach) ──────────
+
+export const TSB_READING_LABELS: Record<TsbReading, string> = {
+  molto_riposato: "molto riposato",
+  fresco: "fresco",
+  neutro: "neutro",
+  in_costruzione: "in costruzione",
+  carico_alto: "carico alto",
+};
+
+export const SWIM_METRIC_THRESHOLDS = {
+  /** Above this share of Z3: «molto lavoro in zona media». */
+  mediumZonePct: 35,
+  /** CTL growth above this many points a week: «crescita molto rapida». */
+  rampPerWeek: 8,
+  /** Fade above this percent: «cali nel finale». */
+  pacingFadePct: 5,
+} as const;
+
+/** Our convention: CV < 2% very even, 2–4% even, > 4% uneven. */
+export function pacingCvReading(cv: number): "molto regolare" | "regolare" | "irregolare" {
+  if (cv < 2) return "molto regolare";
+  if (cv <= 4) return "regolare";
+  return "irregolare";
+}
+
 // ─── Calendar helpers ───────────────────────────────────────────────────────
 
 const dayFormatters = new Map<string, Intl.DateTimeFormat>();

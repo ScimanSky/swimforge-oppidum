@@ -198,6 +198,13 @@ export const statisticsRouter = router({
         return await getSwimMetrics(ctx.user.id);
     }),
 
+    // AI insights of the Coach page, from the caller's swim metrics (cached 24 hours).
+    getInsights: protectedProcedure.query(async ({ ctx }) => {
+        const { getSwimMetrics } = await import("../swim_metrics");
+        const { generateAIInsights } = await import("../ai_insights");
+        return await generateAIInsights(await getSwimMetrics(ctx.user.id), ctx.user.id);
+    }),
+
     // The caller's 400/200 CSS test, saved in the profile preferences.
     setCssTest: protectedProcedure
         .input(z.object({

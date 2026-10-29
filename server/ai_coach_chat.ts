@@ -1,6 +1,12 @@
 import { invokeLLM } from "./_core/llm";
 import { getSwimmerProfile, getActivities } from "./db";
-import { getAdvancedMetrics } from "./db_statistics";
+import { getSwimMetrics } from "./swim_metrics";
+import {
+  SWIM_METRICS_COACH_RULES,
+  swimMetricsForCoach,
+  swimMetricsGlossary,
+} from "./swim_metrics/coach-context";
+import { TSB_READING_LABELS, type SwimMetrics } from "@shared/swimMetrics";
 import { getExistingWorkouts } from "./ai_coach";
 import { listActivityInsights } from "./ai_activity_insights";
 import { logger } from "./middleware/logger";
@@ -26,7 +32,7 @@ export type CoachChatPreferences = {
 
 type CoachContext = {
   profile: Awaited<ReturnType<typeof getSwimmerProfile>>;
-  advanced: Awaited<ReturnType<typeof getAdvancedMetrics>> | null;
+  swimMetrics: SwimMetrics | null;
   recentActivities: Awaited<ReturnType<typeof getActivities>>;
   workouts: Awaited<ReturnType<typeof getExistingWorkouts>> | null;
   latestInsights: Awaited<ReturnType<typeof listActivityInsights>>;
@@ -41,7 +47,6 @@ function formatPace(secPer100m: number | null | undefined) {
 
 function contextToPrompt(ctx: CoachContext) {
   const profile = ctx.profile;
-  const advanced = ctx.advanced;
 
   const recentSummary = ctx.recentActivities.slice(0, 5).map((activity, index) => {
     const date = activity.activityDate instanceof Date
@@ -69,15 +74,9 @@ CONTESTO ATLETA SWIMFORGE
 - Stile preferito: ${profile?.preferredStroke ?? "n/d"}
 - Skill label AI: ${profile?.aiSkillLabel ?? "n/d"}
 
-METRICHE ULTIMI 30 GIORNI
-- Performance Index: ${advanced?.performanceIndex ?? "n/d"}
-- Consistency Score: ${advanced?.consistencyScore ?? "n/d"}
-- Recovery Readiness: ${advanced?.recoveryReadinessScore ?? "n/d"}
-- SEI: ${advanced?.swimmingEfficiencyIndex ?? "n/d"}
-- TCI: ${advanced?.technicalConsistencyIndex ?? "n/d"}
-- SER: ${advanced?.strokeEfficiencyRating ?? "n/d"}
-- ACS: ${advanced?.aerobicCapacityScore ?? "n/d"}
-- POI: ${advanced?.progressiveOverloadIndex ?? "n/d"}
+${ctx.swimMetrics ? swimMetricsForCoach(ctx.swimMetrics) : "METRICHE DI NUOTO: non disponibili in questo momento."}
+
+${swimMetricsGlossary()}
 
 ULTIME ATTIVITA
 ${recentSummary.length ? recentSummary.join("\n") : "- Nessuna attività recente disponibile"}
@@ -106,6 +105,7 @@ Regole:
 - evita diagnosi mediche e sostituzione di professionisti sanitari;
 - se l'utente riferisce dolore/infortunio, raccomanda stop e valutazione specialistica;
 - niente testo motivazionale generico.
+${SWIM_METRICS_COACH_RULES}
 - se l'utente dice che oggi e' stanco/lento, riduci volume/intensita' e proponi una seduta di qualita' tecnica;
 - se l'obiettivo e' 50/100 stile, inserisci lavoro specifico di velocita' e partenze/virate.
 
@@ -160,9 +160,9 @@ function fallbackMessage(
   history: CoachChatMessage[],
   preferences?: CoachChatPreferences
 ) {
-  const performance = ctx.advanced?.performanceIndex;
-  const consistency = ctx.advanced?.consistencyScore;
-  const recovery = ctx.advanced?.recoveryReadinessScore;
+  const metrics = ctx.swimMetrics;
+  const css = metrics?.css.current ?? null;
+  const loadToday = metrics?.load.today ?? null;
   const latest = ctx.recentActivities[0];
   const lastUserMessage = extractLastUserMessage(history).toLowerCase();
   const goal = preferences?.goal?.trim() ?? "";
@@ -177,11 +177,21 @@ function fallbackMessage(
   );
 
   const nextFocus =
-    recovery !== null && recovery !== undefined && recovery < 45
+    loadToday?.reading === "carico_alto"
       ? "recupero + tecnica pulita"
-      : consistency !== null && consistency !== undefined && consistency < 50
-        ? "regolarità (3 sedute/settimana)"
+      : metrics && metrics.volume.avgSessions4 < 2
+        ? "regolarità (almeno 2 nuotate a settimana)"
         : "progressione controllata del volume";
+
+  const metricsLine = metrics
+    ? [
+        css ? `Passo soglia ${formatPace(css.paceSecondsPer100)} (${css.source === "test" ? "test" : `stima, affidabilità ${css.confidence}`})` : "Passo soglia n/d",
+        loadToday
+          ? `equilibrio ${loadToday.tsb > 0 ? "+" : loadToday.tsb < 0 ? "−" : ""}${Math.abs(loadToday.tsb).toFixed(1).replace(".", ",")} (${TSB_READING_LABELS[loadToday.reading]})`
+          : "equilibrio n/d",
+        `${metrics.volume.avgKm4.toFixed(1).replace(".", ",")} km/settimana`,
+      ].join(" · ")
+    : "Metriche non disponibili";
 
   const latestLine = latest
     ? `Ultima sessione: ${latest.distanceMeters}m in ${Math.round(latest.durationSeconds / 60)} min, passo ${formatPace(latest.avgPacePer100m ?? null)}.`
@@ -209,7 +219,7 @@ function fallbackMessage(
 
   return [
     "Lettura dati",
-    `- Performance: ${performance ?? "n/d"} · Consistency: ${consistency ?? "n/d"} · Recovery: ${recovery ?? "n/d"}`,
+    `- ${metricsLine}`,
     `- ${latestLine}`,
     `- Obiettivo: ${goal || "n/d"} · Vincoli: ${constraints || "n/d"}`,
     "",
@@ -258,10 +268,10 @@ export async function generateCoachChatReply(
   history: CoachChatMessage[],
   preferences?: CoachChatPreferences
 ): Promise<CoachChatResult> {
-  const [profile, advancedResult, recentActivities, workoutsResult, insights] =
+  const [profile, swimMetrics, recentActivities, workoutsResult, insights] =
     await Promise.all([
       getSwimmerProfile(userId),
-      getAdvancedMetrics(userId, 30).catch(() => null),
+      getSwimMetrics(userId).catch(() => null),
       getActivities(userId, 10, 0),
       getExistingWorkouts(userId).catch(() => null),
       listActivityInsights(userId, 5, 0).catch(() => []),
@@ -269,7 +279,7 @@ export async function generateCoachChatReply(
 
   const context: CoachContext = {
     profile,
-    advanced: advancedResult,
+    swimMetrics,
     recentActivities,
     workouts: workoutsResult,
     latestInsights: insights,

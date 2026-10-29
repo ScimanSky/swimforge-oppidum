@@ -3,9 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   getSwimMetrics: vi.fn(),
   updateCssTest: vi.fn(),
+  generateAIInsights: vi.fn(),
 }));
 
 vi.mock("../swim_metrics", () => ({ getSwimMetrics: h.getSwimMetrics }));
+vi.mock("../ai_insights", () => ({ generateAIInsights: h.generateAIInsights }));
 vi.mock("../swim_metrics/css-test", async () => {
   const actual = await vi.importActual<typeof import("../swim_metrics/css-test")>("../swim_metrics/css-test");
   return { ...actual, updateCssTest: h.updateCssTest };
@@ -36,7 +38,16 @@ describe("statistics: swim metrics procedures", () => {
     expect((statisticsRouter as any)._def.procedures.getAdvanced).toBeUndefined();
   });
 
-  it.each(["getMetrics", "setCssTest", "clearCssTest"] as const)("%s requires login", async (name) => {
+  it("getInsights builds the Coach page insights from the caller's metrics", async () => {
+    const metrics = { generatedAt: "x", sessions: [] };
+    h.getSwimMetrics.mockResolvedValue(metrics);
+    h.generateAIInsights.mockResolvedValue(["🏊 Tecnica: ..."]);
+    expect(await statisticsRouter.createCaller(ctx).getInsights()).toEqual(["🏊 Tecnica: ..."]);
+    expect(h.getSwimMetrics).toHaveBeenCalledWith(42);
+    expect(h.generateAIInsights).toHaveBeenCalledWith(metrics, 42);
+  });
+
+  it.each(["getMetrics", "getInsights", "setCssTest", "clearCssTest"] as const)("%s requires login", async (name) => {
     const caller = statisticsRouter.createCaller(anonymous as any) as any;
     const input = name === "setCssTest" ? { t200Seconds: 170, t400Seconds: 360, date: "2026-10-20" } : undefined;
     await expect(caller[name](input)).rejects.toMatchObject({ code: "UNAUTHORIZED" });
