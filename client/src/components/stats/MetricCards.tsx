@@ -18,9 +18,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ChoiceGroup } from "@/components/corsia/ChoiceGroup";
 import { Metric } from "@/components/corsia/Metric";
-import { ZoneBar } from "@/components/corsia/ZoneBar";
-import { formatDecimal, formatInteger, formatPaceValue, formatSignedInteger, NO_VALUE } from "@/lib/format";
+import { formatDecimal, formatInteger, formatSignedInteger, NO_VALUE } from "@/lib/format";
 import {
   cssDroppedLabel,
   cssFitText,
@@ -33,10 +33,13 @@ import {
   loadRampText,
   METRIC_ORDER,
   metricHeaders,
-  PACE_ZONE_NAMES,
   strokeHolding,
-  zonePaceRows,
+  zoneShareItems,
+  zonesSourceText,
+  zoneTableRows,
   type MetricHeader,
+  type ZoneTableRow,
+  type ZoneView,
 } from "@/lib/swim-metrics-view";
 import {
   CssHistoryChart,
@@ -49,6 +52,9 @@ import {
   VolumeChart,
 } from "./MetricCharts";
 import { CssTestDialog } from "./CssTestDialog";
+import { PaceZonesDialog } from "./PaceZonesDialog";
+import { ZoneGlossaryButton } from "./ZoneGlossary";
+import { ZoneShareBar } from "./ZoneShareBar";
 
 /** Shown next to «—» when a metric has no value. */
 const NO_DATA_READING = "servono più dati";
@@ -161,30 +167,44 @@ function LoadBody({ metrics }: { metrics: SwimMetrics }) {
   );
 }
 
-/** Z1..Z5 as paces you can swim, from today's threshold pace. */
-function ZonePaceTable({ cssPace }: { cssPace: number }) {
+const ZONE_VIEWS = [
+  { value: "zone", label: "7 zone" },
+  { value: "livelli", label: "5 livelli" },
+] as const;
+
+/** The zones (or levels) as paces you can swim, with the longest rep of C1–C3. */
+function ZoneTable({ rows, view }: { rows: ZoneTableRow[]; view: ZoneView }) {
   return (
     <table className="w-full max-w-md text-sm tabular-nums">
       <caption className={`${sectionTitle} mb-1 text-left`}>
-        Passo delle zone, dal passo soglia {formatPaceValue(cssPace)}
+        {view === "zone" ? "Passo delle zone (per 100 m)" : "Passo dei livelli (per 100 m)"}
       </caption>
       <thead className="sr-only">
         <tr>
-          <th scope="col">Zona</th>
+          <th scope="col">{view === "zone" ? "Zona" : "Livello"}</th>
           <th scope="col">Passo per 100 m</th>
         </tr>
       </thead>
       <tbody>
-        {zonePaceRows(cssPace).map((row) => (
-          <tr key={row.zone} className="border-b border-border last:border-0">
-            <th scope="row" className="py-1.5 pr-3 text-left font-normal">
-              <span className="flex items-center gap-2">
-                <span aria-hidden className="size-2.5 shrink-0 rounded-sm" style={{ background: `var(--zone-${row.zone})` }} />
-                Z{row.zone} {row.name}
+        {rows.map((row) => (
+          <tr key={row.key} className="border-b border-border last:border-0">
+            <th scope="row" className="py-1.5 pr-3 text-left align-top font-normal">
+              <span className="flex items-start gap-2">
+                <span aria-hidden className="mt-1.5 size-2.5 shrink-0 rounded-sm" style={{ background: row.color }} />
+                <span>
+                  {row.label}{" "}
+                  <span className="block text-xs text-muted-foreground">{row.detail}</span>
+                </span>
               </span>
             </th>
-            <td className="py-1.5 text-right">
+            <td className="py-1.5 text-right align-top">
               {row.pace} <span className="text-xs text-muted-foreground">/100 m</span>
+              {row.maxRep ? (
+                <>
+                  {" "}
+                  <span className="block text-xs text-muted-foreground">{row.maxRep}</span>
+                </>
+              ) : null}
             </td>
           </tr>
         ))}
@@ -194,20 +214,39 @@ function ZonePaceTable({ cssPace }: { cssPace: number }) {
 }
 
 function IntensityBody({ metrics }: { metrics: SwimMetrics }) {
+  const [view, setView] = useState<ZoneView>("zone");
   const last28 = metrics.intensity.last28;
   const coverage = intensityCoverageText(metrics);
-  const css = metrics.css.current;
+  const source = zonesSourceText(metrics);
+  const hasZones = metrics.zones.ranges.length > 0;
   return (
     <>
+      {last28 || hasZones ? (
+        <ChoiceGroup
+          aria-label="Vista delle zone"
+          options={ZONE_VIEWS}
+          value={view}
+          onChange={setView}
+          optionClassName="text-sm"
+        />
+      ) : null}
       {last28 ? (
         <div>
           <p className={`${sectionTitle} mb-2`}>Ultime 4 settimane, a stile libero</p>
-          <ZoneBar seconds={last28.zoneMeters} names={PACE_ZONE_NAMES} />
+          <ZoneShareBar
+            items={zoneShareItems(last28.zoneMeters, view)}
+            label={view === "zone" ? "Ultime 4 settimane per zona" : "Ultime 4 settimane per livello"}
+          />
           {coverage ? <p className="mt-2 text-sm">{coverage}</p> : null}
         </div>
       ) : null}
-      {css && last28 ? <ZonePaceTable cssPace={css.paceSecondsPer100} /> : null}
-      <IntensityChart weeks={metrics.intensity.weeks} />
+      {hasZones ? (
+        <div>
+          <ZoneTable rows={zoneTableRows(metrics.zones, view)} view={view} />
+          {source ? <p className="mt-2 text-xs text-muted-foreground">{source}</p> : null}
+        </div>
+      ) : null}
+      <IntensityChart weeks={metrics.intensity.weeks} view={view} />
     </>
   );
 }
@@ -415,7 +454,16 @@ export function MetricCards({ metrics }: { metrics: SwimMetrics }) {
                 setExplained(key);
                 setDialogOpen(true);
               }}
-              actions={key === "css" ? <CssTestDialog current={metrics.css.current} /> : undefined}
+              actions={
+                key === "css" ? (
+                  <CssTestDialog current={metrics.css.current} />
+                ) : key === "intensity" ? (
+                  <>
+                    <PaceZonesDialog zones={metrics.zones} css={metrics.css.current} />
+                    <ZoneGlossaryButton ranges={metrics.zones.ranges} />
+                  </>
+                ) : undefined
+              }
             >
               <Body metrics={metrics} />
             </MetricCard>

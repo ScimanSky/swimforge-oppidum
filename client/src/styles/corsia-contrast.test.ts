@@ -108,3 +108,34 @@ describe.each(themes)("token Corsia, tema %s", (_theme, color) => {
     },
   );
 });
+
+/**
+ * Pace zones A1–C3 (`--pace-*`): fills of bars and swatches, never under text. As graphics they
+ * need 3:1 against every surface (WCAG 1.4.11); a chip tinted at 15% keeps the text ≥ 4.5:1.
+ */
+const PACE_ZONES = ["pace-a1", "pace-a2", "pace-b1", "pace-b2", "pace-c1", "pace-c2", "pace-c3"];
+
+describe("zone di passo A1–C3", () => {
+  it.each(PACE_ZONES)("--%s è dichiarato direttamente in :root e in .dark", (name) => {
+    expect(light[name], `:root senza --${name}`).toBeDefined();
+    expect(dark[name], `.dark senza --${name}`).toBeDefined();
+  });
+
+  describe.each(themes)("tema %s", (_theme, color) => {
+    it.each(PACE_ZONES.flatMap((zone) => SURFACES.map((surface) => [zone, surface])))(
+      "--%s su --%s almeno 3:1",
+      (zone, surface) => {
+        expect(contrast(color(zone), color(surface))).toBeGreaterThanOrEqual(3);
+      },
+    );
+    it.each(PACE_ZONES.flatMap((zone) => SURFACES.map((surface) => [zone, surface])))(
+      "testo su chip --%s al 15%% sopra --%s almeno 4.5:1",
+      (zone, surface) => {
+        expect(contrast(color("foreground"), tint(color(zone), color(surface)))).toBeGreaterThanOrEqual(4.5);
+      },
+    );
+    it("dal freddo al caldo: sette colori diversi", () => {
+      expect(new Set(PACE_ZONES.map(color)).size).toBe(7);
+    });
+  });
+});

@@ -42,6 +42,8 @@ vi.mock("@/lib/trpc", () => ({
       },
       setCssTest: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       clearCssTest: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      setPaceZones: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      clearPaceZones: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
     useUtils: () => ({ statistics: { getMetrics: { invalidate: vi.fn() } } }),
   },

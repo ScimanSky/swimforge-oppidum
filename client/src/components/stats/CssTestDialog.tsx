@@ -19,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
-import { errorToastMessage } from "@/lib/trpc-errors";
+import { requestFieldErrors, type RequestError } from "@/lib/request-errors";
 import { formatClock, parseMinSec } from "@/lib/swim-metrics-view";
 
 type Field = "t400" | "t200" | "date";
@@ -60,34 +60,6 @@ function validate(draft: Draft): FieldErrors {
   }
   if (!draft.date) errors.date = "Inserisci la data del test.";
   return errors;
-}
-
-/** Enough of a tRPC client error to read it. */
-type RequestError = {
-  message?: unknown;
-  data?: {
-    code?: unknown;
-    zodError?: { formErrors?: string[]; fieldErrors?: Partial<Record<string, string[]>> } | null;
-  } | null;
-};
-
-/**
- * What a failed request shows: the input validation messages under their fields (the server's
- * Italian text, never the raw zod message), anything else as one message. A request that never
- * reached the server (no `data`: offline, server down) gets our message, never «Failed to fetch».
- */
-function requestErrors(error: RequestError, fallback: string): { fields: FieldErrors; message: string | null } {
-  const zod = error.data?.zodError;
-  if (zod) {
-    const fields: FieldErrors = {};
-    for (const [serverField, field] of Object.entries(SERVER_FIELDS)) {
-      const message = zod.fieldErrors?.[serverField]?.[0];
-      if (message) fields[field] = message;
-    }
-    const message = zod.formErrors?.[0] ?? null;
-    return Object.keys(fields).length > 0 || message ? { fields, message } : { fields, message: fallback };
-  }
-  return { fields: {}, message: error.data ? errorToastMessage(error, fallback) : fallback };
 }
 
 function TimeField({
@@ -143,7 +115,7 @@ export function CssTestDialog({ current }: { current: CssResult | null }) {
   };
   const fieldId = (field: Field) => `${id}-${field}`;
   const showRequestErrors = (error: RequestError, fallback: string) => {
-    const found = requestErrors(error, fallback);
+    const found = requestFieldErrors(error, SERVER_FIELDS, fallback);
     setErrors(found.fields);
     setRequestMessage(found.message);
     // The first field with a message takes the focus, so its message is read out.

@@ -7,19 +7,24 @@
 import {
   addDaysToKey,
   dayKey,
+  INTENSITY_LEVELS,
+  levelMeters,
+  levelRanges,
+  PACE_ZONES,
   pacingCvReading,
   poolLengthLabel,
   SWIM_METRIC_THRESHOLDS,
   TSB_READING_DESCRIPTIONS,
   TSB_READING_LABELS,
-  ZONE_NAMES,
-  zonePaceRanges,
   type CssPoint,
   type CssResult,
+  type IntensityLevel,
+  type PaceZoneCode,
   type SessionMetrics,
   type SwimMetricKey,
   type SwimMetrics,
-  type Zones5,
+  type SwimZones,
+  type Zones7,
 } from "@shared/swimMetrics"
 import {
   formatDayMonth,
@@ -41,8 +46,6 @@ export const METRIC_ORDER: readonly SwimMetricKey[] = [
   "volume",
 ]
 
-/** Names of the pace zones Z1..Z5 (names and bounds are in the shared definition). */
-export const PACE_ZONE_NAMES = ZONE_NAMES
 
 export type MetricHeader = {
   /** Main value; null shows «—». */
@@ -133,6 +136,9 @@ const CSS_SOURCES: Record<CssResult["source"], { reading: (css: CssResult) => st
   },
 }
 
+/** «stima, affidabilità media» or «test del 12 ott». */
+export const cssReadingText = (css: CssResult) => CSS_SOURCES[css.source].reading(css)
+
 function cssHeader(m: SwimMetrics): MetricHeader {
   const css = m.css.current
   if (!css) return { value: null, reading: null, basis: null, missing: m.css.missing }
@@ -193,7 +199,13 @@ function loadHeader(m: SwimMetrics): MetricHeader {
   return {
     value: formatSignedInteger(today.tsb),
     reading: TSB_READING_LABELS[today.reading],
-    basis: `Carico di ${formatSwims(counted)} degli ultimi 90 giorni (la curva parte da 180 giorni fa).`,
+    basis: `Carico di ${formatSwims(counted)} degli ultimi 90 giorni (la curva parte da 180 giorni fa).${
+      m.load.threshold?.source === "zone manuali"
+        ? ` Senza passo soglia, la soglia del carico è il confine tra B2 e C1 delle tue zone (${formatPaceValue(
+            m.load.threshold.paceSecondsPer100
+          )}).`
+        : ""
+    }`,
     missing: m.load.missing,
     readingNow: `Oggi l'equilibrio è ${formatSignedInteger(today.tsb)}: ${TSB_READING_DESCRIPTIONS[today.reading]}.`,
   }
@@ -223,14 +235,14 @@ export function loadChartSummary(load: SwimMetrics["load"]): string | null {
 
 // ─── Intensità ──────────────────────────────────────────────────────────────
 
-const zoneSum = (zones: Zones5, from: number, to: number) =>
+const zoneSum = (zones: Zones7, from: number, to: number) =>
   zones.slice(from, to + 1).reduce((sum, meters) => sum + meters, 0)
 
 function intensityHeader(m: SwimMetrics): MetricHeader {
   const last28 = m.intensity.last28
   if (!last28) return { value: null, reading: null, basis: null, missing: m.intensity.missing }
   const counted = m.sessions.filter(session => session.zoneMeters && inLast28(m)(session)).length
-  const total = zoneSum(last28.zoneMeters, 0, 4)
+  const total = zoneSum(last28.zoneMeters, 0, 6)
   return {
     value: `${formatInteger(last28.easyPct)}%`,
     unit: "facile",
@@ -271,29 +283,124 @@ export function intensityCoverageText(m: SwimMetrics): string | null {
   return outside.length > 0 ? `${coverage} Fuori dalle zone: ${outside.join("; ")}.` : coverage
 }
 
-/** Z1..Z5 as paces per 100 m from the CSS pace: «più lento di 2:08», «1:58–2:08», «più veloce di 1:45». */
-export function zonePaceRows(cssPaceSecondsPer100: number): { zone: number; name: string; pace: string }[] {
-  return zonePaceRanges(cssPaceSecondsPer100).map(range => ({
-    zone: range.zone,
-    name: range.name,
-    pace:
-      range.slowPace === null
-        ? `più lento di ${formatPaceValue(range.fastPace!)}`
-        : range.fastPace === null
-          ? `più veloce di ${formatPaceValue(range.slowPace)}`
-          : `${formatPaceValue(range.fastPace)}–${formatPaceValue(range.slowPace)}`,
+/** The intensity card shows the seven zones A1–C3 or the five levels aligned to them. */
+export type ZoneView = "zone" | "livelli"
+
+/** Fill of each zone (`--pace-*`, cool to warm). Colour is never the only cue: names stay. */
+export const PACE_ZONE_COLOR: Record<PaceZoneCode, string> = {
+  A1: "var(--pace-a1)",
+  A2: "var(--pace-a2)",
+  B1: "var(--pace-b1)",
+  B2: "var(--pace-b2)",
+  C1: "var(--pace-c1)",
+  C2: "var(--pace-c2)",
+  C3: "var(--pace-c3)",
+}
+
+/** A level takes the colour of one of its zones (Soglia the amber of C1, Sopra soglia the orange of C2). */
+export const LEVEL_COLOR: Record<IntensityLevel, string> = {
+  Facile: PACE_ZONE_COLOR.A1,
+  Aerobico: PACE_ZONE_COLOR.A2,
+  Medio: PACE_ZONE_COLOR.B1,
+  Soglia: PACE_ZONE_COLOR.C1,
+  "Sopra soglia": PACE_ZONE_COLOR.C2,
+}
+
+/** «più lento di 2:08», «2:01–2:08», «più veloce di 1:44» (per 100 m). */
+export function formatZonePace(range: { fastPace: number | null; slowPace: number | null }): string {
+  if (range.slowPace === null) return `più lento di ${formatPaceValue(range.fastPace!)}`
+  if (range.fastPace === null) return `più veloce di ${formatPaceValue(range.slowPace)}`
+  return `${formatPaceValue(range.fastPace)}–${formatPaceValue(range.slowPace)}`
+}
+
+export type ZoneTableRow = {
+  key: string
+  /** «B2 Fondo medio-alto» or «Soglia». */
+  label: string
+  /** The level of a zone, or the zones of a level («B2 e C1»). */
+  detail: string
+  pace: string
+  /** «max 200 m» for C1–C3. */
+  maxRep: string | null
+  color: string
+}
+
+const joinCodes = (codes: readonly string[]) =>
+  codes.length > 1 ? `${codes.slice(0, -1).join(", ")} e ${codes[codes.length - 1]}` : codes[0]
+
+/** The zones in effect as rows of the table: seven zones or five levels, with the user's paces. */
+export function zoneTableRows(zones: SwimZones, view: ZoneView): ZoneTableRow[] {
+  if (view === "livelli") {
+    return levelRanges(zones.ranges).map(range => ({
+      key: range.level,
+      label: range.level,
+      detail: joinCodes(range.codes),
+      pace: formatZonePace(range),
+      maxRep: null,
+      color: LEVEL_COLOR[range.level],
+    }))
+  }
+  return zones.ranges.map(range => ({
+    key: range.code,
+    label: `${range.code} ${range.name}`,
+    detail: range.level,
+    pace: formatZonePace(range),
+    maxRep: range.maxRepMeters ? `max ${formatInteger(range.maxRepMeters)} m` : null,
+    color: PACE_ZONE_COLOR[range.code],
   }))
 }
 
-export function intensityChartSummary(weeksData: SwimMetrics["intensity"]["weeks"]): string {
+export type ZoneShareItem = { key: string; label: string; meters: number; color: string }
+
+/** Metres per zone (A1..C3) or per level, labelled and coloured, for the split bar and the legend. */
+export function zoneShareItems(zoneMeters: Zones7, view: ZoneView): ZoneShareItem[] {
+  if (view === "livelli") {
+    const meters = levelMeters(zoneMeters)
+    return INTENSITY_LEVELS.map((level, index) => ({
+      key: level,
+      label: level,
+      meters: meters[index],
+      color: LEVEL_COLOR[level],
+    }))
+  }
+  return PACE_ZONES.map((zone, index) => ({
+    key: zone.code,
+    label: `${zone.code} ${zone.name}`,
+    meters: zoneMeters[index],
+    color: PACE_ZONE_COLOR[zone.code],
+  }))
+}
+
+/** Where the zones come from: the threshold pace and its source, or the user's own bounds. */
+export function zonesSourceText(m: SwimMetrics): string | null {
+  if (m.zones.source === "manuali") {
+    return m.zones.manualUpdatedAt
+      ? `Le tue zone, inserite il ${formatDayMonth(m.zones.manualUpdatedAt)}.`
+      : "Le tue zone, inserite da te."
+  }
+  const css = m.css.current
+  if (m.zones.source !== "auto" || !css) return null
+  return `Calcolate dal tuo passo soglia ${formatPaceValue(css.paceSecondsPer100)} (${cssReadingText(
+    css
+  )}), che è il confine tra B2 e C1.`
+}
+
+export function intensityChartSummary(weeksData: SwimMetrics["intensity"]["weeks"], view: ZoneView): string {
   const total = weeksData.reduce(
-    (sum, week) => week.zoneMeters.map((meters, index) => sum[index] + meters) as Zones5,
-    [0, 0, 0, 0, 0] as Zones5
+    (sum, week) => week.zoneMeters.map((meters, index) => sum[index] + meters) as Zones7,
+    [0, 0, 0, 0, 0, 0, 0] as Zones7
   )
   const unclassified = weeksData.reduce((sum, week) => sum + (week.unclassifiedMeters ?? 0), 0)
-  const zoned = `Ultime 8 settimane: ${kmOf(zoneSum(total, 0, 4))} a stile libero nelle zone, ${formatKm(
-    zoneSum(total, 0, 1)
-  )} in Z1–Z2 (facile), ${formatKm(total[2])} in Z3 (medio), ${formatKm(zoneSum(total, 3, 4))} in Z4–Z5 (intenso)`
+  const zoned =
+    view === "livelli"
+      ? `Ultime 8 settimane: ${kmOf(zoneSum(total, 0, 6))} a stile libero nelle zone: ${levelMeters(total)
+          .map((meters, index) => `${INTENSITY_LEVELS[index]} ${formatKm(meters)}`)
+          .join(", ")}`
+      : `Ultime 8 settimane: ${kmOf(zoneSum(total, 0, 6))} a stile libero nelle zone, ${formatKm(
+          zoneSum(total, 0, 1)
+        )} in A1–A2 (facile), ${formatKm(zoneSum(total, 2, 3))} in B1–B2 (medio), ${formatKm(
+          zoneSum(total, 4, 6)
+        )} in C1–C3 (intenso)`
   return unclassified > 0
     ? `${zoned}; ${kmOf(unclassified)} di altri stili, tecnica o gambe non classificati.`
     : `${zoned}.`

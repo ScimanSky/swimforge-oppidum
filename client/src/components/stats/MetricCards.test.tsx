@@ -10,6 +10,8 @@ vi.mock("@/lib/trpc", () => ({
     statistics: {
       setCssTest: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       clearCssTest: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      setPaceZones: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      clearPaceZones: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
     useUtils: () => ({ statistics: { getMetrics: { invalidate: vi.fn() } } }),
   },
@@ -71,7 +73,7 @@ describe("Metriche: riquadri", () => {
     const region = screen.getByRole("region", { name: /^Intensità/ });
     expect(
       within(region).getByRole("img", {
-        name: "Ultime 8 settimane: 13,6 km a stile libero nelle zone, 8,6 in Z1–Z2 (facile), 2,4 in Z3 (medio), 2,6 in Z4–Z5 (intenso); 1,8 km di altri stili, tecnica o gambe non classificati.",
+        name: "Ultime 8 settimane: 13,6 km a stile libero nelle zone, 8,6 in A1–A2 (facile), 2,4 in B1–B2 (medio), 2,6 in C1–C3 (intenso); 1,8 km di altri stili, tecnica o gambe non classificati.",
       })
     ).toBeTruthy();
     expect(region).toHaveTextContent("Come si legge: Gli studi sugli sport di resistenza");
@@ -79,7 +81,7 @@ describe("Metriche: riquadri", () => {
       "Su 3 nuotate in vasca con i giri degli ultimi 28 giorni: 8,4 km a stile libero nelle zone."
     );
     // Legend of the zones and the split of the last 4 weeks.
-    for (const zone of ["Facile", "Aerobico", "Medio", "Soglia", "Sopra soglia"]) {
+    for (const zone of ["Recupero attivo", "Fondo lento", "Fondo medio", "Soglia anaerobica", "Potenza anaerobica"]) {
       expect(within(region).getAllByText(new RegExp(zone)).length).toBeGreaterThan(0);
     }
     // The other cards stay closed and without charts.
@@ -87,29 +89,119 @@ describe("Metriche: riquadri", () => {
     expect(screen.getAllByRole("img")).toHaveLength(1);
   });
 
-  it("intensità: quanta parte del volume è nelle zone, cosa resta fuori e i passi delle zone", async () => {
+  /** The cells of each body row of a table, as the user reads them. */
+  const tableRows = (table: HTMLElement) =>
+    within(table)
+      .getAllByRole("row")
+      .slice(1)
+      .map((row) => Array.from(row.children).map((cell) => cell.textContent).join(" | "));
+
+  const splitItems = (region: HTMLElement, name: string) =>
+    within(within(region).getByRole("list", { name })).getAllByRole("listitem").map((item) => item.textContent);
+
+  it("intensità: le sette zone con i tuoi passi, la ripetuta massima e quanta parte del volume è nelle zone", async () => {
     renderCards();
     await userEvent.click(card("Intensità"));
     const region = screen.getByRole("region", { name: /^Intensità/ });
     expect(region).toHaveTextContent(
       "Zone calcolate sul 72% del volume delle ultime 4 settimane. Fuori dalle zone: 1,2 km di altri stili, tecnica o gambe; 2 km in acque libere."
     );
-    // The zones as paces you can swim, from the threshold pace 1:48,5.
-    const table = within(region).getByRole("table", { name: "Passo delle zone, dal passo soglia 1:49" });
-    expect(
-      within(table)
-        .getAllByRole("row")
-        .slice(1)
-        .map((row) => row.textContent)
-    ).toEqual([
-      "Z1 Facilepiù lento di 2:08 /100 m",
-      "Z2 Aerobico1:58–2:08 /100 m",
-      "Z3 Medio1:52–1:58 /100 m",
-      "Z4 Soglia1:45–1:52 /100 m",
-      "Z5 Sopra sogliapiù veloce di 1:45 /100 m",
+    expect(within(region).getByRole("radio", { name: "7 zone" })).toBeChecked();
+    // The last 4 weeks per zone: name and percentage, the largest one marked.
+    expect(splitItems(region, "Ultime 4 settimane per zona")).toEqual([
+      "A1 Recupero attivo 30%",
+      "A2 Fondo lento 34%, prevalente",
+      "B1 Fondo medio 11%",
+      "B2 Fondo medio-alto 5%",
+      "C1 Soglia anaerobica 13%",
+      "C2 Capacità anaerobica 5%",
+      "C3 Potenza anaerobica 2%",
     ]);
+    // The owner's zones from the threshold pace 1:48,5.
+    const table = within(region).getByRole("table", { name: "Passo delle zone (per 100 m)" });
+    expect(tableRows(table)).toEqual([
+      "A1 Recupero attivo Facile | più lento di 2:08 /100 m",
+      "A2 Fondo lento Aerobico | 2:01–2:08 /100 m",
+      "B1 Fondo medio Medio | 1:54–2:01 /100 m",
+      "B2 Fondo medio-alto Soglia | 1:49–1:54 /100 m",
+      "C1 Soglia anaerobica Soglia | 1:44–1:49 /100 m max 200 m",
+      "C2 Capacità anaerobica Sopra soglia | più veloce di 1:44 /100 m max 150 m",
+      "C3 Potenza anaerobica Sopra soglia | più veloce di 1:44 /100 m max 25 m",
+    ]);
+    expect(region).toHaveTextContent(
+      "Calcolate dal tuo passo soglia 1:49 (stima, affidabilità media), che è il confine tra B2 e C1."
+    );
     // The weekly bars keep the unzoned metres apart, in a neutral grey with its own legend.
     expect(within(region).getByText("Non classificati (altri stili, tecnica, gambe)")).toBeTruthy();
+    expect(within(region).getByRole("button", { name: "Le tue zone" })).toBeTruthy();
+    expect(within(region).getByRole("button", { name: "Le zone A1–C3" })).toBeTruthy();
+  });
+
+  it("intensità: con «5 livelli» legenda, tabella e barre settimanali passano ai livelli", async () => {
+    renderCards();
+    await userEvent.click(card("Intensità"));
+    const region = screen.getByRole("region", { name: /^Intensità/ });
+    await userEvent.click(within(region).getByRole("radio", { name: "5 livelli" }));
+    expect(splitItems(region, "Ultime 4 settimane per livello")).toEqual([
+      "Facile 30%",
+      "Aerobico 34%, prevalente",
+      "Medio 11%",
+      "Soglia 18%",
+      "Sopra soglia 7%",
+    ]);
+    const table = within(region).getByRole("table", { name: "Passo dei livelli (per 100 m)" });
+    expect(tableRows(table)).toEqual([
+      "Facile A1 | più lento di 2:08 /100 m",
+      "Aerobico A2 | 2:01–2:08 /100 m",
+      "Medio B1 | 1:54–2:01 /100 m",
+      "Soglia B2 e C1 | 1:44–1:54 /100 m",
+      "Sopra soglia C2 e C3 | più veloce di 1:44 /100 m",
+    ]);
+    expect(
+      within(region).getByRole("img", {
+        name: "Ultime 8 settimane: 13,6 km a stile libero nelle zone: Facile 4, Aerobico 4,6, Medio 1,7, Soglia 2,5, Sopra soglia 0,9; 1,8 km di altri stili, tecnica o gambe non classificati.",
+      })
+    ).toBeTruthy();
+    // The header split stays facile / medio / intenso.
+    expect(card("Intensità")).toHaveTextContent("Intensità 64% facile 16% medio, 20% intenso");
+  });
+
+  it("forma e fatica: senza passo soglia la soglia del carico viene dalle tue zone, e lo dice", async () => {
+    const metrics = swimMetricsFixture();
+    metrics.css.current = null;
+    metrics.load.threshold = { paceSecondsPer100: 110, source: "zone manuali" };
+    renderCards(metrics);
+    await userEvent.click(card("Forma e fatica"));
+    expect(screen.getByRole("region", { name: /^Forma e fatica/ })).toHaveTextContent(
+      "Senza passo soglia, la soglia del carico è il confine tra B2 e C1 delle tue zone (1:50)."
+    );
+  });
+
+  it("intensità: le tue zone dicono da dove vengono", async () => {
+    const metrics = swimMetricsFixture();
+    metrics.zones = { ...metrics.zones, source: "manuali", manualUpdatedAt: "2026-10-25T09:00:00.000Z" };
+    renderCards(metrics);
+    await userEvent.click(card("Intensità"));
+    expect(screen.getByRole("region", { name: /^Intensità/ })).toHaveTextContent("Le tue zone, inserite il 25 ott.");
+  });
+
+  it("intensità: «Le zone A1–C3» spiega ogni zona", async () => {
+    renderCards();
+    await userEvent.click(card("Intensità"));
+    await userEvent.click(screen.getByRole("button", { name: "Le zone A1–C3" }));
+    const glossary = screen.getByRole("dialog", { name: "Le zone A1–C3" });
+    expect(within(glossary).getByRole("region", { name: "B2 Fondo medio-alto · Soglia" })).toHaveTextContent(
+      "Il tuo passo1:49–1:54 /100 m"
+    );
+  });
+
+  it("intensità: «Come si calcola» dice i confini A1–C3 come convenzione approvata", async () => {
+    renderCards();
+    await userEvent.click(card("Intensità"));
+    await userEvent.click(screen.getByRole("button", { name: "Come si calcola: Intensità" }));
+    const dialog = screen.getByRole("dialog", { name: "Intensità" });
+    expect(dialog).toHaveTextContent("A1 sotto 85%, A2 85–90%, B1 90–95%, B2 95–100%, C1 100–104%, C2 sopra 104%");
+    expect(dialog).toHaveTextContent("convenzione di SwimForge, approvata dal suo ideatore");
   });
 
   it("intensità: tutto a stile libero, zone su tutto il volume e niente segmento grigio", async () => {
@@ -125,7 +217,7 @@ describe("Metriche: riquadri", () => {
     expect(region).not.toHaveTextContent("Non classificati");
     expect(
       within(region).getByRole("img", {
-        name: "Ultime 8 settimane: 13,6 km a stile libero nelle zone, 8,6 in Z1–Z2 (facile), 2,4 in Z3 (medio), 2,6 in Z4–Z5 (intenso).",
+        name: "Ultime 8 settimane: 13,6 km a stile libero nelle zone, 8,6 in A1–A2 (facile), 2,4 in B1–B2 (medio), 2,6 in C1–C3 (intenso).",
       })
     ).toBeTruthy();
   });
@@ -438,10 +530,11 @@ describe("Metriche: riquadri", () => {
 
     await userEvent.click(card("Intensità"));
     const intensity = screen.getByRole("region", { name: /^Intensità/ });
-    expect(intensity).toHaveTextContent("Servono il passo soglia e nuotate con i giri.");
+    expect(intensity).toHaveTextContent("Servono il passo soglia (o le tue zone) e nuotate con i giri.");
     expect(within(intensity).queryByRole("img")).toBeNull();
-    // No threshold pace: no zone paces.
+    // No threshold pace: no zone paces, but the zones can be entered by hand.
     expect(within(intensity).queryByRole("table")).toBeNull();
+    expect(within(intensity).getByRole("button", { name: "Le tue zone" })).toBeTruthy();
   });
 
   it("volume senza nuotate: «—» e il motivo", async () => {
@@ -463,7 +556,7 @@ describe("Metriche: riquadri", () => {
     expect(within(dialog).getByRole("heading", { name: "Fonte" })).toBeTruthy();
     expect(dialog).toHaveTextContent("modello di Banister");
     const conventions = within(dialog).getByRole("list", { name: "Convenzioni" });
-    // The five TrainingPeaks bands, the ramp and our IF for the other strokes.
+    // The five TrainingPeaks bands, the ramp, our IF for the other strokes and the manual zones.
     expect(within(conventions).getAllByRole("listitem").map((item) => item.textContent)).toEqual([
       "Equilibrio sopra +25: molto riposato (rischio di perdere forma se dura).",
       "Da +5 (escluso) a +25: fresco.",
@@ -472,6 +565,7 @@ describe("Metriche: riquadri", () => {
       "Sotto −30: carico alto.",
       "Forma che cresce più di 8 punti a settimana: crescita molto rapida.",
       "Giri non a stile libero (altri stili, tecnica, gambe, stile non registrato): IF fisso 0,80, perché il passo soglia è a stile libero. È una convenzione nostra.",
+      "Senza passo soglia ma con le tue zone, la soglia del carico è il confine tra B2 e C1 delle tue zone (fonte: zone manuali).",
     ]);
   });
 

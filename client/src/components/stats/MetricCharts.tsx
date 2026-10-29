@@ -1,5 +1,5 @@
 /**
- * Charts of the «Metriche» cards (Corsia: `--chart-*` and `--zone-*`, no gradients, solid
+ * Charts of the «Metriche» cards (Corsia: `--chart-*` and `--pace-*`, no gradients, solid
  * hairline grid, one y axis). Each chart is a `role="img"` with a text summary for screen
  * readers; the legend and the numbers around it stay as text. Mounted only while its card is open.
  */
@@ -19,7 +19,13 @@ import {
   YAxis,
   type TooltipProps,
 } from "recharts";
-import { TSB_READING_LABELS, tsbReadingOf, type SessionMetrics, type SwimMetrics } from "@shared/swimMetrics";
+import {
+  emptyZones7,
+  TSB_READING_LABELS,
+  tsbReadingOf,
+  type SessionMetrics,
+  type SwimMetrics,
+} from "@shared/swimMetrics";
 import { formatDecimal, formatInteger, formatKm, formatPaceValue, formatSignedInteger } from "@/lib/format";
 import {
   cssChartSummary,
@@ -32,13 +38,14 @@ import {
   formatSwims,
   intensityChartSummary,
   loadChartSummary,
-  PACE_ZONE_NAMES,
   pacingCvSummary,
   pacingDpsSummary,
   pacingSessions,
   pacingSetSummary,
   setTitle,
   volumeChartSummary,
+  zoneShareItems,
+  type ZoneView,
 } from "@/lib/swim-metrics-view";
 import { cn } from "@/lib/utils";
 
@@ -320,32 +327,32 @@ export function LoadChart({ load, sessions }: { load: SwimMetrics["load"]; sessi
 
 // ─── Intensità ──────────────────────────────────────────────────────────────
 
-const ZONE_KEYS = ["z1", "z2", "z3", "z4", "z5"] as const;
 const UNCLASSIFIED_NAME = "Non classificati (altri stili, tecnica, gambe)";
 
-export const zoneLegendItems = (): LegendItem[] =>
-  PACE_ZONE_NAMES.map((name, index) => ({
-    label: `Z${index + 1} ${name}`,
-    color: `var(--zone-${index + 1})`,
-    shape: "box",
-  }));
+/** Legend of the weekly bars: the seven zones A1–C3 or the five levels, with their fills. */
+export const zoneLegendItems = (view: ZoneView): LegendItem[] =>
+  zoneShareItems(emptyZones7(), view).map((item) => ({ label: item.label, color: item.color, shape: "box" }));
 
 /**
- * Weekly km per pace zone, stacked, over the last 8 weeks; the metres not zoned (other strokes,
- * drill, kick) on top as an empty dashed segment (a grey fill reads like Z1), so the bar is the
- * whole pool volume with laps.
+ * Weekly km per pace zone A1–C3 (or per level), stacked cool to warm, over the last 8 weeks; the
+ * metres not zoned (other strokes, drill, kick) on top as an empty dashed segment (a grey fill
+ * reads like a zone), so the bar is the whole pool volume with laps.
  */
-export function IntensityChart({ weeks }: { weeks: SwimMetrics["intensity"]["weeks"] }) {
+export function IntensityChart({ weeks, view }: { weeks: SwimMetrics["intensity"]["weeks"]; view: ZoneView }) {
   const hasUnclassified = weeks.some((week) => (week.unclassifiedMeters ?? 0) > 0);
   if (!hasUnclassified && !weeks.some((week) => week.zoneMeters.some((meters) => meters > 0))) return null;
+  const series = zoneShareItems(emptyZones7(), view);
   const data = weeks.map((week) => ({
     week: week.weekStart,
-    ...Object.fromEntries(ZONE_KEYS.map((key, index) => [key, week.zoneMeters[index] / 1000])),
+    ...Object.fromEntries(zoneShareItems(week.zoneMeters, view).map((item) => [item.key, item.meters / 1000])),
     altro: (week.unclassifiedMeters ?? 0) / 1000,
   }));
   return (
     <div>
-      <ChartFrame title="Km per zona, ultime 8 settimane" summary={intensityChartSummary(weeks)}>
+      <ChartFrame
+        title={view === "zone" ? "Km per zona, ultime 8 settimane" : "Km per livello, ultime 8 settimane"}
+        summary={intensityChartSummary(weeks, view)}
+      >
         <BarChart data={data} margin={MARGIN}>
           {GRID}
           <XAxis dataKey="week" {...X_AXIS} tickFormatter={dayLabel} />
@@ -361,13 +368,13 @@ export function IntensityChart({ weeks }: { weeks: SwimMetrics["intensity"]["wee
             labelFormatter={(week) => `Settimana del ${dayLabel(week)}`}
             formatter={(value, name) => [`${formatKm(Number(value) * 1000)} km`, String(name)]}
           />
-          {ZONE_KEYS.map((key, index) => (
+          {series.map((item) => (
             <Bar
-              key={key}
-              dataKey={key}
+              key={item.key}
+              dataKey={item.key}
               stackId="zone"
-              name={`Z${index + 1} ${PACE_ZONE_NAMES[index]}`}
-              fill={`var(--zone-${index + 1})`}
+              name={item.label}
+              fill={item.color}
               // 1px surface gap between the stacked segments.
               stroke="var(--card)"
               strokeWidth={1}
@@ -392,7 +399,7 @@ export function IntensityChart({ weeks }: { weeks: SwimMetrics["intensity"]["wee
       </ChartFrame>
       <ChartLegend
         items={[
-          ...zoneLegendItems(),
+          ...zoneLegendItems(view),
           ...(hasUnclassified
             ? [{ label: UNCLASSIFIED_NAME, color: "var(--muted-foreground)", shape: "outline" as const }]
             : []),

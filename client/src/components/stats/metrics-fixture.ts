@@ -4,7 +4,14 @@
  * per 100 m than the 400), sessions of 100 m repeats in a 25 m pool, one open-water swim without
  * laps. Used by the UI tests of the «Metriche» cards. Not imported by the app.
  */
-import { addDaysToKey, type CssPoint, type SessionMetrics, type SwimMetrics } from "@shared/swimMetrics";
+import {
+  addDaysToKey,
+  paceZoneBoundsFromCss,
+  paceZoneRanges,
+  type CssPoint,
+  type SessionMetrics,
+  type SwimMetrics,
+} from "@shared/swimMetrics";
 
 const session = (
   date: string,
@@ -82,24 +89,24 @@ export function swimMetricsFixture(): SwimMetrics {
     sessions: [
       poolSwim("2026-09-01", {
         distanceMeters: 2500, movingSeconds: 2950, intensityFactor: 0.82, stss: 50.4,
-        zoneMeters: [700, 800, 400, 300, 0], unclassifiedMeters: 300,
+        zoneMeters: [700, 800, 300, 100, 250, 50, 0], unclassifiedMeters: 300,
         strokeIndex: 1.4, dpsMeters: 1.68, strokeRate: 29.8, swolf: 38,
         pacingCv: 3.1, pacingFade: 2, dpsDropPct: 1.8, strokeRateRisePct: 2.5,
       }),
       poolSwim("2026-09-15", {
         distanceMeters: 3000, movingSeconds: 3540, intensityFactor: 0.85, stss: 54.6,
-        zoneMeters: [900, 900, 500, 400, 0], unclassifiedMeters: 300,
+        zoneMeters: [900, 900, 400, 100, 300, 100, 0], unclassifiedMeters: 300,
         strokeIndex: 1.42, dpsMeters: 1.7, strokeRate: 29.5, swolf: 37.5,
         pacingCv: 2.9, pacingFade: 1.5, dpsDropPct: 2, strokeRateRisePct: 2.8,
       }),
       poolSwim("2026-09-29", {
         distanceMeters: 2800, movingSeconds: 3300, intensityFactor: 0.88, stss: 56,
-        zoneMeters: [600, 800, 600, 400, 100], unclassifiedMeters: 300,
+        zoneMeters: [600, 800, 400, 200, 350, 100, 50], unclassifiedMeters: 300,
         strokeIndex: 1.44, dpsMeters: 1.71, strokeRate: 29.5, swolf: 37,
       }),
       poolSwim("2026-10-06", {
         distanceMeters: 3200, movingSeconds: 3700, intensityFactor: 0.9, stss: 63.2,
-        zoneMeters: [800, 1000, 400, 500, 100], unclassifiedMeters: 400,
+        zoneMeters: [800, 1000, 300, 100, 400, 150, 50], unclassifiedMeters: 400,
         strokeIndex: 1.5, dpsMeters: 1.72, strokeRate: 30.4, swolf: 36.5,
         pacingCv: 2.6, pacingFade: 3, dpsDropPct: 2.1, strokeRateRisePct: 3,
       }),
@@ -109,13 +116,13 @@ export function swimMetricsFixture(): SwimMetrics {
       }),
       poolSwim("2026-10-20", {
         distanceMeters: 3400, movingSeconds: 3850, intensityFactor: 0.91, stss: 69.4,
-        zoneMeters: [900, 1000, 500, 500, 100], unclassifiedMeters: 400,
+        zoneMeters: [900, 1000, 300, 200, 400, 150, 50], unclassifiedMeters: 400,
         strokeIndex: 1.52, dpsMeters: 1.72, strokeRate: 30.8, swolf: 36,
         pacingCv: 2.4, pacingFade: 4, dpsDropPct: 3.4, strokeRateRisePct: 4.1,
       }),
       poolSwim("2026-10-27", {
         distanceMeters: 3000, movingSeconds: 3380, intensityFactor: 0.89, stss: 59.1,
-        zoneMeters: [800, 900, 400, 400, 100], unclassifiedMeters: 400,
+        zoneMeters: [800, 900, 300, 100, 300, 150, 50], unclassifiedMeters: 400,
         strokeIndex: 1.54, dpsMeters: 1.73, strokeRate: 30.9, swolf: 36,
         pacingCv: 2.7, pacingFade: 5.8, dpsDropPct: 5.6, strokeRateRisePct: 6.2,
       }),
@@ -142,7 +149,16 @@ export function swimMetricsFixture(): SwimMetrics {
       ],
       missing: null,
     },
+    // The owner's automatic zones: B2 1:48,5–1:54,2, C1 1:44,3–1:48,5.
+    zones: {
+      source: "auto",
+      ranges: paceZoneRanges(paceZoneBoundsFromCss(108.5)),
+      bounds: paceZoneBoundsFromCss(108.5),
+      autoBounds: paceZoneBoundsFromCss(108.5),
+      manualUpdatedAt: null,
+    },
     load: {
+      threshold: { paceSecondsPer100: 108.5, source: "stima" },
       today: { ctl: 41.3, atl: 48.6, tsb: -7.3, reading: "neutro" },
       rampPerWeek: 2.1,
       days: loadDays,
@@ -151,18 +167,18 @@ export function swimMetricsFixture(): SwimMetrics {
     intensity: {
       // Zoned 8,4 km of the 11,6 km swum in the 28 days: 1,2 km other strokes, 2 km open water.
       last28: {
-        zoneMeters: [2500, 2900, 1300, 1400, 300], easyPct: 64, mediumPct: 16, hardPct: 20,
+        zoneMeters: [2500, 2900, 900, 400, 1100, 450, 150], easyPct: 64, mediumPct: 16, hardPct: 20,
         unclassifiedMeters: 1200, coveragePct: 72,
       },
       weeks: [
-        { weekStart: "2026-09-07", zoneMeters: [0, 0, 0, 0, 0], unclassifiedMeters: 0 },
-        { weekStart: "2026-09-14", zoneMeters: [900, 900, 500, 400, 0], unclassifiedMeters: 300 },
-        { weekStart: "2026-09-21", zoneMeters: [0, 0, 0, 0, 0], unclassifiedMeters: 0 },
-        { weekStart: "2026-09-28", zoneMeters: [600, 800, 600, 400, 100], unclassifiedMeters: 300 },
-        { weekStart: "2026-10-05", zoneMeters: [800, 1000, 400, 500, 100], unclassifiedMeters: 400 },
-        { weekStart: "2026-10-12", zoneMeters: [0, 0, 0, 0, 0], unclassifiedMeters: 0 },
-        { weekStart: "2026-10-19", zoneMeters: [900, 1000, 500, 500, 100], unclassifiedMeters: 400 },
-        { weekStart: "2026-10-26", zoneMeters: [800, 900, 400, 400, 100], unclassifiedMeters: 400 },
+        { weekStart: "2026-09-07", zoneMeters: [0, 0, 0, 0, 0, 0, 0], unclassifiedMeters: 0 },
+        { weekStart: "2026-09-14", zoneMeters: [900, 900, 400, 100, 300, 100, 0], unclassifiedMeters: 300 },
+        { weekStart: "2026-09-21", zoneMeters: [0, 0, 0, 0, 0, 0, 0], unclassifiedMeters: 0 },
+        { weekStart: "2026-09-28", zoneMeters: [600, 800, 400, 200, 350, 100, 50], unclassifiedMeters: 300 },
+        { weekStart: "2026-10-05", zoneMeters: [800, 1000, 300, 100, 400, 150, 50], unclassifiedMeters: 400 },
+        { weekStart: "2026-10-12", zoneMeters: [0, 0, 0, 0, 0, 0, 0], unclassifiedMeters: 0 },
+        { weekStart: "2026-10-19", zoneMeters: [900, 1000, 300, 200, 400, 150, 50], unclassifiedMeters: 400 },
+        { weekStart: "2026-10-26", zoneMeters: [800, 900, 300, 100, 300, 150, 50], unclassifiedMeters: 400 },
       ],
       missing: null,
     },
@@ -221,7 +237,9 @@ export function emptySwimMetricsFixture(): SwimMetrics {
       missing:
         "Servono almeno due tratti continui a stile libero in vasca negli ultimi 90 giorni, tra 2 e 30 minuti, uno lungo almeno il doppio dell'altro (es. 200 e 400 m), nuotati a buon ritmo. Oppure inserisci un test.",
     },
+    zones: { source: null, ranges: [], bounds: null, autoBounds: null, manualUpdatedAt: null },
     load: {
+      threshold: null,
       today: null,
       rampPerWeek: null,
       days: [],
@@ -232,10 +250,10 @@ export function emptySwimMetricsFixture(): SwimMetrics {
       last28: null,
       weeks: base.intensity.weeks.map((week) => ({
         weekStart: week.weekStart,
-        zoneMeters: [0, 0, 0, 0, 0],
+        zoneMeters: [0, 0, 0, 0, 0, 0, 0],
         unclassifiedMeters: 0,
       })),
-      missing: "Servono il passo soglia e nuotate con i giri.",
+      missing: "Servono il passo soglia (o le tue zone) e nuotate con i giri.",
     },
     efficiency: {
       poolLengthMeters: null, latest: null, avg28: null, baseline: null, deltaPct: null,
