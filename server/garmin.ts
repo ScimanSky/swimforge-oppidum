@@ -14,6 +14,7 @@
  * - Step 2: completeMfa() - Complete authentication with MFA code
  */
 
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { getDb, upsertPersonalRecord } from "./db";
 import {
   garminTokens,
@@ -710,7 +711,7 @@ export async function connectGarmin(
 ): Promise<{ success: boolean; mfaRequired?: boolean; error?: string }> {
   const db = await getDb();
   if (!db) {
-    return { success: false, error: "Database not available" };
+    return { success: false, error: DB_UNAVAILABLE_ERR_MSG };
   }
 
   try {
@@ -802,7 +803,7 @@ export async function completeMfa(
 ): Promise<{ success: boolean; error?: string }> {
   const db = await getDb();
   if (!db) {
-    return { success: false, error: "Database not available" };
+    return { success: false, error: DB_UNAVAILABLE_ERR_MSG };
   }
 
   try {
@@ -1038,7 +1039,7 @@ export async function syncGarminActivities(
 }> {
   const db = await getDb();
   if (!db) {
-    return { synced: 0, newXp: 0, detectedPbs: [], error: "Database not available" };
+    return { synced: 0, newXp: 0, detectedPbs: [], error: DB_UNAVAILABLE_ERR_MSG };
   }
 
   // Check if user has Garmin connected
@@ -1909,7 +1910,7 @@ export async function migrateHrZones(userId: number): Promise<{
   if (!db) {
     return {
       success: false,
-      message: "Database not available",
+      message: DB_UNAVAILABLE_ERR_MSG,
       updated: 0,
       failed: 0,
       total: 0,

@@ -1,3 +1,4 @@
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb } from "./db";
 import { users, swimmerProfiles, socialFollows } from "../drizzle/schema";
@@ -180,7 +181,7 @@ export async function getFollowStarterState(viewerUserId: number, limit = 5, tar
 
 export async function toggleFollow(params: { followerId: number; followingId: number }) {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   const existing = await db
     .select({ id: socialFollows.id })

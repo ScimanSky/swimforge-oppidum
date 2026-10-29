@@ -1,3 +1,4 @@
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import {
   clubAiAutomationConfigs,
@@ -14,7 +15,7 @@ const CLUB_STAFF_ROLES = new Set(["owner", "admin", "moderator"]);
 
 async function requireDb() {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
   return db;
 }
 

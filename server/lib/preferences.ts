@@ -3,6 +3,7 @@
  * test, the manual zones). Each writer merges only its own keys with a single UPDATE in SQL, so two concurrent
  * saves of different keys never overwrite each other (no read-modify-write in the server).
  */
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { eq, sql, type SQL } from "drizzle-orm";
 import { swimmerProfiles } from "../../drizzle/schema";
 import { getDb } from "../db";
@@ -37,7 +38,7 @@ export async function mergeSwimmerPreferences(
   remove: string[] = [],
 ): Promise<boolean> {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
   const updated = await db
     .update(swimmerProfiles)
     .set({ preferences: preferencesMergeSql(patch, remove), updatedAt: new Date() })

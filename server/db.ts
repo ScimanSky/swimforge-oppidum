@@ -1,3 +1,4 @@
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { eq, desc, and, gte, lte, sql, getTableColumns } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
@@ -199,7 +200,7 @@ export async function getDb() {
 export async function registerUser(email: string, password: string, name?: string): Promise<{ success: boolean; user?: User; error?: string }> {
   const db = await getDb();
   if (!db) {
-    return { success: false, error: "Database not available" };
+    return { success: false, error: DB_UNAVAILABLE_ERR_MSG };
   }
 
   try {
@@ -251,7 +252,7 @@ export async function registerUser(email: string, password: string, name?: strin
 export async function loginUser(email: string, password: string): Promise<{ success: boolean; user?: User; error?: string }> {
   const db = await getDb();
   if (!db) {
-    return { success: false, error: "Database not available" };
+    return { success: false, error: DB_UNAVAILABLE_ERR_MSG };
   }
 
   try {
@@ -948,7 +949,7 @@ export async function createOAuthUser(data: {
 }): Promise<{ success: boolean; user?: User; error?: string }> {
   const db = await getDb();
   if (!db) {
-    return { success: false, error: "Database not available" };
+    return { success: false, error: DB_UNAVAILABLE_ERR_MSG };
   }
 
   try {
@@ -1031,7 +1032,7 @@ export async function incrementSessionTokenVersion(userId: number): Promise<void
 export async function exportUserData(userId: number) {
   const db = await getDb();
   if (!db) {
-    throw new Error("Database not available");
+    throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
 
   const [
@@ -1128,7 +1129,7 @@ export async function exportUserData(userId: number) {
 export async function deleteUserAccount(userId: number): Promise<{ id: number; email: string; name: string | null; openId: string | null } | null> {
   const db = await getDb();
   if (!db) {
-    throw new Error("Database not available");
+    throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
 
   const userResult = await db.execute(sql`

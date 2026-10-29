@@ -14,6 +14,8 @@ vi.mock("../lib/ai-rate-limit", () => ({
   AI_RATE_LIMIT_MESSAGE: "Troppe richieste al coach AI. Riprova tra un'ora.",
 }));
 
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
+import { AppError } from "../lib/errors";
 import { aiCoachRouter } from "./admin.router";
 
 type AuthenticatedUser = NonNullable<TrpcContext["user"]>;
@@ -72,7 +74,7 @@ describe("aiCoach.generateWorkouts preconditions", () => {
 
   it("throws PRECONDITION_FAILED for users with <3 swimming activities", async () => {
     generateBothWorkoutsMock.mockRejectedValue(
-      new Error("Servono almeno 3 attività di nuoto sincronizzate per generare i workout AI.")
+      new AppError("Servono almeno 3 attività di nuoto sincronizzate per generare i workout AI.", "PRECONDITION_FAILED")
     );
 
     const caller = aiCoachRouter.createCaller(createAuthContext());
@@ -83,16 +85,13 @@ describe("aiCoach.generateWorkouts preconditions", () => {
     });
   });
 
-  it("throws PRECONDITION_FAILED when cooldown is active", async () => {
-    generateBothWorkoutsMock.mockRejectedValue(
-      new Error("Workout generation is on cooldown until 2026-03-10T09:00:00.000Z")
-    );
+  it("throws PRECONDITION_FAILED when cooldown is active, with the Italian message as the toast", async () => {
+    const message = "Potrai generare nuovi allenamenti dal 10 marzo alle 10:00.";
+    generateBothWorkoutsMock.mockRejectedValue(new AppError(message, "PRECONDITION_FAILED"));
 
     const caller = aiCoachRouter.createCaller(createAuthContext());
 
-    await expect(caller.generateWorkouts()).rejects.toMatchObject({
-      code: "PRECONDITION_FAILED",
-    });
+    await expect(caller.generateWorkouts()).rejects.toMatchObject({ code: "PRECONDITION_FAILED", message });
   });
 
   it("over 5 requests an hour: TOO_MANY_REQUESTS in Italian, without generating", async () => {
@@ -105,5 +104,25 @@ describe("aiCoach.generateWorkouts preconditions", () => {
     });
     expect(consumeMock).toHaveBeenCalledWith(42);
     expect(generateBothWorkoutsMock).not.toHaveBeenCalled();
+  });
+
+  it("database down: INTERNAL_SERVER_ERROR with the Italian message", async () => {
+    generateBothWorkoutsMock.mockRejectedValue(new Error(DB_UNAVAILABLE_ERR_MSG));
+    const caller = aiCoachRouter.createCaller(createAuthContext());
+
+    await expect(caller.generateWorkouts()).rejects.toMatchObject({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Servizio momentaneamente non disponibile, riprova tra poco.",
+    });
+  });
+
+  it("any other failure: a generic Italian message, never the raw error", async () => {
+    generateBothWorkoutsMock.mockRejectedValue(new Error('relation "ai_coach_workouts" does not exist'));
+    const caller = aiCoachRouter.createCaller(createAuthContext());
+
+    await expect(caller.generateWorkouts()).rejects.toMatchObject({
+      code: "INTERNAL_SERVER_ERROR",
+      message: "Generazione degli allenamenti non riuscita, riprova più tardi.",
+    });
   });
 });

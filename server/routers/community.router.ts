@@ -1,3 +1,4 @@
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import {
     protectedProcedure, router, z,
     TRPCError,
@@ -182,7 +183,7 @@ async function requirePostReadable(userId: number, postId: number) {
     const { sql } = await import("drizzle-orm");
     const db = await getDb();
     if (!db) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: DB_UNAVAILABLE_ERR_MSG });
     }
 
     const postResult = await db.execute(sql`
@@ -227,7 +228,7 @@ export const communityRouter = router({
             const { getDb } = await import("../db");
             const { sql } = await import("drizzle-orm");
             const db = await getDb();
-            if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+            if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: DB_UNAVAILABLE_ERR_MSG });
 
             const result = await db.execute(sql`
                 SELECT
@@ -513,7 +514,7 @@ export const communityRouter = router({
         .mutation(async ({ ctx, input }) => {
             const { getDb } = await import("../db");
             const db = await getDb();
-            if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database not available" });
+            if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: DB_UNAVAILABLE_ERR_MSG });
 
             const content = input.content?.trim() ?? null;
             const mediaUrls = normalizeMediaUrls(input.mediaUrls, input.mediaUrl ?? null);

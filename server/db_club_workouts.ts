@@ -1,3 +1,4 @@
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { clubPoolWorkoutRuns, clubPoolWorkouts, communityClubMembers } from "../drizzle/schema";
 import { getDb } from "./db";
@@ -9,7 +10,7 @@ const COOLDOWN_SOURCE_STATUSES = ["success", "partial"] as const;
 
 async function requireDb() {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
   return db;
 }
 

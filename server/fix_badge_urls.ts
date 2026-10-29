@@ -1,3 +1,4 @@
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { getDb } from "./db";
 import { sql } from "drizzle-orm";
 import { logger } from "./middleware/logger";
@@ -6,7 +7,7 @@ export async function fixBadgeUrls() {
   const db = await getDb();
   if (!db) {
     logger.error("Database not available");
-    return { success: false, error: "Database not available" };
+    return { success: false, error: DB_UNAVAILABLE_ERR_MSG };
   }
 
   try {

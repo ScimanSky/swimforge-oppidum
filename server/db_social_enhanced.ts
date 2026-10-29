@@ -10,6 +10,7 @@
  * - Reazioni avanzate ai post
  */
 
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { getDb } from "./db"
 import { 
   clubEvents, 
@@ -32,7 +33,7 @@ type DbClient = NonNullable<Awaited<ReturnType<typeof getDb>>>
 
 async function requireDb(): Promise<DbClient> {
   const db = await getDb()
-  if (!db) throw new Error("Database not available")
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG)
   return db
 }
 

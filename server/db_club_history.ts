@@ -1,3 +1,4 @@
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { and, eq, sql } from "drizzle-orm";
 import {
   clubHistoricalAthletes,
@@ -67,7 +68,7 @@ function appendError(counters: UpsertCounters, error: ImportErrorRecord): void {
 
 async function requireDb() {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
   return db;
 }
 

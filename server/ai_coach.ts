@@ -3,6 +3,7 @@
  * Generates personalized swimming workouts (pool and dryland) using Google Gemini AI
  */
 
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getDb } from "./db";
 import { aiCoachWorkouts, swimmerProfiles, swimmingActivities } from "../drizzle/schema";
@@ -10,6 +11,7 @@ import { eq, and, gt, gte, desc, sql } from "drizzle-orm";
 import { logger } from "./middleware/logger";
 import { ENV } from "./_core/env";
 import { withErrorHandling } from "./lib/withErrorHandling";
+import { AppError } from "./lib/errors";
 import { config } from "./config";
 import { getSwimMetrics } from "./swim_metrics";
 import {
@@ -194,7 +196,7 @@ export interface WorkoutsResponse {
 async function getUserSwimmingActivityCount(userId: number): Promise<number> {
   const db = await getDb();
   if (!db) {
-    throw new Error("Database not available");
+    throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
 
   const result = await db
@@ -213,7 +215,7 @@ async function getUserSwimmingActivityCount(userId: number): Promise<number> {
 export async function getExistingWorkouts(userId: number): Promise<WorkoutsResponse> {
   const db = await getDb();
   if (!db) {
-    throw new Error("Database not available");
+    throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
   const activityCount = await getUserSwimmingActivityCount(userId);
   const hasMinimumActivities = activityCount >= MIN_SWIMMING_ACTIVITIES_FOR_GENERATION;
@@ -261,17 +263,33 @@ export async function getExistingWorkouts(userId: number): Promise<WorkoutsRespo
   };
 }
 
+const ROME_DAY_MONTH = new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", day: "numeric", month: "long" });
+const ROME_TIME = new Intl.DateTimeFormat("it-IT", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+/**
+ * «Potrai generare nuovi allenamenti dal 5 novembre alle 18:30.» (Rome time): the end of the
+ * cooldown, shown as the toast of «Genera». «dall'8», «dall'11», «dal 1°».
+ */
+export function workoutCooldownMessage(end: Date): string {
+  const [day, ...month] = ROME_DAY_MONTH.format(end).split(" ");
+  const from = day === "1" ? "dal 1°" : day === "8" || day === "11" ? `dall'${day}` : `dal ${day}`;
+  return `Potrai generare nuovi allenamenti ${from} ${month.join(" ")} alle ${ROME_TIME.format(end)}.`;
+}
+
 /**
  * Generate both pool + dryland workouts (7-day cooldown)
  */
 export async function generateBothWorkouts(userId: number): Promise<WorkoutsResponse> {
   const db = await getDb();
   if (!db) {
-    throw new Error("Database not available");
+    throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
   const activityCount = await getUserSwimmingActivityCount(userId);
   if (activityCount < MIN_SWIMMING_ACTIVITIES_FOR_GENERATION) {
-    throw new Error(`Servono almeno ${MIN_SWIMMING_ACTIVITIES_FOR_GENERATION} attività di nuoto sincronizzate per generare i workout AI.`);
+    throw new AppError(
+      `Servono almeno ${MIN_SWIMMING_ACTIVITIES_FOR_GENERATION} attività di nuoto sincronizzate per generare i workout AI.`,
+      "PRECONDITION_FAILED",
+    );
   }
 
   // Check cooldown: find the most recent generation
@@ -285,7 +303,7 @@ export async function generateBothWorkouts(userId: number): Promise<WorkoutsResp
   if (latest.length > 0) {
     const cooldownEnd = new Date(latest[0].generatedAt.getTime() + COOLDOWN_DAYS * 24 * 60 * 60 * 1000);
     if (cooldownEnd > new Date()) {
-      throw new Error(`Workout generation is on cooldown until ${cooldownEnd.toISOString()}`);
+      throw new AppError(workoutCooldownMessage(cooldownEnd), "PRECONDITION_FAILED");
     }
   }
 
@@ -463,7 +481,7 @@ async function generateText(prompt: string): Promise<string> {
 async function fetchUserStats(userId: number): Promise<UserStatsForCoach> {
   const db = await getDb();
   if (!db) {
-    throw new Error("Database not available");
+    throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
 
   // Get swimmer profile

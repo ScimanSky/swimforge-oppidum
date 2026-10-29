@@ -1,3 +1,4 @@
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { deleteFromIfExists } from "./lib/relation-exists";
 import { deviceTokens, swimmerProfiles } from "../drizzle/schema";
@@ -7,7 +8,7 @@ export type DevicePlatform = "android" | "ios" | "web";
 
 async function requireDb() {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
   return db;
 }
 

@@ -4,6 +4,7 @@
  * week of all the history for the current and the best streak (five queries in parallel), then
  * computes everything (cached 1 hour).
  */
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
 import { and, asc, between, eq, gte, sql } from "drizzle-orm";
 import type { SwimMetrics } from "@shared/swimMetrics";
 import { addDaysToKey, arePaceZoneBoundsValid, dayKey } from "@shared/swimMetrics";
@@ -72,7 +73,7 @@ const romeWeekStart = sql<string>`to_char(date_trunc('week', (${swimmingActiviti
 
 async function loadInput(userId: number, now: Date): Promise<SwimMetricsInput> {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
 
   // One day of margin on each window: the compute keeps whole Rome days.
   const since = new Date(now.getTime() - (HISTORY_DAYS + 1) * DAY_MS);
@@ -196,7 +197,7 @@ export const STROKE_INDEX_WINDOW_DAYS = 118;
  */
 export async function loadStrokeIndexProgress(userId: number, now: Date = new Date()): Promise<EfficiencySummary> {
   const db = await getDb();
-  if (!db) throw new Error("Database not available");
+  if (!db) throw new Error(DB_UNAVAILABLE_ERR_MSG);
   const since = new Date(now.getTime() - (STROKE_INDEX_WINDOW_DAYS + 1) * DAY_MS);
   const poolSwims = and(
     eq(swimmingActivities.userId, userId),

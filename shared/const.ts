@@ -5,3 +5,5 @@ export const AXIOS_TIMEOUT_MS = 30_000;
 export const UNAUTHED_ERR_MSG = 'Please login (10001)';
 export const NOT_ADMIN_ERR_MSG = 'You do not have required permission (10002)';
 export const CSRF_ERR_MSG = 'CSRF validation failed';
+/** The database is unreachable: shown to the user (Italian), whatever the error code. */
+export const DB_UNAVAILABLE_ERR_MSG = "Servizio momentaneamente non disponibile, riprova tra poco.";

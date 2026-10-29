@@ -3,7 +3,10 @@ import {
     TRPCError,
     listPostReports, updatePostReportStatus,
     getPendingActivityInsights, listActivityInsights, markActivityInsightSeen,
+    logger,
 } from "./_shared";
+import { DB_UNAVAILABLE_ERR_MSG } from "@shared/const";
+import { AppError } from "../lib/errors";
 import { cssTestSchema } from "../swim_metrics/css-test";
 import { paceZonesSchema } from "../swim_metrics/pace-zones";
 
@@ -275,14 +278,20 @@ export const aiCoachRouter = router({
             try {
                 return await generateBothWorkouts(ctx.user.id);
             } catch (error) {
-                const message = error instanceof Error ? error.message : "Generazione workout non riuscita";
-                if (
-                    message.includes("almeno 3 attività di nuoto sincronizzate") ||
-                    message.includes("cooldown")
-                ) {
-                    throw new TRPCError({ code: "PRECONDITION_FAILED", message });
+                // Preconditions (fewer than 3 swims, cooldown) carry their code and Italian text.
+                if (error instanceof AppError) {
+                    throw new TRPCError({ code: error.code, message: error.message });
                 }
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+                const message = error instanceof Error ? error.message : String(error);
+                if (message === DB_UNAVAILABLE_ERR_MSG) {
+                    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message });
+                }
+                logger.error("[AI Coach] Workout generation failed", {
+                    event: "ai_coach:generate_workouts_failed",
+                    userId: ctx.user.id,
+                    message,
+                });
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Generazione degli allenamenti non riuscita, riprova più tardi." });
             }
         }),
 
