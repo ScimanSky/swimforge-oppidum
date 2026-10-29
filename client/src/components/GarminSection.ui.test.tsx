@@ -10,6 +10,8 @@ const state = vi.hoisted(() => ({
   syncPending: false,
   invalidateActivities: vi.fn(),
   invalidateProfile: vi.fn(),
+  invalidateStatistics: vi.fn(async () => {}),
+  invalidateRecords: vi.fn(async () => {}),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
   toastInfo: vi.fn(),
@@ -43,6 +45,8 @@ vi.mock("@/lib/trpc", () => {
         garmin: { status: { invalidate: state.invalidateStatus } },
         activities: { list: { invalidate: state.invalidateActivities } },
         profile: { get: { invalidate: state.invalidateProfile } },
+        statistics: { invalidate: state.invalidateStatistics },
+        records: { invalidate: state.invalidateRecords },
       }),
       garmin: {
         status: { useQuery: () => ({ ...state.status, refetch: state.refetchStatus }) },
@@ -135,6 +139,9 @@ describe("GarminSection sync count", () => {
     expect(state.toastSuccess).toHaveBeenCalledWith("Nuovi PB rilevati: 2");
     expect(state.invalidateActivities).toHaveBeenCalled();
     expect(state.invalidateProfile).toHaveBeenCalled();
+    // The swim metrics (Statistiche, Coach, the profile's streak) and the records are not stale.
+    expect(state.invalidateStatistics).toHaveBeenCalled();
+    expect(state.invalidateRecords).toHaveBeenCalled();
   });
 
   it("says there is nothing new when the sync imports no swims", () => {

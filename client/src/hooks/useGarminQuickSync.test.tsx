@@ -18,6 +18,8 @@ const state = vi.hoisted(() => ({
   invalidateActivities: vi.fn(),
   invalidateProfile: vi.fn(),
   invalidateInsights: vi.fn(),
+  invalidateStatistics: vi.fn(async () => {}),
+  invalidateRecords: vi.fn(async () => {}),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
   toastLoading: vi.fn(),
@@ -39,6 +41,8 @@ vi.mock("@/lib/trpc", () => ({
       activities: { list: { invalidate: state.invalidateActivities } },
       profile: { get: { invalidate: state.invalidateProfile } },
       activityInsights: { list: { invalidate: state.invalidateInsights } },
+      statistics: { invalidate: state.invalidateStatistics },
+      records: { invalidate: state.invalidateRecords },
     }),
     garmin: {
       status: {
@@ -188,6 +192,9 @@ describe("useGarminQuickSync", () => {
     expect(state.invalidateProfile).toHaveBeenCalled();
     // The coach summary of the new swim (Today).
     expect(state.invalidateInsights).toHaveBeenCalled();
+    // The swim metrics (Statistiche, Coach, the profile's streak) and the records are not stale.
+    expect(state.invalidateStatistics).toHaveBeenCalled();
+    expect(state.invalidateRecords).toHaveBeenCalled();
 
     state.syncOptions.onSuccess({ error: "Sessione Garmin scaduta" });
     expect(state.toastError).toHaveBeenCalledWith("Sessione Garmin scaduta", { id: GARMIN_SYNC_TOAST_ID });

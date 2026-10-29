@@ -131,6 +131,9 @@ export default function GarminSection({ garminConnected, headingRef }: GarminSec
         }
         utils.activities.list.invalidate();
         utils.profile.get.invalidate();
+        // Swim metrics (Statistiche, Coach, the profile's streak) and personal records.
+        void utils.statistics.invalidate();
+        void utils.records.invalidate();
       }
     },
     onError: (error) => {

@@ -58,6 +58,9 @@ export function AutoSync() {
             void utils.badges.progress.invalidate();
             void utils.badges.getUserAchievementBadges.invalidate();
             void utils.badges.checkNewBadges.invalidate();
+            // Swim metrics (Statistiche, Coach, the profile's streak) and personal records.
+            void utils.statistics.invalidate();
+            void utils.records.invalidate();
           },
           onError: () => {
             toast.error("Errore nella sincronizzazione", { id: toastId });

@@ -65,6 +65,9 @@ export function useGarminQuickSync({
       utils.profile.get.invalidate();
       // The coach summary of the new swim (Today).
       utils.activityInsights.list.invalidate();
+      // Swim metrics (Statistiche, Coach, the profile's streak) and personal records.
+      void utils.statistics.invalidate();
+      void utils.records.invalidate();
     },
     onError: error => {
       toast.error("Errore nella sincronizzazione: " + error.message, {
