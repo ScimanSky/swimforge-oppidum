@@ -84,7 +84,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/onboarding/OnboardingFlow.tsx",
     "components/onboarding/OnboardingIdentitySetup.tsx",
     "index.css",
-    "pages/ReportPost.tsx",
   ],
   "variante-neon": [
     "components/CookieBanner.tsx",
@@ -96,7 +95,6 @@ const PENDING: Record<Rule, string[]> = {
     "pages/ForgotPassword.tsx",
     "pages/Login.tsx",
     "pages/Register.tsx",
-    "pages/ReportPost.tsx",
     "pages/ResetPassword.tsx",
     "pages/Settings.tsx",
   ],
@@ -132,7 +130,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/onboarding/OnboardingWelcomeComposition.tsx",
     "pages/AdminReports.tsx",
     "pages/NotFound.tsx",
-    "pages/ReportPost.tsx",
     "pages/Settings.tsx",
   ],
   "colore-fisso": [
