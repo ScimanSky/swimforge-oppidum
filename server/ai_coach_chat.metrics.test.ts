@@ -64,6 +64,19 @@ describe("coach chat context", () => {
     for (const name of OLD_NAMES) expect(reply.message).not.toMatch(name);
   });
 
+  it("rounds the pace before splitting minutes and seconds (119.6 s is 2:00, never 1:60)", async () => {
+    const metrics = sampleSwimMetrics();
+    metrics.css.current = { ...metrics.css.current!, paceSecondsPer100: 119.6 };
+    h.getSwimMetrics.mockResolvedValue(metrics);
+    h.getActivities.mockResolvedValue([
+      { activityDate: new Date("2026-10-27T08:00:00Z"), distanceMeters: 2000, durationSeconds: 2400, avgPacePer100m: 59.7, avgSwolf: 35 },
+    ]);
+    const reply = await generateCoachChatReply(7, []);
+    expect(reply.message).toContain("Passo soglia 2:00/100m");
+    expect(reply.message).toContain("passo 1:00/100m");
+    expect(reply.message).not.toMatch(/:60/);
+  });
+
   it("the rule-based reply suggests recovery with a high load", async () => {
     const metrics = sampleSwimMetrics();
     metrics.load.today = { ctl: 30, atl: 65, tsb: -35, reading: "carico_alto" };

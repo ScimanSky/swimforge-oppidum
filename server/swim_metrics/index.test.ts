@@ -1,44 +1,63 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { garminActivityLaps, swimmerProfiles, swimmingActivities } from "../../drizzle/schema";
 
-// Fake db: each select resolves to the rows of the table it reads. The streak query is the one
-// that selects only the activity dates.
+// Fake db: each select resolves to the rows of the table it reads (and of the columns it selects).
 const m = vi.hoisted(() => {
   const state = {
-    activities: [] as any[],
-    laps: [] as any[],
-    profile: [] as any[],
     tables: [] as unknown[],
+    selections: [] as Array<Record<string, unknown>>,
+    grouped: [] as boolean[],
+    /** Selects issued when the first query resolved: 5 means all ran in parallel. */
+    selectsAtFirstResolve: null as number | null,
     rowsFor: (_table: unknown, _selection: Record<string, unknown>): unknown[] => [],
   };
   const db = {
+    deleted: [] as unknown[],
+    delete: vi.fn((table: unknown) => {
+      db.deleted.push(table);
+      return { where: async () => undefined };
+    }),
     select: vi.fn((selection: Record<string, unknown>) => {
       let table: unknown;
+      const index = state.selections.length;
+      state.selections.push(selection);
+      state.grouped.push(false);
       const chain: any = {
         from: (t: unknown) => {
           table = t;
           state.tables.push(t);
           return chain;
         },
+        innerJoin: () => chain,
         where: () => chain,
         orderBy: () => chain,
+        groupBy: () => {
+          state.grouped[index] = true;
+          return chain;
+        },
         limit: () => chain,
         then: (resolve: (rows: unknown[]) => unknown, reject: (e: unknown) => unknown) =>
-          Promise.resolve().then(() => state.rowsFor(table, selection)).then(resolve, reject),
+          Promise.resolve()
+            .then(() => {
+              state.selectsAtFirstResolve ??= state.selections.length;
+              return state.rowsFor(table, selection);
+            })
+            .then(resolve, reject),
       };
       return chain;
     }),
   };
-  return { state, db, getOrSetCached: vi.fn() };
+  return { state, db, getOrSetCached: vi.fn(), deleteCached: vi.fn(async () => {}) };
 });
 
 vi.mock("../db", () => ({ getDb: async () => m.db }));
 vi.mock("../lib/cache", async () => {
   const actual = await vi.importActual<typeof import("../lib/cache")>("../lib/cache");
-  return { ...actual, getOrSetCached: m.getOrSetCached };
+  return { ...actual, getOrSetCached: m.getOrSetCached, deleteCached: m.deleteCached };
 });
 
-import { getSwimMetrics, parseCssTest } from "./index";
+import { aiInsightsCache } from "../../drizzle/schema";
+import { getSwimMetrics, invalidateSwimMetrics, loadStrokeIndexProgress, parseCssTest } from "./index";
 
 let lapId = 0;
 function laps(activityId: number, specs: Array<[number, number, string | null, number | null, number | null]>) {
@@ -89,14 +108,32 @@ const LAPS = [
   ]),
 ];
 
+// The light CSS query (300 days): the active laps with their swim's day and pool.
+const ACTIVITY_BY_ID = new Map(ACTIVITIES.map((a) => [a.id, a]));
+const OLD_CSS_LAPS = [
+  // 20/03: older than the 180 days, inside the 90-day window of the end of May.
+  { activityDate: new Date("2026-03-20T17:00:00Z"), poolLengthMeters: 25, isOpenWater: false, distanceMeters: 200, durationSeconds: 170, movingDurationSeconds: 170, strokeType: "FREESTYLE" },
+  { activityDate: new Date("2026-03-20T17:00:00Z"), poolLengthMeters: 25, isOpenWater: false, distanceMeters: 400, durationSeconds: 360, movingDurationSeconds: 360, strokeType: "FREESTYLE" },
+];
+const cssLapRows = () => [
+  ...OLD_CSS_LAPS,
+  ...LAPS.filter((lap) => lap.distanceMeters >= 177 && !ACTIVITY_BY_ID.get(lap.activityId)!.isOpenWater).map((lap) => {
+    const a = ACTIVITY_BY_ID.get(lap.activityId)!;
+    return { activityDate: a.activityDate, poolLengthMeters: a.poolLengthMeters, isOpenWater: a.isOpenWater, distanceMeters: lap.distanceMeters, durationSeconds: lap.durationSeconds, movingDurationSeconds: lap.movingDurationSeconds, strokeType: lap.strokeType };
+  }),
+];
+// Swims per Rome week, as the grouped streak query returns them.
+const STREAK_WEEKS = [
+  { weekStart: "2026-10-05", swims: 2 },
+  { weekStart: "2026-10-12", swims: 2 },
+  { weekStart: "2026-10-19", swims: 3 },
+  { weekStart: "2026-10-26", swims: 1 },
+];
+
 function useData(preferences: unknown = {}) {
   m.state.rowsFor = (table, selection) => {
-    if (table === swimmingActivities) {
-      return Object.keys(selection).length === 1
-        ? ACTIVITIES.map((a) => ({ activityDate: a.activityDate }))
-        : ACTIVITIES;
-    }
-    if (table === garminActivityLaps) return LAPS;
+    if (table === swimmingActivities) return "weekStart" in selection ? STREAK_WEEKS : ACTIVITIES;
+    if (table === garminActivityLaps) return "activityDate" in selection ? cssLapRows() : LAPS;
     if (table === swimmerProfiles) return [{ preferences }];
     return [];
   };
@@ -106,19 +143,36 @@ describe("getSwimMetrics", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     m.state.tables.length = 0;
+    m.state.selections.length = 0;
+    m.state.grouped.length = 0;
+    m.state.selectsAtFirstResolve = null;
     m.getOrSetCached.mockImplementation((_key: string, fetcher: () => Promise<unknown>) => fetcher());
   });
 
-  it("caches per user for one hour", async () => {
+  it("caches per user and Rome day for one hour, so today's load rolls at midnight", async () => {
     useData();
     await getSwimMetrics(42, NOW);
-    expect(m.getOrSetCached).toHaveBeenCalledWith("swim-metrics:v1:42", expect.any(Function), 3600);
+    expect(m.getOrSetCached).toHaveBeenCalledWith("swim-metrics:v2:42:2026-10-29", expect.any(Function), 3600);
+    // 23:30Z on 29/10 is already 30/10 in Rome.
+    await getSwimMetrics(42, new Date("2026-10-29T23:30:00Z"));
+    expect(m.getOrSetCached).toHaveBeenLastCalledWith("swim-metrics:v2:42:2026-10-30", expect.any(Function), 3600);
   });
 
-  it("reads swims, laps, profile and streak dates", async () => {
+  it("invalidation drops today's cached metrics and the AI insights rows", async () => {
+    m.db.deleted.length = 0;
+    await invalidateSwimMetrics(42, NOW);
+    expect(m.deleteCached).toHaveBeenCalledWith("swim-metrics:v2:42:2026-10-29");
+    expect(m.db.deleted).toEqual([aiInsightsCache]);
+  });
+
+  it("reads swims, laps, profile, CSS laps and swims per week with independent queries in parallel", async () => {
     useData();
     await getSwimMetrics(42, NOW);
-    expect(m.state.tables).toEqual([swimmingActivities, garminActivityLaps, swimmerProfiles, swimmingActivities]);
+    expect(m.state.tables).toEqual([swimmingActivities, garminActivityLaps, swimmerProfiles, garminActivityLaps, swimmingActivities]);
+    expect(m.state.selectsAtFirstResolve).toBe(5);
+    // The streak is one grouped count per Rome week, not two years of dates.
+    expect(Object.keys(m.state.selections[4]).sort()).toEqual(["swims", "weekStart"]);
+    expect(m.state.grouped).toEqual([false, false, false, false, true]);
   });
 
   it("computes the six metrics from 3 swims", async () => {
@@ -140,19 +194,25 @@ describe("getSwimMetrics", () => {
     expect(metrics.css.history[5].month).toBe("2026-10");
     expect(metrics.css.history[5].paceSecondsPer100).toBeCloseTo(104.3, 1);
     expect(metrics.css.history[4].paceSecondsPer100).toBeNull();
+    // May's window (from 03/03) is complete thanks to the 300 days of CSS laps: 200 / 190 m/s.
+    expect(metrics.css.history[0]).toEqual({ month: "2026-05", paceSecondsPer100: 95 });
     expect(metrics.css.missing).toBeNull();
 
     // Per swim: the pool swim of 6/10 has zones, SI and a set; open water only load.
     const [a, , ow] = metrics.sessions;
     expect(a).toMatchObject({ date: "2026-10-06", poolLengthMeters: 25, hasLaps: true, isOpenWater: false });
     expect(a.movingSeconds).toBe(380 + 175 + REPS_A.reduce((s, t) => s + t, 0) + 230);
-    expect(a.zoneMeters!.reduce((s, z) => s + z, 0)).toBe(1600);
+    expect(a.zoneMeters!.reduce((s, z) => s + z, 0)).toBe(1400); // the 200 backstroke is not zoned
+    expect(a.unclassifiedMeters).toBe(200);
+    expect(a.swimDistanceMeters).toBe(1600);
+    expect(a.loadEstimated).toBe(false);
     expect(a.intensityFactor).toBeGreaterThan(0.9);
     expect(a.stss).toBeGreaterThan(0);
     expect(a.strokeIndex).toBeGreaterThan(2);
-    expect(a.pacingCv).toBe(1.4); // the 8×100: SD 1.32 s on 93.6 s
+    expect(a.pacingCv).toBe(1.5); // the 8×100: sample SD 1.41 s on 93.6 s
     expect(ow).toMatchObject({ isOpenWater: true, hasLaps: false, poolLengthMeters: null, zoneMeters: null, strokeIndex: null, pacingCv: null });
     expect(ow.stss).toBeGreaterThan(0);
+    expect(ow.loadEstimated).toBe(true);
 
     // Load: 90 days, today's reading.
     expect(metrics.load.days).toHaveLength(90);
@@ -162,22 +222,33 @@ describe("getSwimMetrics", () => {
 
     // Intensity: 8 weeks; the last 28 days hold both pool swims.
     expect(metrics.intensity.weeks).toHaveLength(8);
-    expect(metrics.intensity.last28!.zoneMeters.reduce((s, z) => s + z, 0)).toBe(1600 + 1600);
+    expect(metrics.intensity.last28!.zoneMeters.reduce((s, z) => s + z, 0)).toBe(1400 + 1600);
+    expect(metrics.intensity.last28).toMatchObject({ unclassifiedMeters: 200, coveragePct: 58 }); // 3000 of 5200 m
     const { easyPct, mediumPct, hardPct } = metrics.intensity.last28!;
     expect(easyPct + mediumPct + hardPct).toBe(100);
 
     // Efficiency: 25 m, no baseline yet.
-    expect(metrics.efficiency).toMatchObject({ poolLengthMeters: 25, baseline: null, deltaPct: null });
+    expect(metrics.efficiency).toMatchObject({ poolLengthMeters: 25, baseline: null, deltaPct: null, n28: 2, nBaseline: 0 });
     expect(metrics.efficiency.latest).toBe(metrics.sessions[1].strokeIndex);
     expect(metrics.efficiency.missing).toMatch(/base/);
 
     // Pacing: the 4×200 of 15/10 is the most recent set.
-    expect(metrics.pacing.latestSet).toEqual({ date: "2026-10-15", distanceMeters: 200, stroke: "freestyle", repSeconds: [190, 192, 191, 195] });
+    expect(metrics.pacing.latestSet).toEqual({
+      date: "2026-10-15",
+      distanceMeters: 200,
+      stroke: "freestyle",
+      repSeconds: [190, 192, 191, 195],
+      repDps: [2.38, 2.38, 2.38, 2.38], // 84 cycles every 200
+      dpsDropPct: 0,
+    });
+    // The 8×100 of 06/10 also holds its 42 cycles: no stroke shortening in 28 days.
+    expect(metrics.pacing).toMatchObject({ dpsDrop28: 0 });
     expect(metrics.pacing.cv28).not.toBeNull();
 
     // Volume.
     expect(metrics.volume.weeks).toHaveLength(12);
     expect(metrics.volume.weeks[11]).toEqual({ weekStart: "2026-10-26", km: 2, sessions: 1 });
+    expect(metrics.volume.streakWeeks).toBe(3); // weeks of 5, 12 and 19/10; the current one has 1
   });
 
   it("uses a CSS test of the last 90 days and ignores an expired one", async () => {
@@ -194,11 +265,10 @@ describe("getSwimMetrics", () => {
   it("without swims says what is missing", async () => {
     m.state.rowsFor = (table) => (table === swimmerProfiles ? [{ preferences: null }] : []);
     const metrics = await getSwimMetrics(42, NOW);
-    expect(m.state.tables).not.toContain(garminActivityLaps);
     expect(metrics.sessions).toEqual([]);
     expect(metrics.css.current).toBeNull();
     expect(metrics.css.missing).toBe(
-      "Servono almeno due nuotate continue a stile libero, una fino a 400 m e una da 400 m in su, negli ultimi 90 giorni. Oppure inserisci un test.",
+      "Servono almeno due tratti continui a stile libero in vasca negli ultimi 90 giorni, tra 2 e 30 minuti, uno lungo almeno il doppio dell'altro (es. 200 e 400 m), nuotati a buon ritmo. Oppure inserisci un test.",
     );
     expect(metrics.load).toMatchObject({ today: null, rampPerWeek: null, days: [] });
     expect(metrics.load.missing).toMatch(/passo soglia/);
@@ -224,5 +294,90 @@ describe("parseCssTest", () => {
     expect(parseCssTest({ cssTest: { t200Seconds: 170, t400Seconds: 160, date: "2026-10-20" } })).toBeNull();
     expect(parseCssTest({ cssTest: { t200Seconds: 170, t400Seconds: 360, date: "20/10/2026" } })).toBeNull();
     expect(parseCssTest("{")).toBeNull();
+  });
+});
+
+// The owner: a recreational masters swimmer, out of shape, no CSS test and no Garmin CSS. Best
+// freestyle laps of the last 90 days: 100 in 1:26, 200 in 3:20, 300 in 5:56 (clearly
+// submaximal: slower per 100 m than the 400) and 400 in 6:57.
+describe("getSwimMetrics: the owner's CSS (integration fixture)", () => {
+  const OWNER_SWIMS = [
+    { id: 101, activityDate: new Date("2026-08-20T17:00:00Z"), distanceMeters: 1400, durationSeconds: 1900, poolLengthMeters: 25, isOpenWater: false },
+    { id: 102, activityDate: new Date("2026-09-10T17:00:00Z"), distanceMeters: 1000, durationSeconds: 1300, poolLengthMeters: 25, isOpenWater: false },
+    { id: 103, activityDate: new Date("2026-10-01T17:00:00Z"), distanceMeters: 1200, durationSeconds: 1600, poolLengthMeters: 25, isOpenWater: false },
+    { id: 104, activityDate: new Date("2026-10-22T17:00:00Z"), distanceMeters: 1000, durationSeconds: 1350, poolLengthMeters: 25, isOpenWater: false },
+  ];
+  const rep = (t: number) => [[100, t, "FREESTYLE", 44, 40], [0, 30, null, null, null]] as Array<[number, number, string | null, number | null, number | null]>;
+  const OWNER_LAPS = [
+    ...laps(101, [[400, 417, "FREESTYLE", 180, 44], [0, 90, null, null, null], ...rep(96), ...rep(97), ...rep(99), ...rep(101), [200, 260, "BREASTSTROKE", 60, null], [0, 60, null, null, null], [400, 470, "FREESTYLE", 184, 47]]),
+    ...laps(102, [[200, 200, "FREESTYLE", 88, 43], [0, 60, null, null, null], [300, 356, "FREESTYLE", 138, 49], [0, 60, null, null, null], [100, 86, "FREESTYLE", 40, 38], [0, 120, null, null, null], [400, 480, "FREESTYLE", 186, 48]]),
+    ...laps(103, [[400, 430, "FREESTYLE", 182, 45], [0, 60, null, null, null], [200, 210, "FREESTYLE", 90, 44], [0, 60, null, null, null], ...rep(100), ...rep(102), ...rep(104), [200, 230, "FREESTYLE", 92, 46]]),
+    ...laps(104, [[400, 445, "FREESTYLE", 184, 46], [0, 120, null, null, null], [300, 365, "FREESTYLE", 140, 50], [0, 60, null, null, null], [300, 370, "FREESTYLE", 142, 50]]),
+  ];
+  const byId = new Map(OWNER_SWIMS.map((a) => [a.id, a]));
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    m.getOrSetCached.mockImplementation((_key: string, fetcher: () => Promise<unknown>) => fetcher());
+    m.state.rowsFor = (table, selection) => {
+      if (table === swimmingActivities) return "weekStart" in selection ? [] : OWNER_SWIMS;
+      if (table === garminActivityLaps) {
+        if (!("activityDate" in selection)) return OWNER_LAPS;
+        return OWNER_LAPS.filter((lap) => lap.distanceMeters >= 177).map((lap) => {
+          const a = byId.get(lap.activityId)!;
+          return { activityDate: a.activityDate, poolLengthMeters: 25, isOpenWater: false, distanceMeters: lap.distanceMeters, durationSeconds: lap.durationSeconds, movingDurationSeconds: lap.movingDurationSeconds, strokeType: lap.strokeType };
+        });
+      }
+      if (table === swimmerProfiles) return [{ preferences: { units: "metric" } }];
+      return [];
+    };
+  });
+
+  it("estimates the CSS from the 200 and the 400 at about 1:48.5/100 m, medium confidence", async () => {
+    const metrics = await getSwimMetrics(1, NOW);
+    const css = metrics.css.current!;
+    expect(css.source).toBe("stima");
+    expect(css.confidence).toBe("media");
+    expect(css.paceSecondsPer100).toBe(108.5); // 217 s for the 200 m between the 200 and the 400
+    expect(css.speedMps).toBeCloseTo(200 / 217, 3);
+    expect(css.points.map((p) => [p.distanceMeters, p.seconds, p.date])).toEqual([
+      [200, 200, "2026-09-10"],
+      [400, 417, "2026-08-20"],
+    ]);
+    expect(css.droppedPoints!.map((p) => [p.distanceMeters, p.seconds, p.slowerThan.distanceMeters])).toEqual([[300, 356, 400]]);
+    expect(css.dPrimeMeters).toBeCloseTo(15.7, 1);
+    // The coach reads the zones as paces for this CSS.
+    const { swimMetricsForCoach } = await import("./coach-context");
+    expect(swimMetricsForCoach(metrics)).toContain("Z2 Aerobico 1:58–2:08");
+  });
+});
+
+describe("loadStrokeIndexProgress (for the «Efficienza Suprema» badge)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    m.state.tables.length = 0;
+    m.state.selections.length = 0;
+    m.state.grouped.length = 0;
+  });
+
+  it("reads 118 days of pool swims and their laps, and summarises the Stroke Index like the card", async () => {
+    // 6 baseline swims (40–100 days ago) at SI 2.0, 6 recent swims at SI 2.2 (+10%).
+    const days = [100, 90, 80, 70, 60, 40, 25, 20, 15, 10, 5, 2];
+    const swims = days.map((d, i) => ({
+      id: 200 + i,
+      activityDate: new Date(NOW.getTime() - d * 86_400_000),
+      poolLengthMeters: 25,
+    }));
+    // SI = v × DPS: 100 m in 100 s with 50 cycles = 1 × 2 = 2.0; 100 m in 100/1.1 s with 50 cycles = 2.2.
+    const lapRows = swims.flatMap((s, i) =>
+      laps(s.id, [[100, i < 6 ? 100 : 100 / 1.1, "FREESTYLE", 50, 40], [0, 20, null, null, null], [100, i < 6 ? 100 : 100 / 1.1, "FREESTYLE", 50, 40]]),
+    );
+    m.state.rowsFor = (table) => (table === swimmingActivities ? swims : table === garminActivityLaps ? lapRows : []);
+
+    const summary = await loadStrokeIndexProgress(42, NOW);
+    expect(m.state.tables).toEqual([swimmingActivities, garminActivityLaps]);
+    expect(summary).toMatchObject({ poolLengthMeters: 25, n28: 6, nBaseline: 6 });
+    expect(summary.avg28).toBeCloseTo(2.2, 9);
+    expect(summary.baseline).toBeCloseTo(2.0, 9);
   });
 });

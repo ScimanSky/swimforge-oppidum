@@ -143,7 +143,7 @@ async function fixDatabase() {
           ('Velocista', 'Nuota 100m con un pace inferiore a 1:30/100m (90 secondi)', '/badges_new/sprinter.png', 'single_activity', '{"metric": "avg_pace_per_100m", "operator": "<=", "value": 90}'),
           ('Costanza di Ferro', 'Nuota almeno 3 volte a settimana per 4 settimane consecutive', '/badges_new/consistency.png', 'consistency', '{"min_activities_per_week": 3, "consecutive_weeks": 4}'),
           ('Cardio King', 'Raggiungi una frequenza cardiaca massima di 180 bpm', '/badges_new/cardio.png', 'single_activity', '{"metric": "max_heart_rate", "operator": ">=", "value": 180}'),
-          ('Efficienza Suprema', 'Raggiungi un SEI (Swimming Efficiency Index) di 85 o superiore', '/badges_new/efficiency.png', 'metric_peak', '{"metric": "sei", "operator": ">=", "value": 85}'),
+          ('Efficienza Suprema', 'Il tuo Stroke Index (velocità × distanza per bracciata) delle ultime 4 settimane è almeno il 10% sopra la tua media dei 3 mesi precedenti, nella stessa vasca', '/badges_new/efficiency.png', 'stroke_index_gain', '{"metric": "stroke_index", "min_gain_pct": 10, "min_sessions_28d": 6, "min_sessions_baseline": 6}'),
           ('Primo Tuffo', 'Completa la tua prima attività di nuoto', '/badges_new/first_swim.png', 'single_activity', '{"metric": "distance", "operator": ">", "value": 0}')
           ON CONFLICT DO NOTHING
         `);

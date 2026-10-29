@@ -8,8 +8,8 @@
 import { getDb } from "./db";
 import { achievementBadgeDefinitions, userAchievementBadges, swimmingActivities, swimmerProfiles } from "../drizzle/schema";
 import { eq, and, gte, gt, sql } from "drizzle-orm";
-import { legacyBadgeSei, legacyBadgeSer, legacyBadgeTci } from "./lib/legacy-badge-metrics";
 import { logger } from "./middleware/logger";
+import { loadStrokeIndexProgress } from "./swim_metrics";
 
 interface BadgeCriteria {
   metric: string;
@@ -17,6 +17,40 @@ interface BadgeCriteria {
   value: number;
   min_activities_per_week?: number;
   consecutive_weeks?: number;
+}
+
+/**
+ * «stroke_index_gain» (e.g. «Efficienza Suprema»): the median Stroke Index of the last 28 days is
+ * at least `min_gain_pct` above the median of the 90 days before, in the same pool length, with
+ * enough swims in both windows. The summary is the efficiency card's (same guards).
+ */
+export interface StrokeIndexGainCriteria {
+  metric?: string;
+  min_gain_pct?: number;
+  min_sessions_28d?: number;
+  min_sessions_baseline?: number;
+}
+
+const STROKE_INDEX_GAIN_DEFAULTS = { minGainPct: 10, minSessions28d: 6, minSessionsBaseline: 6 } as const;
+
+/** Scores of the removed invented metrics: criteria naming them never award a badge again. */
+const RETIRED_METRICS = new Set(["sei", "ser", "tci"]);
+
+type StrokeIndexSummary = {
+  avg28: number | null;
+  baseline: number | null;
+  n28?: number;
+  nBaseline?: number;
+};
+
+export function strokeIndexGainMet(summary: StrokeIndexSummary, criteria: StrokeIndexGainCriteria | null | undefined): boolean {
+  const minGainPct = criteria?.min_gain_pct ?? STROKE_INDEX_GAIN_DEFAULTS.minGainPct;
+  const min28 = criteria?.min_sessions_28d ?? STROKE_INDEX_GAIN_DEFAULTS.minSessions28d;
+  const minBaseline = criteria?.min_sessions_baseline ?? STROKE_INDEX_GAIN_DEFAULTS.minSessionsBaseline;
+  if (summary.avg28 === null || summary.baseline === null || !(summary.baseline > 0)) return false;
+  if ((summary.n28 ?? 0) < min28 || (summary.nBaseline ?? 0) < minBaseline) return false;
+  // Small tolerance: exactly +10% counts.
+  return summary.avg28 >= summary.baseline * (1 + minGainPct / 100) - 1e-9;
 }
 
 type SwimmerProfileRow = typeof swimmerProfiles.$inferSelect;
@@ -56,12 +90,6 @@ export async function checkAndAwardBadges(userId: number): Promise<string[]> {
 
     const ownedBadgeIds = new Set(userOwnedBadges.map(b => b.badgeId));
 
-    // Get user's activities
-    const userActivities = await db
-      .select()
-      .from(swimmingActivities)
-      .where(eq(swimmingActivities.userId, userId));
-
     // Get user's profile
     const profiles = await db
       .select()
@@ -81,6 +109,7 @@ export async function checkAndAwardBadges(userId: number): Promise<string[]> {
     const metricPeakBadges: typeof pendingBadges = [];
     const singleActivityBadges: typeof pendingBadges = [];
     const consistencyBadges: typeof pendingBadges = [];
+    const strokeIndexBadges: typeof pendingBadges = [];
 
     for (const badge of pendingBadges) {
       switch (badge.criteriaType) {
@@ -102,15 +131,37 @@ export async function checkAndAwardBadges(userId: number): Promise<string[]> {
         case "consistency":
           consistencyBadges.push(badge);
           break;
+        case "stroke_index_gain":
+          strokeIndexBadges.push(badge);
+          break;
         default:
           log.warn("Unknown badge criteria type", { userId, badgeId: badge.id, criteriaType: badge.criteriaType });
           break;
       }
     }
 
+    // stroke_index_gain: one fresh read of the Stroke Index summary for all such badges. A failure
+    // only skips these badges.
+    if (strokeIndexBadges.length > 0) {
+      try {
+        const summary = await loadStrokeIndexProgress(userId);
+        for (const badge of strokeIndexBadges) {
+          if (!strokeIndexGainMet(summary, badge.criteriaJson as StrokeIndexGainCriteria | null)) continue;
+          await db.insert(userAchievementBadges).values({ userId, badgeId: badge.id });
+          newlyAwardedBadges.push(badge.name);
+          log.info("Badge awarded", { userId, badgeId: badge.id, badgeName: badge.name, criteriaType: badge.criteriaType });
+        }
+      } catch (error) {
+        log.warn("Stroke Index badges skipped", {
+          userId,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     // metric_peak evaluation uses its own bounded query (already limited).
     for (const badge of metricPeakBadges) {
-      const criteria = badge.criteriaJson as BadgeCriteria;
+      const criteria = badge.criteriaJson as BadgeCriteria | null;
       const met = await evaluateMetricPeakCriteria(criteria, userId);
       if (!met) continue;
 
@@ -263,9 +314,13 @@ function evaluateConsistencyCriteriaFromWeeklyCounts(
 }
 
 /**
- * Check if a calculated metric (like SEI) meets the criteria
+ * Peak of a direct activity metric (distance, SWOLF, pace, heart rate...). Criteria on the removed
+ * invented scores (SEI, SER, TCI) and malformed criteria never award a badge.
  */
-async function evaluateMetricPeakCriteria(criteria: BadgeCriteria, userId: number): Promise<boolean> {
+async function evaluateMetricPeakCriteria(criteria: BadgeCriteria | null | undefined, userId: number): Promise<boolean> {
+  if (!criteria || typeof criteria.metric !== "string") return false;
+  if (RETIRED_METRICS.has(criteria.metric.toLowerCase())) return false;
+
   const db = await getDb();
   if (!db) return false;
 
@@ -277,66 +332,6 @@ async function evaluateMetricPeakCriteria(criteria: BadgeCriteria, userId: numbe
 
   if (activities.length === 0) return false;
 
-  if (criteria.metric === "sei") {
-    const seiValues = activities
-      .map(a =>
-        legacyBadgeSei({
-          distanceMeters: a.distanceMeters,
-          durationSeconds: a.durationSeconds,
-          avgPacePer100m: a.avgPacePer100m ?? undefined,
-          swolfScore: a.avgSwolf ?? undefined,
-          avgStrokeDistance: a.avgStrokeDistance ?? undefined,
-          avgStrokes: a.avgStrokes ?? undefined,
-          avgStrokeCadence: a.avgStrokeCadence ?? undefined,
-          poolLengthMeters: a.poolLengthMeters ?? undefined,
-        })
-      )
-      .filter((v): v is number => v !== null && v !== undefined);
-
-    if (seiValues.length === 0) return false;
-    const peak = Math.max(...seiValues);
-    return evaluateOperator(peak, criteria.operator, criteria.value);
-  }
-
-  if (criteria.metric === "ser") {
-    const serValues = activities
-      .map(a =>
-        legacyBadgeSer({
-          distanceMeters: a.distanceMeters,
-          durationSeconds: a.durationSeconds,
-          avgPacePer100m: a.avgPacePer100m ?? undefined,
-          swolfScore: a.avgSwolf ?? undefined,
-          avgStrokeDistance: a.avgStrokeDistance ?? undefined,
-          avgStrokes: a.avgStrokes ?? undefined,
-          avgStrokeCadence: a.avgStrokeCadence ?? undefined,
-          poolLengthMeters: a.poolLengthMeters ?? undefined,
-        })
-      )
-      .filter((v): v is number => v !== null && v !== undefined);
-
-    if (serValues.length === 0) return false;
-    const peak = Math.max(...serValues);
-    return evaluateOperator(peak, criteria.operator, criteria.value);
-  }
-
-  if (criteria.metric === "tci") {
-    const tci = legacyBadgeTci(
-      activities.map(a => ({
-        distanceMeters: a.distanceMeters,
-        durationSeconds: a.durationSeconds,
-        avgPacePer100m: a.avgPacePer100m ?? undefined,
-        swolfScore: a.avgSwolf ?? undefined,
-        avgStrokeDistance: a.avgStrokeDistance ?? undefined,
-        avgStrokes: a.avgStrokes ?? undefined,
-        avgStrokeCadence: a.avgStrokeCadence ?? undefined,
-        poolLengthMeters: a.poolLengthMeters ?? undefined,
-      }))
-    );
-    if (tci === null) return false;
-    return evaluateOperator(tci, criteria.operator, criteria.value);
-  }
-
-  // Fallback: use direct activity metrics and evaluate peak
   const values = activities
     .map(a => getActivityValue(a, criteria.metric))
     .filter((v): v is number => v !== null && v !== undefined);

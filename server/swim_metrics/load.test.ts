@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { loadSeries, rampPerWeek, sessionLoad, tsbReading } from "./load";
+import { lapsLoad, loadSeries, NON_FREESTYLE_IF, rampPerWeek, sessionLoad, tsbReading } from "./load";
+import { lapsFrom } from "./test-helpers";
 
 describe("sessionLoad (sTSS)", () => {
   it("IF 1 for one hour is 100", () => {
@@ -24,6 +25,40 @@ describe("sessionLoad (sTSS)", () => {
   it("no time or no CSS: no load", () => {
     expect(sessionLoad(1000, 0, 1)).toEqual({ intensityFactor: null, stss: null });
     expect(sessionLoad(1000, 900, 0)).toEqual({ intensityFactor: null, stss: null });
+  });
+});
+
+describe("lapsLoad (sTSS on the swum laps, like the zones)", () => {
+  it("sums (v/CSS)³ × hours × 100 over the active laps; IF is the time-weighted cube root", () => {
+    // CSS 1 m/s: 400 in 400 s (ratio 1), rest, 100 in 125 s (ratio 0.8).
+    const result = lapsLoad(lapsFrom([[400, 400], [0, 60], [100, 125]]), 1);
+    const cubes = 1 * 400 + 0.8 ** 3 * 125; // 464
+    expect(result.stss).toBeCloseTo((cubes / 3600) * 100, 9); // 12.9
+    expect(result.intensityFactor).toBeCloseTo(Math.cbrt(cubes / 525), 9); // 0.959
+  });
+
+  it("non-freestyle laps (other strokes, drill, kick, no stroke) count with a fixed IF of 0.80", () => {
+    expect(NON_FREESTYLE_IF).toBe(0.8);
+    const laps = lapsFrom([[100, 70, "backstroke"], [100, 150, "drill"], [50, 60, "kick"], [100, 90, null]]);
+    const result = lapsLoad(laps, 1);
+    expect(result.intensityFactor).toBeCloseTo(0.8, 9);
+    expect(result.stss).toBeCloseTo((0.512 * (70 + 150 + 60 + 90) / 3600) * 100, 9);
+  });
+
+  it("caps each lap at 1.3", () => {
+    const result = lapsLoad(lapsFrom([[50, 25]]), 1); // 2 m/s
+    expect(result.intensityFactor).toBeCloseTo(1.3, 9);
+  });
+
+  it("open water counts every lap as freestyle", () => {
+    const result = lapsLoad(lapsFrom([[1000, 1250, null]]), 1, { allFreestyle: true });
+    expect(result.intensityFactor).toBeCloseTo(0.8, 9);
+    expect(lapsLoad(lapsFrom([[1000, 1000, null]]), 1, { allFreestyle: true }).intensityFactor).toBeCloseTo(1, 9);
+  });
+
+  it("no active laps or no CSS: no load", () => {
+    expect(lapsLoad(lapsFrom([[0, 60]]), 1)).toEqual({ intensityFactor: null, stss: null });
+    expect(lapsLoad(lapsFrom([[100, 100]]), 0)).toEqual({ intensityFactor: null, stss: null });
   });
 });
 
@@ -61,9 +96,12 @@ describe("loadSeries (CTL 42 days, ATL 7 days)", () => {
 });
 
 describe("tsbReading (TrainingPeaks conventions)", () => {
+  // > +25 | (+5, +25] | [−10, +5] | [−30, −10) | < −30
   it.each([
-    [15.1, "molto_riposato"],
-    [15, "fresco"],
+    [40, "molto_riposato"],
+    [25.1, "molto_riposato"],
+    [25, "fresco"],
+    [15.1, "fresco"],
     [5.1, "fresco"],
     [5, "neutro"],
     [0, "neutro"],

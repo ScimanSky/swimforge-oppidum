@@ -1,5 +1,5 @@
 /** Weekly volume (Monday to Sunday, Rome) and the streak of weeks with at least 2 swims. */
-import { addDaysToKey, weekStartKey, weeklyStreak } from "@shared/swimMetrics";
+import { addDaysToKey, weekStartKey, weeklyStreak, weeklyStreakFromCounts } from "@shared/swimMetrics";
 import { round } from "./math";
 
 const WEEKS = 12;
@@ -15,12 +15,13 @@ export type VolumeSummary = {
 /**
  * 12 weeks of km and swims (oldest first, the current week last); averages of the 4 most recent
  * complete weeks and their change from the 4 before (null when those are empty). The streak uses
- * `streakDates` when given (a longer history than the activities), else the activity dates.
+ * `streak` when given (swim dates, or swims per Rome week, over a longer history than the
+ * activities), else the activity dates.
  */
 export function volumeSummary(
   activities: { date: Date; distanceMeters: number }[],
   now: Date,
-  streakDates?: Date[],
+  streak?: Date[] | Map<string, number>,
 ): VolumeSummary {
   const current = weekStartKey(now);
   const weekKeys = Array.from({ length: WEEKS }, (_, i) => addDaysToKey(current, -7 * (WEEKS - 1 - i)));
@@ -47,6 +48,9 @@ export function volumeSummary(
     avgKm4: round(avgKm4, 2)!,
     avgSessions4: round(last4.reduce((sum, w) => sum + w.sessions, 0) / 4, 1)!,
     changePct: previousKm > 0 ? round(((avgKm4 - previousKm) / previousKm) * 100, 1) : null,
-    streakWeeks: weeklyStreak(streakDates ?? activities.map((a) => a.date), now),
+    streakWeeks:
+      streak instanceof Map
+        ? weeklyStreakFromCounts(streak, now)
+        : weeklyStreak(streak ?? activities.map((a) => a.date), now),
   };
 }

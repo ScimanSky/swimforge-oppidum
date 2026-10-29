@@ -2,10 +2,10 @@
  * Pace zones relative to CSS (Swim Smooth, TrainingPeaks). The boundaries are a convention,
  * as a share of the threshold speed: Z1 < 85% ≤ Z2 < 92% ≤ Z3 < 97% ≤ Z4 < 103% ≤ Z5.
  */
-import type { Zones5 } from "@shared/swimMetrics";
+import { ZONE_SPEED_BOUNDS, type Zones5 } from "@shared/swimMetrics";
 import { activeLaps, type MetricLap } from "./laps";
 
-const ZONE_UPPER_BOUNDS = [0.85, 0.92, 0.97, 1.03] as const;
+const ZONE_UPPER_BOUNDS = ZONE_SPEED_BOUNDS;
 
 /** 0-based zone of a speed ratio (lap speed / CSS speed); a boundary goes to the upper zone. */
 export function zoneOf(speedRatio: number): 0 | 1 | 2 | 3 | 4 {
@@ -19,13 +19,24 @@ export function zoneOf(speedRatio: number): 0 | 1 | 2 | 3 | 4 {
 
 export const emptyZones = (): Zones5 => [0, 0, 0, 0, 0];
 
-/** Metres per zone of the active laps of a swim. */
+/**
+ * Metres per zone of the active freestyle laps of a swim. The CSS is a freestyle pace: other
+ * strokes, drill and kick (and laps without a stroke) are not zoned.
+ */
 export function sessionZones(laps: MetricLap[], cssSpeedMps: number): Zones5 {
   const zones = emptyZones();
   for (const lap of activeLaps(laps)) {
+    if (lap.stroke !== "freestyle") continue;
     zones[zoneOf(lap.distanceMeters / lap.seconds / cssSpeedMps)] += lap.distanceMeters;
   }
   return zones;
+}
+
+/** Metres of active laps that are not freestyle («non classificati» in the zones). */
+export function unclassifiedMeters(laps: MetricLap[]): number {
+  return activeLaps(laps)
+    .filter((lap) => lap.stroke !== "freestyle")
+    .reduce((sum, lap) => sum + lap.distanceMeters, 0);
 }
 
 export function addZones(a: Zones5, b: Zones5): Zones5 {

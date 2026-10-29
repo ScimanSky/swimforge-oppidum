@@ -3,12 +3,17 @@ import {
   SWIM_METRIC_DEFINITIONS,
   SWIM_METRIC_THRESHOLDS,
   SWIM_METRICS_TIMEZONE,
+  TSB_BOUNDS,
+  TSB_READING_DESCRIPTIONS,
   TSB_READING_LABELS,
   addDaysToKey,
   dayKey,
+  isYardPool,
+  poolLengthLabel,
   pacingCvReading,
   weekStartKey,
   weeklyStreak,
+  weeklyStreakFromCounts,
 } from "./swimMetrics";
 
 describe("dayKey", () => {
@@ -87,6 +92,17 @@ describe("weeklyStreak", () => {
     expect(weeklyStreak(dates, now)).toBe(1);
   });
 
+  it("from swims counted per Rome week (Monday keys), as the database groups them", () => {
+    const counts = new Map([
+      ["2026-10-12", 2],
+      ["2026-10-19", 3],
+      ["2026-10-26", 1],
+    ]);
+    expect(weeklyStreakFromCounts(counts, now)).toBe(2);
+    expect(weeklyStreakFromCounts({ "2026-10-19": 2, "2026-10-26": 2 }, now)).toBe(2);
+    expect(weeklyStreakFromCounts(new Map(), now)).toBe(0);
+  });
+
   it("is 0 without swims and accepts another minimum", () => {
     expect(weeklyStreak([], now)).toBe(0);
     expect(weeklyStreak([at("2026-10-20T08:00:00Z")], now, 1)).toBe(1);
@@ -122,6 +138,22 @@ describe("readings shared by the interface and the coach", () => {
     });
   });
 
+  it("TSB bands follow TrainingPeaks, explicit and non-overlapping", () => {
+    expect(TSB_BOUNDS).toEqual({ veryRestedAbove: 25, freshAbove: 5, neutralFrom: -10, buildingFrom: -30 });
+    expect(TSB_READING_DESCRIPTIONS.molto_riposato).toBe("molto riposato (rischio di perdere forma se dura)");
+    expect(TSB_READING_DESCRIPTIONS.carico_alto).toBe("carico alto");
+    expect(SWIM_METRIC_DEFINITIONS.load.conventions).toEqual(
+      expect.arrayContaining([
+        "Equilibrio sopra +25: molto riposato (rischio di perdere forma se dura).",
+        "Da +5 (escluso) a +25: fresco.",
+        "Da −10 a +5: neutro.",
+        "Da −30 a −10 (escluso): in costruzione.",
+        "Sotto −30: carico alto.",
+      ]),
+    );
+    expect(SWIM_METRIC_DEFINITIONS.load.conventions!.join(" ")).not.toMatch(/\+15/);
+  });
+
   it.each([
     [1.9, "molto regolare"],
     [2, "regolare"],
@@ -132,6 +164,24 @@ describe("readings shared by the interface and the coach", () => {
   });
 
   it("conventional thresholds", () => {
-    expect(SWIM_METRIC_THRESHOLDS).toEqual({ mediumZonePct: 35, rampPerWeek: 8, pacingFadePct: 5 });
+    expect(SWIM_METRIC_THRESHOLDS).toEqual({ mediumZonePct: 35, rampPerWeek: 8, pacingFadePct: 5, dpsDropPct: 5 });
+    expect(SWIM_METRIC_DEFINITIONS.pacing.name).toBe("Regolarità e tenuta nelle ripetute");
+    expect(SWIM_METRIC_DEFINITIONS.pacing.source).toMatch(/Craig e Pendergast, 1979; Keskinen e Komi, 1993/);
+    expect(SWIM_METRIC_DEFINITIONS.pacing.conventions).toContain(
+      "Distanza per bracciata che cala più del 5% nel finale: la bracciata si accorcia nel finale (convenzione nostra).",
+    );
+  });
+});
+
+describe("pool lengths", () => {
+  it("a 22.86 m pool is 25 yards", () => {
+    expect(isYardPool(23)).toBe(true);
+    expect(isYardPool(22.86)).toBe(true);
+    expect(isYardPool(25)).toBe(false);
+    expect(isYardPool(null)).toBe(false);
+    expect(poolLengthLabel(23)).toBe("25 yd");
+    expect(poolLengthLabel(25)).toBe("25 m");
+    expect(poolLengthLabel(50)).toBe("50 m");
+    expect(poolLengthLabel(null)).toBe("vasca non indicata");
   });
 });

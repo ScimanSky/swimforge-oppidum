@@ -12,14 +12,14 @@ import {
   type SwimMetrics,
   type Zones5,
 } from "@shared/swimMetrics";
-import { cssFromTest, cssHistory, CSS_WINDOW_DAYS, type CssEstimate } from "./css";
+import { cssFromTest, cssHistory, cssLapsOf, CSS_WINDOW_DAYS, type CssEstimate, type CssLap } from "./css";
 import { efficiencySummary, sessionEfficiency } from "./efficiency";
 import { activeLaps, isPoolSwim, type MetricActivity } from "./laps";
-import { loadSeries, rampPerWeek, sessionLoad, tsbReading } from "./load";
+import { lapsLoad, loadSeries, rampPerWeek, sessionLoad, tsbReading } from "./load";
 import { round } from "./math";
 import { pacingSummary, sessionPacing, type RepeatSet } from "./pacing";
 import { volumeSummary } from "./volume";
-import { addZones, emptyZones, intensitySplit, sessionZones } from "./zones";
+import { addZones, emptyZones, intensitySplit, sessionZones, unclassifiedMeters } from "./zones";
 
 export type CssTest = { t200Seconds: number; t400Seconds: number; date: string };
 
@@ -29,7 +29,16 @@ export type SwimMetricsInput = {
   /** The user's 400/200 test, whatever its age. */
   cssTest: CssTest | null;
   /** Dates of the swims over a longer window, for the weekly streak. */
-  streakDates: Date[];
+  streakDates?: Date[];
+  /** Or the swims per Rome week (Monday «YYYY-MM-DD») over that window, counted by the database. */
+  streakWeekCounts?: Map<string, number>;
+  /**
+   * Active pool laps for the CSS estimates over a longer window (300 days), so that every month's
+   * 90-day window is complete. Default: the laps of `activities`.
+   */
+  cssLaps?: CssLap[];
+  /** First Rome day `cssLaps` cover. Default: the first of the 180 days. */
+  cssLapsFrom?: string;
 };
 
 /** Days of swims read; the load curve starts this far back to settle. */
@@ -38,27 +47,38 @@ const SHOWN_DAYS = 90;
 const INTENSITY_WEEKS = 8;
 
 export const MISSING = {
-  css: "Servono almeno due nuotate continue a stile libero, una fino a 400 m e una da 400 m in su, negli ultimi 90 giorni. Oppure inserisci un test.",
-  load: "Serve il passo soglia: inserisci un test o nuota tratti continui a stile libero (una fino a 400 m e una da 400 m in su).",
+  css: "Servono almeno due tratti continui a stile libero in vasca negli ultimi 90 giorni, tra 2 e 30 minuti, uno lungo almeno il doppio dell'altro (es. 200 e 400 m), nuotati a buon ritmo. Oppure inserisci un test.",
+  load: "Serve il passo soglia: inserisci un test o nuota due tratti continui a stile libero, uno lungo almeno il doppio dell'altro (es. 200 e 400 m).",
   intensity: "Servono il passo soglia e nuotate con i giri.",
   intensityNoLaps: "Nessuna nuotata in vasca con i giri negli ultimi 28 giorni.",
+  intensityNoFreestyle:
+    "Nelle ultime 4 settimane non ci sono giri a stile libero da classificare: le zone si calcolano solo sullo stile libero.",
 } as const;
+
+type SwimCss = { speedMps: number; source: "stima" | "test" };
 
 type InternalSession = {
   activity: MetricActivity;
   cssSpeed: number | null;
-  distanceMeters: number;
+  cssSource: "stima" | "test" | null;
+  /** Σ active laps; null without laps. */
+  swimDistanceMeters: number | null;
   movingSeconds: number;
   hasLaps: boolean;
   intensityFactor: number | null;
   stss: number | null;
+  loadEstimated: boolean;
   zoneMeters: Zones5 | null;
+  unclassifiedMeters: number | null;
   strokeIndex: number | null;
   dpsMeters: number | null;
   strokeRate: number | null;
   swolf: number | null;
+  speedMps: number | null;
   pacingCv: number | null;
   pacingFade: number | null;
+  dpsDrop: number | null;
+  strokeRateRise: number | null;
   lastSet: RepeatSet | null;
 };
 
@@ -70,6 +90,9 @@ function cssResultFromEstimate(estimate: CssEstimate): CssResult {
     confidence: estimate.confidence,
     points: estimate.points,
     testDate: null,
+    dPrimeMeters: round(estimate.dPrimeMeters, 1),
+    r2: round(estimate.r2, 3),
+    droppedPoints: estimate.dropped,
   };
 }
 
@@ -93,53 +116,70 @@ const monthIndex = (month: string) => {
   return year * 12 + m;
 };
 
+/** A test is valid from its date to date + 89 (inclusive), forward only. */
+export function testValidOn(test: CssTest, day: string): boolean {
+  const age = daysBetweenKeys(test.date, day);
+  return age >= 0 && age <= CSS_WINDOW_DAYS - 1;
+}
+
 /**
- * CSS speed for a swim day: the test when it is within 90 days of the swim, else the nearest
- * monthly estimate (the swim's month first, an earlier month on a tie), else the test at any
- * distance, else null.
+ * CSS for a swim day: the test when the day is within its validity, else the nearest monthly
+ * estimate (the swim's month first, an earlier month on a tie), else null. An expired test is
+ * never used.
  */
 function cssResolver(
   history: { month: string; estimate: CssEstimate | null }[],
   test: CssTest | null,
-): (day: string) => number | null {
+): (day: string) => SwimCss | null {
   const testSpeed = test ? cssFromTest(test.t200Seconds, test.t400Seconds) : null;
   const monthly = history.filter((h) => h.estimate !== null);
   return (day) => {
-    if (test && testSpeed && Math.abs(daysBetweenKeys(test.date, day)) <= CSS_WINDOW_DAYS) return testSpeed;
-    if (monthly.length > 0) {
-      const target = monthIndex(day.slice(0, 7));
-      let best = monthly[0];
-      for (const entry of monthly) {
-        if (Math.abs(monthIndex(entry.month) - target) < Math.abs(monthIndex(best.month) - target)) best = entry;
-      }
-      return best.estimate!.speedMps;
+    if (test && testSpeed && testValidOn(test, day)) return { speedMps: testSpeed, source: "test" };
+    if (monthly.length === 0) return null;
+    const target = monthIndex(day.slice(0, 7));
+    let best = monthly[0];
+    for (const entry of monthly) {
+      if (Math.abs(monthIndex(entry.month) - target) < Math.abs(monthIndex(best.month) - target)) best = entry;
     }
-    return testSpeed;
+    return { speedMps: best.estimate!.speedMps, source: "stima" };
   };
 }
 
-function computeSession(activity: MetricActivity, cssSpeed: number | null): InternalSession {
+function computeSession(activity: MetricActivity, css: SwimCss | null): InternalSession {
+  const cssSpeed = css?.speedMps ?? null;
   const active = activeLaps(activity.laps);
   const hasLaps = active.length > 0;
-  const distanceMeters = hasLaps ? active.reduce((sum, lap) => sum + lap.distanceMeters, 0) : activity.distanceMeters;
-  const movingSeconds = hasLaps ? active.reduce((sum, lap) => sum + lap.seconds, 0) : activity.durationSeconds;
-  const load = cssSpeed ? sessionLoad(distanceMeters, movingSeconds, cssSpeed) : { intensityFactor: null, stss: null };
   const pool = isPoolSwim(activity);
+  const swimDistanceMeters = hasLaps ? active.reduce((sum, lap) => sum + lap.distanceMeters, 0) : null;
+  const movingSeconds = hasLaps ? active.reduce((sum, lap) => sum + lap.seconds, 0) : activity.durationSeconds;
+  // With laps: sTSS on the swum laps (like the zones). Without: TrainingPeaks on the whole swim.
+  const load = !cssSpeed
+    ? { intensityFactor: null, stss: null }
+    : hasLaps
+      ? lapsLoad(active, cssSpeed, { allFreestyle: !pool })
+      : sessionLoad(activity.distanceMeters, activity.durationSeconds, cssSpeed);
   const efficiency = pool
     ? sessionEfficiency(activity.laps)
-    : { strokeIndex: null, dpsMeters: null, strokeRate: null, swolf: null };
-  const pacing = pool ? sessionPacing(activity.laps) : { cv: null, fade: null, sets: [] };
+    : { strokeIndex: null, dpsMeters: null, strokeRate: null, swolf: null, speedMps: null };
+  const pacing = pool
+    ? sessionPacing(activity.laps)
+    : { cv: null, fade: null, dpsDrop: null, strokeRateRise: null, sets: [] };
   return {
     activity,
     cssSpeed,
-    distanceMeters,
+    cssSource: css?.source ?? null,
+    swimDistanceMeters,
     movingSeconds,
     hasLaps,
     ...load,
-    zoneMeters: pool && hasLaps && cssSpeed ? sessionZones(activity.laps, cssSpeed) : null,
+    loadEstimated: load.stss !== null && !hasLaps,
+    zoneMeters: pool && hasLaps && cssSpeed ? sessionZones(active, cssSpeed) : null,
+    unclassifiedMeters: pool && hasLaps ? unclassifiedMeters(active) : null,
     ...efficiency,
     pacingCv: pacing.cv,
     pacingFade: pacing.fade,
+    dpsDrop: pacing.dpsDrop,
+    strokeRateRise: pacing.strokeRateRise,
     lastSet: pacing.sets[pacing.sets.length - 1] ?? null,
   };
 }
@@ -151,17 +191,24 @@ function toSessionMetrics(s: InternalSession): SessionMetrics {
     poolLengthMeters: s.activity.isOpenWater ? null : s.activity.poolLengthMeters,
     isOpenWater: s.activity.isOpenWater,
     distanceMeters: s.activity.distanceMeters,
+    swimDistanceMeters: s.swimDistanceMeters,
     movingSeconds: Math.round(s.movingSeconds),
     hasLaps: s.hasLaps,
     intensityFactor: round(s.intensityFactor, 2),
     stss: round(s.stss, 1),
+    loadEstimated: s.loadEstimated,
     zoneMeters: s.zoneMeters,
+    unclassifiedMeters: s.unclassifiedMeters,
+    cssPaceSecondsPer100: s.cssSpeed ? round(100 / s.cssSpeed, 1) : null,
+    cssSource: s.cssSource,
     strokeIndex: round(s.strokeIndex, 2),
     dpsMeters: round(s.dpsMeters, 2),
     strokeRate: round(s.strokeRate, 1),
     swolf: round(s.swolf, 1),
     pacingCv: round(s.pacingCv, 1),
     pacingFade: round(s.pacingFade, 1),
+    dpsDropPct: round(s.dpsDrop, 1),
+    strokeRateRisePct: round(s.strokeRateRise, 1),
   };
 }
 
@@ -175,11 +222,13 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
     .sort((a, b) => a.date.getTime() - b.date.getTime());
 
   // ── CSS ──
-  // Seven months cover the 180 days; the chart shows the last six.
-  const history = cssHistory(activities, now, 7);
+  // Seven month-end estimates: the swims of the 180 days fall in these months (a swim uses its
+  // month's estimate) and the chart shows the last six. Each estimate reads the 90 days before
+  // its month's end, so the CSS laps cover 300 days; months not covered stay null.
+  const cssLaps = input.cssLaps ?? cssLapsOf(activities);
+  const history = cssHistory(cssLaps, now, 7, input.cssLapsFrom ?? historyFrom);
   const test = input.cssTest;
-  const testIsCurrent =
-    test !== null && test.date <= today && daysBetweenKeys(test.date, today) < CSS_WINDOW_DAYS;
+  const testIsCurrent = test !== null && testValidOn(test, today);
   const estimateNow = history[history.length - 1].estimate;
   const current = testIsCurrent ? cssResultFromTest(test!) : estimateNow ? cssResultFromEstimate(estimateNow) : null;
   const css: SwimMetrics["css"] = {
@@ -194,11 +243,12 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
   // ── Sessions ──
   const resolveCss = cssResolver(history, test);
   const sessions = activities.map((a) => computeSession(a, resolveCss(a.day)));
-  const anyCss = sessions.some((s) => s.cssSpeed !== null);
+  // The load and the zones need today's CSS, so that they always agree with css.current.
+  const hasCss = current !== null;
 
   // ── Load ──
   let load: SwimMetrics["load"] = { today: null, rampPerWeek: null, days: [], missing: MISSING.load };
-  if (anyCss) {
+  if (hasCss) {
     const daily = new Map<string, number>();
     for (const s of sessions) {
       if (s.stss !== null) daily.set(s.activity.day, (daily.get(s.activity.day) ?? 0) + s.stss);
@@ -229,29 +279,61 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
   const weekKeys = Array.from({ length: INTENSITY_WEEKS }, (_, i) =>
     addDaysToKey(currentWeek, -7 * (INTENSITY_WEEKS - 1 - i)),
   );
-  const perWeek = new Map(weekKeys.map((key) => [key, emptyZones()]));
+  const perWeek = new Map(weekKeys.map((key) => [key, { zones: emptyZones(), unclassified: 0 }]));
   let zones28 = emptyZones();
+  let unclassified28 = 0;
+  let volume28 = 0;
   for (const s of sessions) {
+    const recent = s.activity.day >= from28;
+    if (recent) volume28 += s.activity.distanceMeters;
     if (!s.zoneMeters) continue;
-    const week = weekStartOfKey(s.activity.day);
-    if (perWeek.has(week)) perWeek.set(week, addZones(perWeek.get(week)!, s.zoneMeters));
-    if (s.activity.day >= from28) zones28 = addZones(zones28, s.zoneMeters);
+    const week = perWeek.get(weekStartOfKey(s.activity.day));
+    if (week) {
+      week.zones = addZones(week.zones, s.zoneMeters);
+      week.unclassified += s.unclassifiedMeters ?? 0;
+    }
+    if (recent) {
+      zones28 = addZones(zones28, s.zoneMeters);
+      unclassified28 += s.unclassifiedMeters ?? 0;
+    }
   }
   const split = intensitySplit(zones28);
+  const zoned28 = zones28.reduce((sum, metres) => sum + metres, 0);
   const intensity: SwimMetrics["intensity"] = {
-    last28: split ? { zoneMeters: zones28, ...split } : null,
-    weeks: weekKeys.map((weekStart) => ({ weekStart, zoneMeters: perWeek.get(weekStart)! })),
-    missing: !anyCss ? MISSING.intensity : split ? null : MISSING.intensityNoLaps,
+    last28: hasCss && split
+      ? {
+          zoneMeters: zones28,
+          ...split,
+          unclassifiedMeters: unclassified28,
+          coveragePct: volume28 > 0 ? Math.min(100, Math.round((zoned28 / volume28) * 100)) : 0,
+        }
+      : null,
+    weeks: weekKeys.map((weekStart) => ({
+      weekStart,
+      zoneMeters: perWeek.get(weekStart)!.zones,
+      unclassifiedMeters: perWeek.get(weekStart)!.unclassified,
+    })),
+    missing: !hasCss
+      ? MISSING.intensity
+      : split
+        ? null
+        : unclassified28 > 0
+          ? MISSING.intensityNoFreestyle
+          : MISSING.intensityNoLaps,
   };
 
   // ── Efficiency, pacing, volume ──
   const summaryRows = sessions.map((s) => ({
     date: s.activity.day,
     strokeIndex: s.strokeIndex,
+    dpsMeters: s.dpsMeters,
+    speedMps: s.speedMps,
     poolLengthMeters: s.activity.poolLengthMeters,
     isOpenWater: s.activity.isOpenWater,
     pacingCv: s.pacingCv,
     pacingFade: s.pacingFade,
+    dpsDrop: s.dpsDrop,
+    strokeRateRise: s.strokeRateRise,
     lastSet: s.lastSet,
   }));
   const eff = efficiencySummary(summaryRows, now);
@@ -270,13 +352,27 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
       baseline: round(eff.baseline, 2),
       deltaPct: round(eff.deltaPct, 1),
       missing: eff.missing,
+      n28: eff.n28,
+      nBaseline: eff.nBaseline,
+      dps28: round(eff.dps28, 2),
+      dpsBaseline: round(eff.dpsBaseline, 2),
+      pace28: round(eff.pace28, 1),
+      paceBaseline: round(eff.paceBaseline, 1),
     },
     pacing: {
       cv28: round(pacing.cv28, 1),
       fade28: round(pacing.fade28, 1),
-      latestSet: pacing.latestSet,
+      latestSet: pacing.latestSet
+        ? {
+            ...pacing.latestSet,
+            repDps: pacing.latestSet.repDps?.map((dps) => round(dps, 2)!) ?? null,
+            dpsDropPct: round(pacing.latestSet.dpsDropPct, 1),
+          }
+        : null,
       missing: pacing.missing,
+      dpsDrop28: round(pacing.dpsDrop28, 1),
+      strokeRateRise28: round(pacing.strokeRateRise28, 1),
     },
-    volume: volumeSummary(activities, now, input.streakDates),
+    volume: volumeSummary(activities, now, input.streakWeekCounts ?? input.streakDates),
   };
 }

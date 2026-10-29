@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getDb } from "./db";
-import { aiInsightsCache } from "../drizzle/schema";
+import { aiInsightsCache, swimmingActivities } from "../drizzle/schema";
 import { eq, and, gt } from "drizzle-orm";
 import { logger } from "./middleware/logger";
 import { ENV } from "./_core/env";
@@ -112,6 +112,34 @@ function parseInsightsFromAiText(text: string): string[] {
   return picked.slice(0, 8);
 }
 
+/**
+ * Drops the user's cached Coach page insights (their swims or CSS changed). Best effort: a
+ * failure is logged, never thrown.
+ */
+export async function clearAIInsightsCache(userId: number): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    await db.delete(aiInsightsCache).where(eq(aiInsightsCache.userId, userId));
+  } catch (error) {
+    log.warn("[AI Insights] Could not clear the cached insights", {
+      event: "ai_insights:cache_clear_failed",
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/** True when the user has at least one swim, ever (not only in the metrics' 90 days). */
+async function hasAnySwim(db: NonNullable<Awaited<ReturnType<typeof getDb>>>, userId: number): Promise<boolean> {
+  const rows = await db
+    .select({ id: swimmingActivities.id })
+    .from(swimmingActivities)
+    .where(eq(swimmingActivities.userId, userId))
+    .limit(1);
+  return rows.length > 0;
+}
+
 /** 6-8 insights for the Coach page from the swim metrics (cached 24 hours). */
 export async function generateAIInsights(
   metrics: SwimMetrics,
@@ -122,9 +150,9 @@ export async function generateAIInsights(
     return [];
   }
 
-  // New users (no synced activities) shouldn't trigger AI generation/parsing noise.
-  // Provide a small set of onboarding insights (analysis + direction, no workouts).
-  if (metrics.sessions.length === 0) {
+  // New users (no swim ever) shouldn't trigger AI generation/parsing noise: onboarding insights
+  // (analysis + direction, no workouts). Someone back after a break gets real insights.
+  if (metrics.sessions.length === 0 && !(await hasAnySwim(db, userId))) {
     const insights = [
       "📈 Progressione: Sei in una fase perfetta per creare una base. La cosa piu' importante adesso e' costruire regolarita' prima di inseguire la velocita'.",
       "🔄 Recupero: Parti con calma. Sessioni leggere e costanti ti aiutano a rendere sostenibile l'abitudine senza accumulare fatica.",
@@ -290,7 +318,8 @@ ${SWIM_METRICS_COACH_RULES}
 ESEMPI DI INSIGHTS BUONI:
 ✅ "🔄 Recupero: il tuo equilibrio è in costruzione da due settimane mentre la forma sale: stai caricando bene, ma una settimana più leggera ogni 3-4 ti aiuterà ad assorbire il lavoro."
 ✅ "💪 Intensità: quasi metà del volume cade in zona media; gli studi indicano che spostarne una parte sul facile, tenendo pochi tratti intensi, rende di più."
-✅ "🏊 Tecnica: lo Stroke Index è sopra la tua base nella vasca da 25 m: a parità di passo fai più strada per bracciata."
+✅ "🏊 Tecnica: lo Stroke Index è sopra la tua base nella vasca da 25 m e anche la distanza per bracciata è salita: fai più strada per bracciata, non vai solo più veloce." (dillo solo se sale la distanza per bracciata; se sale solo il passo, il merito è della velocità)
+✅ "⚡ Efficienza: nelle ripetute la distanza per bracciata cala nel finale: la fatica ti accorcia la bracciata, e lì c'è margine con un lavoro di resistenza graduale."
 ✅ "🎯 Obiettivi: la stima del passo soglia ha affidabilità media; una nuotata con un tratto continuo lungo (800 m o più) la renderebbe più solida."
 
 ESEMPI CATTIVI (DA EVITARE):

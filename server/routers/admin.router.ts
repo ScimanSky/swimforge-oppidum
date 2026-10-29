@@ -4,6 +4,7 @@ import {
     listPostReports, updatePostReportStatus,
     getPendingActivityInsights, listActivityInsights, markActivityInsightSeen,
 } from "./_shared";
+import { cssTestSchema } from "../swim_metrics/css-test";
 
 // Seed function for badges and levels
 export async function seedBadgesAndLevels() {
@@ -205,17 +206,12 @@ export const statisticsRouter = router({
         return await generateAIInsights(await getSwimMetrics(ctx.user.id), ctx.user.id);
     }),
 
-    // The caller's 400/200 CSS test, saved in the profile preferences.
+    // The caller's 400/200 CSS test, saved in the profile preferences. Validation errors are in
+    // Italian, each on its field (error.data.zodError.fieldErrors).
     setCssTest: protectedProcedure
-        .input(z.object({
-            t200Seconds: z.number(),
-            t400Seconds: z.number(),
-            date: z.string().max(10),
-        }))
+        .input(cssTestSchema())
         .mutation(async ({ ctx, input }) => {
-            const { updateCssTest, validateCssTest } = await import("../swim_metrics/css-test");
-            const problem = validateCssTest(input);
-            if (problem) throw new TRPCError({ code: "BAD_REQUEST", message: problem.message });
+            const { updateCssTest } = await import("../swim_metrics/css-test");
             if (!(await updateCssTest(ctx.user.id, input))) {
                 throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
             }

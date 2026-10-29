@@ -38,10 +38,12 @@ type CoachContext = {
   latestInsights: Awaited<ReturnType<typeof listActivityInsights>>;
 };
 
-function formatPace(secPer100m: number | null | undefined) {
+/** «m:ss/100m»; the total is rounded first, so 119.6 s is 2:00 and never 1:60. */
+export function formatPace(secPer100m: number | null | undefined) {
   if (!secPer100m || secPer100m <= 0) return "n/d";
-  const mins = Math.floor(secPer100m / 60);
-  const secs = Math.round(secPer100m % 60);
+  const total = Math.round(secPer100m);
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
   return `${mins}:${String(secs).padStart(2, "0")}/100m`;
 }
 

@@ -1,16 +1,51 @@
 /**
  * Training load and form: TrainingPeaks swim TSS (sTSS = IF³ × hours × 100, the cube following
- * water drag) and the Banister model in the TrainingPeaks form (CTL 42 days, ATL 7 days,
+ * water drag), summed on the swum laps when there are laps, and the Banister model in the TrainingPeaks form (CTL 42 days, ATL 7 days,
  * TSB = CTL − ATL at the end of the previous day).
  */
 import type { TsbReading } from "@shared/swimMetrics";
-import { addDaysToKey } from "@shared/swimMetrics";
+import { addDaysToKey, tsbReadingOf } from "@shared/swimMetrics";
+import { activeLaps, type MetricLap } from "./laps";
 
 export const IF_CAP = 1.3;
 export const CTL_DAYS = 42;
 export const ATL_DAYS = 7;
 
-/** Intensity factor and sTSS of a swim: IF = (distance / moving time) / CSS, capped at 1.3. */
+/**
+ * Intensity of an active lap that is not freestyle (other strokes, drill, kick, stroke not
+ * recorded): the CSS is a freestyle pace, so these laps get a fixed IF. Our convention.
+ */
+export const NON_FREESTYLE_IF = 0.8;
+
+/**
+ * sTSS on the swum laps, consistent with the zones: Σ over active laps of (vᵢ/CSS)³ × tᵢ/3600 ×
+ * 100, with tᵢ the moving time and each ratio capped at 1.3; non-freestyle laps at IF 0.80 (open
+ * water: every lap is freestyle). IF = (Σ (vᵢ/CSS)³·tᵢ / Σ tᵢ)^(1/3).
+ */
+export function lapsLoad(
+  laps: MetricLap[],
+  cssSpeedMps: number,
+  options: { allFreestyle?: boolean } = {},
+): { intensityFactor: number | null; stss: number | null } {
+  const active = activeLaps(laps);
+  if (active.length === 0 || !(cssSpeedMps > 0)) return { intensityFactor: null, stss: null };
+  let cubes = 0;
+  let seconds = 0;
+  for (const lap of active) {
+    const ratio =
+      options.allFreestyle || lap.stroke === "freestyle"
+        ? Math.min(lap.distanceMeters / lap.seconds / cssSpeedMps, IF_CAP)
+        : NON_FREESTYLE_IF;
+    cubes += ratio ** 3 * lap.seconds;
+    seconds += lap.seconds;
+  }
+  return { intensityFactor: Math.cbrt(cubes / seconds), stss: (cubes / 3600) * 100 };
+}
+
+/**
+ * Intensity factor and sTSS of a swim without laps, as TrainingPeaks defines it: IF = (distance /
+ * total time) / CSS, capped at 1.3.
+ */
 export function sessionLoad(
   distanceMeters: number,
   movingSeconds: number,
@@ -49,11 +84,5 @@ export function rampPerWeek(series: LoadDay[]): number | null {
   return series[series.length - 1].ctl - series[series.length - 8].ctl;
 }
 
-/** TrainingPeaks readings of the balance (conventions, not rules). */
-export function tsbReading(tsb: number): TsbReading {
-  if (tsb > 15) return "molto_riposato";
-  if (tsb > 5) return "fresco";
-  if (tsb >= -10) return "neutro";
-  if (tsb >= -30) return "in_costruzione";
-  return "carico_alto";
-}
+/** TrainingPeaks readings of the balance (conventions, not rules): see TSB_BOUNDS. */
+export const tsbReading = (tsb: number): TsbReading => tsbReadingOf(tsb);

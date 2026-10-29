@@ -631,7 +631,7 @@ ${userStats.hrZones.hasData ? `- Zona 1 (Recupero): ${userStats.hrZones.zone1}%
 4. **TEMPI DI RIPARTENZA** (OBBLIGATORIO):
    - Per ogni serie con ripetizioni (es. 4x100), specifica SEMPRE il tempo di ripartenza
    - Formato: "a 1:50", "a 1:20", "a 0:50"
-   - Calcolo: se c'è il passo soglia, imposta il passo delle serie con le sue zone (aerobico 85-92% della velocità soglia, soglia 97-103%) e aggiungi il recupero; altrimenti passo medio (${userStats.recent.avgPace} sec/100m) + 10-20 sec (tecnica) o + 5-10 sec (resistenza)
+   - Calcolo: se c'è il passo soglia, imposta il passo delle serie con le zone di passo in m:ss/100 m del blocco METRICHE DI NUOTO (aerobico = Z2, soglia = Z4; valgono per lo stile libero) e aggiungi il recupero; altrimenti passo medio (${userStats.recent.avgPace} sec/100m) + 10-20 sec (tecnica) o + 5-10 sec (resistenza)
 
 5. **ATTREZZI** (usa frequentemente):
    - **Pinne**: Propulsione, tecnica gambe (specialmente venerdì)

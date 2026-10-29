@@ -26,7 +26,14 @@ describe("workout prompts", () => {
     for (const name of OLD_NAMES) expect(prompt).not.toMatch(name);
   });
 
-  it("pool: send-off times from the threshold pace when there is one", () => {
-    expect(buildPoolWorkoutPrompt(stats)).toMatch(/passo soglia/i);
+  it("pool: send-off times from the zone paces in m:ss/100 m, never speed percentages alone", () => {
+    const prompt = buildPoolWorkoutPrompt(stats);
+    expect(prompt).toMatch(/passo soglia/i);
+    expect(prompt).toContain("zone di passo in m:ss/100 m");
+    expect(prompt).not.toMatch(/85-92%|97-103%|% della velocità soglia/);
+  });
+
+  it("pool: fading swimmers get a progressive endurance build and stroke-length drills", () => {
+    expect(buildPoolWorkoutPrompt(stats)).toContain("ripetute brevi con poco recupero → serie spezzate → nuoto continuo");
   });
 });
