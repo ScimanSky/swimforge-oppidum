@@ -197,7 +197,7 @@ export default function ClubDocumentsPanel({ clubId, isMember, canUpload, clubNa
           </div>
           <Button onClick={handleUpload} disabled={!selectedFile || uploadPdfMutation.isPending}>
             <Upload aria-hidden />
-            {uploadPdfMutation.isPending ? "Caricamento..." : "Carica PDF"}
+            {uploadPdfMutation.isPending ? "Caricamento…" : "Carica PDF"}
           </Button>
         </div>
       ) : null}

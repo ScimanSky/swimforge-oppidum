@@ -154,7 +154,7 @@ export default function ClubHistoryMeetsPage() {
     return (
       <AppLayout>
         <div className="container py-6">
-          <div className="surface-panel p-6 text-center text-muted-foreground">Caricamento storico meeting...</div>
+          <div className="surface-panel p-6 text-center text-muted-foreground">Caricamento storico meeting…</div>
         </div>
       </AppLayout>
     );
@@ -232,7 +232,7 @@ export default function ClubHistoryMeetsPage() {
           <p className="text-xs font-semibold text-muted-foreground">Filtri</p>
           <div className="grid gap-2 md:grid-cols-[1fr_220px]">
             <Input
-              placeholder="Cerca meeting..."
+              placeholder="Cerca meeting…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -258,7 +258,7 @@ export default function ClubHistoryMeetsPage() {
             </div>
             <p className="text-xs text-muted-foreground xl:hidden">Tocca un meeting per aprire i risultati.</p>
             {meetsQuery.isLoading ? (
-              <p className="text-sm text-muted-foreground">Caricamento meeting...</p>
+              <p className="text-sm text-muted-foreground">Caricamento meeting…</p>
             ) : meets.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nessun meeting disponibile.</p>
             ) : (
@@ -354,7 +354,7 @@ export default function ClubHistoryMeetsPage() {
 
                 <div className="space-y-2">
                   {resultsQuery.isLoading ? (
-                    <p className="text-sm text-muted-foreground">Caricamento risultati...</p>
+                    <p className="text-sm text-muted-foreground">Caricamento risultati…</p>
                   ) : results.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Nessun risultato per i filtri selezionati.</p>
                   ) : (

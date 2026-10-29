@@ -182,6 +182,10 @@ describe("Allenamenti del club (Corsia)", () => {
     expect(screen.getByRole("heading", { level: 3, name: "Riscaldamento" })).toBeTruthy();
     expect(screen.getByText("Passo obiettivo: 1:35")).toBeTruthy();
     expect(screen.getByRole("heading", { level: 3, name: "Note del coach" })).toBeTruthy();
+    // What the plan does not say is left out, never «n/d».
+    expect(screen.getByText("Ripartenza: 1:50")).toBeTruthy();
+    expect(screen.getByText(/^Serie: 4x100/)).toBeTruthy();
+    expect(screen.queryByText(/n\/d/)).toBeNull();
 
     const user = userEvent.setup({ delay: null });
     await user.click(screen.getByRole("button", { name: "Segna completato" }));

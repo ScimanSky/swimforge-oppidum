@@ -14,6 +14,9 @@ const state = vi.hoisted(() => ({
   invitesError: null as any,
   status: { canGenerate: true, nextAvailableAt: null } as any,
   workout: null as any,
+  aiRuns: [] as any[],
+  historyConfig: { enabled: false } as any,
+  historyLastRun: null as any,
   calls: {} as Record<string, any[]>,
   refetch: {} as Record<string, ReturnType<typeof vi.fn>>,
 }));
@@ -68,8 +71,8 @@ vi.mock("@/lib/trpc", () => {
             publish: mutation("publishMeet"),
           },
           history: {
-            config: { get: query("historyConfig", () => ({ enabled: false })) },
-            import: { lastRun: query("historyLastRun", () => null), start: mutation("historyImport") },
+            config: { get: query("historyConfig", () => state.historyConfig) },
+            import: { lastRun: query("historyLastRun", () => state.historyLastRun), start: mutation("historyImport") },
           },
           workouts: {
             coach: {
@@ -81,7 +84,7 @@ vi.mock("@/lib/trpc", () => {
           },
           aiCoach: {
             getConfig: query("aiConfig", () => undefined),
-            lastRuns: query("aiRuns", () => ({ runs: [] })),
+            lastRuns: query("aiRuns", () => ({ runs: state.aiRuns })),
             upsertConfig: mutation("aiUpsert"),
             manualRun: mutation("aiRun"),
           },
@@ -134,8 +137,12 @@ describe("Area coach del club (Corsia)", () => {
     state.invitesError = null;
     state.status = { canGenerate: true, nextAvailableAt: null };
     state.workout = null;
+    state.aiRuns = [];
+    state.historyConfig = { enabled: false };
+    state.historyLastRun = null;
     state.calls = {};
     flags.clubAiAutomationV1 = false;
+    flags.clubHistoryV1 = false;
     vi.mocked(toast.error).mockClear();
     printing.frames.length = 0;
     for (const refetch of Object.values(state.refetch)) refetch.mockClear();
@@ -222,6 +229,55 @@ describe("Area coach del club (Corsia)", () => {
     renderCoach();
     expect(section("Inviti al club")).toBeTruthy();
     expect(section("Coach AI autonomo")).toBeTruthy();
+  });
+
+  it("Coach AI e storico parlano italiano: attività e stati con le etichette della scelta", () => {
+    flags.clubAiAutomationV1 = true;
+    flags.clubHistoryV1 = true;
+    state.club = { ...state.club, member_role: "admin" };
+    state.aiRuns = [
+      { id: 1, jobType: "scan_meets_weekly", status: "success", startedAt: null, scheduledKey: "manuale" },
+      { id: 2, jobType: "post_motivation_mwf", status: "failed", startedAt: null, scheduledKey: "lun" },
+    ];
+    state.historyConfig = { enabled: true, source: { rootUrl: "https://oppidum.example" } };
+    state.historyLastRun = { status: "partial", startedAt: null, processedPages: 3, processedRecords: 40, errorRecords: 1 };
+    renderCoach();
+
+    const ai = section("Coach AI autonomo");
+    expect(within(ai).getByRole("combobox", { name: "Attività da eseguire" }).textContent).toBe(
+      "Scansione gare settimanale"
+    );
+    expect(within(ai).getByText("Scansione gare settimanale · riuscita")).toBeTruthy();
+    expect(within(ai).getByText("Post motivazionale · non riuscita")).toBeTruthy();
+    expect(within(ai).queryByText(/scan_meets_weekly|success|failed/)).toBeNull();
+
+    const history = section("Storico Oppidum");
+    expect(within(history).getByText("Ultimo import: parziale")).toBeTruthy();
+    expect(within(history).queryByText(/partial/)).toBeNull();
+  });
+
+  it("anteprima senza distanza né ripartenza: niente «n/d», nemmeno nel testo per WhatsApp", () => {
+    state.workout = {
+      id: 42,
+      status: "draft",
+      sessionDate: "2026-10-29",
+      title: "Tecnica",
+      workoutJson: {
+        title: "Tecnica di virata",
+        totalDistance: "n/d",
+        blocks: [{ phase: "main", label: "Centrale", items: [{ label: "Virate", reps: "8x25" }] }],
+      },
+    };
+    renderCoach();
+    const workouts = section("Allenamenti in vasca (AI)");
+    expect(within(workouts).getByText("Tecnica di virata")).toBeTruthy();
+    expect(within(workouts).getByText(/Serie: 8x25/)).toBeTruthy();
+    expect(within(workouts).queryByText(/n\/d/)).toBeNull();
+    const whatsapp = within(workouts).getByRole("link", { name: "Condividi su WhatsApp" }).getAttribute("href")!;
+    const message = decodeURIComponent(whatsapp.split("text=")[1]);
+    expect(message).toContain("Tecnica di virata");
+    expect(message).not.toContain("n/d");
+    expect(message).not.toContain("Distanza");
   });
 
   it("inviti: genera, copia con un nome, errore con Riprova", async () => {

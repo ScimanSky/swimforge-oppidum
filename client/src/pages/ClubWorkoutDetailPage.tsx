@@ -263,7 +263,7 @@ export default function ClubWorkoutDetailPage() {
               disabled={markCompletedMutation.isPending}
             >
               <CheckCircle2 aria-hidden />
-              {markCompletedMutation.isPending ? "Salvataggio..." : "Segna completato"}
+              {markCompletedMutation.isPending ? "Salvataggio…" : "Segna completato"}
             </Button>
             <Button type="button" size="sm" variant="outline" onClick={handlePrintWorkout}>
               <Printer aria-hidden />
@@ -284,6 +284,15 @@ export default function ClubWorkoutDetailPage() {
                   <ul className="mt-2 space-y-2">
                     {block.items.map((item: any, itemIndex: number) => {
                       const line = getWorkoutSeriesDisplay(item);
+                      // Only what the plan says: no «n/d».
+                      const facts = [
+                        ["Stile", planFact(line.stroke)],
+                        ["Serie", planFact(line.reps)],
+                        ["Distanza serie", planFact(line.seriesDistance)],
+                      ]
+                        .filter(([, value]) => value)
+                        .map(([label, value]) => `${label}: ${value}`);
+                      const sendoff = planFact(line.sendoff);
                       return (
                         <li
                           key={`${detailWorkout.id}-${blockIndex}-${itemIndex}`}
@@ -292,10 +301,8 @@ export default function ClubWorkoutDetailPage() {
                           <p className="font-semibold text-foreground workout-print-series-title">
                             {String(item?.label ?? "Serie")}
                           </p>
-                          <p>
-                            Stile: {String(line.stroke ?? "n/d")} · Serie: {line.reps} · Distanza serie: {line.seriesDistance}
-                          </p>
-                          <p>Ripartenza: {line.sendoff}</p>
+                          {facts.length > 0 ? <p>{facts.join(" · ")}</p> : null}
+                          {sendoff ? <p>Ripartenza: {sendoff}</p> : null}
                           {line.betweenSetsRest ? <p>Recupero prima della serie successiva: {line.betweenSetsRest}</p> : null}
                           {line.intensity ? <p>Intensità: {line.intensity}</p> : null}
                           {line.targetPace ? <p>Passo obiettivo: {line.targetPace}</p> : null}

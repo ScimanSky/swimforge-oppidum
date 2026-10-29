@@ -27,7 +27,7 @@ import {
   printInHiddenFrame,
   type MeetRosterRow,
 } from "@/lib/club-print";
-import { formatSessionDay } from "@/lib/club-workouts";
+import { formatSessionDay, planFact } from "@/lib/club-workouts";
 import { NO_VALUE, formatInteger, formatSessionDate } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
 import { errorToastMessage } from "@/lib/trpc-errors";
@@ -96,6 +96,35 @@ const ROLE_LABELS: Record<string, string> = {
   admin: "Admin",
   moderator: "Moderatore",
   coach: "Coach",
+};
+
+type AiJobType = "scan_meets_weekly" | "generate_workouts_weekly" | "publish_workout_daily" | "post_motivation_mwf";
+
+/** The AI coach's jobs, as the «Attività da eseguire» select and the runs list name them. */
+const AI_JOB_OPTIONS: Array<{ value: AiJobType; label: string }> = [
+  { value: "scan_meets_weekly", label: "Scansione gare settimanale" },
+  { value: "generate_workouts_weekly", label: "Genera gli allenamenti della settimana" },
+  { value: "publish_workout_daily", label: "Pubblica l'allenamento del giorno" },
+  { value: "post_motivation_mwf", label: "Post motivazionale" },
+];
+const AI_JOB_LABELS: Record<string, string> = Object.fromEntries(
+  AI_JOB_OPTIONS.map((option) => [option.value, option.label])
+);
+
+/** An AI coach run («esecuzione»). */
+const AI_RUN_STATUS_LABELS: Record<string, string> = {
+  success: "riuscita",
+  partial: "parziale",
+  failed: "non riuscita",
+  skipped: "saltata",
+};
+
+/** A history import run («import»). */
+const HISTORY_IMPORT_STATUS_LABELS: Record<string, string> = {
+  running: "in corso",
+  success: "riuscito",
+  partial: "parziale",
+  failed: "non riuscito",
 };
 
 const WORKOUT_STATUS_LABELS: Record<string, string> = {
@@ -168,6 +197,18 @@ function getRosterAthleteName(user: any) {
   return splitAthleteName(athleteRaw);
 }
 
+/** What a series of the preview says, leaving out what the plan does not («n/d»). */
+function seriesFacts(series: ReturnType<typeof getWorkoutSeriesDisplay>) {
+  return [
+    ["Serie", planFact(series.reps)],
+    ["Distanza serie", planFact(series.seriesDistance)],
+    ["Ripartenza", planFact(series.sendoff)],
+    ["Recupero prima della serie successiva", planFact(series.betweenSetsRest)],
+  ]
+    .filter(([, value]) => value)
+    .map(([label, value]) => `${label}: ${value}`);
+}
+
 function toDateInputValue(date: Date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
@@ -238,7 +279,7 @@ export default function ClubCoachModeration() {
   const [aiImageModel, setAiImageModel] = useState("");
   const [aiMotivationPrompt, setAiMotivationPrompt] = useState("");
   const [aiScanUrl, setAiScanUrl] = useState("https://www.nuotosardegna.it/category/comunicati-master/");
-  const [aiManualJobType, setAiManualJobType] = useState<"scan_meets_weekly" | "generate_workouts_weekly" | "publish_workout_daily" | "post_motivation_mwf">("scan_meets_weekly");
+  const [aiManualJobType, setAiManualJobType] = useState<AiJobType>("scan_meets_weekly");
 
   const clubQuery = trpc.community.clubs.get.useQuery(
     { clubId },
@@ -402,7 +443,9 @@ export default function ClubCoachModeration() {
   });
   const manualAiCoachRunMutation = trpc.community.clubs.aiCoach.manualRun.useMutation({
     onSuccess: (payload: any) => {
-      toast.success(`Job ${String(payload?.run?.jobType ?? "")} completato (${String(payload?.run?.status ?? "ok")})`);
+      const job = AI_JOB_LABELS[String(payload?.run?.jobType ?? "")] ?? "Attività";
+      const status = AI_RUN_STATUS_LABELS[String(payload?.run?.status ?? "")];
+      toast.success(status ? `${job}: ${status}` : `${job}: completata`);
       void aiCoachRunsQuery.refetch();
     },
     onError: (error) => {
@@ -493,14 +536,16 @@ export default function ClubCoachModeration() {
     if (!workoutPreview) return null;
     const title = String(workoutPreviewPlan?.title ?? workoutPreview.title ?? "Workout vasca");
     const sessionDate = String(workoutPreview.sessionDate ?? workoutSessionDate);
-    const distance = String(workoutPreviewPlan?.totalDistance ?? "n/d");
+    const distance = planFact(workoutPreviewPlan?.totalDistance);
     const text = [
       `Workout club ${club?.name ?? ""}`.trim(),
       `${title}`,
       `Data: ${sessionDate}`,
-      `Distanza: ${distance}`,
+      distance ? `Distanza: ${distance}` : null,
       `Apri SwimForge: ${publicSiteUrl(`/community/club/${clubId}/workouts/${workoutPreview.id}`)}`,
-    ].join("\n");
+    ]
+      .filter(Boolean)
+      .join("\n");
     return `https://wa.me/?text=${encodeURIComponent(text)}`;
   }, [workoutPreview, workoutPreviewPlan?.title, workoutPreviewPlan?.totalDistance, workoutSessionDate, club?.name, clubId]);
 
@@ -604,7 +649,7 @@ export default function ClubCoachModeration() {
     return (
       <AppLayout>
         <ClubNotice backHref={`/community/club/${clubId}`}>
-          Accesso riservato a coach e staff. Reindirizzamento in corso...
+          Accesso riservato a coach e staff. Reindirizzamento in corso…
         </ClubNotice>
       </AppLayout>
     );
@@ -686,7 +731,7 @@ export default function ClubCoachModeration() {
               }}
             >
               <Plus aria-hidden />
-              {createMeetMutation.isPending ? "Creazione..." : "Crea convocazione"}
+              {createMeetMutation.isPending ? "Creazione…" : "Crea convocazione"}
             </Button>
 
             {normalizedMeets.length > 0 ? (
@@ -753,7 +798,7 @@ export default function ClubCoachModeration() {
                         publishMeetMutation.mutate({ meetId: selectedMeetId });
                       }}
                     >
-                      {publishMeetMutation.isPending ? "Pubblicazione..." : "Pubblica elenco iscritti"}
+                      {publishMeetMutation.isPending ? "Pubblicazione…" : "Pubblica elenco iscritti"}
                     </Button>
                     <Button
                       className="w-full sm:w-auto"
@@ -1029,7 +1074,7 @@ export default function ClubCoachModeration() {
               }
             >
               <Sparkles aria-hidden />
-              {generateWorkoutDraftMutation.isPending ? "Generazione..." : "Genera allenamento"}
+              {generateWorkoutDraftMutation.isPending ? "Generazione…" : "Genera allenamento"}
             </Button>
 
             {workoutCooldownLabel ? (
@@ -1041,7 +1086,7 @@ export default function ClubCoachModeration() {
                 Stato dell'attesa non disponibile: ricarica la pagina.
               </p>
             ) : workoutGenerationStatusQuery.isFetching ? (
-              <p className="text-sm text-muted-foreground">Verifica dell'attesa...</p>
+              <p className="text-sm text-muted-foreground">Verifica dell'attesa…</p>
             ) : (
               <p className="text-sm text-muted-foreground">Una generazione ogni 24 ore per club, qualunque sia la data scelta.</p>
             )}
@@ -1061,7 +1106,9 @@ export default function ClubCoachModeration() {
                     workoutPreview.sessionDate ? formatSessionDay(workoutPreview.sessionDate) : null,
                     `Stato: ${WORKOUT_STATUS_LABELS[workoutStatus] ?? workoutStatus}`,
                     `Blocchi: ${Array.isArray(workoutPreviewPlan?.blocks) ? workoutPreviewPlan.blocks.length : 0}`,
-                    `Distanza: ${String(workoutPreviewPlan?.totalDistance ?? "n/d")}`,
+                    planFact(workoutPreviewPlan?.totalDistance)
+                      ? `Distanza: ${planFact(workoutPreviewPlan?.totalDistance)}`
+                      : null,
                   ]
                     .filter((part) => part && part !== NO_VALUE)
                     .join(" · ")}
@@ -1079,8 +1126,7 @@ export default function ClubCoachModeration() {
                             return (
                               <li key={`coach-preview-${blockIndex}-${itemIndex}`}>
                                 <span className="font-medium text-foreground">{String(item?.label ?? "Serie")}</span>
-                                {" · "}Serie: {series.reps} · Distanza serie: {series.seriesDistance} · Ripartenza: {series.sendoff}
-                                {series.betweenSetsRest ? ` · Recupero prima della serie successiva: ${series.betweenSetsRest}` : ""}
+                                {seriesFacts(series).map((fact) => ` · ${fact}`).join("")}
                               </li>
                             );
                           })}
@@ -1098,7 +1144,7 @@ export default function ClubCoachModeration() {
                   onClick={() => publishWorkoutMutation.mutate({ workoutId: Number(workoutPreview.id) })}
                 >
                   {publishWorkoutMutation.isPending
-                    ? "Pubblicazione..."
+                    ? "Pubblicazione…"
                     : workoutPublished
                       ? "Pubblicato"
                       : "Pubblica e avvisa i membri"}
@@ -1196,18 +1242,19 @@ export default function ClubCoachModeration() {
                       })
                     }
                   >
-                    {upsertAiCoachConfigMutation.isPending ? "Salvataggio..." : "Salva configurazione"}
+                    {upsertAiCoachConfigMutation.isPending ? "Salvataggio…" : "Salva configurazione"}
                   </Button>
 
                   <Select value={aiManualJobType} onValueChange={(value) => setAiManualJobType(value as typeof aiManualJobType)}>
-                    <SelectTrigger aria-label="Job da eseguire" className="w-full sm:w-[260px]">
+                    <SelectTrigger aria-label="Attività da eseguire" className="w-full sm:w-[260px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="scan_meets_weekly">Scansione gare settimanale</SelectItem>
-                      <SelectItem value="generate_workouts_weekly">Genera gli allenamenti della settimana</SelectItem>
-                      <SelectItem value="publish_workout_daily">Pubblica l'allenamento del giorno</SelectItem>
-                      <SelectItem value="post_motivation_mwf">Post motivazionale</SelectItem>
+                      {AI_JOB_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
 
@@ -1222,7 +1269,7 @@ export default function ClubCoachModeration() {
                     }
                   >
                     <PlayCircle aria-hidden />
-                    {manualAiCoachRunMutation.isPending ? "Esecuzione..." : "Esegui ora"}
+                    {manualAiCoachRunMutation.isPending ? "Esecuzione…" : "Esegui ora"}
                   </Button>
                 </div>
 
@@ -1235,7 +1282,8 @@ export default function ClubCoachModeration() {
                       {aiCoachRuns.map((run: any) => (
                         <li key={run.id} className="border-t border-border py-2 text-xs first:border-t-0">
                           <p className="font-medium">
-                            {String(run.jobType)} · {String(run.status)}
+                            {AI_JOB_LABELS[String(run.jobType)] ?? "Attività"} ·{" "}
+                            {AI_RUN_STATUS_LABELS[String(run.status)] ?? "stato sconosciuto"}
                           </p>
                           <p className="inline-flex items-center gap-1 text-muted-foreground">
                             <Clock3 className="size-3.5" aria-hidden />
@@ -1270,7 +1318,7 @@ export default function ClubCoachModeration() {
                   onClick={() => startHistoryImportMutation.mutate({ clubId, mode: "oppidum_index_full" })}
                 >
                   <RefreshCw className={cn(startHistoryImportMutation.isPending && "animate-spin")} aria-hidden />
-                  {startHistoryImportMutation.isPending ? "Import in corso..." : "Importa adesso"}
+                  {startHistoryImportMutation.isPending ? "Import in corso…" : "Importa adesso"}
                 </Button>
               </div>
             }
@@ -1285,7 +1333,9 @@ export default function ClubCoachModeration() {
                 <p className="text-muted-foreground">Nessun import storico eseguito.</p>
               ) : (
                 <div className="space-y-1">
-                  <p className="font-medium">Ultimo import: {String(historyLastRun.status ?? "-")}</p>
+                  <p className="font-medium">
+                    Ultimo import: {HISTORY_IMPORT_STATUS_LABELS[String(historyLastRun.status)] ?? "stato sconosciuto"}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     Avvio: {formatDate(historyLastRun.startedAt)} · Pagine: {formatInteger(historyLastRun.processedPages ?? 0)} · Record: {formatInteger(historyLastRun.processedRecords ?? 0)} · Errori: {formatInteger(historyLastRun.errorRecords ?? 0)}
                   </p>
@@ -1307,7 +1357,7 @@ export default function ClubCoachModeration() {
               disabled={createInviteMutation.isPending}
               onClick={() => createInviteMutation.mutate({ clubId, maxUses: 10 })}
             >
-              {createInviteMutation.isPending ? "Generazione..." : "Genera nuovo invito"}
+              {createInviteMutation.isPending ? "Generazione…" : "Genera nuovo invito"}
             </Button>
             {invitesQuery.isPending ? (
               <LoadingSkeleton label="Caricamento degli inviti…" count={2} itemClassName="h-11 w-full rounded-xl" />

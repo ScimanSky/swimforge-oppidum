@@ -514,7 +514,7 @@ export default function ClubDetailEnhanced() {
                 disabled={!joinRulesAccepted || joinMutation.isPending}
                 onClick={() => joinMutation.mutate({ clubId, acceptRules: true })}
               >
-                {joinMutation.isPending ? "Iscrizione..." : "Accetta e iscriviti"}
+                {joinMutation.isPending ? "Iscrizione…" : "Accetta e iscriviti"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -572,7 +572,7 @@ export default function ClubDetailEnhanced() {
                   rows={3}
                   value={newMeet.notes}
                   onChange={(e) => setNewMeet((prev) => ({ ...prev, notes: e.target.value }))}
-                  placeholder="Dettagli tecnici, logistica, convocazione..."
+                  placeholder="Dettagli tecnici, logistica, convocazione…"
                 />
               </div>
             </div>
@@ -614,7 +614,7 @@ export default function ClubDetailEnhanced() {
                 }}
                 disabled={createMeetMutation.isPending}
               >
-                {createMeetMutation.isPending ? "Creazione..." : "Crea convocazione"}
+                {createMeetMutation.isPending ? "Creazione…" : "Crea convocazione"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -670,7 +670,7 @@ export default function ClubDetailEnhanced() {
                     onClick={handleFindLocationOnMap}
                     disabled={isGeocodingLocation || !newEvent.location.trim()}
                   >
-                    {isGeocodingLocation ? "Cerco..." : "Trova su mappa"}
+                    {isGeocodingLocation ? "Cerco…" : "Trova su mappa"}
                   </Button>
                   {newEvent.locationLat !== null && newEvent.locationLng !== null && (
                     <span className="text-xs text-muted-foreground">
@@ -779,7 +779,7 @@ export default function ClubDetailEnhanced() {
                   });
                 }}
               >
-                {createEventMutation.isPending ? "Creazione..." : "Crea evento"}
+                {createEventMutation.isPending ? "Creazione…" : "Crea evento"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -798,7 +798,7 @@ export default function ClubDetailEnhanced() {
                 disabled={createInviteMutation.isPending}
                 onClick={() => createInviteMutation.mutate({ clubId, maxUses: 10 })}
               >
-                {createInviteMutation.isPending ? "Generazione..." : "Genera nuovo invito"}
+                {createInviteMutation.isPending ? "Generazione…" : "Genera nuovo invito"}
               </Button>
               {(invitesQuery.data as any[])?.length > 0 && (
                 <div className="space-y-2">
@@ -1067,7 +1067,7 @@ function ClubSettingsForm({
             disabled={generatingAssetKind !== null || saving || !isOwner}
             onClick={() => void handleGenerateAsset("logo")}
           >
-            {generatingAssetKind === "logo" ? "Genero logo..." : "Genera logo AI"}
+            {generatingAssetKind === "logo" ? "Genero logo…" : "Genera logo AI"}
           </Button>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -1121,7 +1121,7 @@ function ClubSettingsForm({
             disabled={generatingAssetKind !== null || saving || !isOwner}
             onClick={() => void handleGenerateAsset("cover")}
           >
-            {generatingAssetKind === "cover" ? "Genero copertina..." : "Genera copertina AI"}
+            {generatingAssetKind === "cover" ? "Genero copertina…" : "Genera copertina AI"}
           </Button>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -1143,7 +1143,7 @@ function ClubSettingsForm({
       {/* Tagline */}
       <div>
         <label className="text-sm font-medium">Tagline</label>
-        <Input value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={200} placeholder="Motto del club..." />
+        <Input value={tagline} onChange={(e) => setTagline(e.target.value)} maxLength={200} placeholder="Motto del club…" />
       </div>
 
       {/* Website URL */}
@@ -1166,7 +1166,7 @@ function ClubSettingsForm({
       {/* Rules */}
       <div>
         <label className="text-sm font-medium">Regolamento</label>
-        <Textarea value={rules} onChange={(e) => setRules(e.target.value)} rows={2} placeholder="Regole del club..." />
+        <Textarea value={rules} onChange={(e) => setRules(e.target.value)} rows={2} placeholder="Regole del club…" />
       </div>
 
       {/* Theme colour: only the AI logo and cover use it. */}
@@ -1202,7 +1202,7 @@ function ClubSettingsForm({
         disabled={saving}
         onClick={handleSave}
       >
-        {saving ? "Caricamento..." : "Salva modifiche"}
+        {saving ? "Caricamento…" : "Salva modifiche"}
       </Button>
 
       {isStaff ? (
@@ -1230,7 +1230,7 @@ function ClubSettingsForm({
               deleteMutation.mutate({ clubId });
             }}
           >
-            {deleteMutation.isPending ? "Eliminazione..." : "Elimina club"}
+            {deleteMutation.isPending ? "Eliminazione…" : "Elimina club"}
           </Button>
         </div>
       ) : null}

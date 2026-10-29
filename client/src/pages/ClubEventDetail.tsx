@@ -420,7 +420,7 @@ export default function ClubEventDetail() {
                     disabled={deleteEvent.isPending}
                     onClick={() => deleteEvent.mutate({ eventId })}
                   >
-                    {deleteEvent.isPending ? "Eliminazione..." : "Elimina"}
+                    {deleteEvent.isPending ? "Eliminazione…" : "Elimina"}
                   </Button>
                 </DialogFooter>
               </DialogContent>
@@ -503,7 +503,7 @@ export default function ClubEventDetail() {
                     disabled={updateEventMutation.isPending}
                   >
                     <Save aria-hidden />
-                    {updateEventMutation.isPending ? "Salvataggio..." : "Salva percorso"}
+                    {updateEventMutation.isPending ? "Salvataggio…" : "Salva percorso"}
                   </Button>
                 </div>
               ) : isStaff && hasMapData ? (

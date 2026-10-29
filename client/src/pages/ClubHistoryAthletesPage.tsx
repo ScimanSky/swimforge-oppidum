@@ -139,7 +139,7 @@ export default function ClubHistoryAthletesPage() {
     return (
       <AppLayout>
         <div className="container py-6">
-          <div className="surface-panel p-6 text-center text-muted-foreground">Caricamento storico atleti...</div>
+          <div className="surface-panel p-6 text-center text-muted-foreground">Caricamento storico atleti…</div>
         </div>
       </AppLayout>
     );
@@ -217,7 +217,7 @@ export default function ClubHistoryAthletesPage() {
           <p className="text-xs font-semibold text-muted-foreground">Filtri</p>
           <div className="grid gap-2 md:grid-cols-[1fr_220px]">
             <Input
-              placeholder="Cerca atleta..."
+              placeholder="Cerca atleta…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -243,7 +243,7 @@ export default function ClubHistoryAthletesPage() {
             </div>
             <p className="text-xs text-muted-foreground xl:hidden">Tocca un atleta per aprire il dettaglio.</p>
             {athletesQuery.isLoading ? (
-              <p className="text-sm text-muted-foreground">Caricamento elenco...</p>
+              <p className="text-sm text-muted-foreground">Caricamento elenco…</p>
             ) : athletes.length === 0 ? (
               <p className="text-sm text-muted-foreground">Nessun atleta trovato.</p>
             ) : (
@@ -291,7 +291,7 @@ export default function ClubHistoryAthletesPage() {
             {!selectedAthleteSlug ? (
               <p className="text-sm text-muted-foreground">Seleziona un atleta.</p>
             ) : athleteDetailQuery.isLoading ? (
-              <p className="text-sm text-muted-foreground">Caricamento dettaglio atleta...</p>
+              <p className="text-sm text-muted-foreground">Caricamento dettaglio atleta…</p>
             ) : !detail?.athlete ? (
               <p className="text-sm text-muted-foreground">Dettaglio atleta non disponibile.</p>
             ) : (

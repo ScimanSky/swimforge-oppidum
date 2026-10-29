@@ -326,7 +326,7 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
         </h3>
         <Textarea
           aria-label="Testo del post"
-          placeholder="Condividi qualcosa con il club..."
+          placeholder="Condividi qualcosa con il club…"
           value={postText}
           onChange={(e) => setPostText(e.target.value)}
           className="min-h-[100px]"
@@ -459,7 +459,7 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
           >
             <Plus aria-hidden />
             {createPostMutation.isPending || imageKitAuth.isPending || cloudinaryVideoAuth.isPending
-              ? "Pubblicazione..."
+              ? "Pubblicazione…"
               : "Pubblica"}
           </Button>
         </div>
@@ -626,7 +626,7 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
                       <div className="flex gap-2">
                         <Textarea
                           aria-label="Commento"
-                          placeholder="Aggiungi un commento..."
+                          placeholder="Aggiungi un commento…"
                           value={commentTextByPost[post.id] || ""}
                           onChange={(e) =>
                             setCommentTextByPost({ ...commentTextByPost, [post.id]: e.target.value })

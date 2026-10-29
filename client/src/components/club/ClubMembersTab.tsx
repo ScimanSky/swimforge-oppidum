@@ -206,7 +206,7 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
               ) : null}
             </div>
             {requestsQuery.isLoading ? (
-              <p className="mt-2 text-sm text-muted-foreground">Caricamento...</p>
+              <p className="mt-2 text-sm text-muted-foreground">Caricamento…</p>
             ) : requestsQuery.error ? (
               <p className="mt-2 text-sm text-muted-foreground">{requestsQuery.error.message}</p>
             ) : requestsQuery.data && requestsQuery.data.length > 0 ? (
@@ -251,7 +251,7 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
               ) : null}
             </div>
             {bannedQuery.isLoading ? (
-              <p className="mt-2 text-sm text-muted-foreground">Caricamento...</p>
+              <p className="mt-2 text-sm text-muted-foreground">Caricamento…</p>
             ) : bannedQuery.error ? (
               <p className="mt-2 text-sm text-muted-foreground">{bannedQuery.error.message}</p>
             ) : bannedQuery.data && bannedQuery.data.length > 0 ? (
