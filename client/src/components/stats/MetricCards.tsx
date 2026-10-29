@@ -39,6 +39,7 @@ import {
   PacingSetChart,
   VolumeChart,
 } from "./MetricCharts";
+import { CssTestDialog } from "./CssTestDialog";
 
 /** Shown next to «—» when a metric has no value. */
 const NO_DATA_READING = "servono più dati";
@@ -294,6 +295,7 @@ export function MetricCards({ metrics }: { metrics: SwimMetrics }) {
                 setExplained(key);
                 setDialogOpen(true);
               }}
+              actions={key === "css" ? <CssTestDialog current={metrics.css.current} /> : undefined}
             >
               <Body metrics={metrics} />
             </MetricCard>

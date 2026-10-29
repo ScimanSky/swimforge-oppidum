@@ -104,6 +104,8 @@ describe("Metriche: riquadri", () => {
       "400 m in 6:50 · 20 ott",
     ]);
     expect(region).toHaveTextContent("Stima su 2 tratti continui a stile libero in vasca degli ultimi 90 giorni.");
+    await userEvent.click(within(region).getByRole("button", { name: "Inserisci un test" }));
+    expect(screen.getByRole("dialog", { name: "Test del passo soglia" })).toBeTruthy();
   });
 
   it("forma e fatica: sintesi, rampa e base", async () => {
@@ -227,6 +229,8 @@ describe("Metriche: riquadri", () => {
     const css = screen.getByRole("region", { name: /^Passo soglia/ });
     expect(css).toHaveTextContent(metrics.css.missing!);
     expect(within(css).queryByRole("img")).toBeNull();
+    // Without data the test is the way to get a threshold pace.
+    expect(within(css).getByRole("button", { name: "Inserisci un test" })).toBeTruthy();
 
     await userEvent.click(card("Intensità"));
     const intensity = screen.getByRole("region", { name: /^Intensità/ });
