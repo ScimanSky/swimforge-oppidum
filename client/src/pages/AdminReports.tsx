@@ -121,7 +121,7 @@ export default function AdminReports() {
                 value={status}
                 onValueChange={(value) => setStatus(value as ReportStatus)}
               >
-                <SelectTrigger className="h-9">
+                <SelectTrigger>
                   <SelectValue placeholder="Seleziona stato" />
                 </SelectTrigger>
                 <SelectContent>

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   distanceParts,
   formatDayMonth,
+  formatDayMonthYear,
   formatDistance,
   formatDurationParts,
   formatInteger,
@@ -19,6 +20,11 @@ describe("formatter Corsia", () => {
   it("data sessione", () =>
     expect(formatSessionDate(monday)).toBe("lun 26 ott · 10:47"));
   it("giorno e mese", () => expect(formatDayMonth(monday)).toBe("26 ott"));
+  it("giorno, mese e anno; «—» senza data valida", () => {
+    expect(formatDayMonthYear(new Date(2025, 2, 12))).toBe("12 mar 2025");
+    expect(formatDayMonthYear(null)).toBe("—");
+    expect(formatDayMonthYear("non è una data")).toBe("—");
+  });
   it("giorno della settimana, giorno e mese", () =>
     expect(formatWeekdayDayMonth(monday)).toBe("lun 26 ott"));
   it("accetta stringhe ISO", () =>

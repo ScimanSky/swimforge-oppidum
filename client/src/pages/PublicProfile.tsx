@@ -7,11 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { MetricOrb } from "@/components/metrics/MetricOrb"
 import { trpc } from "@/lib/trpc"
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import { useLocation, useParams } from "wouter"
 import { UserPlus, UserCheck, ArrowLeft, MapPin, Zap, MessageCircle } from "lucide-react"
 import DirectMessages from "@/components/DirectMessages"
-import { formatSwimCentiseconds } from "@/lib/swimTime"
+import { PersonalRecordsBoard } from "@/components/corsia/PersonalRecordsBoard"
 
 const getInitials = (name: string) =>
   name
@@ -22,35 +22,10 @@ const getInitials = (name: string) =>
     .join("")
     .toUpperCase() || "SF"
 
-const strokeLabels: Record<string, string> = {
-  freestyle: "Stile Libero",
-  backstroke: "Dorso",
-  breaststroke: "Rana",
-  butterfly: "Farfalla",
-  mixed: "Misti",
-}
-
-const sourceLabels: Record<string, string> = {
-  official: "Gara",
-  training: "Allenamento",
-}
-
-const formatDate = (value?: string | Date | null) => {
-  if (!value) return "--"
-  const parsed = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(parsed.getTime())) return "--"
-  return parsed.toLocaleDateString("it-IT", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  })
-}
-
 export default function PublicProfile() {
   const [, setLocation] = useLocation()
   const params = useParams<{ id: string }>()
   const userId = Number.parseInt(params.id || "0", 10)
-  const [finaGender, setFinaGender] = useState<"male" | "female">("male")
   const fromParam =
     typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("from") : null
   const safeFromPath = fromParam && fromParam.startsWith("/") ? fromParam : null
@@ -59,10 +34,6 @@ export default function PublicProfile() {
   const profileQuery = trpc.community.users.getPublicProfile.useQuery(
     { userId },
     { enabled: Number.isFinite(userId) && userId > 0 }
-  )
-  const pbBoardQuery = trpc.records.getByUser.useQuery(
-    { userId, finaGender },
-    { enabled: Number.isFinite(userId) && userId > 0 && Boolean(profileQuery.data) }
   )
 
   const toggleFollowMutation = trpc.community.users.toggleFollow.useMutation({
@@ -93,10 +64,6 @@ export default function PublicProfile() {
   const followerCount = Number((profileQuery.data as any)?.followerCount ?? 0)
   const followingCount = Number((profileQuery.data as any)?.followingCount ?? 0)
   const isFollowing = Boolean((profileQuery.data as any)?.isFollowing)
-  const pbRows = useMemo(() => {
-    const rows = ((pbBoardQuery.data as any)?.records as Array<any> | undefined) ?? []
-    return rows.slice(0, 12)
-  }, [pbBoardQuery.data])
 
   const handleBack = () => {
     if (safeFromPath) {
@@ -216,61 +183,14 @@ export default function PublicProfile() {
                 />
               </div>
 
-              <div className="mt-6 rounded-xl border border-border/60 bg-background/35 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-semibold text-foreground">PB Board</p>
-                  <div className="inline-flex items-center gap-1 rounded-lg border border-border/60 bg-background/40 p-1">
-                    <Button
-                      size="sm"
-                      variant={finaGender === "male" ? "neon" : "ghost"}
-                      className="h-7 px-2 text-xs"
-                      onClick={() => setFinaGender("male")}
-                    >
-                      FINA M
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant={finaGender === "female" ? "neon" : "ghost"}
-                      className="h-7 px-2 text-xs"
-                      onClick={() => setFinaGender("female")}
-                    >
-                      FINA F
-                    </Button>
-                  </div>
-                </div>
-                {pbBoardQuery.isLoading ? (
-                  <p className="mt-2 text-sm text-muted-foreground">Caricamento personal best...</p>
-                ) : pbRows.length === 0 ? (
-                  <p className="mt-2 text-sm text-muted-foreground">Nessun personal best pubblico disponibile.</p>
-                ) : (
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {pbRows.map((row: any) => (
-                      <div key={row.id} className="rounded-lg border border-border/50 bg-card/40 p-2.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-semibold text-foreground">
-                            {strokeLabels[String(row.strokeType)] ?? "Stile"} {Number(row.distanceMeters)}m
-                          </p>
-                          <Badge variant="outline" className="text-[10px]">
-                            {Number(row.poolLengthMeters)}m
-                          </Badge>
-                        </div>
-                        <p className="mt-1 font-display text-base font-bold text-action-text">
-                          {formatSwimCentiseconds(row.timeCs)}
-                        </p>
-                        <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                          <span>{sourceLabels[String(row.source)] ?? "PB"}</span>
-                          <span>{formatDate(row.achievedAt)}</span>
-                        </div>
-                        {Number.isFinite(Number(row.finaPoints)) ? (
-                          <p className="mt-1 text-[11px] font-semibold text-amber-300">
-                            {Math.round(Number(row.finaPoints))} pt FINA
-                          </p>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <PersonalRecordsBoard
+                userId={userId}
+                enabled={Boolean(profileQuery.data)}
+                limit={12}
+                emptyText="Nessun record pubblico."
+                framed={false}
+                className="mt-6 border-t border-border pt-4"
+              />
             </SurfaceContent>
           </Surface>
         )}

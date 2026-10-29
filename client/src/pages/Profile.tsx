@@ -20,132 +20,29 @@ import {
   Sun,
   Waves,
 } from "lucide-react";
-import { formatSwimCentiseconds } from "@/lib/swimTime";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
 import {
   distanceParts,
+  formatDayMonthYear,
   formatDurationParts,
   formatInteger,
   formatPaceValue,
   getInitials,
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
-
-/** «12 mar 2025»; «—» for a missing or invalid date. */
-const formatDate = (date?: string | Date | null) => {
-  if (!date) return "—";
-  const parsed = date instanceof Date ? date : new Date(date);
-  if (Number.isNaN(parsed.getTime())) return "—";
-  return parsed.toLocaleDateString("it-IT", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-};
-
-const parseActivityDate = (value?: string | Date | null) => {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value === "string") {
-    const normalized = value.includes("T") ? value : value.replace(" ", "T");
-    const date = new Date(normalized);
-    return Number.isNaN(date.getTime()) ? null : date;
-  }
-  return null;
-};
-
-const toNumber = (value: unknown) => {
-  if (value === null || value === undefined) return 0;
-  const num = Number(value);
-  return Number.isFinite(num) ? num : 0;
-};
+import {
+  STROKE_LABELS,
+  activityDays,
+  getActivityAvgSwolf,
+  getActivityStroke,
+  getStreaks,
+} from "@/lib/profile-stats";
+import { PersonalRecordsBoard } from "@/components/corsia/PersonalRecordsBoard";
 
 const toTime = (value: unknown) => {
   if (!value) return 0;
   const time = new Date(value as string | Date).getTime();
   return Number.isFinite(time) ? time : 0;
-};
-
-const getActivityDateValue = (activity: any) =>
-  activity?.activityDate ??
-  activity?.activity_date ??
-  activity?.createdAt ??
-  activity?.created_at ??
-  null;
-
-const getActivityPace = (activity: any) =>
-  toNumber(
-    activity?.avgPacePer100m ??
-      activity?.avg_pace_per_100m ??
-      activity?.pacePer100m ??
-      activity?.pace_per_100m ??
-      0
-  );
-
-const getActivityAvgSwolf = (activity: any) =>
-  toNumber(activity?.avgSwolf ?? activity?.avg_swolf ?? 0);
-
-const getActivityStroke = (activity: any) =>
-  activity?.strokeType ?? activity?.stroke_type ?? activity?.stroke ?? "mixed";
-
-const getStreaks = (dates: string[]) => {
-  if (dates.length === 0) return { current: 0, best: 0 };
-  const uniqueDates = Array.from(new Set(dates)).sort();
-  const dateSet = new Set(uniqueDates);
-  const trainingDays = new Set([1, 3, 5]); // Mon/Wed/Fri
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const trainingDates: string[] = [];
-  for (let i = 0; i < 365; i += 1) {
-    const checkDate = new Date(today);
-    checkDate.setDate(checkDate.getDate() - i);
-    if (trainingDays.has(checkDate.getDay())) {
-      trainingDates.push(checkDate.toISOString().split("T")[0]);
-    }
-  }
-  trainingDates.reverse();
-
-  let best = 0;
-  let temp = 0;
-  for (const dateStr of trainingDates) {
-    if (dateSet.has(dateStr)) {
-      temp += 1;
-      best = Math.max(best, temp);
-    } else {
-      temp = 0;
-    }
-  }
-
-  let endIndex = trainingDates.length - 1;
-  const todayStr = today.toISOString().split("T")[0];
-  if (trainingDays.has(today.getDay()) && !dateSet.has(todayStr)) {
-    endIndex -= 1;
-  }
-  let current = 0;
-  for (let i = endIndex; i >= 0; i -= 1) {
-    if (dateSet.has(trainingDates[i])) {
-      current += 1;
-    } else {
-      break;
-    }
-  }
-
-  return { current, best };
-};
-
-const strokeLabels: Record<string, string> = {
-  freestyle: "Stile libero",
-  backstroke: "Dorso",
-  breaststroke: "Rana",
-  butterfly: "Farfalla",
-  mixed: "Misti",
-};
-
-const sourceLabels: Record<string, string> = {
-  official: "Gara",
-  training: "Allenamento",
 };
 
 /** Badges shown in the profile preview (the rest are on `/badges`). */
@@ -234,17 +131,6 @@ function AppearanceSection() {
 export default function Profile() {
   const { data: me } = trpc.auth.me.useQuery();
   const { data: profile } = trpc.profile.get.useQuery();
-  const profileFinaGender = useMemo<"male" | "female">(() => {
-    const raw = String((profile as any)?.gender ?? (profile as any)?.sex ?? "").trim().toLowerCase();
-    if (raw === "female" || raw === "f" || raw === "woman" || raw === "donna") {
-      return "female";
-    }
-    return "male";
-  }, [profile]);
-  const pbBoardQuery = trpc.records.getByUser.useQuery(
-    { userId: Number(me?.id ?? 0), finaGender: profileFinaGender },
-    { enabled: Number(me?.id ?? 0) > 0 }
-  );
   const { data: activitiesData } = trpc.activities.list.useQuery({
     limit: 50,
     offset: 0,
@@ -284,12 +170,8 @@ export default function Profile() {
       : null;
     const bestSwolf = swolfValues.length ? Math.min(...swolfValues) : null;
 
-    const dateList = activities
-      .map((activity) => parseActivityDate(getActivityDateValue(activity)))
-      .filter((value): value is Date => value instanceof Date)
-      .map((date) => date.toISOString().split("T")[0])
-      .filter(Boolean);
-    const streaks = getStreaks(dateList);
+    const swimDays = activityDays(activities);
+    const streaks = getStreaks(swimDays);
 
     return {
       totalDistance,
@@ -298,7 +180,7 @@ export default function Profile() {
       avgPace,
       avgSwolf,
       bestSwolf,
-      hasActivities: dateList.length > 0,
+      hasActivities: swimDays.length > 0,
       streakCurrent: streaks.current,
       streakBest: streaks.best,
     };
@@ -312,13 +194,8 @@ export default function Profile() {
       counts[stroke] = (counts[stroke] || 0) + 1;
     });
     const [top] = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-    return strokeLabels[top?.[0]] || "Misto";
+    return STROKE_LABELS[top?.[0]] || "Misto";
   }, [activities]);
-
-  const pbRows = useMemo(() => {
-    const rows = ((pbBoardQuery.data as any)?.records as Array<any> | undefined) ?? [];
-    return rows.slice(0, 24);
-  }, [pbBoardQuery.data]);
 
   /** Earned badges (progress and achievement ones), newest first. */
   const earnedBadges = useMemo<PreviewBadge[]>(() => {
@@ -400,7 +277,7 @@ export default function Profile() {
               </li>
               <li className="flex items-center gap-1.5">
                 <Calendar className="size-4" aria-hidden />
-                Iscritto dal {formatDate(profile?.createdAt)}
+                Iscritto dal {formatDayMonthYear(profile?.createdAt)}
               </li>
               <li className="flex items-center gap-1.5">
                 <Waves className="size-4" aria-hidden />
@@ -479,43 +356,7 @@ export default function Profile() {
           </ul>
         </Section>
 
-        <Section
-          title="Record personali"
-          aside={<Chip>FINA {profileFinaGender === "female" ? "F" : "M"}</Chip>}
-        >
-          <div className="mt-3">
-            {pbBoardQuery.isLoading ? (
-              <p className="text-sm text-muted-foreground">Caricamento dei record…</p>
-            ) : pbRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Ancora nessun record personale.</p>
-            ) : (
-              <ul className="grid gap-2 sm:grid-cols-2">
-                {pbRows.map((row: any) => (
-                  <li key={row.id} className="rounded-xl bg-raised p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold">
-                        {strokeLabels[String(row.strokeType)] ?? "Stile"} {Number(row.distanceMeters)} m
-                      </p>
-                      <span className="text-xs text-muted-foreground">Vasca {Number(row.poolLengthMeters)} m</span>
-                    </div>
-                    <p className="mt-1 font-display text-2xl font-bold tabular-nums">
-                      {formatSwimCentiseconds(row.timeCs)}
-                    </p>
-                    <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
-                      <span>
-                        {sourceLabels[String(row.source)] ?? "Record"}
-                        {Number.isFinite(Number(row.finaPoints)) && row.finaPoints !== null
-                          ? ` · ${Math.round(Number(row.finaPoints))} punti FINA`
-                          : ""}
-                      </span>
-                      <span>{formatDate(row.achievedAt)}</span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </Section>
+        <PersonalRecordsBoard userId={Number(me?.id ?? 0)} />
 
         <nav aria-label="Altro">
           <ul className="surface-panel divide-y divide-border overflow-hidden">

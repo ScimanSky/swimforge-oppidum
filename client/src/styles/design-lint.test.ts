@@ -60,7 +60,6 @@ const PENDING: Record<Rule, string[]> = {
     "pages/Coach.tsx",
     "pages/Home.tsx",
     "pages/Leaderboard.tsx",
-    "pages/PublicProfile.tsx",
     "pages/Statistics.tsx",
   ],
   "alone-neon": [

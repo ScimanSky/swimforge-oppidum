@@ -1079,10 +1079,10 @@ export default function Coach() {
                         value={archiveSearchTerm}
                         onChange={(event) => setArchiveSearchTerm(event.target.value)}
                         placeholder="Cerca in titolo, summary o insight..."
-                        className="h-9 bg-background/60"
+                        className="bg-background/60"
                       />
                       <Select value={archiveRange} onValueChange={(value) => setArchiveRange(value as "all" | "7d" | "30d" | "90d")}>
-                        <SelectTrigger className="h-9 bg-background/60">
+                        <SelectTrigger className="bg-background/60">
                           <SelectValue placeholder="Periodo" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1098,7 +1098,7 @@ export default function Coach() {
                           setArchiveSort(value as "recent" | "oldest" | "distance" | "duration")
                         }
                       >
-                        <SelectTrigger className="h-9 bg-background/60">
+                        <SelectTrigger className="bg-background/60">
                           <SelectValue placeholder="Ordina" />
                         </SelectTrigger>
                         <SelectContent>

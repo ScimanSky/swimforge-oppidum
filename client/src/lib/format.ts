@@ -10,6 +10,7 @@ const toDate = (value: DateInput | null | undefined): Date | null => {
 }
 const weekdayFmt = new Intl.DateTimeFormat("it-IT", { weekday: "short" })
 const dayMonthFmt = new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "short" })
+const dayMonthYearFmt = new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "short", year: "numeric" })
 const timeFmt = new Intl.DateTimeFormat("it-IT", { hour: "2-digit", minute: "2-digit" })
 // One grouping rule app-wide: Italian CLDR skips the separator on 4-digit numbers (8420),
 // Corsia always shows it («8.420»).
@@ -27,6 +28,12 @@ export const formatSessionDate = (value: DateInput | null | undefined) => {
 export const formatDayMonth = (value: DateInput | null | undefined) => {
   const date = toDate(value)
   return date ? dayMonthFmt.format(date) : NO_VALUE
+}
+
+/** «12 mar 2025»; «—» for a missing or invalid date. */
+export const formatDayMonthYear = (value: DateInput | null | undefined) => {
+  const date = toDate(value)
+  return date ? dayMonthYearFmt.format(date) : NO_VALUE
 }
 
 /** «lun 26 ott»; «—» for a missing or invalid date. */
