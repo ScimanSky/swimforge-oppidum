@@ -95,7 +95,7 @@ Priorità P1 = nella prima app pubblicata, P2 = subito dopo, P3 = quando serve.
 | 18 | Analisi video: variante "chiedi al coach del club" (upload 60 s, il coach del club risponde) | P3 | nessuno staff centrale; i club sì |
 | 19 | Richiesta recensione in-app, sondaggio di uscita | P3 | plugin pronto |
 
-| 20 | **Invia al Garmin**: una sessione pianificata diventa un workout strutturato sull'orologio (`upload_swimming_workout` + `schedule_workout` + `push_workout_to_device`), con obiettivi di passo relativi alla CSS (`SwimCssOffsetTarget`) | P2 | la funzione che il concorrente segna "presto disponibile" |
+| 20 | **Invia al Garmin**: una sessione pianificata diventa un workout strutturato sull'orologio (`upload_swimming_workout` + `schedule_workout` + `push_workout_to_device`), con obiettivi di passo relativi alla CSS (`SwimCssOffsetTarget`). **Approvato il 29/10, P1, fase 3; orologio di prova: Forerunner 970** | P1 | la funzione che il concorrente segna "presto disponibile" |
 
 Fuori scope: abbonamenti/paywall, pacchetti a pagamento, articoli, Polar/Wahoo, speech-to-text.
 
@@ -206,6 +206,20 @@ commit e push. Stime in giorni di lavoro effettivo con Claude Code.
      adatta e, solo dopo l'ok dell'atleta, la crea (chiamata a funzione) e la salva in
      Allena → Sessioni, visualizzata con la vista del punto 1. Niente diagnosi mediche:
      davanti a sintomi seri suggerisce riposo o un medico.
+  5. **Invia al Garmin** (#20, approvato il 29/10): la sessione approvata in chat si crea nel
+     Garmin Connect dell'atleta, si mette in calendario nel giorno scelto e arriva
+     all'orologio con la normale sincronizzazione dell'app Garmin Connect (o con
+     `push_workout_to_device`). Nessuna app Connect IQ: serve solo per schermate
+     personalizzate sull'orologio, non per gli allenamenti. Consenso esplicito prima di
+     scrivere nell'account Garmin. Dopo la nuotata, confronto pianificato/eseguito.
+  6. **Metriche reali** (29/10, design `docs/plans/2026-10-29-swim-metrics-design.md`): le
+     metriche inventate sono sostituite da CSS, carico e forma, intensità, Stroke Index,
+     regolarità nelle ripetute e volume; il coach legge queste. CSS di Garmin
+     (`get_critical_swim_speed`) come fonte tra il test inserito e la stima.
+  7. **Benessere da Garmin per il coach** (29/10): HRV, frequenza a riposo, sonno, Body
+     Battery, Training Readiness e stato di allenamento, solo con un consenso separato
+     (dati sanitari) e l'informativa aggiornata. Record personali di nuoto Garmin
+     (`get_personal_record`) per completare i record di SwimForge.
   - Modello: Gemini 4 Argon (provato il 29/10 sulle stesse prove di Gemini 3.1 Pro: più veloce,
     risposte più personali, chiamate a funzione e JSON con schema supportati). I totali in metri
     della sessione si ricalcolano sempre lato server: in una prova su due il modello ha
@@ -251,6 +265,18 @@ Totale indicativo: 20-27 giorni di lavoro per arrivare al test chiuso.
 3. Storie 24h: **rimosse**.
 4. Home "Oggi" con feed social in seconda tab: **sì, solo nell'app Android**; sul web il feed resta la home (deciso il 27/10 sera). Tutto il social (post con foto e video, commenti, reazioni, DM, club, profili) resta in entrambe le versioni.
 5. Walkthrough con screenshot dell'app concorrente: rinviato a un'altra sessione.
+
+Decisioni del 29/10/2026:
+6. Metriche avanzate inventate (SEI, TCI, SER, ACS, Recupero, Carico progressivo,
+   Prestazione, Costanza) **eliminate** e sostituite da metriche con fondamento (design
+   `docs/plans/2026-10-29-swim-metrics-design.md`); passo soglia da stima automatica più
+   test facoltativo (più il CSS di Garmin quando c'è).
+7. **Sfruttare la libreria python-garminconnect per tutto ciò che serve al nuoto**: CSS,
+   record personali, invio degli allenamenti all'orologio (Forerunner 970), benessere per
+   il coach con consenso. Esclusi i dati non pertinenti al nuoto o troppo sensibili (golf,
+   ciclo mestruale, pressione, glicemia).
+8. Niente app Connect IQ per ora: gli allenamenti arrivano all'orologio tramite il
+   calendario di Garmin Connect.
 
 Azione a carico del proprietario: richiedere l'accesso al Garmin Connect Developer
 Program (serve un account aziendale/sviluppatore Garmin; l'approvazione richiede
