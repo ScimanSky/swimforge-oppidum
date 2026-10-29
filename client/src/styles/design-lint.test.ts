@@ -41,7 +41,6 @@ type Rule = keyof typeof RULES;
 
 /** Files allowed to match a rule for good (justify each entry). */
 const EXEMPT: Partial<Record<Rule, readonly string[]>> = {
-  gradiente: ["index.css"], // skeleton shimmer animation
   // The shell header owns the page title. Public pages render outside the shell (no header), so
   // their own title is the h1: the landing (Home), StravaConnect, the sign-in, sign-up and
   // password pages (AuthLayout), the return from Google and the email link (AuthCallback) and the

@@ -227,15 +227,6 @@ body,
     height: 100dvh;
   }
 
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-
   .sf-page-root {
     min-width: 0;
     overflow-x: hidden;
@@ -245,15 +236,6 @@ body,
     .sf-page-root>* {
       min-width: 0;
     }
-  }
-
-  /*
-   * Kept in utilities on purpose: it overrides `absolute` on panel children, which hides
-   * the old absolute decorations inside panels until the page tasks remove them.
-   * Delete in Task 22.
-   */
-  .surface-panel>* {
-    position: relative;
   }
 }
 
@@ -276,155 +258,6 @@ body,
     margin-top: 0.9rem;
     padding-top: 0.8rem;
     border-top: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
-  }
-
-  .sf-activity-card {
-    border-radius: 16px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    box-shadow: none;
-  }
-
-  .sf-social-card {
-    border-radius: 16px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    box-shadow: none;
-  }
-
-  /* XP chip: sentence case, 12px, 28px pill. */
-  .sf-activity-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    height: 28px;
-    padding: 0 0.75rem;
-    border-radius: 999px;
-    background: color-mix(in oklch, var(--xp) 15%, transparent);
-    color: var(--xp);
-    font-size: 0.75rem;
-    font-weight: 600;
-  }
-
-  .glass-panel {
-    border: 1px solid var(--border);
-    background: var(--card);
-    box-shadow: none;
-  }
-
-  .shimmer-bg {
-    background: linear-gradient(90deg,
-        var(--card) 0%,
-        var(--raised) 40%,
-        var(--raised) 60%,
-        var(--card) 100%);
-    background-size: 200% 100%;
-    animation: shimmer 1.8s ease-in-out infinite;
-  }
-
-  .stream-shell {
-    display: grid;
-    gap: 1.5rem;
-    min-width: 0;
-  }
-
-  .stream-main {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    min-width: 0;
-  }
-
-  .stream-node {
-    position: relative;
-  }
-
-  .stream-card {
-    border-radius: 16px;
-    border: 1px solid var(--border);
-    background: var(--card);
-    padding: 1rem;
-    transition: border-color 150ms ease;
-  }
-
-  .stream-card:hover {
-    border-color: color-mix(in oklch, var(--action-text) 45%, var(--border));
-  }
-
-  @media (min-width: 1024px) {
-    .sf-page-root .stream-shell {
-      gap: 0.9rem;
-    }
-
-    .sf-page-root .stream-main {
-      gap: 0.75rem;
-    }
-
-    .sf-page-root .stream-card {
-      padding: 0.85rem;
-      border-radius: 18px;
-    }
-
-    .stream-main {
-      padding-left: 1.5rem;
-    }
-
-    .stream-main::before {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 0.25rem;
-      bottom: 0.25rem;
-      width: 1px;
-      background: var(--border);
-    }
-
-    .stream-node::before {
-      content: "";
-      position: absolute;
-      left: -1.82rem;
-      top: 1.2rem;
-      width: 11px;
-      height: 11px;
-      border-radius: 999px;
-      background: var(--action-text);
-      box-shadow: 0 0 0 4px color-mix(in oklch, var(--background) 82%, transparent);
-    }
-
-    /* Home feed (Stitch layout): no external status dot near cards. */
-    .social-feed-shell .stream-node::before {
-      content: none;
-    }
-  }
-
-  @media (min-width: 1280px) {
-    .stream-shell {
-      grid-template-columns: minmax(0, 1fr) 22rem;
-      align-items: start;
-    }
-  }
-}
-
-@keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-
-  100% {
-    background-position: 200% 0;
-  }
-}
-
-@keyframes splash-particle {
-  0% {
-    opacity: 1;
-    transform: translate(0, 0) scale(1);
-  }
-
-  100% {
-    opacity: 0;
-    transform: translate(var(--tx), var(--ty)) scale(0.3);
   }
 }
 
