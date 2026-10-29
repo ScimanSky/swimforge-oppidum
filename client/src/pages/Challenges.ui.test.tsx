@@ -133,6 +133,23 @@ describe("Sfide (Corsia)", () => {
     expect(within(marta).getByText("Tu")).toBeTruthy();
   });
 
+  it("classifica settimanale: mostra gli XP della settimana, non quelli totali", async () => {
+    state.leaderboard = [
+      { userId: 1, name: "Anna", totalXp: 9000, periodXp: "1234", totalDistanceMeters: 0 },
+      { userId: 2, name: "Bea", totalXp: 8000, periodXp: null, totalDistanceMeters: 0 },
+    ];
+    renderChallenges();
+    await userEvent.click(screen.getByRole("tab", { name: "Classifica" }));
+    expect(screen.getByText("Questa settimana")).toBeTruthy();
+    const list = screen.getByRole("list", { name: "Classifica" });
+    const anna = within(list).getByRole("link", { name: /Anna/ });
+    expect(within(anna).getByText("1.234")).toBeTruthy();
+    expect(within(anna).queryByText("9.000")).toBeNull();
+    const bea = within(list).getByRole("link", { name: /Bea/ });
+    expect(within(bea).getByText("0")).toBeTruthy();
+    expect(within(bea).getByText("XP")).toBeTruthy();
+  });
+
   it("crea una sfida dal dialogo", async () => {
     renderChallenges();
     await userEvent.click(screen.getByRole("button", { name: "Crea sfida" }));

@@ -43,9 +43,22 @@ export const formatWeekdayDayMonth = (value: DateInput | null | undefined) => {
   return `${weekdayFmt.format(date)} ${dayMonthFmt.format(date)}`
 }
 
-/** Integer with the Italian thousands separator, always: 8420 → «8.420»; «—» if not finite. */
-export const formatInteger = (value: number) =>
-  Number.isFinite(value) ? integerFmt.format(Math.round(value)) : NO_VALUE
+/**
+ * A finite number from a number or a numeric string (Postgres bigint SUM/COUNT arrive as
+ * «"1234"»); null for anything else, blank strings included (never 0 by accident).
+ */
+const toFiniteNumber = (value: number | string | null | undefined): number | null => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null
+  if (typeof value !== "string" || value.trim() === "") return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+/** Integer with the Italian thousands separator, always: 8420 or «"8420"» → «8.420»; «—» if not a finite number. */
+export const formatInteger = (value: number | string | null | undefined) => {
+  const number = toFiniteNumber(value)
+  return number === null ? NO_VALUE : integerFmt.format(Math.round(number))
+}
 
 /** Rounded integer with its sign (typographic minus): 12 → «+12», −3.6 → «−4», 0 → «0»; null if not a number. */
 export const formatSignedInteger = (value: number | null | undefined) => {
@@ -55,9 +68,11 @@ export const formatSignedInteger = (value: number | null | undefined) => {
   return rounded > 0 ? `+${formatInteger(rounded)}` : `−${formatInteger(-rounded)}`
 }
 
-/** Kilometres with Italian decimal comma, no unit: 3200 → «3,2»; «—» if not finite. */
-export const formatKm = (meters: number) =>
-  Number.isFinite(meters) ? kmFmt.format(Math.round(meters / 100) / 10) : NO_VALUE
+/** Kilometres with Italian decimal comma, no unit: 3200 or «"3200"» → «3,2»; «—» if not a finite number. */
+export const formatKm = (meters: number | string | null | undefined) => {
+  const number = toFiniteNumber(meters)
+  return number === null ? NO_VALUE : kmFmt.format(Math.round(number / 100) / 10)
+}
 
 /**
  * The app's one distance rule, split for `<Metric>`: { value: "3,2", unit: "km" } or

@@ -118,6 +118,16 @@ describe("formatter Corsia", () => {
     }
   });
 
+  it("formatKm e formatInteger: accettano stringhe numeriche (bigint di Postgres)", () => {
+    expect(formatInteger("1234")).toBe("1.234");
+    expect(formatInteger(" 42 ")).toBe("42");
+    expect(formatKm("3200")).toBe("3,2");
+    for (const value of ["", "  ", "abc", "12abc", null, undefined]) {
+      expect(formatInteger(value)).toBe("—");
+      expect(formatKm(value)).toBe("—");
+    }
+  });
+
   it("passo: arrotonda i secondi totali prima di dividere (mai «1:60»)", () => {
     expect(formatPaceValue(119.6)).toBe("2:00");
     expect(formatPace(100, 119.6)).toBe("2:00/100m");

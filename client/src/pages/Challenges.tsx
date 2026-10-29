@@ -531,6 +531,8 @@ export default function Challenges() {
           </TabsContent>
 
           <TabsContent value="leaderboard" className="space-y-3">
+            {/* The query is weekly (period "week", sorted by periodXp): so are the numbers. */}
+            <h2 className="text-sm font-semibold text-muted-foreground">Questa settimana</h2>
             {leaderboard.length === 0 ? (
               <EmptyCard>Nessuna classifica disponibile.</EmptyCard>
             ) : (
@@ -551,7 +553,7 @@ export default function Challenges() {
                         name={name}
                         avatarUrl={profile.avatarUrl ?? profile.profileImage}
                         subtitle={distance > 0 ? formatDistance(distance) : undefined}
-                        value={formatInteger(Number(profile.totalXp ?? 0))}
+                        value={formatInteger(Number(entry.periodXp ?? 0))}
                         unit="XP"
                         href={hasProfileLink ? `/u/${userId}` : undefined}
                         isCurrentUser={hasProfileLink && myUserId != null && userId === Number(myUserId)}

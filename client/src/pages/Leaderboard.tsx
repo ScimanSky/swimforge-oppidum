@@ -30,6 +30,12 @@ interface NormalizedEntry {
   periodBadgeCount?: number;
 }
 
+/** Postgres bigint SUM/COUNT arrive as strings («"1234"»): every number goes through here. */
+const toNumber = (value: unknown, fallback = 0) => {
+  const number = typeof value === "string" && value.trim() === "" ? Number.NaN : Number(value);
+  return value != null && Number.isFinite(number) ? number : fallback;
+};
+
 function normalizeEntry(entry: any): NormalizedEntry {
   // Handle both formats: { profile: {...}, userName } and flat { userId, name, level, ... }
   const profile = entry.profile || entry;
@@ -44,11 +50,11 @@ function normalizeEntry(entry: any): NormalizedEntry {
     userName,
     avatarUrl: avatarUrl || undefined,
     username: username || undefined,
-    level: profile.level ?? entry.level ?? 1,
-    totalXp: profile.totalXp ?? entry.totalXp ?? 0,
-    badgeCount: entry.badgeCount ?? 0,
-    periodXp: entry.periodXp ?? 0,
-    periodBadgeCount: entry.badgeCount ?? 0,
+    level: toNumber(profile.level ?? entry.level, 1),
+    totalXp: toNumber(profile.totalXp ?? entry.totalXp),
+    badgeCount: toNumber(entry.badgeCount),
+    periodXp: toNumber(entry.periodXp),
+    periodBadgeCount: toNumber(entry.badgeCount),
   };
 }
 

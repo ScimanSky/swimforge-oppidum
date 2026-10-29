@@ -98,6 +98,26 @@ describe("Classifiche (Corsia)", () => {
     expect(state.queries.at(-1)).toMatchObject({ orderBy: "badges", period: "week" });
   });
 
+  it("periodi e badge: numeri dal database come stringhe (bigint)", async () => {
+    // Flat shape of the week / month query: SUM and COUNT come back as strings.
+    state.rows = [
+      { id: 1, userId: 1, name: "Anna", level: "4", totalXp: "9000", periodXp: "1234", badgeCount: "3" },
+      { id: 2, userId: 2, name: "Bea", level: "3", totalXp: "8000", periodXp: "800", badgeCount: "2" },
+      { id: 3, userId: 3, name: "Cleo", level: "2", totalXp: "7000", periodXp: "500", badgeCount: "1" },
+    ];
+    renderLeaderboard();
+    await userEvent.click(screen.getByRole("tab", { name: "Settimana" }));
+    const podium = screen.getByRole("list", { name: "Podio" });
+    const first = within(podium).getByRole("link", { name: /Anna/ });
+    expect(within(first).getByText("1.234")).toBeTruthy();
+    expect(within(podium).queryByText("—")).toBeNull();
+
+    await userEvent.click(screen.getByRole("tab", { name: "Badge" }));
+    const podiumBadges = screen.getByRole("list", { name: "Podio" });
+    expect(within(within(podiumBadges).getByRole("link", { name: /Anna/ })).getByText("3")).toBeTruthy();
+    expect(within(podiumBadges).queryByText("—")).toBeNull();
+  });
+
   it("pagina le posizioni dopo il podio, quattro per volta", async () => {
     state.rows = Array.from({ length: 9 }, (_, i) => row(i + 10, 1000 - i * 10));
     state.user = { id: 99 };
