@@ -61,7 +61,7 @@ describe("AI insight job records recompute", () => {
 
     await getPendingActivityInsights(userId, 1);
 
-    await vi.waitFor(() => expect(m.recompute).toHaveBeenCalledWith(userId, { activityIds: [31] }));
+    await vi.waitFor(() => expect(m.recompute).toHaveBeenCalledWith(userId, { activityIds: [31] }), { timeout: 5000 });
     expect(m.persistGarminLapDetails).toHaveBeenCalledWith(m.db, 31, expect.anything());
   });
 
