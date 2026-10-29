@@ -65,3 +65,86 @@ describe("computeSwimMetrics: load on laps or on the whole swim", () => {
     );
   });
 });
+
+describe("computeSwimMetrics: which CSS each swim gets", () => {
+  // September efforts: 200 in 2:55 and 400 in 6:20 → estimate 200 / 205 m/s (1:42.5/100 m).
+  const efforts = activity(10, "2026-09-15T17:00:00Z", [[200, 175], rest(120), [400, 380]]);
+  // 900 m is not a CSS distance: these swims do not change the estimates.
+  const swim = (id: number, iso: string) => activity(id, iso, [[900, 990]]);
+  const ESTIMATE_PACE = 102.5;
+
+  it("a test is valid from its date to date + 89, forward only; swims before it use the monthly estimate", () => {
+    const test = { t200Seconds: 180, t400Seconds: 380, date: "2026-10-10" }; // 1:40/100 m
+    const m = computeSwimMetrics(
+      {
+        activities: [efforts, swim(11, "2026-10-09T17:00:00Z"), swim(12, "2026-10-10T17:00:00Z"), swim(13, "2026-10-28T17:00:00Z")],
+        cssTest: test,
+        streakDates: [],
+      },
+      NOW,
+    );
+    const css = Object.fromEntries(m.sessions.map((s) => [s.activityId, [s.cssPaceSecondsPer100, s.cssSource]]));
+    expect(css[11]).toEqual([ESTIMATE_PACE, "stima"]); // the day before the test
+    expect(css[12]).toEqual([100, "test"]); // the test day
+    expect(css[13]).toEqual([100, "test"]);
+    expect(m.css.current).toMatchObject({ source: "test", paceSecondsPer100: 100 });
+  });
+
+  it("day 89 after the test still uses it, day 90 does not (the test expired before today)", () => {
+    const test = { t200Seconds: 180, t400Seconds: 380, date: "2026-07-20" }; // valid to 17/10
+    // With these, the October estimate is 200 / 195 m/s (1:37.5/100 m).
+    const late = activity(20, "2026-10-12T17:00:00Z", [[200, 170], rest(120), [400, 365]]);
+    const m = computeSwimMetrics(
+      {
+        activities: [efforts, late, swim(21, "2026-10-17T10:00:00Z"), swim(22, "2026-10-18T10:00:00Z")],
+        cssTest: test,
+        streakDates: [],
+      },
+      NOW,
+    );
+    const byId = new Map(m.sessions.map((s) => [s.activityId, s]));
+    expect([byId.get(21)!.cssPaceSecondsPer100, byId.get(21)!.cssSource]).toEqual([100, "test"]);
+    expect([byId.get(22)!.cssPaceSecondsPer100, byId.get(22)!.cssSource]).toEqual([97.5, "stima"]);
+    // Today the test has expired: the current CSS is the estimate, the same one the swim of 18/10 used.
+    expect(m.css.current!.source).toBe("stima");
+    expect(byId.get(22)!.cssPaceSecondsPer100).toBe(m.css.current!.paceSecondsPer100);
+  });
+
+  it("an expired test is never a last resort: without an estimate there is no CSS and no load", () => {
+    const test = { t200Seconds: 180, t400Seconds: 380, date: "2026-06-01" }; // expired 29/08
+    const m = computeSwimMetrics({ activities: [swim(30, "2026-10-20T17:00:00Z")], cssTest: test, streakDates: [] }, NOW);
+    expect(m.css.current).toBeNull();
+    expect(m.sessions[0]).toMatchObject({ cssPaceSecondsPer100: null, cssSource: null, stss: null });
+    expect(m.load.today).toBeNull();
+    expect(m.load.missing).not.toBeNull();
+  });
+
+  it("css.current and the load agree: no current CSS, no load (even with older estimates)", () => {
+    // Efforts of mid-June: the July estimate exists, today's 90 days hold none.
+    const june = activity(40, "2026-06-15T17:00:00Z", [[200, 175], rest(120), [400, 380]]);
+    const m = computeSwimMetrics({ activities: [june, swim(41, "2026-10-20T17:00:00Z")], cssTest: null, streakDates: [] }, NOW);
+    expect(m.css.current).toBeNull();
+    expect(m.load).toMatchObject({ today: null, days: [] });
+    expect(m.intensity.last28).toBeNull();
+  });
+});
+
+describe("computeSwimMetrics: CSS history windows", () => {
+  it("months whose 90-day window is not covered by the CSS laps are null", () => {
+    const efforts = activity(50, "2026-06-15T17:00:00Z", [[200, 175], rest(120), [400, 380]]);
+    // CSS laps covering from 03/01: every month's window is covered; only June to August hold the efforts.
+    const covered = computeSwimMetrics(
+      { activities: [efforts], cssTest: null, streakDates: [], cssLaps: undefined, cssLapsFrom: "2026-01-03" },
+      NOW,
+    );
+    expect(covered.css.history.map((h) => h.month)).toEqual(["2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10"]);
+    expect(covered.css.history.map((h) => h.paceSecondsPer100)).toEqual([null, 102.5, 102.5, 102.5, null, null]);
+
+    const partial = computeSwimMetrics(
+      { activities: [efforts], cssTest: null, streakDates: [], cssLapsFrom: "2026-05-01" },
+      NOW,
+    );
+    // June's window starts 02/04, before 01/05: not covered even though June has efforts.
+    expect(partial.css.history.map((h) => h.paceSecondsPer100)).toEqual([null, null, 102.5, 102.5, null, null]);
+  });
+});

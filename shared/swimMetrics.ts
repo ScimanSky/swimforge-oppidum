@@ -39,6 +39,8 @@ export type SessionMetrics = {
   loadEstimated?: boolean;
   /** Active metres not zoned: other strokes, drill, kick, no stroke (pool swims with laps). */
   unclassifiedMeters?: number | null;
+  /** The CSS this swim's load and zones use: a valid test or its month's estimate; null without. */
+  cssPaceSecondsPer100?: number | null; cssSource?: "stima" | "test" | null;
 };
 export type SwimMetrics = {
   generatedAt: string;

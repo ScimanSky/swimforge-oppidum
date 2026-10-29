@@ -215,20 +215,23 @@ const lastDayOfMonth = (month: string) => addDaysToKey(`${shiftMonth(month, 1)}-
 
 /**
  * Estimate at the end of each of the last `months` months (the current one ends today), each on
- * the 90 days before it. Oldest first.
+ * the 90 days before it. A month whose window starts before `coveredFrom` (the first day the laps
+ * cover) is not covered and has no estimate. Oldest first.
  */
 export function cssHistory(
   laps: CssLap[],
   now: Date,
   months = 6,
-): { month: string; estimate: CssEstimate | null }[] {
+  coveredFrom?: string,
+): { month: string; estimate: CssEstimate | null; covered: boolean }[] {
   const today = dayKey(now);
   const current = monthKey(today);
-  const history: { month: string; estimate: CssEstimate | null }[] = [];
+  const history: { month: string; estimate: CssEstimate | null; covered: boolean }[] = [];
   for (let i = months - 1; i >= 0; i -= 1) {
     const month = shiftMonth(current, -i);
     const end = i === 0 ? today : lastDayOfMonth(month);
-    history.push({ month, estimate: estimateCssAt(laps, end) });
+    const covered = coveredFrom === undefined || addDaysToKey(end, -(CSS_WINDOW_DAYS - 1)) >= coveredFrom;
+    history.push({ month, estimate: covered ? estimateCssAt(laps, end) : null, covered });
   }
   return history;
 }
