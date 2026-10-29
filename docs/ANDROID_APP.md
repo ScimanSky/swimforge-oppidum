@@ -11,6 +11,31 @@ App Android `it.swimforge.app`: la stessa web app React dentro un guscio Capacit
   schema https servito dal guscio); deve stare in `ALLOWED_ORIGINS` sul server.
 - L'app punta solo alla produzione (`https://swimforge.it`).
 
+## Navigazione e home
+
+- Barra in basso a cinque voci: Oggi · Feed · «+» · Allena · Community. Il «+» apre il menu
+  «Crea». Sul desktop (≥ 1024 px) la stessa navigazione sta nella barra laterale.
+- Home per piattaforma (`homePathForPlatform`, `client/src/lib/navigation.ts`): `/today` nell'app,
+  `/home` (feed) sul web. Dopo il login si va lì; il feed è la seconda voce.
+
+## Tema e barre di sistema
+
+- Edge-to-edge su ogni versione di Android (`MainActivity`, `EdgeToEdge.enable`): le barre sono
+  trasparenti e lo sfondo è quello dell'header e della barra in basso della pagina, con
+  `env(safe-area-inset-*)`.
+- Le icone delle barre seguono il tema dell'app (non la modalità notte di sistema) tramite
+  `SystemBars` di Capacitor (`syncNativeSystemBars` in `client/src/lib/native-runtime.ts`,
+  `insetsHandling: "native"` in `capacitor.config.ts`). `@capacitor/status-bar` è stato
+  rimosso: su Android 15+ (targetSdk 36) `setBackgroundColor` non ha effetto.
+- Verificato sul Pixel 8a nelle quattro combinazioni: tema app scuro/chiaro × modalità notte
+  di sistema on/off.
+
+## Sincronizzazione Garmin
+
+In Impostazioni → Garmin si sceglie quante nuotate sincronizzare: ultima, ultime 5 o ultime 10
+(`client/src/lib/garmin-sync-count.ts`); la scelta resta nel dispositivo (`localStorage`) e dà
+il testo del pulsante «Sincronizza…».
+
 ## Build
 
 - Prerequisiti: Node 22, JDK 21, Android SDK 36, `android/app/google-services.json` (Firebase
@@ -65,7 +90,7 @@ Un'opzione "senza anteprima" è prevista in una fase successiva.
 
 ## Tasto Indietro
 
-Torna indietro nella cronologia; esce dall'app dalla home (`/home`) o se non c'e' cronologia.
+Torna indietro nella cronologia (solo tra schermate dell'app); esce dall'app da Oggi (`/today`). Da una pagina senza cronologia sale alla pagina madre o torna a Oggi.
 
 ## Sessione nativa
 

@@ -1,6 +1,6 @@
 # Fase 2 — Veste grafica «Corsia»: design (28 ottobre 2026)
 
-Stato: **approvato dal proprietario il 28/10/2026**. Contesto: `docs/ANDROID_APP_PLAN.md` §5 Fase 2,
+Stato: **implementato il 29/10/2026** (ramo android/phase-2). Approvato dal proprietario il 28/10/2026. Contesto: `docs/ANDROID_APP_PLAN.md` §5 Fase 2,
 proposta visiva in `docs/design-proposals/claude-corsia/` (README, `tokens.json`, `renders/*.png`).
 
 ## Obiettivo
@@ -112,8 +112,8 @@ I valori arrivano da `tokens.json`. Il tema scuro resta la classe `.dark` (defau
 
 ### 3.5 Tema chiaro e app
 - Il selettore tema esce dall'header e va nel profilo (sezione «Aspetto»: Scuro, Chiaro).
-- Nativo: al cambio tema `StatusBar.setStyle` e `setBackgroundColor` seguono il fondale
-  (`#0A1520` o `#F4F7F9`). Lo splash resta `#0A1520`.
+- Nativo: al cambio tema le icone delle barre di sistema seguono il tema (vedi «Differenze
+  rispetto al design»). Lo splash resta `#0A1520`.
 
 ## 4. Navigazione e shell (`components/app/app-shell.tsx`)
 - **Barra in basso** (mobile web e app), cinque voci: **Oggi** `/today` · **Feed** `/home` ·
@@ -246,3 +246,17 @@ a Statistiche e Impostazioni, sezione Aspetto (§3.5).
   leggibile, ma le pagine con colori fissi (`text-white`, `bg-black/…`) vanno ripulite.
 - **Tempi:** 3–4 giorni di lavoro degli agenti come da piano; il passaggio manuale si
   limita alle pagine raggiungibili dalla navigazione.
+
+## Differenze rispetto al design
+Cosa è cambiato in implementazione (29/10/2026):
+- **Barre di sistema:** non `StatusBar.setStyle`/`setBackgroundColor` (nessun effetto su Android
+  15+). L'app è edge-to-edge (`MainActivity`), le barre sono trasparenti, le icone seguono il
+  tema con `SystemBars` di Capacitor e il contenuto usa `env(safe-area-inset-*)`.
+  `@capacitor/status-bar` è stato rimosso. Verificato sul Pixel 8a (tema × modalità notte).
+- **FAB dei club:** sostituito dal menu «Crea» del «+» (`components/app/CreateMenu.tsx`).
+- **MetricOrb:** rimosso.
+- **Registrazione:** un solo passo, senza il secondo passo di prima.
+- **Popup di celebrazione** (badge, record, analisi pronta): in coda dietro il banner dei
+  cookie e l'onboarding, si aprono quando questi spariscono (`hooks/useCelebrationGate.ts`).
+- **Token:** aggiunto `--overlay` (sfondo dei dialoghi); i token delle zone di passo
+  `--pace-a1` … `--pace-c3` stanno accanto a quelli della frequenza cardiaca, in entrambi i temi.

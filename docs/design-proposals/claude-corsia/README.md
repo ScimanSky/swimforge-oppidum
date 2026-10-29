@@ -1,5 +1,7 @@
 # Proposta di veste grafica «Corsia» (Claude)
 
+> Implementata: vedi `docs/plans/2026-10-28-android-phase-2-design.md` (il design realizzato, con le differenze rispetto a questa proposta).
+
 Proposta solo visiva per la web app mobile di SwimForge. **Non modifica il codice dell'app.** Serve per confrontarla con altre proposte, per esempio quella di Antigravity.
 
 - Canvas interattivo originale (privato, visibile solo al proprietario): https://claude.ai/artifact/VqYcNrg6K7FxwR7h7sAwVn

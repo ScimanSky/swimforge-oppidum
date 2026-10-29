@@ -188,6 +188,19 @@ commit e push. Stime in giorni di lavoro effettivo con Claude Code.
   5. nell'app Capacitor i font vanno inclusi nel bundle (niente Google Fonts a runtime).
 - Vincoli invariati: dark-first, contrasto alto per bordo vasca bagnato, target touch
   ≥ 48 dp, 5 tab in basso.
+- Completata il 29/10/2026 (ramo android/phase-2, in attesa di rilascio). Stile «Corsia»
+  su tutto il client (web e app), navigazione a cinque voci, schermata Oggi, token e font
+  nel bundle; design in `docs/plans/2026-10-28-android-phase-2-design.md`, differenze
+  rispetto al design in fondo a quel file.
+- Aggiunto il 29/10 oltre l'ambito originale:
+  - metriche di nuoto reali al posto di quelle inventate (design
+    `docs/plans/2026-10-29-swim-metrics-design.md`);
+  - zone di passo A1–C3 al posto di Z1–Z5, con zone manuali e spiegazioni;
+  - limiti di sicurezza del coach (vedi §7);
+  - serie (streak) in settimane;
+  - barre di sistema edge-to-edge (vedi `docs/ANDROID_APP.md`);
+  - correzioni di privacy uscite come PR separate #26–#30 (già su `main`);
+  - ricalcolo dei record personali dai giri salvati.
 
 ### Fase 3 — Cuore allenamento (5-7 giorni)
 - **Richieste del proprietario (29/10/2026), da progettare per prime:**
@@ -281,6 +294,16 @@ Decisioni del 29/10/2026:
    l'account sviluppatore Connect IQ e il simulatore installato: un glance o widget
    SwimForge (forma di oggi, sessione del giorno, consiglio del coach) resta un'opzione per
    le fasi 5-6.
+
+9. Zone **A1–C3** (passo, relative al passo soglia) al posto di Z1–Z5; i cinque livelli
+   (Facile, Aerobico, Medio, Soglia, Sopra soglia) sono allineati ai confini delle zone e
+   l'utente può impostare le zone a mano.
+10. Limiti di sicurezza del coach: per sessione C1 ≤ 1600 m, C2 ≤ 600 m, C3 ≤ 300 m;
+    recuperi minimi; riscaldamento in A1; volume totale ≤ 1,5× la mediana delle ultime 6
+    nuotate.
+11. Flusso delle proposte: metriche, soglie e limiti si propongono al proprietario, che
+    approva o rifiuta prima dell'implementazione (i confini delle zone sono una convenzione
+    approvata da lui, vedi il design delle metriche).
 
 Azione a carico del proprietario: richiedere l'accesso al Garmin Connect Developer
 Program (serve un account aziendale/sviluppatore Garmin; l'approvazione richiede
