@@ -93,12 +93,26 @@ describe("Badge (Corsia)", () => {
     const user = userEvent.setup({ delay: null });
     state.badges = [badge(1), badge(2, { progress: 40 })];
     render(<Badges />);
-    const tile = screen.getByRole("button", { name: "Badge 2, da sbloccare, 40 %" });
+    const tile = screen.getByRole("button", { name: "Badge 2, da sbloccare, 40%" });
     await user.click(tile);
     expect(screen.getByRole("dialog", { name: "Badge 2" })).toBeTruthy();
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.activeElement).toBe(tile);
+  });
+
+  it("se il badge sparisce mentre il dettaglio è aperto, il fuoco va sulla categoria", async () => {
+    const user = userEvent.setup({ delay: null });
+    state.badges = [badge(1), badge(2, { progress: 40 })];
+    const { rerender } = render(<Badges />);
+    await user.click(screen.getByRole("button", { name: "Badge 2, da sbloccare, 40%" }));
+    // A refetch drops badge 2 (its tile unmounts) while the dialog is open.
+    state.badges = [badge(1)];
+    rerender(<Badges />);
+    expect(screen.queryByRole("button", { name: /Badge 2/ })).toBeNull();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("tab", { name: "Tutti" }));
   });
 
   it("senza h1 né tema scuro forzato; collezione e categorie in italiano", () => {
@@ -125,7 +139,7 @@ describe("Badge (Corsia)", () => {
     const grid = screen.getByRole("list", { name: "Badge" });
     const earned = within(grid).getByRole("button", { name: "Badge 1" });
     expect(earned.querySelector("img")?.getAttribute("src")).toBe("/badges_new/first_km.png");
-    const locked = within(grid).getByRole("button", { name: "Badge 2, da sbloccare, 40 %" });
+    const locked = within(grid).getByRole("button", { name: "Badge 2, da sbloccare, 40%" });
     expect(locked.querySelector("img")).toBeNull();
     expect(locked.querySelector('[data-slot="progress"]')).toBeTruthy();
   });
@@ -157,7 +171,7 @@ describe("Badge (Corsia)", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: "Chiudi" }));
     expect(screen.queryByRole("dialog")).toBeNull();
 
-    await userEvent.click(screen.getByRole("button", { name: "Badge 2, da sbloccare, 40 %" }));
+    await userEvent.click(screen.getByRole("button", { name: "Badge 2, da sbloccare, 40%" }));
     dialog = screen.getByRole("dialog", { name: "Badge 2" });
     expect(within(dialog).getByText("40%")).toBeTruthy();
     expect(within(dialog).getByRole("progressbar", { name: "Progresso: Badge 2" })).toBeTruthy();

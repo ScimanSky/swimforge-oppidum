@@ -56,7 +56,7 @@ const badgeImage = (badge: any) =>
 const badgeTileLabel = (badge: any) => {
   if (badge.earned) return badge.name;
   const progress = Math.round(Number(badge.progress) || 0);
-  return progress > 0 ? `${badge.name}, da sbloccare, ${progress} %` : `${badge.name}, da sbloccare`;
+  return progress > 0 ? `${badge.name}, da sbloccare, ${progress}%` : `${badge.name}, da sbloccare`;
 };
 
 /** A locked badge: padlock on a dashed raised disc (the artwork stays a surprise). */
@@ -80,8 +80,10 @@ export default function Badges() {
   // The last opened badge stays rendered while the dialog animates out; `detailOpen` drives it.
   const [selectedBadge, setSelectedBadge] = useState<any | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
-  // The tile that opened the dialog: focus goes back to it on close.
+  // The tile that opened the dialog: focus goes back to it on close (or to the selected
+  // category tab, if a refetch removed the tile meanwhile).
   const openerRef = useRef<HTMLButtonElement | null>(null);
+  const selectedTabRef = useRef<HTMLButtonElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const progressQuery = trpc.badges.progress.useQuery(undefined, { enabled: isAuthenticated });
@@ -228,7 +230,11 @@ export default function Badges() {
         <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
           <TabsList aria-label="Categoria">
             {Object.entries(categoryLabels).map(([key, label]) => (
-              <TabsTrigger key={key} value={key}>
+              <TabsTrigger
+                key={key}
+                value={key}
+                ref={key === selectedCategory ? selectedTabRef : undefined}
+              >
                 {label}
               </TabsTrigger>
             ))}
@@ -311,7 +317,8 @@ export default function Badges() {
               onCloseAutoFocus={(event) => {
                 // Opened from a tile, not a DialogTrigger: give focus back to that tile.
                 event.preventDefault();
-                openerRef.current?.focus();
+                const opener = openerRef.current;
+                (opener?.isConnected ? opener : selectedTabRef.current)?.focus();
               }}
             >
               <DialogHeader className="items-center text-center sm:text-center">
