@@ -44,7 +44,8 @@ import {
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { Metric } from "@/components/corsia/Metric";
 import EventMapEditor from "@/components/club/EventMapEditor";
-import { ClubNotice } from "@/components/club/ClubPageState";
+import { ClubAccessState, ClubNotice } from "@/components/club/ClubPageState";
+import { clubAccess } from "@/lib/club-access";
 import {
   parseRouteGeojson,
   pointsToRouteGeojson,
@@ -53,7 +54,9 @@ import {
   type RoutePoint,
 } from "@/lib/club-event-map";
 import { NO_VALUE, formatDistance, formatInteger, formatSessionDate, getInitials, toFiniteNumber } from "@/lib/format";
+import { previousInAppPath } from "@/lib/in-app-history";
 import { trpc } from "@/lib/trpc";
+import { errorToastMessage } from "@/lib/trpc-errors";
 import { cn } from "@/lib/utils";
 
 type EventRsvpStatus = "going" | "maybe" | "not_going";
@@ -221,8 +224,13 @@ export default function ClubEventDetail() {
   const utils = trpc.useUtils();
 
   const clubQuery = trpc.community.clubs.get.useQuery({ clubId }, { enabled: validIds });
-  const eventQuery = trpc.community.clubs.events.get.useQuery({ eventId }, { enabled: validIds });
-  const attendeesQuery = trpc.community.clubs.events.attendees.useQuery({ eventId }, { enabled: validIds });
+  // Members only (the server answers FORBIDDEN otherwise): not even asked for before.
+  const isMember = Boolean((clubQuery.data as any)?.is_member);
+  const eventQuery = trpc.community.clubs.events.get.useQuery({ eventId }, { enabled: validIds && isMember });
+  const attendeesQuery = trpc.community.clubs.events.attendees.useQuery(
+    { eventId },
+    { enabled: validIds && isMember }
+  );
 
   const rsvpMutation = trpc.community.clubs.events.rsvp.useMutation({
     onSuccess: (data: any) => {
@@ -233,7 +241,7 @@ export default function ClubEventDetail() {
         toast.success(`+${formatInteger(awardedXp)} XP`);
       }
     },
-    onError: (error) => toast.error(error.message || "Risposta non salvata"),
+    onError: (error) => toast.error(errorToastMessage(error, "Risposta non salvata")),
   });
 
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -241,10 +249,13 @@ export default function ClubEventDetail() {
     onSuccess: () => {
       toast.success("Evento eliminato");
       utils.community.clubs.events.list.invalidate();
-      // The event is gone: replace its page, so «back» does not land on «not found».
-      navigate(`/community/club/${clubId}`, { replace: true });
+      // The event is gone: back to the club entry it was opened from, otherwise the club
+      // replaces it. Either way «back» never lands on «not found» nor on the club twice.
+      const clubPath = `/community/club/${clubId}`;
+      if (previousInAppPath() === clubPath) window.history.back();
+      else navigate(clubPath, { replace: true });
     },
-    onError: (error) => toast.error(error.message || "Eliminazione non riuscita"),
+    onError: (error) => toast.error(errorToastMessage(error, "Eliminazione non riuscita")),
   });
   const refreshWeather = trpc.community.clubs.events.refreshWeather.useMutation({
     onSuccess: () => {
@@ -252,7 +263,7 @@ export default function ClubEventDetail() {
       utils.community.clubs.events.get.invalidate({ eventId });
       utils.community.clubs.events.list.invalidate();
     },
-    onError: (error) => toast.error(error.message || "Aggiornamento meteo non riuscito"),
+    onError: (error) => toast.error(errorToastMessage(error, "Aggiornamento meteo non riuscito")),
   });
   const updateEventMutation = trpc.community.clubs.events.update.useMutation({
     onSuccess: async () => {
@@ -263,7 +274,7 @@ export default function ClubEventDetail() {
       ]);
       setIsEditingRoute(false);
     },
-    onError: (error) => toast.error(error.message || "Aggiornamento percorso non riuscito"),
+    onError: (error) => toast.error(errorToastMessage(error, "Aggiornamento percorso non riuscito")),
   });
 
   const attendees = useMemo(() => (attendeesQuery.data as any[]) || [], [attendeesQuery.data]);
@@ -323,6 +334,20 @@ export default function ClubEventDetail() {
 
   // Before `isPending`: a disabled query stays pending for ever.
   if (!validIds) return <Notice>Evento non trovato.</Notice>;
+  const access = clubAccess(clubQuery);
+  if (access !== "member") {
+    return (
+      <AppLayout>
+        <ClubAccessState
+          access={access}
+          clubId={clubId}
+          loadingLabel="Caricamento dell'evento…"
+          notMemberText="Iscriviti al club per vedere l'evento."
+          onRetry={() => void clubQuery.refetch()}
+        />
+      </AppLayout>
+    );
+  }
   if (eventQuery.isPending) {
     return (
       <AppLayout>

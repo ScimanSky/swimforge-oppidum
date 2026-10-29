@@ -1,4 +1,5 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
+import { toast } from "sonner";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
@@ -14,6 +15,9 @@ const state = vi.hoisted(() => ({
   attendeesError: null as any,
   me: { userId: 4 } as any,
   calls: {} as Record<string, any[]>,
+  // A mutation with an error here fails like the server would.
+  failures: {} as Record<string, unknown>,
+  enabled: {} as Record<string, unknown>,
   refetch: {} as Record<string, ReturnType<typeof vi.fn>>,
 }));
 
@@ -26,6 +30,7 @@ const helpers = vi.hoisted(() => {
     loading: () => boolean = () => false
   ) => ({
     useQuery: (_input?: unknown, options?: { enabled?: boolean }) => {
+      state.enabled[name] = options?.enabled;
       state.refetch[name] ??= vi.fn();
       const base = { refetch: state.refetch[name] };
       if (options?.enabled === false || loading()) {
@@ -36,12 +41,13 @@ const helpers = vi.hoisted(() => {
       return { ...base, data: data(), isPending: false, isError: false, error: null };
     },
   });
-  // The mutation runs its onSuccess at once, as if the server agreed.
+  // The mutation answers at once: onSuccess as if the server agreed, onError with a failure.
   const mutation = (name: string) => ({
-    useMutation: (options?: { onSuccess?: (data: any) => void }) => ({
+    useMutation: (options?: { onSuccess?: (data: any) => void; onError?: (error: any) => void }) => ({
       mutate: (vars: any) => {
         (state.calls[name] ??= []).push(vars);
-        options?.onSuccess?.({});
+        if (state.failures[name]) options?.onError?.(state.failures[name]);
+        else options?.onSuccess?.({});
       },
       isPending: false,
     }),
@@ -76,6 +82,8 @@ vi.mock("@/lib/trpc", () => {
 });
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const history = vi.hoisted(() => ({ previous: null as string | null }));
+vi.mock("@/lib/in-app-history", () => ({ previousInAppPath: () => history.previous }));
 vi.mock("@/components/AppLayout", () => ({
   AppLayout: ({ children }: any) => <div>{children}</div>,
 }));
@@ -100,7 +108,7 @@ function renderEvent() {
 describe("ClubEventDetail (Corsia)", () => {
   afterEach(cleanup);
   beforeEach(() => {
-    state.club = { id: 7, member_role: "member" };
+    state.club = { id: 7, is_member: true, member_role: "member" };
     state.event = {
       event: {
         id: 3,
@@ -124,6 +132,10 @@ describe("ClubEventDetail (Corsia)", () => {
     state.attendeesError = null;
     state.me = { userId: 4 };
     state.calls = {};
+    state.failures = {};
+    state.enabled = {};
+    history.previous = null;
+    vi.mocked(toast.error).mockClear();
     for (const refetch of Object.values(state.refetch)) refetch.mockClear();
   });
 
@@ -196,8 +208,8 @@ describe("ClubEventDetail (Corsia)", () => {
     expect(state.refetch.attendees).toHaveBeenCalled();
   });
 
-  it("lo staff elimina l'evento dopo la conferma e torna al club", async () => {
-    state.club = { id: 7, member_role: "admin" };
+  it("lo staff elimina l'evento dopo la conferma e il club prende il suo posto", async () => {
+    state.club = { id: 7, is_member: true, member_role: "admin" };
     const user = userEvent.setup({ delay: null });
     const location = renderEvent();
     await user.click(screen.getByRole("button", { name: "Elimina evento" }));
@@ -205,7 +217,58 @@ describe("ClubEventDetail (Corsia)", () => {
     expect(state.calls.delete).toBeUndefined();
     await user.click(within(dialog).getByRole("button", { name: "Elimina" }));
     expect(state.calls.delete).toEqual([{ eventId: 3 }]);
-    expect(location.history.at(-1)).toBe("/community/club/7");
+    // Replaced, not pushed: «back» never lands on the deleted event.
+    expect(location.history).toEqual(["/community/club/7"]);
+  });
+
+  it("aperto dal club, dopo l'eliminazione torna a quella voce invece di aggiungerne un'altra", async () => {
+    state.club = { id: 7, is_member: true, member_role: "admin" };
+    history.previous = "/community/club/7";
+    const back = vi.spyOn(window.history, "back").mockImplementation(() => {});
+    try {
+      const user = userEvent.setup({ delay: null });
+      const location = renderEvent();
+      await user.click(screen.getByRole("button", { name: "Elimina evento" }));
+      await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Elimina" }));
+      expect(back).toHaveBeenCalledOnce();
+      expect(location.history).toEqual(["/community/club/7/event/3"]);
+    } finally {
+      back.mockRestore();
+    }
+  });
+
+  it("eliminazione rifiutata: avviso in italiano, mai «FORBIDDEN», si resta sull'evento", async () => {
+    state.club = { id: 7, is_member: true, member_role: "admin" };
+    state.failures.delete = { message: "FORBIDDEN", data: { code: "FORBIDDEN" } };
+    const user = userEvent.setup({ delay: null });
+    const location = renderEvent();
+    await user.click(screen.getByRole("button", { name: "Elimina evento" }));
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Elimina" }));
+    expect(toast.error).toHaveBeenCalledWith("Eliminazione non riuscita");
+    expect(location.history).toEqual(["/community/club/7/event/3"]);
+  });
+
+  it("risposta non salvata: avviso in italiano, mai «FORBIDDEN»; un messaggio del server resta", async () => {
+    state.failures.rsvp = { message: "FORBIDDEN", data: { code: "FORBIDDEN" } };
+    const user = userEvent.setup({ delay: null });
+    renderEvent();
+    const group = screen.getByRole("group", { name: "La tua risposta" });
+    await user.click(within(group).getByRole("button", { name: "Forse" }));
+    expect(toast.error).toHaveBeenLastCalledWith("Risposta non salvata");
+
+    state.failures.rsvp = { message: "Evento già concluso", data: { code: "BAD_REQUEST" } };
+    await user.click(within(group).getByRole("button", { name: "Non partecipo" }));
+    expect(toast.error).toHaveBeenLastCalledWith("Evento già concluso");
+  });
+
+  it("chi non è iscritto al club è invitato a iscriversi, l'evento non è chiesto", () => {
+    state.club = { id: 7, is_member: false, member_role: null };
+    renderEvent();
+    expect(screen.getByText("Iscriviti al club per vedere l'evento.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Torna al club" }).getAttribute("href")).toBe("/community/club/7");
+    expect(screen.queryByText("Evento non trovato.")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Traversata del golfo" })).toBeNull();
+    expect(state.enabled.event).toBe(false);
   });
 
   it("meteo con la virgola decimale e il pulsante per aggiornarlo", async () => {
