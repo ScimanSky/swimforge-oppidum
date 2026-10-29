@@ -41,19 +41,22 @@ bracciata (DPS) è in metri per ciclo, come negli studi.
 - **Fonte:** velocità critica (Wakayoshi et al., 1992); versione 400/200 (Ginn, 1993); è il
   riferimento di Swim Smooth, British Triathlon e TrainingPeaks.
 - **Stima automatica:** migliori giri continui a stile libero, in vasca, degli ultimi 90 giorni,
-  sulle distanze 200, 300, 400, 500, 600, 800, 1000, 1500 m (il miglior tempo per distanza).
-  Regressione lineare distanza = CS × tempo + D′ sui punti tra 2 e 30 minuti. Servono almeno due
-  distanze diverse, una ≤ 400 m e una ≥ 400 m. Se la regressione dà CS ≤ 0 o D′ < 0, si ripiega su
-  Ginn con i migliori 200 e 400; altrimenti nessuna stima.
+  sulle distanze 200, 300, 400, 500, 600, 800, 1000, 1500 (±3%; in vasca da 25 yd la distanza è
+  in yard e il calcolo usa i metri veri), il miglior passo per distanza, tra 2 e 30 minuti.
+  - Un tratto più lento per 100 m di uno più lungo non era a tutta: si scarta (ed è mostrato).
+  - Minimi quadrati distanza = CS × tempo + D′; con D′ < 0 la retta passa per l'origine.
+  - Serve un tratto lungo almeno il doppio del più corto; altrimenti nessuna stima.
 - **Controlli:** il passo soglia deve stare tra 1:00 e 3:30/100 m e non essere più veloce del
-  miglior 200.
-- **Affidabilità:** «alta» con almeno 3 punti che coprono un rapporto di distanza ≥ 3; «media» con
-  2 punti; altrimenti nessuna stima. Le stime da allenamento sono di solito un po' più lente del
-  vero, perché raramente si nuota a tutta: va detto nel testo.
+  tratto più corto usato.
+- **Affidabilità:** «alta» con almeno 3 punti che coprono un rapporto di distanza ≥ 3, D′ tra 0 e
+  50 m e R² ≥ 0,98; «media» negli altri casi. Le stime da allenamento sono di solito un po' più
+  lente del vero, perché raramente si nuota a tutta: va detto nel testo.
 - **Test facoltativo:** l'utente può inserire i tempi di un test 400 e 200 a tutta (con la data).
-  Un test degli ultimi 90 giorni vale più della stima. CSS = 200 / (T400 − T200) m/s. Va
-  salvato in `swimmer_profiles.preferences.cssTest = { t200Seconds, t400Seconds, date }`, senza
-  migrazione.
+  CSS = 200 / (T400 − T200) m/s. Il 200 almeno 1:40, T400/T200 tra 2,02 e 2,4 (il passo soglia
+  non è mai più veloce del 400), passo tra 1:00 e 3:30/100 m; ogni errore sta sul suo campo.
+  Vale dalla sua data per 90 giorni (quel giorno compreso), solo in avanti; le nuotate prima del
+  test usano la stima del loro mese, e un test scaduto non si usa mai. Salvato in
+  `swimmer_profiles.preferences.cssTest = { t200Seconds, t400Seconds, date }` con un merge SQL.
 - **Mostrato:** passo m:ss/100 m, fonte (stima o test), affidabilità. Grafico: valore a fine mese
   sugli ultimi 6 mesi (stima su 90 giorni a ritroso da ogni fine mese), con i punti usati.
 
@@ -61,9 +64,14 @@ bracciata (DPS) è in metri per ciclo, come negli studi.
 - **Fonte:** carico del nuoto di TrainingPeaks (sTSS = IF³ × ore × 100, con IF = velocità
   normalizzata / velocità soglia; il cubo segue la resistenza dell'acqua); modello di Banister nella
   forma di TrainingPeaks (forma a 42 giorni, fatica a 7 giorni, equilibrio = forma − fatica).
-- **Per sessione:** velocità = distanza totale / tempo in movimento (somma dei giri attivi; senza
-  giri, distanza / durata). Si usa il CSS valido in quella data (la stima mensile più vicina). IF
-  ha un tetto di 1,3. Acque libere: stesso calcolo sul passo della sessione.
+- **Per sessione con i giri:** sTSS = Σ sui giri attivi (vᵢ/CSS)³ × tᵢ/3600 × 100 (tempo in
+  movimento, come le zone; tetto 1,3 per giro); IF = (Σ (vᵢ/CSS)³·tᵢ / Σ tᵢ)^(1/3). I giri non a
+  stile libero hanno IF fisso 0,80 (convenzione nostra); in acque libere tutti i giri sono stile
+  libero. TrainingPeaks usa la durata totale con le pause, per questo nelle sedute a intervalli il
+  nostro carico è un po' più alto.
+- **Senza giri:** IF = (distanza / durata totale) / CSS, come TrainingPeaks; carico «stimato».
+- Si usa il CSS valido in quella data (test valido o stima del mese). Carico e zone ci sono solo
+  se c'è il passo soglia di oggi, così concordano sempre con il CSS mostrato.
 - **Giornaliero:** CTL_t = CTL_{t−1} + (TSS_t − CTL_{t−1}) / 42; ATL con 7. Si calcola su 180
   giorni per stabilizzare la curva e si mostrano gli ultimi 90. L'equilibrio (TSB) di oggi è
   CTL − ATL a fine di ieri.
@@ -71,11 +79,11 @@ bracciata (DPS) è in metri per ciclo, come negli studi.
 
   | TSB | Lettura |
   |---|---|
-  | > +15 | molto riposato; se dura a lungo, la forma cala |
-  | da +5 a +15 | fresco |
+  | > +25 | molto riposato (rischio di perdere forma se dura) |
+  | da +5 (escluso) a +25 | fresco |
   | da −10 a +5 | neutro |
-  | da −30 a −10 | in costruzione |
-  | < −30 | carico alto, valuta un recupero |
+  | da −30 a −10 (escluso) | in costruzione |
+  | < −30 | carico alto |
 
   Aumento di CTL > 8 punti/settimana: crescita molto rapida.
 - **Senza CSS:** nessun carico. Il riquadro spiega che serve il passo soglia.
@@ -95,7 +103,10 @@ bracciata (DPS) è in metri per ciclo, come negli studi.
   | Z4 Soglia | 97–103% |
   | Z5 Sopra soglia | > 103% |
 
-- **Calcolo:** ogni giro attivo va in una zona secondo la sua velocità; si somma la distanza.
+- **Calcolo:** ogni giro attivo a stile libero va in una zona secondo la sua velocità; si somma la
+  distanza. Gli altri stili, la tecnica e le gambe sono «non classificati» (`unclassifiedMeters`);
+  la copertura è la quota dei metri delle 4 settimane che sta nelle zone. Al coach le zone
+  arrivano come passi m:ss/100 m (passo = passo soglia / rapporto di velocità).
 - **Mostrato:** quota facile (Z1–Z2), medio (Z3) e intenso (Z4–Z5) degli ultimi 28 giorni.
   Lettura: se Z3 supera ~35% del volume, «molto lavoro in zona media»; è un'indicazione basata
   sugli studi, non una regola. Grafico: barre settimanali impilate per zona (8 settimane), con i
@@ -104,24 +115,31 @@ bracciata (DPS) è in metri per ciclo, come negli studi.
 ### 4.4 Efficienza della bracciata (Stroke Index)
 - **Fonte:** Stroke Index = velocità × distanza per ciclo (Costill et al., 1985).
 - **Calcolo:** per sessione, media pesata sulla distanza dei giri attivi a stile libero con
-  bracciate. DPS = distanza / bracciate; velocità = distanza / tempo in movimento. Frequenza =
-  bracciate / minuti in movimento.
-- **Confronto:** con la mediana delle sessioni dei 90 giorni precedenti, nella stessa lunghezza di
-  vasca (la spinta dal muro cambia la DPS tra 25 e 50 m).
+  bracciate plausibili (0,9–3,2 m per ciclo, almeno 15 cicli al minuto). DPS = distanza /
+  bracciate; velocità = distanza / tempo in movimento. Frequenza = bracciate / minuti in movimento.
+- **Confronto:** mediana delle ultime 4 settimane contro la mediana delle sessioni dei 90 giorni
+  precedenti, nella stessa lunghezza di vasca (la spinta dal muro cambia la DPS tra 25 e 50 m),
+  con almeno 3 nuotate di base; si mostrano i numeri di nuotate e, accanto, distanza per ciclo e
+  passo mediani (più strada per bracciata o solo più veloce).
 - **Mostrato:** SI dell'ultima sessione e media 28 giorni, con la differenza % dalla tua base.
   Grafico: SI per sessione con la linea di base; sotto, SWOLF medio e frequenza di bracciata per
   sessione (stessa vasca).
 
-### 4.5 Regolarità nelle ripetute
+### 4.5 Regolarità e tenuta nelle ripetute
 - **Fonte:** variabilità del passo (coefficiente di variazione) e calo nel finale, misure usate
   negli studi sul pacing e dagli allenatori.
-- **Serie:** almeno 3 giri attivi consecutivi (ignorando i recuperi tra l'uno e l'altro) con la
-  stessa distanza ≥ 50 m e lo stesso stile. La serie si chiude quando cambiano distanza o stile.
+- **Serie:** almeno 3 giri attivi consecutivi con la stessa distanza ≥ 50 m e lo stesso stile. La
+  serie si chiude quando cambiano distanza o stile, o con un recupero più lungo di max(60 s, 2 ×
+  la mediana dei recuperi già visti nella serie); un giro più lento non la chiude mai.
 - **Per serie:**
-  - CV = deviazione standard / media dei tempi;
+  - CV = deviazione standard campionaria (n − 1) / media dei tempi;
   - calo = (media dell'ultimo terzo − media del primo terzo) / media del primo terzo × 100.
+  - tenuta della bracciata (con le bracciate di ogni ripetuta; Craig e Pendergast, 1979; Keskinen
+    e Komi, 1993): calo della DPS = (media del primo terzo − media dell'ultimo terzo) / primo terzo
+    × 100, aumento della frequenza allo stesso modo.
 - **Per sessione:** media pesata sulla distanza delle serie.
-- **Letture:** sono convenzioni nostre e il testo lo dice.
+- **Letture:** sono convenzioni nostre e il testo lo dice. DPS che cala oltre il 5%: «la bracciata
+  si accorcia nel finale».
   - CV < 2%: molto regolare; 2–4%: regolare; > 4%: irregolare.
   - Calo > 5%: «cali nel finale».
 - **Mostrato:** CV e calo mediani degli ultimi 28 giorni. Grafico: i tempi della serie più recente
@@ -147,9 +165,13 @@ usano solo in sezioni che spariscono se la richiesta fallisce.
   - funzioni pure, una per metrica (`css.ts`, `load.ts`, `zones.ts`, `efficiency.ts`,
     `pacing.ts`, `volume.ts`);
   - `getSwimMetrics(userId)` legge 180 giorni di nuotate e i loro giri (due query) e calcola tutto.
-- **Cache Redis:** `swim-metrics:v1:{userId}`, 1 ora. Si invalida a ogni nuova nuotata, modifica,
-  cancellazione o sincronizzazione (agganciarsi a dove oggi si invalidano statistiche/classifiche)
-  e al salvataggio di un test CSS.
+- **Letture:** cinque query in parallelo (nuotate e giri di 180 giorni, profilo, giri vicini alle
+  distanze CSS di 300 giorni per avere intera la finestra di 90 giorni di ogni mese, nuotate per
+  settimana di Roma per la serie).
+- **Cache Redis:** `swim-metrics:v2:{userId}:{giorno di Roma}` (il carico di oggi cambia a
+  mezzanotte), 1 ora. Si invalida a ogni nuova nuotata, modifica, cancellazione o sincronizzazione
+  che cambia le nuotate e al salvataggio o alla rimozione di un test CSS; negli stessi casi si
+  cancellano i suggerimenti AI della pagina Coach in cache.
 - **Definizioni condivise** `shared/swimMetrics.ts`:
   - i tipi del risultato;
   - per ogni metrica: nome, cosa misura, formula, fonte, come si legge, soglie.
