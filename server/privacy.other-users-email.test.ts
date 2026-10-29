@@ -177,6 +177,24 @@ describe("public profiles and search", () => {
     expect(Object.keys(profile!)).not.toContain("email");
   });
 
+  it("getUserPublicProfile does not hand out the target's raw privacy settings", async () => {
+    const { getUserPublicProfile } = await import("./db_public_profiles");
+    m.state.selectResults.push(
+      [{ userId: 5, name: "Ada", username: "ada", privacySettings: { profilePublic: false, activitiesPublic: false, showLeaderboards: false } }],
+      [{ count: 2 }],
+      [{ count: 3 }],
+      [],
+      [],
+    );
+    const profile = await getUserPublicProfile({ viewerUserId: 1, targetUserId: 5 });
+    expect(profile).not.toBeNull();
+    expect(profile).not.toHaveProperty("privacySettings");
+    expect(JSON.stringify(profile)).not.toContain("showLeaderboards");
+    // The visibility flag the callers need is still computed from them.
+    expect(profile!.profilePublic).toBe(false);
+    expect(profile).toMatchObject({ userId: 5, followerCount: 2, followingCount: 3 });
+  });
+
   it("searchUsers does not match nor rank users by email", async () => {
     const { searchUsers } = await import("./db_public_profiles");
     await searchUsers(1, "mario@example.com");
