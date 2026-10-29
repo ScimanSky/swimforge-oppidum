@@ -12,14 +12,18 @@ def is_swimming_activity(activity: dict) -> bool:
     return "swim" in activity_type or "pool" in activity_type
 
 
-def _start_time(activity: dict) -> Optional[datetime]:
-    raw = activity.get("startTimeLocal", "")
-    if not raw:
+def _parse_time(raw: object) -> Optional[datetime]:
+    if not isinstance(raw, str) or not raw:
         return None
     try:
         return datetime.fromisoformat(raw.replace("Z", "+00:00")).replace(tzinfo=None)
-    except (TypeError, ValueError):
+    except ValueError:
         return None
+
+
+def _start_instant(activity: dict) -> Optional[datetime]:
+    """Comparable start time: GMT when usable (correct across time zones), else local."""
+    return _parse_time(activity.get("startTimeGMT")) or _parse_time(activity.get("startTimeLocal"))
 
 
 def select_recent_swims(
@@ -31,11 +35,13 @@ def select_recent_swims(
     """Return the swimming activities a sync should import.
 
     Without ``max_activities``: the swims started within ``days_back`` days of
-    ``now`` (a swim with no start time is skipped, one with an unparsable start
-    time is kept, as the service always did), in Garmin's order.
+    ``now`` by local start time (a swim with no start time is skipped, one with
+    an unparsable start time is kept, as the service always did), in Garmin's
+    order.
 
-    With ``max_activities``: the N most recent swims, newest first, regardless of
-    ``days_back``; swims without a usable start time sort last.
+    With ``max_activities``: the N most recent swims, newest first by GMT start
+    time (local start time when GMT is unusable), regardless of ``days_back``;
+    swims without any usable start time are dropped.
     """
     swims = [a for a in (activities or []) if is_swimming_activity(a)]
 
@@ -45,12 +51,12 @@ def select_recent_swims(
         for activity in swims:
             if not activity.get("startTimeLocal", ""):
                 continue
-            started = _start_time(activity)
+            started = _parse_time(activity.get("startTimeLocal"))
             if started is None or started >= start_date:
                 selected.append(activity)
         return selected
 
-    # Newest first; undated swims sort as datetime.min (last). sorted() stays
-    # stable with reverse=True, so ties keep Garmin's order.
-    ordered = sorted(swims, key=lambda a: _start_time(a) or datetime.min, reverse=True)
-    return ordered[:max_activities]
+    dated = [(started, a) for a in swims if (started := _start_instant(a)) is not None]
+    # sorted() stays stable with reverse=True, so ties keep Garmin's order.
+    dated.sort(key=lambda pair: pair[0], reverse=True)
+    return [activity for _, activity in dated[:max_activities]]

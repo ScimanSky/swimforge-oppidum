@@ -83,10 +83,41 @@ def test_cap_larger_than_the_available_swims_returns_them_all():
     assert ids(select_recent_swims(activities, 10, 30, NOW)) == [1, 2]
 
 
-def test_cap_puts_swims_without_a_usable_date_last():
+def test_cap_drops_swims_without_a_usable_start_time():
     activities = [swim(1, ""), swim(2, "2026-10-27 07:00:00"), swim(3, "garbage")]
 
-    assert ids(select_recent_swims(activities, 2, 30, NOW)) == [2, 1]
+    assert ids(select_recent_swims(activities, 2, 30, NOW)) == [2]
+
+
+def test_cap_orders_by_gmt_start_across_time_zones():
+    rome = swim(1, "2026-10-28 08:00:00")
+    rome["startTimeGMT"] = "2026-10-28 07:00:00"
+    new_york = swim(2, "2026-10-28 07:30:00")  # earlier local clock, later instant
+    new_york["startTimeGMT"] = "2026-10-28 11:30:00"
+
+    assert ids(select_recent_swims([rome, new_york], 1, 30, NOW)) == [2]
+    assert ids(select_recent_swims([rome, new_york], 2, 30, NOW)) == [2, 1]
+
+
+def test_cap_falls_back_to_local_start_when_gmt_is_unusable():
+    older = swim(1, "2026-10-20 07:00:00")
+    older["startTimeGMT"] = "garbage"
+    newer = swim(2, "2026-10-27 07:00:00")
+    newer["startTimeGMT"] = None
+
+    assert ids(select_recent_swims([older, newer], 2, 30, NOW)) == [2, 1]
+
+
+def test_non_string_start_times_do_not_raise():
+    odd = swim(1, "2026-10-27 07:00:00")
+    odd["startTimeLocal"] = 1_761_548_400
+    odd["startTimeGMT"] = {"unexpected": True}
+    dated = swim(2, "2026-10-26 07:00:00")
+
+    # Capped: an activity with no usable start time is dropped.
+    assert ids(select_recent_swims([odd, dated], 5, 30, NOW)) == [2]
+    # Uncapped: an unparsable start time keeps the swim, as before.
+    assert ids(select_recent_swims([odd, dated], None, 30, NOW)) == [1, 2]
 
 
 def test_handles_a_missing_activity_list():
