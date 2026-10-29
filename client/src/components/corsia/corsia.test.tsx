@@ -185,7 +185,7 @@ describe("primitivi Corsia", () => {
     expect(link).toHaveAttribute("href", "/track/7");
     // Date and place, XP, then the metrics.
     expect(link).toHaveAccessibleDescription(
-      "lun 26 ott · 10:47 · Vasca 25m +180 XP 3,2 km Distanza 1:02 h Durata 1:52 Passo /100"
+      "lun 26 ott · 10:47 · Vasca 25 m +180 XP 3,2 km Distanza 1:02 h Durata 1:52 Passo /100"
     );
     expect(screen.getByText("1:02")).toBeInTheDocument();
     expect(screen.getByText("1:52")).toHaveClass("text-[24px]");
@@ -205,7 +205,7 @@ describe("primitivi Corsia", () => {
     expect(screen.queryByText(/^\+/)).toBeNull();
     // No XP chip: the description goes from the place straight to the metrics.
     expect(screen.getByRole("link")).toHaveAccessibleDescription(
-      "lun 26 ott · 10:47 · Vasca 25m 3,2 km Distanza 1:02 h Durata 1:52 Passo /100 142 FC media"
+      "lun 26 ott · 10:47 · Vasca 25 m 3,2 km Distanza 1:02 h Durata 1:52 Passo /100 142 FC media"
     );
   });
 

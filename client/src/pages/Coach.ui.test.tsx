@@ -3,9 +3,13 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import Coach from "./Coach";
+import { emptySwimMetricsFixture, swimMetricsFixture } from "@/components/stats/metrics-fixture";
+import { paceZoneRanges } from "@shared/swimMetrics";
 
 const state = vi.hoisted(() => ({
-  advanced: undefined as any,
+  metrics: undefined as any,
+  metricsError: false,
+  coachInsights: undefined as any,
   workouts: undefined as any,
   insights: [] as any[],
   generateCalls: 0,
@@ -16,7 +20,10 @@ const state = vi.hoisted(() => ({
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     auth: { me: { useQuery: () => ({ data: { id: 7 } }) } },
-    statistics: { getAdvanced: { useQuery: () => ({ data: state.advanced }) } },
+    statistics: {
+      getMetrics: { useQuery: () => ({ data: state.metrics, isError: state.metricsError }) },
+      getInsights: { useQuery: () => ({ data: state.coachInsights }) },
+    },
     aiCoach: {
       getWorkouts: { useQuery: () => ({ data: state.workouts }) },
       generateWorkouts: {
@@ -83,19 +90,9 @@ describe("Coach AI", () => {
     state.chatResponse = { message: "Risposta del coach", provider: "gemini", fallback: false };
     vi.mocked(toast.warning).mockClear();
     vi.mocked(toast.info).mockClear();
-    state.advanced = {
-      performanceIndex: 62,
-      consistencyScore: 48,
-      recoveryReadinessScore: null,
-      streak: { current: 2, record: 6 },
-      poiBaseline: true,
-      swimmingEfficiencyIndex: 55,
-      technicalConsistencyIndex: null,
-      strokeEfficiencyRating: 47,
-      aerobicCapacityScore: null,
-      progressiveOverloadIndex: null,
-      insights: ["Il passo è migliorato del **4.5%**", "Aggiungi una nuotata"],
-    };
+    state.metrics = swimMetricsFixture();
+    state.metricsError = false;
+    state.coachInsights = ["Il passo è migliorato del **4.5%**", "Aggiungi una nuotata"];
     state.workouts = { pool: workout("Aerobico in vasca"), dryland: undefined, canGenerate: true };
     state.insights = [
       {
@@ -110,19 +107,24 @@ describe("Coach AI", () => {
     ];
   });
 
-  it("non ripete il titolo e mostra riepilogo, punteggi e consigli", async () => {
+  it("non ripete il titolo e mostra riepilogo, metriche e consigli", async () => {
     render(<Coach />);
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
-    expect(screen.getByText("Focus di oggi")).toBeTruthy();
-    // Recovery has no data: neither the condition nor the score is shown.
-    expect(screen.queryByText("Condizione")).toBeNull();
-    expect(screen.getByText("Ultima analisi")).toBeTruthy();
+    const summary = screen.getByRole("region", { name: "Riepilogo del coach" });
+    // The fixture's balance, −7,3, is in the neutral band (−10 to +5).
+    expect(summary).toHaveTextContent("EquilibrioNeutro");
+    expect(within(summary).getByText("Ultima analisi")).toBeTruthy();
+    expect(within(summary).queryByText("Focus di oggi")).toBeNull();
 
-    const scores = screen.getByRole("region", { name: "Punteggi" });
-    expect(within(scores).getByText("Prestazione")).toBeTruthy();
-    expect(within(scores).queryByText("Recupero")).toBeNull();
-    expect(within(scores).getByText("SEI")).toBeTruthy();
-    expect(within(scores).queryByText("TCI")).toBeNull();
+    const metrics = screen.getByRole("region", { name: "Metriche" });
+    expect(metrics).toHaveTextContent("1:49 /100 m Passo soglia");
+    expect(metrics).toHaveTextContent("64% in zona A Intensità");
+    expect(metrics).toHaveTextContent("7,7 km/sett. Volume");
+    expect(metrics).toHaveTextContent("9 sett. Serie");
+    // The invented scores are gone.
+    for (const old of ["Prestazione", "Costanza", "Recupero", "SEI", "TCI", "SER", "ACS", "POI"]) {
+      expect(screen.queryByText(old)).toBeNull();
+    }
 
     expect(screen.getByRole("heading", { level: 2, name: "Consiglio 1" })).toBeTruthy();
     expect(screen.getByText("4,5 %")).toBeTruthy();
@@ -130,14 +132,17 @@ describe("Coach AI", () => {
     expect(screen.getByText("Aggiungi una nuotata")).toBeTruthy();
   });
 
-  it("recupero una volta sola e carico progressivo con segno", () => {
-    state.advanced = { ...state.advanced, recoveryReadinessScore: 70, progressiveOverloadIndex: -12 };
+  it("senza dati per una metrica non la mostra; senza consigli lo dice", () => {
+    state.metrics = emptySwimMetricsFixture();
+    state.coachInsights = [];
     render(<Coach />);
-    const scores = screen.getByRole("region", { name: "Punteggi" });
-    expect(within(scores).getByText("Recupero")).toBeTruthy();
-    expect(within(scores).queryByText("RRS")).toBeNull();
-    const poi = within(scores).getByText("POI").parentElement!;
-    expect(poi.textContent).toContain("−12 %");
+    expect(screen.queryByText("Equilibrio")).toBeNull();
+    const metrics = screen.getByRole("region", { name: "Metriche" });
+    expect(within(metrics).queryByText("Passo soglia")).toBeNull();
+    expect(within(metrics).queryByText("Intensità")).toBeNull();
+    expect(metrics).toHaveTextContent("1 sett. Serie");
+    expect(screen.queryByText("—")).toBeNull();
+    expect(screen.getByText(/Nessun consiglio disponibile/)).toBeTruthy();
   });
 
   it("apre la scheda dal parametro tab e genera gli allenamenti", async () => {
@@ -155,6 +160,165 @@ describe("Coach AI", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Genera allenamenti" }));
     expect(state.generateCalls).toBe(1);
+  });
+
+  // A generated workout as the server stores it: zones checked, levels and paces added, a split rep.
+  const zonedWorkout = () => ({
+    type: "pool",
+    title: "Soglia e velocità",
+    description: "Lavoro sulla soglia",
+    duration: "60 minuti",
+    difficulty: "Intermedio",
+    totalMeters: 2400,
+    zoneSource: "auto",
+    sections: [
+      {
+        title: "Centrale",
+        exercises: [
+          {
+            name: "6×100 a soglia", repeats: 6, repMeters: 100, rest: "a 2:10", zone: "B2", level: "Soglia",
+            targetPace: { fastPace: 108.5, slowPace: 114.2 },
+          },
+          {
+            name: "8×150 C1 a ritmo gara", repeats: 8, repMeters: 150, rest: "30 sec", zone: "C1", level: "Soglia",
+            targetPace: { fastPace: 104.3, slowPace: 108.5 },
+            zoneNote: "Spezzato in 8×150 m: in C1 la ripetuta più lunga è 200 m.",
+          },
+          { name: "4×50 dorso", repeats: 4, repMeters: 50, zone: "B1", level: "Medio", targetPace: null },
+        ],
+      },
+    ],
+    coachNotes: [],
+  });
+
+  it("allenamento con le zone: chip, passo obiettivo e spiegazione in ogni ripetuta; il totale", async () => {
+    state.workouts = { pool: zonedWorkout(), dryland: undefined, canGenerate: true };
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    expect(screen.getByText("60 minuti · Intermedio · 2,4 km")).toBeTruthy();
+    const rep = screen.getByText("6×100 a soglia").closest("li")!;
+    expect(within(rep).getByRole("button", { name: "B2 · Soglia" })).toBeTruthy();
+    expect(rep).toHaveTextContent("1:49–1:54 /100 m");
+    expect(rep).toHaveTextContent("Respiro impegnato, poche parole tra una vasca e l'altra; alza la soglia.");
+    const split = screen.getByText("8×150 C1 a ritmo gara").closest("li")!;
+    expect(split).toHaveTextContent("Spezzato in 8×150 m: in C1 la ripetuta più lunga è 200 m.");
+    // Another stroke: zone and level as effort, no freestyle pace.
+    const back = screen.getByText("4×50 dorso").closest("li")!;
+    expect(within(back).getByRole("button", { name: "B1 · Medio" })).toBeTruthy();
+    expect(back).not.toHaveTextContent("/100 m");
+  });
+
+  it("ripartenza e recupero hanno il loro nome; il livello non si ripete come intensità", () => {
+    state.workouts = { pool: zonedWorkout(), dryland: undefined, canGenerate: true };
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    expect(screen.getByText("6×100 a soglia").closest("li")).toHaveTextContent("Ripartenza: a 2:10");
+    const split = screen.getByText("8×150 C1 a ritmo gara").closest("li")!;
+    expect(split).toHaveTextContent("Recupero: 30 sec");
+    expect(split).not.toHaveTextContent("Intensità");
+  });
+
+  it("i passi vengono dalle tue zone di oggi; quello salvato resta come storia se è cambiato", () => {
+    const metrics = swimMetricsFixture();
+    // Manual zones saved after the workout: B2 1:50–1:56 instead of 1:49–1:54.
+    const bounds = { a1a2: 130, a2b1: 122, b1b2: 116, b2c1: 110, c1c2: 105 };
+    metrics.zones = { ...metrics.zones, source: "manuali", bounds, ranges: paceZoneRanges(bounds) };
+    state.metrics = metrics;
+    const pool = zonedWorkout();
+    // Generated without zones: no pace stored, today's zones give one.
+    pool.sections[0].exercises.push({ name: "4×100 progressivi", repeats: 4, repMeters: 100, zone: "B1", level: "Medio", targetPace: null } as any);
+    state.workouts = { pool, dryland: undefined, canGenerate: true };
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    const rep = screen.getByText("6×100 a soglia").closest("li")!;
+    expect(rep).toHaveTextContent("1:50–1:56 /100 m");
+    expect(rep).toHaveTextContent("Passo dalle tue zone di oggi; quando l'allenamento è stato generato era 1:49–1:54 /100 m.");
+    expect(screen.getByText("4×100 progressivi").closest("li")).toHaveTextContent("1:56–2:02 /100 m");
+    // Another stroke never gets a pace.
+    expect(screen.getByText("4×50 dorso").closest("li")).not.toHaveTextContent("/100 m");
+  });
+
+  it("finché le metriche non arrivano resta il passo salvato, senza storia", () => {
+    state.metrics = undefined;
+    state.workouts = { pool: zonedWorkout(), dryland: undefined, canGenerate: true };
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    const rep = screen.getByText("6×100 a soglia").closest("li")!;
+    expect(rep).toHaveTextContent("1:49–1:54 /100 m");
+    expect(rep).not.toHaveTextContent("quando l'allenamento è stato generato");
+  });
+
+  it("mostra tutti gli esercizi della parte, ognuno con il suo chip; una parte senza esercizi non rompe la pagina", () => {
+    const pool = zonedWorkout();
+    pool.sections[0].exercises.push(
+      { name: "4×50 C2 forte", repeats: 4, repMeters: 50, rest: "1′", zone: "C2", level: "Sopra soglia" } as any,
+      { name: "200 sciolto", repeats: 1, repMeters: 200, zone: "A1", level: "Facile" } as any,
+    );
+    pool.sections.push({ title: "Note finali" } as any);
+    state.workouts = { pool, dryland: undefined, canGenerate: true };
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    for (const name of ["6×100 a soglia", "8×150 C1 a ritmo gara", "4×50 dorso", "4×50 C2 forte", "200 sciolto"]) {
+      expect(screen.getByText(name)).toBeTruthy();
+    }
+    expect(screen.getByRole("button", { name: "C2 · Sopra soglia" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "A1 · Facile" })).toBeTruthy();
+    expect(screen.queryByText(/esercizi aggiuntivi/)).toBeNull();
+  });
+
+  it("«Le zone A1–C3» mentre le metriche caricano o se falliscono non dice «serve il passo soglia»", async () => {
+    state.metrics = undefined;
+    state.workouts = { pool: zonedWorkout(), dryland: undefined, canGenerate: true };
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    await userEvent.click(screen.getByRole("button", { name: "C1 · Soglia" }));
+    let glossary = screen.getByRole("dialog", { name: "Le zone A1–C3" });
+    expect(within(glossary).getByRole("status")).toHaveTextContent("Caricamento dei tuoi passi…");
+    expect(glossary).not.toHaveTextContent("serve il passo soglia");
+    cleanup();
+
+    state.metricsError = true;
+    render(<Coach />);
+    await userEvent.click(screen.getByRole("button", { name: "C1 · Soglia" }));
+    glossary = screen.getByRole("dialog", { name: "Le zone A1–C3" });
+    expect(within(glossary).getByRole("alert")).toHaveTextContent("Non riesco a caricare i tuoi passi: riprova più tardi.");
+    expect(glossary).not.toHaveTextContent("serve il passo soglia");
+  });
+
+  it("il numero del consiglio: solo una percentuale o una variazione con segno", async () => {
+    state.coachInsights = [
+      "💪 Intensità: in B1–B2 il 40% del volume",
+      "🏊 Tecnica: il tuo passo 1:49 tiene fino in fondo",
+      "🎯 Obiettivi: una nuotata con un tratto continuo lungo (800 m o più) renderebbe la stima più solida",
+    ];
+    render(<Coach />);
+    const header = () => screen.getByRole("heading", { level: 2, name: /^Consiglio/ }).parentElement!;
+    expect(header()).toHaveTextContent(/^Consiglio 1\s*40 %$/);
+    await userEvent.click(screen.getByRole("button", { name: "Consiglio 2" }));
+    expect(header().textContent).toBe("Consiglio 2");
+    await userEvent.click(screen.getByRole("button", { name: "Consiglio 3" }));
+    expect(header().textContent).toBe("Consiglio 3");
+  });
+
+  it("toccando il chip si apre «Le zone A1–C3» su quella zona", async () => {
+    state.workouts = { pool: zonedWorkout(), dryland: undefined, canGenerate: true };
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    await userEvent.click(screen.getByRole("button", { name: "C1 · Soglia" }));
+    const glossary = screen.getByRole("dialog", { name: "Le zone A1–C3" });
+    expect(within(glossary).getByRole("heading", { level: 3, name: "C1 Soglia anaerobica · Soglia" })).toHaveFocus();
+    // The user's paces today, from the metrics.
+    expect(within(glossary).getByRole("region", { name: "C1 Soglia anaerobica · Soglia" })).toHaveTextContent(
+      "Il tuo passo1:44–1:49 /100 m"
+    );
+  });
+
+  it("un allenamento salvato prima delle zone si vede come prima, senza chip", () => {
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    expect(screen.getByText("400 m sciolti")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /·/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Le zone A1–C3" })).toBeNull();
   });
 
   it("mostra l'ultima analisi e la chat in italiano", async () => {

@@ -2,11 +2,14 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import Statistics from "./Statistics";
+import { swimMetricsFixture } from "@/components/stats/metrics-fixture";
 
 const state = vi.hoisted(() => ({
   loading: false,
   periods: [] as number[],
-  advanced: undefined as any,
+  metrics: undefined as any,
+  metricsError: false,
+  refetchMetrics: undefined as any,
   timeline: [] as any[],
   performance: undefined as any,
 }));
@@ -29,10 +32,24 @@ vi.mock("@/lib/trpc", () => ({
         },
       },
       getPerformance: { useQuery: () => ({ data: state.performance, isLoading: false }) },
-      getAdvanced: { useQuery: () => ({ data: state.advanced, isLoading: false }) },
+      getMetrics: {
+        useQuery: () => ({
+          data: state.metrics,
+          isPending: !state.metrics && !state.metricsError,
+          isError: state.metricsError,
+          refetch: state.refetchMetrics,
+        }),
+      },
+      setCssTest: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      clearCssTest: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      setPaceZones: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      clearPaceZones: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
+    useUtils: () => ({ statistics: { getMetrics: { invalidate: vi.fn() } } }),
   },
 }));
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 vi.mock("@/components/AppLayout", () => ({
   AppLayout: ({ children }: any) => <div>{children}</div>,
@@ -51,27 +68,15 @@ describe("Statistiche", () => {
     state.periods.length = 0;
     state.timeline = [];
     state.performance = { ...basePerformance };
-    state.advanced = {
-      performanceIndex: 72.4,
-      consistencyScore: null,
-      recoveryReadinessScore: 64,
-      streak: { current: 3, record: 9 },
-      swimmingEfficiencyIndex: 55,
-      technicalConsistencyIndex: 61,
-      strokeEfficiencyRating: 48,
-      aerobicCapacityScore: 70,
-      poiBaseline: true,
-      progressiveOverloadIndex: 12,
-      trendBaseline: true,
-      trendIndicator: { direction: "down", percentage: 8 },
-      predictions: null,
-    };
+    state.metrics = swimMetricsFixture();
+    state.metricsError = false;
+    state.refetchMetrics = vi.fn();
   });
 
   it("non ripete il titolo della pagina e cambia periodo", async () => {
     render(<Statistics />);
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
-    for (const name of ["Andamento", "Analisi prestazioni", "Analisi avanzate"]) {
+    for (const name of ["Andamento", "Analisi prestazioni", "Metriche"]) {
       expect(screen.getByRole("button", { name })).toBeTruthy();
       expect(screen.getByRole("heading", { level: 2, name })).toBeTruthy();
     }
@@ -83,24 +88,52 @@ describe("Statistiche", () => {
     expect(state.periods.at(-1)).toBe(90);
   });
 
-  it("mostra zone, calorie e punteggi come metriche", async () => {
+  it("mostra zone e calorie come metriche", async () => {
     render(<Statistics />);
     await userEvent.click(screen.getByRole("button", { name: "Analisi prestazioni" }));
     expect(screen.getByText("Zone cardio")).toBeTruthy();
     expect(screen.getByText("4.210")).toBeTruthy();
     expect(screen.getByText("SWOLF medio")).toBeTruthy();
+  });
 
-    await userEvent.click(screen.getByRole("button", { name: "Analisi avanzate" }));
-    expect(screen.getByText("Prestazione")).toBeTruthy();
-    expect(screen.getByText("72")).toBeTruthy();
-    // consistencyScore is null: no tile for it, no «Dati insufficienti».
-    expect(screen.queryByText("Costanza")).toBeNull();
-    expect(screen.queryByText("Dati insufficienti")).toBeNull();
-    expect(screen.getByText("−8")).toBeTruthy();
-    expect(screen.getByText("Serie attuale")).toBeTruthy();
+  it("«Metriche»: sei riquadri chiusi, che non dipendono dal periodo", async () => {
+    render(<Statistics />);
+    await userEvent.click(screen.getByRole("button", { name: "Metriche" }));
+    const cards = screen.getAllByRole("heading", { level: 3 });
+    expect(cards.map((heading) => heading.textContent?.split(/[\d−+—]/)[0].trim())).toEqual([
+      "Passo soglia",
+      "Forma e fatica",
+      "Intensità",
+      "Efficienza della bracciata",
+      "Regolarità e tenuta nelle ripetute",
+      "Volume e costanza",
+    ]);
+    for (const heading of cards) {
+      expect(within(heading).getByRole("button").getAttribute("aria-expanded")).toBe("false");
+    }
+    expect(screen.getByText(/il periodo scelto sopra non le cambia/)).toBeTruthy();
+    // No old invented scores.
+    for (const old of ["SEI", "TCI", "ACS", "Prestazione", "Previsioni", "Analisi avanzate"]) {
+      expect(screen.queryByText(old)).toBeNull();
+    }
+  });
 
-    await userEvent.click(screen.getByRole("button", { name: "Come si calcola: SEI" }));
-    expect(screen.getByRole("dialog", { name: "Indice di efficienza in acqua (SEI)" })).toBeTruthy();
+  it("«Metriche» in caricamento: scheletri, mentre il resto della pagina è già pronto", async () => {
+    state.metrics = undefined;
+    render(<Statistics />);
+    await userEvent.click(screen.getByRole("button", { name: "Metriche" }));
+    expect(screen.getByRole("status")).toHaveTextContent("Caricamento delle metriche");
+    expect(screen.getByRole("button", { name: "Andamento" })).toBeTruthy();
+  });
+
+  it("«Metriche» non caricate: messaggio breve e Riprova", async () => {
+    state.metrics = undefined;
+    state.metricsError = true;
+    render(<Statistics />);
+    await userEvent.click(screen.getByRole("button", { name: "Metriche" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Non riesco a caricare i dati");
+    await userEvent.click(screen.getByRole("button", { name: "Riprova" }));
+    expect(state.refetchMetrics).toHaveBeenCalled();
   });
 
   it("dà un nome alle zone cardio e titoli h3 sotto le sezioni h2", async () => {
@@ -117,22 +150,6 @@ describe("Statistiche", () => {
     ]);
   });
 
-  it("mostra il segno reale della tendenza anche quando è «stabile»", async () => {
-    state.advanced.trendIndicator = { direction: "stable", percentage: 3, signedPercentage: -3 };
-    render(<Statistics />);
-    await userEvent.click(screen.getByRole("button", { name: "Analisi avanzate" }));
-    expect(screen.getByText("−3")).toBeTruthy();
-    expect(screen.queryByText("+3")).toBeNull();
-  });
-
-  it("senza valore con segno una tendenza stabile si legge «Stabile»", async () => {
-    state.advanced.trendIndicator = { direction: "stable", percentage: 3 };
-    render(<Statistics />);
-    await userEvent.click(screen.getByRole("button", { name: "Analisi avanzate" }));
-    expect(screen.getByText("Stabile")).toBeTruthy();
-    expect(screen.queryByText("+3")).toBeNull();
-  });
-
   it("riassume i grafici per i lettori di schermo", async () => {
     state.timeline = [
       { date: "2026-10-20", distance: 2.5, pace: 110, sessions: 1 },
@@ -146,52 +163,24 @@ describe("Statistiche", () => {
     expect(screen.getByText("Nuotate per fascia di passo: 1:30-1:45 3.")).toBeTruthy();
   });
 
-  it("senza dati non mostra riquadri vuoti ma una riga per sezione", async () => {
-    state.advanced = {
-      performanceIndex: null,
-      consistencyScore: null,
-      recoveryReadinessScore: null,
-      streak: undefined,
-      swimmingEfficiencyIndex: null,
-      technicalConsistencyIndex: null,
-      strokeEfficiencyRating: null,
-      aerobicCapacityScore: null,
-      poiBaseline: false,
-      progressiveOverloadIndex: 0,
-      trendBaseline: false,
-      trendIndicator: null,
-      predictions: null,
-    };
-    render(<Statistics />);
-    await userEvent.click(screen.getByRole("button", { name: "Analisi avanzate" }));
-    expect(screen.getAllByText("Servono più nuotate per questa analisi")).toHaveLength(2);
-    expect(screen.queryByText("Dati insufficienti")).toBeNull();
-    expect(screen.queryByText("Prestazione")).toBeNull();
-    expect(screen.queryByRole("button", { name: /Come si calcola/ })).toBeNull();
-  });
-
   it("cambiando periodo resta aperta la sezione scelta", async () => {
     const user = userEvent.setup({ delay: null });
     const { rerender } = render(<Statistics />);
-    await user.click(screen.getByRole("button", { name: "Analisi avanzate" }));
-    expect(screen.getByRole("button", { name: "Analisi avanzate" }).getAttribute("aria-expanded")).toBe("true");
+    await user.click(screen.getByRole("button", { name: "Metriche" }));
+    expect(screen.getByRole("button", { name: "Metriche" }).getAttribute("aria-expanded")).toBe("true");
     state.loading = true;
     await user.click(screen.getByRole("button", { name: "90 giorni" }));
     state.loading = false;
     rerender(<Statistics />);
-    expect(screen.getByRole("button", { name: "Analisi avanzate" }).getAttribute("aria-expanded")).toBe("true");
+    expect(screen.getByRole("button", { name: "Metriche" }).getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("senza calorie non mostra lo zero; previsioni in italiano", async () => {
+  it("senza calorie non mostra lo zero", async () => {
     state.performance = { ...basePerformance, caloriesTotal: 0, avgCaloriesPerSession: 0 };
-    state.advanced.predictions = { targetKm: 12500.5, estimatedDate: "2026-11-30", daysRemaining: 1 };
     render(<Statistics />);
     await userEvent.click(screen.getByRole("button", { name: "Analisi prestazioni" }));
     expect(screen.queryByText("Calorie totali")).toBeNull();
     expect(screen.getByText("SWOLF medio")).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: "Analisi avanzate" }));
-    expect(screen.getByText("12.500,5 km")).toBeTruthy();
-    expect(screen.getByText("1 giorno rimasto")).toBeTruthy();
   });
 
   it("mostra lo stato di caricamento", () => {

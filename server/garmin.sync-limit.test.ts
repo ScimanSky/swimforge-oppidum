@@ -2,13 +2,17 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => {
   process.env.GARMIN_SERVICE_SECRET = "test-secret";
-  return { getDb: vi.fn() };
+  return { getDb: vi.fn(), deleteCached: vi.fn(async () => {}) };
 });
 
 vi.mock("./db", () => ({ getDb: h.getDb, upsertPersonalRecord: vi.fn() }));
+vi.mock("./lib/cache", async () => {
+  const actual = await vi.importActual<typeof import("./lib/cache")>("./lib/cache");
+  return { ...actual, deleteCached: h.deleteCached };
+});
 
-import { syncGarminActivities } from "./garmin";
-import { garminTokens, swimmerProfiles } from "../drizzle/schema";
+import { invalidateAfterGarminSync, syncGarminActivities } from "./garmin";
+import { aiInsightsCache, garminTokens, swimmerProfiles } from "../drizzle/schema";
 
 const originalFetch = global.fetch;
 
@@ -135,5 +139,42 @@ describe("syncGarminActivities auto-sync timestamp", () => {
     expect(updates.some((u) => u.table === swimmerProfiles && "lastGarminSyncAt" in u.values)).toBe(false);
     // The "last sync" shown in Settings still reflects the manual sync.
     expect(updates.some((u) => u.table === garminTokens && "lastSyncAt" in u.values)).toBe(true);
+  });
+
+  it("a sync that changed nothing leaves the swim metrics and insights cached", async () => {
+    mockDbRecordingUpdates();
+
+    await syncGarminActivities(7, 30);
+
+    expect(h.deleteCached).not.toHaveBeenCalled();
+  });
+});
+
+describe("invalidateAfterGarminSync", () => {
+  const deleted: unknown[] = [];
+  beforeEach(() => {
+    vi.clearAllMocks();
+    deleted.length = 0;
+    h.getDb.mockResolvedValue({
+      delete: (table: unknown) => {
+        deleted.push(table);
+        return { where: async () => undefined };
+      },
+    });
+  });
+
+  it.each([
+    [{ syncedCount: 2, existingSwimsChanged: false }, true],
+    [{ syncedCount: 0, existingSwimsChanged: true }, true],
+    [{ syncedCount: 0, existingSwimsChanged: false }, false],
+  ] as const)("%o → drops metrics and insights: %s", async (changes, dropped) => {
+    await invalidateAfterGarminSync(7, changes);
+    if (dropped) {
+      expect(h.deleteCached).toHaveBeenCalledWith(expect.stringMatching(/^swim-metrics:v4:7:\d{4}-\d{2}-\d{2}$/));
+      expect(deleted).toEqual([aiInsightsCache]);
+    } else {
+      expect(h.deleteCached).not.toHaveBeenCalled();
+      expect(deleted).toEqual([]);
+    }
   });
 });

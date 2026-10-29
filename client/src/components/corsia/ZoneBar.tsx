@@ -22,7 +22,12 @@ const positive = (value: number | null | undefined) => {
 export function zoneShares(
   seconds: readonly (number | null | undefined)[]
 ): ZoneShare[] | null {
-  const values = ZONE_BG.map((_, index) => positive(seconds[index]));
+  return sharesOf(ZONE_BG.map((_, index) => seconds[index]));
+}
+
+/** zoneShares for any number of parts (e.g. the seven pace zones A1–C3). */
+export function sharesOf(amounts: readonly (number | null | undefined)[]): ZoneShare[] | null {
+  const values = amounts.map(positive);
   const total = values.reduce((sum, value) => sum + value, 0);
   if (total <= 0) return null;
   const exact = values.map(value => (value * 100) / total);

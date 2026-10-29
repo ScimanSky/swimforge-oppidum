@@ -38,9 +38,9 @@ import {
 } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
-  activityDays,
   getActivityAvgSwolf,
-  getStreaks,
+  STREAK_EXPLANATION,
+  STREAK_UNIT,
   primaryStrokeLabel,
 } from "@/lib/profile-stats";
 import { PersonalRecordsBoard } from "@/components/corsia/PersonalRecordsBoard";
@@ -173,6 +173,11 @@ export default function Profile() {
     offset: 0,
     source: "all",
   });
+  // The streaks of all the history, the same numbers as Statistiche, Sfide and the coach.
+  const metricsQuery = trpc.statistics.getMetrics.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
   const badgesQuery = trpc.badges.progress.useQuery();
   const badgesData = badgesQuery.data;
   const { data: achievementDefinitions } =
@@ -216,9 +221,6 @@ export default function Profile() {
       : null;
     const bestSwolf = swolfValues.length ? Math.min(...swolfValues) : null;
 
-    const swimDays = activityDays(activities);
-    const streaks = getStreaks(swimDays);
-
     return {
       totalDistance,
       totalTime,
@@ -226,9 +228,6 @@ export default function Profile() {
       avgPace,
       avgSwolf,
       bestSwolf,
-      hasActivities: swimDays.length > 0,
-      streakCurrent: streaks.current,
-      streakBest: streaks.best,
     };
   }, [activities, profile]);
 
@@ -293,7 +292,7 @@ export default function Profile() {
       tone: "action",
     });
   }
-  // …SWOLF and streaks from the last activities only (at most 50), shown under their own title.
+  // …SWOLF from the last activities only (at most 50), shown under their own title…
   const recent: MetricProps[] = [];
   if (stats.avgSwolf)
     recent.push({ value: String(stats.avgSwolf), label: "SWOLF medio" });
@@ -302,18 +301,20 @@ export default function Profile() {
       value: String(Math.round(stats.bestSwolf)),
       label: "SWOLF migliore",
     });
-  if (stats.hasActivities) {
-    recent.push({
-      value: String(stats.streakCurrent),
-      unit: "g",
-      label: "Serie attuale",
-    });
-    recent.push({
-      value: String(stats.streakBest),
-      unit: "g",
-      label: "Serie migliore",
-    });
-  }
+  // …and the streaks of all the history from the swim metrics (left out if they fail to load).
+  const volume = metricsQuery.data?.volume;
+  const showStreaks = stats.totalSessions > 0 || activities.length > 0;
+  const streaks: MetricProps[] = volume
+    ? [
+        { value: formatInteger(volume.streakWeeks), unit: STREAK_UNIT, label: "Serie attuale" },
+        {
+          value: formatInteger(volume.bestStreakWeeks ?? volume.streakWeeks),
+          unit: STREAK_UNIT,
+          label: "Serie migliore",
+        },
+      ]
+    : [];
+  const streaksTitleId = useId();
   const recentTitle =
     activities.length === 1
       ? "Ultima nuotata"
@@ -532,6 +533,37 @@ export default function Profile() {
                   </li>
                 ))}
               </ul>
+            </section>
+          ) : null}
+          {showStreaks && (streaks.length > 0 || metricsQuery.isPending) ? (
+            <section
+              aria-labelledby={streaksTitleId}
+              className="mt-5 border-t border-border pt-4"
+            >
+              <h3
+                id={streaksTitleId}
+                className="text-sm font-semibold text-muted-foreground"
+              >
+                Costanza
+              </h3>
+              {streaks.length > 0 ? (
+                <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
+                  {streaks.map(metric => (
+                    <li key={metric.label}>
+                      <Metric {...metric} />
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div role="status" className="mt-3 grid grid-cols-2 gap-x-4 sm:grid-cols-4">
+                  <span className="sr-only">Caricamento della serie…</span>
+                  <Skeleton className="h-12" aria-hidden />
+                  <Skeleton className="h-12" aria-hidden />
+                </div>
+              )}
+              <p className="mt-3 text-xs text-muted-foreground">
+                {STREAK_EXPLANATION}
+              </p>
             </section>
           ) : null}
         </Section>

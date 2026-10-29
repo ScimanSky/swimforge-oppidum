@@ -54,6 +54,16 @@ body,
   --zone-3: #34C6EB;
   --zone-4: #FFB27A;
   --zone-5: #FF8B47;
+  /* Pace zones A1–C3, cool to warm (slate, blue, cyan, teal, amber-yellow, coral red,
+     magenta-crimson): fills only, never under text; 3:1 against every surface. Never orange:
+     Corsia keeps orange for XP and records. Heart-rate zones keep --zone-1..5. */
+  --pace-a1: #5E6E82;
+  --pace-a2: #3466CC;
+  --pace-b1: #0A87A8;
+  --pace-b2: #0B8A70;
+  --pace-c1: #8F7200;
+  --pace-c2: #D2443F;
+  --pace-c3: #B0246E;
 
   /* Legacy hex alias: removed in Task 22 (rename). */
   --ink: #062030;
@@ -101,6 +111,14 @@ body,
   --destructive-foreground: #0A1520;
   --gold: #E8B84A;
   --gold-light: #E8B84A;
+
+  --pace-a1: #8193A8;
+  --pace-a2: #5B8DEF;
+  --pace-b1: #2FB7D6;
+  --pace-b2: #2BC4A0;
+  --pace-c1: #E8C440;
+  --pace-c2: #E9534B;
+  --pace-c3: #E3549E;
 }
 
 /* Derived tokens: recomputed in every scope, so a nested .dark (e.g. Badges) gets dark values. */
@@ -179,6 +197,13 @@ body,
   --color-zone-3: var(--zone-3);
   --color-zone-4: var(--zone-4);
   --color-zone-5: var(--zone-5);
+  --color-pace-a1: var(--pace-a1);
+  --color-pace-a2: var(--pace-a2);
+  --color-pace-b1: var(--pace-b1);
+  --color-pace-b2: var(--pace-b2);
+  --color-pace-c1: var(--pace-c1);
+  --color-pace-c2: var(--pace-c2);
+  --color-pace-c3: var(--pace-c3);
   --color-chip-cyan: var(--chip-cyan);
   --color-chip-emerald: var(--chip-emerald);
   --color-chip-amber: var(--chip-amber);

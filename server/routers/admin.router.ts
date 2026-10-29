@@ -4,6 +4,8 @@ import {
     listPostReports, updatePostReportStatus,
     getPendingActivityInsights, listActivityInsights, markActivityInsightSeen,
 } from "./_shared";
+import { cssTestSchema } from "../swim_metrics/css-test";
+import { paceZonesSchema } from "../swim_metrics/pace-zones";
 
 // Seed function for badges and levels
 export async function seedBadgesAndLevels() {
@@ -192,15 +194,58 @@ export const statisticsRouter = router({
             return await getPerformanceAnalysis(ctx.user.id, input.days);
         }),
 
-    // Get advanced metrics
-    getAdvanced: protectedProcedure
-        .input(z.object({
-            days: z.number().default(30),
-        }))
-        .query(async ({ ctx, input }) => {
-            const { getAdvancedMetrics } = await import("../db_statistics");
-            return await getAdvancedMetrics(ctx.user.id, input.days);
+    // Swim metrics (CSS, load and form, intensity, Stroke Index, pacing, volume) of the caller.
+    getMetrics: protectedProcedure.query(async ({ ctx }) => {
+        const { getSwimMetrics } = await import("../swim_metrics");
+        return await getSwimMetrics(ctx.user.id);
+    }),
+
+    // AI insights of the Coach page, from the caller's swim metrics (cached 24 hours).
+    getInsights: protectedProcedure.query(async ({ ctx }) => {
+        const { getSwimMetrics } = await import("../swim_metrics");
+        const { generateAIInsights } = await import("../ai_insights");
+        return await generateAIInsights(await getSwimMetrics(ctx.user.id), ctx.user.id);
+    }),
+
+    // The caller's 400/200 CSS test, saved in the profile preferences. Validation errors are in
+    // Italian, each on its field (error.data.zodError.fieldErrors).
+    setCssTest: protectedProcedure
+        .input(cssTestSchema())
+        .mutation(async ({ ctx, input }) => {
+            const { updateCssTest } = await import("../swim_metrics/css-test");
+            if (!(await updateCssTest(ctx.user.id, input))) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
+            }
+            return { success: true };
         }),
+
+    clearCssTest: protectedProcedure.mutation(async ({ ctx }) => {
+        const { updateCssTest } = await import("../swim_metrics/css-test");
+        if (!(await updateCssTest(ctx.user.id, null))) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
+        }
+        return { success: true };
+    }),
+
+    // The caller's own zone bounds («Le tue zone»), seconds per 100 m from A1|A2 to C1|C2: they
+    // win over the ones from the CSS. Errors in Italian, each on its field.
+    setPaceZones: protectedProcedure
+        .input(paceZonesSchema)
+        .mutation(async ({ ctx, input }) => {
+            const { updatePaceZones } = await import("../swim_metrics/pace-zones");
+            if (!(await updatePaceZones(ctx.user.id, input))) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
+            }
+            return { success: true };
+        }),
+
+    clearPaceZones: protectedProcedure.mutation(async ({ ctx }) => {
+        const { updatePaceZones } = await import("../swim_metrics/pace-zones");
+        if (!(await updatePaceZones(ctx.user.id, null))) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
+        }
+        return { success: true };
+    }),
 });
 
 // AI Coach

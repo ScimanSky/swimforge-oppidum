@@ -1,10 +1,12 @@
-/** «Acque libere», «Vasca 25m» or «Vasca» when the pool length is unknown. */
+import { poolLengthLabel } from "@shared/swimMetrics";
+
+/** «Acque libere», «Vasca 25 m», «Vasca 25 yd» (a 22.86 m pool) or «Vasca» when the pool length is unknown. */
 export const activityPlaceLabel = (activity: {
   isOpenWater?: boolean | null;
   poolLengthMeters?: number | null;
 }) => {
   if (activity.isOpenWater) return "Acque libere";
-  return activity.poolLengthMeters ? `Vasca ${activity.poolLengthMeters}m` : "Vasca";
+  return activity.poolLengthMeters ? `Vasca ${poolLengthLabel(activity.poolLengthMeters)}` : "Vasca";
 };
 
 const SOURCE_LABELS: Record<string, string> = {

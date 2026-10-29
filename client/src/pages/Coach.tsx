@@ -17,40 +17,116 @@ import {
   formatDistance as formatDistanceValue,
   formatDurationParts,
   formatInteger,
-  formatSignedInteger,
   NO_VALUE,
 } from "@/lib/format"
+import { formatZonePace, metricHeaders } from "@/lib/swim-metrics-view"
+import { STREAK_UNIT } from "@/lib/profile-stats"
+import { cn } from "@/lib/utils"
+import { ZoneGlossary } from "@/components/stats/ZoneGlossary"
+import {
+  isPaceZoneCode,
+  PACE_ZONE_BY_CODE,
+  TSB_READING_LABELS,
+  type PaceZoneCode,
+  type PaceZoneRange,
+} from "@shared/swimMetrics"
+import {
+  isFreestyleRep,
+  parseRest,
+  type CoachWorkout,
+  type CoachWorkoutExercise,
+  type CoachWorkoutSection,
+} from "@shared/coachWorkout"
+import { insightChip } from "@/lib/coach-insights"
 import { toast } from "sonner"
 import { Sparkles, AlertTriangle } from "lucide-react"
 import { useSearch } from "wouter"
 
 const sectionTitle = "text-[17px] font-bold"
-type WorkoutSection = {
-  title: string
-  exercises: WorkoutExercise[]
-  notes?: string
+type WorkoutSection = CoachWorkoutSection
+type WorkoutExercise = CoachWorkoutExercise
+type GeneratedWorkout = CoachWorkout
+
+/** Literal classes so Tailwind generates them: the swatch of each pace zone. */
+const PACE_ZONE_BG: Record<PaceZoneCode, string> = {
+  A1: "bg-pace-a1",
+  A2: "bg-pace-a2",
+  B1: "bg-pace-b1",
+  B2: "bg-pace-b2",
+  C1: "bg-pace-c1",
+  C2: "bg-pace-c2",
+  C3: "bg-pace-c3",
 }
 
-type WorkoutExercise = {
-  name: string
-  sets?: string
-  reps?: string
-  distance?: string
-  duration?: string
-  rest?: string
-  intensity?: string
-  equipment?: string
-  notes?: string
+/** The zone of a rep, when it has a known one (workouts stored before the zones have none). */
+const repZone = (exercise: WorkoutExercise): PaceZoneCode | null =>
+  isPaceZoneCode(exercise.zone) ? exercise.zone : null
+
+const hasZones = (workout: GeneratedWorkout) =>
+  (workout.sections ?? []).some((section) => section.exercises?.some((exercise) => repZone(exercise) !== null))
+
+/**
+ * The target pace of a rep: from the zones in effect today (freestyle without equipment), so a
+ * workout follows the zones after they change; the pace stored at generation stays as history,
+ * said when it differs. Without today's zones (loading, or none) the stored pace.
+ */
+function repPace(code: PaceZoneCode, exercise: WorkoutExercise, ranges: PaceZoneRange[] | null) {
+  const stored = exercise.targetPace ? formatZonePace(exercise.targetPace) : null
+  const range = ranges && isFreestyleRep(exercise) ? ranges.find((candidate) => candidate.code === code) : undefined
+  const current = range ? formatZonePace(range) : null
+  return { pace: current ?? stored, previous: current && stored && stored !== current ? stored : null }
 }
 
-type GeneratedWorkout = {
-  type: "pool" | "dryland"
-  title: string
-  description: string
-  duration: string
-  difficulty: string
-  sections: WorkoutSection[]
-  coachNotes: string[]
+/**
+ * The zone of a rep: a chip «B2 · Soglia» that opens the zone in «Le zone A1–C3», the target
+ * pace from the athlete's zones (freestyle) and in a line how it feels and what it trains.
+ */
+function RepZone({
+  code,
+  exercise,
+  ranges,
+  onOpen,
+}: {
+  code: PaceZoneCode
+  exercise: WorkoutExercise
+  /** The zones in effect today; null while they load. */
+  ranges: PaceZoneRange[] | null
+  onOpen: (code: PaceZoneCode) => void
+}) {
+  const zone = PACE_ZONE_BY_CODE[code]
+  const { pace, previous } = repPace(code, exercise, ranges)
+  return (
+    <div className="mt-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        {/* 44px tall touch target around a 28px chip. */}
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          onClick={() => onOpen(code)}
+          className="-my-2 inline-flex items-center rounded-full py-2 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
+          <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border bg-card px-3 text-xs font-semibold text-foreground">
+            <span aria-hidden className={cn("size-2 shrink-0 rounded-full", PACE_ZONE_BG[code])} />
+            {code} · {zone.level}
+          </span>
+        </button>
+        {pace ? (
+          <span className="text-xs tabular-nums text-foreground">
+            {pace} <span className="text-muted-foreground">/100 m</span>
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {zone.explanation.charAt(0).toUpperCase()}
+        {zone.explanation.slice(1)}.
+      </p>
+      {previous ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Passo dalle tue zone di oggi; quando l&apos;allenamento è stato generato era {previous} /100 m.
+        </p>
+      ) : null}
+    </div>
+  )
 }
 
 /** «1,5 km» / «800 m», null without a distance. */
@@ -81,67 +157,47 @@ const sessionMeta = (entry: any) =>
     .filter(Boolean)
     .join(" · ")
 
-/** Score 0-100 as an integer; null without a number (the metric is then not shown). */
-const formatScore = (value?: number | null) =>
-  value !== null && value !== undefined && Number.isFinite(value) ? formatInteger(value) : null
+const SUGGESTED_CHAT_PROMPTS = [
+  "Come imposto la prossima seduta in base al mio recupero?",
+  "Guardando i miei dati, cosa devo migliorare prima?",
+  "Mi prepari 2 obiettivi concreti per questa settimana?",
+  "Come leggo il mio passo soglia e le zone di intensità?",
+]
 
-const insightNumberFmt = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 })
-/** Number quoted in an insight, Italian style: 4.5% → «4,5 %», -3 → «−3». */
-const formatInsightNumber = (value: number, percent: boolean) =>
-  `${value < 0 ? "−" : ""}${insightNumberFmt.format(Math.abs(value))}${percent ? " %" : ""}`
-
+/**
+ * The details of an exercise. A send-off («a 2:10») is «Ripartenza», a rest («20″») is
+ * «Recupero»; a rep with a zone chip does not repeat its level as «Intensità».
+ */
 const getExerciseDetails = (exercise: WorkoutExercise) =>
   [
     exercise.sets && `Serie: ${exercise.sets}`,
     exercise.reps && `Rip: ${exercise.reps}`,
     exercise.distance && `Distanza: ${exercise.distance}`,
     exercise.duration && `Durata: ${exercise.duration}`,
-    exercise.rest && `Ripartenza: ${exercise.rest}`,
-    exercise.intensity && `Intensità: ${exercise.intensity}`,
+    exercise.rest && `${parseRest(exercise.rest)?.kind === "rest" ? "Recupero" : "Ripartenza"}: ${exercise.rest}`,
+    exercise.intensity && !repZone(exercise) && `Intensità: ${exercise.intensity}`,
     exercise.equipment && `Attrezzi: ${exercise.equipment}`,
   ].filter(Boolean) as string[]
 
-const getConditionLabel = (value?: number | null) => {
-  if (value === null || value === undefined) return "N/D"
-  if (value >= 75) return "Ottima"
-  if (value >= 55) return "Buona"
-  if (value >= 35) return "Da gestire"
-  return "Critica"
-}
-
-const getFocusLabel = (
-  performance?: number,
-  consistency?: number,
-  recovery?: number | null,
-  efficiency?: number | null
-) => {
-  const candidates = [
-    { label: "Prestazione", value: performance },
-    { label: "Costanza", value: consistency },
-    { label: "Recupero", value: recovery },
-    { label: "Efficienza", value: efficiency },
-  ].filter((item) => item.value !== null && item.value !== undefined)
-
-  if (!candidates.length) return "Analisi in corso"
-  candidates.sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
-  return candidates[0].label
-}
-
-/** One generated workout (pool or dry-land): meta, section picker, first three exercises. */
+/** One generated workout (pool or dry-land): meta, section picker, every exercise of the section. */
 function WorkoutDetail({
   workout,
   kicker,
   activeIndex,
   onSelect,
   activeSection,
-  moreLabel,
+  ranges,
+  onZone,
 }: {
   workout: GeneratedWorkout
   kicker: string
   activeIndex: number
   onSelect: (index: number) => void
   activeSection: WorkoutSection | null
-  moreLabel: string
+  /** The zones in effect today; null while they load. */
+  ranges: PaceZoneRange[] | null
+  /** Opens «Le zone A1–C3», at a zone or at the start. */
+  onZone: (code: PaceZoneCode | null) => void
 }) {
   return (
     <div className="space-y-3">
@@ -149,10 +205,22 @@ function WorkoutDetail({
         <p className="text-xs text-muted-foreground">{kicker}</p>
         <h3 className="mt-1 text-base font-bold text-foreground">{workout.title}</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          {[workout.duration, workout.difficulty].filter(Boolean).join(" · ")}
+          {[workout.duration, workout.difficulty, workout.totalMeters ? formatDistance(workout.totalMeters) : null]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
       </div>
       <p className="text-sm text-muted-foreground">{workout.description}</p>
+      {hasZones(workout) ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-muted-foreground">
+            Ogni ripetuta ha la sua zona di passo: tocca la zona per sapere cosa vuol dire.
+          </p>
+          <Button type="button" size="sm" variant="outline" onClick={() => onZone(null)}>
+            Le zone A1–C3
+          </Button>
+        </div>
+      ) : null}
       <div role="group" aria-label="Parti dell'allenamento" className="flex flex-wrap gap-2">
         {workout.sections.map((section, idx) => (
           <Button
@@ -174,25 +242,27 @@ function WorkoutDetail({
             <p className="mt-1 text-xs text-muted-foreground">{activeSection.notes}</p>
           )}
           <ul className="mt-3 divide-y divide-border">
-            {activeSection.exercises.slice(0, 3).map((exercise, exIdx) => (
-              <li key={exIdx} className="py-3 text-sm first:pt-0 last:pb-0">
-                <p className="font-medium text-foreground">{exercise.name}</p>
-                <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  {getExerciseDetails(exercise).map((detail, detailIdx) => (
-                    <span key={detailIdx}>{detail}</span>
-                  ))}
-                </p>
-                {exercise.notes && (
-                  <p className="mt-2 text-xs text-muted-foreground">{exercise.notes}</p>
-                )}
-              </li>
-            ))}
+            {(activeSection.exercises ?? []).map((exercise, exIdx) => {
+              const zone = repZone(exercise)
+              return (
+                <li key={exIdx} className="py-3 text-sm first:pt-0 last:pb-0">
+                  <p className="font-medium text-foreground">{exercise.name}</p>
+                  {zone ? <RepZone code={zone} exercise={exercise} ranges={ranges} onOpen={onZone} /> : null}
+                  <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    {getExerciseDetails(exercise).map((detail, detailIdx) => (
+                      <span key={detailIdx}>{detail}</span>
+                    ))}
+                  </p>
+                  {exercise.zoneNote ? (
+                    <p className="mt-1 text-xs text-muted-foreground">{exercise.zoneNote}</p>
+                  ) : null}
+                  {exercise.notes && (
+                    <p className="mt-2 text-xs text-muted-foreground">{exercise.notes}</p>
+                  )}
+                </li>
+              )
+            })}
           </ul>
-          {activeSection.exercises.length > 3 && (
-            <p className="mt-3 text-xs text-muted-foreground">
-              +{activeSection.exercises.length - 3} esercizi aggiuntivi. {moreLabel}
-            </p>
-          )}
         </div>
       ) : null}
     </div>
@@ -208,15 +278,31 @@ export default function Coach() {
   const [showSessionArchive, setShowSessionArchive] = useState(false)
   const [activeWorkout, setActiveWorkout] = useState<"pool" | "dryland">("pool")
   const [isGenerating, setIsGenerating] = useState(false)
+  // «Le zone A1–C3»: the key outlives the open state, so the dialog keeps its zone while closing.
+  const [glossaryOpen, setGlossaryOpen] = useState(false)
+  const [glossaryZone, setGlossaryZone] = useState<PaceZoneCode | null>(null)
+  const openGlossary = (code: PaceZoneCode | null) => {
+    setGlossaryZone(code)
+    setGlossaryOpen(true)
+  }
   const meQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   })
   const chat = useCoachChat(Number((meQuery.data as any)?.id) || null)
-  const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
-    { days: 30 },
-    { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false }
-  )
+  // The swim metrics (the same as Statistiche) and the AI advice built on them.
+  const metricsQuery = trpc.statistics.getMetrics.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
+  const metrics = metricsQuery.data
+  // The zones in effect today: null while they load (the workouts keep their stored paces).
+  const currentRanges = metrics ? metrics.zones.ranges : null
+  const zonesStatus = metrics ? "ready" : metricsQuery.isError ? "error" : "loading"
+  const { data: insights } = trpc.statistics.getInsights.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
 
   // Read-only: fetch existing workouts (no generation)
   const workoutsQuery = trpc.aiCoach.getWorkouts.useQuery(undefined, {
@@ -269,88 +355,44 @@ export default function Coach() {
     return formatDate(workoutsData.generatedAt)
   }, [workoutsData?.generatedAt])
 
-  const focusLabel = useMemo(
-    () =>
-      getFocusLabel(
-        advanced?.performanceIndex,
-        advanced?.consistencyScore,
-        advanced?.recoveryReadinessScore,
-        advanced?.swimmingEfficiencyIndex
-      ),
-    [advanced]
-  )
-
-  const suggestedChatPrompts = useMemo(
-    () => [
-      "Come imposto la prossima seduta in base al mio recupero?",
-      "Guardando i miei dati, cosa devo migliorare prima?",
-      "Mi prepari 2 obiettivi concreti per questa settimana?",
-      `Che lavoro faccio per migliorare in ${focusLabel.toLowerCase()}?`,
-    ],
-    [focusLabel]
-  )
-
   const sessionInsightsQuery = trpc.activityInsights.list.useQuery(
     { limit: 50, offset: 0 },
     { staleTime: 60 * 1000 }
   )
 
   const insightCards = useMemo(() => {
-    const insights = advanced?.insights ?? []
-    if (!insights.length) return []
-    return insights.map((text, index) => {
-      const metricMatch = text.match(/(-?\d+(?:\.\d+)?)(%?)/)
-      return {
-        title: `Consiglio ${index + 1}`,
-        description: text.replace(/\*\*/g, ""),
-        metric: metricMatch ? formatInsightNumber(Number(metricMatch[1]), metricMatch[2] === "%") : null,
-      }
-    })
-  }, [advanced?.insights])
+    if (!insights?.length) return []
+    return insights.map((text, index) => ({
+      title: `Consiglio ${index + 1}`,
+      description: text.replace(/\*\*/g, ""),
+      // Only a percentage or a signed change, never the 1 of «B1» or a pace.
+      metric: insightChip(text),
+    }))
+  }, [insights])
 
   const safeInsightIndex = insightCards.length
     ? Math.min(activeInsightIndex, insightCards.length - 1)
     : 0
   const activeInsight = insightCards[safeInsightIndex]
 
+  // Key swim metrics with a value (a metric without data is not shown); the rest is in Statistiche.
   const keyMetrics = useMemo((): Array<MetricProps & { id: string }> => {
-    if (!advanced) return []
-    const recovery = advanced.recoveryReadinessScore ?? null
-    const streakCurrent = advanced.streak?.current ?? 0
-    const metrics: Array<MetricProps & { id: string }> = [
-      { id: "performance", value: formatInteger(advanced.performanceIndex ?? 0), unit: "/100", label: "Prestazione" },
-      { id: "consistency", value: formatInteger(advanced.consistencyScore ?? 0), unit: "/100", label: "Costanza" },
+    if (!metrics) return []
+    const headers = metricHeaders(metrics)
+    const tiles: Array<(MetricProps & { id: string }) | null> = [
+      headers.css.value ? { id: "css", value: headers.css.value, unit: headers.css.unit, label: "Passo soglia" } : null,
+      headers.intensity.value
+        ? { id: "intensity", value: headers.intensity.value, unit: headers.intensity.unit, label: "Intensità" }
+        : null,
+      headers.volume.value
+        ? { id: "volume", value: headers.volume.value, unit: headers.volume.unit, label: "Volume" }
+        : null,
+      headers.volume.value
+        ? { id: "streak", value: formatInteger(metrics.volume.streakWeeks), unit: STREAK_UNIT, label: "Serie" }
+        : null,
     ]
-    if (recovery !== null) {
-      metrics.push({ id: "recovery", value: formatInteger(recovery), unit: "/100", label: "Recupero" })
-    }
-    metrics.push({
-      id: "streak",
-      value: formatInteger(streakCurrent),
-      unit: streakCurrent === 1 ? "giorno" : "giorni",
-      label: `Serie, record ${formatInteger(advanced.streak?.record ?? 0)}`,
-    })
-    return metrics
-  }, [advanced])
-
-  // Advanced scores with a value only: a metric without data is not shown.
-  const advancedMetrics = useMemo(
-    () =>
-      // RRS is already the «Recupero» metric above; POI is a signed percentage.
-      [
-        { key: "SEI", value: formatScore(advanced?.swimmingEfficiencyIndex) },
-        { key: "TCI", value: formatScore(advanced?.technicalConsistencyIndex) },
-        { key: "SER", value: formatScore(advanced?.strokeEfficiencyRating) },
-        { key: "ACS", value: formatScore(advanced?.aerobicCapacityScore) },
-        {
-          key: "POI",
-          value:
-            advanced?.poiBaseline === false ? null : formatSignedInteger(advanced?.progressiveOverloadIndex),
-          unit: "%",
-        },
-      ].filter((metric): metric is { key: string; value: string; unit?: string } => metric.value !== null),
-    [advanced]
-  )
+    return tiles.filter((tile) => tile !== null)
+  }, [metrics])
 
   const archive = useSessionArchive(sessionInsightsQuery.data)
   const sessionEntries = archive.entries
@@ -381,10 +423,8 @@ export default function Coach() {
     setActiveDrySectionIndex(0)
   }, [drylandWorkout?.sections?.length])
 
-  const conditionLabel = useMemo(
-    () => getConditionLabel(advanced?.recoveryReadinessScore),
-    [advanced?.recoveryReadinessScore]
-  )
+  // Form − fatigue reading (TrainingPeaks conventions), «In costruzione».
+  const balanceReading = metrics?.load.today ? TSB_READING_LABELS[metrics.load.today.reading] : null
 
   const lastSyncLabel = useMemo(
     () => formatDate(latestSessionInsight?.activity_date),
@@ -407,9 +447,8 @@ export default function Coach() {
   }, [search])
 
   const summaryItems = [
-    { label: "Focus di oggi", value: focusLabel },
-    ...(advanced?.recoveryReadinessScore !== null && advanced?.recoveryReadinessScore !== undefined
-      ? [{ label: "Condizione", value: conditionLabel }]
+    ...(balanceReading
+      ? [{ label: "Equilibrio", value: balanceReading.charAt(0).toUpperCase() + balanceReading.slice(1) }]
       : []),
     { label: "Nuotate analizzate", value: formatInteger(sessionInsightsQuery.data?.length ?? 0) },
   ]
@@ -444,28 +483,13 @@ export default function Coach() {
 
           <TabsContent value="insights" className="mt-3">
             <div className="flex flex-col gap-4">
-              {keyMetrics.length > 0 || advancedMetrics.length > 0 ? (
-                <section aria-label="Punteggi" className="surface-panel order-2 p-4 lg:order-1">
-                  {keyMetrics.length > 0 ? (
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
-                      {keyMetrics.map(({ id, ...metric }) => (
-                        <Metric key={id} size="responsive" {...metric} />
-                      ))}
-                    </div>
-                  ) : null}
-                  {advancedMetrics.length > 0 ? (
-                    <div className="mt-4 grid grid-cols-3 gap-x-4 gap-y-4 border-t border-border pt-4 sm:grid-cols-6">
-                      {advancedMetrics.map((metric) => (
-                        <Metric
-                          key={metric.key}
-                          value={metric.value}
-                          unit={metric.unit}
-                          label={metric.key}
-                          size="sm"
-                        />
-                      ))}
-                    </div>
-                  ) : null}
+              {keyMetrics.length > 0 ? (
+                <section aria-label="Metriche" className="surface-panel order-2 p-4 lg:order-1">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
+                    {keyMetrics.map(({ id, ...metric }) => (
+                      <Metric key={id} size="responsive" {...metric} />
+                    ))}
+                  </div>
                 </section>
               ) : null}
 
@@ -576,7 +600,8 @@ export default function Coach() {
                         activeIndex={activePoolSectionIndex}
                         onSelect={setActivePoolSectionIndex}
                         activeSection={activePoolSection}
-                        moreLabel="Apri l'allenamento completo nel dettaglio sessione."
+                        ranges={currentRanges}
+                        onZone={openGlossary}
                       />
                     ) : (
                       <p className="text-sm text-muted-foreground">
@@ -590,7 +615,8 @@ export default function Coach() {
                       activeIndex={activeDrySectionIndex}
                       onSelect={setActiveDrySectionIndex}
                       activeSection={activeDrySection}
-                      moreLabel="Apri la scheda completa dal coach."
+                      ranges={currentRanges}
+                      onZone={openGlossary}
                     />
                   ) : (
                     <p className="text-sm text-muted-foreground">
@@ -787,12 +813,19 @@ export default function Coach() {
               isLoading={chat.isPending}
               placeholder="Scrivi al coach (es. «Come imposto la nuotata di domani?»)"
               emptyStateMessage="Parti da una domanda concreta sul tuo allenamento."
-              suggestedPrompts={suggestedChatPrompts}
+              suggestedPrompts={SUGGESTED_CHAT_PROMPTS}
               maxInputLength={CHAT_MAX_MESSAGE_CHARS}
               height={520}
             />
           </TabsContent>
         </Tabs>
+        <ZoneGlossary
+          ranges={metrics?.zones?.ranges ?? []}
+          status={zonesStatus}
+          open={glossaryOpen}
+          onOpenChange={setGlossaryOpen}
+          focusZone={glossaryZone}
+        />
       </div>
     </AppLayout>
   )

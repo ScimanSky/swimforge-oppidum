@@ -30,6 +30,7 @@ import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { updateUserProfileBadge } from "./db_profile_badges";
 import { decryptIfNeeded, encryptForStorage } from "./lib/tokenCrypto";
 import { invalidateUserCache } from "./lib/cache";
+import { invalidateSwimMetrics } from "./swim_metrics";
 import { checkAndAwardBadges as checkAchievementBadges } from "./badge_engine";
 import { calculateActivityXp as calculateActivityXpCore } from "./lib/utils";
 import { logger } from "./middleware/logger";
@@ -975,6 +976,19 @@ function calculateActivityXp(activity: GarminServiceActivity): number {
 }
 
 /**
+ * Cache invalidation after a Garmin sync: new swims drop the user caches; new swims, or laps and
+ * details backfilled on stored swims, drop the swim metrics and the Coach page insights written
+ * from them. A sync that changed nothing leaves them alone.
+ */
+export async function invalidateAfterGarminSync(
+  userId: number,
+  changes: { syncedCount: number; existingSwimsChanged: boolean },
+): Promise<void> {
+  if (changes.syncedCount > 0) await invalidateUserCache(String(userId));
+  if (changes.syncedCount > 0 || changes.existingSwimsChanged) await invalidateSwimMetrics(userId);
+}
+
+/**
  * Silent records recompute from stored laps (no pb_detected, no push); never throws,
  * a failure must not fail the sync.
  */
@@ -1122,18 +1136,18 @@ export async function syncGarminActivities(
     // recomputed (silently) once the loop is done.
     const lapsStoredForExisting = new Set<number>();
 
-    /** Fetches the full Garmin details; returns how many laps were stored. */
+    /** Fetches the full Garmin details; null without details, else how many laps were stored. */
     const enrichActivityDetails = async (params: {
       activityId: number;
       garminActivityId: string;
       currentStrokeType?: string | null;
       baseRawData?: Record<string, any> | null;
-    }): Promise<number> => {
+    }): Promise<number | null> => {
       const fullDetails = await getGarminActivityFullDetails(
         userId,
         params.garminActivityId
       );
-      if (!fullDetails) return 0;
+      if (!fullDetails) return null;
 
       const advanced = extractGarminAdvancedFields(fullDetails);
       const updates: Record<string, any> = {
@@ -1224,6 +1238,9 @@ export async function syncGarminActivities(
         .map(a => [a.garminActivityId!, a])
     );
 
+    // Swims already stored that got laps or details in this sync.
+    let existingSwimsChanged = false;
+
     // Process each activity
     for (const activity of result.activities) {
       // Check if activity already exists (by Garmin ID) using our pre-fetched map
@@ -1255,6 +1272,7 @@ export async function syncGarminActivities(
         if (!existingLap && existingDetails) {
           try {
             const storedLaps = await persistGarminLapDetails(db, existing.id, existingDetails);
+            existingSwimsChanged = true;
             if (storedLaps > 0) lapsStoredForExisting.add(existing.id);
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -1275,7 +1293,8 @@ export async function syncGarminActivities(
               currentStrokeType: existing.strokeType,
               baseRawData: existingRaw,
             });
-            if (storedLaps > 0) lapsStoredForExisting.add(existing.id);
+            if (storedLaps !== null) existingSwimsChanged = true;
+            if (storedLaps && storedLaps > 0) lapsStoredForExisting.add(existing.id);
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             logger.warn(`[Garmin] Failed to enrich existing activity ${activity.activity_id}: ${message}`, {
@@ -1517,10 +1536,10 @@ export async function syncGarminActivities(
 
       // Auto-update challenge progress for active challenges
       await updateActiveChallengesProgress(userId);
-
-      // Invalidate cached data for this user
-      await invalidateUserCache(String(userId));
     }
+
+    // Caches and Coach page insights, when this sync changed the user's swims.
+    await invalidateAfterGarminSync(userId, { syncedCount, existingSwimsChanged });
 
     // Update last sync time
     await db
