@@ -55,7 +55,7 @@ export const PACE_ZONE_BOUNDARIES: readonly { key: PaceZoneBoundaryKey; slower: 
  */
 export const PACE_ZONE_SPEED_BOUNDS: PaceZoneBounds = { a1a2: 0.85, a2b1: 0.9, b1b2: 0.95, b2c1: 1, c1c2: 1.04 };
 
-/** An active lap this long or shorter (or one pool length) faster than the C1/C2 boundary is C3. */
+/** An active lap this long or shorter faster than the C1/C2 boundary is C3 (never a whole 50 m length). */
 export const C3_MAX_LAP_METERS = 25;
 
 export type PaceZoneDefinition = {
@@ -302,24 +302,18 @@ export function levelRanges(ranges: PaceZoneRange[]): LevelRange[] {
 const steady = (value: number) => Math.round(value * 1e6) / 1e6;
 
 /**
- * Zone of an active freestyle lap from its pace (s/100 m), distance and the pool length. A pace
- * equal to a boundary goes to the faster zone; faster than C1/C2 is C3 for a lap of at most 25 m
- * or one pool length, else C2.
+ * Zone of an active freestyle lap from its pace (s/100 m) and distance. A pace equal to a
+ * boundary goes to the faster zone; faster than C1/C2 is C3 for a lap of at most 25 m (also one
+ * length of a 25 yd pool), else C2: a whole length of a 50 m pool is not a C3 sprint.
  */
-export function paceZoneOf(
-  paceSecondsPer100: number,
-  lapMeters: number,
-  bounds: PaceZoneBounds,
-  poolLengthMeters: number | null,
-): PaceZoneCode {
+export function paceZoneOf(paceSecondsPer100: number, lapMeters: number, bounds: PaceZoneBounds): PaceZoneCode {
   const pace = steady(paceSecondsPer100);
   if (pace > steady(bounds.a1a2)) return "A1";
   if (pace > steady(bounds.a2b1)) return "A2";
   if (pace > steady(bounds.b1b2)) return "B1";
   if (pace > steady(bounds.b2c1)) return "B2";
   if (pace > steady(bounds.c1c2)) return "C1";
-  const sprintMeters = Math.max(C3_MAX_LAP_METERS, poolLengthMeters ?? 0);
-  return lapMeters <= sprintMeters + 0.01 ? "C3" : "C2";
+  return lapMeters <= C3_MAX_LAP_METERS + 0.01 ? "C3" : "C2";
 }
 
 /**

@@ -111,7 +111,7 @@ coach e allenamenti le parlino (sostituiscono le cinque zone Z1–Z5 della prima
   | B2 Fondo medio-alto | ti avvicini alla soglia, respiro impegnato | 95–100% | Soglia | — | 6–7 |
   | C1 Soglia anaerobica | soglia alta, ritmo gara su medio-lunghe | 100–104% | Soglia | 200 m | 7–8 |
   | C2 Capacità anaerobica | sforzo intenso | > 104% | Sopra soglia | 150 m | 8–9 |
-  | C3 Potenza anaerobica | sprint puro | tratto ≤ 25 m (o una vasca) più veloce di C1/C2 | Sopra soglia | 25 m | 10 |
+  | C3 Potenza anaerobica | sprint puro | tratto ≤ 25 m più veloce di C1/C2 (una vasca da 50 m è C2) | Sopra soglia | 25 m | 10 |
 
   Con il passo soglia del proprietario (1:48,5): A1 più lento di 2:07,6 · A2 2:00,6–2:07,6 ·
   B1 1:54,2–2:00,6 · B2 1:48,5–1:54,2 · C1 1:44,3–1:48,5 · C2/C3 più veloce di 1:44,3 (test in

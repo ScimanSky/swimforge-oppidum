@@ -131,7 +131,7 @@ describe("SWIM_METRIC_DEFINITIONS", () => {
     expect(intensity.formula).toContain(
       "A1 sotto 85%, A2 85–90%, B1 90–95%, B2 95–100%, C1 100–104%, C2 sopra 104%",
     );
-    expect(intensity.formula).toContain("C3: un tratto di al massimo 25 m (o una vasca) più veloce del confine C1/C2");
+    expect(intensity.formula).toContain("C3: un tratto di al massimo 25 m più veloce del confine C1/C2; più lungo è C2 (anche una vasca intera da 50 m)");
     expect(intensity.formula).toContain("zona A = A1 + A2, zona B = B1 + B2, zona C = C1 + C2 + C3");
     expect(intensity.conventions).toEqual(
       expect.arrayContaining([

@@ -162,7 +162,7 @@ describe("zones from the threshold pace (CSS)", () => {
 describe("paceZoneOf", () => {
   // CSS 1:40 (1 m/s): a lap's pace is 100 / speed ratio.
   const bounds = paceZoneBoundsFromCss(100);
-  const at = (ratio: number, meters = 100, pool: number | null = 25) => paceZoneOf(100 / ratio, meters, bounds, pool);
+  const at = (ratio: number, meters = 100) => paceZoneOf(100 / ratio, meters, bounds);
 
   it.each([
     [0.5, "A1"],
@@ -180,22 +180,20 @@ describe("paceZoneOf", () => {
     expect(at(ratio)).toBe(code);
   });
 
-  it("C3 is a sprint of at most 25 m (or one pool length) faster than the C1/C2 boundary", () => {
+  it("C3 is a sprint of at most 25 m faster than the C1/C2 boundary, never a whole 50 m length", () => {
     expect(at(1.1, 25)).toBe("C3");
     expect(at(1.04, 25)).toBe("C3");
-    expect(at(1.1, 50, 25)).toBe("C2"); // a 50 in a 25 m pool is longer than 25 m
-    expect(at(1.1, 50, 50)).toBe("C3"); // one length of a 50 m pool
-    expect(at(1.1, 22.86, 22.86)).toBe("C3"); // one length of a 25 yd pool
+    expect(at(1.1, 50)).toBe("C2"); // a 50, in a 25 m pool or one length of a 50 m pool
+    expect(at(1.1, 22.86)).toBe("C3"); // one length of a 25 yd pool
     expect(at(1.02, 25)).toBe("C1"); // short but not faster than the boundary
-    expect(at(1.1, 25, null)).toBe("C3");
   });
 
   it("works with manual bounds too", () => {
     const manual = { a1a2: 130, a2b1: 122, b1b2: 116, b2c1: 110, c1c2: 105 };
-    expect(paceZoneOf(131, 100, manual, 25)).toBe("A1");
-    expect(paceZoneOf(130, 100, manual, 25)).toBe("A2");
-    expect(paceZoneOf(110, 100, manual, 25)).toBe("C1");
-    expect(paceZoneOf(104, 100, manual, 25)).toBe("C2");
+    expect(paceZoneOf(131, 100, manual)).toBe("A1");
+    expect(paceZoneOf(130, 100, manual)).toBe("A2");
+    expect(paceZoneOf(110, 100, manual)).toBe("C1");
+    expect(paceZoneOf(104, 100, manual)).toBe("C2");
   });
 });
 

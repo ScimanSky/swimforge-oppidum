@@ -23,17 +23,18 @@ describe("sessionZones", () => {
       [50, 60, "kick"],
       [100, 95, null], // no stroke: not zoned
     ]);
-    expect(sessionZones(laps, bounds, 25)).toEqual([400, 200, 100, 100, 100, 150, 25]);
+    expect(sessionZones(laps, bounds)).toEqual([400, 200, 100, 100, 100, 150, 25]);
     expect(unclassifiedMeters(laps)).toBe(300);
   });
 
-  it("a sprint of one length of a 50 m pool is C3", () => {
-    expect(sessionZones(lapsFrom([[50, 25]]), bounds, 50)).toEqual([0, 0, 0, 0, 0, 0, 50]);
+  it("a whole length of a 50 m pool is C2, not C3: C3 counts laps of at most 25 m", () => {
+    expect(sessionZones(lapsFrom([[50, 25]]), bounds)).toEqual([0, 0, 0, 0, 0, 50, 0]);
+    expect(sessionZones(lapsFrom([[25, 11]]), bounds)).toEqual([0, 0, 0, 0, 0, 0, 25]);
   });
 
   it("uses manual bounds as given", () => {
     const manual = { a1a2: 130, a2b1: 122, b1b2: 116, b2c1: 110, c1c2: 105 };
-    expect(sessionZones(lapsFrom([[100, 125], [100, 110]]), manual, 25)).toEqual([0, 100, 0, 0, 100, 0, 0]);
+    expect(sessionZones(lapsFrom([[100, 125], [100, 110]]), manual)).toEqual([0, 100, 0, 0, 100, 0, 0]);
   });
 });
 

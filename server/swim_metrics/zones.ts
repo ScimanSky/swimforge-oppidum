@@ -1,7 +1,7 @@
 /**
  * Pace zones A1–C3 (shared/paceZones.ts): every active freestyle lap goes in the zone of its
  * pace against the bounds in effect (the manual ones, or those from the swim's CSS), C3 for a
- * sprint of at most 25 m or one length. Distances are summed per zone.
+ * sprint of at most 25 m. Distances are summed per zone.
  */
 import { emptyZones7, PACE_ZONE_CODES, paceZoneOf, type PaceZoneBounds, type Zones7 } from "@shared/swimMetrics";
 import { activeLaps, type MetricLap } from "./laps";
@@ -12,11 +12,11 @@ export const emptyZones = emptyZones7;
  * Metres per zone of the active freestyle laps of a swim. The CSS is a freestyle pace: other
  * strokes, drill and kick (and laps without a stroke) are not zoned.
  */
-export function sessionZones(laps: MetricLap[], bounds: PaceZoneBounds, poolLengthMeters: number | null): Zones7 {
+export function sessionZones(laps: MetricLap[], bounds: PaceZoneBounds): Zones7 {
   const zones = emptyZones();
   for (const lap of activeLaps(laps)) {
     if (lap.stroke !== "freestyle") continue;
-    const code = paceZoneOf((lap.seconds / lap.distanceMeters) * 100, lap.distanceMeters, bounds, poolLengthMeters);
+    const code = paceZoneOf((lap.seconds / lap.distanceMeters) * 100, lap.distanceMeters, bounds);
     zones[PACE_ZONE_CODES.indexOf(code)] += lap.distanceMeters;
   }
   return zones;

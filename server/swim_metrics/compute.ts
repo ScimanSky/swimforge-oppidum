@@ -192,7 +192,7 @@ function computeSession(
     hasLaps,
     ...load,
     loadEstimated: load.stss !== null && !hasLaps,
-    zoneMeters: pool && hasLaps && zoneBounds ? sessionZones(active, zoneBounds, activity.poolLengthMeters) : null,
+    zoneMeters: pool && hasLaps && zoneBounds ? sessionZones(active, zoneBounds) : null,
     unclassifiedMeters: pool && hasLaps ? unclassifiedMeters(active) : null,
     ...efficiency,
     pacingCv: pacing.cv,
