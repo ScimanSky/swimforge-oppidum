@@ -28,11 +28,14 @@ vi.mock("../lib/cache", async () => {
   return { ...actual, deleteCached: m.deleteCached };
 });
 
-import { updateCssTest, validateCssTest } from "./css-test";
+import { z } from "zod";
+import { cssTestSchema, updateCssTest, validateCssTest } from "./css-test";
 
 describe("validateCssTest", () => {
   const today = "2026-10-29";
   const ok = { t200Seconds: 170, t400Seconds: 360, date: "2026-10-20" };
+  const T200 = "Il tempo sui 200 m deve essere tra 1:40 e 7:00.";
+  const T400 = "Il tempo sui 400 m deve essere tra 3:00 e 15:00.";
 
   it("accepts plausible times and a past date", () => {
     expect(validateCssTest(ok, today)).toBeNull();
@@ -40,10 +43,11 @@ describe("validateCssTest", () => {
   });
 
   it.each([
-    [{ t200Seconds: 89 }, "t200Seconds", "Il tempo sui 200 m deve essere tra 1:30 e 7:00."],
-    [{ t200Seconds: 421, t400Seconds: 900 }, "t200Seconds", "Il tempo sui 200 m deve essere tra 1:30 e 7:00."],
-    [{ t400Seconds: 179 }, "t400Seconds", "Il tempo sui 400 m deve essere tra 3:00 e 15:00."],
-    [{ t400Seconds: 901 }, "t400Seconds", "Il tempo sui 400 m deve essere tra 3:00 e 15:00."],
+    [{ t200Seconds: 99, t400Seconds: 210 }, "t200Seconds", T200], // the 200 must be ≥ 1:40
+    [{ t200Seconds: 421, t400Seconds: 900 }, "t200Seconds", T200],
+    [{ t400Seconds: 179 }, "t400Seconds", T400],
+    [{ t400Seconds: 901 }, "t400Seconds", T400],
+    [{ t200Seconds: Number.NaN }, "t200Seconds", T200],
     [{ date: "2026-10-30" }, "date", "La data del test non può essere nel futuro."],
     [{ date: "2026-02-30" }, "date", "Data non valida."],
     [{ date: "20/10/2026" }, "date", "Data non valida."],
@@ -51,12 +55,35 @@ describe("validateCssTest", () => {
     expect(validateCssTest({ ...ok, ...patch }, today)).toEqual({ field, message });
   });
 
-  it("T400 must be 1.9 to 2.4 times T200", () => {
-    const message = "Il tempo sui 400 m deve essere tra 1,9 e 2,4 volte quello sui 200 m: controlla i tempi.";
-    expect(validateCssTest({ ...ok, t200Seconds: 180, t400Seconds: 341 }, today)).toEqual({ field: "t400Seconds", message });
-    expect(validateCssTest({ ...ok, t200Seconds: 180, t400Seconds: 433 }, today)).toEqual({ field: "t400Seconds", message });
-    expect(validateCssTest({ ...ok, t200Seconds: 180, t400Seconds: 342 }, today)).toBeNull(); // 1.9
+  it("T400 must be 2.02 to 2.4 times T200: the CSS is never faster than the 400 pace (D′ ≥ 0)", () => {
+    const tooFast = "Il 400 è troppo veloce rispetto al 200: deve durare almeno 2,02 volte il tempo sui 200 m. Controlla i tempi.";
+    const tooSlow = "Il 400 è troppo lento rispetto al 200: deve durare al massimo 2,4 volte il tempo sui 200 m. Controlla i tempi.";
+    // 200 in 3:00 and 400 in 6:00: CSS 1:30, as fast as the 400 itself (D′ = 0, ratio 2).
+    expect(validateCssTest({ ...ok, t200Seconds: 180, t400Seconds: 360 }, today)).toEqual({ field: "t400Seconds", message: tooFast });
+    expect(validateCssTest({ ...ok, t200Seconds: 180, t400Seconds: 363 }, today)).toEqual({ field: "t400Seconds", message: tooFast });
+    expect(validateCssTest({ ...ok, t200Seconds: 180, t400Seconds: 433 }, today)).toEqual({ field: "t400Seconds", message: tooSlow });
+    expect(validateCssTest({ ...ok, t200Seconds: 180, t400Seconds: 363.6 }, today)).toBeNull(); // 2.02
     expect(validateCssTest({ ...ok, t200Seconds: 180, t400Seconds: 432 }, today)).toBeNull(); // 2.4
+  });
+
+  it("the resulting CSS must be within 1:00–3:30/100 m", () => {
+    const message =
+      "Con questi tempi il passo soglia sarebbe fuori dall'intervallo accettato (tra 1:00 e 3:30 per 100 m): controlla i tempi.";
+    // 200 in 6:40 and 400 in 14:00: CSS (840 − 400) / 2 = 220 s/100 m.
+    expect(validateCssTest({ ...ok, t200Seconds: 400, t400Seconds: 840 }, today)).toEqual({ field: "t400Seconds", message });
+    // 200 in 7:00 and 400 in 14:40: CSS 3:40/100 m.
+    expect(validateCssTest({ ...ok, t200Seconds: 420, t400Seconds: 880 }, today)).toEqual({ field: "t400Seconds", message });
+    // 200 in 6:00 and 400 in 13:00: CSS 3:30/100 m, the limit.
+    expect(validateCssTest({ ...ok, t200Seconds: 360, t400Seconds: 780 }, today)).toBeNull();
+  });
+
+  it("the schema puts each message on its field", () => {
+    const result = cssTestSchema(() => today).safeParse({ t200Seconds: 180, t400Seconds: 360, date: "2026-10-30" });
+    expect(result.success).toBe(false);
+    const fieldErrors = z.flattenError(result.error!).fieldErrors as Record<string, string[]>;
+    expect(fieldErrors.date).toEqual(["La data del test non può essere nel futuro."]);
+    expect(fieldErrors.t400Seconds?.[0]).toMatch(/troppo veloce/);
+    expect(fieldErrors.t200Seconds).toBeUndefined();
   });
 });
 
