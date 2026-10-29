@@ -245,7 +245,7 @@ export default function Badges() {
           <LoadingSkeleton
             label="Caricamento dei badge…"
             count={10}
-            className="grid grid-cols-2 gap-3 space-y-0 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+            className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
             itemClassName="h-44 rounded-2xl"
           />
         ) : failed ? (

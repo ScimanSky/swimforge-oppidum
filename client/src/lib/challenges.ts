@@ -62,7 +62,7 @@ export function challengeProgressParts(
 
 
 /** For pace (seconds per 100 m) lower is better; for every other objective higher is. */
-export const isLowerBetter = (objective: string) => objective === "avg_pace";
+const isLowerBetter = (objective: string) => objective === "avg_pace";
 
 /** Pace 0 means «no swim yet»: it never counts as a result. */
 const withData = (objective: string, values: readonly number[]) =>

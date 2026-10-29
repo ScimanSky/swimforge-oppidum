@@ -13,6 +13,7 @@ import {
 import AppLayout from "@/components/AppLayout";
 import { ActivityCard, type ActivityCardData } from "@/components/corsia/ActivityCard";
 import { LevelStrip } from "@/components/corsia/LevelCard";
+import { LoadError } from "@/components/corsia/LoadState";
 import { WeekCard } from "@/components/corsia/WeekCard";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -152,14 +153,7 @@ export default function Today() {
       </div>
     );
   } else if (activitiesQuery.isError) {
-    main = (
-      <div className="surface-panel p-5" role="alert">
-        <p className="font-semibold">Non riesco a caricare i dati</p>
-        <Button type="button" variant="outline" className="mt-4" onClick={retry}>
-          Riprova
-        </Button>
-      </div>
-    );
+    main = <LoadError onRetry={retry} />;
   } else if (!lastSwim) {
     main = (
       <div className="surface-panel p-5">

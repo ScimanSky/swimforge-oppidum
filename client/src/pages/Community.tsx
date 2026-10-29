@@ -275,7 +275,7 @@ export default function Community() {
             <LoadingSkeleton
               label="Caricamento dei club…"
               count={3}
-              className="grid gap-3 space-y-0 sm:grid-cols-2 lg:grid-cols-3"
+              className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"
               itemClassName="h-40 rounded-2xl"
             />
           ) : !clubsQuery.data && clubsQuery.isError ? (
@@ -359,7 +359,7 @@ export default function Community() {
           </div>
 
           {isDiscoverLoading ? (
-            <LoadingSkeleton label="Caricamento dei nuotatori…" count={3} className="mt-3" itemClassName="h-12 w-full rounded-xl" />
+            <LoadingSkeleton label="Caricamento dei nuotatori…" count={3} className="mt-3 space-y-2" itemClassName="h-12 w-full rounded-xl" />
           ) : discoverFailed ? (
             <LoadError className="mt-3 border-0 bg-raised" onRetry={() => void discoverQuery.refetch()} />
           ) : discoverUsers.length === 0 ? (

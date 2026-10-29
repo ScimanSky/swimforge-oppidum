@@ -14,12 +14,12 @@ export function LoadingSkeleton({
 }: {
   label: string;
   count?: number;
-  /** Layout of the placeholders (default: a stacked list). */
+  /** Layout of the placeholders, replacing the default stacked list (`space-y-2`). */
   className?: string;
   itemClassName?: string;
 }) {
   return (
-    <div role="status" className={cn("space-y-2", className)}>
+    <div role="status" className={className ?? "space-y-2"}>
       <span className="sr-only">{label}</span>
       {Array.from({ length: count }, (_, index) => (
         <Skeleton key={index} className={itemClassName} aria-hidden />
