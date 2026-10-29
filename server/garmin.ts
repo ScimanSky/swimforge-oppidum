@@ -1603,16 +1603,20 @@ export async function syncGarminActivities(
       .set({ lastSyncAt: new Date() })
       .where(eq(garminTokens.userId, userId));
 
-    // Update last_garmin_sync_at for auto-sync tracking
-    await db
-      .update(swimmerProfiles)
-      .set({ lastGarminSyncAt: new Date() })
-      .where(eq(swimmerProfiles.userId, userId));
+    // Update last_garmin_sync_at for auto-sync tracking. A capped manual sync
+    // (last N swims) does not cover the full window, so it must not push back
+    // the next auto-sync.
+    if (maxActivities === undefined) {
+      await db
+        .update(swimmerProfiles)
+        .set({ lastGarminSyncAt: new Date() })
+        .where(eq(swimmerProfiles.userId, userId));
 
-    logger.info(`[Garmin Sync] Updated last_garmin_sync_at for user ${userId}`, {
-      event: "garmin:sync_updated_last_sync",
-      userId,
-    });
+      logger.info(`[Garmin Sync] Updated last_garmin_sync_at for user ${userId}`, {
+        event: "garmin:sync_updated_last_sync",
+        userId,
+      });
+    }
 
     // Auto-migrate HR zones for activities that don't have them
     if (syncedCount > 0) {
