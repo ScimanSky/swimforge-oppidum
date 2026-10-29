@@ -97,18 +97,6 @@ vi.mock("@/components/social/ShareActivityPicker", () => ({
   ),
 }));
 
-vi.mock("@/components/ui/switch", () => ({
-  Switch: ({ checked, onCheckedChange, disabled }: any) => (
-    <input
-      aria-label="Condividi nel feed"
-      type="checkbox"
-      checked={!!checked}
-      disabled={!!disabled}
-      onChange={(e) => onCheckedChange?.(e.currentTarget.checked)}
-    />
-  ),
-}));
-
 vi.mock("@/components/ui/dialog", () => ({
   Dialog: ({ open, children }: any) => (open ? <div data-testid="sync-dialog">{children}</div> : null),
   DialogContent: ({ children }: any) => <div>{children}</div>,
@@ -190,7 +178,7 @@ describe("Activities UI interactions", () => {
     cleanup();
   });
 
-  it("calls toggleShare mutation when feed switch is changed", async () => {
+  it("«Condividi» in the panel opens the share sheet on that swim", async () => {
     state.activitiesData = [
       {
         id: 101,
@@ -208,12 +196,10 @@ describe("Activities UI interactions", () => {
 
     render(<Activities />);
 
-    const shareSwitch = screen.getByRole("checkbox", { name: "Condividi nel feed" });
-    expect(shareSwitch).not.toBeChecked();
-
-    await userEvent.click(shareSwitch);
-
-    expect(state.toggleShareMutateCalls).toEqual([{ activityId: 101, share: true }]);
+    expect(screen.queryByRole("checkbox", { name: "Condividi nel feed" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Condividi" }));
+    expect(screen.getByTestId("share-picker-state")).toHaveTextContent("open:true|id:101");
+    expect(state.toggleShareMutateCalls).toEqual([]);
   });
 
   it("opens sync prompt and handles 'Più tardi' by marking activity as seen", async () => {
@@ -284,7 +270,7 @@ describe("Activities UI interactions", () => {
 
     expect(screen.getByRole("link", { name: "Pool Session" })).toHaveAttribute("href", "/track/101");
     expect(screen.getByRole("link", { name: "Lago" })).toHaveAttribute("href", "/track/102");
-    expect(screen.queryByRole("checkbox", { name: "Condividi nel feed" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Condividi" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Dettaglio vasche" })).not.toBeInTheDocument();
   });
 
@@ -377,6 +363,6 @@ describe("Activities UI interactions", () => {
 
     render(<Activities />);
 
-    expect(screen.getByRole("checkbox", { name: "Condividi nel feed" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Condividi" })).toBeInTheDocument();
   });
 });

@@ -768,12 +768,14 @@ export async function getClubWeeklyStats(clubId: number) {
         SELECT COUNT(*)::int
         FROM social_posts p
         WHERE p.club_id = ${clubId}
+          AND p.is_deleted = false
           AND p.created_at >= ${oneWeekAgo.toISOString()}
       ), 0) AS posts_this_week,
       COALESCE((
         SELECT COUNT(DISTINCT p.user_id)::int
         FROM social_posts p
         WHERE p.club_id = ${clubId}
+          AND p.is_deleted = false
           AND p.created_at >= ${oneWeekAgo.toISOString()}
       ), 0) AS active_members,
       COALESCE((

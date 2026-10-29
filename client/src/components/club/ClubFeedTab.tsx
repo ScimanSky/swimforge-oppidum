@@ -9,12 +9,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { MessageCircle, Plus, ImagePlus, X, AtSign, Hash, Trash2 } from "lucide-react";
+import { MessageCircle, Plus, ImagePlus, X, AtSign, Hash, PencilLine, Trash2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { errorToastMessage } from "@/lib/trpc-errors";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import PostReactions from "@/components/PostReactions";
+import { EditPostSheet } from "@/components/social/EditPostSheet";
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import {
   extractHashtags,
@@ -139,6 +140,7 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
   });
 
   const [deletingPostId, setDeletingPostId] = useState<number | null>(null);
+  const [editingPostId, setEditingPostId] = useState<number | null>(null);
   const deletePostMutation = trpc.community.deletePost.useMutation({
     onSuccess: () => {
       toast.success("Post eliminato");
@@ -509,11 +511,22 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
                       <Button
                         variant="ghost"
                         size="icon-sm"
+                        aria-label="Modifica post"
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() => setEditingPostId(post.id)}
+                      >
+                        <PencilLine aria-hidden />
+                      </Button>
+                    ) : null}
+                    {isOwnPost ? (
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
                         aria-label="Elimina post"
                         className="text-muted-foreground hover:text-danger"
                         disabled={deletePostMutation.isPending && deletingPostId === post.id}
                         onClick={() => {
-                          const confirmed = window.confirm("Eliminare questo post?");
+                          const confirmed = window.confirm("Eliminare questo post? Sparisce per tutti.");
                           if (!confirmed) return;
                           setDeletingPostId(post.id);
                           deletePostMutation.mutate({ postId: post.id });
@@ -662,6 +675,13 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
           ) : null}
         </DialogContent>
       </Dialog>
+      {editingPostId ? (
+        <EditPostSheet
+          open
+          onOpenChange={(open) => !open && setEditingPostId(null)}
+          postRef={{ postId: editingPostId }}
+        />
+      ) : null}
     </div>
   );
 }

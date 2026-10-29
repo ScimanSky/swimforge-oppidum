@@ -14,11 +14,13 @@ import {
   UserPlus,
   Flag,
   EyeOff,
+  PencilLine,
   Trash2,
 } from "lucide-react"
 import { formatTimeAgo, getInitials } from "@/lib/format"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
+import { EditPostSheet } from "./EditPostSheet"
 
 const SOURCE_LABELS: Record<string, string> = { garmin: "Garmin", strava: "Strava" }
 
@@ -52,6 +54,7 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
   const initials = getInitials(baseName)
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing ?? false)
   const [location, setLocation] = useLocation()
+  const [editOpen, setEditOpen] = useState(false)
 
   useEffect(() => {
     setIsFollowing(initialIsFollowing ?? false)
@@ -82,6 +85,11 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
       toast.success("Post eliminato")
       utils.community.feed.invalidate()
       utils.community.clubs.feed.invalidate()
+      // A shared swim goes back to «Condividi».
+      if (post.activity_id) {
+        utils.activities.list.invalidate()
+        utils.activities.get.invalidate({ id: post.activity_id })
+      }
     },
     onError: (err) => toast.error(err.message),
   })
@@ -158,18 +166,24 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
             {isOwner ? (
-              <DropdownMenuItem
-                className="gap-2 text-xs text-destructive focus:text-destructive"
-                disabled={deletePost.isPending}
-                onSelect={() => {
-                  const confirmed = window.confirm("Eliminare questo post?")
-                  if (!confirmed) return
-                  deletePost.mutate({ postId: post.id })
-                }}
-              >
-                <Trash2 className="size-3.5" aria-hidden />
-                {deletePost.isPending ? "Elimino..." : "Elimina"}
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem className="gap-2 text-sm" onSelect={() => setEditOpen(true)}>
+                  <PencilLine className="size-4" aria-hidden />
+                  Modifica
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="gap-2 text-sm text-destructive focus:text-destructive"
+                  disabled={deletePost.isPending}
+                  onSelect={() => {
+                    const confirmed = window.confirm("Eliminare questo post? Sparisce per tutti.")
+                    if (!confirmed) return
+                    deletePost.mutate({ postId: post.id })
+                  }}
+                >
+                  <Trash2 className="size-4" aria-hidden />
+                  {deletePost.isPending ? "Elimino…" : "Elimina"}
+                </DropdownMenuItem>
+              </>
             ) : (
               <>
                 <DropdownMenuItem
@@ -197,6 +211,10 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      {/* Mounted only while open: the post is loaded when the author asks to edit it. */}
+      {isOwner && editOpen ? (
+        <EditPostSheet open onOpenChange={setEditOpen} postRef={{ postId: post.id }} />
+      ) : null}
     </div>
   )
 }

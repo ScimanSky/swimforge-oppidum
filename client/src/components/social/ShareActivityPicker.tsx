@@ -63,9 +63,11 @@ export function ShareActivityPicker({
   const shareCloseFromPopStateRef = useRef(false)
   const shareHistoryPathRef = useRef<string | null>(null)
 
-  const { data: activities, isLoading } = trpc.community.unsharedActivities.useQuery(undefined, {
-    enabled: open,
-  })
+  // The swim opened from its page may be older than the 30 days of the list: ask for it too.
+  const { data: activities, isLoading } = trpc.community.unsharedActivities.useQuery(
+    initialActivityId ? { includeActivityId: initialActivityId } : undefined,
+    { enabled: open }
+  )
 
   const utils = trpc.useUtils()
   const imageKitAuth = trpc.community.postImageKitAuth.useMutation()

@@ -35,6 +35,10 @@ vi.mock("@/lib/trpc", () => ({
   },
 }))
 
+vi.mock("./EditPostSheet", () => ({
+  EditPostSheet: ({ postRef }: any) => <div data-testid="edit-post">{JSON.stringify(postRef)}</div>,
+}))
+
 const NOW = new Date("2026-10-28T18:00:00.000Z")
 
 const activityPost: FeedPostRecord = {
@@ -56,10 +60,10 @@ const activityPost: FeedPostRecord = {
   user_club_name: "Nuoto Oppidum",
 }
 
-function renderPost(post: FeedPostRecord) {
+function renderPost(post: FeedPostRecord, currentUserId = 1) {
   return render(
     <Router hook={memoryLocation({ path: "/home" }).hook}>
-      <FeedPost post={post} currentUserId={1} autoplayVideos={false} />
+      <FeedPost post={post} currentUserId={currentUserId} autoplayVideos={false} />
     </Router>
   )
 }
@@ -82,6 +86,16 @@ describe("FeedPost Corsia", () => {
     renderPost(activityPost)
     expect(screen.getByRole("link", { name: "Giulia Bianchi" })).toHaveAttribute("href", "/u/2")
     expect(screen.getByText("Nuoto Oppidum · 2h fa")).toBeInTheDocument()
+  })
+
+  it("il proprio post si può modificare ed eliminare, quando si vuole", async () => {
+    vi.useRealTimers()
+    renderPost(activityPost, 2)
+    await userEvent.click(screen.getByRole("button", { name: "Menu post" }))
+    expect(await screen.findByRole("menuitem", { name: "Elimina" })).toBeInTheDocument()
+    expect(screen.queryByRole("menuitem", { name: "Segnala" })).toBeNull()
+    await userEvent.click(screen.getByRole("menuitem", { name: "Modifica" }))
+    expect(await screen.findByTestId("edit-post")).toHaveTextContent('{"postId":9}')
   })
 
   it("senza club: la fonte della nuotata", () => {

@@ -30,6 +30,7 @@ export {
     addComment,
     deleteOwnPost,
     getComments,
+    getOwnPostForEdit,
     getSocialFeed,
     hidePostForUser,
     listPostReports,
@@ -37,6 +38,7 @@ export {
     setActivityShare,
     toggleSplash,
     unhidePostForUser,
+    updateOwnPost,
     updatePostReportStatus,
     upsertActivityPost,
 } from "../db_social";

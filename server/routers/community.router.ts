@@ -5,6 +5,7 @@ import {
     invalidateUserCache, invalidateLeaderboardCache,
     getSocialFeed, upsertActivityPost, setActivityShare,
     toggleSplash, addComment, getComments, deleteOwnPost,
+    updateOwnPost, getOwnPostForEdit,
     hidePostForUser, unhidePostForUser, reportPost,
     awardActionXp,
     detectImageType, logger,
@@ -472,11 +473,45 @@ export const communityRouter = router({
                 if (message === "Cannot delete other users posts") {
                     throw new TRPCError({ code: "FORBIDDEN", message: "Puoi eliminare solo i tuoi post" });
                 }
-                if (message.startsWith("Delete window expired")) {
-                    throw new TRPCError({
-                        code: "FORBIDDEN",
-                        message: "Tempo massimo per eliminare il post superato",
-                    });
+                throw new TRPCError({ code: "BAD_REQUEST", message });
+            }
+        }),
+
+    /** The author's post as the editor needs it: by post id or by the shared swim. */
+    ownPost: protectedProcedure
+        .input(z.union([
+            z.object({ postId: z.number().int().positive() }),
+            z.object({ activityId: z.number().int().positive() }),
+        ]))
+        .query(async ({ ctx, input }) => {
+            const post = await getOwnPostForEdit(ctx.user.id, input);
+            if (!post) throw new TRPCError({ code: "NOT_FOUND", message: "Post non trovato" });
+            return post;
+        }),
+
+    updatePost: protectedProcedure
+        .input(z.object({
+            postId: z.number().int().positive(),
+            content: z.string().max(2000).optional().nullable(),
+            mediaUrls: z.array(z.string().url()).max(6).optional(),
+        }))
+        .mutation(async ({ ctx, input }) => {
+            try {
+                const result = await updateOwnPost(ctx.user.id, input.postId, {
+                    content: input.content ?? null,
+                    mediaUrls: normalizeMediaUrls(input.mediaUrls, null),
+                });
+                return { success: true, postId: result.postId };
+            } catch (error) {
+                const message = error instanceof Error ? error.message : "Impossibile modificare il post";
+                if (message === "Post not found") {
+                    throw new TRPCError({ code: "NOT_FOUND", message: "Post non trovato" });
+                }
+                if (message === "Cannot edit other users posts") {
+                    throw new TRPCError({ code: "FORBIDDEN", message: "Puoi modificare solo i tuoi post" });
+                }
+                if (message === "Empty post") {
+                    throw new TRPCError({ code: "BAD_REQUEST", message: "Inserisci un testo o almeno un media." });
                 }
                 throw new TRPCError({ code: "BAD_REQUEST", message });
             }
@@ -747,23 +782,42 @@ export const communityRouter = router({
             };
         }),
 
+    /**
+     * Swims of the last 30 days not yet in the feed, plus `includeActivityId` (a swim opened
+     * from its detail page, of any date) when it is the user's and not shared.
+     */
     unsharedActivities: protectedProcedure
-        .query(async ({ ctx }) => {
+        .input(z.object({ includeActivityId: z.number().int().positive().optional() }).optional())
+        .query(async ({ ctx, input }) => {
             const { getDb } = await import("../db");
             const { sql } = await import("drizzle-orm");
             const db = await getDb();
             if (!db) return [];
 
+            const includeId = input?.includeActivityId ?? null;
+            const recentOrIncluded = includeId
+                ? sql`(activity_date > NOW() - INTERVAL '30 days' OR id = ${includeId})`
+                : sql`activity_date > NOW() - INTERVAL '30 days'`;
             const result = await db.execute(sql`
                 SELECT id, activity_name, distance_meters, duration_seconds, activity_date, activity_source
                 FROM swimming_activities
                 WHERE user_id = ${ctx.user.id}
                   AND share_to_feed = false
-                  AND activity_date > NOW() - INTERVAL '30 days'
+                  AND ${recentOrIncluded}
                 ORDER BY activity_date DESC
                 LIMIT 20
             `);
-            return result.rows;
+            const rows = result.rows as Array<{ id: number }>;
+            if (includeId && !rows.some((row) => Number(row.id) === includeId)) {
+                const included = await db.execute(sql`
+                    SELECT id, activity_name, distance_meters, duration_seconds, activity_date, activity_source
+                    FROM swimming_activities
+                    WHERE user_id = ${ctx.user.id} AND share_to_feed = false AND id = ${includeId}
+                    LIMIT 1
+                `);
+                return [...included.rows, ...rows];
+            }
+            return rows;
         }),
 
     users: communityUsersRouter,
