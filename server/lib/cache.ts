@@ -9,13 +9,27 @@ import { createClient } from 'redis';
 import { logger } from '../middleware/logger';
 import { randomUUID } from 'node:crypto';
 import { getRedisPolicy } from './redis-policy';
+import { REDIS_COMMAND_TIMEOUT_MS, isRedisCircuitOpen, withRedisTimeout, withTimeout } from './with-timeout';
+
+/**
+ * Largest serialized value we send to Redis. Upstash rejects requests over
+ * 10 MB by closing the socket, which used to throw the client into a reconnect
+ * loop; anything this big is not worth caching anyway.
+ */
+export const CACHE_MAX_VALUE_BYTES = 1024 * 1024;
 
 export const redis = createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
+  // Reject commands while reconnecting instead of queueing them until the
+  // socket comes back (they would hang the requests waiting on them).
+  disableOfflineQueue: true,
   socket: {
+    connectTimeout: 5000,
+    // Never give up for good: a client that stopped reconnecting stays in
+    // degraded mode until the process restarts. Back off to 30 s instead.
     reconnectStrategy: (retries) => {
-      if (retries > 20) return false; // Stop reconnecting after 20 attempts
-      return Math.min(retries * 100, 3000);
+      if (retries > 20) return 30_000;
+      return Math.min(100 + retries * 200, 5000);
     },
   },
 });
@@ -89,12 +103,30 @@ function lockKeyForCacheKey(key: string): string {
   return `lock:cache:${key}`;
 }
 
-async function acquireLock(lockKey: string, ttlMs: number): Promise<{ token: string } | null> {
-  if (!redis.isOpen) return null;
+/**
+ * Try to take a short-lived lock.
+ * - `{ token }`: we own it
+ * - `'busy'`: someone else holds it
+ * - `'unavailable'`: Redis errored or did not answer in time (callers must not wait on it)
+ */
+async function acquireLock(
+  lockKey: string,
+  ttlMs: number
+): Promise<{ token: string } | 'busy' | 'unavailable'> {
+  if (!redis.isOpen) return 'unavailable';
   const token = randomUUID();
-  const res = await redis.set(lockKey, token, { NX: true, PX: ttlMs });
-  if (res !== 'OK') return null;
-  return { token };
+  try {
+    const res = await withRedisTimeout(
+      () => redis.set(lockKey, token, { NX: true, PX: ttlMs }),
+      `SET ${lockKey}`
+    );
+    if (res !== 'OK') return 'busy';
+    return { token };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`Failed to acquire cache lock ${lockKey}: ${message}`, { event: 'cache:lock_unavailable' });
+    return 'unavailable';
+  }
 }
 
 async function releaseLock(lockKey: string, token: string): Promise<void> {
@@ -108,7 +140,7 @@ async function releaseLock(lockKey: string, token: string): Promise<void> {
     end
   `;
   try {
-    await redis.eval(script, { keys: [lockKey], arguments: [token] });
+    await withRedisTimeout(() => redis.eval(script, { keys: [lockKey], arguments: [token] }), `EVAL release ${lockKey}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.warn(`Failed to release cache lock ${lockKey}: ${message}`, { event: 'cache:lock_release_failed' });
@@ -121,7 +153,7 @@ async function releaseLock(lockKey: string, token: string): Promise<void> {
 export async function getCached<T>(key: string): Promise<T | null> {
   try {
     if (!redis.isOpen) return null; // Redis not connected
-    const cached = await redis.get(key);
+    const cached = await withRedisTimeout(() => redis.get(key), `GET ${key}`);
     if (!cached) return null;
 
     logger.debug(`Cache hit: ${key}`, {
@@ -149,7 +181,19 @@ export async function setCached<T>(
 ): Promise<void> {
   try {
     if (!redis.isOpen) return; // Redis not connected
-    await redis.setEx(key, ttl, JSON.stringify(value));
+    const payload = JSON.stringify(value);
+    if (payload === undefined) return;
+    const bytes = Buffer.byteLength(payload, 'utf8');
+    if (bytes > CACHE_MAX_VALUE_BYTES) {
+      logger.warn(`Cache set skipped for key ${key}: ${bytes} bytes exceeds ${CACHE_MAX_VALUE_BYTES}`, {
+        event: 'cache:set_skipped_oversize',
+        key,
+        bytes,
+        limitBytes: CACHE_MAX_VALUE_BYTES,
+      });
+      return;
+    }
+    await withRedisTimeout(() => redis.setEx(key, ttl, payload), `SETEX ${key}`);
 
     logger.debug(`Cache set: ${key} (TTL: ${ttl}s)`, {
       event: 'cache:set',
@@ -168,7 +212,7 @@ export async function setCached<T>(
 export async function deleteCached(key: string): Promise<void> {
   try {
     if (!redis.isOpen) return; // Redis not connected
-    await redis.del(key);
+    await withRedisTimeout(() => redis.del(key), `DEL ${key}`);
 
     logger.debug(`Cache delete: ${key}`, {
       event: 'cache:delete',
@@ -187,7 +231,7 @@ export async function deleteCached(key: string): Promise<void> {
 export async function deleteMultipleCached(keys: string[]): Promise<void> {
   try {
     if (!redis.isOpen || keys.length === 0) return; // Redis not connected
-    await redis.del(keys);
+    await withRedisTimeout(() => redis.del(keys), `DEL ${keys.length} keys`);
 
     logger.debug(`Cache delete multiple: ${keys.length} keys`, {
       event: 'cache:delete_multiple',
@@ -221,8 +265,13 @@ export async function getOrSetCached<T>(
   const lKey = lockKeyForCacheKey(key);
   const lock = await acquireLock(lKey, CACHE_LOCK_TTL_MS);
 
+  // Redis is failing: do not wait on it, serve straight from the source.
+  if (lock === 'unavailable') {
+    return await fetcher();
+  }
+
   // If we didn't get the lock, wait for the other worker to populate the cache.
-  if (!lock) {
+  if (lock === 'busy') {
     const start = Date.now();
     let backoffMs = 50;
 
@@ -264,25 +313,29 @@ export async function getOrSetCached<T>(
  */
 export async function invalidateCachePattern(pattern: string): Promise<void> {
   try {
-    if (!redis.isOpen) return; // Redis not connected
-    const keysToDelete: string[] = [];
-    
-    // Use SCAN instead of KEYS to avoid blocking Redis on Upstash
-    for await (const key of redis.scanIterator({ MATCH: pattern, COUNT: 100 })) {
-      keysToDelete.push(String(key));
-    }
-    
-    if (keysToDelete.length > 0) {
-      // Handle single key and multiple keys differently to avoid type assertion issues
-      if (keysToDelete.length === 1) {
-        await redis.del(keysToDelete[0]);
-      } else {
-        await redis.del(keysToDelete as [string, ...string[]]);
+    if (!redis.isOpen || isRedisCircuitOpen()) return; // Redis not connected / not answering
+    const work = async () => {
+      const keysToDelete: string[] = [];
+
+      // Use SCAN instead of KEYS to avoid blocking Redis on Upstash
+      for await (const key of redis.scanIterator({ MATCH: pattern, COUNT: 100 })) {
+        keysToDelete.push(String(key));
       }
-      logger.debug(`Cache invalidate pattern: ${pattern} (${keysToDelete.length} keys)`, {
-        event: 'cache:invalidate_pattern',
-      });
-    }
+
+      if (keysToDelete.length > 0) {
+        // Handle single key and multiple keys differently to avoid type assertion issues
+        if (keysToDelete.length === 1) {
+          await redis.del(keysToDelete[0]);
+        } else {
+          await redis.del(keysToDelete as [string, ...string[]]);
+        }
+        logger.debug(`Cache invalidate pattern: ${pattern} (${keysToDelete.length} keys)`, {
+          event: 'cache:invalidate_pattern',
+        });
+      }
+    };
+    // SCAN may take a few round trips: give it a larger, but still bounded, budget.
+    await withTimeout(work(), REDIS_COMMAND_TIMEOUT_MS * 3, `invalidate ${pattern}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     logger.error(`Cache invalidate pattern failed for ${pattern}: ${message}`, {
@@ -314,8 +367,8 @@ export async function invalidateUserCache(userId: string): Promise<void> {
 
   const lockKey = `lock:cache_invalidate:user:${userId}`;
   const lock = await acquireLock(lockKey, 5000);
-  if (!lock) {
-    // Another process is already invalidating; best effort, don't race.
+  if (lock === 'busy' || lock === 'unavailable') {
+    // Another process is already invalidating (or Redis is failing); best effort, don't race.
     return;
   }
 
@@ -334,7 +387,14 @@ export async function invalidateUserCache(userId: string): Promise<void> {
     } else if (keys.length > 1) {
       multi.del(keys as [string, ...string[]]);
     }
-    await multi.exec();
+    try {
+      await withRedisTimeout(() => multi.exec(), `MULTI DEL user ${userId}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      logger.warn(`Cache invalidate failed for user ${userId}: ${message}`, {
+        event: 'cache:invalidate_user_failed',
+      });
+    }
 
     // Pattern-based delete (SCAN) is best-effort; cannot be fully atomic with writes.
     await invalidateCachePattern(`user:activities:${userId}:*`);
@@ -358,8 +418,8 @@ export async function getCacheStats() {
     if (!redis.isOpen) {
       return { keys: 0, info: 'Redis not connected' };
     }
-    const info = await redis.info('stats');
-    const keys = await redis.dbSize();
+    const info = await withRedisTimeout(() => redis.info('stats'), 'INFO stats');
+    const keys = await withRedisTimeout(() => redis.dbSize(), 'DBSIZE');
 
     return {
       keys,

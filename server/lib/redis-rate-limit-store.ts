@@ -9,6 +9,7 @@ import type { Store, IncrementResponse } from 'express-rate-limit';
 import { redis } from './cache';
 import { getRedisPolicy } from './redis-policy';
 import { logger } from '../middleware/logger';
+import { withRedisTimeout } from './with-timeout';
 
 // Cleanup expired local store entries at most once per minute to avoid performance overhead
 const LOCAL_STORE_CLEANUP_INTERVAL_MS = 60000;
@@ -106,14 +107,14 @@ export class RedisRateLimitStore implements Store {
       }
 
       // Use individual commands instead of multi() — pTTL is not available in multi
-      const totalHits = await redis.incr(redisKey);
+      const totalHits = await withRedisTimeout(() => redis.incr(redisKey), 'rate-limit INCR');
       
       // Only set expiry on first increment (when totalHits is 1)
       if (totalHits === 1) {
-        await redis.pExpire(redisKey, this.windowMs);
+        await withRedisTimeout(() => redis.pExpire(redisKey, this.windowMs), 'rate-limit PEXPIRE');
       }
       
-      const ttl = await redis.pTTL(redisKey);
+      const ttl = await withRedisTimeout(() => redis.pTTL(redisKey), 'rate-limit PTTL');
       const resetTime = ttl > 0 ? new Date(Date.now() + ttl) : undefined;
 
       return { totalHits, resetTime };
@@ -134,11 +135,11 @@ export class RedisRateLimitStore implements Store {
     try {
       if (!redis.isOpen) return;
       
-      const current = await redis.get(redisKey);
+      const current = await withRedisTimeout(() => redis.get(redisKey), 'rate-limit GET');
       if (current) {
         const currentStr = current;
         if (parseInt(currentStr) > 0) {
-          await redis.decr(redisKey);
+          await withRedisTimeout(() => redis.decr(redisKey), 'rate-limit DECR');
         }
       }
     } catch (error) {
@@ -154,7 +155,7 @@ export class RedisRateLimitStore implements Store {
     
     try {
       if (!redis.isOpen) return;
-      await redis.del(redisKey);
+      await withRedisTimeout(() => redis.del(redisKey), 'rate-limit DEL');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       logger.error(`Rate limit reset failed: ${message}`, {
@@ -170,11 +171,11 @@ export class RedisRateLimitStore implements Store {
     try {
       if (!redis.isOpen) return undefined;
       
-      const value = await redis.get(redisKey);
+      const value = await withRedisTimeout(() => redis.get(redisKey), 'rate-limit GET');
       if (!value) return undefined;
       
       const valueStr = value;
-      const ttl = await redis.pTTL(redisKey);
+      const ttl = await withRedisTimeout(() => redis.pTTL(redisKey), 'rate-limit PTTL');
       const ttlNum = typeof ttl === 'number' ? ttl : -1;
       const resetTime = ttlNum > 0 ? new Date(Date.now() + ttlNum) : undefined;
       
