@@ -138,7 +138,8 @@ export default function Goals() {
 
   const profile = profileQuery.data
   const timeline = timelineQuery.data ?? []
-  const weeklyDistanceMeters = timeline.reduce((sum, day) => sum + (day.distance || 0), 0)
+  // `statistics.getTimeline` already returns each day's distance in km.
+  const weeklyDistanceKm = timeline.reduce((sum, day) => sum + (day.distance || 0), 0)
   const weeklySessions = (activitiesQuery.data ?? []).filter((activity) => {
     const date = new Date(activity.activityDate)
     const lastWeek = new Date()
@@ -172,21 +173,21 @@ export default function Goals() {
     })
 
     const weeklyTargetKm = 10
-    const weeklyProgress = Math.min(100, (weeklyDistanceMeters / 1000 / weeklyTargetKm) * 100)
+    const weeklyProgress = Math.min(100, (weeklyDistanceKm / weeklyTargetKm) * 100)
     goals.push({
       id: "weekly-distance",
       title: `Nuotare ${weeklyTargetKm} km a settimana`,
       category: "distance",
-      currentValue: (weeklyDistanceMeters / 1000).toFixed(1),
+      currentValue: weeklyDistanceKm.toFixed(1),
       targetValue: weeklyTargetKm,
       unit: "km/settimana",
       progress: weeklyProgress,
       deadline: "In corso",
       status: weeklyProgress >= 60 ? "on-track" : "behind",
       milestones: [
-        { title: "5 km/settimana", completed: weeklyDistanceMeters / 1000 >= 5 },
-        { title: "8 km/settimana", completed: weeklyDistanceMeters / 1000 >= 8 },
-        { title: `${weeklyTargetKm} km/settimana`, completed: weeklyDistanceMeters / 1000 >= weeklyTargetKm },
+        { title: "5 km/settimana", completed: weeklyDistanceKm >= 5 },
+        { title: "8 km/settimana", completed: weeklyDistanceKm >= 8 },
+        { title: `${weeklyTargetKm} km/settimana`, completed: weeklyDistanceKm >= weeklyTargetKm },
       ],
     })
 
@@ -228,7 +229,7 @@ export default function Goals() {
     })
 
     return goals
-  }, [profile, weeklyDistanceMeters, swolfAvg, weeklySessions])
+  }, [profile, weeklyDistanceKm, swolfAvg, weeklySessions])
 
   const completedGoals = useMemo(() => {
     const badges = userBadgesQuery.data ?? []
@@ -242,7 +243,7 @@ export default function Goals() {
 
   const suggestedGoals = useMemo(() => {
     const suggestions = [] as any[]
-    if (weeklyDistanceMeters / 1000 < 8) {
+    if (weeklyDistanceKm < 8) {
       suggestions.push({
         title: "Aumenta il volume settimanale",
         description: "Punta ad almeno 8 km in 7 giorni",
@@ -271,7 +272,7 @@ export default function Goals() {
       })
     }
     return suggestions.slice(0, 3)
-  }, [weeklyDistanceMeters, swolfAvg, weeklySessions])
+  }, [weeklyDistanceKm, swolfAvg, weeklySessions])
 
   const allActiveGoals = useMemo(() => {
     return [...customGoals]
@@ -292,7 +293,7 @@ export default function Goals() {
       },
       {
         id: "distance",
-        value: formatKm(weeklyDistanceMeters),
+        value: formatKm(weeklyDistanceKm * 1000),
         unit: "km",
         label: `Settimana, obiettivo ${distanceGoal?.targetValue ?? 10} km`,
       },
@@ -308,7 +309,7 @@ export default function Goals() {
         label: "Obiettivi attivi",
       },
     ]
-  }, [activeGoals, allActiveGoals.length, profile?.xpLevel, weeklyDistanceMeters, weeklySessions])
+  }, [activeGoals, allActiveGoals.length, profile?.xpLevel, weeklyDistanceKm, weeklySessions])
 
   const addSuggestedGoal = (goal: any) => {
     const title = String(goal.title ?? "").trim()

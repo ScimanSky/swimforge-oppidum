@@ -67,6 +67,26 @@ describe("Obiettivi", () => {
     expect(screen.getByText(/Nessun obiettivo creato/)).toBeTruthy();
   });
 
+  it("somma la distanza settimanale in km (la timeline è già in km)", () => {
+    state.timeline = [
+      { date: "2026-10-27", distance: 4.5, pace: 120, sessions: 1 },
+      { date: "2026-10-28", distance: 4.7, pace: 118, sessions: 1 },
+    ];
+    render(<Goals />);
+    const summary = screen.getByRole("region", { name: "Riepilogo" });
+    expect(within(summary).getByText("9,2")).toBeTruthy();
+    // 9,2 km is above the 8 km threshold: no «more volume» suggestion.
+    expect(screen.queryByText("Aumenta il volume settimanale")).toBeNull();
+  });
+
+  it("suggerisce più volume sotto gli 8 km settimanali", () => {
+    state.timeline = [{ date: "2026-10-28", distance: 3.2, pace: 120, sessions: 1 }];
+    render(<Goals />);
+    const summary = screen.getByRole("region", { name: "Riepilogo" });
+    expect(within(summary).getByText("3,2")).toBeTruthy();
+    expect(screen.getAllByText("Aumenta il volume settimanale").length).toBeGreaterThan(0);
+  });
+
   it("mostra un obiettivo con progresso e lo elimina", async () => {
     state.goals = [
       { id: 9, title: "12 km a settimana", category: "distance", currentValue: 6, targetValue: 12, unit: "km" },
