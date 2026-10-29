@@ -820,6 +820,33 @@ export const communityRouter = router({
             return rows;
         }),
 
+    /** The user's most recent swim, for «Condividi l'ultima nuotata»; null when none. */
+    latestSwim: protectedProcedure
+        .query(async ({ ctx }) => {
+            const { getDb } = await import("../db");
+            const { sql } = await import("drizzle-orm");
+            const db = await getDb();
+            if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: DB_UNAVAILABLE_ERR_MSG });
+
+            const result = await db.execute(sql`
+                SELECT id, activity_name, activity_date, share_to_feed
+                FROM swimming_activities
+                WHERE user_id = ${ctx.user.id}
+                ORDER BY activity_date DESC, id DESC
+                LIMIT 1
+            `);
+            const row = result.rows[0] as
+                | { id: number; activity_name: string | null; activity_date: Date | string | null; share_to_feed: boolean | null }
+                | undefined;
+            if (!row) return null;
+            return {
+                id: Number(row.id),
+                activityName: row.activity_name,
+                activityDate: row.activity_date,
+                shared: Boolean(row.share_to_feed),
+            };
+        }),
+
     users: communityUsersRouter,
 
     analytics: router({

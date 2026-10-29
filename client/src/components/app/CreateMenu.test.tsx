@@ -79,14 +79,14 @@ describe("CreateSheet", () => {
     expect(document.body.style.pointerEvents).not.toBe("none")
   })
 
-  it("Bozza IA del post: stesso comportamento", async () => {
+  it("Condividi l'ultima nuotata: stesso comportamento", async () => {
     const onAction = vi.fn()
     render(<Harness onAction={onAction} />)
     const plus = screen.getByRole("button", { name: "Crea" })
     await userEvent.click(plus)
     const focusPlus = vi.spyOn(plus, "focus")
-    await userEvent.click(await screen.findByRole("button", { name: "Bozza IA del post" }))
-    expect(onAction).toHaveBeenCalledWith("ai-post")
+    await userEvent.click(await screen.findByRole("button", { name: "Condividi l'ultima nuotata" }))
+    expect(onAction).toHaveBeenCalledWith("share-latest")
     const postDialog = await screen.findByRole("dialog", { name: "Nuovo post" })
     await waitFor(() => expect(postDialog.contains(document.activeElement)).toBe(true))
     expect(focusPlus).not.toHaveBeenCalled()

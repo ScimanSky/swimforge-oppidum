@@ -12,6 +12,11 @@ vi.mock("./_shared", async () => {
   return { ...actual, ...m };
 });
 
+vi.mock("../db", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../db")>()),
+  getDb: vi.fn(async () => null),
+}));
+
 import { communityRouter } from "./community.router";
 
 function ctx(): TrpcContext {
@@ -89,5 +94,27 @@ describe("community.ownPost", () => {
   it("no post: «Post non trovato»", async () => {
     m.getOwnPostForEdit.mockResolvedValue(null);
     await expect(communityRouter.createCaller(ctx()).ownPost({ postId: 8 })).rejects.toThrow("Post non trovato");
+  });
+});
+
+describe("community.latestSwim", () => {
+  it("the most recent swim, with whether it is already in the feed", async () => {
+    const { getDb } = await import("../db");
+    const execute = vi.fn(async () => ({
+      rows: [{ id: 99, activity_name: "Soglia", activity_date: "2026-10-28T08:00:00Z", share_to_feed: true }],
+    }));
+    vi.mocked(getDb).mockResolvedValue({ execute } as never);
+    await expect(communityRouter.createCaller(ctx()).latestSwim()).resolves.toEqual({
+      id: 99,
+      activityName: "Soglia",
+      activityDate: "2026-10-28T08:00:00Z",
+      shared: true,
+    });
+  });
+
+  it("no swims yet: null", async () => {
+    const { getDb } = await import("../db");
+    vi.mocked(getDb).mockResolvedValue({ execute: vi.fn(async () => ({ rows: [] })) } as never);
+    await expect(communityRouter.createCaller(ctx()).latestSwim()).resolves.toBeNull();
   });
 });

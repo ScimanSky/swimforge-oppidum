@@ -1,22 +1,19 @@
 import { useEffect, useId, useRef, type ReactNode } from "react"
 import { Link } from "wouter"
-import { MessageSquare, Plus, RefreshCw, Sparkles, SquarePen, type LucideIcon } from "lucide-react"
+import { MessageSquare, Plus, RefreshCw, SquarePen, Waves, type LucideIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 
-export const AI_POST_DRAFT =
-  "Bozza IA:\n\nAllenamento completato oggi. Ecco i punti chiave:\n- Sensazioni in acqua:\n- Metrica migliore:\n- Cosa migliorare nella prossima sessione:\n\n#swimforge #training"
-
-export type CreateAction = "post" | "ai-post" | "garmin"
+export type CreateAction = "post" | "share-latest" | "garmin"
 /** Actions that open another dialog: focus must not go back to «+» when the sheet closes. */
-const OPENS_DIALOG: ReadonlySet<CreateAction> = new Set<CreateAction>(["post", "ai-post"])
+const OPENS_DIALOG: ReadonlySet<CreateAction> = new Set<CreateAction>(["post", "share-latest"])
 type CreateItem = { label: string; icon: LucideIcon } & ({ href: string } | { action: CreateAction })
 
 const CREATE_ITEMS: CreateItem[] = [
   { label: "Nuovo post", icon: SquarePen, action: "post" },
   { label: "Messaggio", icon: MessageSquare, href: "/messages?new=1" },
-  { label: "Bozza IA del post", icon: Sparkles, action: "ai-post" },
+  { label: "Condividi l'ultima nuotata", icon: Waves, action: "share-latest" },
   { label: "Sincronizza Garmin", icon: RefreshCw, action: "garmin" },
 ]
 
