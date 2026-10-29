@@ -16,7 +16,6 @@ const badgeVariants = cva(
         destructive:
           'border-transparent bg-destructive text-destructive-foreground [a&]:hover:bg-destructive/90',
         outline: 'border-border text-foreground',
-        neon: 'border-transparent bg-primary/15 text-action-text',
         'rank-gold': 'border-transparent bg-[var(--gold)]/15 text-[var(--gold)]',
         'rank-silver': 'border-transparent bg-raised text-foreground',
         'rank-bronze': 'border-transparent bg-xp/15 text-xp',

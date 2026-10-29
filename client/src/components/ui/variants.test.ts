@@ -8,8 +8,8 @@ import { createElement } from "react";
 
 const BANNED = [/shadow-\[0_0/, /\buppercase\b/, /tracking-widest/, /linear-gradient/, /neon-(?:glow|soft)/, /-translate-y-/];
 
-const buttonVariantNames = ["default", "neon", "outline-neon", "ghost-neon", "destructive", "outline", "secondary", "ghost", "link"] as const;
-const badgeVariantNames = ["default", "secondary", "destructive", "outline", "neon", "rank-gold", "rank-silver", "rank-bronze"] as const;
+const buttonVariantNames = ["default", "destructive", "outline", "secondary", "ghost", "link"] as const;
+const badgeVariantNames = ["default", "secondary", "destructive", "outline", "rank-gold", "rank-silver", "rank-bronze"] as const;
 
 describe("Corsia variants", () => {
   afterEach(() => {
@@ -22,9 +22,13 @@ describe("Corsia variants", () => {
   it("i bottoni hanno almeno 44px di altezza di default", () => {
     expect(buttonVariants({})).toMatch(/\bh-11\b/);
   });
-  it("i nomi legacy coincidono con le varianti Corsia", () => {
-    expect(buttonVariants({ variant: "neon" })).toBe(buttonVariants({ variant: "default" }));
-    expect(buttonVariants({ variant: "outline-neon" })).toBe(buttonVariants({ variant: "outline" }));
+  it("le varianti legacy neon non esistono più", () => {
+    // An unknown variant adds no variant classes: only the base and the size remain.
+    const bare = buttonVariants({ variant: null });
+    for (const legacy of ["neon", "outline-neon", "ghost-neon"]) {
+      expect(buttonVariants({ variant: legacy as never }), legacy).toBe(bare);
+    }
+    expect(badgeVariants({ variant: "neon" as never })).toBe(badgeVariants({ variant: null }));
   });
   it("destructive usa il testo dedicato (contrasto testato sui token)", () => {
     expect(buttonVariants({ variant: "destructive" })).toMatch(/\btext-destructive-foreground\b/);

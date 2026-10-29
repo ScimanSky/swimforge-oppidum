@@ -10,13 +10,8 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80',
-        // Legacy name, same as default (renamed in Task 22).
-        neon: 'bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80',
         outline: 'border border-border bg-transparent text-foreground hover:bg-raised',
-        // Legacy name, same as outline (renamed in Task 22).
-        'outline-neon': 'border border-border bg-transparent text-foreground hover:bg-raised',
         ghost: 'text-foreground hover:bg-raised',
-        'ghost-neon': 'text-action-text hover:bg-raised',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
         link: 'text-action-text underline-offset-4 hover:underline',
