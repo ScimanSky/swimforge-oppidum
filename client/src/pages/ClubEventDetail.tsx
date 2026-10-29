@@ -1,32 +1,97 @@
-import AppLayout from "@/components/AppLayout";
+/**
+ * Club event: what, when and where, the swimmer's answer, map and route, sea weather and the
+ * people who answered (the shell header carries the «Evento» title and the back button).
+ */
+
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { Link, useLocation, useRoute } from "wouter";
+import { toast } from "sonner";
+import {
+  Calendar,
+  CheckCircle2,
+  Cloud,
+  CloudFog,
+  CloudLightning,
+  CloudRain,
+  CloudSnow,
+  CloudSun,
+  ExternalLink,
+  HelpCircle,
+  MapPin,
+  Pencil,
+  RefreshCw,
+  Save,
+  Sun,
+  Trash2,
+  Wind,
+  Waves,
+  X,
+  XCircle,
+} from "lucide-react";
+import { AppLayout } from "@/components/AppLayout";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface";
-import { Badge } from "@/components/ui/badge";
-import { MetricOrb } from "@/components/metrics/MetricOrb";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
+import { Metric } from "@/components/corsia/Metric";
 import EventMapEditor from "@/components/club/EventMapEditor";
-import { parseRouteGeojson, pointsToRouteGeojson, routeDistanceMeters, routeGeojsonToPoints, type RoutePoint } from "@/lib/club-event-map";
+import {
+  parseRouteGeojson,
+  pointsToRouteGeojson,
+  routeDistanceMeters,
+  routeGeojsonToPoints,
+  type RoutePoint,
+} from "@/lib/club-event-map";
+import { NO_VALUE, formatDistance, formatInteger, formatSessionDate, getInitials, toFiniteNumber } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
-import { Calendar, CheckCircle2, Cloud, CloudFog, CloudLightning, CloudRain, CloudSnow, CloudSun, ExternalLink, HelpCircle, MapPin, Pencil, RefreshCw, Save, Sun, Users, Wind, Waves, X, XCircle } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { Link, useRoute } from "wouter";
-import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 type EventRsvpStatus = "going" | "maybe" | "not_going";
 
-const formatDateTime = (value: unknown): string => {
-  if (!value) return "";
-  const date = new Date(value as any);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("it-IT", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
+const RSVP_OPTIONS: ReadonlyArray<{
+  value: EventRsvpStatus;
+  label: string;
+  group: string;
+  Icon: typeof CheckCircle2;
+}> = [
+  { value: "going", label: "Partecipo", group: "Partecipano", Icon: CheckCircle2 },
+  { value: "maybe", label: "Forse", group: "Forse", Icon: HelpCircle },
+  { value: "not_going", label: "Non partecipo", group: "Non partecipano", Icon: XCircle },
+];
+
+const sectionTitle = "text-[17px] font-bold";
+
+const decimalFormats = new Map<number, Intl.NumberFormat>();
+/** Italian decimal comma with a fixed number of digits: 18.46 → «18,5»; «—» if not a number. */
+function formatDecimal(value: unknown, digits: number) {
+  const number = toFiniteNumber(value);
+  if (number === null) return NO_VALUE;
+  let format = decimalFormats.get(digits);
+  if (!format) {
+    format = new Intl.NumberFormat("it-IT", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+    decimalFormats.set(digits, format);
+  }
+  return format.format(number);
+}
+
+/** «sab 1 nov · 10:00 – 12:00» within a day, both dates when it spans more; null without a start. */
+function formatEventWhen(start: unknown, end: unknown) {
+  const from = formatSessionDate(start as string | Date | null | undefined);
+  if (from === NO_VALUE) return null;
+  const to = formatSessionDate(end as string | Date | null | undefined);
+  if (to === NO_VALUE) return from;
+  const sameDay = new Date(start as string).toDateString() === new Date(end as string).toDateString();
+  return sameDay ? `${from} – ${to.split(" · ")[1]}` : `${from} – ${to}`;
+}
 
 const buildOsmMapLink = (lat: number, lng: number, zoom = 15) =>
   `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=${zoom}/${lat}/${lng}`;
@@ -66,10 +131,16 @@ const parseWeatherSnapshot = (raw: unknown): EventWeatherSnapshot | null => {
 };
 
 function degreesToCardinal(degrees: number | null | undefined) {
-  if (!Number.isFinite(degrees)) return "n/d";
+  if (!Number.isFinite(degrees)) return NO_VALUE;
   const labels = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"];
   const index = Math.round((((degrees as number) % 360) / 22.5)) % 16;
   return labels[index];
+}
+
+/** «NE (45°)», or the cardinal point alone when there is no angle. */
+function formatDirection(degrees: number | null | undefined) {
+  const cardinal = degreesToCardinal(degrees);
+  return Number.isFinite(degrees) ? `${cardinal} (${Math.round(degrees as number)}°)` : cardinal;
 }
 
 function describeWeatherCode(code: number | null | undefined): {
@@ -102,43 +173,84 @@ const pointsEqual = (a: RoutePoint[], b: RoutePoint[]) => {
   return true;
 };
 
+function Notice({ children, clubId }: { children: ReactNode; clubId?: number }) {
+  return (
+    <AppLayout>
+      <div className="surface-panel p-4 text-center">
+        <p className="text-sm text-muted-foreground">{children}</p>
+        {clubId ? (
+          <Button variant="outline" className="mt-3" asChild>
+            <Link href={`/community/club/${clubId}`}>Torna al club</Link>
+          </Button>
+        ) : null}
+      </div>
+    </AppLayout>
+  );
+}
+
+function WeatherTile({
+  icon,
+  label,
+  value,
+  detail,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  detail?: string;
+}) {
+  return (
+    <div className="rounded-xl bg-raised p-3 text-sm">
+      <p className="flex items-center gap-1.5 text-muted-foreground">
+        {icon}
+        {label}
+      </p>
+      <p className="mt-1 font-semibold">{value}</p>
+      {detail ? <p className="mt-0.5 text-xs text-muted-foreground">{detail}</p> : null}
+    </div>
+  );
+}
+
 export default function ClubEventDetail() {
   const [match, params] = useRoute("/community/club/:clubId/event/:eventId");
+  const [, navigate] = useLocation();
   const clubId = Number(params?.clubId);
   const eventId = Number(params?.eventId);
+  const validIds = match && Number.isFinite(clubId) && Number.isFinite(eventId);
+  const titleId = useId();
+  const rsvpTitleId = useId();
+  const rsvpGroupId = useId();
+  const mapTitleId = useId();
+  const weatherTitleId = useId();
+  const peopleTitleId = useId();
 
   const utils = trpc.useUtils();
 
-  const clubQuery = trpc.community.clubs.get.useQuery(
-    { clubId },
-    { enabled: match && Number.isFinite(clubId) }
-  );
-
-  const eventQuery = trpc.community.clubs.events.get.useQuery(
-    { eventId },
-    { enabled: match && Number.isFinite(eventId) }
-  );
-
-  const attendeesQuery = trpc.community.clubs.events.attendees.useQuery(
-    { eventId },
-    { enabled: match && Number.isFinite(eventId) }
-  );
+  const clubQuery = trpc.community.clubs.get.useQuery({ clubId }, { enabled: validIds });
+  const eventQuery = trpc.community.clubs.events.get.useQuery({ eventId }, { enabled: validIds });
+  const attendeesQuery = trpc.community.clubs.events.attendees.useQuery({ eventId }, { enabled: validIds });
 
   const rsvpMutation = trpc.community.clubs.events.rsvp.useMutation({
     onSuccess: (data: any) => {
       utils.community.clubs.events.attendees.invalidate({ eventId });
       utils.community.clubs.events.list.invalidate();
-      if (Number(data?.actionXp?.awardedXp ?? 0) > 0) {
-        toast.success(`+${data.actionXp.awardedXp} XP Action`);
+      const awardedXp = toFiniteNumber(data?.actionXp?.awardedXp) ?? 0;
+      if (awardedXp > 0) {
+        toast.success(`+${formatInteger(awardedXp)} XP`);
       }
     },
+    onError: (error) => toast.error(error.message || "Risposta non salvata"),
   });
 
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const deleteEvent = trpc.community.clubs.events.delete.useMutation({
     onSuccess: () => {
+      toast.success("Evento eliminato");
       utils.community.clubs.events.list.invalidate();
-      window.location.href = `/community/club/${clubId}`;
+      // The event is gone: replace its page, so «back» does not land on «not found».
+      navigate(`/community/club/${clubId}`, { replace: true });
     },
+    onError: (error) => toast.error(error.message || "Eliminazione non riuscita"),
   });
   const refreshWeather = trpc.community.clubs.events.refreshWeather.useMutation({
     onSuccess: () => {
@@ -161,9 +273,7 @@ export default function ClubEventDetail() {
   });
 
   const attendees = useMemo(() => (attendeesQuery.data as any[]) || [], [attendeesQuery.data]);
-  const going = attendees.filter((a) => a.status === "going");
-  const maybe = attendees.filter((a) => a.status === "maybe");
-  const notGoing = attendees.filter((a) => a.status === "not_going");
+  const byStatus = (status: EventRsvpStatus) => attendees.filter((a) => a.status === status);
 
   const currentUserId = trpc.profile.get.useQuery().data?.userId;
   const myStatus = attendees.find((a) => a.user?.id === currentUserId)?.status as
@@ -217,126 +327,188 @@ export default function ClubEventDetail() {
     setDraftRoutePoints((prev) => (pointsEqual(prev, routePoints) ? prev : routePoints));
   }, [isEditingRoute, hasPin, eventLat, eventLng, (event as any)?.id, routePoints]);
 
-  if (!match || !Number.isFinite(clubId) || !Number.isFinite(eventId)) {
-    return null;
+  // Before `isPending`: a disabled query stays pending for ever.
+  if (!validIds) return <Notice>Evento non trovato.</Notice>;
+  if (eventQuery.isPending) {
+    return (
+      <AppLayout>
+        <LoadingSkeleton label="Caricamento dell'evento…" count={3} itemClassName="h-32 w-full rounded-2xl" />
+      </AppLayout>
+    );
+  }
+  if (!event) {
+    // A missing event or one of a secret club is «not found»; anything else can be retried.
+    const errorCode = eventQuery.error?.data?.code;
+    if (eventQuery.isError && errorCode !== "NOT_FOUND" && errorCode !== "FORBIDDEN") {
+      return (
+        <AppLayout>
+          <LoadError onRetry={() => void eventQuery.refetch()} />
+        </AppLayout>
+      );
+    }
+    return <Notice clubId={clubId}>Evento non trovato.</Notice>;
   }
 
-  return (
-    <AppLayout className="text-foreground">
-      <div className="container py-6 lg:py-3 space-y-6 lg:space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="space-y-1">
-            <Link
-              href={`/community/club/${clubId}`}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              Torna al club
-            </Link>
-            <h1 className="text-2xl font-display font-bold neon-gradient-text">
-              {title}
-            </h1>
-          </div>
-          {isStaff && (
-            <Button
-              variant="destructive"
-              onClick={() => deleteEvent.mutate({ eventId })}
-              disabled={deleteEvent.isPending}
-            >
-              Elimina evento
-            </Button>
-          )}
-        </div>
+  const when = formatEventWhen((event as any).startTime, (event as any).endTime);
+  const shownRoutePoints = isEditingRoute ? draftRoutePoints : routePoints;
+  const attendeesLoaded = Boolean(attendeesQuery.data);
 
-        <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
-          <SurfaceHeader>
-            <SurfaceTitle className="font-display">Dettagli</SurfaceTitle>
-          </SurfaceHeader>
-          <SurfaceContent className="space-y-3">
-            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span>{formatDateTime(event?.startTime)}</span>
-                {event?.endTime ? <span> - {formatDateTime(event.endTime)}</span> : null}
-              </div>
-              {event?.location ? (
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  <span>{event.location}</span>
+  return (
+    <AppLayout>
+      <div className="space-y-4">
+        <section aria-labelledby={titleId} className="surface-panel p-4">
+          <h2 id={titleId} className="break-words font-display text-[32px] font-bold leading-none">
+            {title}
+          </h2>
+          {when || (event as any).location ? (
+            <ul className="mt-3 space-y-1.5 text-sm text-muted-foreground">
+              {when ? (
+                <li className="flex items-center gap-2">
+                  <Calendar className="size-4 shrink-0" aria-hidden />
+                  <span>{when}</span>
+                </li>
+              ) : null}
+              {(event as any).location ? (
+                <li className="flex items-center gap-2">
+                  <MapPin className="size-4 shrink-0" aria-hidden />
+                  <span className="min-w-0 break-words">{(event as any).location}</span>
+                </li>
+              ) : null}
+            </ul>
+          ) : null}
+          {(event as any).description ? (
+            <p className="mt-3 whitespace-pre-wrap text-sm text-foreground">{(event as any).description}</p>
+          ) : null}
+          {isStaff ? (
+            <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" className="mt-4">
+                  <Trash2 aria-hidden />
+                  Elimina evento
+                </Button>
+              </DialogTrigger>
+              <DialogContent role="alertdialog" showCloseButton={false} className="sm:max-w-sm">
+                <DialogHeader>
+                  <DialogTitle>Eliminare «{title}»?</DialogTitle>
+                  <DialogDescription>L'evento sparisce per tutti i membri del club.</DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button variant="outline">Annulla</Button>
+                  </DialogClose>
+                  <Button
+                    variant="destructive"
+                    disabled={deleteEvent.isPending}
+                    onClick={() => deleteEvent.mutate({ eventId })}
+                  >
+                    {deleteEvent.isPending ? "Eliminazione..." : "Elimina"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          ) : null}
+        </section>
+
+        <section aria-labelledby={rsvpTitleId} className="surface-panel p-4">
+          <h3 id={rsvpTitleId} className={sectionTitle}>
+            Partecipazione
+          </h3>
+          {/* Only once loaded: never «0» while loading or after an error (the list below says so). */}
+          {attendeesLoaded ? (
+            <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-4">
+              {RSVP_OPTIONS.map((option) => (
+                <Metric
+                  key={option.value}
+                  size="sm"
+                  value={formatInteger(byStatus(option.value).length)}
+                  label={option.group}
+                />
+              ))}
+              <Metric size="sm" value={formatInteger(attendees.length)} label="Risposte" />
+            </div>
+          ) : null}
+          <div className={cn(attendeesLoaded && "mt-4 border-t border-border pt-4", !attendeesLoaded && "mt-3")}>
+            <p id={rsvpGroupId} className="text-sm font-semibold">
+              La tua risposta
+            </p>
+            <div role="group" aria-labelledby={rsvpGroupId} className="mt-2 flex flex-wrap gap-2">
+              {RSVP_OPTIONS.map((option) => (
+                <Button
+                  key={option.value}
+                  size="sm"
+                  variant={myStatus === option.value ? "default" : "outline"}
+                  aria-pressed={myStatus === option.value}
+                  onClick={() => rsvpMutation.mutate({ eventId, status: option.value })}
+                  disabled={rsvpMutation.isPending}
+                >
+                  <option.Icon aria-hidden />
+                  {option.label}
+                </Button>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {hasMapData || isStaff ? (
+          <section aria-labelledby={mapTitleId} className="surface-panel p-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 id={mapTitleId} className={sectionTitle}>
+                Mappa e percorso
+              </h3>
+              {isStaff && isEditingRoute ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setDraftPin(hasPin ? { lat: eventLat, lng: eventLng } : null);
+                      setDraftRoutePoints(routePoints);
+                      setIsEditingRoute(false);
+                    }}
+                  >
+                    <X aria-hidden />
+                    Annulla
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() =>
+                      updateEventMutation.mutate({
+                        eventId,
+                        locationLat: draftPin?.lat,
+                        locationLng: draftPin?.lng,
+                        routeGeojson: pointsToRouteGeojson(draftRoutePoints),
+                      })
+                    }
+                    disabled={updateEventMutation.isPending}
+                  >
+                    <Save aria-hidden />
+                    {updateEventMutation.isPending ? "Salvataggio..." : "Salva percorso"}
+                  </Button>
                 </div>
+              ) : isStaff && hasMapData ? (
+                <Button type="button" size="sm" variant="outline" onClick={() => setIsEditingRoute(true)}>
+                  <Pencil aria-hidden />
+                  Modifica percorso
+                </Button>
               ) : null}
             </div>
-            {event?.description ? (
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                {event.description}
-              </p>
-            ) : null}
-            {hasMapData || (isStaff && isEditingRoute) ? (
-              <div className="space-y-2 pt-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-sm font-medium">Mappa e percorso</p>
-                  {isStaff ? (
-                    isEditingRoute ? (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline-neon"
-                          className="h-8"
-                          onClick={() => {
-                            setDraftPin(hasPin ? { lat: eventLat, lng: eventLng } : null);
-                            setDraftRoutePoints(routePoints);
-                            setIsEditingRoute(false);
-                          }}
-                        >
-                          <X className="mr-1 h-3.5 w-3.5" />
-                          Annulla
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="neon"
-                          className="h-8"
-                          onClick={() =>
-                            updateEventMutation.mutate({
-                              eventId,
-                              locationLat: draftPin?.lat,
-                              locationLng: draftPin?.lng,
-                              routeGeojson: pointsToRouteGeojson(draftRoutePoints),
-                            })
-                          }
-                          disabled={updateEventMutation.isPending}
-                        >
-                          <Save className="mr-1 h-3.5 w-3.5" />
-                          {updateEventMutation.isPending ? "Salvataggio..." : "Salva percorso"}
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline-neon"
-                        className="h-8"
-                        onClick={() => setIsEditingRoute(true)}
-                      >
-                        <Pencil className="mr-1 h-3.5 w-3.5" />
-                        Modifica percorso
-                      </Button>
-                    )
-                  ) : null}
-                </div>
+            {hasMapData || isEditingRoute ? (
+              <div className="mt-3 space-y-2">
                 <EventMapEditor
                   pin={isEditingRoute ? draftPin : hasPin ? { lat: eventLat, lng: eventLng } : null}
-                  routePoints={isEditingRoute ? draftRoutePoints : routePoints}
+                  routePoints={shownRoutePoints}
                   onPinChange={isEditingRoute ? setDraftPin : () => {}}
                   onRouteChange={isEditingRoute ? setDraftRoutePoints : () => {}}
                   readOnly={!isEditingRoute}
-                  className="h-72 w-full rounded-xl border border-border/70"
+                  className="h-72 w-full rounded-xl border border-border"
                 />
-                {(isEditingRoute ? draftRoutePoints : routePoints).length > 0 ? (
+                {shownRoutePoints.length > 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    Waypoint: {(isEditingRoute ? draftRoutePoints : routePoints).length}
-                    {(isEditingRoute ? draftRoutePoints : routePoints).length >= 2
-                      ? ` · Percorso: ${(routeDistanceMeters(isEditingRoute ? draftRoutePoints : routePoints) / 1000).toFixed(2)} km`
+                    Waypoint: {shownRoutePoints.length}
+                    {shownRoutePoints.length >= 2
+                      ? ` · Percorso: ${formatDistance(routeDistanceMeters(shownRoutePoints))}`
                       : ""}
                   </p>
                 ) : null}
@@ -345,294 +517,152 @@ export default function ClubEventDetail() {
                     href={buildOsmMapLink(eventLat, eventLng)}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-sm text-action-text hover:underline"
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-action-text hover:underline"
                   >
-                    <ExternalLink className="h-4 w-4" />
+                    <ExternalLink className="size-4" aria-hidden />
                     Apri mappa completa
                   </a>
                 ) : null}
               </div>
-            ) : null}
-            {!hasMapData && isStaff && !isEditingRoute ? (
-              <div className="rounded-lg border border-border/70 bg-card/40 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm text-muted-foreground">Nessuna mappa/pin impostata per questo evento.</p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline-neon"
-                    className="h-8"
-                    onClick={() => setIsEditingRoute(true)}
-                  >
-                    <Pencil className="mr-1 h-3.5 w-3.5" />
-                    Aggiungi mappa
-                  </Button>
-                </div>
+            ) : (
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm text-muted-foreground">Nessuna mappa per questo evento.</p>
+                <Button type="button" size="sm" variant="outline" onClick={() => setIsEditingRoute(true)}>
+                  <Pencil aria-hidden />
+                  Aggiungi mappa
+                </Button>
               </div>
-            ) : null}
+            )}
+          </section>
+        ) : null}
+
+        {weatherSnapshot || hasPin ? (
+          <section aria-labelledby={weatherTitleId} className="surface-panel p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h3 id={weatherTitleId} className={sectionTitle}>
+                Meteo mare
+              </h3>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                aria-label={weatherSnapshot ? "Aggiorna il meteo" : undefined}
+                onClick={() => refreshWeather.mutate({ eventId })}
+                disabled={refreshWeather.isPending}
+              >
+                <RefreshCw className={cn(refreshWeather.isPending && "animate-spin")} aria-hidden />
+                {weatherSnapshot ? "Aggiorna" : "Carica meteo"}
+              </Button>
+            </div>
             {weatherSnapshot ? (
-              <div className="space-y-2 rounded-lg border border-border/70 bg-card/40 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-medium">Meteo mare</p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline-neon"
-                    className="h-8"
-                    onClick={() => refreshWeather.mutate({ eventId })}
-                    disabled={refreshWeather.isPending}
-                  >
-                    <RefreshCw className={`mr-1 h-3.5 w-3.5 ${refreshWeather.isPending ? "animate-spin" : ""}`} />
-                    Aggiorna
-                  </Button>
+              <>
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  <WeatherTile
+                    icon={<weatherCondition.Icon className="size-4" aria-hidden />}
+                    label="Meteo generale"
+                    value={
+                      toFiniteNumber(weatherSnapshot.general?.temperatureC) !== null
+                        ? `${weatherCondition.label} · ${formatDecimal(weatherSnapshot.general?.temperatureC, 1)} °C`
+                        : weatherCondition.label
+                    }
+                  />
+                  <WeatherTile
+                    icon={<Wind className="size-4" aria-hidden />}
+                    label="Vento"
+                    value={
+                      toFiniteNumber(weatherSnapshot.wind?.speedMps) !== null
+                        ? `${formatDecimal(weatherSnapshot.wind?.speedMps, 1)} m/s`
+                        : NO_VALUE
+                    }
+                    detail={`Direzione: ${formatDirection(weatherSnapshot.wind?.directionDeg)}`}
+                  />
+                  <WeatherTile
+                    icon={<Waves className="size-4" aria-hidden />}
+                    label="Onde"
+                    value={
+                      toFiniteNumber(weatherSnapshot.waves?.heightM) !== null
+                        ? `${formatDecimal(weatherSnapshot.waves?.heightM, 2)} m`
+                        : NO_VALUE
+                    }
+                    detail={`Direzione: ${formatDirection(weatherSnapshot.waves?.directionDeg)} · Periodo: ${
+                      toFiniteNumber(weatherSnapshot.waves?.periodSeconds) !== null
+                        ? `${formatDecimal(weatherSnapshot.waves?.periodSeconds, 1)} s`
+                        : NO_VALUE
+                    }`}
+                  />
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <div className="rounded-md border border-border/60 bg-background/40 p-2 text-sm">
-                    <p className="flex items-center gap-1 text-muted-foreground">
-                      <weatherCondition.Icon className="h-3.5 w-3.5" />
-                      Meteo generale
-                    </p>
-                    <p className="font-semibold">
-                      {weatherCondition.label}
-                      {weatherSnapshot.general?.temperatureC != null ? ` · ${weatherSnapshot.general.temperatureC.toFixed(1)} °C` : ""}
-                    </p>
-                  </div>
-                  <div className="rounded-md border border-border/60 bg-background/40 p-2 text-sm">
-                    <p className="flex items-center gap-1 text-muted-foreground">
-                      <Wind className="h-3.5 w-3.5" />
-                      Vento
-                    </p>
-                    <p className="font-semibold">
-                      {weatherSnapshot.wind?.speedMps != null ? `${weatherSnapshot.wind.speedMps.toFixed(1)} m/s` : "n/d"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Direzione: {degreesToCardinal(weatherSnapshot.wind?.directionDeg)}{" "}
-                      {weatherSnapshot.wind?.directionDeg != null ? `(${Math.round(weatherSnapshot.wind.directionDeg)}°)` : ""}
-                    </p>
-                  </div>
-                  <div className="rounded-md border border-border/60 bg-background/40 p-2 text-sm">
-                    <p className="flex items-center gap-1 text-muted-foreground">
-                      <Waves className="h-3.5 w-3.5" />
-                      Onde
-                    </p>
-                    <p className="font-semibold">
-                      {weatherSnapshot.waves?.heightM != null ? `${weatherSnapshot.waves.heightM.toFixed(2)} m` : "n/d"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Direzione: {degreesToCardinal(weatherSnapshot.waves?.directionDeg)}
-                      {weatherSnapshot.waves?.directionDeg != null ? ` (${Math.round(weatherSnapshot.waves.directionDeg)}°)` : ""}
-                      {" · "}
-                      Periodo: {weatherSnapshot.waves?.periodSeconds != null ? `${weatherSnapshot.waves.periodSeconds.toFixed(1)} s` : "n/d"}
-                    </p>
-                  </div>
-                </div>
-                {weatherTime ? (
-                  <p className="text-xs text-muted-foreground">
-                    Riferimento meteo: {formatDateTime(weatherTime)}
+                {weatherTime && formatSessionDate(weatherTime) !== NO_VALUE ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Riferimento meteo: {formatSessionDate(weatherTime)}
                   </p>
                 ) : null}
-              </div>
-            ) : hasPin ? (
-              <div className="rounded-lg border border-border/70 bg-card/40 p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm text-muted-foreground">Meteo non ancora disponibile.</p>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline-neon"
-                    className="h-8"
-                    onClick={() => refreshWeather.mutate({ eventId })}
-                    disabled={refreshWeather.isPending}
-                  >
-                    <RefreshCw className={`mr-1 h-3.5 w-3.5 ${refreshWeather.isPending ? "animate-spin" : ""}`} />
-                    Carica meteo
-                  </Button>
+              </>
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground">Meteo non ancora disponibile.</p>
+            )}
+          </section>
+        ) : null}
+
+        <section aria-labelledby={peopleTitleId} className="surface-panel p-4">
+          <h3 id={peopleTitleId} className={sectionTitle}>
+            Partecipanti
+          </h3>
+          {attendeesQuery.isPending ? (
+            <LoadingSkeleton
+              label="Caricamento dei partecipanti…"
+              count={3}
+              className="mt-3 space-y-2"
+              itemClassName="h-12 w-full rounded-xl"
+            />
+          ) : !attendeesLoaded && attendeesQuery.isError ? (
+            <LoadError className="mt-3 border-0 bg-raised" onRetry={() => void attendeesQuery.refetch()} />
+          ) : (
+            RSVP_OPTIONS.map((option) => {
+              const people = byStatus(option.value);
+              return (
+                <div
+                  key={option.value}
+                  className="mt-4 border-t border-border pt-4 first-of-type:mt-3 first-of-type:border-t-0 first-of-type:pt-0"
+                >
+                  <h4 className="text-sm font-semibold">
+                    {option.group}{" "}
+                    <span className="font-normal text-muted-foreground tabular-nums">
+                      ({formatInteger(people.length)})
+                    </span>
+                  </h4>
+                  {people.length === 0 ? (
+                    <p className="mt-1 text-sm text-muted-foreground">Nessuno ancora.</p>
+                  ) : (
+                    <ul className="mt-2 grid gap-x-4 gap-y-3 sm:grid-cols-2">
+                      {people.map((attendee) => {
+                        const fullName = attendee.user?.fullName || null;
+                        const username = attendee.user?.username || null;
+                        const name = fullName || username || "Nuotatore";
+                        return (
+                          <li key={attendee.id} className="flex min-w-0 items-center gap-3">
+                            <Avatar className="size-9">
+                              <AvatarImage src={attendee.user?.profilePicture || undefined} alt="" />
+                              <AvatarFallback className="bg-raised text-xs font-semibold">
+                                {getInitials(name)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold">{name}</p>
+                              {/* The @username only under a real name, never twice. */}
+                              {fullName && username ? (
+                                <p className="truncate text-xs text-muted-foreground">@{username}</p>
+                              ) : null}
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
                 </div>
-              </div>
-            ) : null}
-
-            <div className="grid grid-cols-2 gap-2 pt-2 sm:grid-cols-3 lg:grid-cols-4">
-              {[
-                {
-                  label: "Partecipo",
-                  value: going.length,
-                  progress: Math.min(100, Math.round((going.length / Math.max(attendees.length, 1)) * 100)),
-                  helper: "Confermati",
-                  icon: <CheckCircle2 className="h-4 w-4" />,
-                  tone: "lime" as const,
-                },
-                {
-                  label: "Forse",
-                  value: maybe.length,
-                  progress: Math.min(100, Math.round((maybe.length / Math.max(attendees.length, 1)) * 100)),
-                  helper: "In dubbio",
-                  icon: <HelpCircle className="h-4 w-4" />,
-                  tone: "amber" as const,
-                },
-                {
-                  label: "Non partecipo",
-                  value: notGoing.length,
-                  progress: Math.min(100, Math.round((notGoing.length / Math.max(attendees.length, 1)) * 100)),
-                  helper: "Assenti",
-                  icon: <XCircle className="h-4 w-4" />,
-                  tone: "coral" as const,
-                },
-                {
-                  label: "RSVP totali",
-                  value: attendees.length,
-                  progress: Math.min(100, Math.round((attendees.length / 40) * 100)),
-                  helper: "Partecipazione",
-                  icon: <Users className="h-4 w-4" />,
-                  tone: "cyan" as const,
-                },
-              ].map((item) => (
-                <MetricOrb
-                  key={item.label}
-                  label={item.label}
-                  value={item.value}
-                  progress={item.progress}
-                  helper={item.helper}
-                  icon={item.icon}
-                  tone={item.tone}
-                  size="sm"
-                />
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2 pt-2">
-              <Button
-                size="sm"
-                variant={myStatus === "going" ? "neon" : "outline-neon"}
-                onClick={() => rsvpMutation.mutate({ eventId, status: "going" })}
-                disabled={rsvpMutation.isPending}
-              >
-                <CheckCircle2 className="h-4 w-4 mr-1" /> Partecipo ({going.length})
-              </Button>
-              <Button
-                size="sm"
-                variant={myStatus === "maybe" ? "neon" : "outline-neon"}
-                onClick={() => rsvpMutation.mutate({ eventId, status: "maybe" })}
-                disabled={rsvpMutation.isPending}
-              >
-                <HelpCircle className="h-4 w-4 mr-1" /> Forse ({maybe.length})
-              </Button>
-              <Button
-                size="sm"
-                variant={myStatus === "not_going" ? "destructive" : "outline-neon"}
-                onClick={() => rsvpMutation.mutate({ eventId, status: "not_going" })}
-                disabled={rsvpMutation.isPending}
-              >
-                <XCircle className="h-4 w-4 mr-1" /> Non partecipo ({notGoing.length})
-              </Button>
-            </div>
-          </SurfaceContent>
-        </Surface>
-
-        <Surface className="border-border/50 bg-card/60 backdrop-blur-sm">
-          <SurfaceHeader>
-            <SurfaceTitle className="font-display">Partecipanti</SurfaceTitle>
-          </SurfaceHeader>
-          <SurfaceContent className="space-y-6">
-            <section className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                <Badge variant="outline">Partecipo ({going.length})</Badge>
-              </div>
-              {going.length === 0 ? (
-                <div className="text-sm text-muted-foreground">Nessuno ancora.</div>
-              ) : (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {going.map((attendee) => (
-                    <div key={attendee.id} className="flex items-center gap-3 rounded-lg border border-border bg-background/60 p-3">
-                      <Avatar className="h-9 w-9">
-                        <AvatarImage src={attendee.user?.profilePicture || undefined} />
-                        <AvatarFallback>
-                          {(attendee.user?.username?.[0] || "U").toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold truncate">
-                          {attendee.user?.username || "Utente"}
-                        </div>
-                        {attendee.user?.fullName ? (
-                          <div className="text-xs text-muted-foreground truncate">
-                            {attendee.user.fullName}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                <Badge variant="outline">Forse ({maybe.length})</Badge>
-              </div>
-              {maybe.length === 0 ? (
-                <div className="text-sm text-muted-foreground">Nessuno ancora.</div>
-              ) : (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {maybe.map((attendee) => (
-                    <div key={attendee.id} className="flex items-center gap-3 rounded-lg border border-border bg-background/60 p-3">
-                      <Avatar className="h-9 w-9">
-                        <AvatarImage src={attendee.user?.profilePicture || undefined} />
-                        <AvatarFallback>
-                          {(attendee.user?.username?.[0] || "U").toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold truncate">
-                          {attendee.user?.username || "Utente"}
-                        </div>
-                        {attendee.user?.fullName ? (
-                          <div className="text-xs text-muted-foreground truncate">
-                            {attendee.user.fullName}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                <Badge variant="outline">Non partecipo ({notGoing.length})</Badge>
-              </div>
-              {notGoing.length === 0 ? (
-                <div className="text-sm text-muted-foreground">Nessuno ancora.</div>
-              ) : (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {notGoing.map((attendee) => (
-                    <div key={attendee.id} className="flex items-center gap-3 rounded-lg border border-border bg-background/60 p-3">
-                      <Avatar className="h-9 w-9">
-                        <AvatarImage src={attendee.user?.profilePicture || undefined} />
-                        <AvatarFallback>
-                          {(attendee.user?.username?.[0] || "U").toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold truncate">
-                          {attendee.user?.username || "Utente"}
-                        </div>
-                        {attendee.user?.fullName ? (
-                          <div className="text-xs text-muted-foreground truncate">
-                            {attendee.user.fullName}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
-          </SurfaceContent>
-        </Surface>
+              );
+            })
+          )}
+        </section>
       </div>
     </AppLayout>
   );
