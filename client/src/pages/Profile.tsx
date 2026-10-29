@@ -1,50 +1,37 @@
 import { assetUrl } from "@/lib/asset-base";
 import AppLayout from "@/components/AppLayout";
-import { useMemo } from "react";
+import { useId, useMemo, type ReactNode } from "react";
 import { Link } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { Surface, SurfaceContent, SurfaceHeader, SurfaceTitle } from "@/components/ui/surface";
+import { useTheme } from "@/contexts/ThemeContext";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { MetricOrb } from "@/components/metrics/MetricOrb";
-import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Chip } from "@/components/corsia/Chip";
+import { LevelCard } from "@/components/corsia/LevelCard";
+import { Metric, type MetricProps } from "@/components/corsia/Metric";
 import {
+  BarChart3,
   Calendar,
-  Droplets,
+  ChevronRight,
   Edit,
-  Flame,
   MapPin,
-  Target,
-  Timer,
-  TrendingUp,
-  Trophy,
-  Award,
+  Moon,
+  Settings,
+  Sun,
   Waves,
-  Zap,
 } from "lucide-react";
 import { formatSwimCentiseconds } from "@/lib/swimTime";
+import { getBadgeImageUrl } from "@/lib/badgeImages";
+import {
+  distanceParts,
+  formatDurationParts,
+  formatInteger,
+  formatPaceValue,
+  getInitials,
+} from "@/lib/format";
+import { cn } from "@/lib/utils";
 
-const formatDistance = (meters?: number | null) => {
-  if (!meters) return "—";
-  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
-};
-
-const formatTime = (seconds?: number | null) => {
-  if (!seconds) return "—";
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes} min`;
-};
-
-const formatPace = (secondsPer100m?: number | null) => {
-  if (!secondsPer100m || !Number.isFinite(secondsPer100m)) return "—";
-  const minutes = Math.floor(secondsPer100m / 60);
-  const seconds = Math.round(secondsPer100m % 60);
-  return `${minutes}:${seconds.toString().padStart(2, "0")}/100m`;
-};
-
+/** «12 mar 2025»; «—» for a missing or invalid date. */
 const formatDate = (date?: string | Date | null) => {
   if (!date) return "—";
   const parsed = date instanceof Date ? date : new Date(date);
@@ -73,27 +60,18 @@ const toNumber = (value: unknown) => {
   return Number.isFinite(num) ? num : 0;
 };
 
+const toTime = (value: unknown) => {
+  if (!value) return 0;
+  const time = new Date(value as string | Date).getTime();
+  return Number.isFinite(time) ? time : 0;
+};
+
 const getActivityDateValue = (activity: any) =>
   activity?.activityDate ??
   activity?.activity_date ??
   activity?.createdAt ??
   activity?.created_at ??
   null;
-
-const getActivityDistance = (activity: any) =>
-  toNumber(activity?.distanceMeters ?? activity?.distance_meters ?? activity?.distance ?? 0);
-
-const getActivityDuration = (activity: any) =>
-  toNumber(
-    activity?.durationSeconds ??
-      activity?.duration_seconds ??
-      activity?.movingDuration ??
-      activity?.moving_duration ??
-      activity?.elapsedDuration ??
-      activity?.elapsed_duration ??
-      activity?.duration ??
-      0
-  );
 
 const getActivityPace = (activity: any) =>
   toNumber(
@@ -109,15 +87,6 @@ const getActivityAvgSwolf = (activity: any) =>
 
 const getActivityStroke = (activity: any) =>
   activity?.strokeType ?? activity?.stroke_type ?? activity?.stroke ?? "mixed";
-
-const getInitials = (name: string) =>
-  name
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "SF";
 
 const getStreaks = (dates: string[]) => {
   if (dates.length === 0) return { current: 0, best: 0 };
@@ -167,7 +136,7 @@ const getStreaks = (dates: string[]) => {
 };
 
 const strokeLabels: Record<string, string> = {
-  freestyle: "Stile Libero",
+  freestyle: "Stile libero",
   backstroke: "Dorso",
   breaststroke: "Rana",
   butterfly: "Farfalla",
@@ -179,108 +148,86 @@ const sourceLabels: Record<string, string> = {
   training: "Allenamento",
 };
 
-interface StatItemProps {
-  label: string;
-  value: string | number;
-  progress: number;
-  icon: React.ReactNode;
-  helper?: string;
-  tone?: "cyan" | "lime" | "sky" | "amber";
-}
+/** Badges shown in the profile preview (the rest are on `/badges`). */
+const BADGE_PREVIEW = 6;
 
-interface BadgeCardProps {
+type PreviewBadge = { key: string; name: string; imageUrl: string; earnedAt: number };
+
+const sectionTitle = "text-[17px] font-bold";
+
+function Section({
+  title,
+  aside,
+  className,
+  children,
+  ...rest
+}: {
   title: string;
-  description: string;
-  imageUrl: string | null;
-  unlocked: boolean;
-  rarity: string;
-}
-
-function BadgeCard({ title, description, imageUrl, unlocked, rarity }: BadgeCardProps) {
-  const rarityColors: Record<string, string> = {
-    common: "bg-muted/60 text-muted-foreground",
-    uncommon: "bg-emerald-500/10 text-emerald-400",
-    rare: "bg-sky-500/10 text-sky-300",
-    epic: "bg-purple-500/10 text-purple-300",
-    legendary: "bg-amber-500/10 text-amber-300",
-  };
-
+  aside?: ReactNode;
+  className?: string;
+  children: ReactNode;
+  "data-tour"?: string;
+}) {
+  const titleId = useId();
   return (
-    <div
-      className={`flex items-center gap-4 rounded-lg border p-4 ${
-        unlocked ? "border-primary/30 bg-primary/5" : "border-border bg-muted/30 opacity-70"
-      }`}
-    >
-      <div
-        className={`flex size-12 items-center justify-center rounded-full ${
-          unlocked ? "bg-primary/15" : "bg-muted"
-        }`}
-      >
-        {unlocked ? (
-          imageUrl ? (
-            <img src={assetUrl(imageUrl)} alt={title} className="size-9 object-contain" />
-          ) : (
-            <Waves className="size-5 text-action-text" />
-          )
-        ) : (
-          <span className="text-lg font-semibold text-muted-foreground">?</span>
-        )}
+    <section aria-labelledby={titleId} className={cn("surface-panel p-4", className)} {...rest}>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 id={titleId} className={sectionTitle}>
+          {title}
+        </h2>
+        {aside}
       </div>
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <p className="font-medium text-foreground">{title}</p>
-          <Badge className={rarityColors[rarity] || rarityColors.common}>{rarity}</Badge>
-        </div>
-        <p className="text-sm text-muted-foreground">{description}</p>
-      </div>
-      {unlocked && (
-        <Badge variant="neon" className="shrink-0">
-          Sbloccato
-        </Badge>
-      )}
-    </div>
+      {children}
+    </section>
   );
 }
 
-interface ActivityItemProps {
-  type: string;
-  date: string;
-  duration: string;
-  distance: string;
-  pace: string;
+function BadgesLink() {
+  return (
+    <Link
+      href="/badges"
+      className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-action-text hover:underline"
+    >
+      Vedi tutti<span className="sr-only"> i badge</span>
+    </Link>
+  );
 }
 
-function ActivityItem({ type, date, duration, distance, pace }: ActivityItemProps) {
+const APPEARANCE_OPTIONS = [
+  { value: "dark", label: "Scuro", icon: <Moon className="size-5 text-muted-foreground" aria-hidden /> },
+  { value: "light", label: "Chiaro", icon: <Sun className="size-5 text-muted-foreground" aria-hidden /> },
+] as const;
+
+/** «Aspetto»: the only theme switch for signed-in users (native radios: arrows move the choice). */
+function AppearanceSection() {
+  const { theme, setTheme } = useTheme();
+  const titleId = useId();
   return (
-    <div className="flex items-center justify-between border-b border-border py-3 last:border-0">
-      <div className="flex items-center gap-3">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10">
-          {type === "Piscina" ? (
-            <Waves className="size-5 text-action-text" />
-          ) : (
-            <Droplets className="size-5 text-action-text" />
-          )}
-        </div>
-        <div>
-          <p className="font-medium text-foreground">{type}</p>
-          <p className="text-sm text-muted-foreground">{date}</p>
-        </div>
+    <section aria-labelledby={titleId} className="surface-panel p-4">
+      <h2 id={titleId} className={sectionTitle}>
+        Aspetto
+      </h2>
+      <div role="radiogroup" aria-labelledby={titleId} className="mt-3 grid grid-cols-2 gap-3">
+        {APPEARANCE_OPTIONS.map(({ value, label, icon }) => (
+          <label
+            key={value}
+            className="flex h-14 cursor-pointer items-center gap-3 rounded-xl border-2 border-border bg-raised px-4 font-semibold transition-colors has-[:checked]:border-action-text has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50 has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60"
+          >
+            <input
+              type="radio"
+              name="appearance"
+              value={value}
+              checked={theme === value}
+              disabled={!setTheme}
+              onChange={() => setTheme?.(value)}
+              className="sr-only"
+            />
+            {icon}
+            {label}
+          </label>
+        ))}
       </div>
-      <div className="flex items-center gap-4 text-right">
-        <div>
-          <p className="text-sm font-medium text-foreground">{distance}</p>
-          <p className="text-xs text-muted-foreground">Distanza</p>
-        </div>
-        <div>
-          <p className="text-sm font-medium text-foreground">{duration}</p>
-          <p className="text-xs text-muted-foreground">Tempo</p>
-        </div>
-        <div>
-          <p className="text-sm font-medium text-foreground">{pace}</p>
-          <p className="text-xs text-muted-foreground">Pace</p>
-        </div>
-      </div>
-    </div>
+    </section>
   );
 }
 
@@ -337,13 +284,6 @@ export default function Profile() {
       : null;
     const bestSwolf = swolfValues.length ? Math.min(...swolfValues) : null;
 
-    const paceValues = activities
-      .map((activity) => getActivityPace(activity))
-      .filter((value: number | null) => typeof value === "number" && value > 0) as number[];
-    const bestPace = paceValues.length
-      ? paceValues.reduce((min, value) => Math.min(min, value), Number.POSITIVE_INFINITY)
-      : null;
-
     const dateList = activities
       .map((activity) => parseActivityDate(getActivityDateValue(activity)))
       .filter((value): value is Date => value instanceof Date)
@@ -358,7 +298,7 @@ export default function Profile() {
       avgPace,
       avgSwolf,
       bestSwolf,
-      bestPace: bestPace !== null && Number.isFinite(bestPace) ? bestPace : null,
+      hasActivities: dateList.length > 0,
       streakCurrent: streaks.current,
       streakBest: streaks.best,
     };
@@ -375,290 +315,234 @@ export default function Profile() {
     return strokeLabels[top?.[0]] || "Misto";
   }, [activities]);
 
-  const recentActivities = useMemo(() => {
-    return [...activities]
-      .sort((a, b) => {
-        const aDate = parseActivityDate(getActivityDateValue(a));
-        const bDate = parseActivityDate(getActivityDateValue(b));
-        return (bDate?.getTime() ?? 0) - (aDate?.getTime() ?? 0);
-      })
-      .slice(0, 4)
-      .map((activity) => ({
-      id: activity.id,
-      type: activity.isOpenWater ? "Acque libere" : "Piscina",
-      date: formatDate(parseActivityDate(getActivityDateValue(activity))),
-      duration: formatTime(getActivityDuration(activity)),
-      distance: formatDistance(getActivityDistance(activity)),
-      pace: formatPace(getActivityPace(activity)),
-    }));
-  }, [activities]);
-
   const pbRows = useMemo(() => {
     const rows = ((pbBoardQuery.data as any)?.records as Array<any> | undefined) ?? [];
     return rows.slice(0, 24);
   }, [pbBoardQuery.data]);
 
-  const achievementBadgeSummary = useMemo(() => {
-    const total = achievementDefinitions?.length ?? 0;
-    const earned = userAchievementBadges?.length ?? 0;
-    return { total, earned };
-  }, [achievementDefinitions, userAchievementBadges]);
-
-  const unlockedBadges =
-    badgeProgress.filter((badge) => badge.earned).length +
-    achievementBadgeSummary.earned;
-  const totalBadges = badgeProgress.length + achievementBadgeSummary.total;
+  /** Earned badges (progress and achievement ones), newest first. */
+  const earnedBadges = useMemo<PreviewBadge[]>(() => {
+    const progressBadges = badgeProgress
+      .filter((badge) => badge.earned)
+      .map((badge) => ({
+        key: `badge-${badge.id}`,
+        name: String(badge.name ?? ""),
+        imageUrl: getBadgeImageUrl(String(badge.code ?? "")),
+        earnedAt: toTime(badge.earnedAt),
+      }));
+    const achievements = ((userAchievementBadges ?? []) as Array<any>).map((entry) => ({
+      key: `ach-${entry.badgeId}`,
+      name: String(entry.badge?.name ?? ""),
+      imageUrl: entry.badge?.iconUrl
+        ? assetUrl(entry.badge.iconUrl)
+        : getBadgeImageUrl(`achievement_${entry.badgeId}`),
+      earnedAt: toTime(entry.awardedAt),
+    }));
+    return [...progressBadges, ...achievements].sort((a, b) => b.earnedAt - a.earnedAt);
+  }, [badgeProgress, userAchievementBadges]);
+  const totalBadges = badgeProgress.length + (achievementDefinitions?.length ?? 0);
+  const previewBadges = earnedBadges.slice(0, BADGE_PREVIEW);
 
   const followerCount = Number((profile as { followerCount?: number } | undefined)?.followerCount ?? 0);
   const followingCount = Number((profile as { followingCount?: number } | undefined)?.followingCount ?? 0);
 
-  const levelProgress = profile?.nextLevelXp
-    ? Math.min(100, ((profile.totalXp ?? 0) / profile.nextLevelXp) * 100)
-    : 0;
-  const profileOrbs: StatItemProps[] = [
-    {
-      label: "Sessioni totali",
-      value: stats.totalSessions,
-      progress: Math.min(100, Math.round((stats.totalSessions / 120) * 100)),
-      icon: <TrendingUp className="size-4" />,
-      helper: "Carriera",
-      tone: "cyan",
-    },
-    {
-      label: "Distanza totale",
-      value: formatDistance(stats.totalDistance),
-      progress: Math.min(100, Math.round((stats.totalDistance / 200000) * 100)),
-      icon: <Waves className="size-4" />,
-      helper: "Volume",
-      tone: "sky",
-    },
-    {
-      label: "Pace medio",
-      value: formatPace(stats.avgPace),
-      progress: stats.avgPace ? Math.min(100, Math.round((220 / Math.max(stats.avgPace, 1)) * 100)) : 0,
-      icon: <Timer className="size-4" />,
-      helper: "Efficienza",
-      tone: "amber",
-    },
-    {
-      label: "SWOLF medio",
-      value: stats.avgSwolf ?? "—",
-      progress: stats.avgSwolf ? Math.min(100, Math.round((70 / Math.max(stats.avgSwolf, 1)) * 100)) : 0,
-      icon: <Target className="size-4" />,
-      helper: "Tecnica",
-      tone: "lime",
-    },
-    {
-      label: "Tempo totale",
-      value: formatTime(stats.totalTime),
-      progress: Math.min(100, Math.round((stats.totalTime / 50000) * 100)),
-      icon: <Calendar className="size-4" />,
-      helper: "In acqua",
-      tone: "cyan",
-    },
-    {
-      label: "Best SWOLF",
-      value: stats.bestSwolf ?? "—",
-      progress: stats.bestSwolf ? Math.min(100, Math.round((70 / Math.max(stats.bestSwolf, 1)) * 100)) : 0,
-      icon: <Award className="size-4" />,
-      helper: stats.bestSwolf ? "Record personale" : "Nessun record",
-      tone: "lime",
-    },
-    {
-      label: "Streak attuale",
-      value: `${stats.streakCurrent}g`,
-      progress: Math.min(100, Math.round((stats.streakCurrent / 21) * 100)),
-      icon: <Flame className="size-4" />,
-      helper: "Continuita",
-      tone: "amber",
-    },
-    {
-      label: "Streak migliore",
-      value: `${stats.streakBest}g`,
-      progress: Math.min(100, Math.round((stats.streakBest / 30) * 100)),
-      icon: <Trophy className="size-4" />,
-      helper: "Record",
-      tone: "sky",
-    },
-  ];
+  // A metric without data is left out (never a «—»).
+  const metrics: MetricProps[] = [];
+  metrics.push({ value: formatInteger(stats.totalSessions), label: "Sessioni totali" });
+  if (stats.totalDistance > 0) metrics.push({ ...distanceParts(stats.totalDistance), label: "Distanza totale" });
+  const totalTime = formatDurationParts(stats.totalTime);
+  if (totalTime) metrics.push({ ...totalTime, label: "Tempo totale" });
+  if (stats.avgPace > 0 && Number.isFinite(stats.avgPace)) {
+    metrics.push({ value: formatPaceValue(stats.avgPace), unit: "/100", label: "Passo medio", tone: "action" });
+  }
+  if (stats.avgSwolf) metrics.push({ value: String(stats.avgSwolf), label: "SWOLF medio" });
+  if (stats.bestSwolf) metrics.push({ value: String(Math.round(stats.bestSwolf)), label: "SWOLF migliore" });
+  if (stats.hasActivities) {
+    metrics.push({ value: String(stats.streakCurrent), unit: "g", label: "Serie attuale" });
+    metrics.push({ value: String(stats.streakBest), unit: "g", label: "Serie migliore" });
+  }
+
+  const nameId = useId();
+  const profileBadgeName = profile?.profileBadge?.name;
 
   return (
     <AppLayout>
-      <div className="compact-shell space-y-4 lg:space-y-2">
-        <div className="grid gap-6 xl:grid-cols-12">
-          <Surface className="bg-card border-border xl:col-span-7 glass-panel">
-          <div className="relative h-36 overflow-hidden rounded-t-lg bg-muted">
-            {profile?.coverUrl ? (
-              <img
-                src={profile.coverUrl}
-                alt="Cover profilo"
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="h-full w-full bg-[linear-gradient(132deg,#122636_0%,#1f3d54_52%,#102334_100%)]" />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-card/80 to-transparent" />
-          </div>
-          <SurfaceContent className="pt-6">
-            <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
-              <Avatar className="size-24 border border-border">
+      <div className="max-w-3xl space-y-6">
+        <section aria-labelledby={nameId} className="surface-panel overflow-hidden">
+          {profile?.coverUrl ? (
+            <img src={profile.coverUrl} alt="" className="h-28 w-full object-cover sm:h-36" />
+          ) : null}
+          <div className="p-4">
+            <div className="flex items-center gap-4">
+              <Avatar className="size-16 border border-border">
                 <AvatarImage src={profile?.avatarUrl || ""} alt={displayName} />
-                <AvatarFallback className="text-2xl">{getInitials(displayName)}</AvatarFallback>
+                <AvatarFallback className="text-xl font-semibold">{getInitials(displayName)}</AvatarFallback>
               </Avatar>
-              <div className="flex-1 text-center sm:text-left">
-                <div className="flex flex-col items-center gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="text-2xl font-bold neon-gradient-text">{displayName}</h1>
-                      <Badge variant="neon" className="gap-1">
-                        <Zap className="size-3" />
-                        Livello {profile?.level ?? 1}
-                      </Badge>
-                      {profile?.profileBadge?.name && (
-                        <Badge variant="outline" className="border-primary/40 text-action-text">
-                          {profile.profileBadge.name}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-muted-foreground">{username}</p>
-                  </div>
-                  <Link href="/settings">
-                    <Button variant="outline-neon">
-                      <Edit className="mr-2 size-4" />
-                      Modifica profilo
-                    </Button>
-                  </Link>
-                </div>
-                <p className="mt-3 text-foreground">{bio}</p>
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-4 text-sm text-muted-foreground sm:justify-start">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="size-4" />
-                    {location}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="size-4" />
-                    Iscritto {formatDate(profile?.createdAt)}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Waves className="size-4" />
-                    {primaryStroke}
-                  </span>
-                </div>
-                <div className="mt-4 flex flex-wrap justify-center gap-6 text-sm text-muted-foreground sm:justify-start">
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-foreground">{followingCount}</p>
-                    <p>Following</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-foreground">{followerCount}</p>
-                    <p>Follower</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-lg font-bold text-foreground">
-                      {unlockedBadges}/{totalBadges || 0}
-                    </p>
-                    <p>Badge</p>
-                  </div>
-                </div>
+              <div className="min-w-0 flex-1">
+                <h2 id={nameId} className="truncate font-display text-[30px] font-bold leading-tight">
+                  {displayName}
+                </h2>
+                <p className="truncate text-sm text-muted-foreground">{username}</p>
               </div>
             </div>
 
-            <div className="mt-6 rounded-lg border border-border bg-background/60 p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="flex size-8 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
-                    {profile?.level ?? 1}
-                  </div>
-                  <span className="font-medium text-foreground">
-                    Livello {profile?.level ?? 1}
-                  </span>
-                </div>
-                <span className="text-sm text-muted-foreground">
-                  {(profile?.totalXp ?? 0).toLocaleString()} / {(profile?.nextLevelXp ?? 0).toLocaleString()} XP
+            {profileBadgeName ? (
+              <div className="mt-3">
+                <Chip>{profileBadgeName}</Chip>
+              </div>
+            ) : null}
+
+            <p className="mt-3 text-[15px]">{bio}</p>
+            <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+              <li className="flex items-center gap-1.5">
+                <MapPin className="size-4" aria-hidden />
+                {location}
+              </li>
+              <li className="flex items-center gap-1.5">
+                <Calendar className="size-4" aria-hidden />
+                Iscritto dal {formatDate(profile?.createdAt)}
+              </li>
+              <li className="flex items-center gap-1.5">
+                <Waves className="size-4" aria-hidden />
+                {primaryStroke}
+              </li>
+            </ul>
+
+            <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 border-t border-border pt-4">
+              <p>
+                <span className="font-display text-xl font-bold tabular-nums">{formatInteger(followerCount)}</span>{" "}
+                <span className="text-sm text-muted-foreground">Follower</span>
+              </p>
+              <p>
+                <span className="font-display text-xl font-bold tabular-nums">{formatInteger(followingCount)}</span>{" "}
+                <span className="text-sm text-muted-foreground">Seguiti</span>
+              </p>
+              <Button asChild variant="outline" className="ml-auto">
+                <Link href="/settings">
+                  <Edit className="size-4" aria-hidden />
+                  Modifica profilo
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+
+        {profile && typeof profile.level === "number" ? (
+          <LevelCard
+            level={profile.level}
+            totalXp={profile.totalXp ?? 0}
+            currentLevelXp={profile.currentLevelXp ?? 0}
+            nextLevelXp={profile.nextLevelXp ?? null}
+            xpToNextLevel={profile.xpToNextLevel ?? 0}
+          />
+        ) : null}
+
+        <Section
+          title="Badge"
+          data-tour="badges-nav"
+          aside={
+            previewBadges.length > 0 ? (
+              <div className="flex items-baseline gap-3">
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  {formatInteger(earnedBadges.length)} di {formatInteger(totalBadges)}
                 </span>
+                <BadgesLink />
               </div>
-              <Progress value={levelProgress} className="mt-3 h-2" />
-              <p className="mt-2 text-xs text-muted-foreground">
-                {profile?.nextLevelXp
-                  ? `${Math.max(profile.nextLevelXp - (profile.totalXp ?? 0), 0)} XP al livello ${
-                      (profile.level ?? 1) + 1
-                    }`
-                  : ""}
-              </p>
-            </div>
-          </SurfaceContent>
-          </Surface>
+            ) : null
+          }
+        >
+          {previewBadges.length > 0 ? (
+            <ul aria-label="Badge recenti" className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-6">
+              {previewBadges.map((badge) => (
+                <li key={badge.key} className="flex min-w-0 flex-col items-center gap-1.5 text-center">
+                  <img src={badge.imageUrl} alt={badge.name} loading="lazy" className="size-12 object-contain" />
+                  <span aria-hidden="true" className="line-clamp-2 text-xs font-medium">
+                    {badge.name}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Ancora nessun badge · <BadgesLink />
+            </p>
+          )}
+        </Section>
 
-          <Surface className="bg-card border-border xl:col-span-5">
-            <SurfaceHeader>
-              <SurfaceTitle className="font-display">Snapshot performance</SurfaceTitle>
-            </SurfaceHeader>
-            <SurfaceContent>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                {profileOrbs.map((metric) => (
-                  <MetricOrb
-                    key={metric.label}
-                    label={metric.label}
-                    value={metric.value}
-                    progress={metric.progress}
-                    helper={metric.helper}
-                    icon={metric.icon}
-                    tone={metric.tone}
-                    size="sm"
-                  />
-                ))}
-              </div>
-            </SurfaceContent>
-          </Surface>
-        </div>
+        <Section title="Riepilogo" data-tour="profile-stats">
+          <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-4">
+            {metrics.map((metric) => (
+              <li key={metric.label}>
+                <Metric {...metric} />
+              </li>
+            ))}
+          </ul>
+        </Section>
 
-        <Surface className="bg-card border-border">
-          <SurfaceHeader>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <SurfaceTitle className="font-display">PB Board</SurfaceTitle>
-              <Badge variant="outline" className="text-[10px]">
-                FINA {profileFinaGender === "female" ? "F" : "M"}
-              </Badge>
-            </div>
-          </SurfaceHeader>
-          <SurfaceContent className="space-y-3">
+        <Section
+          title="Record personali"
+          aside={<Chip>FINA {profileFinaGender === "female" ? "F" : "M"}</Chip>}
+        >
+          <div className="mt-3">
             {pbBoardQuery.isLoading ? (
-              <p className="text-sm text-muted-foreground">Caricamento personal best...</p>
+              <p className="text-sm text-muted-foreground">Caricamento dei record…</p>
             ) : pbRows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Nessun personal best disponibile. Inserisci il primo PB dalle prossime schermate record.
-              </p>
+              <p className="text-sm text-muted-foreground">Ancora nessun record personale.</p>
             ) : (
-              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <ul className="grid gap-2 sm:grid-cols-2">
                 {pbRows.map((row: any) => (
-                  <div key={row.id} className="rounded-xl border border-border/60 bg-background/35 p-3">
+                  <li key={row.id} className="rounded-xl bg-raised p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-foreground">
-                        {strokeLabels[String(row.strokeType)] ?? "Stile"} {Number(row.distanceMeters)}m
+                      <p className="text-sm font-semibold">
+                        {strokeLabels[String(row.strokeType)] ?? "Stile"} {Number(row.distanceMeters)} m
                       </p>
-                      <Badge variant="outline" className="text-[10px]">
-                        {Number(row.poolLengthMeters)}m
-                      </Badge>
+                      <span className="text-xs text-muted-foreground">Vasca {Number(row.poolLengthMeters)} m</span>
                     </div>
-                    <p className="mt-1 font-display text-lg font-bold text-action-text">
+                    <p className="mt-1 font-display text-2xl font-bold tabular-nums">
                       {formatSwimCentiseconds(row.timeCs)}
                     </p>
-                    <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-                      <span>{sourceLabels[String(row.source)] ?? "PB"}</span>
+                    <div className="mt-1 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                      <span>
+                        {sourceLabels[String(row.source)] ?? "Record"}
+                        {Number.isFinite(Number(row.finaPoints)) && row.finaPoints !== null
+                          ? ` · ${Math.round(Number(row.finaPoints))} punti FINA`
+                          : ""}
+                      </span>
                       <span>{formatDate(row.achievedAt)}</span>
                     </div>
-                    {Number.isFinite(Number(row.finaPoints)) ? (
-                      <p className="mt-1 text-xs font-semibold text-amber-300">
-                        {Math.round(Number(row.finaPoints))} pt FINA
-                      </p>
-                    ) : null}
-                  </div>
+                  </li>
                 ))}
-              </div>
+              </ul>
             )}
-          </SurfaceContent>
-        </Surface>
+          </div>
+        </Section>
 
+        <nav aria-label="Altro">
+          <ul className="surface-panel divide-y divide-border overflow-hidden">
+            <li>
+              <Link
+                href="/profile/performance"
+                className="flex h-14 items-center gap-3 px-4 font-semibold transition-colors hover:bg-raised"
+              >
+                <BarChart3 className="size-5 text-muted-foreground" aria-hidden />
+                <span className="flex-1">Statistiche</span>
+                <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/settings"
+                className="flex h-14 items-center gap-3 px-4 font-semibold transition-colors hover:bg-raised"
+              >
+                <Settings className="size-5 text-muted-foreground" aria-hidden />
+                <span className="flex-1">Impostazioni</span>
+                <ChevronRight className="size-5 text-muted-foreground" aria-hidden />
+              </Link>
+            </li>
+          </ul>
+        </nav>
+
+        <AppearanceSection />
       </div>
     </AppLayout>
   );
