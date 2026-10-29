@@ -36,12 +36,12 @@ const session = { access_token: "t", user: { id: "u" } };
 function renderCallback(search = "") {
   window.history.replaceState({}, "", `/auth/callback${search}`);
   const location = memoryLocation({ path: "/auth/callback", record: true });
-  render(
+  const { unmount } = render(
     <Router hook={location.hook}>
       <AuthCallback />
     </Router>
   );
-  return location;
+  return Object.assign(location, { unmount });
 }
 
 describe("AuthCallback (Corsia)", () => {
@@ -105,5 +105,30 @@ describe("AuthCallback (Corsia)", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Il link è scaduto: richiedine uno nuovo.");
     await act(() => vi.advanceTimersByTimeAsync(3000));
     expect(location.history.at(-1)).toBe("/login");
+  });
+
+  it("lasciata la pagina prima dei 3 secondi: nessun ritorno al login dopo", async () => {
+    vi.useFakeTimers();
+    state.setSession.mockResolvedValue({
+      data: { session: null },
+      error: { code: "otp_expired", message: "Email link is invalid or has expired" },
+    });
+    const location = renderCallback("#access_token=a&refresh_token=b");
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    expect(screen.getByRole("alert")).toBeInTheDocument();
+
+    location.unmount();
+    await act(() => vi.advanceTimersByTimeAsync(3000));
+    expect(location.history).toEqual(["/auth/callback"]);
+  });
+
+  it("lasciata la pagina mentre aspetta la sessione: nessun ritorno al login dopo", async () => {
+    vi.useFakeTimers();
+    state.getSession.mockResolvedValue({ data: { session: null } });
+    const location = renderCallback();
+    location.unmount();
+    // The wait for the session runs out after the page is gone: no timer may start then.
+    await act(() => vi.advanceTimersByTimeAsync(10_000));
+    expect(location.history).toEqual(["/auth/callback"]);
   });
 });

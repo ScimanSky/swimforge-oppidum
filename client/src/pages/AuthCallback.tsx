@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { CheckCircle2, Loader2, MailCheck, TriangleAlert } from "lucide-react";
 import { toast } from "sonner";
@@ -30,6 +30,23 @@ export default function AuthCallback() {
 
   const utils = trpc.useUtils();
 
+  // The redirects run later: none once the page is gone (cleared on unmount, and none started
+  // by a callback that finishes after it).
+  const unmountedRef = useRef(false);
+  const redirectTimerRef = useRef<number | undefined>(undefined);
+  const redirectLater = (redirect: () => void, delayMs: number) => {
+    if (unmountedRef.current) return;
+    window.clearTimeout(redirectTimerRef.current);
+    redirectTimerRef.current = window.setTimeout(redirect, delayMs);
+  };
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+      window.clearTimeout(redirectTimerRef.current);
+    };
+  }, []);
+
   const syncWithBackend = async (session: Parameters<typeof syncSupabaseSession>[0]) => {
     try {
       const { isNewUser } = await syncSupabaseSession(session, (input) =>
@@ -38,7 +55,7 @@ export default function AuthCallback() {
       console.log('[AuthCallback] syncSupabaseUser SUCCESS:', session.user.id);
       setStatus("success");
       toast.success("Accesso effettuato con successo!");
-      setTimeout(() => {
+      redirectLater(() => {
         const target = postLoginPath(isNewUser);
         console.log('[AuthCallback] Redirecting to:', target);
         window.location.href = target;
@@ -150,10 +167,8 @@ export default function AuthCallback() {
         }
         console.error(error);
 
-        // Redirect alla pagina di login dopo 3 secondi
-        setTimeout(() => {
-          navigate("/login");
-        }, 3000);
+        // Back to the sign-in page after 3 seconds.
+        redirectLater(() => navigate("/login"), 3000);
       }
     };
 
