@@ -1144,33 +1144,20 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
 
   if (!user) return null;
 
-  const shouldIgnoreMissingRelation = (error: unknown) => {
-    if (!error || typeof error !== "object") return false;
-    const pgError = error as { code?: string };
-    return pgError.code === "42P01"; // undefined_table
-  };
-
-  // Collect Story ImageKit file IDs before account deletion.
-  let storyImageKitFileIds: string[] = [];
+  // Media references (avatar, posts, stories, club uploads) are read before the rows go: the
+  // files are deleted from the providers after the transaction.
+  const { collectUserMediaRefs, cleanupDeletedAccount } = await import("./account_cleanup");
+  let mediaRefs: Awaited<ReturnType<typeof collectUserMediaRefs>>;
   try {
-    const storyAssetsResult = await db.execute(sql`
-      SELECT imagekit_file_id
-      FROM stories
-      WHERE user_id = ${userId}
-        AND imagekit_file_id IS NOT NULL
-        AND imagekit_file_id <> ''
-    `);
-    storyImageKitFileIds = Array.from(
-      new Set(
-        storyAssetsResult.rows
-          .map((row) => ((row as { imagekit_file_id?: string | null }).imagekit_file_id ?? "").trim())
-          .filter((id) => id.length > 0)
-      )
-    );
+    mediaRefs = await collectUserMediaRefs(db, userId);
   } catch (error) {
-    if (!shouldIgnoreMissingRelation(error)) {
-      throw error;
-    }
+    // The per-user folders are still deleted; only files referenced by URL elsewhere are missed.
+    logger.warn("[Database] Could not read the media of the account to delete", {
+      event: "account:media_refs_failed",
+      userId,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    mediaRefs = { userId, imageKitFileIds: [], urls: [], keepUrls: [] };
   }
 
   await db.transaction(async (tx) => {
@@ -1199,6 +1186,21 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
       ["public.stories"]
     );
     await deleteFromIfExists(tx, "public.stories", sql`user_id = ${userId}`);
+
+    // Product analytics (before the posts it points at): the user's own events and the ones about
+    // them, i.e. their profile and posts viewed by others. Created at runtime by product_analytics,
+    // so it may not exist.
+    await deleteFromIfExists(
+      tx,
+      "public.product_engagement_events",
+      sql`
+        user_id = ${userId}
+        OR (entity_type = 'user_profile' AND entity_id = ${userId})
+        OR (entity_type = 'social_post' AND entity_id IN (SELECT id FROM social_posts WHERE user_id = ${userId}))
+      `,
+      ["public.social_posts"]
+    );
+    await deleteFromIfExists(tx, "public.user_presence", sql`user_id = ${userId}`);
 
     // Social graph and feed
     await deleteFromIfExists(
@@ -1270,6 +1272,41 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
     await deleteFromIfExists(tx, "public.activity_ai_insights", sql`user_id = ${userId}`);
     await deleteFromIfExists(tx, "public.ai_coach_workouts", sql`user_id = ${userId}`);
 
+    // Swims, explicitly (no reliance on the ON DELETE CASCADE of an archived migration): lengths,
+    // laps and the rows pointing at the swims first, then the swims.
+    const userSwims = sql`SELECT id FROM swimming_activities WHERE user_id = ${userId}`;
+    await deleteFromIfExists(
+      tx,
+      "public.garmin_activity_lengths",
+      sql`activity_id IN (${userSwims})`,
+      ["public.swimming_activities"]
+    );
+    await deleteFromIfExists(
+      tx,
+      "public.garmin_activity_laps",
+      sql`activity_id IN (${userSwims})`,
+      ["public.swimming_activities"]
+    );
+    await deleteFromIfExists(
+      tx,
+      "public.ghost_challenges",
+      sql`
+        challenger_user_id = ${userId}
+        OR opponent_user_id = ${userId}
+        OR challenger_activity_id IN (${userSwims})
+        OR opponent_activity_id IN (${userSwims})
+      `,
+      ["public.swimming_activities"]
+    );
+    await deleteFromIfExists(
+      tx,
+      "public.challenge_activity_log",
+      sql`user_id = ${userId} OR activity_id IN (${userSwims})`,
+      ["public.swimming_activities"]
+    );
+    await deleteFromIfExists(tx, "public.challenge_participants", sql`user_id = ${userId}`);
+    await deleteFromIfExists(tx, "public.swimming_activities", sql`user_id = ${userId}`);
+
     // External sync tokens
     await deleteFromIfExists(tx, "public.garmin_tokens", sql`user_id = ${userId}`);
     await deleteFromIfExists(tx, "public.strava_tokens", sql`user_id = ${userId}`);
@@ -1286,27 +1323,9 @@ export async function deleteUserAccount(userId: number): Promise<{ id: number; e
     await tx.execute(sql`DELETE FROM users WHERE id = ${userId}`);
   });
 
-  if (storyImageKitFileIds.length > 0) {
-    try {
-      const { deleteImageKitFileById } = await import("./lib/imagekit");
-      const results = await Promise.allSettled(storyImageKitFileIds.map((fileId) => deleteImageKitFileById(fileId)));
-      const failed = results.filter((result) => result.status === "rejected");
-      if (failed.length > 0) {
-        logger.warn(`[Database] Failed to cleanup ${failed.length}/${storyImageKitFileIds.length} ImageKit files during account deletion`, {
-          event: "account:imagekit_cleanup_partial_failure",
-          userId,
-          failedCount: failed.length,
-        });
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      logger.warn(`[Database] ImageKit cleanup after account deletion failed: ${message}`, {
-        event: "account:imagekit_cleanup_failed",
-        userId,
-        message,
-      });
-    }
-  }
+  // Outside the transaction, best effort: media on ImageKit, Cloudinary and Supabase Storage,
+  // and the Garmin session on the garmin-service. Failures are logged, never thrown.
+  await cleanupDeletedAccount(mediaRefs);
 
   return {
     id: user.id,
