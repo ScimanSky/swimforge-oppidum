@@ -36,6 +36,8 @@ interface ClubHeroProps {
   pbLeaderboardHref?: string | null;
   coachPageHref?: string | null;
   hasActiveMeet?: boolean;
+  /** Members only: the club's «Crea» menu, next to «Lascia club». */
+  createMenu?: ReactNode;
 }
 
 // Same labels as the club directory and the settings form.
@@ -85,6 +87,7 @@ export default function ClubHero({
   pbLeaderboardHref,
   coachPageHref,
   hasActiveMeet = false,
+  createMenu,
 }: ClubHeroProps) {
   const titleId = useId();
   const isStaff = ["owner", "admin", "moderator"].includes(club.member_role ?? "");
@@ -203,12 +206,17 @@ export default function ClubHero({
 
         {!club.is_member ? (
           <Button className="mt-4 w-full sm:w-auto" onClick={onJoin} disabled={isJoining}>
-            {isJoining ? "Richiesta..." : club.visibility === "public" ? "Unisciti" : "Richiedi accesso"}
+            {isJoining ? "Richiesta…" : club.visibility === "public" ? "Unisciti" : "Richiedi accesso"}
           </Button>
-        ) : club.member_role !== "owner" ? (
-          <Button className="mt-3" variant="ghost" size="sm" onClick={onLeave} disabled={isLeaving}>
-            {isLeaving ? "Uscita..." : "Lascia club"}
-          </Button>
+        ) : createMenu || club.member_role !== "owner" ? (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {createMenu}
+            {club.member_role !== "owner" ? (
+              <Button className="ml-auto" variant="ghost" size="sm" onClick={onLeave} disabled={isLeaving}>
+                {isLeaving ? "Uscita…" : "Lascia club"}
+              </Button>
+            ) : null}
+          </div>
         ) : null}
       </div>
     </section>

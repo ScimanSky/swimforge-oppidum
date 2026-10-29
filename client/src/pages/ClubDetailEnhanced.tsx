@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import ClubHero from "@/components/club/ClubHero";
 import ClubEventsPanel, { type ClubAgendaItem } from "@/components/club/ClubEventsPanel";
 import PulseBar, { type ClubWeeklyStats } from "@/components/club/PulseBar";
-import QuickActionsFAB from "@/components/club/QuickActionsFAB";
+import ClubCreateMenu from "@/components/club/ClubCreateMenu";
 import ClubFeedTab from "@/components/club/ClubFeedTab";
 import ClubMembersTab from "@/components/club/ClubMembersTab";
 import EventMapEditor from "@/components/club/EventMapEditor";
@@ -177,6 +177,7 @@ export default function ClubDetailEnhanced() {
   const clubMeetsV1Enabled = UI_FEATURE_FLAGS.clubMeetsV1;
   const clubHistoryV1Enabled = UI_FEATURE_FLAGS.clubHistoryV1;
   const [match, params] = useRoute("/community/club/:id");
+  const [, navigate] = useLocation();
   const clubId = Number(params?.id);
   const [eventsFromDateIso] = useState(() => new Date().toISOString());
 
@@ -315,7 +316,7 @@ export default function ClubDetailEnhanced() {
       utils.community.clubs.meets.list.invalidate({ clubId });
       const meetId = Number(payload?.meet?.id);
       if (Number.isFinite(meetId)) {
-        window.location.href = `/community/club/${clubId}/meet/${meetId}`;
+        navigate(`/community/club/${clubId}/meet/${meetId}`);
       }
     },
     onError: (error) => {
@@ -436,6 +437,13 @@ export default function ClubDetailEnhanced() {
     return status === "published" || status === "open";
   });
 
+  // «Nuovo post»: to the feed, in the composer.
+  const startNewPost = () => {
+    const feed = document.getElementById(feedId);
+    feed?.scrollIntoView({ behavior: "smooth", block: "start" });
+    feed?.querySelector<HTMLTextAreaElement>("textarea")?.focus({ preventScroll: true });
+  };
+
   const handleJoinClub = () => {
     if (!hasClubRules) {
       joinMutation.mutate({ clubId });
@@ -495,6 +503,19 @@ export default function ClubDetailEnhanced() {
             pbLeaderboardHref={pbLeaderboardHref}
             coachPageHref={coachAreaHref}
             hasActiveMeet={hasActiveMeet}
+            createMenu={
+              isMember ? (
+                <ClubCreateMenu
+                  role={memberRole}
+                  meetsEnabled={clubMeetsV1Enabled}
+                  onPost={startNewPost}
+                  onCreateEvent={() => setCreateEventOpen(true)}
+                  // Meet calls and invites live in the coach area.
+                  onCreateMeet={() => navigate(coachAreaHref)}
+                  onInvite={() => navigate(coachAreaHref)}
+                />
+              ) : null
+            }
           />
 
           {pinnedAnnouncements.length > 0 && (
@@ -544,16 +565,6 @@ export default function ClubDetailEnhanced() {
           </div>
         ) : null}
       </div>
-
-        {/* Quick Actions FAB */}
-        <QuickActionsFAB
-          isMember={isMember}
-          isStaff={isStaff}
-          onPost={() => document.getElementById(feedId)?.scrollIntoView({ behavior: "smooth" })}
-          onCreateEvent={() => setCreateEventOpen(true)}
-          onCreateMeet={clubMeetsV1Enabled && isStaff ? () => { window.location.href = coachAreaHref; } : undefined}
-          onInvite={isStaff ? () => { window.location.href = coachAreaHref; } : () => {}}
-        />
 
         {/* Members Sheet */}
         <Sheet open={membersOpen} onOpenChange={setMembersOpen}>
@@ -625,7 +636,7 @@ export default function ClubDetailEnhanced() {
 
         {/* Create Meet Dialog */}
         <Dialog open={clubMeetsV1Enabled ? createMeetOpen : false} onOpenChange={setCreateMeetOpen}>
-          <DialogContent className={isMobile ? "w-[calc(100vw-0.75rem)] max-w-none max-h-[92dvh] overflow-y-auto p-4 pb-24" : "sm:max-w-2xl max-h-[90vh] overflow-y-auto"}>
+          <DialogContent className={isMobile ? "w-[calc(100vw-0.75rem)] max-w-none max-h-[92dvh] overflow-y-auto p-4" : "sm:max-w-2xl max-h-[90vh] overflow-y-auto"}>
             <DialogHeader>
               <DialogTitle>Nuova convocazione gara</DialogTitle>
               <DialogDescription>
@@ -728,7 +739,7 @@ export default function ClubDetailEnhanced() {
           <DialogContent
             className={
               isMobile
-                ? "w-[calc(100vw-0.75rem)] max-w-none max-h-[92dvh] overflow-y-auto p-4 pb-24"
+                ? "w-[calc(100vw-0.75rem)] max-w-none max-h-[92dvh] overflow-y-auto p-4"
                 : "sm:max-w-2xl max-h-[90vh] overflow-y-auto"
             }
           >

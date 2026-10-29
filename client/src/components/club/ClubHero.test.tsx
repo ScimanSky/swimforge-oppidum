@@ -143,6 +143,22 @@ describe("ClubHero", () => {
     expect(onOpenMembers).toHaveBeenCalledOnce();
   });
 
+  it("shows the create menu to members only, the owner without «Lascia club»", () => {
+    const createMenu = <button type="button">Crea nel club</button>;
+    renderClubHero({}, { createMenu });
+    expect(screen.queryByRole("button", { name: "Crea nel club" })).not.toBeInTheDocument();
+    cleanup();
+
+    renderClubHero({ is_member: true, member_role: "member" }, { createMenu });
+    expect(screen.getByRole("button", { name: "Crea nel club" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /lascia club/i })).toBeInTheDocument();
+    cleanup();
+
+    renderClubHero({ is_member: true, member_role: "owner" }, { createMenu });
+    expect(screen.getByRole("button", { name: "Crea nel club" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /lascia club/i })).not.toBeInTheDocument();
+  });
+
   it("renders club records link when provided", () => {
     renderClubHero({}, { pbLeaderboardHref: "/community/club/1/pb" });
     const pbLink = screen.getByRole("link", { name: /record del club/i });
