@@ -1115,6 +1115,12 @@ Riferimento: `renders/Sessione.png`.
 
 ## Gruppo 4 — Pulizia pagina per pagina
 
+### Task 15b: Due regole in più nel design-lint (prima della pulizia)
+**Files:** `client/src/styles/design-lint.test.ts`.
+- `"titolo-pagina": /<h1[\s>]/` — le pagine dentro la shell non hanno `h1` (il titolo è nell'header). `EXEMPT` (con motivo): le pagine pubbliche fuori dalla shell (`pages/Home.tsx`, `pages/Login.tsx`, `pages/Register.tsx`, `pages/ForgotPassword.tsx`, `pages/ResetPassword.tsx`, `pages/AuthCallback.tsx`, `pages/StravaConnect.tsx`, `pages/Privacy.tsx`, `pages/Terms.tsx`, `pages/CookiePolicy.tsx`) e `components/app/ShellHeader.tsx`, solo se oggi le contengono (il test sulle esenzioni scadute lo impone).
+- `"colore-fisso": /-\[(?:#|rgba?\(|hsla?\(|oklch\()|(?<![\w-])(?:text-white|bg-white|bg-black)(?![\w-])/` — colori fissi nelle classi. Il velo pieno su foto (`bg-black/..`) e il testo su `bg-destructive` usano i token (`bg-background/..`, `text-destructive-foreground`); eccezioni solo con `EXEMPT` motivato.
+- Riempi `PENDING` con gli elenchi della prima esecuzione, come nel Task 8. Commit `test(ui): design-lint page titles and fixed colours`.
+
 Per ogni task: applica le **Regole Corsia** ai file elencati e a quelli importati solo da loro; togli i file da `PENDING`; `pnpm check && pnpm test && pnpm lint` verdi; commit `style(ui): Corsia cleanup <area>`. Nessun cambio di logica. Guarda la pagina a 390px nella build di prova prima e dopo, se possibile.
 
 ### Task 16: Allena · Obiettivi, Statistiche, Coach AI
@@ -1127,7 +1133,7 @@ Per ogni task: applica le **Regole Corsia** ai file elencati e a quelli importat
 `pages/ClubDetailEnhanced.tsx`, `ClubEventDetail.tsx`, `ClubWorkoutsPage.tsx`, `ClubWorkoutDetailPage.tsx`, `ClubPbLeaderboardPage.tsx`, `ClubDocumentsPage.tsx`, `ClubCoachModeration.tsx`, `ClubInvite.tsx`, `components/club/*`. Le pagine dietro flag spenti (`ClubMeetDetail`, `ClubMeetProgramBuilder`, `ClubHistory*`) ricevono solo le sostituzioni meccaniche necessarie a svuotare `PENDING`, nessun ridisegno.
 
 ### Task 19: Social e messaggi
-`pages/Messages.tsx`, `pages/PostDetail.tsx`, `pages/ReportPost.tsx`, `pages/PublicProfile.tsx`, `pages/AdminReports.tsx`, `components/DirectMessages*.tsx`, `components/NotificationBell.tsx` e i componenti di notifica. Anche `components/PostReactions.tsx` (colori fissi delle emoji, es. `text-blue-500`, non intercettati dal design-lint) e `lib/social-content.tsx` (classi di default legacy, ancora in `PENDING`).
+`pages/Messages.tsx`, `pages/PostDetail.tsx`, `pages/ReportPost.tsx`, `pages/PublicProfile.tsx`, `pages/AdminReports.tsx`, `components/DirectMessages*.tsx`, `components/NotificationBell.tsx` e i componenti di notifica. Anche `components/PostReactions.tsx` (colori fissi delle emoji, es. `text-blue-500`, non intercettati dal design-lint) e `lib/social-content.tsx` (classi di default legacy, ancora in `PENDING`). `components/corsia/PersonalRecordsBoard.tsx` (dalla review del Task 15): la scelta «Uomini / Donne» si salva solo sul proprio profilo (prop `persist`, il profilo pubblico parte da «Uomini» senza salvare); `placeholderData: keepPreviousData` per non far lampeggiare la lista al cambio; etichetta visibile «Tabelle FINA»; sul proprio profilo `enabled` solo con `auth.me` caricato (mostra il caricamento intanto); un test di base per `PublicProfile` con la tabella dei record.
 
 ### Task 20: Accesso, impostazioni, landing, pagine legali
 `pages/Login.tsx`, `Register.tsx`, `ForgotPassword.tsx`, `ResetPassword.tsx`, `AuthCallback.tsx`, `Settings.tsx`, `Home.tsx` (landing pubblica: stessi token, niente blob/griglie neon), `Privacy.tsx`, `Terms.tsx`, `CookiePolicy.tsx`, `NotFound.tsx`, `components/CookieBanner.tsx`, `components/onboarding/*`, `components/BadgeUnlockNotification.tsx`, `PbCelebrationNotification.tsx`, `ActivityInsightNotification.tsx`, `GarminSection.tsx`.
