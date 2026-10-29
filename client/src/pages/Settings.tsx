@@ -53,6 +53,8 @@ import { formatDistanceToNow } from "date-fns"
 import { it } from "date-fns/locale"
 import { toast } from "sonner"
 import GarminSection from "@/components/GarminSection"
+import GarminSyncCountPicker from "@/components/GarminSyncCountPicker"
+import { garminSyncButtonLabel, useGarminSyncCount } from "@/lib/garmin-sync-count"
 import { Link as RouterLink, useLocation } from "wouter"
 
 const notificationSettings = [
@@ -231,13 +233,18 @@ export default function Settings() {
 
   type GarminSyncResult = { synced?: number; error?: string; detectedPbs?: unknown[] }
 
+  const [garminSyncCount, setGarminSyncCount] = useGarminSyncCount()
   const garminSyncMutation = trpc.garmin.sync.useMutation({
     onSuccess: (data: GarminSyncResult) => {
       if (data?.error) {
         toast.error(data.error)
         return
       }
-      toast.success(`${data?.synced ?? 0} attività sincronizzate!`)
+      if ((data?.synced ?? 0) === 0) {
+        toast.info("Nessuna nuova nuotata da sincronizzare")
+      } else {
+        toast.success(`${data?.synced} attività sincronizzate!`)
+      }
       if (Array.isArray(data?.detectedPbs) && data.detectedPbs.length > 0) {
         toast.success(`Nuovi PB rilevati: ${data.detectedPbs.length}`)
       }
@@ -847,13 +854,20 @@ export default function Settings() {
                   Vai a Connessioni
                 </Button>
               ) : (
-                <Button
-                  variant="neon"
-                  onClick={() => garminSyncMutation.mutate({ daysBack: 30 })}
-                  disabled={!garminStatus?.connected || garminSyncMutation.isPending}
-                >
-                  {garminSyncMutation.isPending ? "Sincronizzazione..." : "Sincronizza Garmin"}
-                </Button>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <GarminSyncCountPicker
+                    value={garminSyncCount}
+                    onChange={setGarminSyncCount}
+                    disabled={!garminStatus?.connected || garminSyncMutation.isPending}
+                  />
+                  <Button
+                    variant="neon"
+                    onClick={() => garminSyncMutation.mutate({ daysBack: 30, maxActivities: garminSyncCount })}
+                    disabled={!garminStatus?.connected || garminSyncMutation.isPending}
+                  >
+                    {garminSyncMutation.isPending ? "Sincronizzazione..." : garminSyncButtonLabel(garminSyncCount)}
+                  </Button>
+                </div>
               )}
               <Button variant="outline-neon" onClick={() => (window.location.href = homePathForPlatform(isNativePlatform()))}>
                 Vai alla Home

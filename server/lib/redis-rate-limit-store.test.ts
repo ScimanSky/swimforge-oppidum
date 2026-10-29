@@ -30,12 +30,14 @@ vi.mock("../middleware/logger", () => ({
 }));
 
 import { RedisRateLimitStore } from "./redis-rate-limit-store";
+import { REDIS_COMMAND_TIMEOUT_MS, resetRedisCircuit } from "./with-timeout";
 
 describe("RedisRateLimitStore", () => {
   let store: RedisRateLimitStore;
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetRedisCircuit();
     mockRedis.isOpen = true;
     delete process.env.REDIS_RATE_LIMIT_MODE;
     store = new RedisRateLimitStore({
@@ -202,6 +204,53 @@ describe("RedisRateLimitStore", () => {
 
       expect(result).toBeUndefined();
       expect(mockRedis.get).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("hung Redis", () => {
+    const never = () => new Promise<never>(() => {});
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("increment lets the request through (memory fallback) when Redis never answers", async () => {
+      vi.useFakeTimers();
+      mockRedis.incr.mockImplementation(never);
+
+      let settled = false;
+      const p = store.increment("hung-key").then((r) => {
+        settled = true;
+        return r;
+      });
+      await vi.advanceTimersByTimeAsync(REDIS_COMMAND_TIMEOUT_MS + 10);
+      expect(settled).toBe(true);
+      const result = await p;
+      expect(result.totalHits).toBe(1);
+    });
+
+    it("increment does not hang when pTTL never answers", async () => {
+      vi.useFakeTimers();
+      mockRedis.incr.mockResolvedValue(2);
+      mockRedis.pTTL.mockImplementation(never);
+
+      const p = store.increment("hung-ttl");
+      await vi.advanceTimersByTimeAsync(REDIS_COMMAND_TIMEOUT_MS + 10);
+      await expect(p).resolves.toMatchObject({ totalHits: 1 });
+    });
+
+    it("decrement, resetKey and get resolve when Redis never answers", async () => {
+      vi.useFakeTimers();
+      mockRedis.get.mockImplementation(never);
+      mockRedis.del.mockImplementation(never);
+
+      const d = store.decrement("k");
+      const r = store.resetKey("k");
+      const g = store.get("k");
+      await vi.advanceTimersByTimeAsync(REDIS_COMMAND_TIMEOUT_MS + 10);
+      await expect(d).resolves.toBeUndefined();
+      await expect(r).resolves.toBeUndefined();
+      await expect(g).resolves.toBeUndefined();
     });
   });
 });

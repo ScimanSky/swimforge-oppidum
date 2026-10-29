@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, getTableColumns } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import bcrypt from "bcryptjs";
@@ -525,6 +525,11 @@ export async function createActivity(data: InsertSwimmingActivity) {
   return result[0]?.id || null;
 }
 
+// List rows carry every column except `rawData` (the raw Garmin payload, ~300 KB
+// each): only the detail page needs it and it gets it from getActivityById.
+// Sending it in lists made 50 rows ~15 MB, over Upstash's 10 MB request limit.
+const { rawData: _rawData, ...activityListColumns } = getTableColumns(swimmingActivities);
+
 export async function getActivities(
   userId: number,
   limit = 20,
@@ -558,7 +563,7 @@ export async function getActivities(
   }
 
   return await db
-    .select()
+    .select(activityListColumns)
     .from(swimmingActivities)
     .where(and(...conditions))
     .orderBy(desc(swimmingActivities.activityDate))
