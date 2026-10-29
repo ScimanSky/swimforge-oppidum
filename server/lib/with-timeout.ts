@@ -43,12 +43,22 @@ export function withTimeout<T>(promise: Promise<T>, ms: number, label = "operati
 
 let consecutiveRedisTimeouts = 0;
 let redisCircuitOpenUntil = 0;
+let circuitOpenHandler: (() => void) | undefined;
+
+/**
+ * Register what to do when the circuit opens (cache.ts uses it to throw away a
+ * socket that is open but silent and connect a new one). One handler; pass
+ * undefined to remove it.
+ */
+export function onRedisCircuitOpen(handler: (() => void) | undefined): void {
+  circuitOpenHandler = handler;
+}
 
 export function isRedisCircuitOpen(): boolean {
   return Date.now() < redisCircuitOpenUntil;
 }
 
-/** Test helper: close the circuit and forget past timeouts. */
+/** Close the circuit and forget past timeouts (fresh connection, or tests). */
 export function resetRedisCircuit(): void {
   consecutiveRedisTimeouts = 0;
   redisCircuitOpenUntil = 0;
@@ -81,6 +91,12 @@ export async function withRedisTimeout<T>(
         logger.warn(`Redis timed out ${REDIS_CIRCUIT_THRESHOLD} times in a row; skipping Redis for ${REDIS_CIRCUIT_OPEN_MS}ms`, {
           event: "redis:circuit_open",
         });
+        try {
+          circuitOpenHandler?.();
+        } catch (handlerError) {
+          const message = handlerError instanceof Error ? handlerError.message : String(handlerError);
+          logger.warn(`Redis circuit-open handler failed: ${message}`, { event: "redis:circuit_open_handler_failed" });
+        }
       }
     }
     throw error;

@@ -12,6 +12,7 @@ import {
   RedisCircuitOpenError,
   TimeoutError,
   isRedisCircuitOpen,
+  onRedisCircuitOpen,
   resetRedisCircuit,
   withRedisTimeout,
   withTimeout,
@@ -22,6 +23,7 @@ const never = () => new Promise<never>(() => {});
 beforeEach(() => {
   vi.clearAllMocks();
   resetRedisCircuit();
+  onRedisCircuitOpen(undefined);
   vi.useFakeTimers();
 });
 
@@ -78,5 +80,26 @@ describe("withRedisTimeout circuit", () => {
       await expect(withRedisTimeout(async () => { throw new Error("offline"); })).rejects.toThrow("offline");
     }
     expect(isRedisCircuitOpen()).toBe(false);
+  });
+
+  it("calls the registered circuit-open handler once each time the circuit opens", async () => {
+    const handler = vi.fn();
+    onRedisCircuitOpen(handler);
+    for (let i = 0; i < REDIS_CIRCUIT_THRESHOLD - 1; i++) await timeOutOnce();
+    expect(handler).not.toHaveBeenCalled();
+    await timeOutOnce();
+    expect(handler).toHaveBeenCalledTimes(1);
+
+    // Calls skipped while open do not call it again.
+    await expect(withRedisTimeout(async () => "OK")).rejects.toBeInstanceOf(RedisCircuitOpenError);
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("a throwing circuit-open handler does not change the command's outcome", async () => {
+    onRedisCircuitOpen(() => {
+      throw new Error("boom");
+    });
+    for (let i = 0; i < REDIS_CIRCUIT_THRESHOLD; i++) await timeOutOnce();
+    expect(isRedisCircuitOpen()).toBe(true);
   });
 });
