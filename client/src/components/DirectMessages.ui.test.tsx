@@ -295,6 +295,8 @@ describe("DirectMessages (Corsia)", () => {
       await userEvent.click(person);
       expect(screen.getByRole("heading", { level: 2, name: "Carla Bianchi" })).toBeInTheDocument();
       expect(screen.getByText("Nessun messaggio: scrivi il primo.")).toBeInTheDocument();
+      // Desktop: the next step is writing, and there is no on-screen keyboard to pop up.
+      expect(screen.getByRole("textbox", { name: "Messaggio" })).toHaveFocus();
 
       await userEvent.type(screen.getByRole("textbox", { name: "Messaggio" }), "Ciao!{Enter}");
       expect(state.sends).toEqual([{ receiverId: 8, content: "Ciao!" }]);
@@ -315,10 +317,22 @@ describe("DirectMessages (Corsia)", () => {
       expect(state.marks).toEqual([]);
 
       await userEvent.click(screen.getByRole("button", { name: /^Ada Rossi/ }));
-      expect(screen.getByRole("textbox", { name: "Messaggio" })).toHaveFocus();
+      // The chat's name, not the message field: focusing it would pop up the keyboard.
+      expect(screen.getByRole("heading", { level: 2, name: "Ada Rossi" })).toHaveFocus();
+      expect(screen.getByRole("textbox", { name: "Messaggio" })).not.toHaveFocus();
       await userEvent.click(screen.getByRole("button", { name: "Torna alle conversazioni" }));
       expect(screen.getByRole("heading", { level: 2, name: "Conversazioni" })).toHaveFocus();
       expect(screen.queryByRole("log")).toBeNull();
+    });
+
+    it("on a phone a person picked in «Nuovo messaggio» opens their chat with focus on its name", async () => {
+      setPhone(true);
+      state.people = [{ userId: 8, name: "Carla Bianchi", username: "carla", avatarUrl: null, level: 3 }];
+      state.chats[8] = [];
+      renderIn(<DirectMessages mode="page" />, "/messages?new=1");
+      await userEvent.type(screen.getByRole("searchbox", { name: "Cerca un nuotatore" }), "car");
+      await userEvent.click(await screen.findByRole("button", { name: "Carla Bianchi @carla" }));
+      expect(screen.getByRole("heading", { level: 2, name: "Carla Bianchi" })).toHaveFocus();
     });
 
     it("loading, error with «Riprova» and empty list are three different answers", async () => {

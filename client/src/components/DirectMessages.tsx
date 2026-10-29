@@ -489,8 +489,9 @@ function MessagesPage() {
   const listHeadingRef = useRef<HTMLHeadingElement>(null);
   const newButtonRef = useRef<HTMLButtonElement>(null);
   const composerRef = useRef<HTMLInputElement>(null);
+  const chatHeadingRef = useRef<HTMLHeadingElement>(null);
   // Where focus goes after a view change that removes the focused control.
-  const pendingFocus = useRef<"search" | "new" | "list" | "composer" | null>(null);
+  const pendingFocus = useRef<"search" | "new" | "list" | "composer" | "chat" | null>(null);
 
   const conversationsQuery = trpc.community.messages.recent.useQuery(
     { limit: 20 },
@@ -563,6 +564,7 @@ function MessagesPage() {
       new: newButtonRef.current,
       list: listHeadingRef.current,
       composer: composerRef.current,
+      chat: chatHeadingRef.current,
     }[target];
     element?.focus();
   }, [composing, conId, isDesktop]);
@@ -577,8 +579,11 @@ function MessagesPage() {
     setPicked(partner);
     setSearch("");
     if (partner.id === conId && !composing) return;
-    // On phones the list disappears: focus moves to the new message field.
-    if (!isDesktop) pendingFocus.current = "composer";
+    // Phones swap the list for the chat: focus goes to its name (the message field would pop up
+    // the keyboard). On desktop a person picked in the search leaves the search for their chat:
+    // the next step is writing; a row of the list stays where it is.
+    if (!isDesktop) pendingFocus.current = "chat";
+    else if (composing) pendingFocus.current = "composer";
     // A chat is a history entry (back returns to the list); one picked in «Nuovo messaggio»
     // takes the search's place, so back never reopens a search that was done.
     navigate(messagesHref({ conId: partner.id, composing: false }), { replace: composing });
@@ -762,7 +767,7 @@ function MessagesPage() {
                     <ChevronLeft className="size-5" aria-hidden />
                   </Button>
                   <PersonAvatar name={selected.name} src={selected.avatarUrl} />
-                  <h2 className="min-w-0 truncate text-[17px] font-bold">
+                  <h2 ref={chatHeadingRef} tabIndex={-1} className="min-w-0 truncate text-[17px] font-bold outline-none">
                     <Link href={`/u/${selected.id}`} className="hover:underline">
                       {selected.name}
                     </Link>
