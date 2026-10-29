@@ -59,7 +59,6 @@ const PENDING: Record<Rule, string[]> = {
   "testo-piccolo": [
     "components/DirectMessages.tsx",
     "components/metrics/MetricOrb.tsx",
-    "lib/social-content.tsx",
     "pages/Home.tsx",
   ],
   "alone-neon": [
@@ -89,7 +88,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/onboarding/OnboardingFlow.tsx",
     "components/onboarding/OnboardingIdentitySetup.tsx",
     "index.css",
-    "lib/social-content.tsx",
     "pages/ReportPost.tsx",
   ],
   "variante-neon": [
@@ -152,7 +150,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/onboarding/OnboardingFlow.tsx",
     "components/ui/dialog.tsx",
     "components/ui/sheet.tsx",
-    "lib/social-content.tsx",
     "pages/AuthCallback.tsx",
     "pages/ForgotPassword.tsx",
     "pages/Home.tsx",

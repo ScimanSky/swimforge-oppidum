@@ -1,5 +1,6 @@
 import { Fragment, type ReactNode, useEffect, useState } from "react";
 import { apiUrl } from "@/lib/api-base";
+import { cn } from "@/lib/utils";
 
 const CONTENT_TOKEN_SPLIT = /(\s+)/g;
 const DOMAIN_LIKE_PATTERN = /^(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,63}(?::\d{2,5})?(?:\/[^\s<>"']*)?$/i;
@@ -63,6 +64,13 @@ export function extractFirstUrl(value: string) {
   return extractUrls(value)[0] ?? null;
 }
 
+/** Hashtags, mentions and links in the action colour (Corsia: one accent). */
+const DEFAULT_CLASSES = {
+  hashtag: "font-medium text-action-text",
+  mention: "font-medium text-action-text",
+  link: "font-medium text-action-text underline decoration-dotted underline-offset-2 hover:opacity-85",
+} as const;
+
 type SocialTextRenderOptions = {
   hashtagClassName?: string;
   mentionClassName?: string;
@@ -84,7 +92,7 @@ export function renderSocialText(content: string, options?: SocialTextRenderOpti
       return (
         <Fragment key={`hash-${core}-${index}`}>
           {leading}
-          <span className={options?.hashtagClassName ?? "font-medium text-[var(--electric-cyan)]"}>{core}</span>
+          <span className={options?.hashtagClassName ?? DEFAULT_CLASSES.hashtag}>{core}</span>
           {trailing}
         </Fragment>
       );
@@ -94,7 +102,7 @@ export function renderSocialText(content: string, options?: SocialTextRenderOpti
       return (
         <Fragment key={`mention-${core}-${index}`}>
           {leading}
-          <span className={options?.mentionClassName ?? "font-medium text-[var(--electric-lime)]"}>{core}</span>
+          <span className={options?.mentionClassName ?? DEFAULT_CLASSES.mention}>{core}</span>
           {trailing}
         </Fragment>
       );
@@ -109,10 +117,7 @@ export function renderSocialText(content: string, options?: SocialTextRenderOpti
             href={normalized.href}
             target="_blank"
             rel="noreferrer"
-            className={
-              options?.linkClassName ??
-              "font-medium text-[var(--electric-cyan)] underline decoration-dotted underline-offset-2 hover:opacity-85"
-            }
+            className={options?.linkClassName ?? DEFAULT_CLASSES.link}
           >
             {normalized.display}
           </a>
@@ -182,9 +187,13 @@ function parseLinkPreview(url: string): ParsedLinkPreview | null {
   }
 }
 
+/**
+ * Card for the first link of a post: site, title and description (from /api/link-preview when
+ * the server can read them), else the bare address. Nothing for an unsafe or invalid URL.
+ */
 export function LinkPreviewCard({
   url,
-  className = "",
+  className,
   compact = false,
 }: {
   url: string;
@@ -192,39 +201,41 @@ export function LinkPreviewCard({
   compact?: boolean;
 }) {
   const preview = parseLinkPreview(url);
-  if (!preview) return null;
-  const [remotePreview, setRemotePreview] = useState<RemoteLinkPreview | null>(() => linkPreviewCache.get(preview.href) ?? null);
+  const previewHref = preview?.href ?? null;
+  // Keyed by URL: a new link never shows the previous link's title while its own loads.
+  const [fetched, setFetched] = useState<{ href: string; data: RemoteLinkPreview | null } | null>(null);
 
   useEffect(() => {
-    const cached = linkPreviewCache.get(preview.href);
+    if (!previewHref) return;
+    const cached = linkPreviewCache.get(previewHref);
     if (cached !== undefined) {
-      setRemotePreview(cached);
+      setFetched({ href: previewHref, data: cached });
       return;
     }
 
     const controller = new AbortController();
-    fetch(apiUrl(`/api/link-preview?url=${encodeURIComponent(preview.href)}`), {
+    const settle = (data: RemoteLinkPreview | null) => {
+      linkPreviewCache.set(previewHref, data);
+      setFetched({ href: previewHref, data });
+    };
+    fetch(apiUrl(`/api/link-preview?url=${encodeURIComponent(previewHref)}`), {
       method: "GET",
       credentials: "include",
       signal: controller.signal,
     })
       .then(async (response) => {
-        if (!response.ok) {
-          linkPreviewCache.set(preview.href, null);
-          setRemotePreview(null);
-          return;
-        }
-        const data = parseRemoteLinkPreview(await response.json());
-        linkPreviewCache.set(preview.href, data);
-        setRemotePreview(data);
+        settle(response.ok ? parseRemoteLinkPreview(await response.json()) : null);
       })
       .catch(() => {
-        linkPreviewCache.set(preview.href, null);
-        setRemotePreview(null);
+        if (!controller.signal.aborted) settle(null);
       });
 
     return () => controller.abort();
-  }, [preview.href]);
+  }, [previewHref]);
+
+  if (!preview) return null;
+  const remotePreview =
+    fetched?.href === preview.href ? fetched.data : (linkPreviewCache.get(preview.href) ?? null);
 
   const href = remotePreview?.resolvedUrl ?? preview.href;
   const title = remotePreview?.title ?? preview.pathLabel;
@@ -238,35 +249,30 @@ export function LinkPreviewCard({
       href={href}
       target="_blank"
       rel="noreferrer"
-      className={`group block rounded-xl border border-border/70 bg-card/35 p-3 transition-colors hover:bg-card/55 ${className}`}
+      className={cn("group block rounded-xl bg-raised p-3 transition-opacity hover:opacity-90", className)}
     >
       {imageSrc ? (
-        <div className="mb-2 overflow-hidden rounded-lg border border-border/60 bg-black/20">
-          <img
-            src={imageSrc}
-            alt={`Anteprima ${siteName}`}
-            className="h-36 w-full object-cover sm:h-44"
-            loading="lazy"
-          />
-        </div>
+        <img
+          src={imageSrc}
+          alt={`Anteprima ${siteName}`}
+          className="mb-2 h-36 w-full rounded-lg object-cover sm:h-44"
+          loading="lazy"
+        />
       ) : null}
 
       <div className="flex items-center gap-2">
         <span
           aria-hidden="true"
-          className={`inline-flex items-center justify-center rounded-sm border border-border/70 bg-background/70 text-[10px] font-semibold uppercase text-muted-foreground ${compact ? "h-4 w-4" : "h-5 w-5"}`}
+          className="inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-background text-xs font-semibold text-muted-foreground"
         >
           {initial}
         </span>
         <div className="min-w-0">
-          <p className={`truncate ${compact ? "text-[11px]" : "text-xs"} text-muted-foreground`}>{siteName}</p>
-          <p
-            className={`truncate ${compact ? "text-xs" : "text-sm"} font-medium text-foreground/90 group-hover:text-foreground`}
-          >
+          <p className="truncate text-xs text-muted-foreground">{siteName}</p>
+          <p className={cn("truncate font-medium text-foreground group-hover:underline", compact ? "text-xs" : "text-sm")}>
             {title}
           </p>
-          {description ? <p className="mt-0.5 text-xs text-muted-foreground">{description}</p> : null}
-          {!description ? <p className="mt-0.5 text-xs text-muted-foreground">{preview.label}</p> : null}
+          <p className="mt-0.5 text-xs text-muted-foreground">{description || preview.label}</p>
         </div>
       </div>
     </a>

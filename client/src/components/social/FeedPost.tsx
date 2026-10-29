@@ -42,13 +42,6 @@ function parseTaggedUsers(raw: unknown): Array<{ user_id: number; name?: string 
   return []
 }
 
-/** Hashtags, mentions and links in the action colour (Corsia). */
-const SOCIAL_TEXT_CLASSES = {
-  hashtagClassName: "font-medium text-action-text",
-  mentionClassName: "font-medium text-action-text",
-  linkClassName: "font-medium text-action-text underline decoration-dotted underline-offset-2 hover:opacity-85",
-}
-
 /** «Nuotata in vasca» / «Nuotata in acque libere»; just «Nuotata» when the type is unknown. */
 function activityTitle(isOpenWater: boolean | null | undefined) {
   if (isOpenWater == null) return "Nuotata"
@@ -87,7 +80,7 @@ export default function FeedPost({ post, currentUserId, autoplayVideos = true }:
       <div className="space-y-3 pt-2">
         {post.content ? (
           <p className="whitespace-pre-wrap text-[15px] text-foreground">
-            {renderSocialText(post.content, SOCIAL_TEXT_CLASSES)}
+            {renderSocialText(post.content)}
           </p>
         ) : null}
         {firstLink ? <LinkPreviewCard url={firstLink} /> : null}
