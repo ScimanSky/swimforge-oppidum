@@ -55,13 +55,21 @@ const effort = (distanceMeters: number, seconds: number, date: string): CssPoint
 const best200 = effort(200, 200, "2026-10-06");
 const best400 = effort(400, 417, "2026-10-20");
 
+/** The load of the swims below, by day (August's swims are not listed in the sessions). */
+const STSS_BY_DAY: Record<string, number> = {
+  "2026-08-04": 48, "2026-08-11": 52, "2026-08-18": 50, "2026-08-25": 55,
+  "2026-09-01": 50.4, "2026-09-15": 54.6, "2026-09-29": 56, "2026-10-06": 63.2,
+  "2026-10-13": 31.6, "2026-10-20": 69.4, "2026-10-27": 59.1,
+};
+
 /** 90 days of load ending today: form 30 → 41,3, fatigue 40 → 48,6. */
 const loadDays = Array.from({ length: 90 }, (_, index) => {
   const ctl = 30 + (11.3 * index) / 89;
   const atl = 40 + (8.6 * index) / 89;
+  const date = addDaysToKey("2026-08-01", index);
   return {
-    date: addDaysToKey("2026-08-01", index),
-    stss: index % 4 === 0 ? 60 : 0,
+    date,
+    stss: STSS_BY_DAY[date] ?? 0,
     ctl: Math.round(ctl * 10) / 10,
     atl: Math.round(atl * 10) / 10,
     tsb: Math.round((ctl - atl) * 10) / 10,

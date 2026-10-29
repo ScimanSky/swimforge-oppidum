@@ -348,14 +348,15 @@ export type EfficiencyRow = { label: string; recent: string; baseline: string | 
  * with the speed. Compared as shown: distance per cycle to the centimetre, pace to the second.
  */
 export function efficiencyComparison(e: SwimMetrics["efficiency"]): { rows: EfficiencyRow[]; reading: string | null } {
-  const dps = (value: number | null | undefined) => (value == null ? null : `${formatDecimal(value, 2)} m`)
-  const pace = (value: number | null | undefined) => (value == null ? null : `${formatPaceValue(value)} /100 m`)
+  // Units in the row label, so the values fit a 360 px column.
+  const dps = (value: number | null | undefined) => (value == null ? null : formatDecimal(value, 2))
+  const pace = (value: number | null | undefined) => (value == null ? null : formatPaceValue(value))
   const rows: EfficiencyRow[] = []
   if (e.avg28 !== null) {
     rows.push({ label: "Stroke Index", recent: formatDecimal(e.avg28, 2), baseline: e.baseline === null ? null : formatDecimal(e.baseline, 2) })
   }
-  if (e.dps28 != null) rows.push({ label: "Distanza per ciclo", recent: dps(e.dps28)!, baseline: dps(e.dpsBaseline) })
-  if (e.pace28 != null) rows.push({ label: "Passo", recent: pace(e.pace28)!, baseline: pace(e.paceBaseline) })
+  if (e.dps28 != null) rows.push({ label: "Distanza per ciclo (m)", recent: dps(e.dps28)!, baseline: dps(e.dpsBaseline) })
+  if (e.pace28 != null) rows.push({ label: "Passo (/100 m)", recent: pace(e.pace28)!, baseline: pace(e.paceBaseline) })
 
   const siChange = e.deltaPct == null ? 0 : Math.round(e.deltaPct)
   if (siChange === 0 || e.dps28 == null || e.dpsBaseline == null || e.pace28 == null || e.paceBaseline == null) {

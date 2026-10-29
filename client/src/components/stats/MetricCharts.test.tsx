@@ -80,7 +80,7 @@ describe("suggerimenti dei grafici delle metriche", () => {
     expect(tooltipRows()).toEqual([
       "Variabilità 2,7%",
       "Calo nel finale +5,8%",
-      "Distanza per bracciata nel finale −5,6%",
+      "Bracciata nel finale −5,6%",
       "Frequenza nel finale +6,2%",
     ]);
   });

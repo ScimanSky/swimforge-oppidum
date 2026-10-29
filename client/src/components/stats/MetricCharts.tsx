@@ -153,7 +153,7 @@ function ChartFrame({
   );
 }
 
-type LegendItem = { label: string; color: string; shape: "line" | "dash" | "box"; faded?: boolean };
+type LegendItem = { label: string; color: string; shape: "line" | "dash" | "box" | "outline"; faded?: boolean };
 
 /** Legend as text with a swatch beside it (the text never takes the series colour). */
 export function ChartLegend({ items, className }: { items: LegendItem[]; className?: string }) {
@@ -167,10 +167,11 @@ export function ChartLegend({ items, className }: { items: LegendItem[]; classNa
               "shrink-0",
               item.shape === "box" && "size-2.5 rounded-sm",
               item.shape === "line" && "h-0.5 w-3.5 rounded-full",
-              item.shape === "dash" && "w-3.5 border-t-2 border-dashed"
+              item.shape === "dash" && "w-3.5 border-t-2 border-dashed",
+              item.shape === "outline" && "size-2.5 rounded-sm border border-dashed"
             )}
             style={
-              item.shape === "dash"
+              item.shape === "dash" || item.shape === "outline"
                 ? { borderColor: item.color }
                 : { background: item.color, opacity: item.faded ? 0.4 : 1 }
             }
@@ -331,7 +332,8 @@ export const zoneLegendItems = (): LegendItem[] =>
 
 /**
  * Weekly km per pace zone, stacked, over the last 8 weeks; the metres not zoned (other strokes,
- * drill, kick) on top in a neutral grey, so the bar is the whole pool volume with laps.
+ * drill, kick) on top as an empty dashed segment (a grey fill reads like Z1), so the bar is the
+ * whole pool volume with laps.
  */
 export function IntensityChart({ weeks }: { weeks: SwimMetrics["intensity"]["weeks"] }) {
   const hasUnclassified = weeks.some((week) => (week.unclassifiedMeters ?? 0) > 0);
@@ -378,9 +380,9 @@ export function IntensityChart({ weeks }: { weeks: SwimMetrics["intensity"]["wee
               dataKey="altro"
               stackId="zone"
               name={UNCLASSIFIED_NAME}
-              fill="var(--muted-foreground)"
-              fillOpacity={0.35}
-              stroke="var(--card)"
+              fill="transparent"
+              stroke="var(--muted-foreground)"
+              strokeDasharray="3 2"
               strokeWidth={1}
               maxBarSize={24}
               isAnimationActive={false}
@@ -392,7 +394,7 @@ export function IntensityChart({ weeks }: { weeks: SwimMetrics["intensity"]["wee
         items={[
           ...zoneLegendItems(),
           ...(hasUnclassified
-            ? [{ label: UNCLASSIFIED_NAME, color: "var(--muted-foreground)", shape: "box" as const, faded: true }]
+            ? [{ label: UNCLASSIFIED_NAME, color: "var(--muted-foreground)", shape: "outline" as const }]
             : []),
         ]}
       />
@@ -517,7 +519,16 @@ export function PacingDpsChart({ set }: { set: NonNullable<SwimMetrics["pacing"]
     <ChartFrame title="Distanza per bracciata per ripetuta (m)" summary={summary} height={130}>
       <LineChart data={data} margin={MARGIN}>
         {GRID}
-        <XAxis dataKey="rep" {...X_AXIS} />
+        {/* Reps on a number axis from 0,5 to n + 0,5: each point and its tick sit over the middle
+            of the rep's bar in the chart above. */}
+        <XAxis
+          dataKey="rep"
+          {...X_AXIS}
+          type="number"
+          domain={[0.5, data.length + 0.5]}
+          ticks={data.map((point) => point.rep)}
+          interval={0}
+        />
         <YAxis
           {...Y_AXIS}
           domain={scale.domain}
@@ -549,7 +560,7 @@ export const PacingTooltipContent = detailTooltip<SessionMetrics & { pacingCv: n
   const rows: TooltipRow[] = [{ label: "Variabilità", value: `${formatDecimal(session.pacingCv, 1)}%` }];
   if (session.pacingFade !== null) rows.push({ label: "Calo nel finale", value: signedPct(session.pacingFade) });
   if (session.dpsDropPct != null) {
-    rows.push({ label: "Distanza per bracciata nel finale", value: signedPct(-session.dpsDropPct) });
+    rows.push({ label: "Bracciata nel finale", value: signedPct(-session.dpsDropPct) });
   }
   if (session.strokeRateRisePct != null) {
     rows.push({ label: "Frequenza nel finale", value: signedPct(session.strokeRateRisePct) });

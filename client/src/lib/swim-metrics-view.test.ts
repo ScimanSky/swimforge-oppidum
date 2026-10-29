@@ -75,8 +75,8 @@ describe("metriche: testi del riquadro", () => {
       expect(noBase.reading).toBeNull();
       expect(noBase.rows).toEqual([
         { label: "Stroke Index", recent: "1,52", baseline: null },
-        { label: "Distanza per ciclo", recent: "1,72 m", baseline: null },
-        { label: "Passo", recent: "1:53 /100 m", baseline: null },
+        { label: "Distanza per ciclo (m)", recent: "1,72", baseline: null },
+        { label: "Passo (/100 m)", recent: "1:53", baseline: null },
       ]);
     });
   });

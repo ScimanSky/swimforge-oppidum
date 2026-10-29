@@ -241,8 +241,8 @@ describe("Metriche: riquadri", () => {
     ]);
     expect(within(table).getAllByRole("row").slice(1).map((row) => row.textContent)).toEqual([
       "Stroke Index1,521,42",
-      "Distanza per ciclo1,72 m1,70 m",
-      "Passo1:53 /100 m2:00 /100 m",
+      "Distanza per ciclo (m)1,721,70",
+      "Passo (/100 m)1:532:00",
     ]);
     expect(region).toHaveTextContent("Lo Stroke Index sale con una bracciata più lunga e un passo più veloce.");
     expect(region).toHaveTextContent("1,54 Ultima nuotata");
@@ -285,8 +285,8 @@ describe("Metriche: riquadri", () => {
     const table = within(region).getByRole("table", { name: "Ultime 4 settimane (mediane)" });
     expect(within(table).getAllByRole("row").slice(1).map((row) => row.textContent)).toEqual([
       "Stroke Index1,52",
-      "Distanza per ciclo1,72 m",
-      "Passo1:53 /100 m",
+      "Distanza per ciclo (m)1,72",
+      "Passo (/100 m)1:53",
     ]);
     expect(region).not.toHaveTextContent("La tua base");
     expect(region).not.toHaveTextContent("Lo Stroke Index sale");
@@ -347,7 +347,7 @@ describe("Metriche: riquadri", () => {
     ).toBeTruthy();
     expect(region).toHaveTextContent("+4,0 % Calo nel finale");
     // Stroke holding over 28 days: median 3,4% (under 5%), the stroke rate rises 4,1%.
-    expect(region).toHaveTextContent("−3,4 % Distanza per bracciata nel finale");
+    expect(region).toHaveTextContent("−3,4 % Bracciata nel finale");
     expect(region).toHaveTextContent("+4,1 % Frequenza nel finale");
     expect(region).toHaveTextContent(
       "Tenuta della bracciata: dal primo all'ultimo terzo delle serie la distanza per bracciata cala del 3,4%, la frequenza sale del 4,1%: la bracciata tiene. Mediana di 3 nuotate degli ultimi 28 giorni."
@@ -367,7 +367,7 @@ describe("Metriche: riquadri", () => {
     renderCards(metrics);
     await userEvent.click(card("Regolarità e tenuta nelle ripetute"));
     const region = screen.getByRole("region", { name: /^Regolarità e tenuta nelle ripetute/ });
-    expect(region).toHaveTextContent("−6,1 % Distanza per bracciata nel finale");
+    expect(region).toHaveTextContent("−6,1 % Bracciata nel finale");
     expect(region).toHaveTextContent("cala del 6,1%, la frequenza sale del 4,1%: la bracciata si accorcia nel finale.");
   });
 

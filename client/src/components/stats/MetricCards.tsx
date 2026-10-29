@@ -164,7 +164,7 @@ function LoadBody({ metrics }: { metrics: SwimMetrics }) {
 /** Z1..Z5 as paces you can swim, from today's threshold pace. */
 function ZonePaceTable({ cssPace }: { cssPace: number }) {
   return (
-    <table className="w-full text-sm tabular-nums">
+    <table className="w-full max-w-md text-sm tabular-nums">
       <caption className={`${sectionTitle} mb-1 text-left`}>
         Passo delle zone, dal passo soglia {formatPaceValue(cssPace)}
       </caption>
@@ -226,7 +226,7 @@ function EfficiencyBody({ metrics }: { metrics: SwimMetrics }) {
       <EfficiencyChart metrics={metrics} />
       {comparison.rows.length > 0 ? (
         <div>
-          <table className="w-full text-sm tabular-nums">
+          <table className="w-full max-w-md text-sm tabular-nums">
             <caption className={`${sectionTitle} mb-1 text-left`}>
               {hasBaseline ? "Ultime 4 settimane e la tua base (mediane)" : "Ultime 4 settimane (mediane)"}
             </caption>
@@ -249,8 +249,10 @@ function EfficiencyBody({ metrics }: { metrics: SwimMetrics }) {
                   <th scope="row" className="py-1.5 pr-3 text-left font-normal">
                     {row.label}
                   </th>
-                  <td className="py-1.5 text-right">{row.recent}</td>
-                  {hasBaseline ? <td className="py-1.5 pl-3 text-right">{row.baseline ?? NO_VALUE}</td> : null}
+                  <td className="whitespace-nowrap py-1.5 text-right">{row.recent}</td>
+                  {hasBaseline ? (
+                    <td className="whitespace-nowrap py-1.5 pl-3 text-right">{row.baseline ?? NO_VALUE}</td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
@@ -279,7 +281,7 @@ function PacingBody({ metrics }: { metrics: SwimMetrics }) {
   const numbers = [
     p.fade28 !== null ? { value: signedPctValue(p.fade28), unit: "%", label: "Calo nel finale" } : null,
     holding?.dpsChange != null
-      ? { value: signedPctValue(holding.dpsChange), unit: "%", label: "Distanza per bracciata nel finale" }
+      ? { value: signedPctValue(holding.dpsChange), unit: "%", label: "Bracciata nel finale" }
       : null,
     holding?.strokeRateRise != null
       ? { value: signedPctValue(holding.strokeRateRise), unit: "%", label: "Frequenza nel finale" }
