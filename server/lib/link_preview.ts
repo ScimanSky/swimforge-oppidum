@@ -226,8 +226,9 @@ async function resolvePublicTarget(rawHostname: string): Promise<PinnedTarget> {
   if (addresses.some((entry) => isDisallowedIp(entry.address))) {
     throw hostNotAllowed();
   }
-  const [first] = addresses;
-  return { address: first.address, family: first.family === 6 ? 6 : 4 };
+  // All of them are vetted; prefer IPv4, since the server may have no IPv6 route.
+  const chosen = addresses.find((entry) => entry.family === 4) ?? addresses[0];
+  return { address: chosen.address, family: chosen.family === 6 ? 6 : 4 };
 }
 
 /** Scheme, credentials and port rules, checked on the first URL and on every redirect. */

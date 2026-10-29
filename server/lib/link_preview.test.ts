@@ -207,6 +207,18 @@ describe("fetchLinkPreviewMetadata", () => {
     expect(json.destroy).toHaveBeenCalled();
   });
 
+  it("connects to an IPv4 address when the host has both families", async () => {
+    mockDnsLookup.mockResolvedValue([
+      { address: "2606:2800:220:1::1", family: 6 },
+      { address: PUBLIC_IP, family: 4 },
+    ]);
+    mockPinnedRequest.mockResolvedValue(response(200, { "content-type": "text/html" }, HTML));
+
+    await fetchLinkPreviewMetadata("https://example.com/dual");
+
+    expect(mockPinnedRequest.mock.calls[0][1]).toEqual({ address: PUBLIC_IP, family: 4 });
+  });
+
   it("follows a redirect to another public page, vetting the new host", async () => {
     mockDnsLookup.mockImplementation(async (host: string) =>
       host === "www.example.com" ? [{ address: "93.184.216.35", family: 4 }] : [{ address: PUBLIC_IP, family: 4 }],
