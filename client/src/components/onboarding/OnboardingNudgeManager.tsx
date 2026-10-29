@@ -64,12 +64,12 @@ export function OnboardingNudgeManager({ userId }: Props) {
     const candidates: Array<{ id: NudgeId; message: string; condition: boolean }> = [
       {
         id: "try-coach",
-        message: "Hai gia 3 attivita! Prova l'AI Coach per un piano personalizzato.",
+        message: "Hai già 3 attività! Prova il Coach AI per un piano personalizzato.",
         condition: activityCount >= 3 && !shownNudges.includes("try-coach"),
       },
       {
         id: "find-club",
-        message: "Il tuo club e su SwimForge? Cercalo nella sezione Community.",
+        message: "Il tuo club è su SwimForge? Cercalo nella sezione Community.",
         condition: !hasClub && !shownNudges.includes("find-club"),
       },
     ];

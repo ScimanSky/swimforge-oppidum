@@ -66,15 +66,12 @@ const PENDING: Record<Rule, string[]> = {
     "components/metrics/MetricOrb.tsx",
   ],
   "alone-neon": [
-    "components/onboarding/OnboardingFlow.tsx",
     "index.css",
   ],
   "maiuscolo-spaziato": [
     "components/ActivityInsightNotification.tsx",
     "components/PbCelebrationNotification.tsx",
     "components/metrics/MetricOrb.tsx",
-    "components/onboarding/OnboardingFlow.tsx",
-    "components/onboarding/OnboardingIdentitySetup.tsx",
   ],
   "testo-gradiente": [
     "components/BadgeUnlockNotification.tsx",
@@ -83,15 +80,10 @@ const PENDING: Record<Rule, string[]> = {
   ],
   "token-legacy": [
     "components/metrics/MetricOrb.tsx",
-    "components/onboarding/OnboardingFlow.tsx",
-    "components/onboarding/OnboardingIdentitySetup.tsx",
     "index.css",
   ],
   "variante-neon": [
     "components/PbCelebrationNotification.tsx",
-    "components/onboarding/OnboardingFirstAction.tsx",
-    "components/onboarding/OnboardingFlow.tsx",
-    "components/onboarding/OnboardingIdentitySetup.tsx",
     "pages/Settings.tsx",
   ],
   "testo-primario": [],
@@ -101,7 +93,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/BadgeUnlockNotification.tsx",
     "components/PbCelebrationNotification.tsx",
     "components/metrics/MetricOrb.tsx",
-    "components/onboarding/OnboardingWelcomeComposition.tsx",
     "pages/Settings.tsx",
   ],
   sfocatura: [
@@ -112,14 +103,12 @@ const PENDING: Record<Rule, string[]> = {
     "pages/StravaConnect.tsx",
   ],
   "titolo-pagina": [
-    "components/onboarding/OnboardingWelcomeComposition.tsx",
     "pages/Settings.tsx",
   ],
   "colore-fisso": [
     "components/ActivityInsightNotification.tsx",
     "components/BadgeUnlockNotification.tsx",
     "components/PbCelebrationNotification.tsx",
-    "components/onboarding/OnboardingFlow.tsx",
     "components/ui/dialog.tsx",
     "components/ui/sheet.tsx",
     "pages/StravaConnect.tsx",
