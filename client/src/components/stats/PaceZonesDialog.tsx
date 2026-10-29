@@ -219,6 +219,7 @@ export function PaceZonesDialog({ zones, css }: { zones: SwimZones; css: CssResu
               })}
             </div>
             <section aria-label="Anteprima" className="rounded-xl bg-raised p-3">
+              <p className="mb-1 text-xs font-semibold text-muted-foreground">Anteprima</p>
               <Preview draft={draft} />
             </section>
             {sourceNote(zones, css).map((note) => (

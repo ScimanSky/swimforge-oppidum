@@ -198,7 +198,7 @@ function ZoneTable({ rows, view }: { rows: ZoneTableRow[]; view: ZoneView }) {
               </span>
             </th>
             <td className="py-1.5 text-right align-top">
-              {row.pace} <span className="text-xs text-muted-foreground">/100 m</span>
+              <span className="whitespace-nowrap">{row.pace}</span>
               {row.maxRep ? (
                 <>
                   {" "}

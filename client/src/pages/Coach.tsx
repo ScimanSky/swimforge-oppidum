@@ -69,7 +69,7 @@ function RepZone({ code, exercise, onOpen }: { code: PaceZoneCode; exercise: Wor
           onClick={() => onOpen(code)}
           className="-my-2 inline-flex items-center rounded-full py-2 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
         >
-          <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-raised px-3 text-xs font-semibold text-foreground">
+          <span className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border bg-card px-3 text-xs font-semibold text-foreground">
             <span aria-hidden className={cn("size-2 shrink-0 rounded-full", PACE_ZONE_BG[code])} />
             {code} · {zone.level}
           </span>

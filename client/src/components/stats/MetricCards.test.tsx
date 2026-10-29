@@ -120,13 +120,13 @@ describe("Metriche: riquadri", () => {
     // The owner's zones from the threshold pace 1:48,5.
     const table = within(region).getByRole("table", { name: "Passo delle zone (per 100 m)" });
     expect(tableRows(table)).toEqual([
-      "A1 Recupero attivo Facile | più lento di 2:08 /100 m",
-      "A2 Fondo lento Aerobico | 2:01–2:08 /100 m",
-      "B1 Fondo medio Medio | 1:54–2:01 /100 m",
-      "B2 Fondo medio-alto Soglia | 1:49–1:54 /100 m",
-      "C1 Soglia anaerobica Soglia | 1:44–1:49 /100 m max 200 m",
-      "C2 Capacità anaerobica Sopra soglia | più veloce di 1:44 /100 m max 150 m",
-      "C3 Potenza anaerobica Sopra soglia | più veloce di 1:44 /100 m max 25 m",
+      "A1 Recupero attivo Facile | più lento di 2:08",
+      "A2 Fondo lento Aerobico | 2:01–2:08",
+      "B1 Fondo medio Medio | 1:54–2:01",
+      "B2 Fondo medio-alto Soglia | 1:49–1:54",
+      "C1 Soglia anaerobica Soglia | 1:44–1:49 max 200 m",
+      "C2 Capacità anaerobica Sopra soglia | più veloce di 1:44 max 150 m",
+      "C3 Potenza anaerobica Sopra soglia | più veloce di 1:44 max 25 m",
     ]);
     expect(region).toHaveTextContent(
       "Calcolate dal tuo passo soglia 1:49 (stima, affidabilità media), che è il confine tra B2 e C1."
@@ -151,11 +151,11 @@ describe("Metriche: riquadri", () => {
     ]);
     const table = within(region).getByRole("table", { name: "Passo dei livelli (per 100 m)" });
     expect(tableRows(table)).toEqual([
-      "Facile A1 | più lento di 2:08 /100 m",
-      "Aerobico A2 | 2:01–2:08 /100 m",
-      "Medio B1 | 1:54–2:01 /100 m",
-      "Soglia B2 e C1 | 1:44–1:54 /100 m",
-      "Sopra soglia C2 e C3 | più veloce di 1:44 /100 m",
+      "Facile A1 | più lento di 2:08",
+      "Aerobico A2 | 2:01–2:08",
+      "Medio B1 | 1:54–2:01",
+      "Soglia B2 e C1 | 1:44–1:54",
+      "Sopra soglia C2 e C3 | più veloce di 1:44",
     ]);
     expect(
       within(region).getByRole("img", {
