@@ -57,7 +57,6 @@ const EXEMPT: Partial<Record<Rule, readonly string[]>> = {
  */
 const PENDING: Record<Rule, string[]> = {
   "testo-piccolo": [
-    "components/DirectMessages.tsx",
     "components/metrics/MetricOrb.tsx",
     "pages/Home.tsx",
   ],
@@ -69,7 +68,6 @@ const PENDING: Record<Rule, string[]> = {
   ],
   "maiuscolo-spaziato": [
     "components/ActivityInsightNotification.tsx",
-    "components/DirectMessages.tsx",
     "components/PbCelebrationNotification.tsx",
     "components/metrics/MetricOrb.tsx",
     "components/onboarding/OnboardingFlow.tsx",
@@ -79,11 +77,9 @@ const PENDING: Record<Rule, string[]> = {
   "testo-gradiente": [
     "components/BadgeUnlockNotification.tsx",
     "components/metrics/MetricOrb.tsx",
-    "pages/Messages.tsx",
     "pages/Settings.tsx",
   ],
   "token-legacy": [
-    "components/DirectMessages.tsx",
     "components/metrics/MetricOrb.tsx",
     "components/onboarding/OnboardingFlow.tsx",
     "components/onboarding/OnboardingIdentitySetup.tsx",
@@ -92,7 +88,6 @@ const PENDING: Record<Rule, string[]> = {
   ],
   "variante-neon": [
     "components/CookieBanner.tsx",
-    "components/DirectMessages.tsx",
     "components/PbCelebrationNotification.tsx",
     "components/onboarding/OnboardingFirstAction.tsx",
     "components/onboarding/OnboardingFlow.tsx",
@@ -112,7 +107,6 @@ const PENDING: Record<Rule, string[]> = {
   gradiente: [
     "components/ActivityInsightNotification.tsx",
     "components/BadgeUnlockNotification.tsx",
-    "components/DirectMessages.tsx",
     "components/PbCelebrationNotification.tsx",
     "components/metrics/MetricOrb.tsx",
     "components/onboarding/OnboardingWelcomeComposition.tsx",
@@ -138,7 +132,6 @@ const PENDING: Record<Rule, string[]> = {
   "titolo-pagina": [
     "components/onboarding/OnboardingWelcomeComposition.tsx",
     "pages/AdminReports.tsx",
-    "pages/Messages.tsx",
     "pages/NotFound.tsx",
     "pages/ReportPost.tsx",
     "pages/Settings.tsx",

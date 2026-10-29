@@ -1,33 +1,41 @@
 /**
- * Direct Messages Component - Chat tra membri
+ * Direct messages between swimmers, in three places:
+ * - `mode="link"`: the header icon to /messages, with the unread count (and the Realtime
+ *   subscription that refreshes every message query: the header is always mounted);
+ * - `mode="page"`: the Messages page, conversations and the open chat side by side on desktop,
+ *   one at a time on phones;
+ * - a dialog with one swimmer (`recipientId`), opened from their public profile.
  */
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "wouter";
-import { MessageCircle, Send, Search, PenSquare, Phone, Video, Info } from "lucide-react";
+import { ChevronLeft, MessageCircle, PenSquare, Search, Send } from "lucide-react";
+import { toast } from "sonner";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { trpc } from "@/lib/trpc";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { formatSessionDate, getInitials } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
-import { toast } from "sonner";
-import { getInitials } from "@/lib/format";
+import { trpc } from "@/lib/trpc";
+import { errorToastMessage } from "@/lib/trpc-errors";
 import { cn } from "@/lib/utils";
 
-interface DirectMessagesProps {
-  recipientId?: number;
-  recipientName?: string;
-  mode?: "dialog" | "page" | "link";
-}
+type DirectMessagesProps =
+  | { mode: "link" }
+  | { mode: "page" }
+  | { mode?: "dialog"; recipientId: number; recipientName?: string };
 
 interface Message {
   id: number;
@@ -41,26 +49,18 @@ interface Message {
   createdAt: Date;
 }
 
-interface MessageWithSender {
-  message: Message;
-  sender: {
-    id: number;
-    username: string | null;
-    profilePicture: string | null;
-  };
-}
-
 interface Conversation {
   lastMessage: Message;
   otherUser: {
     id: number;
+    /** The server's display name: name, else username, else «Utente #id». */
     username: string | null;
     profilePicture: string | null;
   };
   unreadCount: number;
 }
 
-type View = "list" | "conversation" | "search";
+type Partner = { id: number; name: string; avatarUrl?: string | null };
 
 type ForwardMetadata = {
   targetType?: "post";
@@ -70,17 +70,24 @@ type ForwardMetadata = {
   previewMediaUrl?: string | null;
 };
 
+const RETENTION_DAYS = (() => {
+  const days = Number(import.meta.env.VITE_DM_RETENTION_DAYS ?? 60);
+  return Number.isFinite(days) ? days : 60;
+})();
+const RETENTION_NOTE = `I messaggi vengono eliminati automaticamente dal server dopo ${RETENTION_DAYS} giorni.`;
+const SEARCH_DEBOUNCE_MS = 250;
+
 function parseForwardMetadata(raw: unknown): ForwardMetadata | null {
   const source =
     typeof raw === "string"
       ? (() => {
           try {
-            return JSON.parse(raw) as unknown
+            return JSON.parse(raw) as unknown;
           } catch {
-            return null
+            return null;
           }
         })()
-      : raw
+      : raw;
   if (!source || typeof source !== "object" || Array.isArray(source)) return null;
   const data = source as Record<string, unknown>;
   const targetType = data.targetType === "post" ? data.targetType : undefined;
@@ -98,112 +105,43 @@ function parseForwardMetadata(raw: unknown): ForwardMetadata | null {
   };
 }
 
-function getConversationPreview(message: Message) {
-  if (message.messageType === "forward_post") return "📩 Post inoltrato"
-  return message.content
+function conversationPreview(message: Message) {
+  if (message.messageType === "forward_post") return "Post inoltrato";
+  return message.content;
 }
 
-export default function DirectMessages({ recipientId, recipientName, mode = "dialog" }: DirectMessagesProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [view, setView] = useState<View>(recipientId ? "conversation" : "list");
-  const [selectedConversation, setSelectedConversation] = useState<number | null>(
-    recipientId || null
-  );
-  const [selectedName, setSelectedName] = useState<string | null>(recipientName || null);
-  const [messageText, setMessageText] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
-  const utils = trpc.useUtils();
-  const isPageMode = mode === "page";
-  const isLinkMode = mode === "link";
-  const panelActive = isPageMode ? true : isOpen;
-  const conversationLimit = isPageMode ? 100 : 50;
+const timeFmt = new Intl.DateTimeFormat("it-IT", { hour: "2-digit", minute: "2-digit" });
 
+/** «10:47» today, «lun 27 ott · 10:47» before; nothing for an invalid date. */
+function messageTime(value: Date | string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toDateString() === new Date().toDateString() ? timeFmt.format(date) : formatSessionDate(date);
+}
+
+function MessageTime({ value }: { value: Date | string }) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return <time dateTime={date.toISOString()}>{messageTime(date)}</time>;
+}
+
+/** «9+» above nine. */
+const countLabel = (count: number) => (count > 9 ? "9+" : String(count));
+
+const toCount = (value: unknown) => Math.max(0, Number(value) || 0);
+
+export default function DirectMessages(props: DirectMessagesProps) {
+  if (props.mode === "link") return <MessagesLink />;
+  if (props.mode === "page") return <MessagesPage />;
+  return <MessageDialog recipientId={props.recipientId} recipientName={props.recipientName} />;
+}
+
+/** Supabase Realtime: a new message for me refreshes the unread count, the list and the chats. */
+function useMessagesRealtime() {
+  const utils = trpc.useUtils();
   const profileQuery = trpc.profile.get.useQuery(undefined, { staleTime: 5 * 60_000 });
   const currentUserId = profileQuery.data?.userId;
-  const dmRetentionDays = Number(import.meta.env.VITE_DM_RETENTION_DAYS ?? 60);
 
-  // Unread DM count — always active (shows badge on icon)
-  const unreadDmQuery = trpc.community.messages.unreadCount.useQuery(undefined, {
-    refetchInterval: 30_000,
-  });
-
-  // Lista conversazioni recenti
-  const conversationsQuery = trpc.community.messages.recent.useQuery(
-    { limit: 20 },
-    {
-      enabled: panelActive && !recipientId,
-      refetchInterval: isPageMode ? 8_000 : false,
-      refetchOnWindowFocus: true,
-    }
-  );
-
-  // Conversazione specifica — poll every 5s when open
-  const conversationQuery = trpc.community.messages.conversation.useQuery(
-    { otherUserId: selectedConversation || 0, limit: conversationLimit },
-    {
-      enabled: !!selectedConversation && (isPageMode || isOpen || !!recipientId),
-      refetchInterval: panelActive && view === "conversation" ? 5_000 : false,
-    }
-  );
-
-  const normalizedConversations = useMemo<Conversation[]>(() => {
-    const source = conversationsQuery.data ?? [];
-    const byUserId = new Map<number, Conversation>();
-
-    source.forEach((conv) => {
-      const key = conv.otherUser.id;
-      const existing = byUserId.get(key);
-      if (!existing) {
-        byUserId.set(key, { ...conv, unreadCount: Math.max(0, Number(conv.unreadCount ?? 0)) });
-        return;
-      }
-
-      const currentCreatedAt = new Date(conv.lastMessage.createdAt).getTime();
-      const existingCreatedAt = new Date(existing.lastMessage.createdAt).getTime();
-      const mergedUnread = Math.max(0, Number(existing.unreadCount ?? 0)) + Math.max(0, Number(conv.unreadCount ?? 0));
-
-      if (currentCreatedAt >= existingCreatedAt) {
-        byUserId.set(key, { ...conv, unreadCount: mergedUnread });
-      } else {
-        byUserId.set(key, { ...existing, unreadCount: mergedUnread });
-      }
-    });
-
-    return Array.from(byUserId.values()).sort(
-      (a, b) =>
-        new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
-    );
-  }, [conversationsQuery.data]);
-
-  // User search
-  const userSearchQuery = trpc.community.users.search.useQuery(
-    { query: searchQuery, limit: 10 },
-    { enabled: view === "search" && searchQuery.length >= 1 }
-  );
-
-  const sendMutation = trpc.community.messages.send.useMutation({
-    onSuccess: () => {
-      setMessageText("");
-      utils.community.messages.conversation.invalidate();
-      utils.community.messages.recent.invalidate();
-      utils.community.messages.unreadCount.invalidate();
-      scrollToBottom();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Errore nell'invio del messaggio");
-    },
-  });
-
-  const markReadMutation = trpc.community.messages.markRead.useMutation({
-    onSuccess: () => {
-      utils.community.messages.recent.invalidate();
-      utils.community.messages.unreadCount.invalidate();
-    },
-  });
-
-  // Supabase Realtime: refresh on new DM
   useEffect(() => {
     if (!currentUserId) return;
 
@@ -220,9 +158,7 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
         () => {
           utils.community.messages.unreadCount.invalidate();
           utils.community.messages.recent.invalidate();
-          if (selectedConversation) {
-            utils.community.messages.conversation.invalidate();
-          }
+          utils.community.messages.conversation.invalidate();
         }
       )
       .subscribe();
@@ -230,751 +166,524 @@ export default function DirectMessages({ recipientId, recipientName, mode = "dia
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [currentUserId, selectedConversation, utils]);
+  }, [currentUserId, utils]);
+}
 
-  useEffect(() => {
-    if (selectedConversation && conversationQuery.data) {
-      const hasUnread = conversationQuery.data.some((msg) => !msg.message.isRead);
-      if (hasUnread) {
-        markReadMutation.mutate({ senderId: selectedConversation });
-      }
-      scrollToBottom();
-    }
-  }, [selectedConversation, conversationQuery.data]);
+function MessagesLink() {
+  useMessagesRealtime();
+  const unreadQuery = trpc.community.messages.unreadCount.useQuery(undefined, {
+    refetchInterval: 30_000,
+  });
+  const unread = toCount(unreadQuery.data?.count);
 
-  useEffect(() => {
-    if (recipientId) {
-      setSelectedConversation(recipientId);
-      setSelectedName(recipientName || null);
-      setView("conversation");
-    }
-  }, [recipientId]);
+  return (
+    <Button asChild variant="ghost" size="icon" className="relative">
+      <Link href="/messages" aria-label={unread > 0 ? `Messaggi, ${unread} non letti` : "Messaggi"}>
+        <MessageCircle className="size-5" aria-hidden />
+        {unread > 0 ? (
+          <span
+            aria-hidden
+            className="absolute right-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-semibold text-primary-foreground tabular-nums"
+          >
+            {countLabel(unread)}
+          </span>
+        ) : null}
+      </Link>
+    </Button>
+  );
+}
 
-  useEffect(() => {
-    if (view === "search") {
-      setTimeout(() => searchInputRef.current?.focus(), 100);
-    }
-  }, [view]);
-
-  useEffect(() => {
-    if (!isPageMode || recipientId) return;
-    if (!selectedConversation && normalizedConversations.length) {
-      const first = normalizedConversations[0];
-      setSelectedConversation(first.otherUser.id);
-      setSelectedName(first.otherUser.username);
-      setView("conversation");
-    }
-  }, [isPageMode, recipientId, selectedConversation, normalizedConversations]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  const handleSend = () => {
-    if (!messageText.trim() || !selectedConversation) return;
-
-    sendMutation.mutate({
-      receiverId: selectedConversation,
-      content: messageText.trim(),
-    });
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
-
-  const openConversation = (userId: number, name: string | null) => {
-    setSelectedConversation(userId);
-    setSelectedName(name);
-    setView("conversation");
-    setSearchQuery("");
-  };
-
-  const formatTime = (dateInput: string | Date) => {
-    const date = new Date(dateInput);
-    return date.toLocaleTimeString("it-IT", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  const unreadCount = unreadDmQuery.data?.count ?? 0;
-
-  const renderSearchView = () => (
-    <div className="flex flex-col h-full min-h-0">
-      <div className="flex items-center gap-2 p-4 border-b shrink-0">
-        <Button variant="ghost" size="sm" onClick={() => { setView("list"); setSearchQuery(""); }}>
-          ← Indietro
-        </Button>
-        <span className="font-semibold text-sm">Nuovo messaggio</span>
-      </div>
-      <div className="px-4 py-3 border-b">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <Input
-            ref={searchInputRef}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cerca utente per nome..."
-            className="pl-9"
-          />
-        </div>
-      </div>
-      <ScrollArea className="flex-1">
-        {searchQuery.length < 1 ? (
-          <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
-            <Search className="size-8 mb-2 opacity-50" />
-            <p className="text-sm">Cerca un utente per iniziare</p>
-          </div>
-        ) : userSearchQuery.isLoading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-          </div>
-        ) : !userSearchQuery.data?.length ? (
-          <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
-            <p className="text-sm">Nessun utente trovato</p>
-          </div>
-        ) : (
-          <div className="divide-y">
-            {userSearchQuery.data.map((user) => {
-              const name = user.username || user.name || `#${user.userId}`;
-              return (
-                <button
-                  key={user.userId}
-                  onClick={() => openConversation(user.userId, name)}
-                  className="w-full text-left p-4 hover:bg-accent transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar className="size-10">
-                      <AvatarImage src={user.avatarUrl || undefined} />
-                      <AvatarFallback className="text-xs font-semibold">
-                        {getInitials(name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">{name}</p>
-                      {user.level != null && (
-                        <p className="text-xs text-muted-foreground">Lv.{user.level}</p>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </ScrollArea>
-    </div>
+/** One chat: the messages (polled every 5 s while shown), marked read as they arrive, and sending. */
+function useConversation(otherUserId: number, { active, limit }: { active: boolean; limit: number }) {
+  const utils = trpc.useUtils();
+  const query = trpc.community.messages.conversation.useQuery(
+    { otherUserId, limit },
+    { enabled: active, refetchInterval: active ? 5_000 : false }
   );
 
-  const renderConversationsList = () => {
-    return (
-      <div className="flex flex-col h-full min-h-0">
-        <div className="flex items-center justify-between px-4 py-2 border-b shrink-0">
-          <span className="text-xs text-muted-foreground">Conversazioni recenti</span>
-          <Button
-            variant="ghost-neon"
-            size="sm"
-            className="gap-1.5 h-8 text-xs"
-            onClick={() => setView("search")}
-          >
-            <PenSquare className="size-3.5" />
-            Nuovo
-          </Button>
-        </div>
-        {!normalizedConversations.length ? (
-          <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
-            <MessageCircle className="h-12 w-12 mb-2" />
-            <p className="text-sm">Nessun messaggio</p>
-            <Button
-              variant="outline-neon"
-              size="sm"
-              className="mt-3 gap-1.5"
-              onClick={() => setView("search")}
-            >
-              <PenSquare className="size-3.5" />
-              Scrivi un messaggio
-            </Button>
+  const markRead = trpc.community.messages.markRead.useMutation({
+    onSuccess: () => {
+      utils.community.messages.recent.invalidate();
+      utils.community.messages.unreadCount.invalidate();
+    },
+  });
+  // The newest message from them still unread (my own unread ones are theirs to read).
+  const lastUnreadId = useMemo(() => {
+    const unread = (query.data ?? []).filter(
+      (msg) => msg.message.senderId === otherUserId && !msg.message.isRead
+    );
+    return unread.length ? unread[unread.length - 1].message.id : null;
+  }, [query.data, otherUserId]);
+  // Once per newly arrived message (not on every poll): `markRead` is left out of the deps.
+  useEffect(() => {
+    if (lastUnreadId !== null) markRead.mutate({ senderId: otherUserId });
+  }, [lastUnreadId, otherUserId]);
+
+  const send = trpc.community.messages.send.useMutation({
+    onSuccess: () => {
+      utils.community.messages.conversation.invalidate();
+      utils.community.messages.recent.invalidate();
+      utils.community.messages.unreadCount.invalidate();
+    },
+    onError: (error) => toast.error(errorToastMessage(error, "Messaggio non inviato, riprova")),
+  });
+
+  return { query, send };
+}
+
+function MessageBubble({ message, own }: { message: Message; own: boolean }) {
+  const forward = message.messageType === "forward_post" ? parseForwardMetadata(message.metadata) : null;
+  return (
+    <li className={cn("flex", own ? "justify-end" : "justify-start")}>
+      <div
+        className={cn(
+          "max-w-[80%] rounded-2xl px-4 py-2.5 sm:max-w-[72%]",
+          own ? "bg-primary text-primary-foreground" : "bg-raised text-foreground"
+        )}
+      >
+        {/* Who wrote it, for screen readers (the side says it on screen). */}
+        <span className="sr-only">{own ? "Tu: " : "Ricevuto: "}</span>
+        {forward ? (
+          <div className="space-y-2">
+            {/* A card of its own: readable on both bubble colours. */}
+            <div className="rounded-xl bg-card p-3 text-foreground">
+              <p className="text-xs text-muted-foreground">Post inoltrato</p>
+              <p className="text-sm font-semibold">{forward.ownerName || "Contenuto condiviso"}</p>
+              {forward.previewMediaUrl ? (
+                <img src={forward.previewMediaUrl} alt="" className="mt-2 h-24 w-full rounded-lg object-cover" />
+              ) : null}
+              {forward.previewText ? (
+                <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{forward.previewText}</p>
+              ) : null}
+              <Link
+                href={`/post/${forward.targetId}`}
+                className="mt-2 inline-block text-sm font-semibold text-action-text hover:underline"
+              >
+                Apri il post
+              </Link>
+            </div>
+            {message.content ? <p className="whitespace-pre-wrap text-sm">{message.content}</p> : null}
           </div>
         ) : (
-          <ScrollArea className="flex-1">
-            <div className="divide-y">
-              {normalizedConversations.map((conv) => (
-                <button
-                  key={conv.otherUser.id}
-                  onClick={() => openConversation(conv.otherUser.id, conv.otherUser.username)}
-                  className={`w-full text-left p-4 hover:bg-accent transition-colors ${
-                    selectedConversation === conv.otherUser.id ? "bg-accent" : ""
-                  }`}
-                >
-                  <div className="flex gap-3">
-                    <Avatar className="h-10 w-10 flex-shrink-0">
-                      <AvatarImage src={conv.otherUser.profilePicture || undefined} />
-                      <AvatarFallback>
-                        {getInitials(conv.otherUser.username || "U")}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-semibold truncate">{conv.otherUser.username}</p>
-                        {conv.unreadCount > 0 && (
-                          <Badge variant="destructive" className="ml-2">
-                            {conv.unreadCount}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {getConversationPreview(conv.lastMessage)}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {formatTime(conv.lastMessage.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </ScrollArea>
+          <p className="whitespace-pre-wrap text-sm">{message.content}</p>
         )}
+        <p className="mt-1 text-xs">
+          <MessageTime value={message.createdAt} />
+        </p>
       </div>
-    );
+    </li>
+  );
+}
+
+function Composer({
+  onSend,
+  pending,
+  inputRef,
+}: {
+  onSend: (content: string, sent: () => void) => void;
+  pending: boolean;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+}) {
+  const [text, setText] = useState("");
+  const inputId = useId();
+  const content = text.trim();
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (!content || pending) return;
+    onSend(content, () => setText(""));
   };
+  return (
+    <form onSubmit={submit} className="flex items-center gap-2 border-t border-border p-3">
+      <label htmlFor={inputId} className="sr-only">
+        Messaggio
+      </label>
+      <Input
+        ref={inputRef}
+        id={inputId}
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        maxLength={5000}
+        autoComplete="off"
+        placeholder="Scrivi un messaggio…"
+        className="flex-1"
+      />
+      <Button type="submit" disabled={!content || pending}>
+        <Send aria-hidden />
+        Invia
+      </Button>
+    </form>
+  );
+}
 
-  const renderConversation = () => {
-    if (conversationQuery.error) {
-      return (
-        <div className="flex h-full items-center justify-center p-4 text-center text-sm text-muted-foreground">
-          Impossibile caricare la conversazione. Riprova tra pochi secondi.
-        </div>
-      );
-    }
+/** The messages with one swimmer and the composer; `header` sits above the messages. */
+function ConversationView({
+  partner,
+  active,
+  limit,
+  header,
+  inputRef,
+}: {
+  partner: Partner;
+  active: boolean;
+  limit: number;
+  header?: ReactNode;
+  inputRef?: React.RefObject<HTMLInputElement | null>;
+}) {
+  const { query, send } = useConversation(partner.id, { active, limit });
+  const endRef = useRef<HTMLDivElement>(null);
+  const messages = query.data ?? [];
+  const lastId = messages.length ? messages[messages.length - 1].message.id : null;
 
-    if (!conversationQuery.data) {
-      return (
-        <div className="flex items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-        </div>
-      );
-    }
+  useEffect(() => {
+    // `nearest`: brings the newest message into the chat's own scroll area, not the page.
+    endRef.current?.scrollIntoView?.({ block: "nearest" });
+  }, [lastId]);
 
-    // Determine recipient name from props, state, or conversation data
-    const otherUserName =
-      selectedName ||
-      recipientName ||
-      conversationQuery.data[0]?.sender?.username ||
-      "Utente";
-
-    return (
-      <div className="flex flex-col h-full min-h-0">
-        <div className="flex items-center gap-3 p-4 border-b shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => { setSelectedConversation(null); setSelectedName(null); setView("list"); }}
-          >
-            ← Indietro
-          </Button>
-          <div className="flex items-center gap-2 flex-1">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={conversationQuery.data[0]?.sender?.profilePicture || undefined} />
-              <AvatarFallback className="text-xs">{getInitials(otherUserName)}</AvatarFallback>
-            </Avatar>
-            <span className="font-semibold">{otherUserName}</span>
-          </div>
-        </div>
-
-        <div className="flex-1 min-h-0">
-          <ScrollArea className="h-full">
-            <div className="space-y-4 p-4">
-              {conversationQuery.data.length === 0 && (
-                <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
-                  <p className="text-sm">Inizia la conversazione!</p>
-                </div>
-              )}
-              {conversationQuery.data.map((msg) => {
-                const isOwn = msg.message.senderId !== selectedConversation;
-                const forwardMeta = parseForwardMetadata(msg.message.metadata);
-                const isForwarded = msg.message.messageType === "forward_post" && !!forwardMeta;
-                return (
-                  <div
-                    key={msg.message.id}
-                    className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
-                  >
-                    <div
-                      className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                        isOwn
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted"
-                      }`}
-                    >
-                      {isForwarded && forwardMeta ? (
-                        <div className="space-y-2">
-                          <div className="rounded-md border border-border/60 bg-background/60 p-2">
-                            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                              Post inoltrato
-                            </p>
-                            <p className="text-sm font-medium">
-                              {forwardMeta.ownerName
-                                ? `${forwardMeta.ownerName}`
-                                : "Contenuto condiviso"}
-                            </p>
-                            {forwardMeta.previewMediaUrl ? (
-                              <img
-                                src={forwardMeta.previewMediaUrl}
-                                alt="Anteprima inoltro"
-                                className="mt-2 h-24 w-full rounded-md object-cover"
-                              />
-                            ) : null}
-                            {forwardMeta.previewText ? (
-                              <p className="mt-2 text-xs text-muted-foreground line-clamp-2">
-                                {forwardMeta.previewText}
-                              </p>
-                            ) : null}
-                            <div className="mt-2">
-                              {forwardMeta.targetType === "post" ? (
-                                <Link
-                                  href={`/post/${forwardMeta.targetId}`}
-                                  className="text-xs font-medium text-[var(--electric-cyan)] hover:underline"
-                                >
-                                  Apri post
-                                </Link>
-                              ) : (
-                                <Link
-                                  href="/home"
-                                  className="text-xs font-medium text-[var(--electric-cyan)] hover:underline"
-                                >
-                                  Apri feed
-                                </Link>
-                              )}
-                            </div>
-                          </div>
-                          {msg.message.content ? (
-                            <p className="text-sm whitespace-pre-wrap">{msg.message.content}</p>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <p className="text-sm whitespace-pre-wrap">{msg.message.content}</p>
-                      )}
-                      <p className={`text-xs mt-1 ${isOwn ? "text-primary-foreground/70" : "text-muted-foreground"}`}>
-                        {formatTime(msg.message.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
-              <div ref={messagesEndRef} />
-            </div>
-          </ScrollArea>
-        </div>
-
-        <div className="p-4 border-t shrink-0">
-          <div className="flex gap-2">
-            <Input
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Scrivi un messaggio..."
-              className="flex-1"
-            />
-            <Button
-              onClick={handleSend}
-              disabled={!messageText.trim() || sendMutation.isPending}
-              size="icon"
-            >
-              <Send className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+  let body: ReactNode;
+  if (query.isPending) {
+    body = (
+      <LoadingSkeleton
+        label="Caricamento dei messaggi…"
+        count={3}
+        className="space-y-3 p-4"
+        itemClassName="h-12 w-2/3 rounded-2xl"
+      />
+    );
+  } else if (query.isError && !query.data) {
+    // A failed poll keeps the messages already on screen; only a chat that never loaded says so.
+    body = <LoadError onRetry={() => void query.refetch()} className="m-4" />;
+  } else if (messages.length === 0) {
+    body = <p className="p-6 text-center text-sm text-muted-foreground">Nessun messaggio: scrivi il primo.</p>;
+  } else {
+    body = (
+      <div role="log" aria-label={`Messaggi con ${partner.name}`}>
+        <ul className="space-y-3 p-4">
+          {messages.map((msg) => (
+            <MessageBubble key={msg.message.id} message={msg.message} own={msg.message.senderId !== partner.id} />
+          ))}
+        </ul>
+        <div ref={endRef} />
       </div>
-    );
-  };
-
-  const renderConversationMessages = (isPageLayout: boolean) => {
-    if (conversationQuery.error) {
-      return (
-        <div className="flex h-full items-center justify-center p-4 text-center text-sm text-muted-foreground">
-          Impossibile caricare i messaggi della chat.
-        </div>
-      );
-    }
-
-    if (!conversationQuery.data) {
-      return (
-        <div className="flex items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-        </div>
-      );
-    }
-
-    return (
-      <ScrollArea className="h-full">
-        <div className={cn("space-y-4", isPageLayout ? "p-5 md:p-6" : "p-4")}>
-          {conversationQuery.data.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
-              <p className="text-sm">Inizia la conversazione!</p>
-            </div>
-          )}
-          {conversationQuery.data.map((msg) => {
-            const isOwn = msg.message.senderId !== selectedConversation;
-            const forwardMeta = parseForwardMetadata(msg.message.metadata);
-            const isForwarded = msg.message.messageType === "forward_post" && !!forwardMeta;
-            return (
-              <div
-                key={msg.message.id}
-                className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={cn(
-                    "max-w-[72%] rounded-2xl px-4 py-2.5",
-                    isOwn
-                      ? "bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_28%,transparent),color-mix(in_oklch,var(--electric-lime)_16%,transparent))] text-foreground border border-[var(--electric-cyan)]/35"
-                      : "bg-card/80 border border-border/60",
-                  )}
-                >
-                  {isForwarded && forwardMeta ? (
-                    <div className="space-y-2">
-                      <div className="rounded-xl border border-border/60 bg-background/60 p-2.5">
-                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                          Post inoltrato
-                        </p>
-                        <p className="text-sm font-medium">
-                          {forwardMeta.ownerName
-                            ? `${forwardMeta.ownerName}`
-                            : "Contenuto condiviso"}
-                        </p>
-                        {forwardMeta.previewMediaUrl ? (
-                          <img
-                            src={forwardMeta.previewMediaUrl}
-                            alt="Anteprima inoltro"
-                            className="mt-2 h-24 w-full rounded-md object-cover"
-                          />
-                        ) : null}
-                        {forwardMeta.previewText ? (
-                          <p className="mt-2 text-xs text-muted-foreground line-clamp-2">
-                            {forwardMeta.previewText}
-                          </p>
-                        ) : null}
-                        <div className="mt-2">
-                          {forwardMeta.targetType === "post" ? (
-                            <Link
-                              href={`/post/${forwardMeta.targetId}`}
-                              className="text-xs font-medium text-[var(--electric-cyan)] hover:underline"
-                            >
-                              Apri post
-                            </Link>
-                          ) : (
-                            <Link
-                              href="/home"
-                              className="text-xs font-medium text-[var(--electric-cyan)] hover:underline"
-                            >
-                              Apri feed
-                            </Link>
-                          )}
-                        </div>
-                      </div>
-                      {msg.message.content ? (
-                        <p className="text-sm whitespace-pre-wrap">{msg.message.content}</p>
-                      ) : null}
-                    </div>
-                  ) : (
-                    <p className="text-sm whitespace-pre-wrap">{msg.message.content}</p>
-                  )}
-                  <p className={cn("text-xs mt-1", isOwn ? "text-foreground/70" : "text-muted-foreground")}>
-                    {formatTime(msg.message.createdAt)}
-                  </p>
-                </div>
-              </div>
-            );
-          })}
-          <div ref={messagesEndRef} />
-        </div>
-      </ScrollArea>
-    );
-  };
-
-  const renderPageList = () => {
-    const tabBase =
-      "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors border border-transparent";
-
-    return (
-      <div className="flex h-full min-h-0 flex-col border-r border-border/60 bg-card/35">
-        <div className="border-b border-border/60 p-4">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-lg font-display font-bold text-foreground">Messaggi</h2>
-            <Button
-              variant="ghost-neon"
-              size="icon"
-              className="size-9"
-              onClick={() => setView("search")}
-              aria-label="Nuovo messaggio"
-            >
-              <PenSquare className="size-4" />
-            </Button>
-          </div>
-          <div className="mt-3 flex items-center gap-2">
-            <button type="button" className={cn(tabBase, "bg-background/70 border-border/70 text-foreground")}>
-              Primary
-            </button>
-            <button type="button" className={cn(tabBase, "text-muted-foreground hover:text-foreground")}>
-              General
-            </button>
-            <button type="button" className={cn(tabBase, "text-muted-foreground hover:text-foreground")}>
-              Richieste
-            </button>
-          </div>
-          <div className="relative mt-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              ref={searchInputRef}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cerca messaggi..."
-              className="h-10 rounded-xl border-border/70 bg-background/55 pl-9"
-            />
-          </div>
-        </div>
-
-        <ScrollArea className="flex-1">
-          {view === "search" && searchQuery.length >= 1 ? (
-            <div className="divide-y divide-border/40">
-              {userSearchQuery.isLoading ? (
-                <div className="flex items-center justify-center h-28">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-                </div>
-              ) : !userSearchQuery.data?.length ? (
-                <div className="p-5 text-sm text-muted-foreground">Nessun utente trovato.</div>
-              ) : (
-                userSearchQuery.data.map((user) => {
-                  const name = user.username || user.name || `#${user.userId}`;
-                  return (
-                    <button
-                      key={user.userId}
-                      onClick={() => openConversation(user.userId, name)}
-                      className="w-full px-4 py-3 text-left transition-colors hover:bg-background/65"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Avatar className="size-10 border border-border/60">
-                          <AvatarImage src={user.avatarUrl || undefined} />
-                          <AvatarFallback className="text-xs">{getInitials(name)}</AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-foreground">{name}</p>
-                          <p className="text-xs text-muted-foreground">Inizia una nuova chat</p>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          ) : conversationsQuery.error ? (
-            <div className="flex h-40 flex-col items-center justify-center px-4 text-center text-muted-foreground">
-              <MessageCircle className="size-8 opacity-60" />
-              <p className="mt-2 text-sm">Errore caricamento conversazioni.</p>
-            </div>
-          ) : !normalizedConversations.length ? (
-            <div className="flex h-40 flex-col items-center justify-center px-4 text-center text-muted-foreground">
-              <MessageCircle className="size-8 opacity-60" />
-              <p className="mt-2 text-sm">Nessun messaggio disponibile.</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border/40">
-              {normalizedConversations
-                .filter((conv) => {
-                  if (!searchQuery.trim()) return true;
-                  const name = conv.otherUser.username ?? "";
-                  return name.toLowerCase().includes(searchQuery.trim().toLowerCase());
-                })
-                .map((conv) => {
-                  const isActive = selectedConversation === conv.otherUser.id;
-                  return (
-                    <button
-                      key={conv.otherUser.id}
-                      onClick={() => openConversation(conv.otherUser.id, conv.otherUser.username)}
-                      className={cn(
-                        "w-full px-4 py-3 text-left transition-colors hover:bg-background/65",
-                        isActive && "bg-[linear-gradient(90deg,color-mix(in_oklch,var(--electric-cyan)_14%,transparent),transparent)]",
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        <Avatar className="size-11 border border-border/60">
-                          <AvatarImage src={conv.otherUser.profilePicture || undefined} />
-                          <AvatarFallback>{getInitials(conv.otherUser.username || "U")}</AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="truncate text-sm font-semibold text-foreground">{conv.otherUser.username}</p>
-                            <span className="text-[11px] text-muted-foreground">
-                              {formatTime(conv.lastMessage.createdAt)}
-                            </span>
-                          </div>
-                          <div className="mt-0.5 flex items-center justify-between gap-2">
-                            <p className="truncate text-xs text-muted-foreground">
-                              {getConversationPreview(conv.lastMessage)}
-                            </p>
-                            {conv.unreadCount > 0 ? (
-                              <Badge className="h-5 min-w-5 rounded-full px-1.5 text-[10px]" variant="destructive">
-                                {conv.unreadCount > 9 ? "9+" : conv.unreadCount}
-                              </Badge>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-            </div>
-          )}
-        </ScrollArea>
-      </div>
-    );
-  };
-
-  const renderPageConversation = () => {
-    if (!selectedConversation) {
-      return (
-        <div className="flex h-full items-center justify-center text-muted-foreground">
-          <div className="text-center">
-            <MessageCircle className="mx-auto size-10 opacity-50" />
-            <p className="mt-2 text-sm">Seleziona una conversazione per iniziare.</p>
-          </div>
-        </div>
-      );
-    }
-
-    const otherUserName =
-      selectedName ||
-      recipientName ||
-      normalizedConversations.find((conv) => conv.otherUser.id === selectedConversation)?.otherUser.username ||
-      conversationQuery.data?.find((msg) => msg.sender.id === selectedConversation)?.sender.username ||
-      "Utente";
-
-    const otherAvatar =
-      normalizedConversations.find((conv) => conv.otherUser.id === selectedConversation)?.otherUser.profilePicture ||
-      conversationQuery.data?.find((msg) => msg.sender.id === selectedConversation)?.sender.profilePicture ||
-      undefined;
-
-    return (
-      <div className="flex h-full min-h-0 flex-col">
-        <div className="flex items-center justify-between gap-3 border-b border-border/60 px-4 py-3 md:px-5">
-          <div className="flex items-center gap-3 min-w-0">
-            <Avatar className="size-10 border border-border/60">
-              <AvatarImage src={otherAvatar} />
-              <AvatarFallback className="text-xs">{getInitials(otherUserName)}</AvatarFallback>
-            </Avatar>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground">{otherUserName}</p>
-              <p className="text-xs text-muted-foreground">Conversazione privata</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="size-8 rounded-lg" aria-label="Chiama">
-              <Phone className="size-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="size-8 rounded-lg" aria-label="Videochiamata">
-              <Video className="size-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="size-8 rounded-lg" aria-label="Info">
-              <Info className="size-4" />
-            </Button>
-          </div>
-        </div>
-
-        <div className="flex-1 min-h-0">{renderConversationMessages(true)}</div>
-
-        <div className="border-t border-border/60 p-4">
-          <div className="flex items-center gap-2">
-            <Input
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Scrivi un messaggio..."
-              className="h-11 rounded-xl border-border/70 bg-background/55"
-            />
-            <Button
-              onClick={handleSend}
-              disabled={!messageText.trim() || sendMutation.isPending}
-              className="h-11 rounded-xl px-4"
-            >
-              <Send className="mr-1 size-4" />
-              Invia
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  if (isLinkMode) {
-    return (
-      <Link href="/messages" className="inline-flex">
-        <Button variant="ghost" size="icon" className="relative min-h-[44px] min-w-[44px]">
-          <MessageCircle className="h-5 w-5" />
-          {!recipientId && unreadCount > 0 && (
-            <Badge
-              variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-            >
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </Badge>
-          )}
-        </Button>
-      </Link>
-    );
-  }
-
-  if (isPageMode) {
-    return (
-      <section className="surface-panel overflow-hidden h-[calc(100dvh-178px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-[620px]">
-        <div className="grid h-full grid-cols-1 lg:grid-cols-[360px_minmax(0,1fr)]">
-          {renderPageList()}
-          {renderPageConversation()}
-        </div>
-      </section>
     );
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-      setIsOpen(open);
-      if (!open) {
-        setView(recipientId ? "conversation" : "list");
-        setSearchQuery("");
-        if (!recipientId) {
-          setSelectedConversation(null);
-          setSelectedName(null);
+    <div className="flex h-full min-h-0 flex-col">
+      {header}
+      <div className="min-h-0 flex-1">
+        <ScrollArea className="h-full">{body}</ScrollArea>
+      </div>
+      <Composer
+        key={partner.id}
+        inputRef={inputRef}
+        pending={send.isPending}
+        onSend={(content, sent) =>
+          send.mutate({ receiverId: partner.id, content }, { onSuccess: sent })
         }
-      }
-    }}>
+      />
+    </div>
+  );
+}
+
+function PersonAvatar({ name, src, className }: { name: string; src?: string | null; className?: string }) {
+  return (
+    <Avatar aria-hidden className={cn("size-10 shrink-0 border border-border", className)}>
+      <AvatarImage src={src || undefined} alt="" className="object-cover" />
+      <AvatarFallback className="text-xs font-semibold">{getInitials(name)}</AvatarFallback>
+    </Avatar>
+  );
+}
+
+function MessageDialog({ recipientId, recipientName }: { recipientId: number; recipientName?: string }) {
+  const [open, setOpen] = useState(false);
+  const name = recipientName?.trim() || "Nuotatore";
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
-          <MessageCircle className="h-5 w-5" />
-          {!recipientId && unreadCount > 0 && (
-            <Badge
-              variant="destructive"
-              className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
-            >
-              {unreadCount > 9 ? "9+" : unreadCount}
-            </Badge>
-          )}
+        <Button variant="outline">
+          <MessageCircle aria-hidden />
+          Messaggio
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl h-[600px] max-h-[80dvh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="p-4 border-b">
-          <DialogTitle>Messaggi</DialogTitle>
-          <p className="text-xs text-muted-foreground">
-            I messaggi vengono eliminati automaticamente dal server dopo {Number.isFinite(dmRetentionDays) ? dmRetentionDays : 60} giorni.
-          </p>
+      <DialogContent className="flex h-[600px] max-h-[80dvh] max-w-2xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="border-b border-border p-4 pr-12 text-left">
+          <DialogTitle>{name}</DialogTitle>
+          <DialogDescription className="text-xs">{RETENTION_NOTE}</DialogDescription>
         </DialogHeader>
-        {view === "search"
-          ? renderSearchView()
-          : view === "conversation" && selectedConversation
-            ? renderConversation()
-            : renderConversationsList()}
+        <div className="min-h-0 flex-1">
+          <ConversationView partner={{ id: recipientId, name }} active={open} limit={50} />
+        </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function MessagesPage() {
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const [selected, setSelected] = useState<Partner | null>(null);
+  const [composing, setComposing] = useState(false);
+  const [search, setSearch] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const listHeadingRef = useRef<HTMLHeadingElement>(null);
+  const newButtonRef = useRef<HTMLButtonElement>(null);
+  const composerRef = useRef<HTMLInputElement>(null);
+  // Where focus goes after a view change that removes the focused control.
+  const pendingFocus = useRef<"search" | "new" | "list" | "composer" | null>(null);
+
+  const conversationsQuery = trpc.community.messages.recent.useQuery(
+    { limit: 20 },
+    { refetchInterval: 8_000, refetchOnWindowFocus: true }
+  );
+  const conversations = useMemo<Conversation[]>(() => {
+    // One row per person (newest message first), unread counts added up.
+    const byUserId = new Map<number, Conversation>();
+    for (const conv of conversationsQuery.data ?? []) {
+      const existing = byUserId.get(conv.otherUser.id);
+      const unreadCount = toCount(conv.unreadCount) + toCount(existing?.unreadCount);
+      const newer =
+        !existing ||
+        new Date(conv.lastMessage.createdAt).getTime() >= new Date(existing.lastMessage.createdAt).getTime();
+      byUserId.set(conv.otherUser.id, { ...(newer ? conv : existing), unreadCount });
+    }
+    return Array.from(byUserId.values()).sort(
+      (a, b) => new Date(b.lastMessage.createdAt).getTime() - new Date(a.lastMessage.createdAt).getTime()
+    );
+  }, [conversationsQuery.data]);
+
+  const query = useDebouncedValue(search.trim(), SEARCH_DEBOUNCE_MS);
+  const peopleQuery = trpc.community.users.search.useQuery(
+    { query, limit: 10 },
+    { enabled: composing && query.length >= 1 }
+  );
+
+  // Desktop shows the chat next to the list: the newest conversation opens by itself.
+  useEffect(() => {
+    if (!isDesktop || selected || composing || conversations.length === 0) return;
+    const first = conversations[0];
+    setSelected({
+      id: first.otherUser.id,
+      name: first.otherUser.username || "Utente",
+      avatarUrl: first.otherUser.profilePicture,
+    });
+  }, [isDesktop, selected, composing, conversations]);
+
+  useEffect(() => {
+    const target = pendingFocus.current;
+    if (!target) return;
+    pendingFocus.current = null;
+    const element = {
+      search: searchRef.current,
+      new: newButtonRef.current,
+      list: listHeadingRef.current,
+      composer: composerRef.current,
+    }[target];
+    element?.focus();
+  }, [composing, selected, isDesktop]);
+
+  const open = (partner: Partner) => {
+    setSelected(partner);
+    setComposing(false);
+    setSearch("");
+    // On phones the list disappears: focus moves to the new message field.
+    if (!isDesktop) pendingFocus.current = "composer";
+  };
+  const startComposing = () => {
+    pendingFocus.current = "search";
+    setSearch("");
+    setComposing(true);
+  };
+  const stopComposing = () => {
+    pendingFocus.current = "new";
+    setSearch("");
+    setComposing(false);
+  };
+  const backToList = () => {
+    pendingFocus.current = "list";
+    setSelected(null);
+  };
+
+  const filter = search.trim().toLowerCase();
+  const visibleConversations = filter
+    ? conversations.filter((conv) => (conv.otherUser.username ?? "").toLowerCase().includes(filter))
+    : conversations;
+
+  let list: ReactNode;
+  if (composing) {
+    if (query.length === 0) {
+      list = <p className="p-4 text-sm text-muted-foreground">Scrivi un nome per cercare un nuotatore.</p>;
+    } else if (peopleQuery.isPending) {
+      list = <LoadingSkeleton label="Ricerca in corso…" count={3} className="space-y-2 p-4" itemClassName="h-14 w-full rounded-xl" />;
+    } else if (peopleQuery.isError) {
+      list = <LoadError onRetry={() => void peopleQuery.refetch()} className="m-4" />;
+    } else if (peopleQuery.data.length === 0) {
+      list = <p className="p-4 text-sm text-muted-foreground">Nessun nuotatore trovato.</p>;
+    } else {
+      list = (
+        <ul className="divide-y divide-border">
+          {peopleQuery.data.map((person) => {
+            const name = person.name?.trim() || person.username?.trim() || "Nuotatore";
+            const username = person.name?.trim() && person.username?.trim() ? `@${person.username.trim()}` : null;
+            return (
+              <li key={person.userId}>
+                <button
+                  type="button"
+                  onClick={() => open({ id: person.userId, name, avatarUrl: person.avatarUrl })}
+                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-raised"
+                >
+                  <PersonAvatar name={name} src={person.avatarUrl} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-semibold">{name}</span>{" "}
+                    {username ? <span className="block truncate text-xs text-muted-foreground">{username}</span> : null}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      );
+    }
+  } else if (conversationsQuery.isPending) {
+    list = (
+      <LoadingSkeleton label="Caricamento delle conversazioni…" count={4} className="space-y-2 p-4" itemClassName="h-14 w-full rounded-xl" />
+    );
+  } else if (conversationsQuery.isError && !conversationsQuery.data) {
+    list = <LoadError onRetry={() => void conversationsQuery.refetch()} className="m-4" />;
+  } else if (conversations.length === 0) {
+    list = (
+      <div className="flex flex-col items-center gap-3 p-6 text-center text-muted-foreground">
+        <MessageCircle className="size-8" aria-hidden />
+        <p className="text-sm">Nessun messaggio.</p>
+        <Button variant="outline" onClick={startComposing}>
+          <PenSquare aria-hidden />
+          Scrivi un messaggio
+        </Button>
+      </div>
+    );
+  } else if (visibleConversations.length === 0) {
+    list = <p className="p-4 text-sm text-muted-foreground">Nessuna conversazione trovata.</p>;
+  } else {
+    list = (
+      <ul className="divide-y divide-border">
+        {visibleConversations.map((conv) => {
+          const name = conv.otherUser.username || "Utente";
+          const isActive = selected?.id === conv.otherUser.id;
+          return (
+            <li key={conv.otherUser.id}>
+              <button
+                type="button"
+                aria-current={isActive || undefined}
+                onClick={() => open({ id: conv.otherUser.id, name, avatarUrl: conv.otherUser.profilePicture })}
+                className={cn(
+                  "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-raised",
+                  isActive && "bg-raised"
+                )}
+              >
+                <PersonAvatar name={name} src={conv.otherUser.profilePicture} className="size-11" />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-semibold">{name}</span>{" "}
+                    <span className="shrink-0 text-xs text-muted-foreground">{messageTime(conv.lastMessage.createdAt)}</span>
+                  </span>{" "}
+                  <span className="mt-0.5 flex items-center justify-between gap-2">
+                    <span className="truncate text-sm text-muted-foreground">{conversationPreview(conv.lastMessage)}</span>
+                    {conv.unreadCount > 0 ? (
+                      <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold text-primary-foreground tabular-nums">
+                        <span aria-hidden>{countLabel(conv.unreadCount)}</span>
+                        <span className="sr-only">
+                          , {conv.unreadCount} {conv.unreadCount === 1 ? "non letto" : "non letti"}
+                        </span>
+                      </span>
+                    ) : null}
+                  </span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  }
+
+  const showChat = selected !== null;
+
+  return (
+    <section
+      aria-label="Messaggi"
+      className="surface-panel h-[calc(100dvh-11rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] min-h-[420px] overflow-hidden p-0 lg:h-[calc(100dvh-7rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]"
+    >
+      <div className="grid h-full grid-rows-[minmax(0,1fr)] lg:grid-cols-[360px_minmax(0,1fr)]">
+        <div className={cn("flex min-h-0 flex-col border-border lg:border-r", showChat && "hidden lg:flex")}>
+          <div className="space-y-3 border-b border-border p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h2 ref={listHeadingRef} tabIndex={-1} className="text-[17px] font-bold outline-none">
+                {composing ? "Nuovo messaggio" : "Conversazioni"}
+              </h2>
+              {composing ? (
+                <Button variant="ghost" size="sm" onClick={stopComposing}>
+                  Annulla
+                </Button>
+              ) : (
+                <Button
+                  ref={newButtonRef}
+                  variant="ghost"
+                  size="icon"
+                  onClick={startComposing}
+                  aria-label="Nuovo messaggio"
+                  className="text-action-text"
+                >
+                  <PenSquare aria-hidden />
+                </Button>
+              )}
+            </div>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <Input
+                ref={searchRef}
+                type="search"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                aria-label={composing ? "Cerca un nuotatore" : "Cerca tra le conversazioni"}
+                placeholder={composing ? "Cerca un nuotatore…" : "Cerca tra le conversazioni…"}
+                className="pl-9"
+              />
+            </div>
+          </div>
+          <div className="min-h-0 flex-1">
+            <ScrollArea className="h-full">{list}</ScrollArea>
+          </div>
+          <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">{RETENTION_NOTE}</p>
+        </div>
+
+        <div className={cn("min-h-0", !showChat && "hidden lg:block")}>
+          {selected ? (
+            <ConversationView
+              key={selected.id}
+              partner={selected}
+              active
+              limit={100}
+              inputRef={composerRef}
+              header={
+                <div className="flex items-center gap-2 border-b border-border px-2 py-2 lg:px-4">
+                  <Button variant="ghost" size="icon" onClick={backToList} aria-label="Torna alle conversazioni" className="lg:hidden">
+                    <ChevronLeft className="size-5" aria-hidden />
+                  </Button>
+                  <PersonAvatar name={selected.name} src={selected.avatarUrl} />
+                  <h2 className="min-w-0 truncate text-[17px] font-bold">
+                    <Link href={`/u/${selected.id}`} className="hover:underline">
+                      {selected.name}
+                    </Link>
+                  </h2>
+                </div>
+              }
+            />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center text-muted-foreground">
+              <MessageCircle className="size-10" aria-hidden />
+              <p className="text-sm">Scegli una conversazione o scrivi un nuovo messaggio.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
