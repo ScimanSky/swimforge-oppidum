@@ -6,27 +6,36 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { AppLayout } from "@/components/AppLayout";
 import { Chip } from "@/components/corsia/Chip";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { Metric } from "@/components/corsia/Metric";
 import { RankRow } from "@/components/corsia/RankRow";
 import {
   CHALLENGE_DURATION_LABELS,
   CHALLENGE_TYPE_LABELS,
+  averageChallengeProgress,
+  bestChallengeProgress,
   challengeObjectiveLabel,
   challengeProgressParts,
+  compareChallengeProgress,
 } from "@/lib/challenges";
 import { formatInteger } from "@/lib/format";
+import { competitionRanks } from "@/lib/ranking";
 
 const sectionTitle = "text-[17px] font-bold";
 
-function Notice({ children, status = false }: { children: ReactNode; status?: boolean }) {
+function Notice({ children }: { children: ReactNode }) {
   return (
     <AppLayout>
-      <p role={status ? "status" : undefined} className="surface-panel p-4 text-center text-sm text-muted-foreground">
-        {children}
-      </p>
+      <p className="surface-panel p-4 text-center text-sm text-muted-foreground">{children}</p>
     </AppLayout>
   );
 }
+
+/** Profile badge tooltip: «Delfino (Livello 3)», without the parts that are missing. */
+const profileBadgeTitle = (name?: string | null, level?: number | string | null) => {
+  const label = name || "Badge";
+  return level != null && level !== "" ? `${label} (Livello ${level})` : label;
+};
 
 export default function ChallengeDetail() {
   const params = useParams<{ id: string }>();
@@ -35,7 +44,8 @@ export default function ChallengeDetail() {
   const rankingId = useId();
   const { user } = useAuth();
 
-  const { data: challenge, isLoading } = trpc.challenges.getById.useQuery({ id: challengeId });
+  const challengeQuery = trpc.challenges.getById.useQuery({ id: challengeId });
+  const challenge = challengeQuery.data;
 
   // Countdown timer
   const [timeLeft, setTimeLeft] = useState<string>("");
@@ -113,15 +123,35 @@ export default function ChallengeDetail() {
     return () => clearInterval(interval);
   }, [challenge]);
 
-  if (isLoading) return <Notice status>Caricamento...</Notice>;
+  if (challengeQuery.isPending) {
+    return (
+      <AppLayout>
+        <LoadingSkeleton
+          label="Caricamento della sfida…"
+          count={3}
+          itemClassName="h-24 w-full rounded-2xl"
+        />
+      </AppLayout>
+    );
+  }
+  if (!challenge && challengeQuery.isError && challengeQuery.error?.data?.code !== "NOT_FOUND") {
+    return (
+      <AppLayout>
+        <LoadError onRetry={() => void challengeQuery.refetch()} />
+      </AppLayout>
+    );
+  }
   if (!challenge) return <Notice>Sfida non trovata</Notice>;
 
-  const participants = challenge.participants ?? [];
+  // Best first: the server sorts by progress descending, which is backwards for pace.
+  const compare = compareChallengeProgress(challenge.objective);
+  const participants = [...(challenge.participants ?? [])].sort((a, b) =>
+    compare(Number(a.progress ?? 0), Number(b.progress ?? 0))
+  );
   const progressValues = participants.map((p) => Number(p.progress ?? 0));
-  const bestProgress = progressValues.length ? Math.max(...progressValues) : 0;
-  const averageProgress = progressValues.length
-    ? progressValues.reduce((sum, value) => sum + value, 0) / progressValues.length
-    : 0;
+  const ranks = competitionRanks(progressValues);
+  const bestProgress = bestChallengeProgress(challenge.objective, progressValues);
+  const averageProgress = averageChallengeProgress(challenge.objective, progressValues);
 
   const progressParts = (value: number) => challengeProgressParts(challenge.objective, value);
   const statusLabel =
@@ -182,9 +212,9 @@ export default function ChallengeDetail() {
                 const name = participant.username || "Nuotatore";
                 const { value, unit } = progressParts(Number(participant.progress || 0));
                 return (
-                  <li key={participant.userId}>
+                  <li key={participant.userId} value={ranks[index]}>
                     <RankRow
-                      rank={index + 1}
+                      rank={ranks[index]}
                       name={name}
                       avatarUrl={participant.avatarUrl || participant.avatar_url}
                       value={value}
@@ -196,7 +226,10 @@ export default function ChallengeDetail() {
                           <img
                             src={assetUrl(participant.profileBadgeUrl)}
                             alt={participant.profileBadgeName || "Badge"}
-                            title={`${participant.profileBadgeName} (Livello ${participant.profileBadgeLevel})`}
+                            title={profileBadgeTitle(
+                              participant.profileBadgeName,
+                              participant.profileBadgeLevel
+                            )}
                             className="size-7 shrink-0 object-contain"
                           />
                         ) : null

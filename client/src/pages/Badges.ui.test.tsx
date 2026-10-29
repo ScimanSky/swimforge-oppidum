@@ -7,12 +7,22 @@ const state = vi.hoisted(() => ({
   badges: [] as any[],
   definitions: [] as any[],
   userAchievements: [] as any[],
+  pending: false,
+  error: false,
+  refetch: vi.fn(),
 }));
 
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     badges: {
-      progress: { useQuery: () => ({ data: state.badges, isLoading: false }) },
+      progress: {
+        useQuery: () =>
+          state.pending
+            ? { data: undefined, isPending: true, isLoading: true, refetch: state.refetch }
+            : state.error
+              ? { data: undefined, isPending: false, isError: true, refetch: state.refetch }
+              : { data: state.badges, isLoading: false, refetch: state.refetch },
+      },
       getAchievementBadgeDefinitions: {
         useQuery: () => ({ data: state.definitions, isLoading: false }),
       },
@@ -57,6 +67,38 @@ describe("Badge (Corsia)", () => {
     state.badges = [];
     state.definitions = [];
     state.userAchievements = [];
+    state.pending = false;
+    state.error = false;
+    state.refetch.mockClear();
+  });
+
+  it("in caricamento: scheletri, non «0 di 0»", () => {
+    state.pending = true;
+    render(<Badges />);
+    expect(screen.getByRole("status").textContent).toContain("Caricamento");
+    expect(screen.queryByText("di 0")).toBeNull();
+    expect(screen.queryByText("Nessun badge in questa categoria.")).toBeNull();
+  });
+
+  it("errore: messaggio breve e Riprova", async () => {
+    state.error = true;
+    render(<Badges />);
+    expect(screen.getByText("Non riesco a caricare i dati")).toBeTruthy();
+    expect(screen.queryByText("di 0")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Riprova" }));
+    expect(state.refetch).toHaveBeenCalled();
+  });
+
+  it("chiudendo il dettaglio con Esc il fuoco torna sul badge", async () => {
+    const user = userEvent.setup({ delay: null });
+    state.badges = [badge(1), badge(2, { progress: 40 })];
+    render(<Badges />);
+    const tile = screen.getByRole("button", { name: "Badge 2, da sbloccare, 40 %" });
+    await user.click(tile);
+    expect(screen.getByRole("dialog", { name: "Badge 2" })).toBeTruthy();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(tile);
   });
 
   it("senza h1 né tema scuro forzato; collezione e categorie in italiano", () => {
@@ -83,7 +125,7 @@ describe("Badge (Corsia)", () => {
     const grid = screen.getByRole("list", { name: "Badge" });
     const earned = within(grid).getByRole("button", { name: "Badge 1" });
     expect(earned.querySelector("img")?.getAttribute("src")).toBe("/badges_new/first_km.png");
-    const locked = within(grid).getByRole("button", { name: "Badge 2, da sbloccare" });
+    const locked = within(grid).getByRole("button", { name: "Badge 2, da sbloccare, 40 %" });
     expect(locked.querySelector("img")).toBeNull();
     expect(locked.querySelector('[data-slot="progress"]')).toBeTruthy();
   });
@@ -115,7 +157,7 @@ describe("Badge (Corsia)", () => {
     await userEvent.click(within(dialog).getByRole("button", { name: "Chiudi" }));
     expect(screen.queryByRole("dialog")).toBeNull();
 
-    await userEvent.click(screen.getByRole("button", { name: "Badge 2, da sbloccare" }));
+    await userEvent.click(screen.getByRole("button", { name: "Badge 2, da sbloccare, 40 %" }));
     dialog = screen.getByRole("dialog", { name: "Badge 2" });
     expect(within(dialog).getByText("40%")).toBeTruthy();
     expect(within(dialog).getByRole("progressbar", { name: "Progresso: Badge 2" })).toBeTruthy();

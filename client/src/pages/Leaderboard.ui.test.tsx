@@ -9,6 +9,9 @@ const state = vi.hoisted(() => ({
   rows: [] as any[],
   queries: [] as any[],
   user: { id: 4 } as any,
+  pending: false,
+  error: false,
+  refetch: vi.fn(),
 }));
 
 vi.mock("@/lib/trpc", () => ({
@@ -17,7 +20,9 @@ vi.mock("@/lib/trpc", () => ({
       get: {
         useQuery: (input: any) => {
           state.queries.push(input);
-          return { data: state.rows, isLoading: false };
+          if (state.pending) return { data: undefined, isPending: true, isLoading: true, refetch: state.refetch };
+          if (state.error) return { data: undefined, isPending: false, isError: true, refetch: state.refetch };
+          return { data: state.rows, isLoading: false, isPending: false, refetch: state.refetch };
         },
       },
     },
@@ -53,6 +58,56 @@ describe("Classifiche (Corsia)", () => {
     state.rows = [];
     state.queries.length = 0;
     state.user = { id: 4 };
+    state.pending = false;
+    state.error = false;
+    state.refetch.mockClear();
+  });
+
+  it("in caricamento: scheletri, non lo stato vuoto", () => {
+    state.pending = true;
+    renderLeaderboard();
+    expect(screen.getByRole("status").textContent).toContain("Caricamento");
+    expect(screen.queryByText("Nessun nuotatore in classifica")).toBeNull();
+  });
+
+  it("errore: messaggio breve e Riprova", async () => {
+    state.error = true;
+    renderLeaderboard();
+    expect(screen.getByText("Non riesco a caricare i dati")).toBeTruthy();
+    expect(screen.queryByText("Nessun nuotatore in classifica")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Riprova" }));
+    expect(state.refetch).toHaveBeenCalled();
+  });
+
+  it("pari merito: stessa posizione (1, 1, 3) su podio e righe", () => {
+    state.rows = [row(1, 900), row(2, 900), row(3, 700), row(4, 700), row(5, 100)];
+    renderLeaderboard();
+    const podium = screen.getByRole("list", { name: "Podio" });
+    expect(within(within(podium).getByRole("link", { name: /Nuotatore 1/ })).getByText("1")).toBeTruthy();
+    expect(within(within(podium).getByRole("link", { name: /Nuotatore 2/ })).getByText("1")).toBeTruthy();
+    expect(within(within(podium).getByRole("link", { name: /Nuotatore 3/ })).getByText("3")).toBeTruthy();
+    const list = screen.getByRole("list", { name: "Classifica" });
+    const mine = within(list).getByRole("link", { name: /Nuotatore 4/ });
+    expect(within(mine).getByText("3")).toBeTruthy();
+    expect(mine.closest("li")!.getAttribute("value")).toBe("3");
+    const summary = screen.getByRole("region", { name: "La tua posizione" });
+    expect(within(summary).getByText("3°")).toBeTruthy();
+  });
+
+  it("niente podio quando il primo ha zero", () => {
+    state.rows = [row(1, 0), row(2, 0), row(3, 0)];
+    renderLeaderboard();
+    expect(screen.queryByRole("list", { name: "Podio" })).toBeNull();
+    expect(within(screen.getByRole("list", { name: "Classifica" })).getAllByRole("listitem")).toHaveLength(3);
+  });
+
+  it("con 50 nuotatori dice onestamente «tra i primi 50»", () => {
+    state.rows = Array.from({ length: 50 }, (_, i) => row(i + 10, 5000 - i));
+    state.user = { id: 999 };
+    renderLeaderboard();
+    const summary = screen.getByRole("region", { name: "La tua posizione" });
+    expect(within(summary).getByText("Primi in classifica")).toBeTruthy();
+    expect(within(summary).getByText("Non sei ancora tra i primi 50.")).toBeTruthy();
   });
 
   it("senza h1 né pulsante indietro; stato vuoto", () => {
@@ -136,7 +191,7 @@ describe("Classifiche (Corsia)", () => {
   });
 
   it("torna alla prima pagina cambiando periodo", async () => {
-    state.rows = Array.from({ length: 9 }, (_, i) => row(i + 10, 1000 - i * 10));
+    state.rows = Array.from({ length: 9 }, (_, i) => ({ ...row(i + 10, 1000 - i * 10), periodXp: 90 - i }));
     renderLeaderboard();
     const pages = screen.getByRole("navigation", { name: "Pagine della classifica" });
     await userEvent.click(within(pages).getByRole("button", { name: "Avanti" }));

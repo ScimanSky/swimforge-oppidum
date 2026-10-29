@@ -11,6 +11,9 @@ const state = vi.hoisted(() => ({
   suggested: [] as any[],
   followCalls: [] as any[],
   createCalls: [] as any[],
+  clubsPending: false,
+  clubsError: false,
+  refetch: vi.fn(),
 }));
 
 vi.mock("@/lib/trpc", () => ({
@@ -20,7 +23,9 @@ vi.mock("@/lib/trpc", () => ({
         list: {
           useQuery: (input: any) => {
             state.clubQueries.push(input);
-            return { data: state.clubs, isLoading: false, refetch: vi.fn() };
+            if (state.clubsPending) return { data: undefined, isPending: true, isLoading: true, refetch: state.refetch };
+            if (state.clubsError) return { data: undefined, isError: true, refetch: state.refetch };
+            return { data: state.clubs, isLoading: false, refetch: state.refetch };
           },
         },
         create: {
@@ -77,6 +82,26 @@ describe("Community · Club (Corsia)", () => {
     state.suggested = [];
     state.followCalls.length = 0;
     state.createCalls.length = 0;
+    state.clubsPending = false;
+    state.clubsError = false;
+    state.refetch.mockClear();
+  });
+
+  it("club in caricamento: scheletri; errore: Riprova", async () => {
+    state.clubsPending = true;
+    renderCommunity();
+    const loading = screen.getByRole("status");
+    expect(loading.textContent).toContain("Caricamento");
+    expect(loading.querySelector('[data-slot="skeleton"]')).toBeTruthy();
+    expect(screen.queryByText("Nessun club trovato.")).toBeNull();
+    cleanup();
+    state.clubsPending = false;
+    state.clubsError = true;
+    renderCommunity();
+    expect(screen.getByText("Non riesco a caricare i dati")).toBeTruthy();
+    expect(screen.queryByText("Nessun club trovato.")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Riprova" }));
+    expect(state.refetch).toHaveBeenCalled();
   });
 
   it("non ha un h1 né la navigazione verso le classifiche", () => {

@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Chip } from "@/components/corsia/Chip";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { Metric } from "@/components/corsia/Metric";
 import { Pager } from "@/components/corsia/Pager";
 import { Lock } from "lucide-react";
@@ -51,6 +52,13 @@ const badgeImage = (badge: any) =>
       getBadgeImageUrl(badge?.code)
   );
 
+/** Tile name for screen readers: locked badges add «da sbloccare» and the progress when started. */
+const badgeTileLabel = (badge: any) => {
+  if (badge.earned) return badge.name;
+  const progress = Math.round(Number(badge.progress) || 0);
+  return progress > 0 ? `${badge.name}, da sbloccare, ${progress} %` : `${badge.name}, da sbloccare`;
+};
+
 /** A locked badge: padlock on a dashed raised disc (the artwork stays a surprise). */
 function LockedBadge({ className, iconClassName }: { className: string; iconClassName: string }) {
   return (
@@ -69,17 +77,26 @@ export default function Badges() {
   const { isAuthenticated, loading: authLoading } = useAuth();
   const titleId = useId();
   const [selectedCategory, setSelectedCategory] = useState("all");
+  // The last opened badge stays rendered while the dialog animates out; `detailOpen` drives it.
   const [selectedBadge, setSelectedBadge] = useState<any | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  // The tile that opened the dialog: focus goes back to it on close.
+  const openerRef = useRef<HTMLButtonElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const { data: badgeProgress, isLoading } = trpc.badges.progress.useQuery(
-    undefined,
-    { enabled: isAuthenticated }
+  const progressQuery = trpc.badges.progress.useQuery(undefined, { enabled: isAuthenticated });
+  const definitionsQuery = trpc.badges.getAchievementBadgeDefinitions.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+  const userAchievementsQuery = trpc.badges.getUserAchievementBadges.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
+  const badgeProgress = progressQuery.data;
+  const achievementDefinitions = definitionsQuery.data;
+  const userAchievementBadges = userAchievementsQuery.data;
+  const failedQueries = [progressQuery, definitionsQuery, userAchievementsQuery].filter(
+    (query) => query.data === undefined && query.isError
   );
-  const { data: achievementDefinitions, isLoading: achievementsLoading } =
-    trpc.badges.getAchievementBadgeDefinitions.useQuery(undefined, { enabled: isAuthenticated });
-  const { data: userAchievementBadges } =
-    trpc.badges.getUserAchievementBadges.useQuery(undefined, { enabled: isAuthenticated });
 
   const achievementBadges = useMemo(() => {
     if (!achievementDefinitions) return [];
@@ -158,8 +175,10 @@ export default function Badges() {
     }
   }, []);
 
-  const handleBadgeClick = (badge: any, badgeIndex: number) => {
+  const handleBadgeClick = (badge: any, badgeIndex: number, opener: HTMLButtonElement) => {
+    openerRef.current = opener;
     setSelectedBadge(badge);
+    setDetailOpen(true);
     if (badge.earned) {
       playSound(getBadgeSoundUrl(badgeIndex + 1));
     }
@@ -170,7 +189,13 @@ export default function Badges() {
     return <Redirect to="/" />;
   }
 
-  const loading = isLoading || achievementsLoading;
+  // `isPending` also covers the queries still disabled while auth loads.
+  const loading =
+    authLoading ||
+    progressQuery.isPending ||
+    definitionsQuery.isPending ||
+    userAchievementsQuery.isPending;
+  const failed = !loading && failedQueries.length > 0;
 
   return (
     <AppLayout>
@@ -178,23 +203,27 @@ export default function Badges() {
         {/* Hidden audio element for badge sounds (dynamic source) */}
         <audio ref={audioRef} preload="auto" />
 
-        <section aria-labelledby={titleId} className="surface-panel p-4">
-          <h2 id={titleId} className="text-sm font-medium text-muted-foreground">
-            Collezione
-          </h2>
-          <div className="mt-2 flex items-end justify-between gap-4">
-            <Metric
-              size="lg"
-              value={formatInteger(earnedCount)}
-              unit={`di ${formatInteger(totalCount)}`}
-              label="Badge sbloccati"
-            />
-            <span className="font-display text-[28px] font-bold leading-none tabular-nums">
-              {collectionPercent}%
-            </span>
-          </div>
-          <Progress value={collectionPercent} className="mt-4 h-2" aria-label="Collezione completata" />
-        </section>
+        {loading ? (
+          <Skeleton className="h-[132px] w-full rounded-2xl" aria-hidden />
+        ) : failed ? null : (
+          <section aria-labelledby={titleId} className="surface-panel p-4">
+            <h2 id={titleId} className="text-sm font-medium text-muted-foreground">
+              Collezione
+            </h2>
+            <div className="mt-2 flex items-end justify-between gap-4">
+              <Metric
+                size="lg"
+                value={formatInteger(earnedCount)}
+                unit={`di ${formatInteger(totalCount)}`}
+                label="Badge sbloccati"
+              />
+              <span className="font-display text-[28px] font-bold leading-none tabular-nums">
+                {collectionPercent}%
+              </span>
+            </div>
+            <Progress value={collectionPercent} className="mt-4 h-2" aria-label="Collezione completata" />
+          </section>
+        )}
 
         <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
           <TabsList aria-label="Categoria">
@@ -207,12 +236,14 @@ export default function Badges() {
         </Tabs>
 
         {loading ? (
-          <div role="status" className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            <span className="sr-only">Caricamento dei badge…</span>
-            {[...Array(10)].map((_, i) => (
-              <Skeleton key={i} className="h-44 rounded-2xl" aria-hidden />
-            ))}
-          </div>
+          <LoadingSkeleton
+            label="Caricamento dei badge…"
+            count={10}
+            className="grid grid-cols-2 gap-3 space-y-0 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5"
+            itemClassName="h-44 rounded-2xl"
+          />
+        ) : failed ? (
+          <LoadError onRetry={() => failedQueries.forEach((query) => void query.refetch())} />
         ) : filteredBadges.length === 0 ? (
           <p className="surface-panel p-4 text-sm text-muted-foreground">
             Nessun badge in questa categoria.
@@ -226,8 +257,10 @@ export default function Badges() {
                 <li key={badge.id}>
                   <button
                     type="button"
-                    onClick={() => handleBadgeClick(badge, position >= 0 ? position : index)}
-                    aria-label={isEarned ? badge.name : `${badge.name}, da sbloccare`}
+                    onClick={(event) =>
+                      handleBadgeClick(badge, position >= 0 ? position : index, event.currentTarget)
+                    }
+                    aria-label={badgeTileLabel(badge)}
                     className="flex h-full w-full flex-col items-center gap-2 rounded-2xl border border-border bg-card p-3 text-center transition-colors hover:bg-raised focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   >
                     <span className="flex size-24 items-center justify-center">
@@ -261,7 +294,7 @@ export default function Badges() {
             })}
           </ul>
         )}
-        {!loading ? (
+        {!loading && !failed ? (
           <Pager
             page={badgePage}
             totalPages={badgeTotalPages}
@@ -271,9 +304,16 @@ export default function Badges() {
           />
         ) : null}
 
-        <Dialog open={selectedBadge != null} onOpenChange={(open) => !open && setSelectedBadge(null)}>
+        <Dialog open={detailOpen && selectedBadge != null} onOpenChange={setDetailOpen}>
           {selectedBadge ? (
-            <DialogContent className="max-w-sm">
+            <DialogContent
+              className="max-w-sm"
+              onCloseAutoFocus={(event) => {
+                // Opened from a tile, not a DialogTrigger: give focus back to that tile.
+                event.preventDefault();
+                openerRef.current?.focus();
+              }}
+            >
               <DialogHeader className="items-center text-center sm:text-center">
                 <span className="mb-2 flex size-40 items-center justify-center">
                   {selectedBadge.earned ? (

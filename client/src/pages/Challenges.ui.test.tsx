@@ -11,29 +11,48 @@ const state = vi.hoisted(() => ({
   joinCalls: [] as any[],
   leaveCalls: [] as any[],
   createCalls: [] as any[],
+  activities: [] as any[],
+  pending: false,
+  error: false,
+  refetch: vi.fn(),
+  // Options and pending flags of the mutations, by name.
+  options: {} as Record<string, any>,
+  mutating: {} as Record<string, any>,
 }));
 
-const mutation = vi.hoisted(() => (calls: any[]) => () => ({
-  mutate: (vars: any) => calls.push(vars),
-  isPending: false,
-}));
+const mutation = vi.hoisted(() => (name: string, calls: any[]) => (options: any) => {
+  state.options[name] = options;
+  return {
+    mutate: (vars: any) => calls.push(vars),
+    isPending: state.mutating[name] !== undefined,
+    variables: state.mutating[name],
+  };
+});
 
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     profile: { get: { useQuery: () => ({ data: { userId: 4, level: 5, totalXp: 8420 } }) } },
-    activities: { list: { useQuery: () => ({ data: [] }) } },
+    activities: { list: { useQuery: () => ({ data: state.activities }) } },
     badges: { userBadges: { useQuery: () => ({ data: [{ id: 1 }, { id: 2 }] }) } },
     challenges: {
-      list: { useQuery: () => ({ data: state.challenges, refetch: vi.fn() }) },
-      create: { useMutation: mutation(state.createCalls) },
-      join: { useMutation: mutation(state.joinCalls) },
-      leave: { useMutation: mutation(state.leaveCalls) },
+      list: {
+        useQuery: () =>
+          state.pending
+            ? { data: undefined, isPending: true, isLoading: true, refetch: state.refetch }
+            : state.error
+              ? { data: undefined, isPending: false, isError: true, refetch: state.refetch }
+              : { data: state.challenges, refetch: state.refetch },
+      },
+      create: { useMutation: mutation("create", state.createCalls) },
+      join: { useMutation: mutation("join", state.joinCalls) },
+      leave: { useMutation: mutation("leave", state.leaveCalls) },
     },
     leaderboard: { get: { useQuery: () => ({ data: state.leaderboard }) } },
   },
 }));
 
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("sonner", () => ({ toast }));
 
 vi.mock("@/components/AppLayout", () => ({
   default: ({ children }: any) => <div>{children}</div>,
@@ -69,6 +88,71 @@ describe("Sfide (Corsia)", () => {
     state.joinCalls.length = 0;
     state.leaveCalls.length = 0;
     state.createCalls.length = 0;
+    state.activities = [];
+    state.pending = false;
+    state.error = false;
+    state.refetch.mockClear();
+    state.mutating = {};
+    toast.error.mockClear();
+  });
+
+  it("in caricamento: scheletri, non «Attive (0)» né lo stato vuoto", () => {
+    state.pending = true;
+    renderChallenges();
+    expect(screen.getByRole("status").textContent).toContain("Caricamento");
+    expect(screen.getByRole("tab", { name: /Attive/ }).textContent).not.toContain("(0)");
+    expect(screen.queryByText(/Nessuna sfida attiva/)).toBeNull();
+  });
+
+  it("errore: messaggio breve e Riprova", async () => {
+    state.error = true;
+    renderChallenges();
+    expect(screen.getByText("Non riesco a caricare i dati")).toBeTruthy();
+    expect(screen.queryByText(/Nessuna sfida attiva/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Riprova" }));
+    expect(state.refetch).toHaveBeenCalled();
+  });
+
+  it("«Giorni di fila» senza unità ripetuta, contati sui giorni locali", () => {
+    const today = new Date();
+    today.setHours(0, 30, 0, 0);
+    state.activities = [{ activityDate: today.toISOString() }];
+    renderChallenges();
+    const summary = screen.getByRole("region", { name: "Riepilogo" });
+    const streak = within(summary).getByText("Giorni di fila").parentElement!;
+    expect(streak.textContent).not.toMatch(/giorn[oi]/);
+    expect(within(streak).getByText("1")).toBeTruthy();
+  });
+
+  it("Partecipa disattivato mentre la richiesta è in corso; errore con avviso", () => {
+    state.challenges = [challenge(9), challenge(10)];
+    state.mutating.join = { challengeId: 9 };
+    renderChallenges();
+    return userEvent.click(screen.getByRole("tab", { name: "Disponibili" })).then(() => {
+      const button = screen.getByRole("button", { name: "Partecipa: Sfida 9" });
+      expect(button.hasAttribute("disabled")).toBe(true);
+      expect(screen.getByRole("button", { name: "Partecipa: Sfida 10" }).hasAttribute("disabled")).toBe(false);
+      state.options.join.onError(new Error("Rete assente"));
+      expect(toast.error).toHaveBeenCalledWith("Rete assente");
+      state.options.leave.onError({ message: "" });
+      expect(toast.error).toHaveBeenLastCalledWith("Impossibile abbandonare la sfida");
+    });
+  });
+
+  it("sfida sul passo: la barra misura rispetto al passo migliore (più basso)", () => {
+    state.challenges = [
+      challenge(3, {
+        isParticipant: true,
+        objective: "avg_pace",
+        current_progress: 125,
+        leaderboard: [{ progress: 100 }, { progress: 125 }, { progress: 0 }],
+      }),
+    ];
+    renderChallenges();
+    const bar = screen.getByRole("progressbar", { name: "Progresso: Sfida 3" });
+    // 1:40 is the best pace, mine is 2:05: 80% of the way.
+    const indicator = bar.querySelector<HTMLElement>('[data-slot="progress-indicator"]')!;
+    expect(indicator.style.transform).toBe("translateX(-20%)");
   });
 
   it("senza h1 né titolo ripetuto; riepilogo con metriche e schede in italiano", () => {
@@ -106,6 +190,16 @@ describe("Sfide (Corsia)", () => {
       "/challenges/7"
     );
     await userEvent.click(within(card).getByRole("button", { name: "Abbandona" }));
+    // Asks first: nothing is sent until confirmed.
+    expect(state.leaveCalls).toEqual([]);
+    const confirm = screen.getByRole("alertdialog", { name: "Abbandonare «Sfida 7»?" });
+    await userEvent.click(within(confirm).getByRole("button", { name: "Annulla" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(state.leaveCalls).toEqual([]);
+    await userEvent.click(within(card).getByRole("button", { name: "Abbandona" }));
+    await userEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Abbandona" })
+    );
     expect(state.leaveCalls).toEqual([{ challengeId: 7 }]);
   });
 

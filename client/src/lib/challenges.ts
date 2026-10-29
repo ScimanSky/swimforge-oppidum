@@ -5,6 +5,7 @@ import {
   formatInteger,
   formatPaceValue,
 } from "@/lib/format";
+import { localDayKey } from "@/lib/profile-stats";
 
 /** Labels shared by the challenge list, the create dialog and the challenge detail. */
 export const CHALLENGE_TYPE_LABELS: Record<string, string> = {
@@ -60,3 +61,54 @@ export function challengeProgressParts(
   }
 }
 
+
+/** For pace (seconds per 100 m) lower is better; for every other objective higher is. */
+export const isLowerBetter = (objective: string) => objective === "avg_pace";
+
+/** Pace 0 means «no swim yet»: it never counts as a result. */
+const withData = (objective: string, values: readonly number[]) =>
+  isLowerBetter(objective) ? values.filter((value) => value > 0) : values;
+
+/** Comparator, best first: descending, or ascending pace with the swimmers without data last. */
+export const compareChallengeProgress = (objective: string) => (a: number, b: number) => {
+  if (!isLowerBetter(objective)) return b - a;
+  if (a > 0 && b > 0) return a - b;
+  return (b > 0 ? 1 : 0) - (a > 0 ? 1 : 0);
+};
+
+/** Best result of the group (the highest, or the lowest pace); 0 without data. */
+export function bestChallengeProgress(objective: string, values: readonly number[]): number {
+  const valid = withData(objective, values);
+  if (valid.length === 0) return 0;
+  return isLowerBetter(objective) ? Math.min(...valid) : Math.max(...valid);
+}
+
+/** Group average; for pace only over the swimmers with a result. 0 without data. */
+export function averageChallengeProgress(objective: string, values: readonly number[]): number {
+  const valid = withData(objective, values);
+  return valid.length === 0 ? 0 : valid.reduce((sum, value) => sum + value, 0) / valid.length;
+}
+
+/** Progress bar 0-100 against the best of the group (inverted for pace: best / mine). */
+export function challengeProgressPercent(
+  objective: string,
+  mine: number,
+  values: readonly number[]
+): number {
+  const best = bestChallengeProgress(objective, values);
+  if (!(mine > 0) || !(best > 0)) return 0;
+  const ratio = isLowerBetter(objective) ? best / mine : mine / best;
+  return Math.min(100, ratio * 100);
+}
+
+/** Consecutive local days with a swim, ending today (0 when today has no swim yet). */
+export function dayStreak(days: readonly Date[], now: Date = new Date()): number {
+  const swum = new Set(days.map(localDayKey));
+  const cursor = new Date(now);
+  let streak = 0;
+  while (swum.has(localDayKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}

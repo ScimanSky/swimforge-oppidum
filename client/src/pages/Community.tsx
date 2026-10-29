@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Chip } from "@/components/corsia/Chip"
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState"
 import { Pager } from "@/components/corsia/Pager"
 import { getInitials } from "@/lib/format"
 import {
@@ -122,7 +123,9 @@ export default function Community() {
       return true;
     });
   }, [discoverMode, suggestedUsersQuery.data, userSearchQuery.data])
-  const isDiscoverLoading = discoverMode ? userSearchQuery.isLoading : suggestedUsersQuery.isLoading
+  const discoverQuery = discoverMode ? userSearchQuery : suggestedUsersQuery
+  const isDiscoverLoading = discoverQuery.isLoading
+  const discoverFailed = !discoverQuery.data && discoverQuery.isError
   const clubsListRef = useRef<HTMLUListElement>(null)
   const {
     page: clubsPage,
@@ -268,10 +271,15 @@ export default function Community() {
             />
           </div>
 
-          {clubsQuery.isLoading ? (
-            <p role="status" className="surface-panel p-4 text-sm text-muted-foreground">
-              Caricamento club...
-            </p>
+          {clubsQuery.isPending ? (
+            <LoadingSkeleton
+              label="Caricamento dei club…"
+              count={3}
+              className="grid gap-3 space-y-0 sm:grid-cols-2 lg:grid-cols-3"
+              itemClassName="h-40 rounded-2xl"
+            />
+          ) : !clubsQuery.data && clubsQuery.isError ? (
+            <LoadError onRetry={() => void clubsQuery.refetch()} />
           ) : clubs.length === 0 ? (
             <p className="surface-panel p-4 text-sm text-muted-foreground">Nessun club trovato.</p>
           ) : (
@@ -351,9 +359,9 @@ export default function Community() {
           </div>
 
           {isDiscoverLoading ? (
-            <p role="status" className="mt-3 text-sm text-muted-foreground">
-              Caricamento nuotatori...
-            </p>
+            <LoadingSkeleton label="Caricamento dei nuotatori…" count={3} className="mt-3" itemClassName="h-12 w-full rounded-xl" />
+          ) : discoverFailed ? (
+            <LoadError className="mt-3 border-0 bg-raised" onRetry={() => void discoverQuery.refetch()} />
           ) : discoverUsers.length === 0 ? (
             <p className="mt-3 text-sm text-muted-foreground">
               {discoverMode ? "Nessun utente trovato." : "Nessun suggerimento disponibile al momento."}

@@ -2,12 +2,13 @@ import { AppLayout } from "@/components/AppLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { Metric } from "@/components/corsia/Metric";
 import { Pager } from "@/components/corsia/Pager";
 import { RankBadge, RankRow, RankValue } from "@/components/corsia/RankRow";
 import { formatInteger, getInitials } from "@/lib/format";
+import { competitionRanks } from "@/lib/ranking";
 import { cn } from "@/lib/utils";
 import { Award, TrendingUp, Trophy, Zap } from "lucide-react";
 import { Link, Redirect } from "wouter";
@@ -16,6 +17,8 @@ import { usePaged } from "@/hooks/usePaged";
 
 type OrderBy = "level" | "totalXp" | "badges";
 type Period = "all" | "week" | "month";
+/** The server returns at most this many swimmers. */
+const LEADERBOARD_LIMIT = 50;
 
 // Helper to normalize leaderboard entry data from different query formats
 interface NormalizedEntry {
@@ -65,8 +68,8 @@ export default function Leaderboard() {
   const [period, setPeriod] = useState<Period>("all");
   const listRef = useRef<HTMLOListElement>(null);
 
-  const { data: leaderboard, isLoading } = trpc.leaderboard.get.useQuery(
-    { orderBy, period, limit: 50 },
+  const leaderboardQuery = trpc.leaderboard.get.useQuery(
+    { orderBy, period, limit: LEADERBOARD_LIMIT },
     {
       enabled: isAuthenticated,
       staleTime: 15_000,
@@ -75,6 +78,10 @@ export default function Leaderboard() {
       refetchOnMount: "always",
     }
   );
+  const leaderboard = leaderboardQuery.data;
+  // `isPending` also covers the query still disabled while auth loads (isLoading is false then).
+  const loading = authLoading || leaderboardQuery.isPending;
+  const failed = !leaderboard && leaderboardQuery.isError;
 
   // Number shown for an entry, by ranking and period.
   const numericValue = (entry: NormalizedEntry) => {
@@ -92,7 +99,11 @@ export default function Leaderboard() {
 
   // Normalize all entries
   const normalizedLeaderboard = leaderboard?.map(normalizeEntry) || [];
-  const podiumOffset = normalizedLeaderboard.length >= 3 ? 3 : 0;
+  // Ties share a position (1, 1, 3); the list arrives sorted by the shown value.
+  const ranks = competitionRanks(normalizedLeaderboard.map(numericValue));
+  // No podium for a ranking nobody has scored in yet (everyone at 0).
+  const podiumOffset =
+    normalizedLeaderboard.length >= 3 && numericValue(normalizedLeaderboard[0]) > 0 ? 3 : 0;
   const podium = normalizedLeaderboard.slice(0, podiumOffset);
   const restEntries = normalizedLeaderboard.slice(podiumOffset);
   const {
@@ -110,6 +121,7 @@ export default function Leaderboard() {
 
   const isMe = (entry: NormalizedEntry) => user != null && String(entry.userId) === String(user.id);
   const totalPlayers = normalizedLeaderboard.length;
+  const atLimit = totalPlayers >= LEADERBOARD_LIMIT;
   const myIndex = normalizedLeaderboard.findIndex(isMe);
   const me = myIndex >= 0 ? normalizedLeaderboard[myIndex] : null;
   const myValueLabel =
@@ -144,13 +156,10 @@ export default function Leaderboard() {
           </Tabs>
         </div>
 
-        {isLoading ? (
-          <div role="status" className="space-y-2">
-            <span className="sr-only">Caricamento della classifica…</span>
-            {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full rounded-2xl" aria-hidden />
-            ))}
-          </div>
+        {loading ? (
+          <LoadingSkeleton label="Caricamento della classifica…" count={6} />
+        ) : failed ? (
+          <LoadError onRetry={() => void leaderboardQuery.refetch()} />
         ) : totalPlayers === 0 ? (
           <div className="surface-panel flex flex-col items-center gap-2 p-6 text-center">
             <Trophy className="size-10 text-muted-foreground" aria-hidden />
@@ -163,10 +172,15 @@ export default function Leaderboard() {
           <>
             <section aria-label="La tua posizione" className="surface-panel p-4">
               <div className="grid grid-cols-3 gap-4">
-                <Metric size="responsive" value={formatInteger(totalPlayers)} label="Nuotatori" />
+                {/* The server sends the first 50 only: never claim they are all the swimmers. */}
+                <Metric
+                  size="responsive"
+                  value={formatInteger(totalPlayers)}
+                  label={atLimit ? "Primi in classifica" : "In classifica"}
+                />
                 {me ? (
                   <>
-                    <Metric size="responsive" value={`${myIndex + 1}°`} label="La tua posizione" />
+                    <Metric size="responsive" value={`${ranks[myIndex]}°`} label="La tua posizione" />
                     <Metric
                       size="responsive"
                       tone={orderBy === "totalXp" ? "xp" : "default"}
@@ -177,7 +191,9 @@ export default function Leaderboard() {
                   </>
                 ) : (
                   <p className="col-span-2 self-center text-sm text-muted-foreground">
-                    Non sei ancora in classifica.
+                    {atLimit
+                      ? `Non sei ancora tra i primi ${LEADERBOARD_LIMIT}.`
+                      : "Non sei ancora in classifica."}
                   </p>
                 )}
               </div>
@@ -186,23 +202,25 @@ export default function Leaderboard() {
             {podium.length > 0 ? (
               <ol aria-label="Podio" className="surface-panel grid grid-cols-3 items-end gap-2 p-3">
                 {podium.map((entry, index) => {
-                  const rank = index + 1;
+                  const rank = ranks[index];
                   const current = isMe(entry);
                   const { value, unit } = valueParts(entry);
                   return (
                     <li
                       key={entry.userId}
-                      className={cn("min-w-0", rank === 1 ? "order-2" : rank === 2 ? "order-1" : "order-3")}
+                      value={rank}
+                      // Placed by list position (winner in the middle), whatever the ties.
+                      className={cn("min-w-0", index === 0 ? "order-2" : index === 1 ? "order-1" : "order-3")}
                     >
                       <Link
                         href={`/u/${entry.userId}`}
                         className={cn(
                           "flex min-w-0 flex-col items-center gap-2 rounded-xl border p-2 text-center transition-colors",
                           current ? "border-action-text bg-raised" : "border-transparent hover:bg-raised",
-                          rank === 1 ? "pb-4" : null
+                          index === 0 ? "pb-4" : null
                         )}
                       >
-                        <Avatar className={rank === 1 ? "size-20" : "size-14"}>
+                        <Avatar className={index === 0 ? "size-20" : "size-14"}>
                           <AvatarImage src={entry.avatarUrl || undefined} alt="" className="object-cover" />
                           <AvatarFallback className="bg-raised font-semibold">
                             {getInitials(entry.userName)}
@@ -230,11 +248,12 @@ export default function Leaderboard() {
                 className="scroll-mt-20 space-y-2"
               >
                 {pagedRestEntries.map((entry, index) => {
-                  const position = podiumOffset + restOffset + index + 1;
+                  const position = podiumOffset + restOffset + index;
+                  const rank = ranks[position];
                   return (
-                    <li key={entry.id || position}>
+                    <li key={entry.id || position + 1} value={rank}>
                       <RankRow
-                        rank={position}
+                        rank={rank}
                         name={entry.userName}
                         avatarUrl={entry.avatarUrl}
                         subtitle={subtitleFor(entry)}

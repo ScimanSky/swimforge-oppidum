@@ -11,7 +11,10 @@ import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Dialog,
+  DialogClose,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -24,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Chip } from "@/components/corsia/Chip"
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState"
 import { Metric } from "@/components/corsia/Metric"
 import { Pager } from "@/components/corsia/Pager"
 import { RankRow } from "@/components/corsia/RankRow"
@@ -39,8 +43,11 @@ import {
   CHALLENGE_TYPE_LABELS,
   challengeObjectiveLabel,
   challengeProgressParts,
+  challengeProgressPercent,
+  dayStreak,
 } from "@/lib/challenges"
 import { formatDistance, formatInteger } from "@/lib/format"
+import { competitionRanks } from "@/lib/ranking"
 
 const formatDaysLeft = (endDate: string | Date) => {
   const end = new Date(endDate)
@@ -95,21 +102,6 @@ const getClassicChallengeImage = (challenge: any): string => {
   }
 }
 
-const getStreak = (dates: string[]) => {
-  const uniqueDates = Array.from(new Set(dates)).sort()
-  if (!uniqueDates.length) return 0
-  const dateSet = new Set(uniqueDates)
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  let streak = 0
-  let cursor = new Date(today)
-  while (dateSet.has(cursor.toISOString().split("T")[0])) {
-    streak += 1
-    cursor.setDate(cursor.getDate() - 1)
-  }
-  return streak
-}
-
 type ChallengeType = "open_water" | "pool" | "both"
 type ChallengeObjective =
   | "total_sessions"
@@ -133,6 +125,9 @@ export default function Challenges() {
   const fieldId = useId()
   const [activeTab, setActiveTab] = useState("active")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  // «Abbandona» asks first; focus goes back to the button that asked.
+  const [leaveTarget, setLeaveTarget] = useState<{ id: number; name: string } | null>(null)
+  const leaveOpenerRef = useRef<HTMLButtonElement | null>(null)
   const isDesktopWide = useMediaQuery("(min-width: 1280px)", false)
   const activeListRef = useRef<HTMLUListElement>(null)
   const availableListRef = useRef<HTMLUListElement>(null)
@@ -175,10 +170,20 @@ export default function Challenges() {
 
   const joinChallenge = trpc.challenges.join.useMutation({
     onSuccess: () => challengesQuery.refetch(),
+    onError: (err) => toast.error(err.message || "Impossibile partecipare alla sfida"),
   })
   const leaveChallenge = trpc.challenges.leave.useMutation({
-    onSuccess: () => challengesQuery.refetch(),
+    onSuccess: (result) => {
+      // The server reports a failed delete as { success: false }, not as an error.
+      if (result && result.success === false) toast.error("Impossibile abbandonare la sfida")
+      challengesQuery.refetch()
+    },
+    onError: (err) => toast.error(err.message || "Impossibile abbandonare la sfida"),
   })
+  const isJoining = (id: number) =>
+    joinChallenge.isPending && joinChallenge.variables?.challengeId === id
+  const isLeaving = (id: number) =>
+    leaveChallenge.isPending && leaveChallenge.variables?.challengeId === id
 
   const challenges = (challengesQuery.data ?? []) as any[]
   const activeChallenges = challenges.filter(
@@ -202,12 +207,19 @@ export default function Challenges() {
   const availablePaging = usePaged(availableChallenges, isDesktopWide ? 2 : 3, [activeTab])
   const leaderboardPaging = usePaged(leaderboard, isDesktopWide ? 3 : 4, [activeTab])
 
+  // Local calendar days (a swim at 00:30 is today, not yesterday in UTC).
   const streak = useMemo(() => {
-    const dates = (activitiesQuery.data ?? [])
-      .map((activity) => new Date(activity.activityDate).toISOString().split("T")[0])
-      .filter(Boolean)
-    return getStreak(dates)
+    const days = (activitiesQuery.data ?? [])
+      .map((activity) => new Date(activity.activityDate))
+      .filter((date) => !Number.isNaN(date.getTime()))
+    return dayStreak(days)
   }, [activitiesQuery.data])
+  const challengesLoading = challengesQuery.isPending
+  const challengesFailed = !challengesQuery.data && challengesQuery.isError
+  const leaderboardLoading = leaderboardQuery.isPending
+  const leaderboardFailed = !leaderboardQuery.data && leaderboardQuery.isError
+  // The weekly ranking is sorted by periodXp: ties share a position.
+  const leaderboardRanks = competitionRanks(leaderboard.map((entry) => Number(entry.periodXp ?? 0)))
 
   const myUserId = profileQuery.data?.userId
   const participatingCount = activeChallenges.length + pendingChallenges.length
@@ -218,7 +230,7 @@ export default function Challenges() {
       : null,
     badgesQuery.data ? { label: "Badge", value: formatInteger(badgesQuery.data.length) } : null,
     activitiesQuery.data
-      ? { label: "Giorni di fila", value: formatInteger(streak), unit: streak === 1 ? "giorno" : "giorni" }
+      ? { label: "Giorni di fila", value: formatInteger(streak) }
       : null,
     profileQuery.data
       ? { label: "XP totali", value: formatInteger(profileQuery.data.totalXp ?? 0), unit: "XP", tone: "xp" as const }
@@ -337,9 +349,9 @@ export default function Challenges() {
           <Button
             className="w-full"
             onClick={() => createChallenge.mutate(createDraft)}
-            disabled={!createDraft.name.trim()}
+            disabled={createChallenge.isPending || !createDraft.name.trim()}
           >
-            Crea sfida
+            {createChallenge.isPending ? "Creazione..." : "Crea sfida"}
           </Button>
         </div>
       </DialogContent>
@@ -367,7 +379,10 @@ export default function Challenges() {
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
             <TabsList aria-label="Sfide">
               <TabsTrigger value="active">
-                Attive <span className="tabular-nums">({participatingCount})</span>
+                Attive
+                {challengesQuery.data ? (
+                  <span className="tabular-nums">({participatingCount})</span>
+                ) : null}
               </TabsTrigger>
               <TabsTrigger value="available">Disponibili</TabsTrigger>
               <TabsTrigger value="completed">Concluse</TabsTrigger>
@@ -377,20 +392,26 @@ export default function Challenges() {
           </div>
 
           <TabsContent value="active" className="space-y-3">
-            {participatingChallenges.length === 0 && (
+            {challengesLoading ? (
+              <LoadingSkeleton label="Caricamento delle sfide…" count={2} itemClassName="h-48 w-full rounded-2xl" />
+            ) : challengesFailed ? (
+              <LoadError onRetry={() => void challengesQuery.refetch()} />
+            ) : participatingChallenges.length === 0 ? (
               <EmptyCard>Nessuna sfida attiva. Esplora le sfide disponibili.</EmptyCard>
-            )}
+            ) : null}
             {activePaging.pageItems.length > 0 ? (
               <ul ref={activeListRef} className="scroll-mt-20 space-y-3">
                 {activePaging.pageItems.map((challenge) => {
-                  const leaderboard = (challenge.leaderboard ?? []) as Array<{ progress: number }>
-                  const maxProgress = leaderboard.reduce(
-                    (max, item) => Math.max(max, item.progress || 0),
-                    0
+                  const groupProgress = ((challenge.leaderboard ?? []) as Array<{ progress: number }>).map(
+                    (item) => Number(item.progress) || 0
                   )
-                  const progressValue = challenge.current_progress ?? 0
-                  const progressPercent =
-                    maxProgress > 0 ? Math.min(100, (progressValue / maxProgress) * 100) : 0
+                  const progressValue = Number(challenge.current_progress ?? 0)
+                  // Against the best of the group (for pace the lowest is the best).
+                  const progressPercent = challengeProgressPercent(
+                    challenge.objective,
+                    progressValue,
+                    groupProgress
+                  )
                   const progress = challengeProgressParts(challenge.objective, progressValue)
                   const daysLeft = formatDaysLeft(challenge.end_date)
 
@@ -454,7 +475,11 @@ export default function Challenges() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => leaveChallenge.mutate({ challengeId: challenge.id })}
+                          disabled={isLeaving(challenge.id)}
+                          onClick={(event) => {
+                            leaveOpenerRef.current = event.currentTarget
+                            setLeaveTarget({ id: challenge.id, name: challenge.name })
+                          }}
                         >
                           Abbandona
                         </Button>
@@ -474,9 +499,13 @@ export default function Challenges() {
           </TabsContent>
 
           <TabsContent value="available" className="space-y-3">
-            {availableChallenges.length === 0 && (
+            {challengesLoading ? (
+              <LoadingSkeleton label="Caricamento delle sfide…" count={3} itemClassName="h-28 w-full rounded-2xl" />
+            ) : challengesFailed ? (
+              <LoadError onRetry={() => void challengesQuery.refetch()} />
+            ) : availableChallenges.length === 0 ? (
               <EmptyCard>Nessuna sfida disponibile al momento.</EmptyCard>
-            )}
+            ) : null}
             {availablePaging.pageItems.length > 0 ? (
               <ul ref={availableListRef} className="scroll-mt-20 space-y-3">
                 {availablePaging.pageItems.map((challenge) => (
@@ -499,6 +528,7 @@ export default function Challenges() {
                       </p>
                       <Button
                         size="sm"
+                        disabled={isJoining(challenge.id)}
                         onClick={() => joinChallenge.mutate({ challengeId: challenge.id })}
                         aria-label={`Partecipa: ${challenge.name}`}
                       >
@@ -525,7 +555,11 @@ export default function Challenges() {
           <TabsContent value="leaderboard" className="space-y-3">
             {/* The query is weekly (period "week", sorted by periodXp): so are the numbers. */}
             <h2 className="text-sm font-semibold text-muted-foreground">Questa settimana</h2>
-            {leaderboard.length === 0 ? (
+            {leaderboardLoading ? (
+              <LoadingSkeleton label="Caricamento della classifica…" />
+            ) : leaderboardFailed ? (
+              <LoadError onRetry={() => void leaderboardQuery.refetch()} />
+            ) : leaderboard.length === 0 ? (
               <EmptyCard>Nessuna classifica disponibile.</EmptyCard>
             ) : (
               <ol
@@ -543,10 +577,12 @@ export default function Challenges() {
                   const hasProfileLink = Number.isFinite(userId) && userId > 0
                   const distance = Number(profile.totalDistanceMeters ?? 0)
 
+                  const rank = leaderboardRanks[absoluteIndex]
+
                   return (
-                    <li key={entry.userId ?? entry.id ?? index}>
+                    <li key={entry.userId ?? entry.id ?? index} value={rank}>
                       <RankRow
-                        rank={absoluteIndex + 1}
+                        rank={rank}
                         name={name}
                         avatarUrl={profile.avatarUrl ?? profile.profileImage}
                         subtitle={distance > 0 ? formatDistance(distance) : undefined}
@@ -569,6 +605,38 @@ export default function Challenges() {
             />
           </TabsContent>
         </Tabs>
+
+        <Dialog open={leaveTarget != null} onOpenChange={(open) => !open && setLeaveTarget(null)}>
+          <DialogContent
+            role="alertdialog"
+            showCloseButton={false}
+            className="sm:max-w-sm"
+            onCloseAutoFocus={(event) => {
+              // Back to «Abbandona» when its card is still there (cancelled or failed).
+              event.preventDefault()
+              if (leaveOpenerRef.current?.isConnected) leaveOpenerRef.current.focus()
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Abbandonare «{leaveTarget?.name}»?</DialogTitle>
+              <DialogDescription>Esci dalla classifica di questa sfida.</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <DialogClose asChild>
+                <Button variant="outline">Annulla</Button>
+              </DialogClose>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (leaveTarget) leaveChallenge.mutate({ challengeId: leaveTarget.id })
+                  setLeaveTarget(null)
+                }}
+              >
+                Abbandona
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   )
