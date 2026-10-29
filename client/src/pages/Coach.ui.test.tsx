@@ -159,6 +159,73 @@ describe("Coach AI", () => {
     expect(state.generateCalls).toBe(1);
   });
 
+  // A generated workout as the server stores it: zones checked, levels and paces added, a split rep.
+  const zonedWorkout = () => ({
+    type: "pool",
+    title: "Soglia e velocità",
+    description: "Lavoro sulla soglia",
+    duration: "60 minuti",
+    difficulty: "Intermedio",
+    totalMeters: 2400,
+    zoneSource: "auto",
+    sections: [
+      {
+        title: "Centrale",
+        exercises: [
+          {
+            name: "6×100 a soglia", repeats: 6, repMeters: 100, rest: "a 2:10", zone: "B2", level: "Soglia",
+            targetPace: { fastPace: 108.5, slowPace: 114.2 },
+          },
+          {
+            name: "8×150 C1 a ritmo gara", repeats: 8, repMeters: 150, rest: "30 sec", zone: "C1", level: "Soglia",
+            targetPace: { fastPace: 104.3, slowPace: 108.5 },
+            zoneNote: "Spezzato in 8×150 m: in C1 la ripetuta più lunga è 200 m.",
+          },
+          { name: "4×50 dorso", repeats: 4, repMeters: 50, zone: "B1", level: "Medio", targetPace: null },
+        ],
+      },
+    ],
+    coachNotes: [],
+  });
+
+  it("allenamento con le zone: chip, passo obiettivo e spiegazione in ogni ripetuta; il totale", async () => {
+    state.workouts = { pool: zonedWorkout(), dryland: undefined, canGenerate: true };
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    expect(screen.getByText("60 minuti · Intermedio · 2,4 km")).toBeTruthy();
+    const rep = screen.getByText("6×100 a soglia").closest("li")!;
+    expect(within(rep).getByRole("button", { name: "B2 · Soglia" })).toBeTruthy();
+    expect(rep).toHaveTextContent("1:49–1:54 /100 m");
+    expect(rep).toHaveTextContent("Respiro impegnato, poche parole tra una vasca e l'altra; alza la soglia.");
+    const split = screen.getByText("8×150 C1 a ritmo gara").closest("li")!;
+    expect(split).toHaveTextContent("Spezzato in 8×150 m: in C1 la ripetuta più lunga è 200 m.");
+    // Another stroke: zone and level as effort, no freestyle pace.
+    const back = screen.getByText("4×50 dorso").closest("li")!;
+    expect(within(back).getByRole("button", { name: "B1 · Medio" })).toBeTruthy();
+    expect(back).not.toHaveTextContent("/100 m");
+  });
+
+  it("toccando il chip si apre «Le zone A1–C3» su quella zona", async () => {
+    state.workouts = { pool: zonedWorkout(), dryland: undefined, canGenerate: true };
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    await userEvent.click(screen.getByRole("button", { name: "C1 · Soglia" }));
+    const glossary = screen.getByRole("dialog", { name: "Le zone A1–C3" });
+    expect(within(glossary).getByRole("heading", { level: 3, name: "C1 Soglia anaerobica · Soglia" })).toHaveFocus();
+    // The user's paces today, from the metrics.
+    expect(within(glossary).getByRole("region", { name: "C1 Soglia anaerobica · Soglia" })).toHaveTextContent(
+      "Il tuo passo1:44–1:49 /100 m"
+    );
+  });
+
+  it("un allenamento salvato prima delle zone si vede come prima, senza chip", () => {
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    expect(screen.getByText("400 m sciolti")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /·/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Le zone A1–C3" })).toBeNull();
+  });
+
   it("mostra l'ultima analisi e la chat in italiano", async () => {
     window.history.replaceState(null, "", "/coach?tab=session-iq");
     render(<Coach />);

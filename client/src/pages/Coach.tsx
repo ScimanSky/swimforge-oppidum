@@ -19,40 +19,73 @@ import {
   formatInteger,
   NO_VALUE,
 } from "@/lib/format"
-import { metricHeaders } from "@/lib/swim-metrics-view"
+import { formatZonePace, metricHeaders } from "@/lib/swim-metrics-view"
 import { STREAK_UNIT } from "@/lib/profile-stats"
-import { TSB_READING_LABELS } from "@shared/swimMetrics"
+import { cn } from "@/lib/utils"
+import { ZoneGlossary } from "@/components/stats/ZoneGlossary"
+import { isPaceZoneCode, PACE_ZONE_BY_CODE, TSB_READING_LABELS, type PaceZoneCode } from "@shared/swimMetrics"
+import type { CoachWorkout, CoachWorkoutExercise, CoachWorkoutSection } from "@shared/coachWorkout"
 import { toast } from "sonner"
 import { Sparkles, AlertTriangle } from "lucide-react"
 import { useSearch } from "wouter"
 
 const sectionTitle = "text-[17px] font-bold"
-type WorkoutSection = {
-  title: string
-  exercises: WorkoutExercise[]
-  notes?: string
+type WorkoutSection = CoachWorkoutSection
+type WorkoutExercise = CoachWorkoutExercise
+type GeneratedWorkout = CoachWorkout
+
+/** Literal classes so Tailwind generates them: the swatch of each pace zone. */
+const PACE_ZONE_BG: Record<PaceZoneCode, string> = {
+  A1: "bg-pace-a1",
+  A2: "bg-pace-a2",
+  B1: "bg-pace-b1",
+  B2: "bg-pace-b2",
+  C1: "bg-pace-c1",
+  C2: "bg-pace-c2",
+  C3: "bg-pace-c3",
 }
 
-type WorkoutExercise = {
-  name: string
-  sets?: string
-  reps?: string
-  distance?: string
-  duration?: string
-  rest?: string
-  intensity?: string
-  equipment?: string
-  notes?: string
-}
+/** The zone of a rep, when it has a known one (workouts stored before the zones have none). */
+const repZone = (exercise: WorkoutExercise): PaceZoneCode | null =>
+  isPaceZoneCode(exercise.zone) ? exercise.zone : null
 
-type GeneratedWorkout = {
-  type: "pool" | "dryland"
-  title: string
-  description: string
-  duration: string
-  difficulty: string
-  sections: WorkoutSection[]
-  coachNotes: string[]
+const hasZones = (workout: GeneratedWorkout) =>
+  workout.sections.some((section) => section.exercises.some((exercise) => repZone(exercise) !== null))
+
+/**
+ * The zone of a rep: a chip «B2 · Soglia» that opens the zone in «Le zone A1–C3», the target
+ * pace from the athlete's zones (freestyle) and in a line how it feels and what it trains.
+ */
+function RepZone({ code, exercise, onOpen }: { code: PaceZoneCode; exercise: WorkoutExercise; onOpen: (code: PaceZoneCode) => void }) {
+  const zone = PACE_ZONE_BY_CODE[code]
+  const pace = exercise.targetPace ? formatZonePace(exercise.targetPace) : null
+  return (
+    <div className="mt-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        {/* 44px tall touch target around a 28px chip. */}
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          onClick={() => onOpen(code)}
+          className="-my-2 inline-flex items-center rounded-full py-2 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+        >
+          <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-raised px-3 text-xs font-semibold text-foreground">
+            <span aria-hidden className={cn("size-2 shrink-0 rounded-full", PACE_ZONE_BG[code])} />
+            {code} · {zone.level}
+          </span>
+        </button>
+        {pace ? (
+          <span className="text-xs tabular-nums text-foreground">
+            {pace} <span className="text-muted-foreground">/100 m</span>
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {zone.explanation.charAt(0).toUpperCase()}
+        {zone.explanation.slice(1)}.
+      </p>
+    </div>
+  )
 }
 
 /** «1,5 km» / «800 m», null without a distance. */
@@ -114,6 +147,7 @@ function WorkoutDetail({
   onSelect,
   activeSection,
   moreLabel,
+  onZone,
 }: {
   workout: GeneratedWorkout
   kicker: string
@@ -121,6 +155,8 @@ function WorkoutDetail({
   onSelect: (index: number) => void
   activeSection: WorkoutSection | null
   moreLabel: string
+  /** Opens «Le zone A1–C3», at a zone or at the start. */
+  onZone: (code: PaceZoneCode | null) => void
 }) {
   return (
     <div className="space-y-3">
@@ -128,10 +164,22 @@ function WorkoutDetail({
         <p className="text-xs text-muted-foreground">{kicker}</p>
         <h3 className="mt-1 text-base font-bold text-foreground">{workout.title}</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          {[workout.duration, workout.difficulty].filter(Boolean).join(" · ")}
+          {[workout.duration, workout.difficulty, workout.totalMeters ? formatDistance(workout.totalMeters) : null]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
       </div>
       <p className="text-sm text-muted-foreground">{workout.description}</p>
+      {hasZones(workout) ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-muted-foreground">
+            Ogni ripetuta ha la sua zona di passo: tocca la zona per sapere cosa vuol dire.
+          </p>
+          <Button type="button" size="sm" variant="outline" onClick={() => onZone(null)}>
+            Le zone A1–C3
+          </Button>
+        </div>
+      ) : null}
       <div role="group" aria-label="Parti dell'allenamento" className="flex flex-wrap gap-2">
         {workout.sections.map((section, idx) => (
           <Button
@@ -153,19 +201,26 @@ function WorkoutDetail({
             <p className="mt-1 text-xs text-muted-foreground">{activeSection.notes}</p>
           )}
           <ul className="mt-3 divide-y divide-border">
-            {activeSection.exercises.slice(0, 3).map((exercise, exIdx) => (
-              <li key={exIdx} className="py-3 text-sm first:pt-0 last:pb-0">
-                <p className="font-medium text-foreground">{exercise.name}</p>
-                <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  {getExerciseDetails(exercise).map((detail, detailIdx) => (
-                    <span key={detailIdx}>{detail}</span>
-                  ))}
-                </p>
-                {exercise.notes && (
-                  <p className="mt-2 text-xs text-muted-foreground">{exercise.notes}</p>
-                )}
-              </li>
-            ))}
+            {activeSection.exercises.slice(0, 3).map((exercise, exIdx) => {
+              const zone = repZone(exercise)
+              return (
+                <li key={exIdx} className="py-3 text-sm first:pt-0 last:pb-0">
+                  <p className="font-medium text-foreground">{exercise.name}</p>
+                  {zone ? <RepZone code={zone} exercise={exercise} onOpen={onZone} /> : null}
+                  <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    {getExerciseDetails(exercise).map((detail, detailIdx) => (
+                      <span key={detailIdx}>{detail}</span>
+                    ))}
+                  </p>
+                  {exercise.zoneNote ? (
+                    <p className="mt-1 text-xs text-muted-foreground">{exercise.zoneNote}</p>
+                  ) : null}
+                  {exercise.notes && (
+                    <p className="mt-2 text-xs text-muted-foreground">{exercise.notes}</p>
+                  )}
+                </li>
+              )
+            })}
           </ul>
           {activeSection.exercises.length > 3 && (
             <p className="mt-3 text-xs text-muted-foreground">
@@ -187,6 +242,13 @@ export default function Coach() {
   const [showSessionArchive, setShowSessionArchive] = useState(false)
   const [activeWorkout, setActiveWorkout] = useState<"pool" | "dryland">("pool")
   const [isGenerating, setIsGenerating] = useState(false)
+  // «Le zone A1–C3»: the key outlives the open state, so the dialog keeps its zone while closing.
+  const [glossaryOpen, setGlossaryOpen] = useState(false)
+  const [glossaryZone, setGlossaryZone] = useState<PaceZoneCode | null>(null)
+  const openGlossary = (code: PaceZoneCode | null) => {
+    setGlossaryZone(code)
+    setGlossaryOpen(true)
+  }
   const meQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
@@ -501,6 +563,7 @@ export default function Coach() {
                         onSelect={setActivePoolSectionIndex}
                         activeSection={activePoolSection}
                         moreLabel="Apri l'allenamento completo nel dettaglio sessione."
+                        onZone={openGlossary}
                       />
                     ) : (
                       <p className="text-sm text-muted-foreground">
@@ -515,6 +578,7 @@ export default function Coach() {
                       onSelect={setActiveDrySectionIndex}
                       activeSection={activeDrySection}
                       moreLabel="Apri la scheda completa dal coach."
+                      onZone={openGlossary}
                     />
                   ) : (
                     <p className="text-sm text-muted-foreground">
@@ -717,6 +781,12 @@ export default function Coach() {
             />
           </TabsContent>
         </Tabs>
+        <ZoneGlossary
+          ranges={metrics?.zones?.ranges ?? []}
+          open={glossaryOpen}
+          onOpenChange={setGlossaryOpen}
+          focusZone={glossaryZone}
+        />
       </div>
     </AppLayout>
   )
