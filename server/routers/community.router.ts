@@ -16,7 +16,7 @@ import { socialPosts } from "../../drizzle/schema";
 import { getCloudinaryCreditUsage } from "../lib/cloudinary";
 import { uploadImageToMediaProviders } from "../lib/image_upload";
 import { ensureUserPresenceSchema, getOnlineIntervalSql } from "../user_presence";
-import { authorClubNameSql } from "../db_social";
+import { activityCardSql, authorClubNameSql } from "../db_social";
 import { createCommunityClubsRouter } from "./community.clubs.router";
 import { createCommunityReactionsRouter } from "./community.reactions.router";
 import { createCommunityMessagesRouter } from "./community.messages.router";
@@ -263,6 +263,7 @@ export const communityRouter = router({
                   a.calories AS activity_calories,
                   a.avg_heart_rate AS activity_heart_rate,
                   a.swolf_score AS activity_swolf,
+                  ${activityCardSql()},
                   COALESCE((SELECT COUNT(*) FROM social_splashes s WHERE s.post_id = p.id), 0) AS splash_count,
                   COALESCE((SELECT COUNT(*) FROM social_comments c WHERE c.post_id = p.id), 0) AS comment_count,
                   EXISTS(

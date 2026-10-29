@@ -131,3 +131,33 @@ describe("setActivityShare", () => {
     expect(restore).not.toMatch(/media_urls =/);
   });
 });
+
+describe("upsertActivityPost follower notification", () => {
+  function fakeChains(records: number) {
+    const db = m.db as unknown as Record<string, unknown>;
+    db.select = () => ({
+      from: () => ({ where: () => ({ limit: async () => [{ id: 99, isOpenWater: false }] }) }),
+    });
+    db.update = () => ({ set: () => ({ where: async () => {} }) });
+    db.insert = () => ({ values: () => ({ returning: async () => [{ id: 7 }] }) });
+    respondWith((text) => (text.includes("FROM personal_records") ? { rows: [{ n: records }] } : { rows: [] }));
+  }
+
+  it("a swim with a record: «Nuovo record nel feed»", async () => {
+    fakeChains(1);
+    const { upsertActivityPost } = await import("./db_social");
+    // The fake select finds a post for the swim: the update branch, which notifies too.
+    await upsertActivityPost(42, 99, { content: "Che nuotata" });
+    const notify = m.executed.map((q) => render(q)).find((q) => q.sql.includes("INSERT INTO user_notifications"));
+    expect(notify?.params).toContain("Nuovo record nel feed");
+    expect(notify?.params).toContain(" ha condiviso una nuotata con un nuovo record.");
+  });
+
+  it("a swim without records: «Nuova attività nel feed»", async () => {
+    fakeChains(0);
+    const { upsertActivityPost } = await import("./db_social");
+    await upsertActivityPost(42, 99, { content: "Tranquilla" });
+    const notify = m.executed.map((q) => render(q)).find((q) => q.sql.includes("INSERT INTO user_notifications"));
+    expect(notify?.params).toContain("Nuova attività nel feed");
+  });
+});

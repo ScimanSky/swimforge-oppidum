@@ -22,6 +22,8 @@ export interface FeedPostRecord {
   activity_calories?: number | null
   activity_heart_rate?: number | null
   activity_swolf?: number | null
+  activity_avg_pace_per_100m?: number | string | null
+  activity_records?: unknown
   activity_is_open_water?: boolean | null
   comment_count?: number | string
   user_name?: string | null

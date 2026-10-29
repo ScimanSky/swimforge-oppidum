@@ -50,6 +50,7 @@ const activityPost: FeedPostRecord = {
   activity_date: "2026-10-28T16:00:00.000Z",
   activity_distance_meters: 3400,
   activity_duration_seconds: 3700,
+  activity_avg_pace_per_100m: 109,
   activity_calories: 650,
   activity_heart_rate: null,
   activity_swolf: null,
@@ -112,6 +113,27 @@ describe("FeedPost Corsia", () => {
     expect(within(card).getByText("1:02")).toBeInTheDocument()
     expect(within(card).queryByText(/kcal|Calorie/)).toBeNull()
     expect(within(card).queryByText("FC media")).toBeNull()
+  })
+
+  it("card attività: il passo è quello di Garmin, mai dal tempo totale con le pause", () => {
+    renderPost({ ...activityPost, activity_avg_pace_per_100m: 98 })
+    const card = screen.getByRole("group", { name: "Nuotata in vasca" })
+    expect(within(card).getByText("1:38")).toHaveClass("text-action-text")
+    cleanup()
+
+    renderPost({ ...activityPost, activity_avg_pace_per_100m: null })
+    const noPace = screen.getByRole("group", { name: "Nuotata in vasca" })
+    expect(within(noPace).queryByText("Passo /100")).toBeNull()
+    expect(within(noPace).queryByText("1:49")).toBeNull()
+  })
+
+  it("card attività: il bollino dei record fatti in quella nuotata", () => {
+    renderPost({
+      ...activityPost,
+      activity_records: [{ record_type: "pb_200_25_t", stroke_type: "freestyle", value: 19240, previous_value: 19640 }],
+    })
+    const records = screen.getByRole("list", { name: "Record di questa nuotata" })
+    expect(within(records).getByText("Record 200 SL 3:12 (−4 s)")).toBeInTheDocument()
   })
 
   it("card attività: FC e SWOLF solo se presenti, al massimo quattro metriche", () => {

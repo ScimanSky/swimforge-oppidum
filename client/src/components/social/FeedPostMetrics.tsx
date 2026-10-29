@@ -1,6 +1,8 @@
 import { useId } from "react"
 import { Metric, type MetricProps } from "@/components/corsia/Metric"
-import { formatDurationParts, formatKm, formatPaceValue, paceSecondsPer100m } from "@/lib/format"
+import { Chip } from "@/components/corsia/Chip"
+import { recordChipLabels } from "@/lib/feed-records"
+import { formatDurationParts, formatKm, formatPaceValue } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 interface FeedPostMetricsProps {
@@ -8,6 +10,10 @@ interface FeedPostMetricsProps {
   title?: string
   distanceMeters?: number | string | null
   durationSeconds?: number | string | null
+  /** Garmin's average pace (s/100 m, moving time): never total time with rests. */
+  avgPacePer100m?: number | string | null
+  /** Training records set in this swim (feed query `activity_records`). */
+  records?: unknown
   heartRate?: number | string | null
   swolf?: number | string | null
 }
@@ -28,6 +34,8 @@ export default function FeedPostMetrics({
   title,
   distanceMeters,
   durationSeconds,
+  avgPacePer100m,
+  records,
   heartRate,
   swolf,
 }: FeedPostMetricsProps) {
@@ -39,7 +47,8 @@ export default function FeedPostMetrics({
 
   const metrics: Omit<MetricProps, "size">[] = []
   if (distance) metrics.push({ value: formatKm(distance), unit: "km", label: "Distanza" })
-  const pace = paceSecondsPer100m({ distanceMeters: distance, durationSeconds: duration })
+  // No pace from total time: with the rests it would be slower than the swim really was.
+  const pace = positive(avgPacePer100m)
   if (pace) metrics.push({ value: formatPaceValue(pace), label: "Passo /100", tone: "action" })
   const durationParts = formatDurationParts(duration)
   if (durationParts) metrics.push({ value: durationParts.value, unit: durationParts.unit, label: "Durata" })
@@ -47,7 +56,8 @@ export default function FeedPostMetrics({
   if (swolfScore) metrics.push({ value: String(Math.round(swolfScore)), label: "SWOLF" })
 
   const shown = metrics.slice(0, MAX_METRICS)
-  if (shown.length === 0) return null
+  const recordLabels = recordChipLabels(records)
+  if (shown.length === 0 && recordLabels.length === 0) return null
   const four = shown.length === MAX_METRICS
 
   return (
@@ -63,11 +73,22 @@ export default function FeedPostMetrics({
           {title}
         </p>
       ) : null}
-      <div className={cn("grid gap-3", four ? "grid-cols-4" : "grid-cols-3")}>
-        {shown.map((metric) => (
-          <Metric key={metric.label} {...metric} size={four ? "sm" : "md"} />
-        ))}
-      </div>
+      {shown.length > 0 ? (
+        <div className={cn("grid gap-3", four ? "grid-cols-4" : "grid-cols-3")}>
+          {shown.map((metric) => (
+            <Metric key={metric.label} {...metric} size={four ? "sm" : "md"} />
+          ))}
+        </div>
+      ) : null}
+      {recordLabels.length > 0 ? (
+        <ul className="mt-3 flex flex-wrap gap-2" aria-label="Record di questa nuotata">
+          {recordLabels.map((label) => (
+            <li key={label}>
+              <Chip tone="xp">{label}</Chip>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   )
 }

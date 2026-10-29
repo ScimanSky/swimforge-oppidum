@@ -90,6 +90,8 @@ export default function FeedPost({ post, currentUserId, autoplayVideos = true }:
             title={activityTitle(post.activity_is_open_water)}
             distanceMeters={post.activity_distance_meters}
             durationSeconds={post.activity_duration_seconds}
+            avgPacePer100m={post.activity_avg_pace_per_100m}
+            records={post.activity_records}
             heartRate={post.activity_heart_rate}
             swolf={post.activity_swolf}
           />

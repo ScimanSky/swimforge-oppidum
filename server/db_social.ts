@@ -43,6 +43,35 @@ export function authorClubNameSql(viewerId: number) {
   )`;
 }
 
+/**
+ * Swim fields of a feed post (`p` post, `a` its activity): Garmin's average pace (from moving
+ * time, not total time with rests) and the training records set in that swim, with the time
+ * they beat.
+ */
+export function activityCardSql() {
+  return sql`
+      a.avg_pace_per_100m AS activity_avg_pace_per_100m,
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'record_type', pr.record_type,
+              'stroke_type', pr.stroke_type,
+              'value', pr.value,
+              'previous_value', pr.previous_value
+            )
+            ORDER BY pr.record_type, pr.stroke_type, pr.value
+          )
+          FROM personal_records pr
+          WHERE p.activity_id IS NOT NULL
+            AND pr.activity_id = p.activity_id
+            AND pr.user_id = p.user_id
+            AND pr.record_type LIKE 'pb\_%\_t'
+        ),
+        '[]'::json
+      ) AS activity_records`;
+}
+
 export async function getSocialFeed(userId: number, options: { limit?: number; scope?: FeedScope; before?: Date } = {}) {
   const db = await getDb();
   if (!db) return [];
@@ -98,6 +127,7 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
       a.calories AS activity_calories,
       a.avg_heart_rate AS activity_heart_rate,
       a.swolf_score AS activity_swolf,
+      ${activityCardSql()},
       COALESCE((SELECT COUNT(*) FROM social_splashes s WHERE s.post_id = p.id), 0) AS splash_count,
       COALESCE((SELECT COUNT(*) FROM social_comments c WHERE c.post_id = p.id), 0) AS comment_count,
       EXISTS(
@@ -563,6 +593,17 @@ export async function upsertActivityPost(
     .where(eq(socialPosts.activityId, activityId))
     .limit(1);
 
+  // A swim with a training record tells the followers so.
+  const recordCount = await db.execute(sql`
+    SELECT COUNT(*)::int AS n FROM personal_records
+    WHERE activity_id = ${activityId} AND user_id = ${userId} AND record_type LIKE 'pb\_%\_t'
+  `);
+  const hasRecord = Number((recordCount.rows[0] as { n?: number } | undefined)?.n ?? 0) > 0;
+  const notificationTitle = hasRecord ? "Nuovo record nel feed" : "Nuova attività nel feed";
+  const notificationText = hasRecord
+    ? " ha condiviso una nuotata con un nuovo record."
+    : " ha condiviso un nuovo allenamento.";
+
   const basePayload = {
     content: resolvedContent,
     mediaUrl: data.mediaUrl ?? null,
@@ -583,8 +624,8 @@ export async function upsertActivityPost(
       SELECT
         f.follower_id,
         'activity_shared',
-        'Nuova attività nel feed',
-        COALESCE(u.name, 'Un nuotatore') || ' ha condiviso un nuovo allenamento.',
+        ${notificationTitle},
+        COALESCE(u.name, 'Un nuotatore') || ${notificationText},
         ${`/post/${existing[0].id}`},
         ${existing[0].id},
         NOW()
@@ -622,8 +663,8 @@ export async function upsertActivityPost(
       SELECT
         f.follower_id,
         'activity_shared',
-        'Nuova attività nel feed',
-        COALESCE(u.name, 'Un nuotatore') || ' ha condiviso un nuovo allenamento.',
+        ${notificationTitle},
+        COALESCE(u.name, 'Un nuotatore') || ${notificationText},
         ${`/post/${postId}`},
         ${postId},
         NOW()

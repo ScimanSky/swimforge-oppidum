@@ -109,3 +109,16 @@ describe("community.postById user_club_name", () => {
     expectClubNameVisibleOnlyWhenAllowed(postQuery, VIEWER_ID);
   });
 });
+
+describe("feed swim card", () => {
+  it("selects Garmin's average pace and the training records set in that swim", async () => {
+    await getSocialFeed(VIEWER_ID, { scope: "global" });
+    const { sql: text } = render(m.executed[0]);
+    expect(text).toMatch(/a\.avg_pace_per_100m AS activity_avg_pace_per_100m/);
+    expect(text).toMatch(/FROM personal_records pr/);
+    expect(text).toMatch(/pr\.activity_id = p\.activity_id/);
+    expect(text).toMatch(/pr\.user_id = p\.user_id/);
+    expect(text).toMatch(/'previous_value', pr\.previous_value/);
+    expect(text).toMatch(/AS activity_records/);
+  });
+});
