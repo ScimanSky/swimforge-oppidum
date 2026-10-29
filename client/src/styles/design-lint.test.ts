@@ -60,7 +60,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/DirectMessages.tsx",
     "components/metrics/MetricOrb.tsx",
     "lib/social-content.tsx",
-    "pages/ClubCoachModeration.tsx",
     "pages/Home.tsx",
   ],
   "alone-neon": [
@@ -76,7 +75,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/metrics/MetricOrb.tsx",
     "components/onboarding/OnboardingFlow.tsx",
     "components/onboarding/OnboardingIdentitySetup.tsx",
-    "pages/ClubCoachModeration.tsx",
     "pages/Home.tsx",
   ],
   "testo-gradiente": [
@@ -103,7 +101,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/onboarding/OnboardingFlow.tsx",
     "components/onboarding/OnboardingIdentitySetup.tsx",
     "pages/AdminReports.tsx",
-    "pages/ClubCoachModeration.tsx",
     "pages/ForgotPassword.tsx",
     "pages/Login.tsx",
     "pages/PostDetail.tsx",
@@ -147,7 +144,6 @@ const PENDING: Record<Rule, string[]> = {
   "titolo-pagina": [
     "components/onboarding/OnboardingWelcomeComposition.tsx",
     "pages/AdminReports.tsx",
-    "pages/ClubCoachModeration.tsx",
     "pages/Messages.tsx",
     "pages/NotFound.tsx",
     "pages/PublicProfile.tsx",

@@ -1,21 +1,41 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useRoute } from "wouter";
-import AppLayout from "@/components/AppLayout";
+/**
+ * Coach and staff area of a club: meet calls and rosters, AI pool workouts, the autonomous AI
+ * coach, the Oppidum history import and invites (the shell header carries the «Club» title and
+ * the back button; meets, AI automation and history are behind their feature flags).
+ */
+
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import { Link, useLocation, useRoute } from "wouter";
+import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Chip } from "@/components/corsia/Chip";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
+import { ClubAccessState, ClubNotice } from "@/components/club/ClubPageState";
+import { clubAccess } from "@/lib/club-access";
+import {
+  buildMeetRosterPrintHtml,
+  buildWorkoutPrintHtml,
+  formatTimeCs,
+  openPrintTab,
+  printInHiddenFrame,
+  type MeetRosterRow,
+} from "@/lib/club-print";
+import { formatSessionDay } from "@/lib/club-workouts";
+import { NO_VALUE, formatInteger, formatSessionDate } from "@/lib/format";
 import { trpc } from "@/lib/trpc";
 import { UI_FEATURE_FLAGS } from "@/lib/feature-flags";
 import { getWorkoutSeriesDisplay, parseWorkoutPlan } from "@/lib/workout-plan";
+import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { publicSiteUrl } from "@/lib/public-url";
-import { ArrowLeft, Bot, Calendar as CalendarIcon, Check, Clock3, Copy, Database, Flag, PlayCircle, Plus, Printer, RefreshCw, Shield, Users, Sparkles } from "lucide-react";
+import { Bot, Calendar as CalendarIcon, Check, Clock3, Copy, Database, Flag, PlayCircle, Plus, Printer, RefreshCw, Users, Sparkles } from "lucide-react";
 
 type MeetForm = {
   name: string;
@@ -50,7 +70,7 @@ const WORKOUT_FOCUS_OPTIONS: Array<{ value: WorkoutFocus; label: string }> = [
 ];
 
 const WORKOUT_STROKE_OPTIONS: Array<{ value: WorkoutStroke; label: string }> = [
-  { value: "sl", label: "Stile Libero" },
+  { value: "sl", label: "Stile libero" },
   { value: "do", label: "Dorso" },
   { value: "ra", label: "Rana" },
   { value: "de", label: "Delfino" },
@@ -64,6 +84,30 @@ const WORKOUT_EQUIPMENT_OPTIONS: Array<{ value: WorkoutEquipment; label: string 
   { value: "tavoletta", label: "Tavoletta" },
   { value: "snorkel", label: "Snorkel" },
 ];
+
+const ROLE_LABELS: Record<string, string> = {
+  owner: "Proprietario",
+  admin: "Admin",
+  moderator: "Moderatore",
+  coach: "Coach",
+};
+
+const WORKOUT_STATUS_LABELS: Record<string, string> = {
+  draft: "Bozza",
+  published: "Pubblicato",
+};
+
+const sectionTitle = "inline-flex items-center gap-2 text-[17px] font-bold";
+const subTitle = "text-sm font-semibold";
+/** A checkbox choice as a 44px tile; the checked one has the action border. */
+const choiceTile =
+  "flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-border bg-raised px-3 text-sm has-[:checked]:border-action-text has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50";
+
+/** Coach-area date shown in lists: «ven 30 ott · 10:47», «-» when missing. */
+const formatDate = (value?: string | Date | null) => {
+  const label = formatSessionDate(value);
+  return label === NO_VALUE ? "-" : label;
+};
 
 function parseDateTimeLocal(value: string) {
   if (!value) return null;
@@ -93,7 +137,8 @@ function DateTimePickerField({
 }) {
   const selected = parseDateTimeLocal(value);
   const [open, setOpen] = useState(false);
-  const timeInputId = `coach-meet-time-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+  const triggerId = useId();
+  const timeInputId = useId();
 
   const applyDate = (nextDate: Date | undefined) => {
     if (!nextDate) return;
@@ -125,14 +170,14 @@ function DateTimePickerField({
 
   return (
     <div className="space-y-1">
-      <Label>
+      <Label htmlFor={triggerId}>
         {label}
         {required ? " *" : ""}
       </Label>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button type="button" variant="outline-neon" className="w-full justify-start font-normal">
-            <CalendarIcon className="mr-2 h-4 w-4" />
+          <Button id={triggerId} type="button" variant="outline" className="w-full justify-start font-normal">
+            <CalendarIcon aria-hidden />
             <span className="truncate">{formattedLabel}</span>
           </Button>
         </PopoverTrigger>
@@ -157,7 +202,7 @@ function DateTimePickerField({
               {!required ? (
                 <Button
                   type="button"
-                  variant="outline-neon"
+                  variant="outline"
                   size="sm"
                   onClick={() => onChange("")}
                 >
@@ -166,7 +211,7 @@ function DateTimePickerField({
               ) : (
                 <span />
               )}
-              <Button type="button" variant="neon" size="sm" onClick={() => setOpen(false)}>
+              <Button type="button" size="sm" onClick={() => setOpen(false)}>
                 Conferma
               </Button>
             </div>
@@ -177,51 +222,7 @@ function DateTimePickerField({
   );
 }
 
-function formatDate(value?: string | Date | null) {
-  if (!value) return "-";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString("it-IT", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatTimeCs(value?: number | null) {
-  if (!Number.isFinite(value ?? null)) return "-";
-  const cs = Number(value);
-  const minutes = Math.floor(cs / 6000);
-  const seconds = Math.floor((cs % 6000) / 100);
-  const centis = cs % 100;
-  return `${minutes}:${String(seconds).padStart(2, "0")}.${String(centis).padStart(2, "0")}`;
-}
-
-function escapeHtml(input: string) {
-  return input
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll("\"", "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
 const ACTIVE_MEET_ENTRY_STATUSES = new Set(["pending", "confirmed", "waitlist"]);
-
-type MeetRosterRow = {
-  entryId: number;
-  firstName: string;
-  lastName: string;
-  fullName: string;
-  email: string;
-  eventLabel: string;
-  stroke: string;
-  distance: string;
-  status: string;
-  seedTime: string;
-};
 
 function splitAthleteName(value: string) {
   const normalized = value.trim().replace(/\s+/g, " ");
@@ -270,90 +271,6 @@ function getRosterAthleteName(user: any) {
   return splitAthleteName(athleteRaw);
 }
 
-function buildMeetRosterPrintHtml(meet: any, rows: MeetRosterRow[]) {
-  const rowHtml = rows
-    .map(
-      (row, index) => `
-        <tr>
-          <td>${index + 1}</td>
-          <td>${escapeHtml(row.firstName)}</td>
-          <td>${escapeHtml(row.lastName)}</td>
-          <td>${escapeHtml(row.eventLabel)}</td>
-          <td>${escapeHtml(row.stroke)}</td>
-          <td>${escapeHtml(row.distance)}</td>
-          <td>${escapeHtml(row.status)}</td>
-          <td>${escapeHtml(row.seedTime)}</td>
-          <td>${escapeHtml(row.email)}</td>
-        </tr>
-      `
-    )
-    .join("");
-
-  return `<!doctype html>
-<html lang="it">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Iscritti gare - ${escapeHtml(String(meet?.name ?? "Meeting"))}</title>
-    <style>
-      body { font-family: Arial, sans-serif; margin: 12mm; color: #0f172a; }
-      h1 { margin: 0 0 4px; font-size: 20px; }
-      p { margin: 0 0 4px; color: #475569; font-size: 12px; }
-      table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-      th, td { border: 1px solid #cbd5e1; padding: 6px 7px; text-align: left; font-size: 12px; }
-      th { background: #e2e8f0; font-weight: 700; }
-      tbody tr:nth-child(even) { background: #f8fafc; }
-      @page { size: A4; margin: 12mm; }
-    </style>
-  </head>
-  <body>
-    <h1>Elenco iscritti gare</h1>
-    <p>${escapeHtml(String(meet?.name ?? "Meeting"))}</p>
-    <p>${escapeHtml(String(meet?.venue ?? "Impianto n/d"))} • ${escapeHtml(formatDate(meet?.startDate))} - ${escapeHtml(formatDate(meet?.endDate))}</p>
-    <p>Generato il ${escapeHtml(formatDate(new Date()))}</p>
-    <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Nome</th>
-          <th>Cognome</th>
-          <th>Gara</th>
-          <th>Stile</th>
-          <th>Distanza</th>
-          <th>Stato</th>
-          <th>Seed</th>
-          <th>Email</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${rowHtml || `<tr><td colspan="9">Nessun iscritto attivo.</td></tr>`}
-      </tbody>
-    </table>
-  </body>
-</html>`;
-}
-
-function injectAutoPrintScript(html: string) {
-  const script = `<script>(function(){const run=function(){setTimeout(function(){try{window.focus();window.print();}catch(_err){}},260);};if(document.readyState==="complete"){run();}else{window.addEventListener("load",run,{once:true});}window.addEventListener("afterprint",function(){setTimeout(function(){try{window.close();}catch(_err){}},120);});})();</script>`;
-  return html.includes("</body>") ? html.replace("</body>", `${script}</body>`) : `${html}${script}`;
-}
-
-function openPrintTab(html: string) {
-  try {
-    const blob = new Blob([injectAutoPrintScript(html)], { type: "text/html;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const popup = window.open(url, "_blank");
-    if (popup) {
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      return true;
-    }
-    URL.revokeObjectURL(url);
-    return false;
-  } catch {
-    return false;
-  }
-}
-
 function toDateInputValue(date: Date) {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
@@ -367,24 +284,52 @@ function InviteRow({ invite }: { invite: any }) {
   const link = publicSiteUrl(`/community/invite/${invite.code}`);
 
   return (
-    <div className="flex min-w-0 items-center gap-2 rounded-lg border border-border/60 bg-card/35 p-2 text-sm">
+    <div className="flex min-w-0 items-center gap-2 rounded-xl bg-raised py-1 pl-3 pr-1 text-sm">
       <code className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{link}</code>
-      <span className="text-xs text-muted-foreground">
+      <span className="text-xs text-muted-foreground tabular-nums">
         {invite.usedCount}/{invite.maxUses}
       </span>
       <Button
         variant="ghost"
-        size="icon"
-        className="h-7 w-7 shrink-0"
+        size="icon-sm"
+        aria-label={copied ? "Link copiato" : "Copia link"}
+        className="shrink-0"
         onClick={() => {
           navigator.clipboard.writeText(link);
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         }}
       >
-        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+        {copied ? <Check className="size-4 text-success" aria-hidden /> : <Copy className="size-4" aria-hidden />}
       </Button>
     </div>
+  );
+}
+
+/** One coach-area card: icon and h3 title, optional extra on the right, content. */
+function CoachSection({
+  icon,
+  title,
+  aside,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  aside?: ReactNode;
+  children: ReactNode;
+}) {
+  const titleId = useId();
+  return (
+    <section aria-labelledby={titleId} className="surface-panel space-y-4 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 id={titleId} className={sectionTitle}>
+          {icon}
+          {title}
+        </h3>
+        {aside}
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -393,6 +338,8 @@ export default function ClubCoachModeration() {
   const clubHistoryV1Enabled = UI_FEATURE_FLAGS.clubHistoryV1;
   const clubAiAutomationV1Enabled = UI_FEATURE_FLAGS.clubAiAutomationV1;
   const [match, params] = useRoute("/community/club/:id/coach");
+  const [, navigate] = useLocation();
+  const formId = useId();
   const clubId = Number(params?.id);
   const utils = trpc.useUtils();
 
@@ -489,7 +436,7 @@ export default function ClubCoachModeration() {
       utils.community.clubs.meets.list.invalidate({ clubId });
       const meetId = Number(payload?.meet?.id);
       if (Number.isFinite(meetId)) {
-        window.location.href = `/community/club/${clubId}/meet/${meetId}`;
+        navigate(`/community/club/${clubId}/meet/${meetId}`);
       }
     },
     onError: (error) => {
@@ -541,7 +488,7 @@ export default function ClubCoachModeration() {
       toast.info("Bozza salvata. Pubblica il workout per notificare i membri del club.");
       const warnings = Array.isArray(payload?.generation?.warnings) ? payload.generation.warnings : [];
       if (warnings.length > 0) {
-        toast.warning(`Quality gate: ${String(warnings[0])}`);
+        toast.warning(`Controllo qualità: ${String(warnings[0])}`);
       }
       setGeneratedWorkoutPreview(payload?.workout ?? null);
       void workoutGenerationStatusQuery.refetch();
@@ -663,15 +610,8 @@ export default function ClubCoachModeration() {
     if (workoutCanGenerate) return null;
     const next = workoutGenerationStatus?.nextAvailableAt;
     if (!next) return null;
-    const parsed = new Date(next);
-    if (Number.isNaN(parsed.getTime())) return null;
-    return parsed.toLocaleString("it-IT", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const label = formatSessionDate(next);
+    return label === NO_VALUE ? null : label;
   }, [workoutCanGenerate, workoutGenerationStatus?.nextAvailableAt]);
   const workoutPreviewPlan = useMemo(() => {
     return parseWorkoutPlan(workoutPreview?.workoutJson ?? null);
@@ -693,102 +633,13 @@ export default function ClubCoachModeration() {
 
   const handlePrintWorkout = () => {
     if (!workoutPreview) return;
-    const title = String(workoutPreviewPlan?.title ?? workoutPreview.title ?? "Workout");
-    const description = String(workoutPreviewPlan?.description ?? workoutPreview.description ?? "");
-    const blocks = Array.isArray(workoutPreviewPlan?.blocks) ? workoutPreviewPlan.blocks : [];
-    const notes = Array.isArray(workoutPreviewPlan?.coachNotes) ? workoutPreviewPlan.coachNotes : [];
-    const blockHtml = blocks
-      .map((block: any) => {
-        const items = Array.isArray(block?.items) ? block.items : [];
-        const itemsHtml = items
-          .map((item: any) => {
-            const label = String(item?.label ?? "").trim();
-            if (!label) return "";
-            const series = getWorkoutSeriesDisplay(item);
-            const parts = [
-              `Serie ${series.reps}`,
-              `Distanza serie ${series.seriesDistance}`,
-              `Ripartenza ${series.sendoff}`,
-              series.betweenSetsRest ? `Recupero prima prossima serie ${series.betweenSetsRest}` : null,
-              series.intensity ? `Intensità ${series.intensity}` : null,
-              series.targetPace ? `Pace ${series.targetPace}` : null,
-            ].filter(Boolean);
-            return `<li><strong>${escapeHtml(label)}</strong>${parts.length ? ` — ${escapeHtml(parts.join(" • "))}` : ""}${
-              series.notes ? `<br/><span>${escapeHtml(series.notes)}</span>` : ""
-            }</li>`;
-          })
-          .filter((item: string) => item.length > 0)
-          .join("");
-        if (!itemsHtml) return "";
-        return `<section><h3>${escapeHtml(String(block?.label ?? "Blocco"))}</h3><ul>${itemsHtml}</ul></section>`;
-      })
-      .filter((item: string) => item.length > 0)
-      .join("");
-    const notesHtml = notes.length
-      ? `<section><h3>Note Coach</h3><ul>${notes.map((note: any) => `<li>${escapeHtml(String(note))}</li>`).join("")}</ul></section>`
-      : "";
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>@page{size:A4;margin:12mm}html,body{margin:0;padding:0;color:#111;font-family:Arial,sans-serif;font-size:13px;line-height:1.35}.sheet{max-width:760px;margin:0 auto}h1,h2,h3{margin:0 0 6px}h1{font-size:20px}h3{font-size:14px}p{margin:0 0 8px}section{margin:10px 0;break-inside:avoid-page;page-break-inside:avoid}ul{margin:4px 0 0 18px;padding:0}li{margin:2px 0}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style></head><body><main class="sheet"><h1>${escapeHtml(title)}</h1><p>${escapeHtml(description)}</p><p><strong>Data:</strong> ${escapeHtml(String(workoutPreview.sessionDate ?? workoutSessionDate))}</p>${blockHtml || "<p>Nessun blocco disponibile.</p>"}${notesHtml}</main></body></html>`;
-
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.left = "-9999px";
-    iframe.style.top = "0";
-    iframe.style.width = "794px";
-    iframe.style.height = "1123px";
-    iframe.style.border = "0";
-    iframe.style.opacity = "0";
-    iframe.setAttribute("aria-hidden", "true");
-    document.body.appendChild(iframe);
-
-    const frameWindow = iframe.contentWindow;
-    const frameDocument = frameWindow?.document;
-    if (!frameWindow || !frameDocument) {
-      document.body.removeChild(iframe);
-      toast.error("Stampa non disponibile su questo browser.");
-      return;
-    }
-
-    const cleanup = () => {
-      if (iframe.parentNode) {
-        iframe.parentNode.removeChild(iframe);
-      }
-    };
-
-    iframe.onload = () => {
-      frameWindow.onafterprint = cleanup;
-      setTimeout(() => {
-        try {
-          frameWindow.focus();
-          frameWindow.print();
-        } catch {
-          cleanup();
-          toast.error("Stampa non disponibile su questo browser.");
-        }
-      }, 350);
-    };
-
-    try {
-      iframe.srcdoc = html;
-    } catch {
-      try {
-        frameDocument.open();
-        frameDocument.write(html);
-        frameDocument.close();
-        frameWindow.onafterprint = cleanup;
-        setTimeout(() => {
-          try {
-            frameWindow.focus();
-            frameWindow.print();
-          } catch {
-            cleanup();
-            toast.error("Stampa non disponibile su questo browser.");
-          }
-        }, 500);
-      } catch {
-        cleanup();
-        toast.error("Stampa non disponibile su questo browser.");
-      }
-    }
+    const html = buildWorkoutPrintHtml({
+      title: String(workoutPreviewPlan?.title ?? workoutPreview.title ?? "Workout"),
+      description: String(workoutPreviewPlan?.description ?? workoutPreview.description ?? ""),
+      sessionDate: String(workoutPreview.sessionDate ?? workoutSessionDate),
+      plan: workoutPreviewPlan,
+    });
+    printInHiddenFrame(html, () => toast.error("Stampa non disponibile su questo browser."));
   };
 
   useEffect(() => {
@@ -816,9 +667,8 @@ export default function ClubCoachModeration() {
     if (clubQuery.isLoading) return;
     if (!isMember) return;
     if (isCoachStaff) return;
-    if (typeof window === "undefined") return;
-    window.location.replace(`/community/club/${clubId}`);
-  }, [match, clubId, clubQuery.isLoading, isMember, isCoachStaff]);
+    navigate(`/community/club/${clubId}`, { replace: true });
+  }, [match, clubId, clubQuery.isLoading, isMember, isCoachStaff, navigate]);
 
   useEffect(() => {
     if (!clubMeetsV1Enabled) return;
@@ -857,87 +707,22 @@ export default function ClubCoachModeration() {
 
     const html = buildMeetRosterPrintHtml(selectedMeet, rosterRows);
     if (openPrintTab(html)) return;
-
-    const iframe = document.createElement("iframe");
-    iframe.style.position = "fixed";
-    iframe.style.left = "-9999px";
-    iframe.style.top = "0";
-    iframe.style.width = "794px";
-    iframe.style.height = "1123px";
-    iframe.style.border = "0";
-    iframe.style.opacity = "0";
-    iframe.setAttribute("aria-hidden", "true");
-    document.body.appendChild(iframe);
-
-    const frameWindow = iframe.contentWindow;
-    const frameDocument = frameWindow?.document;
-    if (!frameWindow || !frameDocument) {
-      document.body.removeChild(iframe);
-      toast.error("Stampa non disponibile su questo browser.");
-      return;
-    }
-
-    const cleanup = () => {
-      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-    };
-
-    iframe.onload = () => {
-      frameWindow.onafterprint = cleanup;
-      setTimeout(() => {
-        try {
-          frameWindow.focus();
-          frameWindow.print();
-        } catch {
-          cleanup();
-          toast.error("Stampa non disponibile su questo browser.");
-        }
-      }, 350);
-    };
-
-    try {
-      iframe.srcdoc = html;
-    } catch {
-      try {
-        frameDocument.open();
-        frameDocument.write(html);
-        frameDocument.close();
-        frameWindow.onafterprint = cleanup;
-        setTimeout(() => {
-          try {
-            frameWindow.focus();
-            frameWindow.print();
-          } catch {
-            cleanup();
-            toast.error("Stampa non disponibile su questo browser.");
-          }
-        }, 500);
-      } catch {
-        cleanup();
-        toast.error("Stampa non disponibile su questo browser.");
-      }
-    }
+    printInHiddenFrame(html, () => toast.error("Stampa non disponibile su questo browser."));
   };
 
   if (!match || !Number.isFinite(clubId)) return null;
 
-  if (clubQuery.isLoading) {
+  const access = clubAccess(clubQuery);
+  if (access !== "member") {
     return (
       <AppLayout>
-        <div className="container py-6">
-          <div className="surface-panel p-6 text-center text-muted-foreground">Caricamento area coach...</div>
-        </div>
-      </AppLayout>
-    );
-  }
-
-  if (!club || !isMember) {
-    return (
-      <AppLayout>
-        <div className="container py-6">
-          <div className="surface-panel p-6 text-center text-muted-foreground">
-            Devi essere iscritto al club per accedere a questa area.
-          </div>
-        </div>
+        <ClubAccessState
+          access={access}
+          clubId={clubId}
+          loadingLabel="Caricamento dell'area coach…"
+          notMemberText="Devi essere iscritto al club per accedere a quest'area."
+          onRetry={() => void clubQuery.refetch()}
+        />
       </AppLayout>
     );
   }
@@ -945,50 +730,42 @@ export default function ClubCoachModeration() {
   if (!isCoachStaff) {
     return (
       <AppLayout>
-        <div className="container py-6 space-y-4">
-          <Link href={`/community/club/${clubId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Torna al club
-          </Link>
-          <div className="surface-panel p-6 text-center">
-            <Shield className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">Accesso riservato a coach e staff. Reindirizzamento in corso...</p>
-          </div>
-        </div>
+        <ClubNotice backHref={`/community/club/${clubId}`}>
+          Accesso riservato a coach e staff. Reindirizzamento in corso...
+        </ClubNotice>
       </AppLayout>
     );
   }
 
+  const fieldId = (name: string) => `${formId}-${name}`;
+  const workoutStatus = String(workoutPreview?.status ?? "");
+  const workoutPublished = workoutStatus === "published";
+  const invites = invitesQuery.data as any[] | undefined;
+
   return (
     <AppLayout>
-      <div className="container py-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <Link href={`/community/club/${clubId}`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" /> Torna al club
-            </Link>
-            <h1 className="mt-1 text-2xl font-display font-bold">Area Coach • {club.name}</h1>
-            <p className="text-sm text-muted-foreground">Moderazione club separata dal feed pubblico.</p>
+            <h2 className="font-display text-[28px] font-bold leading-none">Area coach</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{club.name} · solo coach e staff</p>
           </div>
-          <Badge variant="outline">{role}</Badge>
+          <Chip>{ROLE_LABELS[role] ?? role}</Chip>
         </div>
 
         {clubMeetsV1Enabled ? (
-          <section className="surface-panel p-4 space-y-3">
-            <div className="flex items-center gap-2">
-              <Flag className="h-4 w-4 text-action-text" />
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Convocazioni Gare</h2>
-            </div>
-            <div className="grid gap-2 md:grid-cols-2">
-              <div>
-                <Label>Nome meeting *</Label>
-                <Input value={meetForm.name} onChange={(e) => setMeetForm((p) => ({ ...p, name: e.target.value }))} />
+          <CoachSection icon={<Flag className="size-4 text-action-text" aria-hidden />} title="Convocazioni gare">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor={fieldId("meet-name")}>Nome meeting *</Label>
+                <Input id={fieldId("meet-name")} value={meetForm.name} onChange={(e) => setMeetForm((p) => ({ ...p, name: e.target.value }))} />
               </div>
-              <div>
-                <Label>Impianto</Label>
-                <Input value={meetForm.venue} onChange={(e) => setMeetForm((p) => ({ ...p, venue: e.target.value }))} />
+              <div className="space-y-1">
+                <Label htmlFor={fieldId("meet-venue")}>Impianto</Label>
+                <Input id={fieldId("meet-venue")} value={meetForm.venue} onChange={(e) => setMeetForm((p) => ({ ...p, venue: e.target.value }))} />
               </div>
             </div>
-            <div className="grid gap-2 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-3">
               <DateTimePickerField
                 label="Inizio"
                 required
@@ -1002,19 +779,18 @@ export default function ClubCoachModeration() {
                 onChange={(next) => setMeetForm((p) => ({ ...p, endDate: next }))}
               />
               <DateTimePickerField
-                label="Deadline iscrizioni"
+                label="Scadenza iscrizioni"
                 required
                 value={meetForm.registrationDeadline}
                 onChange={(next) => setMeetForm((p) => ({ ...p, registrationDeadline: next }))}
               />
             </div>
-            <div>
-              <Label>Note</Label>
-              <Textarea rows={3} value={meetForm.notes} onChange={(e) => setMeetForm((p) => ({ ...p, notes: e.target.value }))} />
+            <div className="space-y-1">
+              <Label htmlFor={fieldId("meet-notes")}>Note</Label>
+              <Textarea id={fieldId("meet-notes")} rows={3} value={meetForm.notes} onChange={(e) => setMeetForm((p) => ({ ...p, notes: e.target.value }))} />
             </div>
             <Button
               className="w-full sm:w-auto"
-              variant="neon"
               disabled={createMeetMutation.isPending}
               onClick={() => {
                 const start = parseDateTimeLocal(meetForm.startDate);
@@ -1036,56 +812,55 @@ export default function ClubCoachModeration() {
                 });
               }}
             >
-              <Plus className="mr-1.5 h-4 w-4" />
+              <Plus aria-hidden />
               {createMeetMutation.isPending ? "Creazione..." : "Crea convocazione"}
             </Button>
 
             {normalizedMeets.length > 0 ? (
-              <div className="space-y-2 pt-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ultime convocazioni</p>
-                {normalizedMeets.slice(0, 5).map((meet: any) => {
-                  const status = String(meet.status ?? "draft");
-                  return (
-                    <Link
-                      key={meet.id}
-                      href={`/community/club/${clubId}/meet/${meet.id}`}
-                      className="flex items-center justify-between rounded-xl border border-border/60 bg-card/35 px-3 py-2 transition-colors hover:bg-card/55"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{meet.name}</p>
-                        <p className="text-xs text-muted-foreground">{formatDate(meet.startDate)}</p>
-                      </div>
-                      <span className="shrink-0 rounded-full border border-border/60 px-2 py-0.5 text-[11px] text-muted-foreground">
-                        {meetStatusLabel[status] ?? status}
-                      </span>
-                    </Link>
-                  );
-                })}
+              <div className="border-t border-border pt-4">
+                <h4 className={subTitle}>Ultime convocazioni</h4>
+                <ul className="mt-1">
+                  {normalizedMeets.slice(0, 5).map((meet: any) => {
+                    const status = String(meet.status ?? "draft");
+                    return (
+                      <li key={meet.id} className="border-t border-border first:border-t-0">
+                        <Link
+                          href={`/community/club/${clubId}/meet/${meet.id}`}
+                          className="flex min-h-11 items-center justify-between gap-3 py-2 transition-colors hover:text-action-text"
+                        >
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold">{meet.name}</span>
+                            <span className="block text-xs text-muted-foreground">{formatDate(meet.startDate)}</span>
+                          </span>
+                          <Chip>{meetStatusLabel[status] ?? status}</Chip>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             ) : null}
 
             {normalizedMeets.length > 0 ? (
-              <div className="space-y-3 rounded-xl border border-border/60 bg-card/30 p-3">
+              <div className="space-y-3 border-t border-border pt-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Elenco iscritti gare</p>
-                  <span className="text-xs text-muted-foreground">
-                    Solo coach/staff
-                  </span>
+                  <h4 className={subTitle}>Elenco iscritti gare</h4>
+                  <span className="text-xs text-muted-foreground">Solo coach e staff</span>
                 </div>
-                <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-                  <div>
-                    <Label>Seleziona convocazione</Label>
+                <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                  <div className="space-y-1">
+                    <Label htmlFor={fieldId("roster-meet")}>Convocazione</Label>
                     <Select
                       value={selectedMeetId ? String(selectedMeetId) : undefined}
                       onValueChange={(value) => setSelectedMeetId(Number(value))}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger id={fieldId("roster-meet")} className="w-full">
                         <SelectValue placeholder="Seleziona convocazione" />
                       </SelectTrigger>
                       <SelectContent>
                         {normalizedMeets.map((meet: any) => {
                           const status = String(meet.status ?? "draft");
-                          const label = `${meet.name} • ${meetStatusLabel[status] ?? status}`;
+                          const label = `${meet.name} · ${meetStatusLabel[status] ?? status}`;
                           return (
                             <SelectItem key={meet.id} value={String(meet.id)}>
                               {label}
@@ -1098,7 +873,7 @@ export default function ClubCoachModeration() {
                   <div className="flex w-full flex-wrap gap-2 md:w-auto">
                     <Button
                       className="w-full sm:w-auto"
-                      variant="outline-neon"
+                      variant="outline"
                       disabled={!selectedMeet || publishMeetMutation.isPending || selectedMeetStatus !== "draft"}
                       onClick={() => {
                         if (!selectedMeetId) return;
@@ -1109,72 +884,72 @@ export default function ClubCoachModeration() {
                     </Button>
                     <Button
                       className="w-full sm:w-auto"
-                      variant="outline-neon"
+                      variant="outline"
                       disabled={!selectedMeet || rosterRows.length === 0}
                       onClick={handlePrintMeetRoster}
                     >
-                      <Printer className="mr-1.5 h-4 w-4" />
+                      <Printer aria-hidden />
                       Stampa elenco
                     </Button>
                     {selectedMeet ? (
-                      <Link href={`/community/club/${clubId}/meet/${selectedMeet.id}`} className="w-full sm:w-auto">
-                        <Button className="w-full sm:w-auto" variant="neon">
-                          Apri dettaglio meeting
-                        </Button>
-                      </Link>
+                      <Button className="w-full sm:w-auto" asChild>
+                        <Link href={`/community/club/${clubId}/meet/${selectedMeet.id}`}>Apri dettaglio meeting</Link>
+                      </Button>
                     ) : null}
                   </div>
                 </div>
 
                 {selectedMeet ? (
-                  <div className="rounded-lg border border-border/50 bg-background/25 px-3 py-2 text-xs text-muted-foreground">
-                    <p className="font-medium text-foreground">{selectedMeet.name}</p>
+                  <div className="rounded-xl bg-raised p-3 text-sm text-muted-foreground">
+                    <p className="font-semibold text-foreground">{selectedMeet.name}</p>
                     <p>
-                      Stato: {meetStatusLabel[selectedMeetStatus] ?? selectedMeetStatus} • Iscritti attivi: {rosterRows.length}
+                      Stato: {meetStatusLabel[selectedMeetStatus] ?? selectedMeetStatus} · Iscritti attivi: {rosterRows.length}
                     </p>
                     {selectedMeetStatus === "draft" ? (
-                      <p>La lista non è ancora visibile ai membri: usa "Pubblica elenco iscritti" quando vuoi renderla disponibile.</p>
+                      <p>La lista non è ancora visibile ai membri: usa «Pubblica elenco iscritti» quando vuoi renderla disponibile.</p>
                     ) : null}
                   </div>
                 ) : null}
 
                 {meetEntriesQuery.isLoading ? (
-                  <p className="text-sm text-muted-foreground">Caricamento iscritti...</p>
+                  <LoadingSkeleton label="Caricamento degli iscritti…" count={2} itemClassName="h-12 w-full rounded-xl" />
+                ) : !meetEntriesQuery.data && meetEntriesQuery.isError ? (
+                  <LoadError className="border-0 bg-raised" onRetry={() => void meetEntriesQuery.refetch()} />
                 ) : rosterRows.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Nessun iscritto attivo per la convocazione selezionata.</p>
                 ) : (
                   <>
-                    <div className="space-y-2 md:hidden">
+                    <ul className="md:hidden">
                       {rosterRows.map((row) => (
-                        <div key={row.entryId} className="rounded-lg border border-border/60 bg-background/30 p-2 text-sm">
+                        <li key={row.entryId} className="border-t border-border py-2 text-sm first:border-t-0">
                           <p className="font-semibold">{row.fullName}</p>
                           <p className="text-xs text-muted-foreground">{row.email}</p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            {row.eventLabel} • {row.distance} {row.stroke !== "-" ? `• ${row.stroke}` : ""}
+                            {row.eventLabel} · {row.distance} {row.stroke !== "-" ? `· ${row.stroke}` : ""}
                           </p>
                           <p className="text-xs text-muted-foreground">
-                            Stato: {row.status} • Seed: {row.seedTime}
+                            Stato: {row.status} · Seed: {row.seedTime}
                           </p>
-                        </div>
+                        </li>
                       ))}
-                    </div>
-                    <div className="hidden md:block overflow-x-auto rounded-lg border border-border/60">
+                    </ul>
+                    <div className="hidden overflow-x-auto rounded-xl border border-border md:block">
                       <table className="min-w-full text-sm">
-                        <thead className="bg-card/50 text-xs uppercase tracking-wide text-muted-foreground">
+                        <thead className="bg-raised text-xs text-muted-foreground">
                           <tr>
-                            <th className="px-2 py-2 text-left">Nome</th>
-                            <th className="px-2 py-2 text-left">Cognome</th>
-                            <th className="px-2 py-2 text-left">Gara</th>
-                            <th className="px-2 py-2 text-left">Stile</th>
-                            <th className="px-2 py-2 text-left">Distanza</th>
-                            <th className="px-2 py-2 text-left">Stato</th>
-                            <th className="px-2 py-2 text-left">Seed</th>
-                            <th className="px-2 py-2 text-left">Email</th>
+                            <th className="px-2 py-2 text-left font-semibold">Nome</th>
+                            <th className="px-2 py-2 text-left font-semibold">Cognome</th>
+                            <th className="px-2 py-2 text-left font-semibold">Gara</th>
+                            <th className="px-2 py-2 text-left font-semibold">Stile</th>
+                            <th className="px-2 py-2 text-left font-semibold">Distanza</th>
+                            <th className="px-2 py-2 text-left font-semibold">Stato</th>
+                            <th className="px-2 py-2 text-left font-semibold">Seed</th>
+                            <th className="px-2 py-2 text-left font-semibold">Email</th>
                           </tr>
                         </thead>
                         <tbody>
                           {rosterRows.map((row) => (
-                            <tr key={row.entryId} className="border-t border-border/40">
+                            <tr key={row.entryId} className="border-t border-border">
                               <td className="px-2 py-2">{row.firstName}</td>
                               <td className="px-2 py-2">{row.lastName}</td>
                               <td className="px-2 py-2">{row.eventLabel}</td>
@@ -1192,31 +967,27 @@ export default function ClubCoachModeration() {
                 )}
               </div>
             ) : null}
-          </section>
+          </CoachSection>
         ) : null}
 
-        <section className="surface-panel p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-action-text" />
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Allenamenti in vasca (AI)</h2>
-          </div>
-
-          <div className="grid gap-2 md:grid-cols-3">
-            <div>
-              <Label>Data allenamento *</Label>
+        <CoachSection icon={<Sparkles className="size-4 text-action-text" aria-hidden />} title="Allenamenti in vasca (AI)">
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="space-y-1">
+              <Label htmlFor={fieldId("workout-date")}>Data allenamento *</Label>
               <Input
+                id={fieldId("workout-date")}
                 type="date"
                 value={workoutSessionDate}
                 onChange={(e) => setWorkoutSessionDate(e.target.value)}
               />
             </div>
-            <div>
-              <Label>Volume</Label>
+            <div className="space-y-1">
+              <Label htmlFor={fieldId("workout-volume")}>Volume</Label>
               <Select
                 value={workoutDirectives.volume}
                 onValueChange={(value) => setWorkoutDirectives((prev) => ({ ...prev, volume: value as WorkoutDirectivesForm["volume"] }))}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id={fieldId("workout-volume")} className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="light">Leggero</SelectItem>
                   <SelectItem value="medium">Medio</SelectItem>
@@ -1225,13 +996,13 @@ export default function ClubCoachModeration() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Intensità</Label>
+            <div className="space-y-1">
+              <Label htmlFor={fieldId("workout-intensity")}>Intensità</Label>
               <Select
                 value={workoutDirectives.intensity}
                 onValueChange={(value) => setWorkoutDirectives((prev) => ({ ...prev, intensity: value as WorkoutDirectivesForm["intensity"] }))}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id={fieldId("workout-intensity")} className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="easy">Facile</SelectItem>
                   <SelectItem value="mixed">Mista</SelectItem>
@@ -1241,13 +1012,14 @@ export default function ClubCoachModeration() {
             </div>
           </div>
 
-          <div>
-            <Label>Focus</Label>
+          <fieldset>
+            <legend className="text-sm font-medium">Focus</legend>
             <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
               {WORKOUT_FOCUS_OPTIONS.map((option) => (
-                <label key={option.value} className="inline-flex items-center gap-2 rounded-lg border border-border/60 bg-card/25 px-2 py-1.5 text-sm">
+                <label key={option.value} className={choiceTile}>
                   <input
                     type="checkbox"
+                    className="size-4 accent-primary"
                     checked={workoutDirectives.focus.includes(option.value)}
                     onChange={() =>
                       setWorkoutDirectives((prev) => ({
@@ -1260,15 +1032,16 @@ export default function ClubCoachModeration() {
                 </label>
               ))}
             </div>
-          </div>
+          </fieldset>
 
-          <div>
-            <Label>Mix stili</Label>
+          <fieldset>
+            <legend className="text-sm font-medium">Mix stili</legend>
             <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
               {WORKOUT_STROKE_OPTIONS.map((option) => (
-                <label key={option.value} className="inline-flex items-center gap-2 rounded-lg border border-border/60 bg-card/25 px-2 py-1.5 text-sm">
+                <label key={option.value} className={choiceTile}>
                   <input
                     type="checkbox"
+                    className="size-4 accent-primary"
                     checked={workoutDirectives.strokeMix.includes(option.value)}
                     onChange={() =>
                       setWorkoutDirectives((prev) => ({
@@ -1281,16 +1054,17 @@ export default function ClubCoachModeration() {
                 </label>
               ))}
             </div>
-          </div>
+          </fieldset>
 
-          <div className="grid gap-2 md:grid-cols-3">
-            <div>
-              <Label>Attrezzi ammessi</Label>
+          <div className="grid gap-3 md:grid-cols-3">
+            <fieldset>
+              <legend className="text-sm font-medium">Attrezzi ammessi</legend>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {WORKOUT_EQUIPMENT_OPTIONS.map((option) => (
-                  <label key={option.value} className="inline-flex items-center gap-2 rounded-lg border border-border/60 bg-card/25 px-2 py-1.5 text-sm">
+                  <label key={option.value} className={choiceTile}>
                     <input
                       type="checkbox"
+                      className="size-4 accent-primary"
                       checked={workoutDirectives.equipment.includes(option.value)}
                       onChange={() =>
                         setWorkoutDirectives((prev) => ({
@@ -1303,14 +1077,14 @@ export default function ClubCoachModeration() {
                   </label>
                 ))}
               </div>
-            </div>
-            <div>
-              <Label>Durata sessione</Label>
+            </fieldset>
+            <div className="space-y-1">
+              <Label htmlFor={fieldId("workout-minutes")}>Durata sessione</Label>
               <Select
                 value={String(workoutDirectives.sessionMinutes)}
                 onValueChange={(value) => setWorkoutDirectives((prev) => ({ ...prev, sessionMinutes: Number(value) as WorkoutDirectivesForm["sessionMinutes"] }))}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id={fieldId("workout-minutes")} className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="45">45 min</SelectItem>
                   <SelectItem value="60">60 min</SelectItem>
@@ -1319,8 +1093,8 @@ export default function ClubCoachModeration() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label>Distanza totale target (opzionale)</Label>
+            <div className="space-y-1">
+              <Label htmlFor={fieldId("workout-distance")}>Distanza totale (facoltativa)</Label>
               <Select
                 value={workoutDirectives.targetDistanceMeters ? String(workoutDirectives.targetDistanceMeters) : "auto"}
                 onValueChange={(value) =>
@@ -1330,27 +1104,23 @@ export default function ClubCoachModeration() {
                   }))
                 }
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger id={fieldId("workout-distance")} className="w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">Auto</SelectItem>
-                  <SelectItem value="1500">1500m</SelectItem>
-                  <SelectItem value="1800">1800m</SelectItem>
-                  <SelectItem value="2000">2000m</SelectItem>
-                  <SelectItem value="2200">2200m</SelectItem>
-                  <SelectItem value="2500">2500m</SelectItem>
-                  <SelectItem value="2800">2800m</SelectItem>
-                  <SelectItem value="3000">3000m</SelectItem>
-                  <SelectItem value="3200">3200m</SelectItem>
-                  <SelectItem value="3500">3500m</SelectItem>
-                  <SelectItem value="4000">4000m</SelectItem>
+                  <SelectItem value="auto">Automatica</SelectItem>
+                  {[1500, 1800, 2000, 2200, 2500, 2800, 3000, 3200, 3500, 4000].map((meters) => (
+                    <SelectItem key={meters} value={String(meters)}>
+                      {formatInteger(meters)} m
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          <div>
-            <Label>Nota coach (opzionale)</Label>
+          <div className="space-y-1">
+            <Label htmlFor={fieldId("workout-notes")}>Nota del coach (facoltativa)</Label>
             <Textarea
+              id={fieldId("workout-notes")}
               rows={2}
               value={workoutDirectives.notes}
               onChange={(e) => setWorkoutDirectives((prev) => ({ ...prev, notes: e.target.value }))}
@@ -1358,10 +1128,9 @@ export default function ClubCoachModeration() {
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             <Button
               className="w-full sm:w-auto"
-              variant="neon"
               disabled={
                 generateWorkoutDraftMutation.isPending ||
                 !workoutCanGenerate ||
@@ -1386,148 +1155,150 @@ export default function ClubCoachModeration() {
                 })
               }
             >
-              <Sparkles className="mr-1.5 h-4 w-4" />
-              {generateWorkoutDraftMutation.isPending ? "Generazione..." : "Genera workout"}
+              <Sparkles aria-hidden />
+              {generateWorkoutDraftMutation.isPending ? "Generazione..." : "Genera allenamento"}
             </Button>
 
             {workoutCooldownLabel ? (
-              <p className="text-xs text-amber-300">
-                Generazione disponibile il {workoutCooldownLabel}
+              <p className="text-sm text-warning">
+                Generazione disponibile da {workoutCooldownLabel}
               </p>
             ) : workoutGenerationStatusQuery.error ? (
-              <p className="text-xs text-amber-300">
-                Stato cooldown non disponibile: ricarica la pagina.
+              <p className="text-sm text-warning">
+                Stato dell'attesa non disponibile: ricarica la pagina.
               </p>
             ) : workoutGenerationStatusQuery.isFetching ? (
-              <p className="text-xs text-muted-foreground">Verifica cooldown...</p>
+              <p className="text-sm text-muted-foreground">Verifica dell'attesa...</p>
             ) : (
-              <p className="text-xs text-muted-foreground">Cooldown: 1 generazione ogni 24h per club (indipendente dalla data selezionata).</p>
+              <p className="text-sm text-muted-foreground">Una generazione ogni 24 ore per club, qualunque sia la data scelta.</p>
             )}
           </div>
 
           {workoutPreview ? (
-            <div className="rounded-xl border border-border/60 bg-card/35 p-3 space-y-2">
-              <p className="text-sm font-semibold">
-                {String(workoutPreviewPlan?.title ?? workoutPreview.title ?? "Workout")}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {String(workoutPreviewPlan?.description ?? workoutPreview.description ?? "Bozza salvata")}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {workoutPreview.sessionDate ? `Data ${workoutPreview.sessionDate} • ` : ""}
-                Stato: {workoutPreview.status}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Blocchi: {Array.isArray(workoutPreviewPlan?.blocks) ? workoutPreviewPlan.blocks.length : 0} •
-                Distanza: {String(workoutPreviewPlan?.totalDistance ?? "n/d")}
-              </p>
+            <div className="space-y-3 rounded-xl bg-raised p-3">
+              <div>
+                <p className="font-semibold">
+                  {String(workoutPreviewPlan?.title ?? workoutPreview.title ?? "Allenamento")}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {String(workoutPreviewPlan?.description ?? workoutPreview.description ?? "Bozza salvata")}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {[
+                    workoutPreview.sessionDate ? formatSessionDay(workoutPreview.sessionDate) : null,
+                    `Stato: ${WORKOUT_STATUS_LABELS[workoutStatus] ?? workoutStatus}`,
+                    `Blocchi: ${Array.isArray(workoutPreviewPlan?.blocks) ? workoutPreviewPlan.blocks.length : 0}`,
+                    `Distanza: ${String(workoutPreviewPlan?.totalDistance ?? "n/d")}`,
+                  ]
+                    .filter((part) => part && part !== NO_VALUE)
+                    .join(" · ")}
+                </p>
+              </div>
               {Array.isArray(workoutPreviewPlan?.blocks) && workoutPreviewPlan.blocks.length > 0 ? (
-                <div className="space-y-2 rounded-lg border border-border/60 bg-card/25 p-2">
+                <div>
                   {workoutPreviewPlan.blocks.map((block: any, blockIndex: number) => (
-                    <div key={`coach-preview-${blockIndex}`} className="space-y-1">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{String(block?.label ?? `Blocco ${blockIndex + 1}`)}</p>
-                      <div className="space-y-1">
-                        {Array.isArray(block?.items)
-                          ? block.items.map((item: any, itemIndex: number) => {
-                              const series = getWorkoutSeriesDisplay(item);
-                              return (
-                                <div key={`coach-preview-${blockIndex}-${itemIndex}`} className="rounded-md border border-border/50 bg-background/30 p-2 text-[11px]">
-                                  <p className="font-medium text-foreground/90">{String(item?.label ?? "Serie")}</p>
-                                  <p>Serie: {series.reps} • Distanza serie: {series.seriesDistance} • Ripartenza: {series.sendoff}</p>
-                                  {series.betweenSetsRest ? <p>Recupero prima prossima serie: {series.betweenSetsRest}</p> : null}
-                                </div>
-                              );
-                            })
-                          : null}
-                      </div>
+                    <div key={`coach-preview-${blockIndex}`} className="border-t border-border py-2 first:border-t-0 first:pt-0">
+                      <p className={subTitle}>{String(block?.label ?? `Blocco ${blockIndex + 1}`)}</p>
+                      {Array.isArray(block?.items) ? (
+                        <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
+                          {block.items.map((item: any, itemIndex: number) => {
+                            const series = getWorkoutSeriesDisplay(item);
+                            return (
+                              <li key={`coach-preview-${blockIndex}-${itemIndex}`}>
+                                <span className="font-medium text-foreground">{String(item?.label ?? "Serie")}</span>
+                                {" · "}Serie: {series.reps} · Distanza serie: {series.seriesDistance} · Ripartenza: {series.sendoff}
+                                {series.betweenSetsRest ? ` · Recupero prima della serie successiva: ${series.betweenSetsRest}` : ""}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : null}
                     </div>
                   ))}
                 </div>
               ) : null}
-              <div className="flex flex-wrap gap-2 pt-1">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
-                  variant={String(workoutPreview.status) === "published" ? "outline-neon" : "neon"}
-                  disabled={publishWorkoutMutation.isPending || String(workoutPreview.status) === "published"}
+                  variant={workoutPublished ? "outline" : "default"}
+                  disabled={publishWorkoutMutation.isPending || workoutPublished}
                   onClick={() => publishWorkoutMutation.mutate({ workoutId: Number(workoutPreview.id) })}
                 >
                   {publishWorkoutMutation.isPending
                     ? "Pubblicazione..."
-                    : String(workoutPreview.status) === "published"
+                    : workoutPublished
                       ? "Pubblicato"
-                      : "Pubblica + Notifica membri"}
+                      : "Pubblica e avvisa i membri"}
                 </Button>
-                <Button size="sm" variant="outline-neon" onClick={handlePrintWorkout}>
+                <Button size="sm" variant="outline" onClick={handlePrintWorkout}>
+                  <Printer aria-hidden />
                   Stampa
                 </Button>
                 {workoutWhatsappLink ? (
-                  <a href={workoutWhatsappLink} target="_blank" rel="noreferrer" className="inline-flex">
-                    <Button size="sm" variant="outline-neon">Condividi WhatsApp</Button>
-                  </a>
+                  <Button size="sm" variant="outline" asChild>
+                    <a href={workoutWhatsappLink} target="_blank" rel="noreferrer">
+                      Condividi su WhatsApp
+                    </a>
+                  </Button>
                 ) : null}
               </div>
             </div>
           ) : null}
-        </section>
+        </CoachSection>
 
         {clubAiAutomationV1Enabled ? (
-          <section className="surface-panel p-4 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Bot className="h-4 w-4 text-action-text" />
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Coach AI Autonomo</h2>
-              </div>
-              <Badge variant="outline">{aiSectionEnabledForClub ? "enabled" : "disabled"}</Badge>
-            </div>
-
+          <CoachSection
+            icon={<Bot className="size-4 text-action-text" aria-hidden />}
+            title="Coach AI autonomo"
+            aside={<Chip tone={aiSectionEnabledForClub ? "action" : "neutral"}>{aiSectionEnabledForClub ? "Attivo" : "Spento"}</Chip>}
+          >
             {aiCoachConfigQuery.isLoading ? (
-              <p className="text-xs text-muted-foreground">Caricamento configurazione Coach AI...</p>
+              <LoadingSkeleton label="Caricamento della configurazione…" count={2} itemClassName="h-24 w-full rounded-xl" />
             ) : (
               <>
-                <div className="grid gap-2 md:grid-cols-2">
-                  <div className="rounded-xl border border-border/60 bg-card/35 p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="coach-ai-enabled">Automazione attiva</Label>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-2 rounded-xl bg-raised p-3 text-sm text-muted-foreground">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor={fieldId("ai-enabled")} className="text-foreground">Automazione attiva</Label>
                       <Switch
-                        id="coach-ai-enabled"
+                        id={fieldId("ai-enabled")}
                         checked={aiAutomationEnabled}
                         onCheckedChange={(checked) => setAiAutomationEnabled(Boolean(checked))}
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      Actor bot: {aiActorBot?.name ?? "Coach AI"} ({aiActorBot?.email ?? "-"}) • userId {aiActorUserId || "-"}
+                    <p>
+                      Bot: {aiActorBot?.name ?? "Coach AI"} ({aiActorBot?.email ?? "-"}) · utente {aiActorUserId || "-"}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      Timezone: {String(aiCoachConfig?.timezone ?? "Europe/Rome")}
+                    <p>Fuso orario: {String(aiCoachConfig?.timezone ?? "Europe/Rome")}</p>
+                    <p>
+                      Esecuzioni: {formatInteger(aiCoachSummary?.runsCount ?? 0)} · fallite: {formatInteger(aiCoachSummary?.failedCount ?? 0)}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      Run totali: {Number(aiCoachSummary?.runsCount ?? 0)} • falliti: {Number(aiCoachSummary?.failedCount ?? 0)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      Ultimo avvio: {aiCoachSummary?.lastStartedAt ? formatDate(aiCoachSummary.lastStartedAt) : "-"}
-                    </p>
+                    <p>Ultimo avvio: {aiCoachSummary?.lastStartedAt ? formatDate(aiCoachSummary.lastStartedAt) : "-"}</p>
                   </div>
 
-                  <div className="rounded-xl border border-border/60 bg-card/35 p-3 space-y-2">
-                    <div>
-                      <Label>Modello immagine (hint)</Label>
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <Label htmlFor={fieldId("ai-image-model")}>Modello immagine (suggerimento)</Label>
                       <Input
+                        id={fieldId("ai-image-model")}
                         value={aiImageModel}
                         onChange={(e) => setAiImageModel(e.target.value)}
                         placeholder="es. nano-banana"
                       />
                     </div>
-                    <div>
-                      <Label>URL scansione comunicati</Label>
+                    <div className="space-y-1">
+                      <Label htmlFor={fieldId("ai-scan-url")}>URL dei comunicati da scansionare</Label>
                       <Input
+                        id={fieldId("ai-scan-url")}
                         value={aiScanUrl}
                         onChange={(e) => setAiScanUrl(e.target.value)}
                         placeholder="https://www.nuotosardegna.it/category/comunicati-master/"
                       />
                     </div>
-                    <div>
-                      <Label>Prompt motivazionale extra</Label>
+                    <div className="space-y-1">
+                      <Label htmlFor={fieldId("ai-prompt")}>Prompt motivazionale extra</Label>
                       <Textarea
+                        id={fieldId("ai-prompt")}
                         rows={2}
                         value={aiMotivationPrompt}
                         onChange={(e) => setAiMotivationPrompt(e.target.value)}
@@ -1539,7 +1310,6 @@ export default function ClubCoachModeration() {
 
                 <div className="flex flex-wrap gap-2">
                   <Button
-                    variant="neon"
                     disabled={upsertAiCoachConfigMutation.isPending || !Number.isFinite(aiActorUserId) || aiActorUserId <= 0}
                     onClick={() =>
                       upsertAiCoachConfigMutation.mutate({
@@ -1557,19 +1327,19 @@ export default function ClubCoachModeration() {
                   </Button>
 
                   <Select value={aiManualJobType} onValueChange={(value) => setAiManualJobType(value as typeof aiManualJobType)}>
-                    <SelectTrigger className="w-full sm:w-[260px]">
+                    <SelectTrigger aria-label="Job da eseguire" className="w-full sm:w-[260px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="scan_meets_weekly">Scan gare settimanale</SelectItem>
-                      <SelectItem value="generate_workouts_weekly">Genera workout settimanali</SelectItem>
-                      <SelectItem value="publish_workout_daily">Pubblica workout giorno</SelectItem>
+                      <SelectItem value="scan_meets_weekly">Scansione gare settimanale</SelectItem>
+                      <SelectItem value="generate_workouts_weekly">Genera gli allenamenti della settimana</SelectItem>
+                      <SelectItem value="publish_workout_daily">Pubblica l'allenamento del giorno</SelectItem>
                       <SelectItem value="post_motivation_mwf">Post motivazionale</SelectItem>
                     </SelectContent>
                   </Select>
 
                   <Button
-                    variant="outline-neon"
+                    variant="outline"
                     disabled={manualAiCoachRunMutation.isPending}
                     onClick={() =>
                       manualAiCoachRunMutation.mutate({
@@ -1578,113 +1348,107 @@ export default function ClubCoachModeration() {
                       })
                     }
                   >
-                    <PlayCircle className="mr-1.5 h-4 w-4" />
-                    {manualAiCoachRunMutation.isPending ? "Esecuzione..." : "Esegui job manuale"}
+                    <PlayCircle aria-hidden />
+                    {manualAiCoachRunMutation.isPending ? "Esecuzione..." : "Esegui ora"}
                   </Button>
                 </div>
 
-                <div className="rounded-xl border border-border/60 bg-card/35 p-3 space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ultimi run automation</p>
+                <div className="border-t border-border pt-4">
+                  <h4 className={subTitle}>Ultime esecuzioni</h4>
                   {aiCoachRuns.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Nessun run registrato.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Nessuna esecuzione registrata.</p>
                   ) : (
-                    <div className="space-y-2">
+                    <ul className="mt-1">
                       {aiCoachRuns.map((run: any) => (
-                        <div key={run.id} className="rounded-lg border border-border/50 bg-card/20 px-2 py-1.5 text-xs">
+                        <li key={run.id} className="border-t border-border py-2 text-xs first:border-t-0">
                           <p className="font-medium">
-                            {String(run.jobType)} • <span className="uppercase">{String(run.status)}</span>
+                            {String(run.jobType)} · {String(run.status)}
                           </p>
-                          <p className="text-muted-foreground inline-flex items-center gap-1">
-                            <Clock3 className="h-3 w-3" />
-                            {formatDate(run.startedAt)} • key {String(run.scheduledKey)}
+                          <p className="inline-flex items-center gap-1 text-muted-foreground">
+                            <Clock3 className="size-3.5" aria-hidden />
+                            {formatDate(run.startedAt)} · chiave {String(run.scheduledKey)}
                           </p>
-                        </div>
+                        </li>
                       ))}
-                    </div>
+                    </ul>
                   )}
                 </div>
               </>
             )}
-          </section>
+          </CoachSection>
         ) : null}
 
         {clubHistoryV1Enabled && historyEnabled ? (
-          <section className="surface-panel p-4 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Database className="h-4 w-4 text-action-text" />
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Storico Oppidum</h2>
-              </div>
+          <CoachSection
+            icon={<Database className="size-4 text-action-text" aria-hidden />}
+            title="Storico Oppidum"
+            aside={
               <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-                <Link href={`/community/club/${clubId}/history/athletes`} className="w-full sm:w-auto">
-                  <Button className="w-full sm:w-auto" variant="outline-neon" size="sm">Storico Atleti</Button>
-                </Link>
-                <Link href={`/community/club/${clubId}/history/meets`} className="w-full sm:w-auto">
-                  <Button className="w-full sm:w-auto" variant="outline-neon" size="sm">Storico Meeting</Button>
-                </Link>
+                <Button className="w-full sm:w-auto" variant="outline" size="sm" asChild>
+                  <Link href={`/community/club/${clubId}/history/athletes`}>Storico atleti</Link>
+                </Button>
+                <Button className="w-full sm:w-auto" variant="outline" size="sm" asChild>
+                  <Link href={`/community/club/${clubId}/history/meets`}>Storico meeting</Link>
+                </Button>
                 <Button
                   className="w-full sm:w-auto"
-                  variant="neon"
                   size="sm"
                   disabled={startHistoryImportMutation.isPending}
                   onClick={() => startHistoryImportMutation.mutate({ clubId, mode: "oppidum_index_full" })}
                 >
-                  <RefreshCw className={`mr-1.5 h-4 w-4 ${startHistoryImportMutation.isPending ? "animate-spin" : ""}`} />
+                  <RefreshCw className={cn(startHistoryImportMutation.isPending && "animate-spin")} aria-hidden />
                   {startHistoryImportMutation.isPending ? "Import in corso..." : "Importa adesso"}
                 </Button>
               </div>
-            </div>
-
-            <div className="rounded-xl border border-border/60 bg-card/35 p-3 text-sm">
+            }
+          >
+            <div className="rounded-xl bg-raised p-3 text-sm">
               <p className="text-xs text-muted-foreground">Sorgente</p>
-              <p className="font-medium break-all">{String(historyConfig?.source?.rootUrl ?? "-")}</p>
+              <p className="break-all font-medium">{String(historyConfig?.source?.rootUrl ?? "-")}</p>
             </div>
 
-            <div className="rounded-xl border border-border/60 bg-card/35 p-3 text-sm">
+            <div className="rounded-xl bg-raised p-3 text-sm">
               {!historyLastRun ? (
                 <p className="text-muted-foreground">Nessun import storico eseguito.</p>
               ) : (
                 <div className="space-y-1">
-                  <p className="font-medium">
-                    Ultimo run: <span className="uppercase">{String(historyLastRun.status ?? "-")}</span>
-                  </p>
+                  <p className="font-medium">Ultimo import: {String(historyLastRun.status ?? "-")}</p>
                   <p className="text-xs text-muted-foreground">
-                    Avvio: {formatDate(historyLastRun.startedAt)} • Pagine: {Number(historyLastRun.processedPages ?? 0)} • Record: {Number(historyLastRun.processedRecords ?? 0)} • Errori: {Number(historyLastRun.errorRecords ?? 0)}
+                    Avvio: {formatDate(historyLastRun.startedAt)} · Pagine: {formatInteger(historyLastRun.processedPages ?? 0)} · Record: {formatInteger(historyLastRun.processedRecords ?? 0)} · Errori: {formatInteger(historyLastRun.errorRecords ?? 0)}
                   </p>
                   {Array.isArray(historyLastRun.errorsJson) && historyLastRun.errorsJson.length > 0 ? (
-                    <p className="text-xs text-amber-300">
+                    <p className="text-xs text-warning">
                       {historyLastRun.errorsJson.slice(0, 2).map((error: any) => String(error?.message ?? error)).join(" | ")}
                     </p>
                   ) : null}
                 </div>
               )}
             </div>
-          </section>
+          </CoachSection>
         ) : null}
 
-        <section className="surface-panel p-4 space-y-3">
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-action-text" />
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Inviti Club</h2>
-          </div>
+        <CoachSection icon={<Users className="size-4 text-action-text" aria-hidden />} title="Inviti al club">
           <Button
             className="w-full sm:w-auto"
-            variant="neon"
             disabled={createInviteMutation.isPending}
             onClick={() => createInviteMutation.mutate({ clubId, maxUses: 10 })}
           >
             {createInviteMutation.isPending ? "Generazione..." : "Genera nuovo invito"}
           </Button>
-          {(invitesQuery.data as any[])?.length ? (
+          {invitesQuery.isPending ? (
+            <LoadingSkeleton label="Caricamento degli inviti…" count={2} itemClassName="h-11 w-full rounded-xl" />
+          ) : !invites && invitesQuery.isError ? (
+            <LoadError className="border-0 bg-raised" onRetry={() => void invitesQuery.refetch()} />
+          ) : invites?.length ? (
             <div className="space-y-2">
-              {(invitesQuery.data as any[]).map((inv: any) => (
+              {invites.map((inv: any) => (
                 <InviteRow key={inv.id} invite={inv} />
               ))}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground">Nessun invito attivo.</p>
+            <p className="text-sm text-muted-foreground">Nessun invito attivo.</p>
           )}
-        </section>
+        </CoachSection>
       </div>
     </AppLayout>
   );
