@@ -1,4 +1,4 @@
-import { useId, useState } from "react";
+import { useId, useState, type Ref } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,8 @@ import { errorToastMessage } from "@/lib/trpc-errors";
 
 interface GarminSectionProps {
   garminConnected: boolean;
+  /** The card's title, focusable from code (Settings moves the focus here from the list above). */
+  headingRef?: Ref<HTMLHeadingElement>;
 }
 
 type AuthStep = "credentials" | "mfa";
@@ -53,7 +55,7 @@ function formatGarminErrorMessage(message: string): string {
  * Garmin Connect in Impostazioni › Connessioni: state of the link, connect (with the MFA code
  * step), disconnect, and the sync of the last 1/5/10 swims.
  */
-export default function GarminSection({ garminConnected }: GarminSectionProps) {
+export default function GarminSection({ garminConnected, headingRef }: GarminSectionProps) {
   const [isConnectDialogOpen, setIsConnectDialogOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -187,7 +189,7 @@ export default function GarminSection({ garminConnected }: GarminSectionProps) {
             <LinkIcon className="size-5" />
           </span>
           <div className="min-w-0">
-            <h2 id={titleId} className="text-[17px] font-bold">
+            <h2 id={titleId} ref={headingRef} tabIndex={-1} className="text-[17px] font-bold outline-none">
               Garmin Connect
             </h2>
             {statusUnknown ? null : (

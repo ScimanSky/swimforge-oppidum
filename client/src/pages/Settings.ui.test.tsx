@@ -1,7 +1,8 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { unregisterPushToken } from "@/lib/push";
 import Settings from "./Settings";
 
 type QueryState = { data?: unknown; isLoading?: boolean; isError?: boolean };
@@ -20,7 +21,15 @@ vi.mock("wouter", () => ({
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn(), info: vi.fn(), warning: vi.fn() } }));
 vi.mock("@/components/AppLayout", () => ({ default: ({ children }: any) => <div>{children}</div> }));
-vi.mock("@/components/GarminSection", () => ({ default: () => <p>Garmin</p> }));
+vi.mock("@/components/GarminSection", () => ({
+  default: ({ headingRef }: any) => (
+    <section aria-label="Scheda Garmin">
+      <h2 ref={headingRef} tabIndex={-1}>
+        Garmin Connect
+      </h2>
+    </section>
+  ),
+}));
 vi.mock("@/lib/supabase", () => ({ supabase: { auth: { signOut: vi.fn() } } }));
 vi.mock("@/lib/push", () => ({ registerPushToken: vi.fn(), unregisterPushToken: vi.fn(async () => {}) }));
 // The Radix switch and select measure themselves; jsdom has no ResizeObserver.
@@ -200,6 +209,124 @@ describe("Settings (Corsia)", () => {
     expect(within(accounts).getAllByRole("button")).toHaveLength(1);
     expect(within(accounts).getByText("Non collegato")).toBeInTheDocument();
     expect(within(accounts).getByText("Disponibile prossimamente")).toBeInTheDocument();
+  });
+
+  it("offline, profilo mai arrivato (né in caricamento né in errore): scheletro, mai valori finti", () => {
+    // A query paused offline: no data, isLoading false, isError false.
+    state.queries["profile.get"] = { isLoading: false, isError: false };
+    render(<Settings />);
+    expect(screen.getByRole("status")).toHaveTextContent("Caricamento del profilo…");
+    expect(screen.queryByLabelText("Nome")).toBeNull();
+    cleanup();
+
+    state.search = "tab=notifications";
+    render(<Settings />);
+    expect(screen.getByRole("status")).toHaveTextContent("Caricamento delle notifiche…");
+    expect(screen.queryByRole("switch")).toBeNull();
+  });
+
+  it("offline, stati delle connessioni mai arrivati: scheletro, non «Non collegato»", () => {
+    state.queries["garmin.status"] = { isLoading: false, isError: false };
+    state.search = "tab=connections";
+    render(<Settings />);
+    const accounts = screen.getByRole("region", { name: "Account collegati" });
+    expect(within(accounts).getByRole("status")).toHaveTextContent("Caricamento degli account collegati…");
+    expect(within(accounts).queryByText("Non collegato")).toBeNull();
+  });
+
+  it("?onboarding=1&tab=connections apre Connessioni con il passo 2 di 2", () => {
+    state.search = "onboarding=1&tab=connections";
+    render(<Settings />);
+    expect(screen.getByRole("tab", { name: "Connessioni" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("region", { name: "Benvenuto su SwimForge" })).toHaveTextContent(
+      "Passo 2 di 2: collega Garmin Connect e avvia la prima sincronizzazione."
+    );
+    expect(screen.getByRole("region", { name: "Account collegati" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Garmin Connect" })).toBeInTheDocument();
+  });
+
+  it("consenso marketing col profilo in caricamento: interruttore bloccato, niente impostazioni di default salvate", () => {
+    state.queries["profile.get"] = { isLoading: true };
+    state.search = "tab=privacy";
+    render(<Settings />);
+    expect(screen.getByRole("switch", { name: "Comunicazioni marketing" })).toBeDisabled();
+    // The other consents do not depend on the profile.
+    expect(screen.getByRole("switch", { name: "Sincronizzazione Garmin" })).toBeEnabled();
+  });
+
+  it("consenso marketing col profilo non caricato: interruttore bloccato", () => {
+    state.queries["profile.get"] = { isError: true };
+    state.search = "tab=privacy";
+    render(<Settings />);
+    expect(screen.getByRole("switch", { name: "Comunicazioni marketing" })).toBeDisabled();
+  });
+
+  it("consenso marketing col profilo: salva le notifiche del profilo, non quelle di default", async () => {
+    state.queries["profile.get"] = {
+      data: { ...profile, notificationSettings: { activity_sync: false, social: true, marketing: false } },
+    };
+    state.search = "tab=privacy";
+    render(<Settings />);
+    await userEvent.click(screen.getByRole("switch", { name: "Comunicazioni marketing" }));
+
+    expect(state.mutations["consent.set"].calls).toEqual([
+      { consentType: "marketing_communications", granted: true },
+    ]);
+    expect(state.mutations["profile.update"].calls.at(-1)).toEqual({
+      notificationSettings: expect.objectContaining({ activity_sync: false, social: true, marketing: true }),
+    });
+  });
+
+  it("«Gestisci Garmin Connect» porta alla scheda Garmin e ci sposta il fuoco", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    state.search = "tab=connections";
+    render(<Settings />);
+    await userEvent.click(screen.getByRole("button", { name: "Gestisci Garmin Connect" }));
+
+    await vi.waitFor(() => expect(screen.getByRole("heading", { name: "Garmin Connect" })).toHaveFocus());
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "smooth", block: "start" });
+  });
+
+  it("con il movimento ridotto lo scorrimento verso Garmin è istantaneo", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === "(prefers-reduced-motion: reduce)",
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+    try {
+      state.search = "tab=connections";
+      render(<Settings />);
+      await userEvent.click(screen.getByRole("button", { name: "Gestisci Garmin Connect" }));
+      await vi.waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: "auto", block: "start" }));
+      expect(screen.getByRole("heading", { name: "Garmin Connect" })).toHaveFocus();
+    } finally {
+      vi.stubGlobal("matchMedia", undefined);
+    }
+  });
+
+  it("eliminazione in corso: Esc e i tocchi fuori non chiudono il dialogo", async () => {
+    let finishUnregister = () => {};
+    vi.mocked(unregisterPushToken).mockImplementationOnce(
+      () => new Promise<void>((resolve) => (finishUnregister = resolve))
+    );
+    state.search = "tab=privacy";
+    render(<Settings />);
+    await userEvent.click(screen.getByRole("button", { name: "Elimina" }));
+    const dialog = screen.getByRole("dialog", { name: "Conferma eliminazione account" });
+    await userEvent.type(within(dialog).getByLabelText("Password"), "giusta");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Conferma eliminazione" }));
+    expect(within(dialog).getByRole("button", { name: "Eliminazione…" })).toBeDisabled();
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.getByRole("dialog", { name: "Conferma eliminazione account" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: "Chiudi" })).toBeNull();
+
+    await act(async () => finishUnregister());
+    expect(state.mutations["auth.deleteAccount"].calls).toEqual([{ password: "giusta" }]);
   });
 
   it("eliminazione con password sbagliata: errore sotto il campo e fuoco sul campo", async () => {

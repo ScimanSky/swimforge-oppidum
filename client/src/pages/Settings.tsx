@@ -41,6 +41,7 @@ import { clearNativeSessionToken } from "@/lib/session-token"
 import { UNAUTHED_ERR_MSG } from "@shared/const"
 import { ONBOARDING_FORCE_QUERY_PARAM } from "@/lib/onboarding"
 import { useSettingsTab } from "@/hooks/useSettingsTab"
+import { prefersReducedMotion } from "@/hooks/usePrefersReducedMotion"
 import { homePathForPlatform } from "@/lib/navigation"
 import { isNativePlatform } from "@/lib/platform"
 import { formatInteger } from "@/lib/format"
@@ -165,6 +166,9 @@ const consentItems = [
   },
 ] as const
 
+/** A query with no data and no error: still loading, or paused offline (isLoading is false then). */
+const awaitingData = (query: { data?: unknown; isError: boolean }) => query.data === undefined && !query.isError
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null
 
@@ -208,6 +212,9 @@ export default function Settings() {
   const [, setLocation] = useLocation()
   const { activeTab, selectTab: updateTabInUrl, onboarding } = useSettingsTab()
 
+  const garminHeadingRef = useRef<HTMLHeadingElement | null>(null)
+  // «Collega/Gestisci Garmin Connect»: scroll to the Garmin card (at once with reduced motion)
+  // and move the focus to its title, so keyboard and screen reader users land there too.
   const scrollToGarminControls = () => {
     if (activeTab !== "connections") {
       updateTabInUrl("connections")
@@ -215,7 +222,8 @@ export default function Settings() {
     if (typeof window === "undefined") return
     window.setTimeout(() => {
       const target = document.getElementById("garmin-connection-controls")
-      target?.scrollIntoView({ behavior: "smooth", block: "start" })
+      target?.scrollIntoView?.({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "start" })
+      garminHeadingRef.current?.focus({ preventScroll: true })
     }, 120)
   }
 
@@ -314,7 +322,10 @@ export default function Settings() {
     return metrics
   }, [activities, activitiesBySource, favoriteStroke, garminStatus, profile, stravaStatus])
   const summaryLoading =
-    profileQuery.isLoading || activitiesQuery.isLoading || garminStatusQuery.isLoading || stravaStatusQuery.isLoading
+    awaitingData(profileQuery) ||
+    awaitingData(activitiesQuery) ||
+    awaitingData(garminStatusQuery) ||
+    awaitingData(stravaStatusQuery)
 
   const preferredPool = useMemo(() => {
     const length = activities?.[0]?.poolLengthMeters
@@ -745,7 +756,13 @@ export default function Settings() {
     }
   }
 
+  // The marketing consent also saves the notification settings: never from the defaults, only
+  // once the profile's own settings are here (the switch is disabled until then).
+  const consentNeedsProfile = (consentType: typeof consentItems[number]["type"]) =>
+    consentType === "marketing_communications" && !profile
+
   const toggleConsent = async (consentType: typeof consentItems[number]["type"], granted: boolean) => {
+    if (consentNeedsProfile(consentType)) return
     setConsentState((prev) => ({ ...prev, [consentType]: granted }))
     try {
       await setConsentMutation.mutateAsync({ consentType, granted })
@@ -794,6 +811,8 @@ export default function Settings() {
     logoutAllDevicesMutation.mutate()
   }
 
+  const isDeletingAccount = isUnregistering || deleteAccountMutation.isPending
+
   const handleDeleteAccount = async () => {
     if (deleteRequiresPassword && !deletePassword.trim()) {
       setDeletePasswordError("Inserisci la password per confermare l'eliminazione.")
@@ -801,7 +820,7 @@ export default function Settings() {
       return
     }
     setDeletePasswordError(null)
-    if (isUnregistering || deleteAccountMutation.isPending) return
+    if (isDeletingAccount) return
     // Before the server call: push.unregister needs the session.
     setIsUnregistering(true)
     try {
@@ -814,7 +833,8 @@ export default function Settings() {
     )
   }
 
-  const profileLoading = meQuery.isLoading || profileQuery.isLoading
+  // No data yet and no error: loading, or paused offline (isLoading is false then).
+  const profileLoading = awaitingData(meQuery) || awaitingData(profileQuery)
   const profileFailed = (meQuery.isError && !me) || (profileQuery.isError && !profile)
   const retryProfile = () => {
     if (meQuery.isError) void meQuery.refetch()
@@ -828,7 +848,7 @@ export default function Settings() {
       <LoadError onRetry={retryProfile} />
     ) : null
 
-  const statusesLoading = garminStatusQuery.isLoading || stravaStatusQuery.isLoading
+  const statusesLoading = awaitingData(garminStatusQuery) || awaitingData(stravaStatusQuery)
   const statusesFailed = (garminStatusQuery.isError && !garminStatus) || (stravaStatusQuery.isError && !stravaStatus)
   const accounts = [
     {
@@ -1146,7 +1166,7 @@ export default function Settings() {
             </Section>
 
             <div id="garmin-connection-controls" className="scroll-mt-20">
-              <GarminSection garminConnected={garminStatus?.connected ?? false} />
+              <GarminSection garminConnected={garminStatus?.connected ?? false} headingRef={garminHeadingRef} />
             </div>
           </TabsContent>
 
@@ -1371,7 +1391,7 @@ export default function Settings() {
                         title={item.title}
                         description={item.description}
                         checked={Boolean(consentState[item.type])}
-                        disabled={setConsentMutation.isPending}
+                        disabled={setConsentMutation.isPending || consentNeedsProfile(item.type)}
                         onChange={(value) => void toggleConsent(item.type, value)}
                       />
                     ))}
@@ -1451,6 +1471,8 @@ export default function Settings() {
         <Dialog
           open={deleteDialogOpen}
           onOpenChange={(open) => {
+            // While the deletion runs, Esc, a tap outside and the X do not close it.
+            if (!open && isDeletingAccount) return
             setDeleteDialogOpen(open)
             if (!open) {
               setDeletePassword("")
@@ -1458,7 +1480,7 @@ export default function Settings() {
             }
           }}
         >
-          <DialogContent className="rounded-2xl bg-card shadow-none">
+          <DialogContent className="rounded-2xl bg-card shadow-none" showCloseButton={!isDeletingAccount}>
             <DialogHeader>
               <DialogTitle className="text-[17px] font-bold text-danger">Conferma eliminazione account</DialogTitle>
               <DialogDescription>
@@ -1496,20 +1518,16 @@ export default function Settings() {
               <Button
                 variant="outline"
                 onClick={() => setDeleteDialogOpen(false)}
-                disabled={isUnregistering || deleteAccountMutation.isPending}
+                disabled={isDeletingAccount}
               >
                 Annulla
               </Button>
               <Button
                 variant="destructive"
                 onClick={() => void handleDeleteAccount()}
-                disabled={
-                  isUnregistering ||
-                  deleteAccountMutation.isPending ||
-                  (deleteRequiresPassword && deletePassword.trim().length === 0)
-                }
+                disabled={isDeletingAccount || (deleteRequiresPassword && deletePassword.trim().length === 0)}
               >
-                {isUnregistering || deleteAccountMutation.isPending ? "Eliminazione…" : "Conferma eliminazione"}
+                {isDeletingAccount ? "Eliminazione…" : "Conferma eliminazione"}
               </Button>
             </DialogFooter>
           </DialogContent>
