@@ -38,11 +38,14 @@ export function detectSets(laps: MetricLap[]): RepeatSet[] {
   return sets;
 }
 
-/** CV = population SD / mean × 100; fade = (mean of last third − mean of first third) / first × 100. */
+/**
+ * CV = sample SD (n − 1) / mean × 100; fade = (mean of last third − mean of first third) / first
+ * × 100. A set has at least 3 reps, so n − 1 ≥ 2.
+ */
 export function setStats(times: number[]): { cv: number; fade: number } {
   const n = times.length;
   const avg = times.reduce((sum, t) => sum + t, 0) / n;
-  const variance = times.reduce((sum, t) => sum + (t - avg) ** 2, 0) / n;
+  const variance = times.reduce((sum, t) => sum + (t - avg) ** 2, 0) / (n - 1);
   const third = Math.ceil(n / 3);
   const first = times.slice(0, third).reduce((sum, t) => sum + t, 0) / third;
   const last = times.slice(n - third).reduce((sum, t) => sum + t, 0) / third;

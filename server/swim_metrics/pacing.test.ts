@@ -32,10 +32,11 @@ describe("detectSets", () => {
 });
 
 describe("setStats", () => {
-  it("CV (population SD / mean) and fade (last third against first third)", () => {
+  it("CV (sample SD, n − 1, / mean) and fade (last third against first third)", () => {
     const { cv, fade } = setStats([90, 92, 94, 96, 98, 100]);
-    // mean 95, variance 70/6, SD 3.416 → CV 3.60%.
-    expect(cv).toBeCloseTo((Math.sqrt(70 / 6) / 95) * 100, 9);
+    // mean 95, squared deviations 70, sample variance 70/5 = 14, SD 3.742 → CV 3.94%.
+    expect(cv).toBeCloseTo((Math.sqrt(70 / 5) / 95) * 100, 9);
+    expect(cv).toBeCloseTo(3.94, 2);
     // thirds of 2: (99 − 91) / 91 = 8.79%.
     expect(fade).toBeCloseTo((8 / 91) * 100, 9);
   });

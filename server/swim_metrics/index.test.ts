@@ -150,7 +150,7 @@ describe("getSwimMetrics", () => {
     expect(a.intensityFactor).toBeGreaterThan(0.9);
     expect(a.stss).toBeGreaterThan(0);
     expect(a.strokeIndex).toBeGreaterThan(2);
-    expect(a.pacingCv).toBe(1.4); // the 8×100: SD 1.32 s on 93.6 s
+    expect(a.pacingCv).toBe(1.5); // the 8×100: sample SD 1.41 s on 93.6 s
     expect(ow).toMatchObject({ isOpenWater: true, hasLaps: false, poolLengthMeters: null, zoneMeters: null, strokeIndex: null, pacingCv: null });
     expect(ow.stss).toBeGreaterThan(0);
 

@@ -141,7 +141,7 @@ export const SWIM_METRIC_DEFINITIONS: Record<SwimMetricKey, SwimMetricDefinition
     measures:
       "Quanto tieni costante il passo nelle serie di ripetute e quanto cali nel finale.",
     formula:
-      "Una serie è fatta di almeno 3 giri attivi consecutivi con la stessa distanza (almeno 50 m) e lo stesso stile, ignorando i recuperi. Variabilità = deviazione standard / media dei tempi × 100; calo = (media dell'ultimo terzo − media del primo terzo) / media del primo terzo × 100.",
+      "Una serie è fatta di almeno 3 giri attivi consecutivi con la stessa distanza (almeno 50 m) e lo stesso stile, ignorando i recuperi. Variabilità = deviazione standard campionaria (n − 1) / media dei tempi × 100; calo = (media dell'ultimo terzo − media del primo terzo) / media del primo terzo × 100.",
     source:
       "Variabilità del passo (coefficiente di variazione) e calo nel finale, misure usate negli studi sul pacing e dagli allenatori.",
     howToRead:
