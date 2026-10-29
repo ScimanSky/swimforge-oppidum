@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
@@ -133,13 +133,15 @@ describe("Record del club (Corsia)", () => {
     expect(screen.getByText("Pagina 2 di 2")).toBeTruthy();
   });
 
-  it("la categoria master filtra la richiesta, entro i 32 caratteri del server", async () => {
+  it("la categoria master filtra la richiesta a battitura ferma, entro i 32 caratteri del server", async () => {
     renderPage();
     const input = screen.getByRole("textbox", { name: "Categoria master" });
     expect(input.getAttribute("maxlength")).toBe("32");
     await userEvent.setup({ delay: null }).type(input, "M35");
+    await waitFor(() => expect(screen.getByText("Tempi di allenamento · categoria M35")).toBeTruthy());
     expect(state.inputs.at(-1)).toMatchObject({ clubId: 7, masterCategory: "M35", source: "training" });
-    expect(screen.getByText("Tempi di allenamento · categoria M35")).toBeTruthy();
+    // One request for the pause, none for «M» or «M3» on the way.
+    expect(state.inputs.some((input) => input.masterCategory && input.masterCategory !== "M35")).toBe(false);
   });
 
   it("in caricamento: scheletri, non «Nessun record»", () => {

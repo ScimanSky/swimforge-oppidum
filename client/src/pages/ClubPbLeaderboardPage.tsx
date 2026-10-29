@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { Link, useRoute } from "wouter";
 import { Dumbbell, Medal } from "lucide-react";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -16,12 +17,14 @@ import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { Pager } from "@/components/corsia/Pager";
 import { RankRow } from "@/components/corsia/RankRow";
 import { ClubAccessState, ClubNotice } from "@/components/club/ClubPageState";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { usePaged } from "@/hooks/usePaged";
 import { clubAccess } from "@/lib/club-access";
 import { NO_VALUE, formatDayMonthYear, toFiniteNumber } from "@/lib/format";
 import { rankEntries } from "@/lib/ranking";
 import { formatSwimCentiseconds } from "@/lib/swimTime";
 import { trpc } from "@/lib/trpc";
+import { cn } from "@/lib/utils";
 
 const STROKES = [
   { value: "freestyle", label: "Stile libero" },
@@ -42,6 +45,8 @@ const DISTANCES_BY_STROKE: Record<string, number[]> = {
 /** The server accepts a master category up to 32 characters. */
 const MASTER_CATEGORY_MAX = 32;
 const PAGE_SIZE = 20;
+/** The category box asks the server once the typing pauses. */
+const CATEGORY_DEBOUNCE_MS = 300;
 
 export default function ClubPbLeaderboardPage() {
   const [match, params] = useRoute("/community/club/:clubId/pb");
@@ -74,7 +79,9 @@ export default function ClubPbLeaderboardPage() {
     { enabled: match && Number.isFinite(clubId) }
   );
 
-  const category = masterCategory.trim();
+  // Members only (the server answers FORBIDDEN otherwise): not even asked for before.
+  const isMember = Boolean((clubQuery.data as any)?.is_member);
+  const category = useDebouncedValue(masterCategory.trim(), CATEGORY_DEBOUNCE_MS);
   const leaderboardQuery = trpc.records.clubLeaderboard.useQuery(
     {
       clubId,
@@ -85,7 +92,11 @@ export default function ClubPbLeaderboardPage() {
       ...(category.length > 0 ? { masterCategory: category } : {}),
       limit: 80,
     },
-    { enabled: match && Number.isFinite(clubId) && clubId > 0 }
+    {
+      enabled: match && Number.isFinite(clubId) && clubId > 0 && isMember,
+      // A new filter keeps the current ranking on screen (marked busy) instead of a skeleton.
+      placeholderData: keepPreviousData,
+    }
   );
 
   const rows = useMemo(
@@ -117,11 +128,14 @@ export default function ClubPbLeaderboardPage() {
   const selectedStrokeLabel = STROKES.find((entry) => entry.value === strokeType)?.label ?? strokeType;
   const leaderboardErrorCode = leaderboardQuery.error?.data?.code;
   const leaderboardFailed = !leaderboardQuery.data && leaderboardQuery.isError;
+  // The previous filter's ranking while the new one loads.
+  const showingPrevious = leaderboardQuery.isPlaceholderData;
   const profileHref = (userId: unknown) =>
     `/u/${userId}?from=${encodeURIComponent(`/community/club/${clubId}/pb`)}`;
 
   let ranking: ReactNode;
-  if (leaderboardQuery.isPending) {
+  // An empty previous ranking is no answer for the new filter: a skeleton, not «Nessun record».
+  if (leaderboardQuery.isPending || (showingPrevious && rows.length === 0)) {
     ranking = <LoadingSkeleton label="Caricamento della classifica…" count={5} className="mt-3 space-y-2" />;
   } else if (leaderboardFailed && leaderboardErrorCode === "FORBIDDEN") {
     ranking = (
@@ -148,7 +162,12 @@ export default function ClubPbLeaderboardPage() {
     ranking = (
       <>
         {/* Each `value` keeps the list position equal to the visible rank; no value without one. */}
-        <ol ref={listRef} aria-labelledby={rankingTitleId} className="mt-3 scroll-mt-20 space-y-2">
+        <ol
+          ref={listRef}
+          aria-labelledby={rankingTitleId}
+          aria-busy={showingPrevious || undefined}
+          className={cn("mt-3 scroll-mt-20 space-y-2", showingPrevious && "opacity-60")}
+        >
           {paging.pageItems.map(({ entry: row, rank }, index) => {
             const subtitle = [row.masterCategory || null, formatDayMonthYear(row.achievedAt)]
               .filter((part) => part && part !== NO_VALUE)
