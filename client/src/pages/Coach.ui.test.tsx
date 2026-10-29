@@ -4,9 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { toast } from "sonner";
 import Coach from "./Coach";
 import { emptySwimMetricsFixture, swimMetricsFixture } from "@/components/stats/metrics-fixture";
+import { paceZoneRanges } from "@shared/swimMetrics";
 
 const state = vi.hoisted(() => ({
   metrics: undefined as any,
+  metricsError: false,
   coachInsights: undefined as any,
   workouts: undefined as any,
   insights: [] as any[],
@@ -19,7 +21,7 @@ vi.mock("@/lib/trpc", () => ({
   trpc: {
     auth: { me: { useQuery: () => ({ data: { id: 7 } }) } },
     statistics: {
-      getMetrics: { useQuery: () => ({ data: state.metrics }) },
+      getMetrics: { useQuery: () => ({ data: state.metrics, isError: state.metricsError }) },
       getInsights: { useQuery: () => ({ data: state.coachInsights }) },
     },
     aiCoach: {
@@ -89,6 +91,7 @@ describe("Coach AI", () => {
     vi.mocked(toast.warning).mockClear();
     vi.mocked(toast.info).mockClear();
     state.metrics = swimMetricsFixture();
+    state.metricsError = false;
     state.coachInsights = ["Il passo è migliorato del **4.5%**", "Aggiungi una nuotata"];
     state.workouts = { pool: workout("Aerobico in vasca"), dryland: undefined, canGenerate: true };
     state.insights = [
@@ -203,6 +206,98 @@ describe("Coach AI", () => {
     const back = screen.getByText("4×50 dorso").closest("li")!;
     expect(within(back).getByRole("button", { name: "B1 · Medio" })).toBeTruthy();
     expect(back).not.toHaveTextContent("/100 m");
+  });
+
+  it("ripartenza e recupero hanno il loro nome; il livello non si ripete come intensità", () => {
+    state.workouts = { pool: zonedWorkout(), dryland: undefined, canGenerate: true };
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    expect(screen.getByText("6×100 a soglia").closest("li")).toHaveTextContent("Ripartenza: a 2:10");
+    const split = screen.getByText("8×150 C1 a ritmo gara").closest("li")!;
+    expect(split).toHaveTextContent("Recupero: 30 sec");
+    expect(split).not.toHaveTextContent("Intensità");
+  });
+
+  it("i passi vengono dalle tue zone di oggi; quello salvato resta come storia se è cambiato", () => {
+    const metrics = swimMetricsFixture();
+    // Manual zones saved after the workout: B2 1:50–1:56 instead of 1:49–1:54.
+    const bounds = { a1a2: 130, a2b1: 122, b1b2: 116, b2c1: 110, c1c2: 105 };
+    metrics.zones = { ...metrics.zones, source: "manuali", bounds, ranges: paceZoneRanges(bounds) };
+    state.metrics = metrics;
+    const pool = zonedWorkout();
+    // Generated without zones: no pace stored, today's zones give one.
+    pool.sections[0].exercises.push({ name: "4×100 progressivi", repeats: 4, repMeters: 100, zone: "B1", level: "Medio", targetPace: null } as any);
+    state.workouts = { pool, dryland: undefined, canGenerate: true };
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    const rep = screen.getByText("6×100 a soglia").closest("li")!;
+    expect(rep).toHaveTextContent("1:50–1:56 /100 m");
+    expect(rep).toHaveTextContent("Passo dalle tue zone di oggi; quando l'allenamento è stato generato era 1:49–1:54 /100 m.");
+    expect(screen.getByText("4×100 progressivi").closest("li")).toHaveTextContent("1:56–2:02 /100 m");
+    // Another stroke never gets a pace.
+    expect(screen.getByText("4×50 dorso").closest("li")).not.toHaveTextContent("/100 m");
+  });
+
+  it("finché le metriche non arrivano resta il passo salvato, senza storia", () => {
+    state.metrics = undefined;
+    state.workouts = { pool: zonedWorkout(), dryland: undefined, canGenerate: true };
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    const rep = screen.getByText("6×100 a soglia").closest("li")!;
+    expect(rep).toHaveTextContent("1:49–1:54 /100 m");
+    expect(rep).not.toHaveTextContent("quando l'allenamento è stato generato");
+  });
+
+  it("mostra tutti gli esercizi della parte, ognuno con il suo chip; una parte senza esercizi non rompe la pagina", () => {
+    const pool = zonedWorkout();
+    pool.sections[0].exercises.push(
+      { name: "4×50 C2 forte", repeats: 4, repMeters: 50, rest: "1′", zone: "C2", level: "Sopra soglia" } as any,
+      { name: "200 sciolto", repeats: 1, repMeters: 200, zone: "A1", level: "Facile" } as any,
+    );
+    pool.sections.push({ title: "Note finali" } as any);
+    state.workouts = { pool, dryland: undefined, canGenerate: true };
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    for (const name of ["6×100 a soglia", "8×150 C1 a ritmo gara", "4×50 dorso", "4×50 C2 forte", "200 sciolto"]) {
+      expect(screen.getByText(name)).toBeTruthy();
+    }
+    expect(screen.getByRole("button", { name: "C2 · Sopra soglia" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "A1 · Facile" })).toBeTruthy();
+    expect(screen.queryByText(/esercizi aggiuntivi/)).toBeNull();
+  });
+
+  it("«Le zone A1–C3» mentre le metriche caricano o se falliscono non dice «serve il passo soglia»", async () => {
+    state.metrics = undefined;
+    state.workouts = { pool: zonedWorkout(), dryland: undefined, canGenerate: true };
+    window.history.replaceState(null, "", "/coach?tab=workouts");
+    render(<Coach />);
+    await userEvent.click(screen.getByRole("button", { name: "C1 · Soglia" }));
+    let glossary = screen.getByRole("dialog", { name: "Le zone A1–C3" });
+    expect(within(glossary).getByRole("status")).toHaveTextContent("Caricamento dei tuoi passi…");
+    expect(glossary).not.toHaveTextContent("serve il passo soglia");
+    cleanup();
+
+    state.metricsError = true;
+    render(<Coach />);
+    await userEvent.click(screen.getByRole("button", { name: "C1 · Soglia" }));
+    glossary = screen.getByRole("dialog", { name: "Le zone A1–C3" });
+    expect(within(glossary).getByRole("alert")).toHaveTextContent("Non riesco a caricare i tuoi passi: riprova più tardi.");
+    expect(glossary).not.toHaveTextContent("serve il passo soglia");
+  });
+
+  it("il numero del consiglio: solo una percentuale o una variazione con segno", async () => {
+    state.coachInsights = [
+      "💪 Intensità: in B1–B2 il 40% del volume",
+      "🏊 Tecnica: il tuo passo 1:49 tiene fino in fondo",
+      "🎯 Obiettivi: una nuotata con un tratto continuo lungo (800 m o più) renderebbe la stima più solida",
+    ];
+    render(<Coach />);
+    const header = () => screen.getByRole("heading", { level: 2, name: /^Consiglio/ }).parentElement!;
+    expect(header()).toHaveTextContent(/^Consiglio 1\s*40 %$/);
+    await userEvent.click(screen.getByRole("button", { name: "Consiglio 2" }));
+    expect(header().textContent).toBe("Consiglio 2");
+    await userEvent.click(screen.getByRole("button", { name: "Consiglio 3" }));
+    expect(header().textContent).toBe("Consiglio 3");
   });
 
   it("toccando il chip si apre «Le zone A1–C3» su quella zona", async () => {

@@ -23,8 +23,21 @@ import { formatZonePace, metricHeaders } from "@/lib/swim-metrics-view"
 import { STREAK_UNIT } from "@/lib/profile-stats"
 import { cn } from "@/lib/utils"
 import { ZoneGlossary } from "@/components/stats/ZoneGlossary"
-import { isPaceZoneCode, PACE_ZONE_BY_CODE, TSB_READING_LABELS, type PaceZoneCode } from "@shared/swimMetrics"
-import type { CoachWorkout, CoachWorkoutExercise, CoachWorkoutSection } from "@shared/coachWorkout"
+import {
+  isPaceZoneCode,
+  PACE_ZONE_BY_CODE,
+  TSB_READING_LABELS,
+  type PaceZoneCode,
+  type PaceZoneRange,
+} from "@shared/swimMetrics"
+import {
+  isFreestyleRep,
+  parseRest,
+  type CoachWorkout,
+  type CoachWorkoutExercise,
+  type CoachWorkoutSection,
+} from "@shared/coachWorkout"
+import { insightChip } from "@/lib/coach-insights"
 import { toast } from "sonner"
 import { Sparkles, AlertTriangle } from "lucide-react"
 import { useSearch } from "wouter"
@@ -50,15 +63,38 @@ const repZone = (exercise: WorkoutExercise): PaceZoneCode | null =>
   isPaceZoneCode(exercise.zone) ? exercise.zone : null
 
 const hasZones = (workout: GeneratedWorkout) =>
-  workout.sections.some((section) => section.exercises.some((exercise) => repZone(exercise) !== null))
+  (workout.sections ?? []).some((section) => section.exercises?.some((exercise) => repZone(exercise) !== null))
+
+/**
+ * The target pace of a rep: from the zones in effect today (freestyle without equipment), so a
+ * workout follows the zones after they change; the pace stored at generation stays as history,
+ * said when it differs. Without today's zones (loading, or none) the stored pace.
+ */
+function repPace(code: PaceZoneCode, exercise: WorkoutExercise, ranges: PaceZoneRange[] | null) {
+  const stored = exercise.targetPace ? formatZonePace(exercise.targetPace) : null
+  const range = ranges && isFreestyleRep(exercise) ? ranges.find((candidate) => candidate.code === code) : undefined
+  const current = range ? formatZonePace(range) : null
+  return { pace: current ?? stored, previous: current && stored && stored !== current ? stored : null }
+}
 
 /**
  * The zone of a rep: a chip «B2 · Soglia» that opens the zone in «Le zone A1–C3», the target
  * pace from the athlete's zones (freestyle) and in a line how it feels and what it trains.
  */
-function RepZone({ code, exercise, onOpen }: { code: PaceZoneCode; exercise: WorkoutExercise; onOpen: (code: PaceZoneCode) => void }) {
+function RepZone({
+  code,
+  exercise,
+  ranges,
+  onOpen,
+}: {
+  code: PaceZoneCode
+  exercise: WorkoutExercise
+  /** The zones in effect today; null while they load. */
+  ranges: PaceZoneRange[] | null
+  onOpen: (code: PaceZoneCode) => void
+}) {
   const zone = PACE_ZONE_BY_CODE[code]
-  const pace = exercise.targetPace ? formatZonePace(exercise.targetPace) : null
+  const { pace, previous } = repPace(code, exercise, ranges)
   return (
     <div className="mt-2">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -84,6 +120,11 @@ function RepZone({ code, exercise, onOpen }: { code: PaceZoneCode; exercise: Wor
         {zone.explanation.charAt(0).toUpperCase()}
         {zone.explanation.slice(1)}.
       </p>
+      {previous ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Passo dalle tue zone di oggi; quando l&apos;allenamento è stato generato era {previous} /100 m.
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -123,30 +164,29 @@ const SUGGESTED_CHAT_PROMPTS = [
   "Come leggo il mio passo soglia e le zone di intensità?",
 ]
 
-const insightNumberFmt = new Intl.NumberFormat("it-IT", { maximumFractionDigits: 1 })
-/** Number quoted in an insight, Italian style: 4.5% → «4,5 %», -3 → «−3». */
-const formatInsightNumber = (value: number, percent: boolean) =>
-  `${value < 0 ? "−" : ""}${insightNumberFmt.format(Math.abs(value))}${percent ? " %" : ""}`
-
+/**
+ * The details of an exercise. A send-off («a 2:10») is «Ripartenza», a rest («20″») is
+ * «Recupero»; a rep with a zone chip does not repeat its level as «Intensità».
+ */
 const getExerciseDetails = (exercise: WorkoutExercise) =>
   [
     exercise.sets && `Serie: ${exercise.sets}`,
     exercise.reps && `Rip: ${exercise.reps}`,
     exercise.distance && `Distanza: ${exercise.distance}`,
     exercise.duration && `Durata: ${exercise.duration}`,
-    exercise.rest && `Ripartenza: ${exercise.rest}`,
-    exercise.intensity && `Intensità: ${exercise.intensity}`,
+    exercise.rest && `${parseRest(exercise.rest)?.kind === "rest" ? "Recupero" : "Ripartenza"}: ${exercise.rest}`,
+    exercise.intensity && !repZone(exercise) && `Intensità: ${exercise.intensity}`,
     exercise.equipment && `Attrezzi: ${exercise.equipment}`,
   ].filter(Boolean) as string[]
 
-/** One generated workout (pool or dry-land): meta, section picker, first three exercises. */
+/** One generated workout (pool or dry-land): meta, section picker, every exercise of the section. */
 function WorkoutDetail({
   workout,
   kicker,
   activeIndex,
   onSelect,
   activeSection,
-  moreLabel,
+  ranges,
   onZone,
 }: {
   workout: GeneratedWorkout
@@ -154,7 +194,8 @@ function WorkoutDetail({
   activeIndex: number
   onSelect: (index: number) => void
   activeSection: WorkoutSection | null
-  moreLabel: string
+  /** The zones in effect today; null while they load. */
+  ranges: PaceZoneRange[] | null
   /** Opens «Le zone A1–C3», at a zone or at the start. */
   onZone: (code: PaceZoneCode | null) => void
 }) {
@@ -201,12 +242,12 @@ function WorkoutDetail({
             <p className="mt-1 text-xs text-muted-foreground">{activeSection.notes}</p>
           )}
           <ul className="mt-3 divide-y divide-border">
-            {activeSection.exercises.slice(0, 3).map((exercise, exIdx) => {
+            {(activeSection.exercises ?? []).map((exercise, exIdx) => {
               const zone = repZone(exercise)
               return (
                 <li key={exIdx} className="py-3 text-sm first:pt-0 last:pb-0">
                   <p className="font-medium text-foreground">{exercise.name}</p>
-                  {zone ? <RepZone code={zone} exercise={exercise} onOpen={onZone} /> : null}
+                  {zone ? <RepZone code={zone} exercise={exercise} ranges={ranges} onOpen={onZone} /> : null}
                   <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                     {getExerciseDetails(exercise).map((detail, detailIdx) => (
                       <span key={detailIdx}>{detail}</span>
@@ -222,11 +263,6 @@ function WorkoutDetail({
               )
             })}
           </ul>
-          {activeSection.exercises.length > 3 && (
-            <p className="mt-3 text-xs text-muted-foreground">
-              +{activeSection.exercises.length - 3} esercizi aggiuntivi. {moreLabel}
-            </p>
-          )}
         </div>
       ) : null}
     </div>
@@ -255,10 +291,14 @@ export default function Coach() {
   })
   const chat = useCoachChat(Number((meQuery.data as any)?.id) || null)
   // The swim metrics (the same as Statistiche) and the AI advice built on them.
-  const { data: metrics } = trpc.statistics.getMetrics.useQuery(undefined, {
+  const metricsQuery = trpc.statistics.getMetrics.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   })
+  const metrics = metricsQuery.data
+  // The zones in effect today: null while they load (the workouts keep their stored paces).
+  const currentRanges = metrics ? metrics.zones.ranges : null
+  const zonesStatus = metrics ? "ready" : metricsQuery.isError ? "error" : "loading"
   const { data: insights } = trpc.statistics.getInsights.useQuery(undefined, {
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
@@ -322,14 +362,12 @@ export default function Coach() {
 
   const insightCards = useMemo(() => {
     if (!insights?.length) return []
-    return insights.map((text, index) => {
-      const metricMatch = text.match(/(-?\d+(?:\.\d+)?)(%?)/)
-      return {
-        title: `Consiglio ${index + 1}`,
-        description: text.replace(/\*\*/g, ""),
-        metric: metricMatch ? formatInsightNumber(Number(metricMatch[1]), metricMatch[2] === "%") : null,
-      }
-    })
+    return insights.map((text, index) => ({
+      title: `Consiglio ${index + 1}`,
+      description: text.replace(/\*\*/g, ""),
+      // Only a percentage or a signed change, never the 1 of «B1» or a pace.
+      metric: insightChip(text),
+    }))
   }, [insights])
 
   const safeInsightIndex = insightCards.length
@@ -562,7 +600,7 @@ export default function Coach() {
                         activeIndex={activePoolSectionIndex}
                         onSelect={setActivePoolSectionIndex}
                         activeSection={activePoolSection}
-                        moreLabel="Apri l'allenamento completo nel dettaglio sessione."
+                        ranges={currentRanges}
                         onZone={openGlossary}
                       />
                     ) : (
@@ -577,7 +615,7 @@ export default function Coach() {
                       activeIndex={activeDrySectionIndex}
                       onSelect={setActiveDrySectionIndex}
                       activeSection={activeDrySection}
-                      moreLabel="Apri la scheda completa dal coach."
+                      ranges={currentRanges}
                       onZone={openGlossary}
                     />
                   ) : (
@@ -783,6 +821,7 @@ export default function Coach() {
         </Tabs>
         <ZoneGlossary
           ranges={metrics?.zones?.ranges ?? []}
+          status={zonesStatus}
           open={glossaryOpen}
           onOpenChange={setGlossaryOpen}
           focusZone={glossaryZone}

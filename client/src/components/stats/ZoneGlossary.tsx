@@ -11,17 +11,30 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { formatZonePace, PACE_ZONE_COLOR } from "@/lib/swim-metrics-view";
 
 const TITLE = "Le zone A1–C3";
+
+/** Whether the user's paces are known: still loading, failed, or loaded (maybe without zones). */
+export type ZonesStatus = "loading" | "error" | "ready";
+
+/** What «Il tuo passo» says without a pace. */
+const NO_PACE: Record<ZonesStatus, string> = {
+  loading: "Caricamento dei tuoi passi…",
+  error: "Non riesco a caricare i tuoi passi: riprova più tardi.",
+  ready: "serve il passo soglia o le tue zone",
+};
 const headingId = (code: PaceZoneCode) => `zona-${code.toLowerCase()}`;
 const sentence = (text: string) => `${text.charAt(0).toUpperCase()}${text.slice(1)}.`;
 
 export function ZoneGlossary({
   ranges,
+  status = "ready",
   open,
   onOpenChange,
   focusZone = null,
 }: {
   /** The user's zones (empty without a threshold pace or manual zones). */
   ranges: PaceZoneRange[];
+  /** «loading» and «error» are said instead of «serve il passo soglia». */
+  status?: ZonesStatus;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** The zone to open at: its heading takes the focus. */
@@ -48,6 +61,11 @@ export function ZoneGlossary({
             soglia), così l'allenamento si segue anche senza conoscere le zone. I passi valgono per lo stile libero.
           </DialogDescription>
         </DialogHeader>
+        {status !== "ready" ? (
+          <p role={status === "error" ? "alert" : "status"} className="text-sm text-muted-foreground">
+            {NO_PACE[status]}
+          </p>
+        ) : null}
         <div className="space-y-3">
           {PACE_ZONES.map((zone) => {
             const range = ranges.find((candidate) => candidate.code === zone.code);
@@ -69,7 +87,7 @@ export function ZoneGlossary({
                 <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
                   <dt className="text-muted-foreground">Il tuo passo</dt>
                   <dd className="tabular-nums">
-                    {range ? `${formatZonePace(range)} /100 m` : "serve il passo soglia o le tue zone"}
+                    {range ? `${formatZonePace(range)} /100 m` : NO_PACE[status]}
                   </dd>
                   {zone.maxRepMeters ? (
                     <>
