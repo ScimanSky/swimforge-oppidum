@@ -29,12 +29,23 @@ const RULES = {
   gradiente:
     /bg-gradient-to-|bg-(?:linear|radial|conic)-|(?:linear|radial|conic)-gradient\(/,
   sfocatura: /backdrop-blur|backdrop-filter/,
+  // Pages inside the shell have no h1: the page title is the h1 in the shell header.
+  "titolo-pagina": /<h1[\s>]/,
+  // Fixed colours in classes: photo veils and text on destructive use tokens instead.
+  "colore-fisso":
+    /-\[(?:#|rgba?\(|hsla?\(|oklch\()|(?<![\w-])(?:text-white|bg-white|bg-black)(?![\w-])/,
 } as const;
 type Rule = keyof typeof RULES;
 
 /** Files allowed to match a rule for good (justify each entry). */
 const EXEMPT: Partial<Record<Rule, readonly string[]>> = {
   gradiente: ["index.css"], // skeleton shimmer animation
+  // The shell header owns the page title; Home and StravaConnect are public pages outside the shell.
+  "titolo-pagina": [
+    "components/app/ShellHeader.tsx",
+    "pages/Home.tsx",
+    "pages/StravaConnect.tsx",
+  ],
 };
 
 /**
@@ -210,6 +221,60 @@ const PENDING: Record<Rule, string[]> = {
     "pages/ClubInvite.tsx",
     "pages/Home.tsx",
     "pages/NotFound.tsx",
+    "pages/StravaConnect.tsx",
+  ],
+  "titolo-pagina": [
+    "components/club/ClubHero.tsx",
+    "components/onboarding/OnboardingWelcomeComposition.tsx",
+    "pages/AdminReports.tsx",
+    "pages/ChallengeDetail.tsx",
+    "pages/Challenges.tsx",
+    "pages/ClubCoachModeration.tsx",
+    "pages/ClubDocumentsPage.tsx",
+    "pages/ClubEventDetail.tsx",
+    "pages/ClubHistoryAthletesPage.tsx",
+    "pages/ClubHistoryMeetsPage.tsx",
+    "pages/ClubInvite.tsx",
+    "pages/ClubMeetDetail.tsx",
+    "pages/ClubMeetProgramBuilder.tsx",
+    "pages/ClubPbLeaderboardPage.tsx",
+    "pages/ClubWorkoutDetailPage.tsx",
+    "pages/ClubWorkoutsPage.tsx",
+    "pages/Coach.tsx",
+    "pages/Community.tsx",
+    "pages/Goals.tsx",
+    "pages/Leaderboard.tsx",
+    "pages/Messages.tsx",
+    "pages/NotFound.tsx",
+    "pages/PublicProfile.tsx",
+    "pages/ReportPost.tsx",
+    "pages/Settings.tsx",
+    "pages/Statistics.tsx",
+  ],
+  "colore-fisso": [
+    "components/ActivityInsightNotification.tsx",
+    "components/BadgeUnlockNotification.tsx",
+    "components/PbCelebrationNotification.tsx",
+    "components/club/ClubFeedTab.tsx",
+    "components/club/ClubHero.tsx",
+    "components/club/HistoryMetricCircle.tsx",
+    "components/club/QuickActionsFAB.tsx",
+    "components/onboarding/OnboardingFlow.tsx",
+    "components/ui/dialog.tsx",
+    "components/ui/sheet.tsx",
+    "lib/social-content.tsx",
+    "pages/AuthCallback.tsx",
+    "pages/Badges.tsx",
+    "pages/ClubDetailEnhanced.tsx",
+    "pages/ClubInvite.tsx",
+    "pages/ForgotPassword.tsx",
+    "pages/Home.tsx",
+    "pages/Leaderboard.tsx",
+    "pages/Login.tsx",
+    "pages/NotFound.tsx",
+    "pages/Register.tsx",
+    "pages/ResetPassword.tsx",
+    "pages/Statistics.tsx",
     "pages/StravaConnect.tsx",
   ],
 };
