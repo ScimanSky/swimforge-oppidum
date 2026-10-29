@@ -44,7 +44,6 @@ body,
   --destructive: #A62B2B;
   --destructive-foreground: #FFFFFF;
   --gold: #74570E;
-  --gold-light: #74570E;
 
   --chart-1: #34C6EB;
   --chart-2: #2C8FB8;
@@ -66,9 +65,6 @@ body,
   --pace-c1: #8F7200;
   --pace-c2: #D2443F;
   --pace-c3: #B0246E;
-
-  /* Legacy hex alias: removed in Task 22 (rename). */
-  --ink: #062030;
 
   --z-base: 1;
   --z-nav: 40;
@@ -113,7 +109,6 @@ body,
   --destructive: #FF7B7B;
   --destructive-foreground: #0A1520;
   --gold: #E8B84A;
-  --gold-light: #E8B84A;
 
   --pace-a1: #8193A8;
   --pace-a2: #5B8DEF;
@@ -135,30 +130,6 @@ body,
   --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
-
-  /* Legacy aliases: removed in Task 22 (rename). Text-safe mapping. */
-  --electric-cyan: var(--action-text);
-  --electric-lime: var(--success);
-  --electric-coral: var(--danger);
-  --electric-violet: var(--muted-foreground);
-  --forge-orange: var(--xp);
-  --forge-orange-soft: color-mix(in oklch, var(--xp) 16%, transparent);
-  --neon-glow: transparent;
-  --neon-soft: transparent;
-  --forge-glow: transparent;
-  --surface-glow: transparent;
-  --chip-cyan: var(--action-text);
-  --chip-emerald: var(--success);
-  --chip-amber: var(--muted-foreground);
-  --chip-rose: var(--danger);
-  --chip-sky: var(--muted-foreground);
-  --chip-violet: var(--muted-foreground);
-  --navy: var(--card);
-  --navy-light: var(--raised);
-  --azure: var(--primary);
-  --badge-spotlight: var(--raised);
-  --badge-ring: var(--border);
-  --badge-shadow: transparent;
 }
 
 @theme inline {
@@ -208,14 +179,7 @@ body,
   --color-pace-c1: var(--pace-c1);
   --color-pace-c2: var(--pace-c2);
   --color-pace-c3: var(--pace-c3);
-  --color-chip-cyan: var(--chip-cyan);
-  --color-chip-emerald: var(--chip-emerald);
-  --color-chip-amber: var(--chip-amber);
-  --color-chip-rose: var(--chip-rose);
-  --color-chip-sky: var(--chip-sky);
-  --color-chip-violet: var(--chip-violet);
   --color-card-elevated: var(--card-elevated);
-  --color-surface-glow: var(--surface-glow);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
@@ -250,36 +214,6 @@ body,
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
   }
-}
-
-@keyframes swimforge-badge-spin {
-  from {
-    transform: perspective(800px) rotateY(0deg);
-  }
-
-  to {
-    transform: perspective(800px) rotateY(360deg);
-  }
-}
-
-.badge-hero-spin {
-  animation: swimforge-badge-spin 10s linear infinite;
-  transform-style: preserve-3d;
-  backface-visibility: hidden;
-}
-
-.badge-spotlight {
-  position: absolute;
-  inset: 12%;
-  border-radius: 9999px;
-  background: radial-gradient(circle at 30% 30%,
-      var(--badge-spotlight),
-      transparent 70%);
-  box-shadow:
-    0 10px 30px var(--badge-shadow),
-    0 0 0 1px var(--badge-ring);
-  z-index: 0;
-  pointer-events: none;
 }
 
 @layer utilities {

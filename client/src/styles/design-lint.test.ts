@@ -22,7 +22,9 @@ const RULES = {
   "maiuscolo-spaziato":
     /\buppercase\b[^"'`\n]*\btracking-(?:\[[^\]]+\]|wide|wider|widest)|\btracking-(?:\[[^\]]+\]|wide|wider|widest)[^"'`\n]*\buppercase\b/,
   "testo-gradiente": /neon-gradient-text|bg-clip-text/,
-  "token-legacy": /electric-(?:cyan|lime|coral|violet)|forge-orange/,
+  // The aliases deleted in Task 22: an unknown var() or colour class fails silently.
+  "token-legacy":
+    /electric-(?:cyan|lime|coral|violet)|forge-orange|chip-(?:cyan|emerald|amber|rose|sky|violet)|surface-glow/,
   "variante-neon": /variant=["'](?:neon|outline-neon|ghost-neon)["']/,
   "testo-primario": /(?<![\w-])text-primary(?![\w-])/,
   "accento-lime": /(?<![\w-])(?:text|border|ring|from|to|via)-accent(?![\w-])/,
@@ -58,19 +60,15 @@ const EXEMPT: Partial<Record<Rule, readonly string[]>> = {
 
 /**
  * Files still to clean, per rule. Ratchet: a file leaves the list in the task that cleans it
- * and can never come back; at the end of phase 2 every list is empty.
- * `index.css` (alone-neon, token-legacy) is the legacy alias block: it stays until Task 22.
+ * and can never come back. Every list has been empty since the end of phase 2 (Task 22): a
+ * lasting exception goes in EXEMPT with its reason.
  */
 const PENDING: Record<Rule, string[]> = {
   "testo-piccolo": [],
-  "alone-neon": [
-    "index.css",
-  ],
+  "alone-neon": [],
   "maiuscolo-spaziato": [],
   "testo-gradiente": [],
-  "token-legacy": [
-    "index.css",
-  ],
+  "token-legacy": [],
   "variante-neon": [],
   "testo-primario": [],
   "accento-lime": [],
