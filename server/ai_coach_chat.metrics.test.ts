@@ -15,7 +15,7 @@ vi.mock("./ai_coach", () => ({ getExistingWorkouts: vi.fn(async () => null) }));
 vi.mock("./ai_activity_insights", () => ({ listActivityInsights: vi.fn(async () => []) }));
 
 import { generateCoachChatReply } from "./ai_coach_chat";
-import { PACE_ZONE_COACH_RULES } from "./swim_metrics/coach-context";
+import { paceZoneCoachRules } from "./swim_metrics/coach-context";
 
 const OLD_NAMES = [/\bSEI\b/, /\bTCI\b/, /\bSER\b/, /\bACS\b/, /\bPOI\b/, /Performance Index/i, /Consistency/i, /Recovery Readiness/i];
 const previousKey = process.env.BUILT_IN_FORGE_API_KEY;
@@ -55,7 +55,35 @@ describe("coach chat context", () => {
     const prompt = systemPrompt();
     expect(prompt).toContain("ZONE DI PASSO A1–C3 (zone automatiche dal passo soglia 1:44/100 m, stima;");
     expect(prompt).toContain("- B2 Fondo medio-alto · livello Soglia: 1:44–1:50/100 m");
-    expect(prompt).toContain(PACE_ZONE_COACH_RULES);
+    // No pool swims among the last activities: no cap on the total.
+    expect(prompt).toContain(paceZoneCoachRules(sampleSwimMetrics().zones, { medianMeters: null, swims: 0, usualPoolLengthMeters: null }));
+    // The example rep uses the athlete's own B2, never someone else's paces.
+    expect(prompt).toContain("«6×100 B2 · Soglia 1:44–1:50, rec. 20″»");
+  });
+
+  it("asks for «Le zone di oggi» whenever zones appear, with room in the bullet limits", async () => {
+    await generateCoachChatReply(7, [{ role: "user", content: "Mi prepari un allenamento?" }]);
+    const prompt = systemPrompt();
+    expect(prompt).toContain('1) "Lettura dati" (max 2 bullet)');
+    expect(prompt).toContain('2) "Cosa fare adesso" (max 3 bullet con target concreti)');
+    expect(prompt).toContain(
+      '3) "Le zone di oggi" (ogni volta che nella risposta ci sono zone: una riga per ogni zona usata, con codice, livello, passo e sensazione; senza zone ometti la sezione)',
+    );
+    expect(prompt).toContain('5) "Domanda mirata"');
+  });
+
+  it("the safety limits with the athlete's own total, from the last pool swims", async () => {
+    h.getActivities.mockResolvedValue(
+      [1000, 1200, 800].map((distanceMeters, index) => ({
+        activityDate: new Date(Date.UTC(2026, 9, 27 - index, 8)),
+        distanceMeters,
+        durationSeconds: 1800,
+        isOpenWater: false,
+        poolLengthMeters: 25,
+      })),
+    );
+    await generateCoachChatReply(7, [{ role: "user", content: "Mi prepari un allenamento?" }]);
+    expect(systemPrompt()).toContain("il totale non supera 1500 m, 1,5 volte la mediana delle tue ultime 3 nuotate in vasca (1000 m)");
   });
 
   it("the rule-based session speaks the zones too, with the athlete's paces and what each zone is", async () => {
@@ -65,16 +93,18 @@ describe("coach chat context", () => {
     );
     const zones = reply.message.split("Le zone di oggi\n")[1].split("\n\n")[0].split("\n");
     expect(zones).toEqual([
-      "- A1 · Facile: nuoto sciolto, potresti parlare normalmente; scalda e fa recuperare",
-      "- A2 · Aerobico: ritmo comodo, frasi intere tra una vasca e l'altra; costruisce la base",
-      "- B1 · Medio: ritmo sostenuto, solo frasi brevi; allunga la resistenza",
-      "- B2 · Soglia: respiro impegnato, poche parole tra una vasca e l'altra; alza la soglia",
+      "- A1 · Facile (più lento di 2:03/100 m): nuoto sciolto, potresti parlare normalmente; scalda e fa recuperare",
+      "- A2 · Aerobico (1:56–2:03/100 m): ritmo comodo, frasi intere tra una vasca e l'altra; costruisce la base",
+      "- B1 · Medio (1:50–1:56/100 m): ritmo sostenuto, solo frasi brevi; allunga la resistenza",
+      "- B2 · Soglia (1:44–1:50/100 m): respiro impegnato, poche parole tra una vasca e l'altra; alza la soglia",
     ]);
   });
 
-  it("the rule-based sprint session stays within 25 m in C3 and 150 m in C2", async () => {
+  it("the rule-based sprint session stays within 25 m in C3 and 150 m in C2, with safe rests", async () => {
     const reply = await generateCoachChatReply(7, [], { goal: "migliorare i 50 stile" });
-    expect(reply.message).toContain("2 serie di 6×25 C3 · Sopra soglia (più veloce di 1:40), rec. 30″");
+    // C1/C2 boundary 104.3 / 1.04 = 100.3 s/100 m: 25 m = 25.1 s, × 3 = 75.2 s → 1′20″.
+    expect(reply.message).toContain("2 serie di 6×25 C3 · Sopra soglia (più veloce di 1:40), rec. 1′20″");
+    // 50 m = 50.1 s → 55″: the written 1′ is enough.
     expect(reply.message).toContain("4×50 C2 · Sopra soglia (più veloce di 1:40), rec. 1′");
   });
 

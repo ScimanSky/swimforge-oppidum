@@ -18,9 +18,12 @@ import {
   poolLengthLabel,
   zoneRpeLabel,
   type CssPoint,
+  type PaceZoneCode,
   type PaceZoneRange,
   type SwimMetrics,
+  type SwimZones,
 } from "@shared/swimMetrics";
+import { safetyRulesText, type PoolHistory } from "../ai_coach_safety";
 
 const STROKE_NAMES: Record<string, string> = {
   freestyle: "stile libero",
@@ -280,14 +283,28 @@ const MAX_REP_LIMITS = PACE_ZONES.filter((zone) => zone.maxRepMeters !== null)
   .map((zone) => `${zone.code} ${zone.maxRepMeters} m`)
   .join(", ");
 
+/** The pace of a zone of the athlete («1:49–1:54/100 m»), or «m:ss–m:ss/100 m» without zones. */
+export function zonePaceOrPlaceholder(zones: SwimZones | null, code: PaceZoneCode): string {
+  const range = zones?.source ? zones.ranges.find((candidate) => candidate.code === code) : undefined;
+  return `${range ? zonePaceText(range) : "m:ss–m:ss"}/100 m`;
+}
+
 /**
  * How the coach writes workouts with the zones A1–C3 (chat and workout generation): every rep
- * with zone, level and pace, within the maximum rep, each zone explained in plain words.
+ * with zone, level and pace (the example with the athlete's own B2), within the maximum rep and
+ * the safety limits, each zone explained in plain words.
  */
-export const PACE_ZONE_COACH_RULES = [
-  "- ogni ripetuta di un allenamento che proponi ha il codice della zona, il livello e il passo obiettivo dalle zone dell'atleta, per esempio «6×100 B2 · Soglia 1:49–1:54, rec. 20″»; senza passi (manca il passo soglia) usa zona, livello e fatica percepita (RPE) e dillo;",
-  `- non superare mai la ripetuta massima: ${MAX_REP_LIMITS} (per esempio non 4×300 in C1, ma 8×150);`,
-  "- l'atleta sta imparando le zone e il suo allenatore non le usa: spiega in breve, con parole semplici, ogni zona che usi: sensazione (respiro, quanto riesci a parlare, fatica da 1 a 10), passo e a cosa serve;",
-  `- l'allenamento deve potersi seguire anche senza conoscere le zone: accanto al codice scrivi sempre il livello (${INTENSITY_LEVELS.join(", ")}) e il passo;`,
-  "- le zone valgono per lo stile libero: negli altri stili, nella tecnica e nelle gambe usa zona e livello come sensazione di sforzo, senza passo.",
-].join("\n");
+export function paceZoneCoachRules(zones: SwimZones | null, history: PoolHistory | null = null): string {
+  const b2 = zonePaceOrPlaceholder(zones, "B2").replace("/100 m", "");
+  return [
+    `- ogni ripetuta di un allenamento che proponi ha il codice della zona, il livello e il passo obiettivo dalle zone dell'atleta, per esempio «6×100 B2 · Soglia ${b2}, rec. 20″»; senza passi (manca il passo soglia) usa zona, livello e fatica percepita (RPE) e dillo;`,
+    `- non superare mai la ripetuta massima: ${MAX_REP_LIMITS} (per esempio non 4×300 in C1, ma 8×150);`,
+    ...(history?.usualPoolLengthMeters && history.usualPoolLengthMeters >= 45
+      ? ["- l'atleta nuota in vasca da 50 m: il C3 si fa su una vasca, 25 m sprint + 25 m facile (repMeters 50);"]
+      : []),
+    `- ${safetyRulesText(history)};`,
+    "- l'atleta sta imparando le zone e il suo allenatore non le usa: spiega in breve, con parole semplici, ogni zona che usi: sensazione (respiro, quanto riesci a parlare, fatica da 1 a 10), passo e a cosa serve;",
+    `- l'allenamento deve potersi seguire anche senza conoscere le zone: accanto al codice scrivi sempre il livello (${INTENSITY_LEVELS.join(", ")}) e il passo;`,
+    "- le zone valgono per lo stile libero senza attrezzi: negli altri stili, nella tecnica, nelle gambe e con pinne, palette o pull buoy usa zona e livello come sensazione di sforzo, senza passo.",
+  ].join("\n");
+}

@@ -77,6 +77,9 @@ describe("generateAIInsights from the swim metrics", () => {
     // The Stroke Index example no longer claims «a parità di passo» on its own.
     expect(prompt).not.toContain("a parità di passo fai più strada per bracciata");
     expect(prompt).toContain("distanza per bracciata");
+    // The examples speak the zones A1–C3, never the old Z1–Z5.
+    expect(prompt).not.toMatch(/\bZ[1-5]\b/);
+    expect(prompt).toContain("4x100 in B2");
   });
 
   it("caches the insights for the 90-day metrics (old 30-day insights are never reused)", async () => {

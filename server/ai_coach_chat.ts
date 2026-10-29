@@ -2,8 +2,8 @@ import { invokeLLM } from "./_core/llm";
 import { getSwimmerProfile, getActivities } from "./db";
 import { getSwimMetrics } from "./swim_metrics";
 import {
-  PACE_ZONE_COACH_RULES,
   SWIM_METRICS_COACH_RULES,
+  paceZoneCoachRules,
   swimMetricsForCoach,
   swimMetricsGlossary,
   zonePaceText,
@@ -12,11 +12,12 @@ import {
   PACE_ZONE_BY_CODE,
   PACE_ZONE_CODES,
   TSB_READING_LABELS,
-  zoneOneLine,
   type PaceZoneCode,
   type PaceZoneRange,
   type SwimMetrics,
 } from "@shared/swimMetrics";
+import { formatRestSeconds, parseRest } from "@shared/coachWorkout";
+import { minRestSeconds, poolHistoryOf, type SafetyContext } from "./ai_coach_safety";
 import { getExistingWorkouts } from "./ai_coach";
 import { listActivityInsights } from "./ai_activity_insights";
 import { logger } from "./middleware/logger";
@@ -118,15 +119,16 @@ Regole:
 - se l'utente riferisce dolore/infortunio, raccomanda stop e valutazione specialistica;
 - niente testo motivazionale generico.
 ${SWIM_METRICS_COACH_RULES}
-${PACE_ZONE_COACH_RULES}
+${paceZoneCoachRules(ctx.swimMetrics?.zones ?? null, poolHistoryOf(ctx.recentActivities))}
 - se l'utente dice che oggi e' stanco/lento, riduci volume/intensita' e proponi una seduta di qualita' tecnica;
 - se l'obiettivo e' 50/100 stile, inserisci lavoro specifico di velocita' e partenze/virate.
 
 Formato di risposta preferito:
-1) "Lettura dati" (max 3 bullet)
-2) "Cosa fare adesso" (max 4 bullet con target concreti)
-3) "Check prossimo" (1 bullet: cosa monitorare nella prossima sessione)
-4) "Domanda mirata" (1 domanda breve per affinare il piano)
+1) "Lettura dati" (max 2 bullet)
+2) "Cosa fare adesso" (max 3 bullet con target concreti)
+3) "Le zone di oggi" (ogni volta che nella risposta ci sono zone: una riga per ogni zona usata, con codice, livello, passo e sensazione; senza zone ometti la sezione)
+4) "Check prossimo" (1 bullet: cosa monitorare nella prossima sessione)
+5) "Domanda mirata" (1 domanda breve per affinare il piano)
 
 PREFERENZE UTENTE
 - Obiettivo attuale: ${goal && goal.length > 0 ? goal : "n/d"}
@@ -181,15 +183,35 @@ type FallbackRep = {
   freestyle?: boolean;
 };
 
-function repText(rep: FallbackRep, ranges: PaceZoneRange[]): string {
+/**
+ * The rest of a rule-based rep: the one written, or longer when the safety limits want it (C2 at
+ * least the rep time, C3 three times, at the athlete's zone pace).
+ */
+function safeRest(rep: FallbackRep, safety: SafetyContext): string | undefined {
+  if (!rep.rest) return rep.rest;
+  const min = minRestSeconds(rep.code, { name: "", repMeters: rep.meters }, safety);
+  const written = parseRest(rep.rest)?.seconds ?? 0;
+  return min !== null && written < min ? formatRestSeconds(min) : rep.rest;
+}
+
+function repText(rep: FallbackRep, safety: SafetyContext): string {
+  const ranges = safety.zones?.ranges ?? [];
   const range = rep.freestyle === false ? undefined : ranges.find((candidate) => candidate.code === rep.code);
   const paceText = range ? zonePaceText(range) : null;
   const pace = !range ? "" : range.fastPace !== null && range.slowPace !== null ? ` ${paceText}` : ` (${paceText})`;
   const reps = rep.count ? `${rep.sets ? `${rep.sets} serie di ` : ""}${rep.count}×${rep.meters}` : `${rep.meters}`;
-  return `${reps}${rep.label ? ` ${rep.label}` : ""} ${rep.code} · ${PACE_ZONE_BY_CODE[rep.code].level}${pace}${rep.rest ? `, rec. ${rep.rest}` : ""}`;
+  const rest = safeRest(rep, safety);
+  return `${reps}${rep.label ? ` ${rep.label}` : ""} ${rep.code} · ${PACE_ZONE_BY_CODE[rep.code].level}${pace}${rest ? `, rec. ${rest}` : ""}`;
 }
 
-const sessionText = (reps: FallbackRep[], ranges: PaceZoneRange[]) => reps.map((rep) => repText(rep, ranges)).join(" + ");
+const sessionText = (reps: FallbackRep[], safety: SafetyContext) => reps.map((rep) => repText(rep, safety)).join(" + ");
+
+/** «B1 · Medio (1:50–1:56/100 m): ritmo sostenuto, …», the pace only when the zones are known. */
+function zoneLine(code: PaceZoneCode, ranges: PaceZoneRange[]): string {
+  const zone = PACE_ZONE_BY_CODE[code];
+  const range = ranges.find((candidate) => candidate.code === code);
+  return `- ${code} · ${zone.level}${range ? ` (${zonePaceText(range)}/100 m)` : ""}: ${zone.explanation}`;
+}
 
 function fallbackMessage(
   ctx: CoachContext,
@@ -233,8 +255,10 @@ function fallbackMessage(
     ? `Ultima sessione: ${latest.distanceMeters}m in ${Math.round(latest.durationSeconds / 60)} min, passo ${formatPace(latest.avgPacePer100m ?? null)}.`
     : "Non vedo sessioni recenti, quindi parto da una base conservativa.";
 
-  // Every rep with zone, level and the athlete's pace (rules of PACE_ZONE_COACH_RULES).
+  // Every rep with zone, level and the athlete's pace (rules of paceZoneCoachRules), rests
+  // within the safety limits.
   const ranges = metrics?.zones.ranges ?? [];
+  const safety: SafetyContext = { zones: metrics?.zones ?? null, history: null, referencePace: latest?.avgPacePer100m ?? null };
   let today: FallbackRep[] = [
     { meters: 300, code: "A1" },
     { count: 8, meters: 100, code: "B1", rest: "20″" },
@@ -270,9 +294,9 @@ function fallbackMessage(
     { count: 3, meters: 400, code: "A2", rest: "30″" },
     { count: 6, meters: 50, code: "B1", rest: "15″" },
   ];
-  const sessionBullet = `- ${sessionLabel}: ${sessionText(today, ranges)}.`;
+  const sessionBullet = `- ${sessionLabel}: ${sessionText(today, safety)}.`;
   const used = new Set([...today, ...next].map((rep) => rep.code));
-  const zoneLines = PACE_ZONE_CODES.filter((code) => used.has(code)).map((code) => `- ${zoneOneLine(code)}`);
+  const zoneLines = PACE_ZONE_CODES.filter((code) => used.has(code)).map((code) => zoneLine(code, ranges));
   if (ranges.length === 0) zoneLines.push("- Passi delle zone non disponibili: servono il passo soglia o le tue zone.");
 
   const shoulderLine = mentionsShoulder
@@ -288,7 +312,7 @@ function fallbackMessage(
     "Cosa fare adesso",
     `- Focus prossime 2 sedute: ${nextFocus}.`,
     sessionBullet,
-    `- Sessione successiva: ${sessionText(next, ranges)}, curando la tecnica.`,
+    `- Sessione successiva: ${sessionText(next, safety)}, curando la tecnica.`,
     shoulderLine,
     "",
     "Le zone di oggi",

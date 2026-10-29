@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  PACE_ZONE_COACH_RULES,
+  paceZoneCoachRules,
   SWIM_METRICS_COACH_RULES,
   swimMetricsForCoach,
   swimMetricsGlossary,
@@ -178,16 +178,24 @@ describe("SWIM_METRICS_COACH_RULES", () => {
   });
 });
 
-describe("PACE_ZONE_COACH_RULES", () => {
-  it("every rep has zone, level and pace; the maximum reps; the zones explained; followable without them", () => {
-    expect(PACE_ZONE_COACH_RULES).toContain(
-      "ogni ripetuta di un allenamento che proponi ha il codice della zona, il livello e il passo obiettivo dalle zone dell'atleta, per esempio «6×100 B2 · Soglia 1:49–1:54, rec. 20″»",
+describe("paceZoneCoachRules", () => {
+  it("every rep has zone, level and pace; the maximum reps; the safety limits; the zones explained; followable without them", () => {
+    const rules = paceZoneCoachRules(sampleSwimMetrics().zones); // CSS 1:44.3: B2 1:44–1:50
+    expect(rules).toContain(
+      "ogni ripetuta di un allenamento che proponi ha il codice della zona, il livello e il passo obiettivo dalle zone dell'atleta, per esempio «6×100 B2 · Soglia 1:44–1:50, rec. 20″»",
     );
-    expect(PACE_ZONE_COACH_RULES).toContain("non superare mai la ripetuta massima: C1 200 m, C2 150 m, C3 25 m");
-    expect(PACE_ZONE_COACH_RULES).toContain("il suo allenatore non le usa");
-    expect(PACE_ZONE_COACH_RULES).toContain(
+    expect(rules).toContain("non superare mai la ripetuta massima: C1 200 m, C2 150 m, C3 25 m");
+    expect(rules).toContain("limiti di sicurezza");
+    expect(rules).toContain("il suo allenatore non le usa");
+    expect(rules).toContain(
       "spiega in breve, con parole semplici, ogni zona che usi: sensazione (respiro, quanto riesci a parlare, fatica da 1 a 10), passo e a cosa serve",
     );
-    expect(PACE_ZONE_COACH_RULES).toContain("Facile, Aerobico, Medio, Soglia, Sopra soglia");
+    expect(rules).toContain("Facile, Aerobico, Medio, Soglia, Sopra soglia");
+  });
+
+  it("without zones the example has no paces of anybody else", () => {
+    const rules = paceZoneCoachRules(null);
+    expect(rules).toContain("«6×100 B2 · Soglia m:ss–m:ss, rec. 20″»");
+    expect(rules).not.toMatch(/1:49|1:54/);
   });
 });

@@ -296,7 +296,7 @@ ${SWIM_METRICS_COACH_RULES}
 
 3. ✅ DAI INDICAZIONI GENERALI (NON ALLENAMENTI SPECIFICI)
    - Identifica aree da migliorare e suggerisci direzioni generali
-   - ❌ NON dare serie/ripetizioni specifiche (es. NO "4x100 in Z3", NO "500 m di tecnica")
+   - ❌ NON dare serie/ripetizioni specifiche (es. NO "4x100 in B2", NO "500 m di tecnica")
 
 4. ✅ USA CONTESTO E PSICOLOGIA
    - Serie di settimane a 0: motivazione per ripartire, senza giudizio
@@ -326,7 +326,7 @@ ESEMPI CATTIVI (DA EVITARE):
 ❌ "Il tuo passo soglia è 1:44/100 m" (RIPETE I DATI)
 ❌ "Continua così!" (TROPPO GENERICO)
 ❌ "Hai un indice di efficienza di 72/100" (INDICE INVENTATO)
-❌ "Nella prossima sessione fai 4x100 in Z3" (ALLENAMENTO SPECIFICO - NON È IL TUO RUOLO)
+❌ "Nella prossima sessione fai 4x100 in B2" (ALLENAMENTO SPECIFICO - NON È IL TUO RUOLO)
 
 Genera 6-8 insights CATEGORIZZATI seguendo RIGOROSAMENTE queste regole:`;
 
