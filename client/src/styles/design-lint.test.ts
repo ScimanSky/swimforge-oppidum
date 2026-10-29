@@ -63,7 +63,6 @@ const PENDING: Record<Rule, string[]> = {
     "pages/ClubCoachModeration.tsx",
     "pages/ClubHistoryAthletesPage.tsx",
     "pages/ClubHistoryMeetsPage.tsx",
-    "pages/ClubPbLeaderboardPage.tsx",
     "pages/Home.tsx",
   ],
   "alone-neon": [
@@ -89,7 +88,6 @@ const PENDING: Record<Rule, string[]> = {
     "pages/ClubHistoryMeetsPage.tsx",
     "pages/ClubMeetDetail.tsx",
     "pages/ClubMeetProgramBuilder.tsx",
-    "pages/ClubPbLeaderboardPage.tsx",
     "pages/Home.tsx",
   ],
   "testo-gradiente": [
@@ -125,7 +123,6 @@ const PENDING: Record<Rule, string[]> = {
     "pages/ClubHistoryMeetsPage.tsx",
     "pages/ClubMeetDetail.tsx",
     "pages/ClubMeetProgramBuilder.tsx",
-    "pages/ClubPbLeaderboardPage.tsx",
     "pages/ForgotPassword.tsx",
     "pages/Login.tsx",
     "pages/PostDetail.tsx",
@@ -179,7 +176,6 @@ const PENDING: Record<Rule, string[]> = {
     "pages/ClubHistoryMeetsPage.tsx",
     "pages/ClubMeetDetail.tsx",
     "pages/ClubMeetProgramBuilder.tsx",
-    "pages/ClubPbLeaderboardPage.tsx",
     "pages/Messages.tsx",
     "pages/NotFound.tsx",
     "pages/PublicProfile.tsx",

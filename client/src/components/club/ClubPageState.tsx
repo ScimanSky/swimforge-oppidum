@@ -3,19 +3,22 @@ import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import type { ClubAccess } from "@/lib/club-access";
+import { cn } from "@/lib/utils";
 
 /** A short message in a card («Evento non trovato.»), with an optional way back. */
 export function ClubNotice({
   children,
   backHref,
   backLabel = "Torna al club",
+  className,
 }: {
   children: ReactNode;
   backHref?: string;
   backLabel?: string;
+  className?: string;
 }) {
   return (
-    <div className="surface-panel p-4 text-center">
+    <div className={cn("surface-panel p-4 text-center", className)}>
       <p className="text-sm text-muted-foreground">{children}</p>
       {backHref ? (
         <Button variant="outline" className="mt-3" asChild>
