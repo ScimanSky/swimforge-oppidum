@@ -1,7 +1,8 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { useEffect, useId, useMemo, useState } from "react"
+import { useId, useMemo, useRef, useState } from "react"
+import { usePaged } from "@/hooks/usePaged"
 import { Link } from "wouter"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -42,7 +43,6 @@ export default function Community() {
   const [clubScope, setClubScope] = useState<"all" | "mine">("all")
   const [clubSearch, setClubSearch] = useState("")
   const [userSearch, setUserSearch] = useState("")
-  const [clubsPage, setClubsPage] = useState(1)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [pendingFollowUserId, setPendingFollowUserId] = useState<number | null>(null)
   const [createDraft, setCreateDraft] = useState({
@@ -109,7 +109,7 @@ export default function Community() {
     },
   })
 
-  const clubs = useMemo(() => (clubsQuery.data as any[]) || [], [clubsQuery.data])
+  const clubs = (clubsQuery.data as any[] | undefined) ?? []
   const discoverUsers = useMemo(() => {
     const rows = discoverMode
       ? ((userSearchQuery.data as any[] | undefined) ?? [])
@@ -123,16 +123,13 @@ export default function Community() {
     });
   }, [discoverMode, suggestedUsersQuery.data, userSearchQuery.data])
   const isDiscoverLoading = discoverMode ? userSearchQuery.isLoading : suggestedUsersQuery.isLoading
-  const clubsPageSize = 6
-  const clubsTotalPages = Math.max(1, Math.ceil(clubs.length / clubsPageSize))
-  const pagedClubs = useMemo(() => {
-    const start = (clubsPage - 1) * clubsPageSize
-    return clubs.slice(start, start + clubsPageSize)
-  }, [clubs, clubsPage])
-
-  useEffect(() => {
-    setClubsPage(1)
-  }, [clubScope, clubSearch, clubs.length])
+  const clubsListRef = useRef<HTMLUListElement>(null)
+  const {
+    page: clubsPage,
+    setPage: setClubsPage,
+    totalPages: clubsTotalPages,
+    pageItems: pagedClubs,
+  } = usePaged(clubs, 6, [clubScope, clubSearch])
 
   const createClubDialog = (
     <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -278,7 +275,7 @@ export default function Community() {
           ) : clubs.length === 0 ? (
             <p className="surface-panel p-4 text-sm text-muted-foreground">Nessun club trovato.</p>
           ) : (
-            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <ul ref={clubsListRef} className="grid scroll-mt-20 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {pagedClubs.map((club: any) => {
                 const thumbnail = (club.logo_url || club.logoUrl || club.cover_image_url || undefined) as
                   | string
@@ -323,6 +320,7 @@ export default function Community() {
             page={clubsPage}
             totalPages={clubsTotalPages}
             onChange={setClubsPage}
+            listRef={clubsListRef}
             label="Pagine dei club"
           />
         </section>

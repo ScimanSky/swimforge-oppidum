@@ -52,11 +52,13 @@ const challenge = (id: number, extra: Record<string, unknown> = {}) => ({
 });
 
 function renderChallenges() {
-  render(
+  const tree = () => (
     <Router hook={memoryLocation({ path: "/challenges" }).hook}>
       <Challenges />
     </Router>
   );
+  const { rerender } = render(tree());
+  return { rerender: () => rerender(tree()) };
 }
 
 describe("Sfide (Corsia)", () => {
@@ -148,6 +150,29 @@ describe("Sfide (Corsia)", () => {
     const bea = within(list).getByRole("link", { name: /Bea/ });
     expect(within(bea).getByText("0")).toBeTruthy();
     expect(within(bea).getByText("XP")).toBeTruthy();
+  });
+
+  it("dopo Partecipa sull'ultima pagina non resta una pagina vuota", async () => {
+    state.challenges = [1, 2, 3, 4].map((id) => challenge(id));
+    const { rerender } = renderChallenges();
+    await userEvent.click(screen.getByRole("tab", { name: "Disponibili" }));
+    const pages = screen.getByRole("navigation", { name: "Pagine delle sfide disponibili" });
+    await userEvent.click(within(pages).getByRole("button", { name: "Avanti" }));
+    expect(screen.getByRole("heading", { level: 3, name: "Sfida 4" })).toBeTruthy();
+    // Joined: «Sfida 4» leaves the available list, which now fits on one page.
+    state.challenges = [1, 2, 3].map((id) => challenge(id)).concat(challenge(4, { isParticipant: true }));
+    rerender();
+    expect(screen.queryByRole("navigation", { name: "Pagine delle sfide disponibili" })).toBeNull();
+    expect(screen.getByRole("heading", { level: 3, name: "Sfida 1" })).toBeTruthy();
+  });
+
+  it("classifica paginata: la lista parte dalla posizione visibile", async () => {
+    state.leaderboard = [1, 2, 3, 4, 5].map((userId) => ({ userId, name: `N${userId}`, periodXp: 100 - userId }));
+    renderChallenges();
+    await userEvent.click(screen.getByRole("tab", { name: "Classifica" }));
+    expect(screen.getByRole("list", { name: "Classifica" }).getAttribute("start")).toBe("1");
+    await userEvent.click(screen.getByRole("button", { name: "Avanti" }));
+    expect(screen.getByRole("list", { name: "Classifica" }).getAttribute("start")).toBe("5");
   });
 
   it("crea una sfida dal dialogo", async () => {

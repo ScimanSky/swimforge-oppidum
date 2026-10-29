@@ -16,7 +16,8 @@ import { Metric } from "@/components/corsia/Metric";
 import { Pager } from "@/components/corsia/Pager";
 import { Lock } from "lucide-react";
 import { Redirect } from "wouter";
-import { useState, useRef, useCallback, useMemo, useEffect, useId } from "react";
+import { useState, useRef, useCallback, useMemo, useId } from "react";
+import { usePaged } from "@/hooks/usePaged";
 import { getBadgeImageUrl } from "@/lib/badgeImages";
 import { AppLayout } from "@/components/AppLayout";
 import { formatDayMonthYear, formatInteger } from "@/lib/format";
@@ -69,7 +70,6 @@ export default function Badges() {
   const titleId = useId();
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedBadge, setSelectedBadge] = useState<any | null>(null);
-  const [badgePage, setBadgePage] = useState(1);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: badgeProgress, isLoading } = trpc.badges.progress.useQuery(
@@ -113,12 +113,13 @@ export default function Badges() {
   const filteredBadges = allBadges.filter(
     (b) => selectedCategory === "all" || b.category === selectedCategory
   );
-  const badgePageSize = 10;
-  const badgeTotalPages = Math.max(1, Math.ceil(filteredBadges.length / badgePageSize));
-  const pagedBadges = useMemo(() => {
-    const start = (badgePage - 1) * badgePageSize;
-    return filteredBadges.slice(start, start + badgePageSize);
-  }, [filteredBadges, badgePage]);
+  const {
+    page: badgePage,
+    setPage: setBadgePage,
+    totalPages: badgeTotalPages,
+    pageItems: pagedBadges,
+  } = usePaged(filteredBadges, 10, [selectedCategory]);
+  const badgeListRef = useRef<HTMLUListElement>(null);
 
   // Count earned badges
   const earnedCount = allBadges.filter((b) => b.earned).length || 0;
@@ -163,14 +164,6 @@ export default function Badges() {
       playSound(getBadgeSoundUrl(badgeIndex + 1));
     }
   };
-
-  useEffect(() => {
-    setBadgePage(1);
-  }, [selectedCategory]);
-
-  useEffect(() => {
-    if (badgePage > badgeTotalPages) setBadgePage(badgeTotalPages);
-  }, [badgePage, badgeTotalPages]);
 
   // After every hook: an early return between hooks breaks the rules of hooks.
   if (!authLoading && !isAuthenticated) {
@@ -225,7 +218,7 @@ export default function Badges() {
             Nessun badge in questa categoria.
           </p>
         ) : (
-          <ul aria-label="Badge" className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          <ul ref={badgeListRef} aria-label="Badge" className="scroll-mt-20 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {pagedBadges.map((badge, index) => {
               const isEarned = Boolean(badge.earned);
               const position = allBadges.indexOf(badge);
@@ -269,7 +262,13 @@ export default function Badges() {
           </ul>
         )}
         {!loading ? (
-          <Pager page={badgePage} totalPages={badgeTotalPages} onChange={setBadgePage} label="Pagine dei badge" />
+          <Pager
+            page={badgePage}
+            totalPages={badgeTotalPages}
+            onChange={setBadgePage}
+            listRef={badgeListRef}
+            label="Pagine dei badge"
+          />
         ) : null}
 
         <Dialog open={selectedBadge != null} onOpenChange={(open) => !open && setSelectedBadge(null)}>

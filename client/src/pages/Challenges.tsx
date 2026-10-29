@@ -2,7 +2,7 @@
 
 import { assetUrl } from "@/lib/asset-base";
 import AppLayout from "@/components/AppLayout"
-import { useId, useMemo, useState, type ReactNode } from "react"
+import { useId, useMemo, useRef, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -32,6 +32,7 @@ import { Link } from "wouter"
 import { trpc } from "@/lib/trpc"
 import { toast } from "sonner"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
+import { usePaged } from "@/hooks/usePaged"
 import {
   CHALLENGE_DURATION_LABELS,
   CHALLENGE_OBJECTIVE_LABELS,
@@ -133,9 +134,9 @@ export default function Challenges() {
   const [activeTab, setActiveTab] = useState("active")
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const isDesktopWide = useMediaQuery("(min-width: 1280px)", false)
-  const [activePage, setActivePage] = useState(1)
-  const [availablePage, setAvailablePage] = useState(1)
-  const [leaderboardPage, setLeaderboardPage] = useState(1)
+  const activeListRef = useRef<HTMLUListElement>(null)
+  const availableListRef = useRef<HTMLUListElement>(null)
+  const leaderboardListRef = useRef<HTMLOListElement>(null)
   const [createDraft, setCreateDraft] = useState<ChallengeCreateDraft>({
     name: "",
     description: "",
@@ -179,7 +180,7 @@ export default function Challenges() {
     onSuccess: () => challengesQuery.refetch(),
   })
 
-  const challenges = useMemo(() => (challengesQuery.data ?? []) as any[], [challengesQuery.data])
+  const challenges = (challengesQuery.data ?? []) as any[]
   const activeChallenges = challenges.filter(
     (challenge) => challenge.status === "active" && challenge.isParticipant
   )
@@ -194,18 +195,12 @@ export default function Challenges() {
   )
   const participatingChallenges = [...activeChallenges, ...pendingChallenges]
 
-  const activePageSize = isDesktopWide ? 1 : 2
-  const availablePageSize = isDesktopWide ? 2 : 3
-  const leaderboardPageSize = isDesktopWide ? 3 : 4
-  const activeTotalPages = Math.max(1, Math.ceil(participatingChallenges.length / activePageSize))
-  const availableTotalPages = Math.max(1, Math.ceil(availableChallenges.length / availablePageSize))
-  const leaderboard = useMemo(() => (leaderboardQuery.data ?? []) as any[], [leaderboardQuery.data])
-  const leaderboardTotalPages = Math.max(1, Math.ceil(leaderboard.length / leaderboardPageSize))
-  const pageOf = <T,>(items: T[], page: number, size: number) =>
-    items.slice((page - 1) * size, page * size)
-  const pagedParticipatingChallenges = pageOf(participatingChallenges, activePage, activePageSize)
-  const pagedAvailableChallenges = pageOf(availableChallenges, availablePage, availablePageSize)
-  const pagedLeaderboard = pageOf(leaderboard, leaderboardPage, leaderboardPageSize)
+  const leaderboard = (leaderboardQuery.data ?? []) as any[]
+  // Switching tab starts every list from its first page; leaving or joining a challenge, or
+  // crossing 1280px (page sizes change), keeps each list on a page that still exists.
+  const activePaging = usePaged(participatingChallenges, isDesktopWide ? 1 : 2, [activeTab])
+  const availablePaging = usePaged(availableChallenges, isDesktopWide ? 2 : 3, [activeTab])
+  const leaderboardPaging = usePaged(leaderboard, isDesktopWide ? 3 : 4, [activeTab])
 
   const streak = useMemo(() => {
     const dates = (activitiesQuery.data ?? [])
@@ -366,12 +361,7 @@ export default function Challenges() {
 
         <Tabs
           value={activeTab}
-          onValueChange={(value) => {
-            setActiveTab(value)
-            if (value === "active") setActivePage(1)
-            if (value === "available") setAvailablePage(1)
-            if (value === "leaderboard") setLeaderboardPage(1)
-          }}
+          onValueChange={setActiveTab}
           className="gap-3"
         >
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -390,9 +380,9 @@ export default function Challenges() {
             {participatingChallenges.length === 0 && (
               <EmptyCard>Nessuna sfida attiva. Esplora le sfide disponibili.</EmptyCard>
             )}
-            {pagedParticipatingChallenges.length > 0 ? (
-              <ul className="space-y-3">
-                {pagedParticipatingChallenges.map((challenge) => {
+            {activePaging.pageItems.length > 0 ? (
+              <ul ref={activeListRef} className="scroll-mt-20 space-y-3">
+                {activePaging.pageItems.map((challenge) => {
                   const leaderboard = (challenge.leaderboard ?? []) as Array<{ progress: number }>
                   const maxProgress = leaderboard.reduce(
                     (max, item) => Math.max(max, item.progress || 0),
@@ -475,9 +465,10 @@ export default function Challenges() {
               </ul>
             ) : null}
             <Pager
-              page={activePage}
-              totalPages={activeTotalPages}
-              onChange={setActivePage}
+              page={activePaging.page}
+              totalPages={activePaging.totalPages}
+              onChange={activePaging.setPage}
+              listRef={activeListRef}
               label="Pagine delle sfide attive"
             />
           </TabsContent>
@@ -486,9 +477,9 @@ export default function Challenges() {
             {availableChallenges.length === 0 && (
               <EmptyCard>Nessuna sfida disponibile al momento.</EmptyCard>
             )}
-            {pagedAvailableChallenges.length > 0 ? (
-              <ul className="space-y-3">
-                {pagedAvailableChallenges.map((challenge) => (
+            {availablePaging.pageItems.length > 0 ? (
+              <ul ref={availableListRef} className="scroll-mt-20 space-y-3">
+                {availablePaging.pageItems.map((challenge) => (
                   <li key={challenge.id} className="surface-panel p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -519,9 +510,10 @@ export default function Challenges() {
               </ul>
             ) : null}
             <Pager
-              page={availablePage}
-              totalPages={availableTotalPages}
-              onChange={setAvailablePage}
+              page={availablePaging.page}
+              totalPages={availablePaging.totalPages}
+              onChange={availablePaging.setPage}
+              listRef={availableListRef}
               label="Pagine delle sfide disponibili"
             />
           </TabsContent>
@@ -536,9 +528,14 @@ export default function Challenges() {
             {leaderboard.length === 0 ? (
               <EmptyCard>Nessuna classifica disponibile.</EmptyCard>
             ) : (
-              <ol aria-label="Classifica" className="space-y-2">
-                {pagedLeaderboard.map((entry, index) => {
-                  const absoluteIndex = (leaderboardPage - 1) * leaderboardPageSize + index
+              <ol
+                ref={leaderboardListRef}
+                aria-label="Classifica"
+                start={leaderboardPaging.offset + 1}
+                className="scroll-mt-20 space-y-2"
+              >
+                {leaderboardPaging.pageItems.map((entry, index) => {
+                  const absoluteIndex = leaderboardPaging.offset + index
                   const profile = entry.profile ?? entry
                   const name = entry.name ?? profile.name ?? "Nuotatore"
                   const rawUserId = profile.userId ?? entry.userId
@@ -564,9 +561,10 @@ export default function Challenges() {
               </ol>
             )}
             <Pager
-              page={leaderboardPage}
-              totalPages={leaderboardTotalPages}
-              onChange={setLeaderboardPage}
+              page={leaderboardPaging.page}
+              totalPages={leaderboardPaging.totalPages}
+              onChange={leaderboardPaging.setPage}
+              listRef={leaderboardListRef}
               label="Pagine della classifica"
             />
           </TabsContent>

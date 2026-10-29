@@ -11,7 +11,8 @@ import { formatInteger, getInitials } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Award, TrendingUp, Trophy, Zap } from "lucide-react";
 import { Link, Redirect } from "wouter";
-import { useEffect, useMemo, useState } from "react";
+import { useRef, useState } from "react";
+import { usePaged } from "@/hooks/usePaged";
 
 type OrderBy = "level" | "totalXp" | "badges";
 type Period = "all" | "week" | "month";
@@ -62,7 +63,7 @@ export default function Leaderboard() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const [orderBy, setOrderBy] = useState<OrderBy>("totalXp");
   const [period, setPeriod] = useState<Period>("all");
-  const [listPage, setListPage] = useState(1);
+  const listRef = useRef<HTMLOListElement>(null);
 
   const { data: leaderboard, isLoading } = trpc.leaderboard.get.useQuery(
     { orderBy, period, limit: 50 },
@@ -94,20 +95,13 @@ export default function Leaderboard() {
   const podiumOffset = normalizedLeaderboard.length >= 3 ? 3 : 0;
   const podium = normalizedLeaderboard.slice(0, podiumOffset);
   const restEntries = normalizedLeaderboard.slice(podiumOffset);
-  const restPageSize = 4;
-  const restTotalPages = Math.max(1, Math.ceil(restEntries.length / restPageSize));
-  const pagedRestEntries = useMemo(() => {
-    const start = (listPage - 1) * restPageSize;
-    return restEntries.slice(start, start + restPageSize);
-  }, [restEntries, listPage]);
-
-  useEffect(() => {
-    setListPage(1);
-  }, [period, orderBy]);
-
-  useEffect(() => {
-    if (listPage > restTotalPages) setListPage(restTotalPages);
-  }, [listPage, restTotalPages]);
+  const {
+    page: listPage,
+    setPage: setListPage,
+    totalPages: restTotalPages,
+    pageItems: pagedRestEntries,
+    offset: restOffset,
+  } = usePaged(restEntries, 4, [period, orderBy]);
 
   // After every hook: an early return between hooks breaks the rules of hooks.
   if (!authLoading && !isAuthenticated) {
@@ -228,9 +222,15 @@ export default function Leaderboard() {
             ) : null}
 
             {pagedRestEntries.length > 0 ? (
-              <ol aria-label="Classifica" className="space-y-2">
+              // `start` keeps the announced list position equal to the visible rank.
+              <ol
+                ref={listRef}
+                aria-label="Classifica"
+                start={podiumOffset + restOffset + 1}
+                className="scroll-mt-20 space-y-2"
+              >
                 {pagedRestEntries.map((entry, index) => {
-                  const position = podiumOffset + (listPage - 1) * restPageSize + index + 1;
+                  const position = podiumOffset + restOffset + index + 1;
                   return (
                     <li key={entry.id || position}>
                       <RankRow
@@ -251,6 +251,7 @@ export default function Leaderboard() {
               page={listPage}
               totalPages={restTotalPages}
               onChange={setListPage}
+              listRef={listRef}
               label="Pagine della classifica"
             />
           </>

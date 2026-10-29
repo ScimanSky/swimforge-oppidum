@@ -126,9 +126,22 @@ describe("Classifiche (Corsia)", () => {
     expect(within(summary).getByText("Non sei ancora in classifica.")).toBeTruthy();
     const pages = screen.getByRole("navigation", { name: "Pagine della classifica" });
     expect(within(pages).getByText("Pagina 1 di 2")).toBeTruthy();
+    expect(screen.getByRole("list", { name: "Classifica" }).getAttribute("start")).toBe("4");
     await userEvent.click(within(pages).getByRole("button", { name: "Avanti" }));
     const list = screen.getByRole("list", { name: "Classifica" });
+    // Screen readers announce the visible rank: the list starts at 8.
+    expect(list.getAttribute("start")).toBe("8");
     expect(within(list).getAllByRole("listitem")).toHaveLength(2);
     expect(within(list).getByText("8")).toBeTruthy();
+  });
+
+  it("torna alla prima pagina cambiando periodo", async () => {
+    state.rows = Array.from({ length: 9 }, (_, i) => row(i + 10, 1000 - i * 10));
+    renderLeaderboard();
+    const pages = screen.getByRole("navigation", { name: "Pagine della classifica" });
+    await userEvent.click(within(pages).getByRole("button", { name: "Avanti" }));
+    expect(within(pages).getByText("Pagina 2 di 2")).toBeTruthy();
+    await userEvent.click(screen.getByRole("tab", { name: "Mese" }));
+    expect(screen.getByText("Pagina 1 di 2")).toBeTruthy();
   });
 });
