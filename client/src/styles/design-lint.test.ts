@@ -69,12 +69,9 @@ const PENDING: Record<Rule, string[]> = {
     "index.css",
   ],
   "maiuscolo-spaziato": [
-    "components/ActivityInsightNotification.tsx",
-    "components/PbCelebrationNotification.tsx",
     "components/metrics/MetricOrb.tsx",
   ],
   "testo-gradiente": [
-    "components/BadgeUnlockNotification.tsx",
     "components/metrics/MetricOrb.tsx",
     "pages/Settings.tsx",
   ],
@@ -83,22 +80,15 @@ const PENDING: Record<Rule, string[]> = {
     "index.css",
   ],
   "variante-neon": [
-    "components/PbCelebrationNotification.tsx",
     "pages/Settings.tsx",
   ],
   "testo-primario": [],
   "accento-lime": [],
   gradiente: [
-    "components/ActivityInsightNotification.tsx",
-    "components/BadgeUnlockNotification.tsx",
-    "components/PbCelebrationNotification.tsx",
     "components/metrics/MetricOrb.tsx",
     "pages/Settings.tsx",
   ],
   sfocatura: [
-    "components/ActivityInsightNotification.tsx",
-    "components/BadgeUnlockNotification.tsx",
-    "components/PbCelebrationNotification.tsx",
     "components/metrics/MetricOrb.tsx",
     "pages/StravaConnect.tsx",
   ],
@@ -106,9 +96,6 @@ const PENDING: Record<Rule, string[]> = {
     "pages/Settings.tsx",
   ],
   "colore-fisso": [
-    "components/ActivityInsightNotification.tsx",
-    "components/BadgeUnlockNotification.tsx",
-    "components/PbCelebrationNotification.tsx",
     "components/ui/dialog.tsx",
     "components/ui/sheet.tsx",
     "pages/StravaConnect.tsx",
