@@ -202,6 +202,11 @@ export function AIChatBox({
       )}
       style={{ height }}
     >
+      {/* Always mounted so screen readers hear the change; only the text changes. */}
+      <div role="status" className="sr-only">
+        {isLoading ? "Risposta in arrivo" : ""}
+      </div>
+
       {/* Messages Area */}
       <div ref={scrollAreaRef} className="flex-1 overflow-hidden">
         {displayMessages.length === 0 ? (
@@ -231,7 +236,8 @@ export function AIChatBox({
           </div>
         ) : (
           <ScrollArea className="h-full">
-            <div className="flex flex-col space-y-4 p-4">
+            {/* New messages are read out politely; each bubble says who is speaking. */}
+            <div role="log" aria-live="polite" className="flex flex-col space-y-4 p-4">
               {displayMessages.map((message, index) => {
                 // Apply min-height to last message only if NOT loading (when loading, the loading indicator gets it)
                 const isLastMessage = index === displayMessages.length - 1;
@@ -260,6 +266,7 @@ export function AIChatBox({
                     )}
 
                     <div
+                      data-chat-message
                       className={cn(
                         "max-w-[80%] rounded-2xl px-4 py-2.5",
                         message.role === "user"
@@ -267,6 +274,9 @@ export function AIChatBox({
                           : "bg-raised text-foreground"
                       )}
                     >
+                      <span className="sr-only">
+                        {message.role === "assistant" ? "Coach: " : "Tu: "}
+                      </span>
                       {message.role === "assistant" ? (
                         <div className="prose prose-sm dark:prose-invert max-w-none">
                           <Streamdown>{message.content}</Streamdown>
@@ -299,9 +309,8 @@ export function AIChatBox({
                   <div className="size-8 shrink-0 mt-1 rounded-full bg-raised flex items-center justify-center">
                     <Sparkles className="size-4 text-muted-foreground" aria-hidden />
                   </div>
-                  <div role="status" className="rounded-2xl bg-raised px-4 py-2.5">
+                  <div className="rounded-2xl bg-raised px-4 py-2.5">
                     <Loader2 className="size-4 animate-spin text-muted-foreground" aria-hidden />
-                    <span className="sr-only">Risposta in arrivo</span>
                   </div>
                 </div>
               )}

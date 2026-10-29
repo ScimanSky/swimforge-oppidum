@@ -1,14 +1,16 @@
 "use client"
 
 import AppLayout from "@/components/AppLayout"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Chip } from "@/components/corsia/Chip"
 import { Metric, type MetricProps } from "@/components/corsia/Metric"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { AIChatBox, type Message as ChatMessage } from "@/components/AIChatBox"
+import { AIChatBox } from "@/components/AIChatBox"
+import { CHAT_MAX_MESSAGE_CHARS, useCoachChat } from "@/hooks/useCoachChat"
+import { useSessionArchive, type ArchiveRange, type ArchiveSort } from "@/hooks/useSessionArchive"
 import { trpc } from "@/lib/trpc"
 import {
   formatDayMonthYear,
@@ -19,7 +21,7 @@ import {
 } from "@/lib/format"
 import { toast } from "sonner"
 import { Sparkles, AlertTriangle } from "lucide-react"
-import { useLocation } from "wouter"
+import { useSearch } from "wouter"
 
 const sectionTitle = "text-[17px] font-bold"
 type WorkoutSection = {
@@ -78,25 +80,6 @@ const sessionMeta = (entry: any) =>
     .filter(Boolean)
     .join(" · ")
 
-const parseBulletsSafe = (value: any): string[] => {
-  if (!value) return []
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item)).filter(Boolean)
-  }
-  if (typeof value === "string") {
-    try {
-      const parsed = JSON.parse(value)
-      if (Array.isArray(parsed)) {
-        return parsed.map((item) => String(item)).filter(Boolean)
-      }
-    } catch {
-      // ignore parse errors and fallback to plain string
-    }
-    return value.trim().length > 0 ? [value] : []
-  }
-  return []
-}
-
 const getExerciseDetails = (exercise: WorkoutExercise) =>
   [
     exercise.sets && `Serie: ${exercise.sets}`,
@@ -133,29 +116,6 @@ const getFocusLabel = (
   candidates.sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
   return candidates[0].label
 }
-
-const CHAT_STORAGE_KEY_BASE = "coach_chat_history_v1"
-const CHAT_GOAL_STORAGE_KEY_BASE = "coach_chat_goal_v1"
-const CHAT_CONSTRAINTS_STORAGE_KEY_BASE = "coach_chat_constraints_v1"
-const CHAT_MAX_MESSAGE_CHARS = 2000
-const CHAT_MAX_HISTORY = 20
-
-const clampChatContent = (value: string) => {
-  const normalized = value.trim()
-  if (normalized.length <= CHAT_MAX_MESSAGE_CHARS) return normalized
-  return `${normalized.slice(0, CHAT_MAX_MESSAGE_CHARS - 1).trimEnd()}…`
-}
-
-const sanitizeChatMessages = (messages: ChatMessage[]): ChatMessage[] =>
-  messages
-    .map((item): ChatMessage => ({
-      role: item.role === "assistant" ? "assistant" : "user",
-      content: clampChatContent(String(item.content ?? "")),
-    }))
-    .filter((item) => item.content.length > 0)
-    .slice(-CHAT_MAX_HISTORY)
-
-const scopedStorageKey = (baseKey: string, userId: number) => `${baseKey}:u:${userId}`
 
 /** One generated workout (pool or dry-land): meta, section picker, first three exercises. */
 function WorkoutDetail({
@@ -230,38 +190,19 @@ function WorkoutDetail({
 }
 
 export default function Coach() {
-  const [location] = useLocation()
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
-  const [chatGoal, setChatGoal] = useState("")
-  const [chatConstraints, setChatConstraints] = useState("")
-  const [chatProvider, setChatProvider] = useState<"forge" | "gemini" | "rule_based" | null>(null)
-  const fallbackToastShownRef = useRef(false)
+  const search = useSearch()
   const [activeTab, setActiveTab] = useState<"insights" | "workouts" | "session-iq" | "chat">("insights")
   const [activeInsightIndex, setActiveInsightIndex] = useState(0)
   const [activePoolSectionIndex, setActivePoolSectionIndex] = useState(0)
   const [activeDrySectionIndex, setActiveDrySectionIndex] = useState(0)
   const [showSessionArchive, setShowSessionArchive] = useState(false)
-  const [archiveSearchTerm, setArchiveSearchTerm] = useState("")
-  const [archiveRange, setArchiveRange] = useState<"all" | "7d" | "30d" | "90d">("all")
-  const [archiveSort, setArchiveSort] = useState<"recent" | "oldest" | "distance" | "duration">("recent")
   const [activeWorkout, setActiveWorkout] = useState<"pool" | "dryland">("pool")
   const [isGenerating, setIsGenerating] = useState(false)
   const meQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
     refetchOnWindowFocus: false,
   })
-  const authUserId = Number((meQuery.data as any)?.id)
-  const isScopedStorageReady = Number.isFinite(authUserId) && authUserId > 0
-
-  const chatStorageKeys = useMemo(() => {
-    if (!isScopedStorageReady) return null
-    return {
-      history: scopedStorageKey(CHAT_STORAGE_KEY_BASE, authUserId),
-      goal: scopedStorageKey(CHAT_GOAL_STORAGE_KEY_BASE, authUserId),
-      constraints: scopedStorageKey(CHAT_CONSTRAINTS_STORAGE_KEY_BASE, authUserId),
-    }
-  }, [authUserId, isScopedStorageReady])
-
+  const chat = useCoachChat(Number((meQuery.data as any)?.id) || null)
   const { data: advanced } = trpc.statistics.getAdvanced.useQuery(
     { days: 30 },
     { staleTime: 5 * 60 * 1000, refetchOnWindowFocus: false }
@@ -277,7 +218,6 @@ export default function Coach() {
   const utils = trpc.useUtils()
 
   const generateMutation = trpc.aiCoach.generateWorkouts.useMutation()
-  const chatMutation = trpc.aiCoach.chat.useMutation()
 
   const handleGenerate = async () => {
     setIsGenerating(true)
@@ -319,19 +259,25 @@ export default function Coach() {
     return formatDate(workoutsData.generatedAt)
   }, [workoutsData?.generatedAt])
 
+  const focusLabel = useMemo(
+    () =>
+      getFocusLabel(
+        advanced?.performanceIndex,
+        advanced?.consistencyScore,
+        advanced?.recoveryReadinessScore,
+        advanced?.swimmingEfficiencyIndex
+      ),
+    [advanced]
+  )
+
   const suggestedChatPrompts = useMemo(
     () => [
       "Come imposto la prossima seduta in base al mio recupero?",
       "Guardando i miei dati, cosa devo migliorare prima?",
       "Mi prepari 2 obiettivi concreti per questa settimana?",
-      `Che lavoro faccio per migliorare in ${getFocusLabel(
-        advanced?.performanceIndex,
-        advanced?.consistencyScore,
-        advanced?.recoveryReadinessScore,
-        advanced?.swimmingEfficiencyIndex
-      ).toLowerCase()}?`,
+      `Che lavoro faccio per migliorare in ${focusLabel.toLowerCase()}?`,
     ],
-    [advanced]
+    [focusLabel]
   )
 
   const sessionInsightsQuery = trpc.activityInsights.list.useQuery(
@@ -394,79 +340,12 @@ export default function Coach() {
     [advanced]
   )
 
-  const sessionEntries = useMemo(() => {
-    const data = sessionInsightsQuery.data ?? []
-    const normalizeDate = (value: any) => {
-      if (!value) return null
-      if (value instanceof Date) return value
-      if (typeof value === "string") {
-        const normalized = value.includes("T") ? value : value.replace(" ", "T")
-        const date = new Date(normalized)
-        return Number.isNaN(date.getTime()) ? null : date
-      }
-      return null
-    }
-    return [...data]
-      .map((item: any) => {
-        const date =
-          normalizeDate(item.activity_date) ||
-          normalizeDate(item.activityDate) ||
-          normalizeDate(item.generated_at) ||
-          normalizeDate(item.generatedAt)
-        return {
-          ...item,
-          _date: date,
-          _sort: date ? date.getTime() : 0,
-        }
-      })
-      .sort((a, b) => b._sort - a._sort)
-  }, [sessionInsightsQuery.data])
-
-  const latestSessionInsight = sessionEntries[0] ?? null
-
-  const filteredArchiveEntries = useMemo(() => {
-    const term = archiveSearchTerm.trim().toLowerCase()
-    const now = Date.now()
-    const rangeMs =
-      archiveRange === "7d"
-        ? 7 * 24 * 60 * 60 * 1000
-        : archiveRange === "30d"
-          ? 30 * 24 * 60 * 60 * 1000
-          : archiveRange === "90d"
-            ? 90 * 24 * 60 * 60 * 1000
-            : null
-
-    const list = sessionEntries.filter((entry: any) => {
-      if (rangeMs !== null) {
-        if (!entry._date) return false
-        if (now - entry._date.getTime() > rangeMs) return false
-      }
-
-      if (!term) return true
-
-      const bulletText = parseBulletsSafe(entry.bullets).join(" ").toLowerCase()
-      const content = `${String(entry.title ?? "")} ${String(entry.summary ?? "")} ${bulletText}`.toLowerCase()
-      return content.includes(term)
-    })
-
-    list.sort((a: any, b: any) => {
-      if (archiveSort === "oldest") return (a._sort ?? 0) - (b._sort ?? 0)
-      if (archiveSort === "distance") {
-        return Number(b.activity_distance_meters ?? 0) - Number(a.activity_distance_meters ?? 0)
-      }
-      if (archiveSort === "duration") {
-        return Number(b.activity_duration_seconds ?? 0) - Number(a.activity_duration_seconds ?? 0)
-      }
-      return (b._sort ?? 0) - (a._sort ?? 0)
-    })
-
-    return list
-  }, [archiveRange, archiveSearchTerm, archiveSort, sessionEntries])
-
-  const parsedSessionBullets = useMemo(() => {
-    if (!latestSessionInsight) return []
-    return parseBulletsSafe(latestSessionInsight.bullets)
-  }, [latestSessionInsight])
+  const archive = useSessionArchive(sessionInsightsQuery.data)
+  const sessionEntries = archive.entries
+  const latestSessionInsight = archive.latest
+  const filteredArchiveEntries = archive.filtered
+  const parsedSessionBullets = latestSessionInsight?._bullets ?? []
+  const latestSessionMeta = latestSessionInsight ? sessionMeta(latestSessionInsight) : ""
 
   const activePoolSection = useMemo(() => {
     const sections = poolWorkout?.sections ?? []
@@ -490,17 +369,6 @@ export default function Coach() {
     setActiveDrySectionIndex(0)
   }, [drylandWorkout?.sections?.length])
 
-  const focusLabel = useMemo(
-    () =>
-      getFocusLabel(
-        advanced?.performanceIndex,
-        advanced?.consistencyScore,
-        advanced?.recoveryReadinessScore,
-        advanced?.swimmingEfficiencyIndex
-      ),
-    [advanced]
-  )
-
   const conditionLabel = useMemo(
     () => getConditionLabel(advanced?.recoveryReadinessScore),
     [advanced?.recoveryReadinessScore]
@@ -512,8 +380,7 @@ export default function Coach() {
   )
 
   useEffect(() => {
-    if (typeof window === "undefined") return
-    const params = new URLSearchParams(window.location.search)
+    const params = new URLSearchParams(search)
     const tab = params.get("tab")
     const workout = params.get("workout")
     if (tab === "insights" || tab === "workouts" || tab === "session-iq" || tab === "chat") {
@@ -525,132 +392,7 @@ export default function Coach() {
     if (workout === "pool" || workout === "dryland") {
       setActiveWorkout(workout)
     }
-  }, [location])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    if (!chatStorageKeys) return
-
-    // Reset in-memory state whenever account scope changes, then load scoped data.
-    setChatMessages([])
-    setChatGoal("")
-    setChatConstraints("")
-    setChatProvider(null)
-
-    try {
-      const raw = window.localStorage.getItem(chatStorageKeys.history)
-      if (raw) {
-        const parsed = JSON.parse(raw)
-        if (Array.isArray(parsed)) {
-          const safeMessages: ChatMessage[] = parsed
-            .filter((item) =>
-              item &&
-              typeof item === "object" &&
-              (item.role === "user" || item.role === "assistant") &&
-              typeof item.content === "string"
-            )
-            .map((item): ChatMessage => ({
-              role: item.role === "assistant" ? "assistant" : "user",
-              content: clampChatContent(item.content as string),
-            }))
-            .filter((item) => item.content.length > 0)
-            .slice(-CHAT_MAX_HISTORY)
-          if (safeMessages.length > 0) {
-            setChatMessages(safeMessages)
-          }
-        }
-      }
-    } catch {
-      // Ignore corrupted local chat storage
-    }
-
-    const storedGoal = window.localStorage.getItem(chatStorageKeys.goal)
-    const storedConstraints = window.localStorage.getItem(chatStorageKeys.constraints)
-    if (storedGoal) setChatGoal(storedGoal)
-    if (storedConstraints) setChatConstraints(storedConstraints)
-
-    // Cleanup legacy non-scoped keys to prevent accidental cross-account reuse.
-    window.localStorage.removeItem(CHAT_STORAGE_KEY_BASE)
-    window.localStorage.removeItem(CHAT_GOAL_STORAGE_KEY_BASE)
-    window.localStorage.removeItem(CHAT_CONSTRAINTS_STORAGE_KEY_BASE)
-  }, [chatStorageKeys])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    if (!chatStorageKeys) return
-    try {
-      window.localStorage.setItem(chatStorageKeys.history, JSON.stringify(sanitizeChatMessages(chatMessages)))
-    } catch {
-      // Best-effort persistence
-    }
-  }, [chatMessages, chatStorageKeys])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    if (!chatStorageKeys) return
-    window.localStorage.setItem(chatStorageKeys.goal, chatGoal)
-  }, [chatGoal, chatStorageKeys])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    if (!chatStorageKeys) return
-    window.localStorage.setItem(chatStorageKeys.constraints, chatConstraints)
-  }, [chatConstraints, chatStorageKeys])
-
-  const handleSendChatMessage = async (content: string) => {
-    if (chatMutation.isPending) return
-
-    const originalTrimmed = content.trim()
-    const normalizedUserContent = clampChatContent(originalTrimmed)
-    if (!normalizedUserContent) return
-    if (originalTrimmed.length > CHAT_MAX_MESSAGE_CHARS) {
-      toast.info("Messaggio troppo lungo: inviati i primi 2000 caratteri.")
-    }
-
-    const userMessage: ChatMessage = { role: "user", content: normalizedUserContent }
-    const nextMessages = sanitizeChatMessages([...chatMessages, userMessage])
-    setChatMessages(nextMessages)
-
-    try {
-      const response = await chatMutation.mutateAsync({
-        messages: nextMessages.map((msg) => ({
-          role: msg.role === "assistant" ? "assistant" : "user",
-          content: clampChatContent(msg.content),
-        })),
-        goal: chatGoal.trim() || null,
-        constraints: chatConstraints.trim() || null,
-      })
-
-      const assistantContent = clampChatContent(String(response.message ?? ""))
-      if (!assistantContent) {
-        throw new Error("Risposta vuota dal Coach AI.")
-      }
-      const assistantMessage: ChatMessage = {
-        role: "assistant",
-        content: assistantContent,
-      }
-      setChatProvider((response.provider as "forge" | "gemini" | "rule_based" | undefined) ?? null)
-      if (response.fallback && !fallbackToastShownRef.current) {
-        toast.warning("Coach in modalità base: risposte semplificate (controlla la configurazione del server per l'IA).")
-        fallbackToastShownRef.current = true
-      }
-      if (!response.fallback) {
-        fallbackToastShownRef.current = false
-      }
-      setChatMessages((prev) => sanitizeChatMessages([...prev, assistantMessage]))
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Impossibile contattare il Coach AI."
-      toast.error(message)
-    }
-  }
-
-  const clearChat = () => {
-    setChatMessages([])
-    setChatProvider(null)
-    if (typeof window !== "undefined" && chatStorageKeys) {
-      window.localStorage.removeItem(chatStorageKeys.history)
-    }
-  }
+  }, [search])
 
   const summaryItems = [
     { label: "Focus di oggi", value: focusLabel },
@@ -872,8 +614,8 @@ export default function Coach() {
                 <div className="space-y-3 border-t border-border pt-4">
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     <Chip>Ultima nuotata</Chip>
-                    {sessionMeta(latestSessionInsight) ? (
-                      <span className="tabular-nums">{sessionMeta(latestSessionInsight)}</span>
+                    {latestSessionMeta ? (
+                      <span className="tabular-nums">{latestSessionMeta}</span>
                     ) : null}
                   </div>
                   <h3 className="text-base font-bold text-foreground">
@@ -908,12 +650,12 @@ export default function Coach() {
                   {sessionEntries.length > 0 ? (
                     <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_170px_170px]">
                       <Input
-                        value={archiveSearchTerm}
-                        onChange={(event) => setArchiveSearchTerm(event.target.value)}
+                        value={archive.search}
+                        onChange={(event) => archive.setSearch(event.target.value)}
                         placeholder="Cerca nelle analisi…"
                         aria-label="Cerca nelle analisi"
                       />
-                      <Select value={archiveRange} onValueChange={(value) => setArchiveRange(value as "all" | "7d" | "30d" | "90d")}>
+                      <Select value={archive.range} onValueChange={(value) => archive.setRange(value as ArchiveRange)}>
                         <SelectTrigger aria-label="Periodo">
                           <SelectValue placeholder="Periodo" />
                         </SelectTrigger>
@@ -925,10 +667,8 @@ export default function Coach() {
                         </SelectContent>
                       </Select>
                       <Select
-                        value={archiveSort}
-                        onValueChange={(value) =>
-                          setArchiveSort(value as "recent" | "oldest" | "distance" | "duration")
-                        }
+                        value={archive.sort}
+                        onValueChange={(value) => archive.setSort(value as ArchiveSort)}
                       >
                         <SelectTrigger aria-label="Ordina">
                           <SelectValue placeholder="Ordina" />
@@ -945,8 +685,8 @@ export default function Coach() {
 
                   {filteredArchiveEntries.length > 0 ? (
                     <ul className="max-h-[42dvh] space-y-2 overflow-y-auto pr-1">
-                      {filteredArchiveEntries.map((entry: any) => {
-                        const bullets = parseBulletsSafe(entry.bullets).slice(0, 2)
+                      {filteredArchiveEntries.map((entry) => {
+                        const bullets = entry._bullets.slice(0, 2)
                         const meta = sessionMeta(entry)
                         return (
                           <li key={entry.id} className="rounded-xl bg-raised p-3">
@@ -986,10 +726,10 @@ export default function Coach() {
                   <p className="mt-1 text-xs text-muted-foreground">
                     Risposte basate sui tuoi dati reali (nuotate, metriche e analisi).
                   </p>
-                  {chatProvider === "gemini" && (
+                  {chat.provider === "gemini" && (
                     <Chip className="mt-2">Fornitore attivo: Gemini</Chip>
                   )}
-                  {chatProvider === "rule_based" && (
+                  {chat.provider === "rule_based" && (
                     <Chip className="mt-2">
                       <AlertTriangle className="size-3.5 text-warning" aria-hidden />
                       Modalità base (AI cloud non raggiungibile)
@@ -1000,23 +740,23 @@ export default function Coach() {
                   type="button"
                   size="sm"
                   variant="outline"
-                  disabled={chatMessages.length === 0 || chatMutation.isPending}
-                  onClick={clearChat}
+                  disabled={chat.messages.length === 0 || chat.isPending}
+                  onClick={chat.clear}
                 >
                   Svuota chat
                 </Button>
               </div>
               <div className="grid gap-2 md:grid-cols-2">
                 <Input
-                  value={chatGoal}
-                  onChange={(e) => setChatGoal(e.target.value)}
+                  value={chat.goal}
+                  onChange={(e) => chat.setGoal(e.target.value)}
                   placeholder="Obiettivo attuale (es. migliorare il passo sui 100 m)"
                   aria-label="Obiettivo attuale"
                   maxLength={120}
                 />
                 <Input
-                  value={chatConstraints}
-                  onChange={(e) => setChatConstraints(e.target.value)}
+                  value={chat.constraints}
+                  onChange={(e) => chat.setConstraints(e.target.value)}
                   placeholder="Vincoli (es. 2 nuotate, spalla delicata)"
                   aria-label="Vincoli"
                   maxLength={240}
@@ -1024,9 +764,9 @@ export default function Coach() {
               </div>
             </section>
             <AIChatBox
-              messages={chatMessages}
-              onSendMessage={handleSendChatMessage}
-              isLoading={chatMutation.isPending}
+              messages={chat.messages}
+              onSendMessage={chat.send}
+              isLoading={chat.isPending}
               placeholder="Scrivi al coach (es. «Come imposto la nuotata di domani?»)"
               emptyStateMessage="Parti da una domanda concreta sul tuo allenamento."
               suggestedPrompts={suggestedChatPrompts}
