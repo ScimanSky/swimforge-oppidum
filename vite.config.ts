@@ -211,8 +211,6 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
-      "next/link": path.resolve(import.meta.dirname, "client", "src", "next", "link.tsx"),
-      "next/image": path.resolve(import.meta.dirname, "client", "src", "next", "image.tsx"),
     },
   },
   envDir: path.resolve(import.meta.dirname),
