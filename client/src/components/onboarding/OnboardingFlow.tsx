@@ -162,6 +162,10 @@ export default function OnboardingFlow() {
   const [currentStep, setCurrentStep] = useState(0);
   const [highlightRect, setHighlightRect] = useState<DOMRect | null>(null);
   const [manualRunNonce, setManualRunNonce] = useState(0);
+  // A forced run («Rivedi il tour», ?onboarding=1, ?tour=1) on a finished onboarding: its trigger
+  // is gone once the tour starts (startTour strips the query and resets the nonce), so this
+  // keeps it open until completeOnboarding.
+  const [replaying, setReplaying] = useState(false);
   const [pendingTourLaunch, setPendingTourLaunch] = useState(false);
   const [welcomeCompleted, setWelcomeCompleted] = useState(false);
   const [resumePathAfterTour, setResumePathAfterTour] = useState<string | null>(null);
@@ -207,6 +211,7 @@ export default function OnboardingFlow() {
     if (!meQuery.data?.id) {
       setStage("hidden");
       setHighlightRect(null);
+      setReplaying(false);
       return;
     }
 
@@ -224,9 +229,12 @@ export default function OnboardingFlow() {
       if (stage === "hidden") {
         setStage("welcome");
         setWelcomeCompleted(false);
+        setReplaying(true);
       }
       return;
     }
+
+    if (replaying) return;
 
     if (!serverDone && !localDone) {
       // Open welcome only when idle; do not interrupt an already-started interactive tour.
@@ -241,7 +249,7 @@ export default function OnboardingFlow() {
       setStage("hidden");
       setHighlightRect(null);
     }
-  }, [canEvaluate, meQuery.data?.id, onboardingUserId, pathname, pendingTourLaunch, serverDone, shouldForce, stage]);
+  }, [canEvaluate, meQuery.data?.id, onboardingUserId, pathname, pendingTourLaunch, replaying, serverDone, shouldForce, stage]);
 
   useEffect(() => {
     if (!canEvaluate || !meQuery.data?.id) return;
@@ -344,6 +352,7 @@ export default function OnboardingFlow() {
     setCurrentStep(0);
     setHighlightRect(null);
     setManualRunNonce(0);
+    setReplaying(false);
     setPendingTourLaunch(false);
     setResumePathAfterTour(null);
 
@@ -356,6 +365,9 @@ export default function OnboardingFlow() {
 
     if (!meQuery.data?.id || serverDone) return;
 
+    // Before the call: the sync effect below would otherwise send the same consent again
+    // (the local flag is already set and the mutation re-renders as it starts).
+    syncAttemptedRef.current = true;
     try {
       await setConsentMutation.mutateAsync({
         consentType: ONBOARDING_CONSENT_TYPE,
@@ -364,7 +376,8 @@ export default function OnboardingFlow() {
       });
       await utils.consent.list.invalidate();
     } catch {
-      // Retry will happen automatically when local state is checked on next session.
+      // The sync effect retries it (now, or on the next session).
+      syncAttemptedRef.current = false;
     }
   };
 

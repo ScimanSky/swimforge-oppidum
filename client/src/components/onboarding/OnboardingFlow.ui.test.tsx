@@ -97,11 +97,11 @@ describe("OnboardingFlow (Corsia): dialoghi accessibili", () => {
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(isOnboardingCompletedLocally("7")).toBe(true);
-    expect(state.consentCalls).toContainEqual({
-      consentType: "product_onboarding_tour",
-      granted: true,
-      consentVersion: "v1.0",
-    });
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    // Saved once: not again by the sync effect that sees the local flag.
+    expect(state.consentCalls).toEqual([
+      { consentType: "product_onboarding_tour", granted: true, consentVersion: "v1.0" },
+    ]);
   });
 
   it("configurazione: a ogni scelta il titolo del passo successivo prende il fuoco", async () => {
