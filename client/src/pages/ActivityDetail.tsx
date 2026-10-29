@@ -3,23 +3,27 @@
 import AppLayout from "@/components/AppLayout"
 import { trpc } from "@/lib/trpc"
 import { useRoute, Link } from "wouter"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useId, useMemo, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { MetricOrb } from "@/components/metrics/MetricOrb"
-import { cn } from "@/lib/utils"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ShareActivityPicker } from "@/components/social/ShareActivityPicker"
+import { Chip } from "@/components/corsia/Chip"
+import { Metric, type MetricProps } from "@/components/corsia/Metric"
+import { PaceBars, paceBars } from "@/components/corsia/PaceBars"
+import { ZoneBar } from "@/components/corsia/ZoneBar"
+import { activityPlaceLabel, activitySourceLabel } from "@/lib/activity-labels"
 import {
-  ArrowLeft,
-  ChevronLeft,
-  ChevronDown,
-  ChevronRight,
-  Clock3,
-  Droplets,
-  Gauge,
-  HeartPulse,
-  Waves,
-} from "lucide-react"
+  NO_VALUE,
+  formatDurationParts,
+  formatInteger,
+  formatKm,
+  formatPaceValue,
+  formatSessionDate,
+  paceSecondsPer100m,
+} from "@/lib/format"
+import { cn } from "@/lib/utils"
+import { ChevronDown, ChevronLeft, ChevronRight, Sparkles } from "lucide-react"
 
 type RecordAny = Record<string, unknown>
 
@@ -135,14 +139,14 @@ type RepeatRow = {
 }
 
 const STROKE_LABELS: Record<string, string> = {
-  freestyle: "Freestyle",
-  backstroke: "Backstroke",
-  breaststroke: "Breaststroke",
-  butterfly: "Butterfly",
-  mixed: "Mixed",
-  recovery: "Recovery",
-  drill: "Drill",
-  kick: "Kick",
+  freestyle: "Stile libero",
+  backstroke: "Dorso",
+  breaststroke: "Rana",
+  butterfly: "Farfalla",
+  mixed: "Misti",
+  recovery: "Recupero",
+  drill: "Esercizi",
+  kick: "Gambe",
 }
 
 const REPEATS_PER_PAGE = 15
@@ -169,13 +173,15 @@ const buildPaginationItems = (currentPage: number, totalPages: number): Array<nu
 const formatDistance = (meters?: number | null) => {
   if (!meters && meters !== 0) return "—"
   if (meters === 0) return "0 m"
-  return meters >= 1000 ? `${(meters / 1000).toFixed(2)} km` : `${Math.round(meters)} m`
+  return meters >= 1000
+    ? `${(meters / 1000).toFixed(2).replace(".", ",")} km`
+    : `${Math.round(meters)} m`
 }
 
 const formatNumber = (value?: number | null, digits = 0) => {
   if (value === null || value === undefined) return "—"
   if (!Number.isFinite(value)) return "—"
-  return digits > 0 ? Number(value).toFixed(digits) : String(Math.round(value))
+  return digits > 0 ? Number(value).toFixed(digits).replace(".", ",") : String(Math.round(value))
 }
 
 const formatDuration = (seconds?: number | null) => {
@@ -214,19 +220,6 @@ const formatPace = (
   const minutes = Math.floor(pace / 60)
   const seconds = Math.round(pace % 60)
   return `${minutes}:${seconds.toString().padStart(2, "0")}/100m`
-}
-
-const formatDateTime = (value?: string | Date | null) => {
-  if (!value) return "—"
-  const parsed = new Date(value)
-  if (Number.isNaN(parsed.getTime())) return "—"
-  return parsed.toLocaleString("it-IT", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
 }
 
 const toNumber = (value: unknown) => {
@@ -310,6 +303,223 @@ const normalizeStrokeKey = (value: unknown) => {
   if (normalized.includes("kick")) return "kick"
   if (normalized.includes("mix") || normalized.includes("medley")) return "mixed"
   return normalized
+}
+
+const positiveNumber = (value: unknown) => {
+  const number = Number(value ?? 0)
+  return Number.isFinite(number) && number > 0 ? number : null
+}
+
+/** «3,2» km from 1 km up, otherwise whole metres. */
+const distanceParts = (meters: number): { value: string; unit: string } =>
+  meters >= 1000 ? { value: formatKm(meters), unit: "km" } : { value: String(Math.round(meters)), unit: "m" }
+
+/** Session summary (2×3 grid of `Sessione.png`); a metric without data is not shown. */
+function sessionSummaryMetrics(activity: {
+  distanceMeters?: number | null
+  durationSeconds?: number | null
+  avgPacePer100m?: number | null
+  avgHeartRate?: number | null
+  maxHeartRate?: number | null
+  calories?: number | null
+}): MetricProps[] {
+  const metrics: MetricProps[] = []
+  const distance = positiveNumber(activity.distanceMeters)
+  if (distance) metrics.push({ value: formatKm(distance), unit: "km", label: "Distanza" })
+  const duration = formatDurationParts(activity.durationSeconds)
+  if (duration) metrics.push({ value: duration.value, unit: duration.unit, label: "Durata" })
+  const pace = paceSecondsPer100m(activity)
+  if (pace)
+    metrics.push({ value: formatPaceValue(pace), unit: "/100", label: "Passo medio", tone: "action" })
+  const avgHr = positiveNumber(activity.avgHeartRate)
+  if (avgHr) metrics.push({ value: String(Math.round(avgHr)), unit: "bpm", label: "FC media" })
+  const maxHr = positiveNumber(activity.maxHeartRate)
+  if (maxHr) metrics.push({ value: String(Math.round(maxHr)), unit: "bpm", label: "FC massima" })
+  const calories = positiveNumber(activity.calories)
+  if (calories) metrics.push({ value: formatInteger(calories), unit: "kcal", label: "Calorie" })
+  return metrics
+}
+
+/** Distance, time, pace and SWOLF of a lap, split, repeat or length (only those with data). */
+const segmentMetrics = (segment: {
+  distance?: number | null
+  duration?: number | null
+  pace?: number | null
+  swolf?: number | null
+}): MetricProps[] => {
+  const metrics: MetricProps[] = []
+  const distance = positiveNumber(segment.distance)
+  if (distance) metrics.push({ ...distanceParts(distance), label: "Distanza" })
+  const duration = positiveNumber(segment.duration)
+  if (duration) metrics.push({ value: formatSplitDuration(duration), label: "Tempo" })
+  const pace = positiveNumber(segment.pace)
+  if (pace) metrics.push({ value: formatPaceValue(pace), unit: "/100", label: "Passo", tone: "action" })
+  const swolf = positiveNumber(segment.swolf)
+  if (swolf) metrics.push({ value: String(Math.round(swolf)), label: "SWOLF" })
+  return metrics
+}
+
+/** «100 m · 1:42 · 1:42/100m · 142 bpm», skipping missing values. */
+const segmentLine = (segment: {
+  distance?: number | null
+  duration?: number | null
+  pace?: number | null
+  avgHr?: number | null
+}) =>
+  [
+    positiveNumber(segment.distance) ? formatDistance(segment.distance) : null,
+    positiveNumber(segment.duration) ? formatSplitDuration(segment.duration) : null,
+    positiveNumber(segment.pace) ? formatPace(segment.pace) : null,
+    positiveNumber(segment.avgHr) ? `${Math.round(Number(segment.avgHr))} bpm` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+
+type DetailItem = { label: string; value: string | number | null | undefined }
+
+/** Metrics and details of the selected lap/split/repeat; missing values are left out. */
+function SegmentDetail({
+  title,
+  metrics,
+  details,
+}: {
+  title: string
+  metrics: MetricProps[]
+  details: DetailItem[]
+}) {
+  const shown = details.filter(
+    (item) => item.value !== null && item.value !== undefined && item.value !== "" && item.value !== NO_VALUE,
+  )
+  return (
+    <div className="rounded-xl bg-raised p-3">
+      <p className="text-sm font-semibold">{title}</p>
+      {metrics.length > 0 ? (
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {metrics.map((metric) => (
+            <Metric key={metric.label} {...metric} size="sm" />
+          ))}
+        </div>
+      ) : null}
+      {shown.length > 0 ? (
+        <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs sm:grid-cols-3">
+          {shown.map((item) => (
+            <div key={item.label} className="min-w-0">
+              <dt className="text-muted-foreground">{item.label}</dt>
+              <dd className="font-semibold tabular-nums">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+    </div>
+  )
+}
+
+function EmptyNote({ children }: { children: ReactNode }) {
+  return <p className="rounded-xl bg-raised p-4 text-sm text-muted-foreground">{children}</p>
+}
+
+/** Selectable row (lap or split): title, stroke chip, the values it has. */
+function SegmentButton({
+  title,
+  stroke,
+  line,
+  selected,
+  onSelect,
+}: {
+  title: string
+  stroke: string | null
+  line: string
+  selected: boolean
+  onSelect: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={cn(
+        "w-full rounded-xl border p-3 text-left transition-colors",
+        selected ? "border-action-text bg-primary/10" : "border-border bg-card hover:bg-raised",
+      )}
+    >
+      <span className="flex items-center justify-between gap-2">
+        <span className="truncate text-sm font-semibold">{title}</span>
+        {stroke ? <Chip>{stroke}</Chip> : null}
+      </span>
+      {line ? (
+        <span className="mt-1 block text-xs text-muted-foreground tabular-nums">{line}</span>
+      ) : null}
+    </button>
+  )
+}
+
+function RepeatPagination({
+  currentPage,
+  totalPages,
+  items,
+  onGoTo,
+  className,
+}: {
+  currentPage: number
+  totalPages: number
+  items: Array<number | "ellipsis">
+  onGoTo: (page: number) => void
+  className?: string
+}) {
+  return (
+    <div className={cn("mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-3", className)}>
+      <p className="text-xs text-muted-foreground tabular-nums">
+        Pagina {currentPage} di {totalPages}
+      </p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onGoTo(currentPage - 1)}
+          disabled={currentPage === 1}
+          aria-label="Vai alla pagina precedente delle ripetute"
+        >
+          <ChevronLeft className="size-4" aria-hidden />
+          Precedente
+        </Button>
+        {items.map((item, index) =>
+          item === "ellipsis" ? (
+            <span key={`ellipsis-${index}`} className="px-1.5 text-xs text-muted-foreground" aria-hidden="true">
+              …
+            </span>
+          ) : (
+            <button
+              key={item}
+              type="button"
+              onClick={() => onGoTo(item)}
+              aria-label={`Vai alla pagina ${item} delle ripetute`}
+              aria-current={item === currentPage ? "page" : undefined}
+              className={cn(
+                "min-h-10 min-w-10 rounded-lg border px-2 text-xs font-semibold tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+                item === currentPage
+                  ? "border-action-text bg-primary/15 text-foreground"
+                  : "border-border text-muted-foreground hover:bg-raised hover:text-foreground",
+              )}
+            >
+              {item}
+            </button>
+          ),
+        )}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onGoTo(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          aria-label="Vai alla pagina successiva delle ripetute"
+        >
+          Successiva
+          <ChevronRight className="size-4" aria-hidden />
+        </Button>
+      </div>
+    </div>
+  )
 }
 
 export default function ActivityDetail() {
@@ -432,7 +642,7 @@ export default function ActivityDetail() {
           key: `repeat-${lap.id}`,
           lapId: lap.id,
           repeatNumber: lap.lapIndex ?? index + 1,
-          label: distance === 0 ? "Recovery" : `Ripetuta ${lap.lapIndex ?? index + 1}`,
+          label: distance === 0 ? "Recupero" : `Ripetuta ${lap.lapIndex ?? index + 1}`,
           distance,
           duration,
           cumulativeSeconds: globalCumulative,
@@ -485,7 +695,7 @@ export default function ActivityDetail() {
 
       return {
         index,
-        label: isRecovery ? "Recovery" : `Lap ${index + 1}`,
+        label: isRecovery ? "Recupero" : `Giro ${index + 1}`,
         distance,
         duration,
         cumulativeSeconds: cumulative,
@@ -518,7 +728,7 @@ export default function ActivityDetail() {
 
       return {
         index,
-        label: strokeLabel ? `Split ${index + 1} · ${strokeLabel}` : `Split ${index + 1}`,
+        label: strokeLabel ? `Frazione ${index + 1} · ${strokeLabel}` : `Frazione ${index + 1}`,
         distance,
         duration,
         pace,
@@ -559,7 +769,7 @@ export default function ActivityDetail() {
     () =>
       laps.map((lap, index) => ({
         index,
-        label: lap.displayStroke === "recovery" ? "Recovery" : `${lap.label} · ${getStrokeLabel(lap.displayStroke)}`,
+        label: lap.displayStroke === "recovery" ? "Recupero" : `${lap.label} · ${getStrokeLabel(lap.displayStroke)}`,
         distance: lap.distance,
         duration: lap.duration,
         pace: lap.pace,
@@ -636,12 +846,25 @@ export default function ActivityDetail() {
     setCurrentRepeatPage(clampedPage)
   }
 
+  const [sharePickerOpen, setSharePickerOpen] = useState(false)
+  const utils = trpc.useUtils()
+  const detailTitleId = useId()
+  const lapsTitleId = useId()
+  const splitsTitleId = useId()
+  const repeatsTitleId = useId()
+
+  const paceRows = useMemo(() => {
+    const source =
+      repeatRows.length > 0
+        ? repeatRows.map((row) => ({ number: row.repeatNumber, distance: row.distance, pace: row.pace }))
+        : laps.map((lap) => ({ number: lap.index + 1, distance: lap.distance, pace: lap.pace }))
+    return paceBars(source.filter((row) => row.distance > 0))
+  }, [laps, repeatRows])
+
   if (!Number.isFinite(activityId)) {
     return (
       <AppLayout>
-        <div className="compact-shell p-3 lg:p-0">
-          <div className="surface-panel p-6 text-sm text-muted-foreground">Attività non valida.</div>
-        </div>
+        <p className="surface-panel p-5 text-sm text-muted-foreground">Attività non valida.</p>
       </AppLayout>
     )
   }
@@ -649,23 +872,12 @@ export default function ActivityDetail() {
   if (isLoading) {
     return (
       <AppLayout>
-        <div className="compact-shell space-y-3 p-3 lg:p-0">
-          <div className="surface-panel p-5">
-            <Skeleton className="h-8 w-60" />
-            <Skeleton className="mt-2 h-4 w-80" />
-          </div>
-          <div className="grid gap-3 xl:grid-cols-2">
-            <div className="surface-panel p-4 space-y-2">
-              {Array.from({ length: 5 }).map((_, idx) => (
-                <Skeleton key={idx} className="h-16 w-full" />
-              ))}
-            </div>
-            <div className="surface-panel p-4 space-y-2">
-              {Array.from({ length: 6 }).map((_, idx) => (
-                <Skeleton key={idx} className="h-10 w-full" />
-              ))}
-            </div>
-          </div>
+        <div className="space-y-4" role="status">
+          <span className="sr-only">Caricamento…</span>
+          <Skeleton className="h-4 w-56" />
+          <Skeleton className="h-10 w-72" />
+          <Skeleton className="h-[164px] rounded-2xl" />
+          <Skeleton className="h-[200px] rounded-2xl" />
         </div>
       </AppLayout>
     )
@@ -674,769 +886,547 @@ export default function ActivityDetail() {
   if (!activity) {
     return (
       <AppLayout>
-        <div className="compact-shell p-3 lg:p-0">
-          <div className="surface-panel p-6 text-sm text-muted-foreground">Attività non trovata.</div>
-        </div>
+        <p className="surface-panel p-5 text-sm text-muted-foreground">Attività non trovata.</p>
       </AppLayout>
     )
   }
 
+  const sessionDate = formatSessionDate(activity.activityDate)
+  const headerLine = [
+    sessionDate !== NO_VALUE ? sessionDate : null,
+    activityPlaceLabel(activity),
+    activitySourceLabel(activity.activitySource),
+  ]
+    .filter(Boolean)
+    .join(" · ")
+  const summaryMetrics = sessionSummaryMetrics(activity)
+  const zoneSeconds = [
+    activity.hrZone1Seconds,
+    activity.hrZone2Seconds,
+    activity.hrZone3Seconds,
+    activity.hrZone4Seconds,
+    activity.hrZone5Seconds,
+  ]
+  const hasZones = zoneSeconds.some((value) => Number(value) > 0)
+  const lengthsTotal = repeatRows.reduce((sum, row) => sum + row.lengths.length, 0)
+  const counts = [
+    laps.length ? `${laps.length} giri` : null,
+    splits.length ? `${splits.length} frazioni` : null,
+    repeatRows.length ? `${repeatRows.length} ripetute` : null,
+    lengthsTotal ? `${lengthsTotal} vasche` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+
   return (
     <AppLayout>
-      <div className="compact-shell space-y-3 p-3 lg:p-0">
-        <section className="surface-panel p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost-neon" size="sm" asChild>
-                  <Link href="/track">
-                    <ArrowLeft className="size-4" />
-                    Torna alle attività
-                  </Link>
-                </Button>
-                <Badge variant="outline">Dettaglio Laps</Badge>
+      <div className="space-y-6">
+        <header>
+          {headerLine ? <p className="text-sm text-muted-foreground">{headerLine}</p> : null}
+          <h2 className="mt-1 break-words font-display text-[40px] font-bold leading-none text-foreground">
+            {activity.activityName || "Nuotata"}
+          </h2>
+          {activity.xpEarned ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Chip tone="xp" className="h-8 px-3.5 text-sm">
+                +{formatInteger(activity.xpEarned)} XP
+              </Chip>
+            </div>
+          ) : null}
+        </header>
+
+        {summaryMetrics.length > 0 ? (
+          <div className="surface-panel grid grid-cols-3 overflow-hidden p-0">
+            {summaryMetrics.map((metric, index) => (
+              <div
+                key={metric.label}
+                className={cn(
+                  "min-w-0 border-border p-3 sm:p-4",
+                  index % 3 !== 0 && "border-l",
+                  index >= 3 && "border-t",
+                )}
+              >
+                <Metric {...metric} />
               </div>
-              <h1 className="mt-2 text-2xl font-display font-bold neon-gradient-text">
-                {detailView === "repeats" ? "Ripetute Garmin-style" : "Laps & Splits"}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {activity.activityName || "Swim Session"} · {formatDateTime(activity.activityDate)}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">Lap: {laps.length}</Badge>
-              <Badge variant="outline">Split: {splits.length}</Badge>
-              <Badge variant="outline">Ripetute: {repeatRows.length}</Badge>
-              <Badge variant="outline">
-                Vasche: {repeatRows.reduce((sum, row) => sum + row.lengths.length, 0)}
-              </Badge>
-            </div>
+            ))}
           </div>
-          <div className="mt-4 inline-flex rounded-lg border border-border/70 bg-card/35 p-1">
-            <button
-              type="button"
-              onClick={() => setDetailView("laps-splits")}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm transition-colors",
-                detailView === "laps-splits"
-                  ? "bg-[color-mix(in_oklch,var(--electric-cyan)_22%,transparent)] text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Laps & Splits
-            </button>
-            <button
-              type="button"
-              onClick={() => setDetailView("repeats")}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm transition-colors",
-                detailView === "repeats"
-                  ? "bg-[color-mix(in_oklch,var(--electric-lime)_22%,transparent)] text-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Ripetute
-            </button>
+        ) : null}
+
+        {paceRows || hasZones ? (
+          <div className={cn("grid gap-4", paceRows && hasZones && "lg:grid-cols-2")}>
+            {paceRows ? (
+              <section className="surface-panel p-4 sm:p-5" aria-labelledby={`${detailTitleId}-pace`}>
+                <h3 id={`${detailTitleId}-pace`} className="mb-4 text-base font-bold">
+                  Passo per ripetuta
+                </h3>
+                <PaceBars bars={paceRows} />
+              </section>
+            ) : null}
+            {hasZones ? (
+              <section className="surface-panel p-4 sm:p-5" aria-labelledby={`${detailTitleId}-zones`}>
+                <h3 id={`${detailTitleId}-zones`} className="mb-4 text-base font-bold">
+                  Zone cardio
+                </h3>
+                <ZoneBar seconds={zoneSeconds} />
+              </section>
+            ) : null}
           </div>
-        </section>
+        ) : null}
 
-        {detailView === "laps-splits" ? (
-        <>
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
-          <section className="surface-panel p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-display font-semibold text-foreground">Laps</h2>
-              <span className="text-xs text-muted-foreground">Seleziona un lap per vedere tutti i dettagli</span>
-            </div>
-
-            {laps.length === 0 ? (
-              <div className="rounded-xl border border-border/70 bg-card/40 p-4 text-sm text-muted-foreground">
-                Nessun lap disponibile per questa attività.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="max-h-[40dvh] space-y-2 overflow-y-auto pr-1">
-                  {laps.map((lap, index) => {
-                    const strokeLabel = lap.displayStroke
-                      ? STROKE_LABELS[lap.displayStroke] ?? lap.displayStroke
-                      : "—"
-                    return (
-                      <button
-                        key={`lap-row-${index}`}
-                        type="button"
-                        onClick={() => setSelectedLapIdx(index)}
-                        className={cn(
-                          "w-full rounded-xl border p-3 text-left transition-colors",
-                          selectedLapIdx === index
-                            ? "border-[var(--electric-cyan)]/60 bg-[color-mix(in_oklch,var(--electric-cyan)_12%,transparent)]"
-                            : "border-border/70 bg-card/35 hover:border-[var(--electric-cyan)]/40",
-                        )}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold text-foreground">{lap.label}</p>
-                          <Badge variant="outline" className="text-[10px]">{strokeLabel}</Badge>
-                        </div>
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4">
-                          <span className="inline-flex items-center gap-1"><Droplets className="size-3.5" /> {formatDistance(lap.distance)}</span>
-                          <span className="inline-flex items-center gap-1"><Clock3 className="size-3.5" /> {formatSplitDuration(lap.duration)}</span>
-                          <span className="inline-flex items-center gap-1"><Gauge className="size-3.5" /> {lap.pace ? formatPace(lap.pace, lap.distance, lap.duration) : "—"}</span>
-                          <span className="inline-flex items-center gap-1"><HeartPulse className="size-3.5" /> {lap.avgHr ? `${lap.avgHr} bpm` : "—"}</span>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {selectedLap ? (
-                  <div className="rounded-xl border border-border/70 bg-card/35 p-3">
-                    <h3 className="mb-2 text-sm font-semibold text-foreground">Metriche lap selezionato</h3>
-                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                      <MetricOrb
-                        label="Distanza"
-                        value={formatDistance(selectedLap.distance)}
-                        progress={Math.max(0, Math.min(100, Math.round((selectedLap.distance / 100) * 100)))}
-                        helper="lap"
-                        tone="cyan"
-                        size="sm"
-                        icon={<Droplets className="size-3.5" />}
-                      />
-                      <MetricOrb
-                        label="Durata"
-                        value={formatSplitDuration(selectedLap.duration)}
-                        progress={Math.max(0, Math.min(100, Math.round((selectedLap.duration / 90) * 100)))}
-                        helper="tempo"
-                        tone="sky"
-                        size="sm"
-                        icon={<Clock3 className="size-3.5" />}
-                      />
-                      <MetricOrb
-                        label="Pace"
-                        value={selectedLap.pace ? formatPace(selectedLap.pace, selectedLap.distance, selectedLap.duration) : "—"}
-                        progress={
-                          selectedLap.pace
-                            ? Math.max(0, Math.min(100, Math.round((180 - selectedLap.pace) / 1.5)))
-                            : 0
-                        }
-                        helper="min/100m"
-                        tone="lime"
-                        size="sm"
-                        icon={<Gauge className="size-3.5" />}
-                      />
-                      <MetricOrb
-                        label="SWOLF"
-                        value={selectedLap.swolf ?? "—"}
-                        progress={
-                          selectedLap.swolf
-                            ? Math.max(0, Math.min(100, Math.round((60 - selectedLap.swolf) * 2.2)))
-                            : 0
-                        }
-                        helper="efficienza"
-                        tone="amber"
-                        size="sm"
-                        icon={<Waves className="size-3.5" />}
-                      />
-                    </div>
-                    <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 xl:grid-cols-3">
-                      <span>Stile: {getStrokeLabel(selectedLap.displayStroke ?? activityStroke)}</span>
-                      <span>Cumulato: {formatSplitDuration(selectedLap.cumulativeSeconds)}</span>
-                      <span>Pace migliore: {selectedLap.bestPace ? formatPace(selectedLap.bestPace, selectedLap.distance, selectedLap.duration) : "—"}</span>
-                      <span>FC media: {selectedLap.avgHr ? `${selectedLap.avgHr} bpm` : "—"}</span>
-                      <span>FC max: {selectedLap.maxHr ? `${selectedLap.maxHr} bpm` : "—"}</span>
-                      <span>Bracciate totali: {selectedLap.totalStrokes ?? "—"}</span>
-                      <span>Bracciate medie: {selectedLap.avgStrokes ?? "—"}</span>
-                      <span>Calorie: {selectedLap.calories ? `${selectedLap.calories}` : "—"}</span>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            )}
-          </section>
-
-          <section className="surface-panel p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-lg font-display font-semibold text-foreground">Splits</h2>
-              <span className="text-xs text-muted-foreground">
-                {splits.length > 0
-                  ? "Panoramica split con tutti i valori disponibili"
-                  : "Split non disponibili: mostrati i dati lap sul lato destro"}
-              </span>
-            </div>
-
-            <div className="space-y-2">
-              <div className="max-h-[40dvh] space-y-2 overflow-y-auto pr-1">
-                {effectiveSplits.map((split, index) => {
-                  const strokeLabel = getStrokeLabel(split.stroke)
-                  return (
-                    <button
-                      key={`split-row-${index}`}
-                      type="button"
-                      onClick={() => setSelectedSplitIdx(index)}
-                      className={cn(
-                        "w-full rounded-xl border p-3 text-left transition-colors",
-                        selectedSplitIdx === index
-                          ? "border-[var(--electric-lime)]/60 bg-[color-mix(in_oklch,var(--electric-lime)_11%,transparent)]"
-                          : "border-border/70 bg-card/35 hover:border-[var(--electric-lime)]/45",
-                      )}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold text-foreground">{split.label}</p>
-                        <Badge variant="outline" className="text-[10px]">{strokeLabel}</Badge>
-                      </div>
-                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-muted-foreground sm:grid-cols-4">
-                        <span className="inline-flex items-center gap-1"><Droplets className="size-3.5" /> {formatDistance(split.distance)}</span>
-                        <span className="inline-flex items-center gap-1"><Clock3 className="size-3.5" /> {formatDuration(split.duration)}</span>
-                        <span className="inline-flex items-center gap-1"><Gauge className="size-3.5" /> {split.pace ? formatPace(split.pace, split.distance ?? 0, split.duration ?? 0) : "—"}</span>
-                        <span className="inline-flex items-center gap-1"><HeartPulse className="size-3.5" /> {split.avgHr ? `${split.avgHr} bpm` : "—"}</span>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {selectedEffectiveSplit ? (
-                <div className="rounded-xl border border-border/70 bg-card/35 p-3">
-                  <h3 className="mb-2 text-sm font-semibold text-foreground">Metriche split selezionato</h3>
-                  <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
-                    <MetricOrb
-                      label="Distanza"
-                      value={formatDistance(selectedEffectiveSplit.distance)}
-                      progress={Math.max(0, Math.min(100, Math.round(((selectedEffectiveSplit.distance ?? 0) / 100) * 100)))}
-                      helper="split"
-                      tone="cyan"
-                      size="sm"
-                      icon={<Droplets className="size-3.5" />}
-                    />
-                    <MetricOrb
-                      label="Durata"
-                      value={formatSplitDuration(selectedEffectiveSplit.duration)}
-                      progress={Math.max(0, Math.min(100, Math.round(((selectedEffectiveSplit.duration ?? 0) / 90) * 100)))}
-                      helper="tempo"
-                      tone="sky"
-                      size="sm"
-                      icon={<Clock3 className="size-3.5" />}
-                    />
-                    <MetricOrb
-                      label="Pace"
-                      value={selectedEffectiveSplit.pace ? formatPace(selectedEffectiveSplit.pace, selectedEffectiveSplit.distance ?? 0, selectedEffectiveSplit.duration ?? 0) : "—"}
-                      progress={
-                        selectedEffectiveSplit.pace
-                          ? Math.max(0, Math.min(100, Math.round((180 - selectedEffectiveSplit.pace) / 1.5)))
-                          : 0
-                      }
-                      helper="min/100m"
-                      tone="lime"
-                      size="sm"
-                      icon={<Gauge className="size-3.5" />}
-                    />
-                    <MetricOrb
-                      label="SWOLF"
-                      value={selectedEffectiveSplit.swolf ?? "—"}
-                      progress={
-                        selectedEffectiveSplit.swolf
-                          ? Math.max(0, Math.min(100, Math.round((60 - selectedEffectiveSplit.swolf) * 2.2)))
-                          : 0
-                      }
-                      helper="efficienza"
-                      tone="amber"
-                      size="sm"
-                      icon={<Waves className="size-3.5" />}
-                    />
-                  </div>
-                  <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-2 xl:grid-cols-3">
-                    <span>Stile: {getStrokeLabel(selectedEffectiveSplit.stroke ?? activityStroke)}</span>
-                    <span>Lap inclusi: {selectedEffectiveSplit.laps ?? 1}</span>
-                    <span>FC media: {selectedEffectiveSplit.avgHr ? `${selectedEffectiveSplit.avgHr} bpm` : "—"}</span>
-                    <span>Bracciate: {selectedEffectiveSplit.strokes ?? "—"}</span>
-                    <span>Cadence: {selectedEffectiveSplit.cadence ?? "—"}</span>
-                    <span>Calorie: {toNumber(pickFirst(selectedEffectiveSplit.raw, ["calories", "caloriesBurned"])) ?? "—"}</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-border/70 bg-card/40 p-4 text-sm text-muted-foreground">
-                  Nessun dato split/lap disponibile per questa attività.
-                </div>
-              )}
-            </div>
-          </section>
+        <div className="flex items-center gap-3">
+          {activity.shareToFeed ? (
+            <p className="flex h-12 flex-1 items-center text-sm font-semibold text-success">
+              Condivisa nel feed
+            </p>
+          ) : (
+            <Button type="button" size="lg" className="flex-1" onClick={() => setSharePickerOpen(true)}>
+              Condividi nel feed
+            </Button>
+          )}
+          <Button variant="outline" size="icon-lg" asChild>
+            <Link href="/coach" aria-label="Coach AI" title="Coach AI">
+              <Sparkles className="size-5" aria-hidden />
+            </Link>
+          </Button>
         </div>
 
-        {(laps.length === 0 && splits.length === 0) ? (
-          <section className="surface-panel p-4 text-sm text-muted-foreground">
-            Nessun dato laps/splits disponibile in questa attività. Se proviene da sync esterna, verifica che il provider includa i dettagli estesi.
-          </section>
-        ) : null}
-        </>
-        ) : (
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-            <section className="surface-panel p-4">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-lg font-display font-semibold text-foreground">Ripetute</h2>
-                <span className="text-xs text-muted-foreground">
-                  Garmin-like view con dettaglio vasca per vasca
-                </span>
+        <section aria-labelledby={detailTitleId} className="space-y-4">
+          <div>
+            <h3 id={detailTitleId} className="text-base font-bold">
+              Dettaglio vasche
+            </h3>
+            {counts ? <p className="mt-1 text-sm text-muted-foreground tabular-nums">{counts}</p> : null}
+          </div>
+
+          <Tabs
+            value={detailView}
+            onValueChange={(value) => setDetailView(value as "laps-splits" | "repeats")}
+            className="gap-4"
+          >
+            <TabsList aria-label="Vista del dettaglio">
+              <TabsTrigger value="laps-splits">Giri e frazioni</TabsTrigger>
+              <TabsTrigger value="repeats">Ripetute</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="laps-splits" className="space-y-4">
+              <div className="grid gap-4 xl:grid-cols-2">
+                <section className="surface-panel min-w-0 p-4" aria-labelledby={lapsTitleId}>
+                  <h4 id={lapsTitleId} className="mb-3 text-base font-bold">
+                    Giri
+                  </h4>
+                  {laps.length === 0 ? (
+                    <EmptyNote>Nessun giro disponibile per questa attività.</EmptyNote>
+                  ) : (
+                    <div className="space-y-3">
+                      <ul className="max-h-[40dvh] space-y-2 overflow-y-auto pr-1">
+                        {laps.map((lap, index) => (
+                          <li key={`lap-row-${index}`}>
+                            <SegmentButton
+                              title={lap.label}
+                              stroke={lap.displayStroke ? getStrokeLabel(lap.displayStroke) : null}
+                              line={segmentLine(lap)}
+                              selected={selectedLapIdx === index}
+                              onSelect={() => setSelectedLapIdx(index)}
+                            />
+                          </li>
+                        ))}
+                      </ul>
+
+                      {selectedLap ? (
+                        <SegmentDetail
+                          title={`${selectedLap.label} selezionato`}
+                          metrics={segmentMetrics(selectedLap)}
+                          details={[
+                            { label: "Stile", value: getStrokeLabel(selectedLap.displayStroke ?? activityStroke) },
+                            { label: "Cumulato", value: formatSplitDuration(selectedLap.cumulativeSeconds) },
+                            {
+                              label: "Passo migliore",
+                              value: selectedLap.bestPace ? formatPace(selectedLap.bestPace) : null,
+                            },
+                            { label: "FC media", value: selectedLap.avgHr ? `${selectedLap.avgHr} bpm` : null },
+                            { label: "FC massima", value: selectedLap.maxHr ? `${selectedLap.maxHr} bpm` : null },
+                            { label: "Bracciate totali", value: selectedLap.totalStrokes },
+                            { label: "Bracciate medie", value: selectedLap.avgStrokes },
+                            { label: "Calorie", value: selectedLap.calories || null },
+                          ]}
+                        />
+                      ) : null}
+                    </div>
+                  )}
+                </section>
+
+                <section className="surface-panel min-w-0 p-4" aria-labelledby={splitsTitleId}>
+                  <h4 id={splitsTitleId} className="text-base font-bold">
+                    Frazioni
+                  </h4>
+                  {splits.length === 0 && laps.length > 0 ? (
+                    <p className="mt-1 text-xs text-muted-foreground">Frazioni non disponibili: mostro i giri.</p>
+                  ) : null}
+                  <div className="mt-3 space-y-3">
+                    {effectiveSplits.length > 0 ? (
+                      <ul className="max-h-[40dvh] space-y-2 overflow-y-auto pr-1">
+                        {effectiveSplits.map((split, index) => (
+                          <li key={`split-row-${index}`}>
+                            <SegmentButton
+                              title={split.label}
+                              stroke={split.stroke ? getStrokeLabel(split.stroke) : null}
+                              line={segmentLine(split)}
+                              selected={selectedSplitIdx === index}
+                              onSelect={() => setSelectedSplitIdx(index)}
+                            />
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+
+                    {selectedEffectiveSplit ? (
+                      <SegmentDetail
+                        title="Frazione selezionata"
+                        metrics={segmentMetrics(selectedEffectiveSplit)}
+                        details={[
+                          {
+                            label: "Stile",
+                            value: getStrokeLabel(selectedEffectiveSplit.stroke ?? activityStroke),
+                          },
+                          { label: "Giri inclusi", value: selectedEffectiveSplit.laps ?? 1 },
+                          {
+                            label: "FC media",
+                            value: selectedEffectiveSplit.avgHr ? `${selectedEffectiveSplit.avgHr} bpm` : null,
+                          },
+                          { label: "Bracciate", value: selectedEffectiveSplit.strokes },
+                          { label: "Cadenza", value: selectedEffectiveSplit.cadence },
+                          {
+                            label: "Calorie",
+                            value: toNumber(pickFirst(selectedEffectiveSplit.raw, ["calories", "caloriesBurned"])),
+                          },
+                        ]}
+                      />
+                    ) : (
+                      <EmptyNote>Nessun dato su frazioni o giri per questa attività.</EmptyNote>
+                    )}
+                  </div>
+                </section>
               </div>
 
-              {repeatRows.length === 0 ? (
-                <div className="rounded-xl border border-border/70 bg-card/40 p-4 text-sm text-muted-foreground">
-                  Nessun dato ripetute disponibile in questa attività.
-                </div>
-              ) : (
-                <>
-                  <div className="hidden xl:block overflow-x-auto">
-                    <table className="min-w-[1350px] w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-border/70 text-muted-foreground">
-                          <th className="px-2 py-2 text-left font-medium">Ripetute</th>
-                          <th className="px-2 py-2 text-left font-medium">Stile</th>
-                          <th className="px-2 py-2 text-right font-medium">Vasche</th>
-                          <th className="px-2 py-2 text-right font-medium">Distanza</th>
-                          <th className="px-2 py-2 text-right font-medium">Tempo</th>
-                          <th className="px-2 py-2 text-right font-medium">Tempo cumulato</th>
-                          <th className="px-2 py-2 text-right font-medium">Passo medio</th>
-                          <th className="px-2 py-2 text-right font-medium">Passo migliore</th>
-                          <th className="px-2 py-2 text-right font-medium">SWOLF medio</th>
-                          <th className="px-2 py-2 text-right font-medium">FC media</th>
-                          <th className="px-2 py-2 text-right font-medium">FC max</th>
-                          <th className="px-2 py-2 text-right font-medium">Totale bracciate</th>
-                          <th className="px-2 py-2 text-right font-medium">Bracciate medie</th>
-                          <th className="px-2 py-2 text-right font-medium">Calorie</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {pagedRepeatRows.flatMap((repeat) => {
-                          const isRepeatSelected = selectedRepeatKey === repeat.key && !selectedLength
-                          const isExpanded = Boolean(expandedRepeatKeys[repeat.key])
-                          const rows = [
-                            <tr
-                              key={repeat.key}
-                              onClick={() => {
-                                setSelectedRepeatKey(repeat.key)
-                                setSelectedLengthKey(null)
-                              }}
-                              className={cn(
-                                "cursor-pointer border-b border-border/40 transition-colors",
-                                isRepeatSelected
-                                  ? "bg-[color-mix(in_oklch,var(--electric-lime)_22%,transparent)]"
-                                  : "bg-[color-mix(in_oklch,var(--electric-cyan)_8%,transparent)] hover:bg-[color-mix(in_oklch,var(--electric-cyan)_13%,transparent)]",
-                              )}
-                            >
-                              <td className="px-2 py-2">
-                                <button
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation()
-                                    toggleRepeat(repeat.key)
-                                  }}
-                                  className="inline-flex items-center gap-1 font-semibold text-foreground"
-                                >
-                                  {isExpanded ? <ChevronDown className="size-3.5" /> : <ChevronRight className="size-3.5" />}
-                                  {repeat.repeatNumber}
-                                </button>
-                              </td>
-                              <td className="px-2 py-2">{getStrokeLabel(repeat.stroke)}</td>
-                              <td className="px-2 py-2 text-right">{repeat.lengthsCount}</td>
-                              <td className="px-2 py-2 text-right">{formatDistance(repeat.distance)}</td>
-                              <td className="px-2 py-2 text-right">{formatSplitDuration(repeat.duration)}</td>
-                              <td className="px-2 py-2 text-right">{formatSplitDuration(repeat.cumulativeSeconds)}</td>
-                              <td className="px-2 py-2 text-right">{formatPace(repeat.pace, repeat.distance, repeat.duration)}</td>
-                              <td className="px-2 py-2 text-right">{formatPace(repeat.bestPace, repeat.distance, repeat.duration)}</td>
-                              <td className="px-2 py-2 text-right">{formatNumber(repeat.swolf)}</td>
-                              <td className="px-2 py-2 text-right">{formatNumber(repeat.avgHr)}</td>
-                              <td className="px-2 py-2 text-right">{formatNumber(repeat.maxHr)}</td>
-                              <td className="px-2 py-2 text-right">{formatNumber(repeat.totalStrokes)}</td>
-                              <td className="px-2 py-2 text-right">{formatNumber(repeat.avgStrokes, 1)}</td>
-                              <td className="px-2 py-2 text-right">{formatNumber(repeat.calories)}</td>
-                            </tr>,
-                          ]
+              {laps.length === 0 && splits.length === 0 ? (
+                <EmptyNote>
+                  Nessun dato su giri e frazioni in questa attività. Se viene da una sincronizzazione esterna,
+                  controlla che il servizio includa i dettagli estesi.
+                </EmptyNote>
+              ) : null}
+            </TabsContent>
 
-                          if (!isExpanded) return rows
+            <TabsContent value="repeats">
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+                <section className="surface-panel min-w-0 p-4" aria-labelledby={repeatsTitleId}>
+                  <h4 id={repeatsTitleId} className="mb-3 text-base font-bold">
+                    Ripetute
+                  </h4>
 
-                          return rows.concat(
-                            repeat.lengths.map((length) => {
-                              const isLengthSelected = selectedLength?.key === length.key
-                              return (
+                  {repeatRows.length === 0 ? (
+                    <EmptyNote>Nessun dato sulle ripetute in questa attività.</EmptyNote>
+                  ) : (
+                    <>
+                      <div className="hidden overflow-x-auto xl:block">
+                        <table className="w-full min-w-[1350px] text-xs tabular-nums">
+                          <thead>
+                            <tr className="border-b border-border text-muted-foreground">
+                              <th className="px-2 py-2 text-left font-medium">Ripetute</th>
+                              <th className="px-2 py-2 text-left font-medium">Stile</th>
+                              <th className="px-2 py-2 text-right font-medium">Vasche</th>
+                              <th className="px-2 py-2 text-right font-medium">Distanza</th>
+                              <th className="px-2 py-2 text-right font-medium">Tempo</th>
+                              <th className="px-2 py-2 text-right font-medium">Tempo cumulato</th>
+                              <th className="px-2 py-2 text-right font-medium">Passo medio</th>
+                              <th className="px-2 py-2 text-right font-medium">Passo migliore</th>
+                              <th className="px-2 py-2 text-right font-medium">SWOLF medio</th>
+                              <th className="px-2 py-2 text-right font-medium">FC media</th>
+                              <th className="px-2 py-2 text-right font-medium">FC massima</th>
+                              <th className="px-2 py-2 text-right font-medium">Totale bracciate</th>
+                              <th className="px-2 py-2 text-right font-medium">Bracciate medie</th>
+                              <th className="px-2 py-2 text-right font-medium">Calorie</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pagedRepeatRows.flatMap((repeat) => {
+                              const isRepeatSelected = selectedRepeatKey === repeat.key && !selectedLength
+                              const isExpanded = Boolean(expandedRepeatKeys[repeat.key])
+                              const rows = [
                                 <tr
-                                  key={length.key}
+                                  key={repeat.key}
                                   onClick={() => {
                                     setSelectedRepeatKey(repeat.key)
-                                    setSelectedLengthKey(length.key)
+                                    setSelectedLengthKey(null)
                                   }}
                                   className={cn(
-                                    "cursor-pointer border-b border-border/30 bg-card/25 hover:bg-card/40",
-                                    isLengthSelected ? "bg-[color-mix(in_oklch,var(--electric-cyan)_14%,transparent)]" : "",
+                                    "cursor-pointer border-b border-border transition-colors",
+                                    isRepeatSelected ? "bg-primary/15" : "hover:bg-raised",
                                   )}
                                 >
-                                  <td className="px-2 py-2 pl-6 text-muted-foreground">{length.label}</td>
-                                  <td className="px-2 py-2">{getStrokeLabel(length.stroke)}</td>
-                                  <td className="px-2 py-2 text-right">1</td>
-                                  <td className="px-2 py-2 text-right">{formatDistance(length.distance)}</td>
-                                  <td className="px-2 py-2 text-right">{formatSplitDuration(length.duration)}</td>
-                                  <td className="px-2 py-2 text-right">{formatSplitDuration(length.cumulativeSeconds)}</td>
-                                  <td className="px-2 py-2 text-right">{formatPace(length.pace, length.distance, length.duration)}</td>
-                                  <td className="px-2 py-2 text-right">{formatPace(length.bestPace, length.distance, length.duration)}</td>
-                                  <td className="px-2 py-2 text-right">{formatNumber(length.swolf)}</td>
-                                  <td className="px-2 py-2 text-right">{formatNumber(length.avgHr)}</td>
-                                  <td className="px-2 py-2 text-right">{formatNumber(length.maxHr)}</td>
-                                  <td className="px-2 py-2 text-right">{formatNumber(length.totalStrokes)}</td>
-                                  <td className="px-2 py-2 text-right">{formatNumber(length.avgStrokes, 1)}</td>
-                                  <td className="px-2 py-2 text-right">{formatNumber(length.calories)}</td>
-                                </tr>
+                                  <td className="px-2 py-2">
+                                    <button
+                                      type="button"
+                                      onClick={(event) => {
+                                        event.stopPropagation()
+                                        toggleRepeat(repeat.key)
+                                      }}
+                                      aria-expanded={isExpanded}
+                                      aria-label={`Vasche della ripetuta ${repeat.repeatNumber}`}
+                                      className="inline-flex items-center gap-1 font-semibold text-foreground"
+                                    >
+                                      {isExpanded ? (
+                                        <ChevronDown className="size-4" aria-hidden />
+                                      ) : (
+                                        <ChevronRight className="size-4" aria-hidden />
+                                      )}
+                                      {repeat.repeatNumber}
+                                    </button>
+                                  </td>
+                                  <td className="px-2 py-2">{getStrokeLabel(repeat.stroke)}</td>
+                                  <td className="px-2 py-2 text-right">{repeat.lengthsCount}</td>
+                                  <td className="px-2 py-2 text-right">{formatDistance(repeat.distance)}</td>
+                                  <td className="px-2 py-2 text-right">{formatSplitDuration(repeat.duration)}</td>
+                                  <td className="px-2 py-2 text-right">{formatSplitDuration(repeat.cumulativeSeconds)}</td>
+                                  <td className="px-2 py-2 text-right">{formatPace(repeat.pace, repeat.distance, repeat.duration)}</td>
+                                  <td className="px-2 py-2 text-right">{formatPace(repeat.bestPace, repeat.distance, repeat.duration)}</td>
+                                  <td className="px-2 py-2 text-right">{formatNumber(repeat.swolf)}</td>
+                                  <td className="px-2 py-2 text-right">{formatNumber(repeat.avgHr)}</td>
+                                  <td className="px-2 py-2 text-right">{formatNumber(repeat.maxHr)}</td>
+                                  <td className="px-2 py-2 text-right">{formatNumber(repeat.totalStrokes)}</td>
+                                  <td className="px-2 py-2 text-right">{formatNumber(repeat.avgStrokes, 1)}</td>
+                                  <td className="px-2 py-2 text-right">{formatNumber(repeat.calories)}</td>
+                                </tr>,
+                              ]
+
+                              if (!isExpanded) return rows
+
+                              return rows.concat(
+                                repeat.lengths.map((length) => {
+                                  const isLengthSelected = selectedLength?.key === length.key
+                                  return (
+                                    <tr
+                                      key={length.key}
+                                      onClick={() => {
+                                        setSelectedRepeatKey(repeat.key)
+                                        setSelectedLengthKey(length.key)
+                                      }}
+                                      className={cn(
+                                        "cursor-pointer border-b border-border",
+                                        isLengthSelected ? "bg-primary/15" : "bg-raised/50 hover:bg-raised",
+                                      )}
+                                    >
+                                      <td className="px-2 py-2 pl-6 text-muted-foreground">{length.label}</td>
+                                      <td className="px-2 py-2">{getStrokeLabel(length.stroke)}</td>
+                                      <td className="px-2 py-2 text-right">1</td>
+                                      <td className="px-2 py-2 text-right">{formatDistance(length.distance)}</td>
+                                      <td className="px-2 py-2 text-right">{formatSplitDuration(length.duration)}</td>
+                                      <td className="px-2 py-2 text-right">{formatSplitDuration(length.cumulativeSeconds)}</td>
+                                      <td className="px-2 py-2 text-right">{formatPace(length.pace, length.distance, length.duration)}</td>
+                                      <td className="px-2 py-2 text-right">{formatPace(length.bestPace, length.distance, length.duration)}</td>
+                                      <td className="px-2 py-2 text-right">{formatNumber(length.swolf)}</td>
+                                      <td className="px-2 py-2 text-right">{formatNumber(length.avgHr)}</td>
+                                      <td className="px-2 py-2 text-right">{formatNumber(length.maxHr)}</td>
+                                      <td className="px-2 py-2 text-right">{formatNumber(length.totalStrokes)}</td>
+                                      <td className="px-2 py-2 text-right">{formatNumber(length.avgStrokes, 1)}</td>
+                                      <td className="px-2 py-2 text-right">{formatNumber(length.calories)}</td>
+                                    </tr>
+                                  )
+                                }),
                               )
-                            }),
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {totalRepeatPages > 1 ? (
+                        <RepeatPagination
+                          className="hidden xl:flex"
+                          currentPage={currentRepeatPage}
+                          totalPages={totalRepeatPages}
+                          items={repeatPaginationItems}
+                          onGoTo={goToRepeatPage}
+                        />
+                      ) : null}
+
+                      <ul className="space-y-2 xl:hidden">
+                        {pagedRepeatRows.map((repeat) => {
+                          const isExpanded = Boolean(expandedRepeatKeys[repeat.key])
+                          const rowDetailSource =
+                            selectedRepeatKey === repeat.key
+                              ? (selectedLength?.key && repeat.lengths.some((length) => length.key === selectedLength.key)
+                                ? selectedLength
+                                : repeat)
+                              : repeat
+                          return (
+                            <li key={repeat.key} className="rounded-xl border border-border p-3">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedRepeatKey(repeat.key)
+                                  setSelectedLengthKey(null)
+                                  toggleRepeat(repeat.key)
+                                }}
+                                aria-expanded={isExpanded}
+                                className="flex w-full items-start justify-between gap-2 text-left"
+                              >
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-semibold text-foreground">
+                                    Ripetuta {repeat.repeatNumber}
+                                  </span>
+                                  <span className="block text-xs text-muted-foreground tabular-nums">
+                                    {getStrokeLabel(repeat.stroke)} · {repeat.lengthsCount} vasche ·{" "}
+                                    {formatDistance(repeat.distance)}
+                                  </span>
+                                </span>
+                                <span className="inline-flex items-center gap-2">
+                                  <Chip className="tabular-nums">{formatSplitDuration(repeat.duration)}</Chip>
+                                  {isExpanded ? (
+                                    <ChevronDown className="size-4" aria-hidden />
+                                  ) : (
+                                    <ChevronRight className="size-4" aria-hidden />
+                                  )}
+                                </span>
+                              </button>
+
+                              {isExpanded ? (
+                                <div className="mt-3 space-y-2">
+                                  {repeat.lengths.map((length) => (
+                                    <SegmentButton
+                                      key={length.key}
+                                      title={`Vasca ${length.label}`}
+                                      stroke={getStrokeLabel(length.stroke)}
+                                      line={segmentLine(length)}
+                                      selected={selectedLength?.key === length.key}
+                                      onSelect={() => {
+                                        setSelectedRepeatKey(repeat.key)
+                                        setSelectedLengthKey(length.key)
+                                      }}
+                                    />
+                                  ))}
+
+                                  <SegmentDetail
+                                    title={
+                                      rowDetailSource && "lengths" in rowDetailSource
+                                        ? "Ripetuta selezionata"
+                                        : "Vasca selezionata"
+                                    }
+                                    metrics={rowDetailSource ? segmentMetrics(rowDetailSource) : []}
+                                    details={[
+                                      { label: "Stile", value: getStrokeLabel(rowDetailSource?.stroke) },
+                                      {
+                                        label: "Tempo cumulato",
+                                        value: formatSplitDuration(rowDetailSource?.cumulativeSeconds),
+                                      },
+                                      {
+                                        label: "Passo migliore",
+                                        value: formatPace(
+                                          rowDetailSource?.bestPace,
+                                          rowDetailSource?.distance,
+                                          rowDetailSource?.duration,
+                                        ),
+                                      },
+                                      {
+                                        label: "FC media",
+                                        value: rowDetailSource?.avgHr ? `${formatNumber(rowDetailSource.avgHr)} bpm` : null,
+                                      },
+                                      {
+                                        label: "FC massima",
+                                        value: rowDetailSource?.maxHr ? `${formatNumber(rowDetailSource.maxHr)} bpm` : null,
+                                      },
+                                      { label: "Bracciate", value: formatNumber(rowDetailSource?.totalStrokes) },
+                                      { label: "Bracciate medie", value: formatNumber(rowDetailSource?.avgStrokes, 1) },
+                                      { label: "Calorie", value: formatNumber(rowDetailSource?.calories) },
+                                    ]}
+                                  />
+                                </div>
+                              ) : null}
+                            </li>
                           )
                         })}
-                      </tbody>
-                    </table>
+                      </ul>
+
+                      {totalRepeatPages > 1 ? (
+                        <RepeatPagination
+                          className="xl:hidden"
+                          currentPage={currentRepeatPage}
+                          totalPages={totalRepeatPages}
+                          items={repeatPaginationItems}
+                          onGoTo={goToRepeatPage}
+                        />
+                      ) : null}
+                    </>
+                  )}
+                </section>
+
+                <section className="surface-panel hidden min-w-0 space-y-3 p-4 xl:block">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-base font-bold">Metriche selezionate</h4>
+                    {selectedLength || selectedRepeat ? (
+                      <span className="text-xs text-muted-foreground">
+                        {selectedLength ? `Vasca ${selectedLength.label}` : `Ripetuta ${selectedRepeat?.repeatNumber}`}
+                      </span>
+                    ) : null}
                   </div>
 
-                  {totalRepeatPages > 1 ? (
-                    <div className="mt-3 hidden flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3 xl:flex">
-                      <p className="text-xs text-muted-foreground">
-                        Pagina {currentRepeatPage} di {totalRepeatPages}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => goToRepeatPage(currentRepeatPage - 1)}
-                          disabled={currentRepeatPage === 1}
-                          aria-label="Vai alla pagina precedente delle ripetute"
-                        >
-                          <ChevronLeft className="size-3.5" />
-                          Precedente
-                        </Button>
-                        {repeatPaginationItems.map((item, index) =>
-                          item === "ellipsis" ? (
-                            <span
-                              key={`repeat-page-ellipsis-${index}`}
-                              className="px-1.5 text-xs text-muted-foreground"
-                              aria-hidden="true"
-                            >
-                              ...
-                            </span>
-                          ) : (
-                            <button
-                              key={`repeat-page-${item}`}
-                              type="button"
-                              onClick={() => goToRepeatPage(item)}
-                              aria-label={`Vai alla pagina ${item} delle ripetute`}
-                              className={cn(
-                                "min-w-8 rounded-md border px-2 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--electric-cyan)]/70",
-                                item === currentRepeatPage
-                                  ? "border-[var(--electric-cyan)]/60 bg-[color-mix(in_oklch,var(--electric-cyan)_18%,transparent)] text-foreground"
-                                  : "border-border/70 bg-card/35 text-muted-foreground hover:text-foreground",
-                              )}
-                            >
-                              {item}
-                            </button>
+                  {selectedRepeatMetricSource ? (
+                    <SegmentDetail
+                      title={selectedLength ? "Vasca" : "Ripetuta"}
+                      metrics={segmentMetrics(selectedRepeatMetricSource)}
+                      details={[
+                        { label: "Stile", value: getStrokeLabel(selectedRepeatMetricSource.stroke) },
+                        {
+                          label: "Tempo cumulato",
+                          value: formatSplitDuration(selectedRepeatMetricSource.cumulativeSeconds),
+                        },
+                        {
+                          label: "Passo migliore",
+                          value: formatPace(
+                            selectedRepeatMetricSource.bestPace,
+                            selectedRepeatMetricSource.distance,
+                            selectedRepeatMetricSource.duration,
                           ),
-                        )}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => goToRepeatPage(currentRepeatPage + 1)}
-                          disabled={currentRepeatPage === totalRepeatPages}
-                          aria-label="Vai alla pagina successiva delle ripetute"
-                        >
-                          Successiva
-                          <ChevronRight className="size-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  <div className="xl:hidden space-y-2">
-                    {pagedRepeatRows.map((repeat) => {
-                      const isExpanded = Boolean(expandedRepeatKeys[repeat.key])
-                      const rowDetailSource =
-                        selectedRepeatKey === repeat.key
-                          ? (selectedLength?.key && repeat.lengths.some((length) => length.key === selectedLength.key)
-                            ? selectedLength
-                            : repeat)
-                          : repeat
-                      return (
-                        <div key={repeat.key} className="rounded-xl border border-border/70 bg-card/35 p-3">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedRepeatKey(repeat.key)
-                              setSelectedLengthKey(null)
-                              toggleRepeat(repeat.key)
-                            }}
-                            className="flex w-full items-start justify-between gap-2 text-left"
-                          >
-                            <div>
-                              <p className="text-sm font-semibold text-foreground">
-                                Ripetuta {repeat.repeatNumber}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {getStrokeLabel(repeat.stroke)} · {repeat.lengthsCount} vasche · {formatDistance(repeat.distance)}
-                              </p>
-                            </div>
-                            <div className="inline-flex items-center gap-2">
-                              <Badge variant="outline" className="text-[10px]">{formatSplitDuration(repeat.duration)}</Badge>
-                              {isExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
-                            </div>
-                          </button>
-
-                          {isExpanded ? (
-                            <div className="mt-3 space-y-2">
-                              {repeat.lengths.map((length) => (
-                                <button
-                                  key={length.key}
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedRepeatKey(repeat.key)
-                                    setSelectedLengthKey(length.key)
-                                  }}
-                                  className={cn(
-                                    "w-full rounded-lg border border-border/60 bg-card/30 p-2 text-left",
-                                    selectedLength?.key === length.key
-                                      ? "border-[var(--electric-cyan)]/60"
-                                      : "",
-                                  )}
-                                >
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-xs font-medium text-foreground">{length.label}</span>
-                                    <Badge variant="outline" className="text-[10px]">{getStrokeLabel(length.stroke)}</Badge>
-                                  </div>
-                                  <div className="mt-1 grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
-                                    <span>Distanza: {formatDistance(length.distance)}</span>
-                                    <span>Tempo: {formatSplitDuration(length.duration)}</span>
-                                    <span>Passo: {formatPace(length.pace, length.distance, length.duration)}</span>
-                                    <span>FC media: {formatNumber(length.avgHr)}</span>
-                                  </div>
-                                </button>
-                              ))}
-
-                              <div className="rounded-lg border border-border/60 bg-card/30 p-2">
-                                <p className="text-xs font-semibold text-foreground mb-2">
-                                  Metriche selezionato
-                                </p>
-                                <div className="grid grid-cols-2 gap-2">
-                                  <MetricOrb
-                                    label="Distanza"
-                                    value={formatDistance(rowDetailSource?.distance)}
-                                    progress={Math.max(0, Math.min(100, Math.round(((rowDetailSource?.distance ?? 0) / 100) * 100)))}
-                                    helper={selectedLength ? "vasca" : "ripetuta"}
-                                    tone="cyan"
-                                    size="sm"
-                                    icon={<Droplets className="size-3.5" />}
-                                  />
-                                  <MetricOrb
-                                    label="Tempo"
-                                    value={formatSplitDuration(rowDetailSource?.duration)}
-                                    progress={Math.max(0, Math.min(100, Math.round(((rowDetailSource?.duration ?? 0) / 90) * 100)))}
-                                    helper="tempo"
-                                    tone="sky"
-                                    size="sm"
-                                    icon={<Clock3 className="size-3.5" />}
-                                  />
-                                  <MetricOrb
-                                    label="Passo medio"
-                                    value={formatPace(rowDetailSource?.pace, rowDetailSource?.distance, rowDetailSource?.duration)}
-                                    progress={
-                                      rowDetailSource?.pace
-                                        ? Math.max(0, Math.min(100, Math.round((180 - rowDetailSource.pace) / 1.5)))
-                                        : 0
-                                    }
-                                    helper="min/100m"
-                                    tone="lime"
-                                    size="sm"
-                                    icon={<Gauge className="size-3.5" />}
-                                  />
-                                  <MetricOrb
-                                    label="SWOLF"
-                                    value={rowDetailSource?.swolf ?? "—"}
-                                    progress={
-                                      rowDetailSource?.swolf
-                                        ? Math.max(0, Math.min(100, Math.round((60 - rowDetailSource.swolf) * 2.2)))
-                                        : 0
-                                    }
-                                    helper="efficienza"
-                                    tone="amber"
-                                    size="sm"
-                                    icon={<Waves className="size-3.5" />}
-                                  />
-                                </div>
-                                <div className="mt-2 grid grid-cols-2 gap-1.5">
-                                  {[
-                                    { label: "Stile", value: getStrokeLabel(rowDetailSource?.stroke) },
-                                    { label: "Tempo cumulato", value: formatSplitDuration(rowDetailSource?.cumulativeSeconds) },
-                                    { label: "Passo migliore", value: formatPace(rowDetailSource?.bestPace, rowDetailSource?.distance, rowDetailSource?.duration) },
-                                    { label: "FC media", value: rowDetailSource?.avgHr ? `${formatNumber(rowDetailSource.avgHr)} bpm` : "—" },
-                                    { label: "FC max", value: rowDetailSource?.maxHr ? `${formatNumber(rowDetailSource.maxHr)} bpm` : "—" },
-                                    { label: "Bracciate", value: formatNumber(rowDetailSource?.totalStrokes) },
-                                    { label: "Bracciate medie", value: formatNumber(rowDetailSource?.avgStrokes, 1) },
-                                    { label: "Calorie", value: formatNumber(rowDetailSource?.calories) },
-                                  ].map((item) => (
-                                    <div
-                                      key={`${repeat.key}-${item.label}`}
-                                      className="rounded-md border border-border/60 bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_10%,transparent),color-mix(in_oklch,var(--card)_95%,transparent))] px-2 py-1.5"
-                                    >
-                                      <p className="text-[10px] uppercase tracking-[0.11em] text-muted-foreground">{item.label}</p>
-                                      <p className="mt-0.5 text-xs font-semibold text-foreground">{item.value}</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {totalRepeatPages > 1 ? (
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3 xl:hidden">
-                      <p className="text-xs text-muted-foreground">
-                        Pagina {currentRepeatPage} di {totalRepeatPages}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => goToRepeatPage(currentRepeatPage - 1)}
-                          disabled={currentRepeatPage === 1}
-                          aria-label="Vai alla pagina precedente delle ripetute"
-                        >
-                          <ChevronLeft className="size-3.5" />
-                          Precedente
-                        </Button>
-                        {repeatPaginationItems.map((item, index) =>
-                          item === "ellipsis" ? (
-                            <span
-                              key={`repeat-page-mobile-ellipsis-${index}`}
-                              className="px-1.5 text-xs text-muted-foreground"
-                              aria-hidden="true"
-                            >
-                              ...
-                            </span>
-                          ) : (
-                            <button
-                              key={`repeat-page-mobile-${item}`}
-                              type="button"
-                              onClick={() => goToRepeatPage(item)}
-                              aria-label={`Vai alla pagina ${item} delle ripetute`}
-                              className={cn(
-                                "min-w-8 rounded-md border px-2 py-1 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--electric-cyan)]/70",
-                                item === currentRepeatPage
-                                  ? "border-[var(--electric-cyan)]/60 bg-[color-mix(in_oklch,var(--electric-cyan)_18%,transparent)] text-foreground"
-                                  : "border-border/70 bg-card/35 text-muted-foreground hover:text-foreground",
-                              )}
-                            >
-                              {item}
-                            </button>
-                          ),
-                        )}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => goToRepeatPage(currentRepeatPage + 1)}
-                          disabled={currentRepeatPage === totalRepeatPages}
-                          aria-label="Vai alla pagina successiva delle ripetute"
-                        >
-                          Successiva
-                          <ChevronRight className="size-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  ) : null}
-                </>
-              )}
-            </section>
-
-            <section className="surface-panel p-4 hidden xl:block">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-lg font-display font-semibold text-foreground">Metriche selezionato</h2>
-                <span className="text-xs text-muted-foreground">
-                  {selectedLength ? `Vasca ${selectedLength.label}` : selectedRepeat ? `Ripetuta ${selectedRepeat.repeatNumber}` : "—"}
-                </span>
+                        },
+                        {
+                          label: "FC media",
+                          value: selectedRepeatMetricSource.avgHr
+                            ? `${formatNumber(selectedRepeatMetricSource.avgHr)} bpm`
+                            : null,
+                        },
+                        {
+                          label: "FC massima",
+                          value: selectedRepeatMetricSource.maxHr
+                            ? `${formatNumber(selectedRepeatMetricSource.maxHr)} bpm`
+                            : null,
+                        },
+                        { label: "Totale bracciate", value: formatNumber(selectedRepeatMetricSource.totalStrokes) },
+                        { label: "Bracciate medie", value: formatNumber(selectedRepeatMetricSource.avgStrokes, 1) },
+                        { label: "Calorie", value: formatNumber(selectedRepeatMetricSource.calories) },
+                        ...(selectedRepeat
+                          ? [{ label: "Vasche nella ripetuta", value: formatNumber(selectedRepeat.lengthsCount) }]
+                          : []),
+                      ]}
+                    />
+                  ) : (
+                    <EmptyNote>Scegli una ripetuta o una vasca per vederne le metriche.</EmptyNote>
+                  )}
+                </section>
               </div>
-
-              {selectedRepeatMetricSource ? (
-                <div className="space-y-3">
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <MetricOrb
-                      label="Distanza"
-                      value={formatDistance(selectedRepeatMetricSource.distance)}
-                      progress={Math.max(0, Math.min(100, Math.round(((selectedRepeatMetricSource.distance ?? 0) / 100) * 100)))}
-                      helper={selectedLength ? "vasca" : "ripetuta"}
-                      tone="cyan"
-                      size="sm"
-                      icon={<Droplets className="size-3.5" />}
-                    />
-                    <MetricOrb
-                      label="Tempo"
-                      value={formatSplitDuration(selectedRepeatMetricSource.duration)}
-                      progress={Math.max(0, Math.min(100, Math.round(((selectedRepeatMetricSource.duration ?? 0) / 90) * 100)))}
-                      helper="tempo"
-                      tone="sky"
-                      size="sm"
-                      icon={<Clock3 className="size-3.5" />}
-                    />
-                    <MetricOrb
-                      label="Passo medio"
-                      value={formatPace(selectedRepeatMetricSource.pace, selectedRepeatMetricSource.distance, selectedRepeatMetricSource.duration)}
-                      progress={
-                        selectedRepeatMetricSource.pace
-                          ? Math.max(0, Math.min(100, Math.round((180 - selectedRepeatMetricSource.pace) / 1.5)))
-                          : 0
-                      }
-                      helper="min/100m"
-                      tone="lime"
-                      size="sm"
-                      icon={<Gauge className="size-3.5" />}
-                    />
-                    <MetricOrb
-                      label="SWOLF"
-                      value={selectedRepeatMetricSource.swolf ?? "—"}
-                      progress={
-                        selectedRepeatMetricSource.swolf
-                          ? Math.max(0, Math.min(100, Math.round((60 - selectedRepeatMetricSource.swolf) * 2.2)))
-                          : 0
-                      }
-                      helper="efficienza"
-                      tone="amber"
-                      size="sm"
-                      icon={<Waves className="size-3.5" />}
-                    />
-                  </div>
-                  <div className="grid gap-1.5 sm:grid-cols-2">
-                    {[
-                      { label: "Stile", value: getStrokeLabel(selectedRepeatMetricSource.stroke) },
-                      { label: "Tempo cumulato", value: formatSplitDuration(selectedRepeatMetricSource.cumulativeSeconds) },
-                      { label: "Passo migliore", value: formatPace(selectedRepeatMetricSource.bestPace, selectedRepeatMetricSource.distance, selectedRepeatMetricSource.duration) },
-                      { label: "FC media", value: selectedRepeatMetricSource.avgHr ? `${formatNumber(selectedRepeatMetricSource.avgHr)} bpm` : "—" },
-                      { label: "FC max", value: selectedRepeatMetricSource.maxHr ? `${formatNumber(selectedRepeatMetricSource.maxHr)} bpm` : "—" },
-                      { label: "Totale bracciate", value: formatNumber(selectedRepeatMetricSource.totalStrokes) },
-                      { label: "Bracciate medie", value: formatNumber(selectedRepeatMetricSource.avgStrokes, 1) },
-                      { label: "Calorie", value: formatNumber(selectedRepeatMetricSource.calories) },
-                      ...(selectedRepeat ? [{ label: "Vasche nella ripetuta", value: formatNumber(selectedRepeat.lengthsCount) }] : []),
-                    ].map((item) => (
-                      <div
-                        key={`selected-metric-${item.label}`}
-                        className="rounded-lg border border-border/70 bg-[linear-gradient(135deg,color-mix(in_oklch,var(--electric-cyan)_10%,transparent),color-mix(in_oklch,var(--card)_95%,transparent))] px-2.5 py-2"
-                      >
-                        <p className="text-[10px] uppercase tracking-[0.11em] text-muted-foreground">{item.label}</p>
-                        <p className="mt-1 text-sm font-semibold text-foreground">{item.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-xl border border-border/70 bg-card/40 p-4 text-sm text-muted-foreground">
-                  Seleziona una ripetuta o una vasca per vedere le metriche.
-                </div>
-              )}
-            </section>
-          </div>
-        )}
+            </TabsContent>
+          </Tabs>
+        </section>
       </div>
+
+      <ShareActivityPicker
+        open={sharePickerOpen}
+        onOpenChange={setSharePickerOpen}
+        initialActivityId={activity.id}
+        onShared={async () => {
+          await Promise.all([
+            utils.activities.get.invalidate({ id: activity.id }),
+            utils.activities.list.invalidate(),
+          ])
+        }}
+      />
     </AppLayout>
   )
 }
