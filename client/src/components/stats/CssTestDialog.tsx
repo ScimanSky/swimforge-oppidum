@@ -1,7 +1,8 @@
 /**
  * «Inserisci un test»: the 400/200 threshold pace test (Swim Smooth protocol). Times in m:ss,
- * checked here for their format; ranges and the 400/200 ratio are checked by the server, whose
- * Italian message is shown under the fields.
+ * checked here for their format; ranges, the 400/200 ratio and the date are checked by the
+ * server, whose Italian messages (`error.data.zodError.fieldErrors`) are shown each under its
+ * field.
  */
 import { useId, useState, type FormEvent } from "react";
 import { toast } from "sonner";
@@ -18,10 +19,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
+import { errorToastMessage } from "@/lib/trpc-errors";
 import { formatClock, parseMinSec } from "@/lib/swim-metrics-view";
 
 type Field = "t400" | "t200" | "date";
 type Draft = Record<Field, string>;
+type FieldErrors = Partial<Record<Field, string>>;
+
+/** The server's input fields (statistics.setCssTest) and the form field each one sits under. */
+const SERVER_FIELDS = { t400Seconds: "t400", t200Seconds: "t200", date: "date" } as const satisfies Record<
+  string,
+  Field
+>;
+const FIELD_ORDER: readonly Field[] = ["t400", "t200", "date"];
 
 const FORMAT_ERROR = "Scrivi il tempo come minuti:secondi, per esempio 6:20.";
 const SAVE_FAILED = "Non riesco a salvare il test. Riprova.";
@@ -39,8 +49,8 @@ function initialDraft(current: CssResult | null): Draft {
   return { t400: "", t200: "", date: dayKey(new Date()) };
 }
 
-function validate(draft: Draft): Partial<Record<Field, string>> {
-  const errors: Partial<Record<Field, string>> = {};
+function validate(draft: Draft): FieldErrors {
+  const errors: FieldErrors = {};
   for (const [field, distance] of [
     ["t400", 400],
     ["t200", 200],
@@ -52,9 +62,33 @@ function validate(draft: Draft): Partial<Record<Field, string>> {
   return errors;
 }
 
-/** Message of a failed request: the server's own (Italian) for invalid input, ours otherwise. */
-const requestError = (error: { message: string; data?: { code?: string } | null }, fallback: string) =>
-  error.data?.code === "BAD_REQUEST" && error.message ? error.message : fallback;
+/** Enough of a tRPC client error to read it. */
+type RequestError = {
+  message?: unknown;
+  data?: {
+    code?: unknown;
+    zodError?: { formErrors?: string[]; fieldErrors?: Partial<Record<string, string[]>> } | null;
+  } | null;
+};
+
+/**
+ * What a failed request shows: the input validation messages under their fields (the server's
+ * Italian text, never the raw zod message), anything else as one message. A request that never
+ * reached the server (no `data`: offline, server down) gets our message, never «Failed to fetch».
+ */
+function requestErrors(error: RequestError, fallback: string): { fields: FieldErrors; message: string | null } {
+  const zod = error.data?.zodError;
+  if (zod) {
+    const fields: FieldErrors = {};
+    for (const [serverField, field] of Object.entries(SERVER_FIELDS)) {
+      const message = zod.fieldErrors?.[serverField]?.[0];
+      if (message) fields[field] = message;
+    }
+    const message = zod.formErrors?.[0] ?? null;
+    return Object.keys(fields).length > 0 || message ? { fields, message } : { fields, message: fallback };
+  }
+  return { fields: {}, message: error.data ? errorToastMessage(error, fallback) : fallback };
+}
 
 function TimeField({
   id,
@@ -96,7 +130,7 @@ function TimeField({
 export function CssTestDialog({ current }: { current: CssResult | null }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(() => initialDraft(current));
-  const [errors, setErrors] = useState<Partial<Record<Field, string>>>({});
+  const [errors, setErrors] = useState<FieldErrors>({});
   const [requestMessage, setRequestMessage] = useState<string | null>(null);
   const id = useId();
   const utils = trpc.useUtils();
@@ -107,13 +141,22 @@ export function CssTestDialog({ current }: { current: CssResult | null }) {
     toast.success(message);
     setOpen(false);
   };
+  const fieldId = (field: Field) => `${id}-${field}`;
+  const showRequestErrors = (error: RequestError, fallback: string) => {
+    const found = requestErrors(error, fallback);
+    setErrors(found.fields);
+    setRequestMessage(found.message);
+    // The first field with a message takes the focus, so its message is read out.
+    const first = FIELD_ORDER.find((field) => found.fields[field]);
+    if (first) document.getElementById(fieldId(first))?.focus();
+  };
   const save = trpc.statistics.setCssTest.useMutation({
     onSuccess: () => done("Test salvato: il passo soglia è aggiornato."),
-    onError: (error) => setRequestMessage(requestError(error, SAVE_FAILED)),
+    onError: (error) => showRequestErrors(error, SAVE_FAILED),
   });
   const clear = trpc.statistics.clearCssTest.useMutation({
     onSuccess: () => done("Test rimosso."),
-    onError: (error) => setRequestMessage(requestError(error, CLEAR_FAILED)),
+    onError: (error) => showRequestErrors(error, CLEAR_FAILED),
   });
 
   const onOpenChange = (next: boolean) => {
@@ -156,7 +199,7 @@ export function CssTestDialog({ current }: { current: CssResult | null }) {
           <form noValidate onSubmit={onSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <TimeField
-                id={`${id}-t400`}
+                id={fieldId("t400")}
                 label="Tempo sui 400 m"
                 placeholder="6:20"
                 value={draft.t400}
@@ -164,7 +207,7 @@ export function CssTestDialog({ current }: { current: CssResult | null }) {
                 onChange={update("t400")}
               />
               <TimeField
-                id={`${id}-t200`}
+                id={fieldId("t200")}
                 label="Tempo sui 200 m"
                 placeholder="3:00"
                 value={draft.t200}
@@ -173,9 +216,9 @@ export function CssTestDialog({ current }: { current: CssResult | null }) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor={`${id}-date`}>Data del test</Label>
+              <Label htmlFor={fieldId("date")}>Data del test</Label>
               <Input
-                id={`${id}-date`}
+                id={fieldId("date")}
                 type="date"
                 value={draft.date}
                 max={dayKey(new Date())}

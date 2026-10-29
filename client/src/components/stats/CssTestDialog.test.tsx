@@ -103,25 +103,87 @@ describe("Test del passo soglia", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("l'errore del server compare sotto i campi", async () => {
+  // The server's zod errors (statistics.setCssTest): error.message is the raw zod text, the
+  // Italian messages are in error.data.zodError.fieldErrors.
+  const zodError = (fieldErrors: Record<string, string[]>, formErrors: string[] = []) => ({
+    message: JSON.stringify([{ code: "custom", path: Object.keys(fieldErrors), message: "…" }]),
+    data: { code: "BAD_REQUEST", httpStatus: 400, path: "statistics.setCssTest", zodError: { formErrors, fieldErrors } },
+  });
+
+  async function submitTimes(t400: string, t200: string) {
     const dialog = await openDialog();
-    await userEvent.type(within(dialog).getByLabelText("Tempo sui 400 m"), "9:00");
-    await userEvent.type(within(dialog).getByLabelText("Tempo sui 200 m"), "3:00");
+    await userEvent.type(within(dialog).getByLabelText("Tempo sui 400 m"), t400);
+    await userEvent.type(within(dialog).getByLabelText("Tempo sui 200 m"), t200);
     await userEvent.click(within(dialog).getByRole("button", { name: "Salva il test" }));
-    act(() =>
-      state.saveOptions.onError({
-        message: "Il tempo sui 400 m deve essere tra 1,9 e 2,4 volte quello sui 200 m: controlla i tempi.",
-        data: { code: "BAD_REQUEST" },
-      })
-    );
-    expect(within(dialog).getByRole("alert")).toHaveTextContent(
-      "Il tempo sui 400 m deve essere tra 1,9 e 2,4 volte quello sui 200 m: controlla i tempi."
-    );
+    return dialog;
+  }
+
+  it("errore del server sul rapporto 400/200: sotto il tempo sui 400, che prende il focus", async () => {
+    const dialog = await submitTimes("5:00", "3:00");
+    const ratio =
+      "Il 400 è troppo veloce rispetto al 200: deve durare almeno 2,02 volte il tempo sui 200 m. Controlla i tempi.";
+    act(() => state.saveOptions.onError(zodError({ t400Seconds: [ratio] })));
+    const t400 = within(dialog).getByLabelText("Tempo sui 400 m");
+    expect(t400).toHaveAttribute("aria-invalid", "true");
+    expect(t400).toHaveAccessibleDescription(ratio);
+    expect(t400).toHaveFocus();
+    // The 200 is fine, nothing else is shown, never the raw zod message.
+    expect(within(dialog).getByLabelText("Tempo sui 200 m")).not.toHaveAttribute("aria-invalid");
+    expect(within(dialog).getByLabelText("Tempo sui 200 m")).toHaveAccessibleDescription("Minuti:secondi");
+    expect(within(dialog).queryByRole("alert")).toBeNull();
+    expect(dialog).not.toHaveTextContent("custom");
     expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("errori del server su più campi: ognuno sotto il suo", async () => {
+    const dialog = await submitTimes("6:20", "1:30");
+    act(() =>
+      state.saveOptions.onError(
+        zodError({
+          t200Seconds: ["Il tempo sui 200 m deve essere tra 1:40 e 7:00."],
+          date: ["La data del test non può essere nel futuro."],
+        })
+      )
+    );
+    const t200 = within(dialog).getByLabelText("Tempo sui 200 m");
+    expect(t200).toHaveAccessibleDescription("Il tempo sui 200 m deve essere tra 1:40 e 7:00.");
+    expect(t200).toHaveFocus();
+    const date = within(dialog).getByLabelText("Data del test");
+    expect(date).toHaveAttribute("aria-invalid", "true");
+    expect(date).toHaveAccessibleDescription("La data del test non può essere nel futuro.");
+    expect(within(dialog).getByLabelText("Tempo sui 400 m")).not.toHaveAttribute("aria-invalid");
+  });
+
+  it("un nuovo invio toglie gli errori del server", async () => {
+    const dialog = await submitTimes("5:00", "3:00");
+    act(() => state.saveOptions.onError(zodError({ t400Seconds: ["Il tempo sui 400 m deve essere tra 3:00 e 15:00."] })));
+    expect(within(dialog).getByLabelText("Tempo sui 400 m")).toHaveAttribute("aria-invalid", "true");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Salva il test" }));
+    expect(within(dialog).getByLabelText("Tempo sui 400 m")).not.toHaveAttribute("aria-invalid");
+    expect(state.saveCalls).toHaveLength(2);
+  });
+
+  it("altri errori: il messaggio del server in italiano, altrimenti il nostro", async () => {
+    const dialog = await submitTimes("6:20", "3:00");
+    // A server error with its own message (no profile).
+    act(() =>
+      state.saveOptions.onError({ message: "Profilo non trovato", data: { code: "NOT_FOUND", zodError: null } })
+    );
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Profilo non trovato");
+    expect(within(dialog).getByLabelText("Tempo sui 400 m")).not.toHaveAttribute("aria-invalid");
+
+    // A role check answers with the bare code: never shown.
+    act(() => state.saveOptions.onError({ message: "UNAUTHORIZED", data: { code: "UNAUTHORIZED", zodError: null } }));
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Non riesco a salvare il test. Riprova.");
+
+    // Validation without a message on our fields: our message, never the raw zod text.
+    act(() => state.saveOptions.onError(zodError({})));
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Non riesco a salvare il test. Riprova.");
 
     // Any other failure (network, server down): a plain Italian message, never the raw one.
     act(() => state.saveOptions.onError({ message: "Failed to fetch", data: undefined }));
     expect(within(dialog).getByRole("alert")).toHaveTextContent("Non riesco a salvare il test. Riprova.");
+    expect(screen.getByRole("dialog")).toBeTruthy();
   });
 
   it("mentre salva il pulsante è disattivato", async () => {
@@ -141,5 +203,13 @@ describe("Test del passo soglia", () => {
     expect(state.invalidate).toHaveBeenCalled();
     expect(toast.success).toHaveBeenCalledWith("Test rimosso.");
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("rimozione non riuscita: messaggio in italiano, il dialogo resta aperto", async () => {
+    const dialog = await openDialog(testResult);
+    await userEvent.click(within(dialog).getByRole("button", { name: "Rimuovi test" }));
+    act(() => state.clearOptions.onError({ message: "Failed to fetch", data: undefined }));
+    expect(within(dialog).getByRole("alert")).toHaveTextContent("Non riesco a rimuovere il test. Riprova.");
+    expect(screen.getByRole("dialog")).toBeTruthy();
   });
 });
