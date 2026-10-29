@@ -136,7 +136,7 @@ describe("SWIM_METRIC_DEFINITIONS", () => {
     expect(intensity.conventions).toEqual(
       expect.arrayContaining([
         "I confini delle zone sono una convenzione di SwimForge, approvata dal suo ideatore: il passo soglia è il confine tra B2 e C1. Se il tuo allenatore usa altri valori, inseriscili in «Le tue zone».",
-        "Le tue zone, quando le inserisci, valgono ovunque: classificazione dei giri, questo riquadro, il coach e gli allenamenti.",
+        "Le tue zone, quando le inserisci, valgono ovunque: classificazione dei giri, questo riquadro, la soglia del carico, il coach e gli allenamenti.",
         "I cinque livelli sono allineati alle zone: Facile = A1, Aerobico = A2, Medio = B1, Soglia = B2 + C1, Sopra soglia = C2 + C3.",
         "Se la zona B (B1–B2) supera circa il 35% del volume: molto lavoro in zona B. È un'indicazione basata sugli studi, non una regola.",
         "Le zone A sono aerobiche (lavoro facile e di base, potresti parlare), le B miste (aerobico sostenuto fino a ridosso della soglia, frasi brevi), le C anaerobiche (dalla soglia in su: ripetute brevi e recuperi lunghi).",
@@ -148,9 +148,9 @@ describe("SWIM_METRIC_DEFINITIONS", () => {
     expect(JSON.stringify(intensity)).not.toMatch(/\bZ[1-5]\b/);
   });
 
-  it("load: without a CSS the B2/C1 boundary of the manual zones is the threshold", () => {
+  it("load: with manual zones their B2/C1 boundary is the threshold, CSS or not", () => {
     expect(SWIM_METRIC_DEFINITIONS.load.conventions).toContain(
-      "Senza passo soglia ma con le tue zone, la soglia del carico è il confine tra B2 e C1 delle tue zone (fonte: zone manuali).",
+      "Con le tue zone, la soglia del carico è il loro confine tra B2 e C1 (fonte: zone manuali), anche se c'è un passo soglia: le tue zone valgono ovunque.",
     );
   });
 });

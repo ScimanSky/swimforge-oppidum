@@ -180,7 +180,7 @@ export function PaceZonesDialog({ zones, css }: { zones: SwimZones; css: CssResu
             <DialogTitle>{TITLE}</DialogTitle>
             <DialogDescription>
               I confini tra le zone, in passo per 100 m, dal più lento al più veloce. Le tue zone valgono ovunque:
-              statistiche, coach e allenamenti.
+              statistiche, soglia del carico, coach e allenamenti.
             </DialogDescription>
           </DialogHeader>
           <form noValidate onSubmit={onSubmit} className="space-y-4">

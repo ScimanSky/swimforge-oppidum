@@ -201,9 +201,9 @@ function loadHeader(m: SwimMetrics): MetricHeader {
     reading: TSB_READING_LABELS[today.reading],
     basis: `Carico di ${formatSwims(counted)} degli ultimi 90 giorni (la curva parte da 180 giorni fa).${
       m.load.threshold?.source === "zone manuali"
-        ? ` Senza passo soglia, la soglia del carico è il confine tra B2 e C1 delle tue zone (${formatPaceValue(
+        ? ` Con le tue zone, la soglia del carico è il loro confine tra B2 e C1 (${formatPaceValue(
             m.load.threshold.paceSecondsPer100
-          )}).`
+          )}), anche quando c'è un passo soglia.`
         : ""
     }`,
     missing: m.load.missing,

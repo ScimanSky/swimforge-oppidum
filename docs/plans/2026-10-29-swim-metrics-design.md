@@ -86,11 +86,13 @@ bracciata (DPS) è in metri per ciclo, come negli studi.
   | < −30 | carico alto |
 
   Aumento di CTL > 8 punti/settimana: crescita molto rapida.
-- **Senza CSS:** nessun carico, salvo con «Le tue zone»: allora la soglia è il loro confine
-  B2/C1 (fonte «zone manuali», detto nel riquadro e al coach). Il riquadro spiega che serve il
-  passo soglia.
+- **Le tue zone:** quando ci sono, la soglia del carico di ogni nuotata è il loro confine B2/C1
+  (fonte «zone manuali»), anche se c'è un CSS: le zone manuali valgono ovunque (detto nel riquadro,
+  nel suggerimento del grafico e al coach). Senza CSS né zone: nessun carico, e il riquadro spiega
+  che serve il passo soglia o le tue zone.
 - **Mostrato:** equilibrio di oggi e lettura. Grafico: forma e fatica (linee) ed equilibrio (barre)
-  sugli ultimi 90 giorni.
+  sugli ultimi 90 giorni; il suggerimento di ogni giorno dice la soglia usata: «test», «stima» o
+  «confine B2/C1 delle tue zone».
 
 ### 4.3 Intensità (zone di passo A1–C3)
 Aggiornato il 29/10: il proprietario usa le zone italiane A1–C3 e ha chiesto che statistiche,
@@ -120,8 +122,9 @@ coach e allenamenti le parlino (sostituiscono le cinque zone Z1–Z5 della prima
 - **Le tue zone:** l'utente può scrivere i cinque confini (s/100 m, tra 1:00 e 4:00, ognuno più
   veloce del precedente) in `swimmer_profiles.preferences.paceZones = { bounds: { a1a2, a2b1,
   b1b2, b2c1, c1c2 }, updatedAt }`, salvati con lo stesso merge SQL del test CSS. Quando ci sono
-  vincono ovunque (classificazione, riquadro, coach, allenamenti) e valgono per tutte le nuotate
-  mostrate. Senza CSS il confine B2/C1 è la soglia delle zone e del carico (fonte «zone manuali»).
+  vincono ovunque (classificazione, riquadro, carico, coach, allenamenti) e valgono per tutte le
+  nuotate mostrate. Il loro confine B2/C1 è la soglia del carico, con o senza CSS (fonte «zone
+  manuali»).
 - **Calcolo:** ogni giro attivo a stile libero va nella zona del suo passo (confini manuali,
   altrimenti quelli dal CSS valido nel giorno della nuotata); si somma la distanza. Gli altri
   stili, la tecnica e le gambe sono «non classificati» (`unclassifiedMeters`); la copertura è la

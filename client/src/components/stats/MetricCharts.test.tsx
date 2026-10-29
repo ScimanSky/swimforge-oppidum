@@ -52,8 +52,20 @@ describe("suggerimenti dei grafici delle metriche", () => {
       "Fatica 47",
       "Equilibrio −7 · neutro",
       "Carico del giorno 69",
-      "Passo soglia usato 1:49 /100 m (stima)",
+      "Soglia usata 1:49 /100 m (stima)",
     ]);
+  });
+
+  it("forma: la soglia di ogni fonte, test, stima o le tue zone", () => {
+    const swim = sessions.find((session) => session.date === "2026-10-20")!;
+    const rows = (cssSource: "test" | "stima" | "zone manuali", pace: number) => {
+      cleanup();
+      showLoad(day({ stss: 69.4, sessions: [{ ...swim, cssPaceSecondsPer100: pace, cssSource }] }));
+      return tooltipRows().find((row) => row.startsWith("Soglia usata"));
+    };
+    expect(rows("test", 108.5)).toBe("Soglia usata 1:49 /100 m (test)");
+    expect(rows("stima", 108.5)).toBe("Soglia usata 1:49 /100 m (stima)");
+    expect(rows("zone manuali", 110)).toBe("Soglia usata 1:50 /100 m (confine B2/C1 delle tue zone)");
   });
 
   it("forma: una nuotata senza giri ha il carico stimato", () => {

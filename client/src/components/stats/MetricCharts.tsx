@@ -25,6 +25,7 @@ import {
   tsbReadingOf,
   type SessionMetrics,
   type SwimMetrics,
+  type ThresholdSource,
 } from "@shared/swimMetrics";
 import { formatDecimal, formatInteger, formatKm, formatPaceValue, formatSignedInteger } from "@/lib/format";
 import {
@@ -243,11 +244,18 @@ export type LoadDatum = {
   sessions: SessionMetrics[];
 };
 
-/** «1:49 /100 m (stima)»: the CSS a swim's load uses. */
-const cssUsedLabel = (session: SessionMetrics) =>
+/** Where the threshold of a swim's load comes from, in the tooltip. */
+const THRESHOLD_SOURCE_LABELS: Record<ThresholdSource, string> = {
+  test: "test",
+  stima: "stima",
+  "zone manuali": "confine B2/C1 delle tue zone",
+};
+
+/** «1:49 /100 m (stima)», «1:50 /100 m (confine B2/C1 delle tue zone)»: the threshold a swim's load uses. */
+const thresholdUsedLabel = (session: SessionMetrics) =>
   session.cssPaceSecondsPer100 == null
     ? null
-    : `${formatPaceValue(session.cssPaceSecondsPer100)} /100 m (${session.cssSource === "test" ? "test" : "stima"})`;
+    : `${formatPaceValue(session.cssPaceSecondsPer100)} /100 m (${THRESHOLD_SOURCE_LABELS[session.cssSource ?? "stima"]})`;
 
 /** Tooltip of a day of the load chart: the balance read with the shared bands, the day's load and CSS. */
 export const LoadTooltipContent = detailTooltip<LoadDatum>((day) => {
@@ -262,8 +270,8 @@ export const LoadTooltipContent = detailTooltip<LoadDatum>((day) => {
   if (day.stss > 0) {
     const estimated = day.sessions.some((session) => session.loadEstimated);
     rows.push({ label: "Carico del giorno", value: `${formatInteger(day.stss)}${estimated ? " (stimato)" : ""}` });
-    const cssUsed = Array.from(new Set(day.sessions.map(cssUsedLabel).filter((label) => label !== null)));
-    if (cssUsed.length > 0) rows.push({ label: "Passo soglia usato", value: cssUsed.join(", ") });
+    const used = Array.from(new Set(day.sessions.map(thresholdUsedLabel).filter((label) => label !== null)));
+    if (used.length > 0) rows.push({ label: "Soglia usata", value: used.join(", ") });
   }
   return { title: dayLabel(day.date), rows };
 });

@@ -98,9 +98,10 @@ describe("computeSwimMetrics: manual zones («Le tue zone»)", () => {
     expect(m.zones).toMatchObject({ source: "manuali", bounds: MANUAL.bounds, manualUpdatedAt: "2026-10-25T09:00:00.000Z" });
     expect(m.zones.autoBounds).toEqual(paceZoneBoundsFromCss(100));
     expect(m.zones.ranges.find((r) => r.code === "B2")).toMatchObject({ fastPace: 110, slowPace: 116, level: "Soglia" });
-    // The load keeps the CSS.
-    expect(m.sessions[0]).toMatchObject({ cssPaceSecondsPer100: 100, cssSource: "test" });
-    expect(m.load.threshold).toEqual({ paceSecondsPer100: 100, source: "test" });
+    // The load takes their B2/C1 boundary too, even with a CSS: manual zones apply everywhere.
+    expect(m.css.current).toMatchObject({ paceSecondsPer100: 100, source: "test" });
+    expect(m.sessions[0]).toMatchObject({ cssPaceSecondsPer100: 110, cssSource: "zone manuali" });
+    expect(m.load.threshold).toEqual({ paceSecondsPer100: 110, source: "zone manuali" });
   });
 
   it("without a CSS the B2/C1 boundary is the threshold of the zones and of the load («zone manuali»)", () => {

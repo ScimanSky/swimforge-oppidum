@@ -73,7 +73,7 @@ describe("swimMetricsForCoach", () => {
     const metrics = sampleSwimMetrics();
     metrics.load.threshold = { paceSecondsPer100: 110, source: "zone manuali" };
     expect(swimMetricsForCoach(metrics)).toContain(
-      "soglia del carico: confine B2/C1 delle zone manuali (1:50/100 m), perché manca il passo soglia",
+      "soglia del carico: confine B2/C1 delle zone dell'atleta (1:50/100 m), che valgono al posto del passo soglia",
     );
   });
 

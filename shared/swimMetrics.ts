@@ -13,8 +13,8 @@ export const SWIM_METRICS_TIMEZONE = "Europe/Rome";
 // ─── Result types (server → clients) ────────────────────────────────────────
 
 /**
- * Where a threshold comes from: the estimate, the 400/200 test, or (without a CSS) the B2/C1
- * boundary of the user's manual zones.
+ * Where a threshold comes from: the estimate, the 400/200 test, or the B2/C1 boundary of the
+ * user's manual zones, which win over the CSS when they exist.
  */
 export type ThresholdSource = "stima" | "test" | "zone manuali";
 export type CssPoint = {
@@ -50,8 +50,9 @@ export type SessionMetrics = {
   /** Active metres not zoned: other strokes, drill, kick, no stroke (pool swims with laps). */
   unclassifiedMeters?: number | null;
   /**
-   * The threshold this swim's load uses: a valid test or its month's estimate, else the B2/C1
-   * boundary of the manual zones («zone manuali»); null without. Automatic zones use it too.
+   * The threshold this swim's load uses: the B2/C1 boundary of the manual zones («zone
+   * manuali») when they exist, else a valid test or its month's estimate; null without.
+   * Automatic zones use the CSS.
    */
   cssPaceSecondsPer100?: number | null; cssSource?: ThresholdSource | null;
   /** Stroke holding in the repeat sets (distance-weighted): DPS drop and stroke rate rise, %. */
@@ -77,7 +78,7 @@ export type SwimMetrics = {
   css: { current: CssResult | null; history: { month: string; paceSecondsPer100: number | null }[]; missing: string | null };
   zones: SwimZones;
   load: {
-    /** The threshold of today's load: the CSS, else the B2/C1 boundary of the manual zones. */
+    /** The threshold of today's load: the B2/C1 boundary of the manual zones, else the CSS. */
     threshold: { paceSecondsPer100: number; source: ThresholdSource } | null;
     today: { ctl: number; atl: number; tsb: number; reading: TsbReading } | null;
     rampPerWeek: number | null;
@@ -183,7 +184,7 @@ export const SWIM_METRIC_DEFINITIONS: Record<SwimMetricKey, SwimMetricDefinition
       "Sotto −30: carico alto.",
       "Forma che cresce più di 8 punti a settimana: crescita molto rapida.",
       "Giri non a stile libero (altri stili, tecnica, gambe, stile non registrato): IF fisso 0,80, perché il passo soglia è a stile libero. È una convenzione nostra.",
-      "Senza passo soglia ma con le tue zone, la soglia del carico è il confine tra B2 e C1 delle tue zone (fonte: zone manuali).",
+      "Con le tue zone, la soglia del carico è il loro confine tra B2 e C1 (fonte: zone manuali), anche se c'è un passo soglia: le tue zone valgono ovunque.",
     ],
   },
   intensity: {
@@ -198,7 +199,7 @@ export const SWIM_METRIC_DEFINITIONS: Record<SwimMetricKey, SwimMetricDefinition
       "Gli studi sugli sport di resistenza indicano che la maggior parte del volume in zona A e una piccola parte in zona C funzionano meglio di tanto lavoro in zona B. Più alta è la zona, più è intensa e più corte sono le ripetute.",
     conventions: [
       "I confini delle zone sono una convenzione di SwimForge, approvata dal suo ideatore: il passo soglia è il confine tra B2 e C1. Se il tuo allenatore usa altri valori, inseriscili in «Le tue zone».",
-      "Le tue zone, quando le inserisci, valgono ovunque: classificazione dei giri, questo riquadro, il coach e gli allenamenti.",
+      "Le tue zone, quando le inserisci, valgono ovunque: classificazione dei giri, questo riquadro, la soglia del carico, il coach e gli allenamenti.",
       "Ripetuta massima: C1 200 m, C2 150 m, C3 25 m.",
       "I cinque livelli sono allineati alle zone: Facile = A1, Aerobico = A2, Medio = B1, Soglia = B2 + C1, Sopra soglia = C2 + C3.",
       "Le zone valgono solo per lo stile libero, perché il passo soglia è a stile libero: gli altri stili non sono classificati.",

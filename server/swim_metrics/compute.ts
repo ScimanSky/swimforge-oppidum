@@ -56,7 +56,7 @@ const INTENSITY_WEEKS = 8;
 
 export const MISSING = {
   css: "Servono almeno due tratti continui a stile libero in vasca negli ultimi 90 giorni, tra 2 e 30 minuti, uno lungo almeno il doppio dell'altro (es. 200 e 400 m), nuotati a buon ritmo. Oppure inserisci un test.",
-  load: "Serve il passo soglia: inserisci un test o nuota due tratti continui a stile libero, uno lungo almeno il doppio dell'altro (es. 200 e 400 m).",
+  load: "Serve il passo soglia o le tue zone: inserisci un test, scrivi le tue zone o nuota due tratti continui a stile libero, uno lungo almeno il doppio dell'altro (es. 200 e 400 m).",
   intensity: "Servono il passo soglia (o le tue zone) e nuotate con i giri.",
   intensityNoLaps: "Nessuna nuotata in vasca con i giri negli ultimi 28 giorni.",
   intensityNoFreestyle:
@@ -64,7 +64,7 @@ export const MISSING = {
 } as const;
 
 type SwimCss = { speedMps: number; source: "stima" | "test" };
-/** The threshold of a swim's load: its CSS, or the B2/C1 boundary of the manual zones. */
+/** The threshold of a swim's load: the B2/C1 boundary of the manual zones, else its CSS. */
 type SwimThreshold = { speedMps: number; source: ThresholdSource };
 
 type InternalSession = {
@@ -272,14 +272,14 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
   };
 
   // ── Sessions ──
-  // The load and the automatic zones need today's CSS, so that they always agree with
-  // css.current. Without it, manual zones lend their B2/C1 boundary as the threshold.
+  // «Le tue zone» win everywhere: their B2/C1 boundary is the threshold of every swim's load,
+  // with or without a CSS. Otherwise the load and the automatic zones need today's CSS, so that
+  // they always agree with css.current.
   const resolveCss = cssResolver(history, test);
   const manualThreshold: SwimThreshold | null = manual
     ? { speedMps: 100 / manual.bounds.b2c1, source: "zone manuali" }
     : null;
-  const thresholdOf = (day: string): SwimThreshold | null =>
-    current ? (resolveCss(day) ?? manualThreshold) : manualThreshold;
+  const thresholdOf = (day: string): SwimThreshold | null => manualThreshold ?? (current ? resolveCss(day) : null);
   const sessions = activities.map((a) => computeSession(a, thresholdOf(a.day), manual?.bounds ?? null));
   const hasThreshold = current !== null || manual !== null;
 
@@ -293,9 +293,9 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
     const series = loadSeries(daily, historyFrom, today);
     const last = series[series.length - 1];
     load = {
-      threshold: current
-        ? { paceSecondsPer100: current.paceSecondsPer100, source: current.source }
-        : { paceSecondsPer100: manual!.bounds.b2c1, source: "zone manuali" },
+      threshold: manual
+        ? { paceSecondsPer100: manual.bounds.b2c1, source: "zone manuali" }
+        : { paceSecondsPer100: current!.paceSecondsPer100, source: current!.source },
       today: {
         ctl: round(last.ctl, 1)!,
         atl: round(last.atl, 1)!,

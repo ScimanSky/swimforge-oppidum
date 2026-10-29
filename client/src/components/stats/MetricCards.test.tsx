@@ -166,14 +166,13 @@ describe("Metriche: riquadri", () => {
     expect(card("Intensità")).toHaveTextContent("Intensità 64% in zona A 16% B · 20% C");
   });
 
-  it("forma e fatica: senza passo soglia la soglia del carico viene dalle tue zone, e lo dice", async () => {
+  it("forma e fatica: con le tue zone la soglia del carico è il loro confine B2/C1, anche con il passo soglia, e lo dice", async () => {
     const metrics = swimMetricsFixture();
-    metrics.css.current = null;
     metrics.load.threshold = { paceSecondsPer100: 110, source: "zone manuali" };
     renderCards(metrics);
     await userEvent.click(card("Forma e fatica"));
     expect(screen.getByRole("region", { name: /^Forma e fatica/ })).toHaveTextContent(
-      "Senza passo soglia, la soglia del carico è il confine tra B2 e C1 delle tue zone (1:50)."
+      "Con le tue zone, la soglia del carico è il loro confine tra B2 e C1 (1:50), anche quando c'è un passo soglia."
     );
   });
 
@@ -565,7 +564,7 @@ describe("Metriche: riquadri", () => {
       "Sotto −30: carico alto.",
       "Forma che cresce più di 8 punti a settimana: crescita molto rapida.",
       "Giri non a stile libero (altri stili, tecnica, gambe, stile non registrato): IF fisso 0,80, perché il passo soglia è a stile libero. È una convenzione nostra.",
-      "Senza passo soglia ma con le tue zone, la soglia del carico è il confine tra B2 e C1 delle tue zone (fonte: zone manuali).",
+      "Con le tue zone, la soglia del carico è il loro confine tra B2 e C1 (fonte: zone manuali), anche se c'è un passo soglia: le tue zone valgono ovunque.",
     ]);
   });
 

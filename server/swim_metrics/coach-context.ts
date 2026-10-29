@@ -134,7 +134,7 @@ function loadLine(m: SwimMetrics): string {
   const sample = loadSample(m);
   if (sample) line += ` · ${sample}`;
   if (m.load.threshold?.source === "zone manuali") {
-    line += ` · soglia del carico: confine B2/C1 delle zone manuali (${clock(m.load.threshold.paceSecondsPer100)}/100 m), perché manca il passo soglia`;
+    line += ` · soglia del carico: confine B2/C1 delle zone dell'atleta (${clock(m.load.threshold.paceSecondsPer100)}/100 m), che valgono al posto del passo soglia`;
   }
   return line;
 }
