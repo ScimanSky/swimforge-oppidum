@@ -41,10 +41,12 @@ type Rule = keyof typeof RULES;
 const EXEMPT: Partial<Record<Rule, readonly string[]>> = {
   gradiente: ["index.css"], // skeleton shimmer animation
   // The shell header owns the page title. Public pages render outside the shell (no header), so
-  // their own title is the h1: the landing (Home), StravaConnect and the legal documents
-  // (LegalPage). club-print builds standalone print documents (own tab or hidden iframe).
+  // their own title is the h1: the landing (Home), StravaConnect, the sign-in, sign-up and
+  // password pages (AuthLayout) and the legal documents (LegalPage). club-print builds
+  // standalone print documents (own tab or hidden iframe).
   "titolo-pagina": [
     "components/app/ShellHeader.tsx",
+    "components/auth/AuthLayout.tsx",
     "components/legal/LegalPage.tsx",
     "lib/club-print.ts",
     "pages/Home.tsx",
@@ -65,8 +67,6 @@ const PENDING: Record<Rule, string[]> = {
   "alone-neon": [
     "components/onboarding/OnboardingFlow.tsx",
     "index.css",
-    "pages/Login.tsx",
-    "pages/Register.tsx",
   ],
   "maiuscolo-spaziato": [
     "components/ActivityInsightNotification.tsx",
@@ -93,10 +93,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/onboarding/OnboardingFirstAction.tsx",
     "components/onboarding/OnboardingFlow.tsx",
     "components/onboarding/OnboardingIdentitySetup.tsx",
-    "pages/ForgotPassword.tsx",
-    "pages/Login.tsx",
-    "pages/Register.tsx",
-    "pages/ResetPassword.tsx",
     "pages/Settings.tsx",
   ],
   "testo-primario": [],
@@ -108,12 +104,8 @@ const PENDING: Record<Rule, string[]> = {
     "components/metrics/MetricOrb.tsx",
     "components/onboarding/OnboardingWelcomeComposition.tsx",
     "pages/AuthCallback.tsx",
-    "pages/ForgotPassword.tsx",
     "pages/Home.tsx",
-    "pages/Login.tsx",
     "pages/NotFound.tsx",
-    "pages/Register.tsx",
-    "pages/ResetPassword.tsx",
     "pages/Settings.tsx",
   ],
   sfocatura: [
@@ -139,12 +131,8 @@ const PENDING: Record<Rule, string[]> = {
     "components/ui/dialog.tsx",
     "components/ui/sheet.tsx",
     "pages/AuthCallback.tsx",
-    "pages/ForgotPassword.tsx",
     "pages/Home.tsx",
-    "pages/Login.tsx",
     "pages/NotFound.tsx",
-    "pages/Register.tsx",
-    "pages/ResetPassword.tsx",
     "pages/StravaConnect.tsx",
   ],
 };

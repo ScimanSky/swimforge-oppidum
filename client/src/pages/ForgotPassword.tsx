@@ -1,42 +1,52 @@
-"use client";
-
-import { useState } from "react";
-import Link from "next/link";
+import { useId, useState, type FormEvent } from "react";
+import { Link } from "wouter";
+import { ArrowRight, MailCheck } from "lucide-react";
+import { toast } from "sonner";
+import { AuthLayout } from "@/components/auth/AuthLayout";
+import { FieldError, FormError, fieldAria, useFieldErrors } from "@/components/auth/form-fields";
 import { Button } from "@/components/ui/button";
-import {
-  Surface,
-  SurfaceContent,
-  SurfaceDescription,
-  SurfaceHeader,
-  SurfaceTitle,
-} from "@/components/ui/surface";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Waves, ArrowRight } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { authErrorMessage, isPlausibleEmail } from "@/lib/auth-errors";
 import { publicSiteUrl } from "@/lib/public-url";
-import { toast } from "sonner";
-import ThemeToggleButton from "@/components/ThemeToggleButton";
+import { supabase } from "@/lib/supabase";
+
+const ASIDE = {
+  headline: "Recupero password",
+  body: "Ti invieremo un link per impostare una nuova password.",
+};
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSent, setIsSent] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const { errors, show, clear } = useFieldErrors<"email">();
+  const emailId = useId();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) {
-      toast.error("Inserisci un'email valida");
-      return;
-    }
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (isLoading) return;
+    setFormError(null);
+    const valid = show(
+      {
+        email: !email.trim()
+          ? "Inserisci l'email."
+          : !isPlausibleEmail(email)
+            ? "Inserisci un'email valida, ad esempio nome@esempio.it."
+            : undefined,
+      },
+      [["email", emailId]]
+    );
+    if (!valid) return;
 
     setIsLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
       redirectTo: publicSiteUrl("/reset-password"),
     });
 
     if (error) {
-      toast.error(error.message || "Errore durante l'invio dell'email");
+      setFormError(authErrorMessage(error, "Invio non riuscito. Riprova."));
       setIsLoading(false);
       return;
     }
@@ -46,97 +56,65 @@ export default function ForgotPassword() {
     toast.success("Email inviata! Controlla la tua casella di posta.");
   };
 
-  return (
-    <div className="min-h-screen bg-background flex relative dark:bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_rgba(15,23,42,0.92)_45%,_rgba(2,6,23,1)_100%)] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-      <ThemeToggleButton className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-20" />
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden border-r border-border/50 bg-[linear-gradient(145deg,#0f1722_0%,#162838_46%,#0f1926_100%)]">
-        <div className="absolute inset-0 bg-[radial-gradient(68%_84%_at_14%_0%,rgba(6,182,212,0.28),transparent_70%),radial-gradient(58%_72%_at_86%_12%,rgba(59,130,246,0.18),transparent_72%)]" />
-        <div className="absolute -left-16 bottom-6 size-72 rounded-full bg-[rgba(20,184,166,0.2)] blur-3xl" />
-        <div className="absolute right-[-4rem] top-[26%] size-72 rounded-full bg-[rgba(56,189,248,0.16)] blur-3xl" />
-        <div className="absolute inset-0 bg-gradient-to-r from-background/14 via-background/28 to-background/74" />
-        <div className="absolute bottom-12 left-12 max-w-md">
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <Waves className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="font-display text-2xl font-bold text-foreground">
-              SwimForge
-            </span>
-          </div>
-          <h2 className="text-3xl font-display font-bold text-foreground mb-2">
-            Recupero password
-          </h2>
-          <p className="text-muted-foreground">
-            Ti invieremo un link per impostare una nuova password.
+  if (isSent) {
+    return (
+      <AuthLayout title="Controlla la tua email" aside={ASIDE}>
+        <div role="status" className="space-y-3 text-center">
+          <MailCheck className="mx-auto size-8 text-action-text" aria-hidden />
+          <p className="text-[15px]">
+            Abbiamo inviato il link di recupero a <span className="font-semibold">{email.trim()}</span>.
           </p>
+          <p className="text-sm text-muted-foreground">Se non lo vedi, controlla anche la cartella spam.</p>
         </div>
-      </div>
+        <Button asChild variant="outline" className="mt-5 w-full">
+          <Link href="/login">Torna al login</Link>
+        </Button>
+      </AuthLayout>
+    );
+  }
 
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="w-full max-w-md">
-          <div className="flex items-center gap-2 mb-8 lg:hidden">
-            <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center">
-              <Waves className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <span className="font-display text-2xl font-bold text-foreground">
-              SwimForge
-            </span>
-          </div>
-
-          <Surface className="bg-card border-border">
-            <SurfaceHeader className="text-center">
-              <SurfaceTitle className="text-2xl font-display">Password dimenticata</SurfaceTitle>
-              <SurfaceDescription>
-                Inserisci l&apos;email per ricevere il link di recupero
-              </SurfaceDescription>
-            </SurfaceHeader>
-            <SurfaceContent className="space-y-4">
-              {isSent ? (
-                <div className="space-y-3 text-center text-sm text-muted-foreground">
-                  Abbiamo inviato il link di recupero a
-                  <span className="text-foreground font-medium"> {email}</span>.
-                  <div className="text-xs text-muted-foreground">
-                    Se non lo vedi, controlla anche la cartella spam.
-                  </div>
-                  <Link href="/login" className="inline-flex w-full">
-                    <Button variant="outline-neon" className="w-full">
-                      Torna al login
-                    </Button>
-                  </Link>
-                </div>
-              ) : (
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Email</Label>
-                    <Input
-                      type="email"
-                      placeholder="nome@esempio.com"
-                      className="bg-background/60"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={isLoading}
-                    />
-                  </div>
-
-                  <Button variant="neon" type="submit" className="w-full gap-2" disabled={isLoading}>
-                    {isLoading ? "Invio..." : "Invia link"}
-                    {!isLoading && <ArrowRight className="w-4 h-4" />}
-                  </Button>
-                </form>
-              )}
-
-              {!isSent && (
-                <p className="text-center text-sm text-muted-foreground mt-6">
-                  Ricordi la password?{" "}
-                  <Link href="/login" className="text-action-text hover:underline">
-                    Accedi
-                  </Link>
-                </p>
-              )}
-            </SurfaceContent>
-          </Surface>
+  return (
+    <AuthLayout
+      title="Password dimenticata"
+      description="Inserisci l'email per ricevere il link di recupero."
+      aside={ASIDE}
+      footer={
+        <>
+          Ricordi la password?{" "}
+          <Link href="/login" className="font-semibold text-action-text hover:underline">
+            Accedi
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} noValidate aria-label="Recupero password" className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor={emailId}>Email</Label>
+          <Input
+            id={emailId}
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder="nome@esempio.it"
+            value={email}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              clear("email");
+            }}
+            {...fieldAria(emailId, errors.email)}
+          />
+          <FieldError fieldId={emailId} error={errors.email} />
         </div>
-      </div>
-    </div>
+
+        <FormError error={formError} />
+
+        <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLoading ? "Invio…" : "Invia link"}
+          {!isLoading && <ArrowRight aria-hidden />}
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }
