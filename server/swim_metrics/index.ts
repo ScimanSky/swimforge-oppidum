@@ -1,21 +1,22 @@
 /**
  * Swim metrics of a user: reads 180 days of swims and their laps, 300 days of laps near the CSS
- * distances, the CSS test in the profile preferences and the swims per week for the streak (five
+ * distances, the CSS test and the manual zones in the profile preferences and the swims per week
+ * for the streak (five
  * queries in parallel), then computes everything (cached 1 hour).
  */
 import { and, asc, between, eq, gte, sql } from "drizzle-orm";
 import type { SwimMetrics } from "@shared/swimMetrics";
-import { addDaysToKey, dayKey } from "@shared/swimMetrics";
+import { addDaysToKey, arePaceZoneBoundsValid, dayKey } from "@shared/swimMetrics";
 import { garminActivityLaps, swimmerProfiles, swimmingActivities } from "../../drizzle/schema";
 import { getDb } from "../db";
 import { clearAIInsightsCache } from "../ai_insights";
 import { cacheKeys, deleteCached, getOrSetCached } from "../lib/cache";
-import { computeSwimMetrics, HISTORY_DAYS, type CssTest, type SwimMetricsInput } from "./compute";
+import { computeSwimMetrics, HISTORY_DAYS, type CssTest, type ManualPaceZones, type SwimMetricsInput } from "./compute";
 import type { CssLap } from "./css";
 import { efficiencySummary, sessionEfficiency, type EfficiencySummary } from "./efficiency";
 import { toMetricLap, type MetricActivity, type MetricLap } from "./laps";
 
-export { computeSwimMetrics, type CssTest } from "./compute";
+export { computeSwimMetrics, type CssTest, type ManualPaceZones } from "./compute";
 
 const DAY_MS = 86_400_000;
 export const SWIM_METRICS_TTL_SECONDS = 3600;
@@ -46,6 +47,20 @@ export function parseCssTest(preferences: unknown): CssTest | null {
   if (typeof t200Seconds !== "number" || typeof t400Seconds !== "number" || typeof date !== "string") return null;
   if (!(t200Seconds > 0) || !(t400Seconds > t200Seconds) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
   return { t200Seconds, t400Seconds, date };
+}
+
+/**
+ * `preferences.paceZones` («Le tue zone») when well formed: five paces between 1:00 and 4:00 per
+ * 100 m, each faster than the previous one.
+ */
+export function parsePaceZones(preferences: unknown): ManualPaceZones | null {
+  const raw = preferencesObject(preferences).paceZones;
+  if (!isRecord(raw) || !arePaceZoneBoundsValid(raw.bounds)) return null;
+  const { a1a2, a2b1, b1b2, b2c1, c1c2 } = raw.bounds;
+  return {
+    bounds: { a1a2, a2b1, b1b2, b2c1, c1c2 },
+    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : null,
+  };
 }
 
 /** Days of freestyle laps read for the CSS estimates: the 90-day windows of 7 month ends. */
@@ -167,6 +182,7 @@ async function loadInput(userId: number, now: Date): Promise<SwimMetricsInput> {
   return {
     activities,
     cssTest: parseCssTest(profileRows[0]?.preferences),
+    paceZones: parsePaceZones(profileRows[0]?.preferences),
     streakWeekCounts: new Map(streakRows.map((row) => [String(row.weekStart), Number(row.swims) || 0])),
     cssLaps,
     cssLapsFrom: addDaysToKey(dayKey(now), -(CSS_LAPS_DAYS - 1)),
@@ -242,7 +258,7 @@ export async function getSwimMetrics(userId: number, now: Date = new Date()): Pr
 
 /**
  * Drop today's cached metrics and the Coach page insights written from them (new swims or laps,
- * CSS test saved or removed).
+ * CSS test or manual zones saved or removed).
  */
 export async function invalidateSwimMetrics(userId: number, now: Date = new Date()): Promise<void> {
   await Promise.all([

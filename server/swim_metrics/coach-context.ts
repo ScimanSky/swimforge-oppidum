@@ -1,10 +1,13 @@
 /**
  * The swim metrics as text for the AI coach (chat, Coach page insights, workout generation):
- * the values with source, reliability, sample sizes and readings, the zones as paces, the last
- * swims, and a compact glossary built on the shared definitions, so the coach and the interface
- * say the same things.
+ * the values with source, reliability, sample sizes and readings, the zones A1–C3 with the
+ * athlete's paces and how they feel, the last swims, and a compact glossary built on the shared
+ * definitions, so the coach and the interface say the same things.
  */
 import {
+  INTENSITY_LEVELS,
+  PACE_ZONE_CODES,
+  PACE_ZONES,
   SWIM_METRIC_DEFINITIONS,
   SWIM_METRIC_THRESHOLDS,
   TSB_BOUNDS,
@@ -13,8 +16,9 @@ import {
   dayKey,
   pacingCvReading,
   poolLengthLabel,
-  zonePaceRanges,
+  zoneRpeLabel,
   type CssPoint,
+  type PaceZoneRange,
   type SwimMetrics,
 } from "@shared/swimMetrics";
 
@@ -59,17 +63,50 @@ function cssLine(m: SwimMetrics): string {
   return `- Passo soglia (CSS): ${pace} — stima dai tuoi tratti continui, affidabilità ${css.confidence} (${points}${dropped}); le stime da allenamento sono di solito un po' più lente del vero`;
 }
 
-/** The zone boundaries as paces for today's CSS (never speed percentages alone). */
-function zonesLine(m: SwimMetrics): string | null {
+/** «più lento di 2:08», «2:01–2:08», «più veloce di 1:44» (per 100 m). */
+export function zonePaceText(range: Pick<PaceZoneRange, "fastPace" | "slowPace">): string {
+  if (range.slowPace === null) return `più lento di ${clock(range.fastPace!)}`;
+  if (range.fastPace === null) return `più veloce di ${clock(range.slowPace)}`;
+  return `${clock(range.fastPace)}–${clock(range.slowPace)}`;
+}
+
+function zonesHeader(m: SwimMetrics): string {
+  const tail = "valgono per lo stile libero; dalla più lenta alla più esplosiva";
+  if (m.zones.source === "manuali") {
+    return `ZONE DI PASSO A1–C3 (zone manuali inserite dall'atleta, al posto di quelle dal passo soglia; ${tail})`;
+  }
   const css = m.css.current;
-  if (!css) return null;
-  const zones = zonePaceRanges(css.paceSecondsPer100).map(({ zone, name, fastPace, slowPace }) => {
-    const label = `Z${zone} ${name}`;
-    if (slowPace === null) return `${label} più lento di ${clock(fastPace!)}`;
-    if (fastPace === null) return `${label} più veloce di ${clock(slowPace)}`;
-    return `${label} ${clock(fastPace)}–${clock(slowPace)}`;
-  });
-  return `- Zone di passo per questo passo soglia (solo stile libero): ${zones.join(" · ")} (per 100 m)`;
+  if (m.zones.source === "auto" && css) {
+    return `ZONE DI PASSO A1–C3 (zone automatiche dal passo soglia ${clock(css.paceSecondsPer100)}/100 m, ${css.source}; ${tail})`;
+  }
+  return "ZONE DI PASSO A1–C3 (passi non disponibili: servono il passo soglia o le zone dell'atleta; usa livello e fatica percepita)";
+}
+
+/**
+ * The seven zones with the athlete's paces (never speed percentages), level, maximum rep, how
+ * they feel and what they train: the coach explains each zone it uses with these words.
+ */
+function zonesBlock(m: SwimMetrics): string[] {
+  const ranges = new Map(m.zones.ranges.map((range) => [range.code, range]));
+  return [
+    zonesHeader(m),
+    ...PACE_ZONES.map((zone) => {
+      const range = ranges.get(zone.code);
+      const pace = range ? `: ${zonePaceText(range)}/100 m` : "";
+      const maxRep = zone.maxRepMeters ? ` · max ${zone.maxRepMeters} m a ripetuta` : "";
+      return `- ${zone.code} ${zone.name} · livello ${zone.level}${pace}${maxRep} · ${zone.breathing}, ${zone.talkTest}, RPE ${zoneRpeLabel(zone)} · ${zone.purpose}`;
+    }),
+  ];
+}
+
+/** «A1 30%, A2 42%, …» for the zones with metres (whole percent of the zoned metres). */
+function zoneShares(zoneMeters: number[]): string | null {
+  const total = zoneMeters.reduce((sum, metres) => sum + metres, 0);
+  if (total <= 0) return null;
+  return zoneMeters
+    .map((metres, index) => (metres > 0 ? `${PACE_ZONE_CODES[index]} ${Math.round((metres / total) * 100)}%` : null))
+    .filter((part) => part !== null)
+    .join(", ");
 }
 
 /** Swims with a load in the last 42 days (the «forma» window) and how many had no laps. */
@@ -93,14 +130,19 @@ function loadLine(m: SwimMetrics): string {
   }
   const sample = loadSample(m);
   if (sample) line += ` · ${sample}`;
+  if (m.load.threshold?.source === "zone manuali") {
+    line += ` · soglia del carico: confine B2/C1 delle zone manuali (${clock(m.load.threshold.paceSecondsPer100)}/100 m), perché manca il passo soglia`;
+  }
   return line;
 }
 
 function intensityLine(m: SwimMetrics): string {
   const last28 = m.intensity.last28;
   if (!last28) return `- Intensità: non disponibile. ${m.intensity.missing ?? ""}`.trimEnd();
-  let line = `- Intensità (ultimi 28 giorni, zone di passo dal passo soglia, solo stile libero): facile ${last28.easyPct}% · medio ${last28.mediumPct}% · intenso ${last28.hardPct}%`;
+  let line = `- Intensità (ultimi 28 giorni, zone A1–C3, solo stile libero): facile (A1–A2) ${last28.easyPct}% · medio (B1–B2) ${last28.mediumPct}% · intenso (C1–C3) ${last28.hardPct}%`;
   if (last28.mediumPct > SWIM_METRIC_THRESHOLDS.mediumZonePct) line += " (molto lavoro in zona media)";
+  const shares = zoneShares(last28.zoneMeters);
+  if (shares) line += ` · per zona ${shares}`;
   if (last28.coveragePct !== undefined) {
     const unclassified = last28.unclassifiedMeters
       ? ` (non classificati ${num(last28.unclassifiedMeters / 1000)} km: altri stili, tecnica, gambe)`
@@ -182,27 +224,23 @@ function swimLine(s: SwimMetrics["sessions"][number]): string {
   const parts = [shortDate(s.date), `${num(s.distanceMeters / 1000)} km`, s.isOpenWater ? "acque libere" : `vasca ${poolLengthLabel(s.poolLengthMeters)}`];
   if (s.intensityFactor !== null) parts.push(`IF ${num(s.intensityFactor, 2)}`);
   if (s.stss !== null) parts.push(`carico ${Math.round(s.stss)}${s.loadEstimated ? " (stimato, senza giri)" : ""}`);
-  if (s.zoneMeters) {
-    const total = s.zoneMeters.reduce((sum, metres) => sum + metres, 0);
-    if (total > 0) {
-      parts.push(`zone ${s.zoneMeters.map((metres, i) => `Z${i + 1} ${Math.round((metres / total) * 100)}%`).join(", ")}`);
-    }
-  }
+  const shares = s.zoneMeters ? zoneShares(s.zoneMeters) : null;
+  if (shares) parts.push(`zone ${shares}`);
   return `- ${parts.join(" · ")}`;
 }
 
-/** Compact block of the six metrics, the zone paces and the last 5 swims. */
+/** Compact block of the six metrics, the zones A1–C3 and the last 5 swims. */
 export function swimMetricsForCoach(m: SwimMetrics): string {
   const last5 = m.sessions.slice(-5).reverse();
   return [
     "METRICHE DI NUOTO (calcolate da SwimForge sui dati dell'atleta; confronti solo con sé stesso)",
     cssLine(m),
-    zonesLine(m),
     loadLine(m),
     intensityLine(m),
     efficiencyLine(m),
     pacingLine(m),
     volumeLine(m),
+    ...zonesBlock(m),
     "ULTIME 5 NUOTATE",
     ...(last5.length ? last5.map(swimLine) : ["- nessuna nuotata negli ultimi 90 giorni"]),
   ]
@@ -221,7 +259,7 @@ export function swimMetricsGlossary(): string {
   const lines = [
     `- ${d.css.name}: passo/100 m sostenibile a lungo; velocità critica (Wakayoshi 1992) dai migliori tratti continui a stile libero, o test 400/200 (Ginn 1993); le stime sono di solito un po' più lente del vero.`,
     `- ${d.load.name}: carico (sTSS, TrainingPeaks) = IF³ × ore × 100 sui giri nuotati; giri non a stile libero IF 0,80 (convenzione nostra); forma 42 giorni, fatica 7, equilibrio = forma − fatica a fine di ieri: sopra +${b.veryRestedAbove} molto riposato, da +${b.freshAbove} a +${b.veryRestedAbove} fresco, da ${signed(b.neutralFrom, 0)} a +${b.freshAbove} neutro, da ${signed(b.buildingFrom, 0)} a ${signed(b.neutralFrom, 0)} in costruzione, sotto ${signed(b.buildingFrom, 0)} carico alto.`,
-    `- ${d.intensity.name}: zone Z1–Z5 dal passo soglia, solo stile libero (passi nel blocco sopra); Z3 oltre il ${t.mediumZonePct}% = molto lavoro medio (Seiler).`,
+    `- ${d.intensity.name}: zone A1–C3 (passi e sensazioni nel blocco ZONE), solo stile libero; facile = A1–A2, medio = B1–B2, intenso = C1–C3; medio oltre il ${t.mediumZonePct}% = molto lavoro medio (Seiler).`,
     `- ${d.efficiency.name}: Stroke Index = velocità × distanza per bracciata (Costill 1985), contro la tua base nella stessa vasca; se sale ma la distanza per bracciata no, vai solo più veloce.`,
     `- ${d.pacing.name}: variabilità sotto 2% molto regolare, 2–4% regolare, oltre irregolare; calo nel finale oltre ${t.pacingFadePct}%; distanza per bracciata che cala oltre ${t.dpsDropPct}% = la bracciata si accorcia con la fatica (Craig e Pendergast 1979).`,
     `- ${d.volume.name}: km e nuotate a settimana; serie = settimane di fila con almeno 2 nuotate.`,
@@ -233,7 +271,23 @@ export function swimMetricsGlossary(): string {
 export const SWIM_METRICS_COACH_RULES = [
   "- usa solo le metriche del blocco METRICHE DI NUOTO (spiegate nel GLOSSARIO) e i dati del contesto; citale quando servono;",
   "- se l'affidabilità del passo soglia è media, se è una stima o se mancano dati, dillo chiaramente;",
-  "- per i passi delle serie usa le zone di passo in m:ss/100 m del blocco METRICHE, mai solo percentuali della velocità; le zone valgono per lo stile libero;",
+  "- per i passi delle serie usa le zone A1–C3 del blocco ZONE DI PASSO, in m:ss/100 m, mai solo percentuali della velocità; le zone valgono per lo stile libero;",
   "- se il calo nel finale o il calo della distanza per bracciata sono alti, proponi una progressione della resistenza (ripetute brevi con poco recupero → serie spezzate → nuoto continuo) ed esercizi tecnici per allungare la bracciata (es. conteggio delle bracciate, scivolamento, catch-up); non limitarti a «nuota di più»;",
   "- non inventare altri indici o punteggi e non confrontare l'atleta con valori di altri nuotatori o di campioni.",
+].join("\n");
+
+const MAX_REP_LIMITS = PACE_ZONES.filter((zone) => zone.maxRepMeters !== null)
+  .map((zone) => `${zone.code} ${zone.maxRepMeters} m`)
+  .join(", ");
+
+/**
+ * How the coach writes workouts with the zones A1–C3 (chat and workout generation): every rep
+ * with zone, level and pace, within the maximum rep, each zone explained in plain words.
+ */
+export const PACE_ZONE_COACH_RULES = [
+  "- ogni ripetuta di un allenamento che proponi ha il codice della zona, il livello e il passo obiettivo dalle zone dell'atleta, per esempio «6×100 B2 · Soglia 1:49–1:54, rec. 20″»; senza passi (manca il passo soglia) usa zona, livello e fatica percepita (RPE) e dillo;",
+  `- non superare mai la ripetuta massima: ${MAX_REP_LIMITS} (per esempio non 4×300 in C1, ma 8×150);`,
+  "- l'atleta sta imparando le zone e il suo allenatore non le usa: spiega in breve, con parole semplici, ogni zona che usi: sensazione (respiro, quanto riesci a parlare, fatica da 1 a 10), passo e a cosa serve;",
+  `- l'allenamento deve potersi seguire anche senza conoscere le zone: accanto al codice scrivi sempre il livello (${INTENSITY_LEVELS.join(", ")}) e il passo;`,
+  "- le zone valgono per lo stile libero: negli altri stili, nella tecnica e nelle gambe usa zona e livello come sensazione di sforzo, senza passo.",
 ].join("\n");

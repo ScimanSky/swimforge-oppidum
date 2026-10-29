@@ -246,7 +246,7 @@ describe("invalidateUserCache", () => {
     await invalidateUserCache("42");
 
     expect(multi.del).toHaveBeenCalledWith(
-      expect.arrayContaining(["user:stats:42", `swim-metrics:v2:42:${dayKey(new Date())}`]),
+      expect.arrayContaining(["user:stats:42", `swim-metrics:v3:42:${dayKey(new Date())}`]),
     );
   });
 });

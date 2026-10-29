@@ -1,6 +1,6 @@
 /**
  * swimmer_profiles.preferences is one JSON object shared by several writers (Settings, the CSS
- * test). Each writer merges only its own keys with a single UPDATE in SQL, so two concurrent
+ * test, the manual zones). Each writer merges only its own keys with a single UPDATE in SQL, so two concurrent
  * saves of different keys never overwrite each other (no read-modify-write in the server).
  */
 import { eq, sql, type SQL } from "drizzle-orm";

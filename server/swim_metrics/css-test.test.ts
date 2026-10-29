@@ -102,7 +102,7 @@ describe("updateCssTest", () => {
     const { sql, params } = render(m.state.updates[0].values.preferences);
     expect(sql).toContain("||");
     expect(params).toEqual([JSON.stringify({ cssTest: test })]);
-    expect(m.deleteCached).toHaveBeenCalledWith(expect.stringMatching(/^swim-metrics:v2:42:\d{4}-\d{2}-\d{2}$/));
+    expect(m.deleteCached).toHaveBeenCalledWith(expect.stringMatching(/^swim-metrics:v3:42:\d{4}-\d{2}-\d{2}$/));
     // The Coach page insights were written from the old CSS: their cache rows go too.
     expect(m.db.delete).toHaveBeenCalledWith(aiInsightsCache);
   });

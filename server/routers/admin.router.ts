@@ -5,6 +5,7 @@ import {
     getPendingActivityInsights, listActivityInsights, markActivityInsightSeen,
 } from "./_shared";
 import { cssTestSchema } from "../swim_metrics/css-test";
+import { paceZonesSchema } from "../swim_metrics/pace-zones";
 
 // Seed function for badges and levels
 export async function seedBadgesAndLevels() {
@@ -221,6 +222,26 @@ export const statisticsRouter = router({
     clearCssTest: protectedProcedure.mutation(async ({ ctx }) => {
         const { updateCssTest } = await import("../swim_metrics/css-test");
         if (!(await updateCssTest(ctx.user.id, null))) {
+            throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
+        }
+        return { success: true };
+    }),
+
+    // The caller's own zone bounds («Le tue zone»), seconds per 100 m from A1|A2 to C1|C2: they
+    // win over the ones from the CSS. Errors in Italian, each on its field.
+    setPaceZones: protectedProcedure
+        .input(paceZonesSchema)
+        .mutation(async ({ ctx, input }) => {
+            const { updatePaceZones } = await import("../swim_metrics/pace-zones");
+            if (!(await updatePaceZones(ctx.user.id, input))) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
+            }
+            return { success: true };
+        }),
+
+    clearPaceZones: protectedProcedure.mutation(async ({ ctx }) => {
+        const { updatePaceZones } = await import("../swim_metrics/pace-zones");
+        if (!(await updatePaceZones(ctx.user.id, null))) {
             throw new TRPCError({ code: "NOT_FOUND", message: "Profilo non trovato" });
         }
         return { success: true };

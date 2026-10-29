@@ -3,11 +3,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   getSwimMetrics: vi.fn(),
   updateCssTest: vi.fn(),
+  updatePaceZones: vi.fn(),
   generateAIInsights: vi.fn(),
 }));
 
 vi.mock("../swim_metrics", () => ({ getSwimMetrics: h.getSwimMetrics }));
 vi.mock("../ai_insights", () => ({ generateAIInsights: h.generateAIInsights }));
+vi.mock("../swim_metrics/pace-zones", async () => {
+  const actual = await vi.importActual<typeof import("../swim_metrics/pace-zones")>("../swim_metrics/pace-zones");
+  return { ...actual, updatePaceZones: h.updatePaceZones };
+});
 vi.mock("../swim_metrics/css-test", async () => {
   const actual = await vi.importActual<typeof import("../swim_metrics/css-test")>("../swim_metrics/css-test");
   return { ...actual, updateCssTest: h.updateCssTest };
@@ -18,12 +23,29 @@ import { statisticsRouter } from "./admin.router";
 
 const ctx = { user: { id: 42 } as any, req: { protocol: "https", headers: {} } as any, res: {} as any };
 const anonymous = { user: null, req: { protocol: "https", headers: {} } as any, res: {} as any };
+const OWNER_ZONES = { a1a2: 128, a2b1: 121, b1b2: 114, b2c1: 109, c1c2: 104 };
+
+/** A mutation through the HTTP handler, as the client sends it. */
+async function post(procedure: string, input: unknown, context: unknown = ctx) {
+  const response = await fetchRequestHandler({
+    endpoint: "/trpc",
+    req: new Request(`http://localhost/trpc/${procedure}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ json: input }),
+    }),
+    router: statisticsRouter,
+    createContext: () => context as any,
+  });
+  return { status: response.status, body: (await response.json()) as any };
+}
 
 describe("statistics: swim metrics procedures", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
     h.updateCssTest.mockResolvedValue(true);
+    h.updatePaceZones.mockResolvedValue(true);
   });
 
   it("getMetrics returns the caller's metrics only", async () => {
@@ -48,12 +70,44 @@ describe("statistics: swim metrics procedures", () => {
     expect(h.generateAIInsights).toHaveBeenCalledWith(metrics, 42);
   });
 
-  it.each(["getMetrics", "getInsights", "setCssTest", "clearCssTest"] as const)("%s requires login", async (name) => {
-    const caller = statisticsRouter.createCaller(anonymous as any) as any;
-    const input = name === "setCssTest" ? { t200Seconds: 170, t400Seconds: 360, date: "2026-10-20" } : undefined;
-    await expect(caller[name](input)).rejects.toMatchObject({ code: "UNAUTHORIZED" });
-    expect(h.getSwimMetrics).not.toHaveBeenCalled();
-    expect(h.updateCssTest).not.toHaveBeenCalled();
+  it.each(["getMetrics", "getInsights", "setCssTest", "clearCssTest", "setPaceZones", "clearPaceZones"] as const)(
+    "%s requires login",
+    async (name) => {
+      const caller = statisticsRouter.createCaller(anonymous as any) as any;
+      const input =
+        name === "setCssTest"
+          ? { t200Seconds: 170, t400Seconds: 360, date: "2026-10-20" }
+          : name === "setPaceZones"
+            ? OWNER_ZONES
+            : undefined;
+      await expect(caller[name](input)).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+      expect(h.getSwimMetrics).not.toHaveBeenCalled();
+      expect(h.updateCssTest).not.toHaveBeenCalled();
+      expect(h.updatePaceZones).not.toHaveBeenCalled();
+    },
+  );
+
+  it("setPaceZones saves the caller's zones", async () => {
+    expect(await statisticsRouter.createCaller(ctx).setPaceZones(OWNER_ZONES)).toEqual({ success: true });
+    expect(h.updatePaceZones).toHaveBeenCalledWith(42, OWNER_ZONES);
+  });
+
+  it("setPaceZones errors carry the Italian message on their field (zodError.fieldErrors)", async () => {
+    const { status, body } = await post("setPaceZones", { ...OWNER_ZONES, a1a2: 300, c1c2: 110 });
+    expect(status).toBe(400);
+    expect(body.error.json.data.zodError.fieldErrors).toEqual({
+      a1a2: ["Scrivi un passo tra 1:00 e 4:00 per 100 m."],
+      c1c2: ["Il confine tra C1 e C2 deve essere più veloce di quello tra B2 e C1 (1:49)."],
+    });
+    expect(h.updatePaceZones).not.toHaveBeenCalled();
+  });
+
+  it("clearPaceZones removes the caller's zones; NOT_FOUND without a profile", async () => {
+    expect(await statisticsRouter.createCaller(ctx).clearPaceZones()).toEqual({ success: true });
+    expect(h.updatePaceZones).toHaveBeenCalledWith(42, null);
+    h.updatePaceZones.mockResolvedValue(false);
+    await expect(statisticsRouter.createCaller(ctx).clearPaceZones()).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await expect(statisticsRouter.createCaller(ctx).setPaceZones(OWNER_ZONES)).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
   it("setCssTest saves the caller's test", async () => {
@@ -75,17 +129,7 @@ describe("statistics: swim metrics procedures", () => {
 
   // Through the HTTP handler: the client reads error.data.zodError.fieldErrors[field].
   async function postSetCssTest(input: unknown, context: unknown = ctx) {
-    const response = await fetchRequestHandler({
-      endpoint: "/trpc",
-      req: new Request("http://localhost/trpc/setCssTest", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ json: input }),
-      }),
-      router: statisticsRouter,
-      createContext: () => context as any,
-    });
-    return { status: response.status, body: (await response.json()) as any };
+    return post("setCssTest", input, context);
   }
 
   it("setCssTest errors carry the Italian message on their field (zodError.fieldErrors)", async () => {

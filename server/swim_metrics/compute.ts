@@ -6,11 +6,15 @@ import {
   addDaysToKey,
   dayKey,
   daysBetweenKeys,
+  paceZoneBoundsFromCss,
+  paceZoneRanges,
   weekStartOfKey,
   type CssResult,
+  type PaceZoneBounds,
   type SessionMetrics,
   type SwimMetrics,
-  type Zones5,
+  type ThresholdSource,
+  type Zones7,
 } from "@shared/swimMetrics";
 import { cssFromTest, cssHistory, cssLapsOf, CSS_WINDOW_DAYS, type CssEstimate, type CssLap } from "./css";
 import { efficiencySummary, sessionEfficiency } from "./efficiency";
@@ -22,12 +26,16 @@ import { volumeSummary } from "./volume";
 import { addZones, emptyZones, intensitySplit, sessionZones, unclassifiedMeters } from "./zones";
 
 export type CssTest = { t200Seconds: number; t400Seconds: number; date: string };
+/** The user's own zone bounds («Le tue zone»), from preferences.paceZones. */
+export type ManualPaceZones = { bounds: PaceZoneBounds; updatedAt: string | null };
 
 export type SwimMetricsInput = {
   /** Swims of the last 180 days, with their laps. */
   activities: MetricActivity[];
   /** The user's 400/200 test, whatever its age. */
   cssTest: CssTest | null;
+  /** The user's manual zone bounds: they win over the ones from the CSS. */
+  paceZones?: ManualPaceZones | null;
   /** Dates of the swims over a longer window, for the weekly streak. */
   streakDates?: Date[];
   /** Or the swims per Rome week (Monday «YYYY-MM-DD») over that window, counted by the database. */
@@ -49,18 +57,20 @@ const INTENSITY_WEEKS = 8;
 export const MISSING = {
   css: "Servono almeno due tratti continui a stile libero in vasca negli ultimi 90 giorni, tra 2 e 30 minuti, uno lungo almeno il doppio dell'altro (es. 200 e 400 m), nuotati a buon ritmo. Oppure inserisci un test.",
   load: "Serve il passo soglia: inserisci un test o nuota due tratti continui a stile libero, uno lungo almeno il doppio dell'altro (es. 200 e 400 m).",
-  intensity: "Servono il passo soglia e nuotate con i giri.",
+  intensity: "Servono il passo soglia (o le tue zone) e nuotate con i giri.",
   intensityNoLaps: "Nessuna nuotata in vasca con i giri negli ultimi 28 giorni.",
   intensityNoFreestyle:
     "Nelle ultime 4 settimane non ci sono giri a stile libero da classificare: le zone si calcolano solo sullo stile libero.",
 } as const;
 
 type SwimCss = { speedMps: number; source: "stima" | "test" };
+/** The threshold of a swim's load: its CSS, or the B2/C1 boundary of the manual zones. */
+type SwimThreshold = { speedMps: number; source: ThresholdSource };
 
 type InternalSession = {
   activity: MetricActivity;
   cssSpeed: number | null;
-  cssSource: "stima" | "test" | null;
+  cssSource: ThresholdSource | null;
   /** Σ active laps; null without laps. */
   swimDistanceMeters: number | null;
   movingSeconds: number;
@@ -68,7 +78,7 @@ type InternalSession = {
   intensityFactor: number | null;
   stss: number | null;
   loadEstimated: boolean;
-  zoneMeters: Zones5 | null;
+  zoneMeters: Zones7 | null;
   unclassifiedMeters: number | null;
   strokeIndex: number | null;
   dpsMeters: number | null;
@@ -145,8 +155,17 @@ function cssResolver(
   };
 }
 
-function computeSession(activity: MetricActivity, css: SwimCss | null): InternalSession {
+/**
+ * One swim: the load on its threshold; the zones on the manual bounds, else on the bounds of its
+ * own CSS (the automatic zones follow the CSS valid on the swim's day).
+ */
+function computeSession(
+  activity: MetricActivity,
+  css: SwimThreshold | null,
+  manualBounds: PaceZoneBounds | null,
+): InternalSession {
   const cssSpeed = css?.speedMps ?? null;
+  const zoneBounds = manualBounds ?? (cssSpeed ? paceZoneBoundsFromCss(100 / cssSpeed) : null);
   const active = activeLaps(activity.laps);
   const hasLaps = active.length > 0;
   const pool = isPoolSwim(activity);
@@ -173,7 +192,7 @@ function computeSession(activity: MetricActivity, css: SwimCss | null): Internal
     hasLaps,
     ...load,
     loadEstimated: load.stss !== null && !hasLaps,
-    zoneMeters: pool && hasLaps && cssSpeed ? sessionZones(active, cssSpeed) : null,
+    zoneMeters: pool && hasLaps && zoneBounds ? sessionZones(active, zoneBounds, activity.poolLengthMeters) : null,
     unclassifiedMeters: pool && hasLaps ? unclassifiedMeters(active) : null,
     ...efficiency,
     pacingCv: pacing.cv,
@@ -240,15 +259,33 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
     missing: current ? null : MISSING.css,
   };
 
+  // ── Zones in effect ──
+  const manual = input.paceZones ?? null;
+  const autoBounds = current ? paceZoneBoundsFromCss(current.paceSecondsPer100) : null;
+  const effectiveBounds = manual?.bounds ?? autoBounds;
+  const zones: SwimMetrics["zones"] = {
+    source: manual ? "manuali" : autoBounds ? "auto" : null,
+    ranges: effectiveBounds ? paceZoneRanges(effectiveBounds) : [],
+    bounds: effectiveBounds,
+    autoBounds,
+    manualUpdatedAt: manual?.updatedAt ?? null,
+  };
+
   // ── Sessions ──
+  // The load and the automatic zones need today's CSS, so that they always agree with
+  // css.current. Without it, manual zones lend their B2/C1 boundary as the threshold.
   const resolveCss = cssResolver(history, test);
-  const sessions = activities.map((a) => computeSession(a, resolveCss(a.day)));
-  // The load and the zones need today's CSS, so that they always agree with css.current.
-  const hasCss = current !== null;
+  const manualThreshold: SwimThreshold | null = manual
+    ? { speedMps: 100 / manual.bounds.b2c1, source: "zone manuali" }
+    : null;
+  const thresholdOf = (day: string): SwimThreshold | null =>
+    current ? (resolveCss(day) ?? manualThreshold) : manualThreshold;
+  const sessions = activities.map((a) => computeSession(a, thresholdOf(a.day), manual?.bounds ?? null));
+  const hasThreshold = current !== null || manual !== null;
 
   // ── Load ──
-  let load: SwimMetrics["load"] = { today: null, rampPerWeek: null, days: [], missing: MISSING.load };
-  if (hasCss) {
+  let load: SwimMetrics["load"] = { threshold: null, today: null, rampPerWeek: null, days: [], missing: MISSING.load };
+  if (hasThreshold) {
     const daily = new Map<string, number>();
     for (const s of sessions) {
       if (s.stss !== null) daily.set(s.activity.day, (daily.get(s.activity.day) ?? 0) + s.stss);
@@ -256,6 +293,9 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
     const series = loadSeries(daily, historyFrom, today);
     const last = series[series.length - 1];
     load = {
+      threshold: current
+        ? { paceSecondsPer100: current.paceSecondsPer100, source: current.source }
+        : { paceSecondsPer100: manual!.bounds.b2c1, source: "zone manuali" },
       today: {
         ctl: round(last.ctl, 1)!,
         atl: round(last.atl, 1)!,
@@ -300,7 +340,7 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
   const split = intensitySplit(zones28);
   const zoned28 = zones28.reduce((sum, metres) => sum + metres, 0);
   const intensity: SwimMetrics["intensity"] = {
-    last28: hasCss && split
+    last28: hasThreshold && split
       ? {
           zoneMeters: zones28,
           ...split,
@@ -313,7 +353,7 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
       zoneMeters: perWeek.get(weekStart)!.zones,
       unclassifiedMeters: perWeek.get(weekStart)!.unclassified,
     })),
-    missing: !hasCss
+    missing: !hasThreshold
       ? MISSING.intensity
       : split
         ? null
@@ -343,6 +383,7 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
     generatedAt: now.toISOString(),
     sessions: sessions.filter((s) => s.activity.day >= shownFrom).map(toSessionMetrics),
     css,
+    zones,
     load,
     intensity,
     efficiency: {

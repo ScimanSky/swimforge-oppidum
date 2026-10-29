@@ -125,6 +125,30 @@ describe("SWIM_METRIC_DEFINITIONS", () => {
     expect(SWIM_METRIC_DEFINITIONS.css.source).toMatch(/Wakayoshi/);
     expect(SWIM_METRIC_DEFINITIONS.efficiency.source).toMatch(/Costill/);
   });
+
+  it("intensity speaks the zones A1–C3, with the bounds said as our convention approved by the owner", () => {
+    const intensity = SWIM_METRIC_DEFINITIONS.intensity;
+    expect(intensity.formula).toContain(
+      "A1 sotto 85%, A2 85–90%, B1 90–95%, B2 95–100%, C1 100–104%, C2 sopra 104%",
+    );
+    expect(intensity.formula).toContain("C3: un tratto di al massimo 25 m (o una vasca) più veloce del confine C1/C2");
+    expect(intensity.formula).toContain("facile = A1 + A2, medio = B1 + B2, intenso = C1 + C2 + C3");
+    expect(intensity.conventions).toEqual(
+      expect.arrayContaining([
+        "I confini delle zone sono una convenzione di SwimForge, approvata dal suo ideatore: il passo soglia è il confine tra B2 e C1. Se il tuo allenatore usa altri valori, inseriscili in «Le tue zone».",
+        "Le tue zone, quando le inserisci, valgono ovunque: classificazione dei giri, questo riquadro, il coach e gli allenamenti.",
+        "I cinque livelli sono allineati alle zone: Facile = A1, Aerobico = A2, Medio = B1, Soglia = B2 + C1, Sopra soglia = C2 + C3.",
+        "Se la zona media (B1–B2) supera circa il 35% del volume: molto lavoro in zona media. È un'indicazione basata sugli studi, non una regola.",
+      ]),
+    );
+    expect(JSON.stringify(intensity)).not.toMatch(/\bZ[1-5]\b/);
+  });
+
+  it("load: without a CSS the B2/C1 boundary of the manual zones is the threshold", () => {
+    expect(SWIM_METRIC_DEFINITIONS.load.conventions).toContain(
+      "Senza passo soglia ma con le tue zone, la soglia del carico è il confine tra B2 e C1 delle tue zone (fonte: zone manuali).",
+    );
+  });
 });
 
 describe("readings shared by the interface and the coach", () => {

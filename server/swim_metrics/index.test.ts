@@ -57,7 +57,7 @@ vi.mock("../lib/cache", async () => {
 });
 
 import { aiInsightsCache } from "../../drizzle/schema";
-import { getSwimMetrics, invalidateSwimMetrics, loadStrokeIndexProgress, parseCssTest } from "./index";
+import { getSwimMetrics, invalidateSwimMetrics, loadStrokeIndexProgress, parseCssTest, parsePaceZones } from "./index";
 
 let lapId = 0;
 function laps(activityId: number, specs: Array<[number, number, string | null, number | null, number | null]>) {
@@ -152,16 +152,16 @@ describe("getSwimMetrics", () => {
   it("caches per user and Rome day for one hour, so today's load rolls at midnight", async () => {
     useData();
     await getSwimMetrics(42, NOW);
-    expect(m.getOrSetCached).toHaveBeenCalledWith("swim-metrics:v2:42:2026-10-29", expect.any(Function), 3600);
+    expect(m.getOrSetCached).toHaveBeenCalledWith("swim-metrics:v3:42:2026-10-29", expect.any(Function), 3600);
     // 23:30Z on 29/10 is already 30/10 in Rome.
     await getSwimMetrics(42, new Date("2026-10-29T23:30:00Z"));
-    expect(m.getOrSetCached).toHaveBeenLastCalledWith("swim-metrics:v2:42:2026-10-30", expect.any(Function), 3600);
+    expect(m.getOrSetCached).toHaveBeenLastCalledWith("swim-metrics:v3:42:2026-10-30", expect.any(Function), 3600);
   });
 
   it("invalidation drops today's cached metrics and the AI insights rows", async () => {
     m.db.deleted.length = 0;
     await invalidateSwimMetrics(42, NOW);
-    expect(m.deleteCached).toHaveBeenCalledWith("swim-metrics:v2:42:2026-10-29");
+    expect(m.deleteCached).toHaveBeenCalledWith("swim-metrics:v3:42:2026-10-29");
     expect(m.db.deleted).toEqual([aiInsightsCache]);
   });
 
@@ -262,6 +262,14 @@ describe("getSwimMetrics", () => {
     expect(expired.css.current).toMatchObject({ source: "stima", testDate: null });
   });
 
+  it("uses the manual zones saved in the preferences", async () => {
+    const bounds = { a1a2: 130, a2b1: 122, b1b2: 116, b2c1: 110, c1c2: 105 };
+    useData({ cssTest: null, paceZones: { bounds, updatedAt: "2026-10-25T09:00:00.000Z" } });
+    const metrics = await getSwimMetrics(42, NOW);
+    expect(metrics.zones).toMatchObject({ source: "manuali", bounds, manualUpdatedAt: "2026-10-25T09:00:00.000Z" });
+    expect(metrics.zones.autoBounds!.b2c1).toBeCloseTo(104.3, 1);
+  });
+
   it("without swims says what is missing", async () => {
     m.state.rowsFor = (table) => (table === swimmerProfiles ? [{ preferences: null }] : []);
     const metrics = await getSwimMetrics(42, NOW);
@@ -273,7 +281,8 @@ describe("getSwimMetrics", () => {
     expect(metrics.load).toMatchObject({ today: null, rampPerWeek: null, days: [] });
     expect(metrics.load.missing).toMatch(/passo soglia/);
     expect(metrics.intensity.last28).toBeNull();
-    expect(metrics.intensity.missing).toBe("Servono il passo soglia e nuotate con i giri.");
+    expect(metrics.intensity.missing).toBe("Servono il passo soglia (o le tue zone) e nuotate con i giri.");
+    expect(metrics.zones).toMatchObject({ source: null, ranges: [] });
     expect(metrics.efficiency.missing).not.toBeNull();
     expect(metrics.pacing.missing).not.toBeNull();
     expect(metrics.volume).toMatchObject({ avgKm4: 0, avgSessions4: 0, changePct: null, streakWeeks: 0 });
@@ -294,6 +303,26 @@ describe("parseCssTest", () => {
     expect(parseCssTest({ cssTest: { t200Seconds: 170, t400Seconds: 160, date: "2026-10-20" } })).toBeNull();
     expect(parseCssTest({ cssTest: { t200Seconds: 170, t400Seconds: 360, date: "20/10/2026" } })).toBeNull();
     expect(parseCssTest("{")).toBeNull();
+  });
+});
+
+describe("parsePaceZones", () => {
+  const bounds = { a1a2: 128, a2b1: 121, b1b2: 114, b2c1: 109, c1c2: 104 };
+
+  it("reads the manual bounds from the preferences, as object or JSON", () => {
+    const paceZones = { bounds, updatedAt: "2026-10-25T09:00:00.000Z" };
+    expect(parsePaceZones({ paceZones })).toEqual(paceZones);
+    expect(parsePaceZones(JSON.stringify({ paceZones }))).toEqual(paceZones);
+    expect(parsePaceZones({ paceZones: { bounds } })).toEqual({ bounds, updatedAt: null });
+  });
+
+  it("ignores missing or malformed bounds", () => {
+    expect(parsePaceZones(null)).toBeNull();
+    expect(parsePaceZones({})).toBeNull();
+    expect(parsePaceZones({ paceZones: { bounds: { ...bounds, b1b2: "1:54" } } })).toBeNull();
+    expect(parsePaceZones({ paceZones: { bounds: { ...bounds, b2c1: 121 } } })).toBeNull(); // not decreasing
+    expect(parsePaceZones({ paceZones: { bounds: { ...bounds, a1a2: 300 } } })).toBeNull(); // over 4:00
+    expect(parsePaceZones({ paceZones: { bounds: { a1a2: 128 } } })).toBeNull();
   });
 });
 
@@ -346,9 +375,23 @@ describe("getSwimMetrics: the owner's CSS (integration fixture)", () => {
     ]);
     expect(css.droppedPoints!.map((p) => [p.distanceMeters, p.seconds, p.slowerThan.distanceMeters])).toEqual([[300, 356, 400]]);
     expect(css.dPrimeMeters).toBeCloseTo(15.7, 1);
-    // The coach reads the zones as paces for this CSS.
+    // The owner's zones A1–C3 for this CSS, to the tenth of a second.
+    expect(metrics.zones.source).toBe("auto");
+    const tenth = (pace: number | null) => (pace === null ? null : Math.round(pace * 10) / 10);
+    expect(metrics.zones.ranges.map((r) => [r.code, tenth(r.fastPace), tenth(r.slowPace)])).toEqual([
+      ["A1", 127.6, null],
+      ["A2", 120.6, 127.6],
+      ["B1", 114.2, 120.6],
+      ["B2", 108.5, 114.2],
+      ["C1", 104.3, 108.5],
+      ["C2", null, 104.3],
+      ["C3", null, 104.3],
+    ]);
+    // The coach reads them as paces with the level and the maximum rep.
     const { swimMetricsForCoach } = await import("./coach-context");
-    expect(swimMetricsForCoach(metrics)).toContain("Z2 Aerobico 1:58–2:08");
+    const text = swimMetricsForCoach(metrics);
+    expect(text).toContain("- A2 Fondo lento · livello Aerobico: 2:01–2:08/100 m");
+    expect(text).toContain("- C1 Soglia anaerobica · livello Soglia: 1:44–1:49/100 m · max 200 m a ripetuta");
   });
 });
 

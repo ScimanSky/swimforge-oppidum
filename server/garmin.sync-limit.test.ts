@@ -170,7 +170,7 @@ describe("invalidateAfterGarminSync", () => {
   ] as const)("%o → drops metrics and insights: %s", async (changes, dropped) => {
     await invalidateAfterGarminSync(7, changes);
     if (dropped) {
-      expect(h.deleteCached).toHaveBeenCalledWith(expect.stringMatching(/^swim-metrics:v2:7:\d{4}-\d{2}-\d{2}$/));
+      expect(h.deleteCached).toHaveBeenCalledWith(expect.stringMatching(/^swim-metrics:v3:7:\d{4}-\d{2}-\d{2}$/));
       expect(deleted).toEqual([aiInsightsCache]);
     } else {
       expect(h.deleteCached).not.toHaveBeenCalled();

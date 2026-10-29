@@ -4,11 +4,19 @@
  * in the Rome time zone). Design: docs/plans/2026-10-29-swim-metrics-design.md.
  */
 
+import type { PaceZoneBounds, PaceZoneRange, Zones7 } from "./paceZones";
+
+export * from "./paceZones";
+
 export const SWIM_METRICS_TIMEZONE = "Europe/Rome";
 
 // ─── Result types (server → clients) ────────────────────────────────────────
 
-export type Zones5 = [number, number, number, number, number]; // metres in Z1..Z5
+/**
+ * Where a threshold comes from: the estimate, the 400/200 test, or (without a CSS) the B2/C1
+ * boundary of the user's manual zones.
+ */
+export type ThresholdSource = "stima" | "test" | "zone manuali";
 export type CssPoint = {
   distanceMeters: number; seconds: number; date: string;
   /** The CSS distance the lap matched, in the pool's unit (e.g. 200 yd is 182.9 m): for labels. */
@@ -30,7 +38,9 @@ export type SessionMetrics = {
   activityId: number; date: string; poolLengthMeters: number | null; isOpenWater: boolean;
   /** Total of the activity (volume). */
   distanceMeters: number; movingSeconds: number; hasLaps: boolean;
-  intensityFactor: number | null; stss: number | null; zoneMeters: Zones5 | null;
+  intensityFactor: number | null; stss: number | null;
+  /** Metres of active freestyle laps per zone A1..C3; null without laps or zones. */
+  zoneMeters: Zones7 | null;
   strokeIndex: number | null; dpsMeters: number | null; strokeRate: number | null; swolf: number | null;
   pacingCv: number | null; pacingFade: number | null;
   /** Σ active laps (the swum distance behind pace-derived values); null without laps. */
@@ -39,16 +49,36 @@ export type SessionMetrics = {
   loadEstimated?: boolean;
   /** Active metres not zoned: other strokes, drill, kick, no stroke (pool swims with laps). */
   unclassifiedMeters?: number | null;
-  /** The CSS this swim's load and zones use: a valid test or its month's estimate; null without. */
-  cssPaceSecondsPer100?: number | null; cssSource?: "stima" | "test" | null;
+  /**
+   * The threshold this swim's load uses: a valid test or its month's estimate, else the B2/C1
+   * boundary of the manual zones («zone manuali»); null without. Automatic zones use it too.
+   */
+  cssPaceSecondsPer100?: number | null; cssSource?: ThresholdSource | null;
   /** Stroke holding in the repeat sets (distance-weighted): DPS drop and stroke rate rise, %. */
   dpsDropPct?: number | null; strokeRateRisePct?: number | null;
 };
+/** The pace zones A1–C3 in effect: manual bounds win over the ones computed from the CSS. */
+export type SwimZones = {
+  /** «auto»: from today's CSS; «manuali»: the user's bounds; null: neither (no CSS, no manual zones). */
+  source: "auto" | "manuali" | null;
+  /** The seven zones as paces, A1..C3; empty when source is null. */
+  ranges: PaceZoneRange[];
+  /** The effective bounds (s/100 m); null when source is null. */
+  bounds: PaceZoneBounds | null;
+  /** What the automatic calculation gives from today's CSS, also when manual bounds win. */
+  autoBounds: PaceZoneBounds | null;
+  /** When the manual bounds were saved (ISO); null without manual bounds. */
+  manualUpdatedAt: string | null;
+};
+
 export type SwimMetrics = {
   generatedAt: string;
   sessions: SessionMetrics[]; // last 90 days, oldest first
   css: { current: CssResult | null; history: { month: string; paceSecondsPer100: number | null }[]; missing: string | null };
+  zones: SwimZones;
   load: {
+    /** The threshold of today's load: the CSS, else the B2/C1 boundary of the manual zones. */
+    threshold: { paceSecondsPer100: number; source: ThresholdSource } | null;
     today: { ctl: number; atl: number; tsb: number; reading: TsbReading } | null;
     rampPerWeek: number | null;
     days: { date: string; stss: number; ctl: number; atl: number; tsb: number }[]; // last 90 days
@@ -56,13 +86,14 @@ export type SwimMetrics = {
   };
   intensity: {
     last28: {
-      zoneMeters: Zones5; easyPct: number; mediumPct: number; hardPct: number;
+      /** Metres per zone A1..C3; facile = A1+A2, medio = B1+B2, intenso = C1+C2+C3. */
+      zoneMeters: Zones7; easyPct: number; mediumPct: number; hardPct: number;
       /** Active metres not zoned (other strokes, drill, kick) in the 28 days. */
       unclassifiedMeters?: number;
       /** Zoned metres / all metres swum in the 28 days × 100 (whole percent). */
       coveragePct?: number;
     } | null;
-    weeks: { weekStart: string; zoneMeters: Zones5; unclassifiedMeters?: number }[]; // last 8 weeks
+    weeks: { weekStart: string; zoneMeters: Zones7; unclassifiedMeters?: number }[]; // last 8 weeks
     missing: string | null;
   };
   efficiency: {
@@ -149,22 +180,26 @@ export const SWIM_METRIC_DEFINITIONS: Record<SwimMetricKey, SwimMetricDefinition
       "Sotto −30: carico alto.",
       "Forma che cresce più di 8 punti a settimana: crescita molto rapida.",
       "Giri non a stile libero (altri stili, tecnica, gambe, stile non registrato): IF fisso 0,80, perché il passo soglia è a stile libero. È una convenzione nostra.",
+      "Senza passo soglia ma con le tue zone, la soglia del carico è il confine tra B2 e C1 delle tue zone (fonte: zone manuali).",
     ],
   },
   intensity: {
     name: "Intensità",
     measures:
-      "Come si divide il tuo volume tra lavoro facile, medio e intenso, in base al passo di ogni giro rispetto al passo soglia.",
+      "Come si divide il tuo volume tra le zone di passo A1–C3, dalla più lenta alla più esplosiva, e quindi tra lavoro facile, medio e intenso.",
     formula:
-      "Ogni giro attivo a stile libero va in una zona secondo la sua velocità rispetto alla velocità soglia: Z1 sotto 85%, Z2 85–92%, Z3 92–97%, Z4 97–103%, Z5 sopra 103% (in passo: passo soglia / percentuale). Si somma la distanza per zona. Gli altri stili, la tecnica e le gambe restano non classificati; la copertura è la quota dei metri delle ultime 4 settimane che sta nelle zone.",
+      "Ogni giro attivo a stile libero va in una zona secondo il suo passo rispetto al passo soglia, in % della velocità soglia: A1 sotto 85%, A2 85–90%, B1 90–95%, B2 95–100%, C1 100–104%, C2 sopra 104% (in passo: passo soglia / percentuale; un passo uguale a un confine va nella zona più veloce). C3: un tratto di al massimo 25 m (o una vasca) più veloce del confine C1/C2; più lungo è C2. Con «Le tue zone» valgono i tuoi confini. Si somma la distanza per zona; facile = A1 + A2, medio = B1 + B2, intenso = C1 + C2 + C3. Gli altri stili, la tecnica e le gambe restano non classificati; la copertura è la quota dei metri delle ultime 4 settimane che sta nelle zone.",
     source:
-      "Zone di passo relative al passo soglia (Swim Smooth, TrainingPeaks); distribuzione dell'intensità polarizzata o piramidale (Seiler, 2010; Stöggl e Sperlich, 2014).",
+      "Zone di passo A1–C3 della scuola di allenamento italiana, legate al passo soglia (Swim Smooth, TrainingPeaks); distribuzione dell'intensità polarizzata o piramidale (Seiler, 2010; Stöggl e Sperlich, 2014).",
     howToRead:
-      "Gli studi sugli sport di resistenza indicano che la maggior parte del volume facile e una piccola parte intensa funzionano meglio di tanto lavoro medio.",
+      "Gli studi sugli sport di resistenza indicano che la maggior parte del volume facile e una piccola parte intensa funzionano meglio di tanto lavoro medio. Più alta è la zona, più è intensa e più corte sono le ripetute.",
     conventions: [
-      "I confini delle zone sono una convenzione.",
+      "I confini delle zone sono una convenzione di SwimForge, approvata dal suo ideatore: il passo soglia è il confine tra B2 e C1. Se il tuo allenatore usa altri valori, inseriscili in «Le tue zone».",
+      "Le tue zone, quando le inserisci, valgono ovunque: classificazione dei giri, questo riquadro, il coach e gli allenamenti.",
+      "Ripetuta massima: C1 200 m, C2 150 m, C3 25 m.",
+      "I cinque livelli sono allineati alle zone: Facile = A1, Aerobico = A2, Medio = B1, Soglia = B2 + C1, Sopra soglia = C2 + C3.",
       "Le zone valgono solo per lo stile libero, perché il passo soglia è a stile libero: gli altri stili non sono classificati.",
-      "Se la zona media (Z3) supera circa il 35% del volume: molto lavoro in zona media. È un'indicazione basata sugli studi, non una regola.",
+      "Se la zona media (B1–B2) supera circa il 35% del volume: molto lavoro in zona media. È un'indicazione basata sugli studi, non una regola.",
     ],
   },
   efficiency: {
@@ -243,7 +278,7 @@ export function tsbReadingOf(tsb: number): TsbReading {
 }
 
 export const SWIM_METRIC_THRESHOLDS = {
-  /** Above this share of Z3: «molto lavoro in zona media». */
+  /** Above this share of B1 + B2: «molto lavoro in zona media». */
   mediumZonePct: 35,
   /** CTL growth above this many points a week: «crescita molto rapida». */
   rampPerWeek: 8,
@@ -258,28 +293,6 @@ export function pacingCvReading(cv: number): "molto regolare" | "regolare" | "ir
   if (cv < 2) return "molto regolare";
   if (cv <= 4) return "regolare";
   return "irregolare";
-}
-
-// ─── Pace zones ─────────────────────────────────────────────────────────────
-
-/** Upper bounds of Z1..Z4 as a share of the CSS speed (a boundary goes to the upper zone). */
-export const ZONE_SPEED_BOUNDS = [0.85, 0.92, 0.97, 1.03] as const;
-export const ZONE_NAMES = ["Facile", "Aerobico", "Medio", "Soglia", "Sopra soglia"] as const;
-
-/**
- * The five zones as paces (s/100 m) for a CSS pace: pace = CSS pace / speed ratio. `slowPace` is
- * the slow end (null for Z1, open-ended), `fastPace` the fast end (null for Z5).
- */
-export function zonePaceRanges(
-  cssPaceSecondsPer100: number,
-): { zone: 1 | 2 | 3 | 4 | 5; name: string; fastPace: number | null; slowPace: number | null }[] {
-  const paceAt = (ratio: number) => cssPaceSecondsPer100 / ratio;
-  return ZONE_NAMES.map((name, index) => ({
-    zone: (index + 1) as 1 | 2 | 3 | 4 | 5,
-    name,
-    fastPace: index < ZONE_SPEED_BOUNDS.length ? paceAt(ZONE_SPEED_BOUNDS[index]) : null,
-    slowPace: index > 0 ? paceAt(ZONE_SPEED_BOUNDS[index - 1]) : null,
-  }));
 }
 
 // ─── Pools ──────────────────────────────────────────────────────────────────

@@ -130,7 +130,8 @@ export const profileRouter = router({
             }
 
             // Settings sends only its own preference keys: one SQL merge into the stored ones, so
-            // other keys (e.g. cssTest, saved by statistics.setCssTest) survive concurrent saves.
+            // other keys (e.g. cssTest and paceZones, saved by statistics.setCssTest and
+            // statistics.setPaceZones) survive concurrent saves.
             // Keys sent as undefined stay as stored.
             if (preferences) {
                 await mergeSwimmerPreferences(ctx.user.id, preferencesPatch(preferences));

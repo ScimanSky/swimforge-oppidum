@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { SWIM_METRICS_COACH_RULES, swimMetricsForCoach, swimMetricsGlossary } from "./coach-context";
+import {
+  PACE_ZONE_COACH_RULES,
+  SWIM_METRICS_COACH_RULES,
+  swimMetricsForCoach,
+  swimMetricsGlossary,
+} from "./coach-context";
+import { paceZoneRanges } from "@shared/swimMetrics";
 import { sampleSwimMetrics } from "./test-helpers";
 
 const OLD_NAMES = [/\bSEI\b/, /\bTCI\b/, /\bSER\b/, /\bACS\b/, /\bRRS\b/, /\bPOI\b/, /Performance Index/i, /Consistency Score/i];
@@ -13,7 +19,8 @@ describe("swimMetricsForCoach", () => {
     expect(text).toContain("scartato 300 m in 5:00 il 10/10 (più lento del tuo 400 m)");
     expect(text).toContain("equilibrio −7,8 (neutro), cioè forma − fatica a fine di ieri");
     expect(text).toContain("forma +2,1 punti in 7 giorni");
-    expect(text).toContain("facile 72% · medio 18% · intenso 10%");
+    expect(text).toContain("facile (A1–A2) 72% · medio (B1–B2) 18% · intenso (C1–C3) 10%");
+    expect(text).toContain("per zona A1 30%, A2 42%, B1 10%, B2 8%, C1 6%, C2 3%, C3 1%");
     expect(text).toContain("Stroke Index, vasca 25 m");
     expect(text).toContain("base 2,02 su 9 nuotate (+4,0%)");
     expect(text).toContain("variabilità 2,8% (regolare)");
@@ -22,13 +29,51 @@ describe("swimMetricsForCoach", () => {
     for (const name of OLD_NAMES) expect(text).not.toMatch(name);
   });
 
-  it("gives the zones as paces for the current CSS, never as speed percentages alone", () => {
+  it("gives the seven zones with the user's paces, levels, maximum reps, sensations and purpose", () => {
     const text = swimMetricsForCoach(sampleSwimMetrics()); // CSS 1:44.3
-    expect(text).toContain(
-      "Zone di passo per questo passo soglia (solo stile libero): Z1 Facile più lento di 2:03 · Z2 Aerobico 1:53–2:03 · Z3 Medio 1:48–1:53 · Z4 Soglia 1:41–1:48 · Z5 Sopra soglia più veloce di 1:41 (per 100 m)",
+    const block = text.split("ZONE DI PASSO A1–C3")[1].split("\nULTIME 5 NUOTATE")[0];
+    expect(block.split("\n")[0]).toBe(
+      " (zone automatiche dal passo soglia 1:44/100 m, stima; valgono per lo stile libero; dalla più lenta alla più esplosiva)",
     );
+    expect(block).toContain(
+      "- A1 Recupero attivo · livello Facile: più lento di 2:03/100 m · respiro tranquillo, quasi come a riposo, potresti parlare normalmente, RPE 2–3 · Scalda, fa recuperare tra le serie e scioglie a fine allenamento; è il ritmo giusto per curare la tecnica.",
+    );
+    expect(block).toContain("- A2 Fondo lento · livello Aerobico: 1:56–2:03/100 m ·");
+    expect(block).toContain("- B1 Fondo medio · livello Medio: 1:50–1:56/100 m ·");
+    expect(block).toContain("- B2 Fondo medio-alto · livello Soglia: 1:44–1:50/100 m · respiro impegnato, poche parole tra una vasca e l'altra, RPE 6–7");
+    expect(block).toContain("- C1 Soglia anaerobica · livello Soglia: 1:40–1:44/100 m · max 200 m a ripetuta ·");
+    expect(block).toContain("- C2 Capacità anaerobica · livello Sopra soglia: più veloce di 1:40/100 m · max 150 m a ripetuta ·");
+    expect(block).toContain("- C3 Potenza anaerobica · livello Sopra soglia: più veloce di 1:40/100 m · max 25 m a ripetuta ·");
     expect(text).not.toMatch(/\d+\s?% della velocità/);
-    expect(text).not.toMatch(/85%|92%|97%|103%/);
+    expect(text).not.toMatch(/85%|90%|95%|104%/);
+  });
+
+  it("says when the zones are the athlete's own", () => {
+    const metrics = sampleSwimMetrics();
+    const bounds = { a1a2: 130, a2b1: 122, b1b2: 116, b2c1: 110, c1c2: 105 };
+    metrics.zones = { ...metrics.zones, source: "manuali", bounds, ranges: paceZoneRanges(bounds) };
+    const text = swimMetricsForCoach(metrics);
+    expect(text).toContain("ZONE DI PASSO A1–C3 (zone manuali inserite dall'atleta, al posto di quelle dal passo soglia;");
+    expect(text).toContain("- B2 Fondo medio-alto · livello Soglia: 1:50–1:56/100 m");
+  });
+
+  it("without zones: the guide without paces, and what is missing", () => {
+    const metrics = sampleSwimMetrics();
+    metrics.zones = { source: null, ranges: [], bounds: null, autoBounds: null, manualUpdatedAt: null };
+    const text = swimMetricsForCoach(metrics);
+    expect(text).toContain(
+      "ZONE DI PASSO A1–C3 (passi non disponibili: servono il passo soglia o le zone dell'atleta; usa livello e fatica percepita)",
+    );
+    expect(text).toContain("- B2 Fondo medio-alto · livello Soglia · respiro impegnato");
+    expect(text).not.toContain("/100 m · respiro impegnato");
+  });
+
+  it("says when the threshold of the load is the B2/C1 boundary of the manual zones", () => {
+    const metrics = sampleSwimMetrics();
+    metrics.load.threshold = { paceSecondsPer100: 110, source: "zone manuali" };
+    expect(swimMetricsForCoach(metrics)).toContain(
+      "soglia del carico: confine B2/C1 delle zone manuali (1:50/100 m), perché manca il passo soglia",
+    );
   });
 
   it("gives the sample sizes and the coverage behind each number", () => {
@@ -77,7 +122,7 @@ describe("swimMetricsForCoach", () => {
     const swims = text.split("ULTIME 5 NUOTATE")[1].trim().split("\n");
     expect(swims).toHaveLength(5);
     expect(swims[0]).toBe("- 27/10 · 2,0 km · acque libere · IF 0,86 · carico 42 (stimato, senza giri)");
-    expect(swims[1]).toBe("- 26/10 · 2,5 km · vasca 25 m · IF 0,92 · carico 56 · zone Z1 20%, Z2 40%, Z3 20%, Z4 16%, Z5 4%");
+    expect(swims[1]).toBe("- 26/10 · 2,5 km · vasca 25 m · IF 0,92 · carico 56 · zone A1 20%, A2 40%, B1 12%, B2 8%, C1 12%, C2 4%, C3 4%");
   });
 
   it("says what is missing and the CSS test date", () => {
@@ -110,7 +155,9 @@ describe("swimMetricsGlossary", () => {
     expect(glossary).toContain("equilibrio = forma − fatica a fine di ieri");
     expect(glossary).toContain("IF 0,80");
     expect(glossary).toContain("Craig e Pendergast");
-    expect(glossary).not.toMatch(/85%|92%|97%|103%/);
+    expect(glossary).not.toMatch(/85%|90%|95%|104%/);
+    expect(glossary).toContain("zone A1–C3");
+    expect(glossary).toContain("facile = A1–A2, medio = B1–B2, intenso = C1–C3");
     for (const name of OLD_NAMES) expect(glossary).not.toMatch(name);
   });
 });
@@ -123,9 +170,24 @@ describe("SWIM_METRICS_COACH_RULES", () => {
   });
 
   it("asks for the zone paces and a progressive endurance build when the swimmer fades", () => {
+    expect(SWIM_METRICS_COACH_RULES).toMatch(/zone A1–C3/);
     expect(SWIM_METRICS_COACH_RULES).toMatch(/m:ss\/100 m/);
     expect(SWIM_METRICS_COACH_RULES).toMatch(/ripetute brevi con poco recupero → serie spezzate → nuoto continuo/);
     expect(SWIM_METRICS_COACH_RULES).toMatch(/esercizi tecnici/);
     expect(SWIM_METRICS_COACH_RULES).toMatch(/«nuota di più»/);
+  });
+});
+
+describe("PACE_ZONE_COACH_RULES", () => {
+  it("every rep has zone, level and pace; the maximum reps; the zones explained; followable without them", () => {
+    expect(PACE_ZONE_COACH_RULES).toContain(
+      "ogni ripetuta di un allenamento che proponi ha il codice della zona, il livello e il passo obiettivo dalle zone dell'atleta, per esempio «6×100 B2 · Soglia 1:49–1:54, rec. 20″»",
+    );
+    expect(PACE_ZONE_COACH_RULES).toContain("non superare mai la ripetuta massima: C1 200 m, C2 150 m, C3 25 m");
+    expect(PACE_ZONE_COACH_RULES).toContain("il suo allenatore non le usa");
+    expect(PACE_ZONE_COACH_RULES).toContain(
+      "spiega in breve, con parole semplici, ogni zona che usi: sensazione (respiro, quanto riesci a parlare, fatica da 1 a 10), passo e a cosa serve",
+    );
+    expect(PACE_ZONE_COACH_RULES).toContain("Facile, Aerobico, Medio, Soglia, Sopra soglia");
   });
 });

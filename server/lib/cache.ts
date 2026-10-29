@@ -478,7 +478,7 @@ export const cacheKeys = {
   search: (query: string) => `search:${query}`,
   badgeDefinitions: () => 'badge:definitions',
   // v2: per Rome day (today's load rolls at midnight) and the fixed metrics' payload.
-  swimMetrics: (userId: string, romeDay: string) => `swim-metrics:v2:${userId}:${romeDay}`,
+  swimMetrics: (userId: string, romeDay: string) => `swim-metrics:v3:${userId}:${romeDay}`,
 };
 
 /**

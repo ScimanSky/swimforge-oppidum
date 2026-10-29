@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { paceZoneBoundsFromCss } from "@shared/swimMetrics";
 import { computeSwimMetrics } from "./compute";
 import { activity } from "./test-helpers";
 
@@ -42,18 +43,36 @@ describe("computeSwimMetrics: load on laps or on the whole swim", () => {
   });
 
   it("zones take only freestyle laps; the rest is unclassified, with the coverage of the volume", () => {
-    expect(a.zoneMeters).toEqual([0, 400, 0, 400, 0]);
+    // The 400 at the CSS (1:40) is C1, the 100s at 1:50 are B1.
+    expect(a.zoneMeters).toEqual([0, 0, 400, 0, 400, 0, 0]);
     expect(a.unclassifiedMeters).toBe(300);
     expect(b.zoneMeters).toBeNull();
     expect(metrics.intensity.last28).toMatchObject({
-      zoneMeters: [0, 400, 0, 400, 0],
+      zoneMeters: [0, 0, 400, 0, 400, 0, 0],
       unclassifiedMeters: 300,
       coveragePct: 26, // 800 m zoned of 3100 m swum in 28 days
-      easyPct: 50,
+      easyPct: 0,
+      mediumPct: 50,
       hardPct: 50,
     });
     const week = metrics.intensity.weeks.find((w) => w.weekStart === "2026-10-19")!;
-    expect(week).toEqual({ weekStart: "2026-10-19", zoneMeters: [0, 400, 0, 400, 0], unclassifiedMeters: 300 });
+    expect(week).toEqual({ weekStart: "2026-10-19", zoneMeters: [0, 0, 400, 0, 400, 0, 0], unclassifiedMeters: 300 });
+  });
+
+  it("the zones in effect are computed from today's CSS, with the threshold of the load", () => {
+    expect(metrics.zones).toMatchObject({ source: "auto", manualUpdatedAt: null });
+    expect(metrics.zones.bounds).toEqual(paceZoneBoundsFromCss(100));
+    expect(metrics.zones.autoBounds).toEqual(paceZoneBoundsFromCss(100));
+    expect(metrics.zones.ranges.map((r) => [r.code, r.fastPace && Math.round(r.fastPace * 10) / 10, r.slowPace && Math.round(r.slowPace * 10) / 10, r.maxRepMeters])).toEqual([
+      ["A1", 117.6, null, null],
+      ["A2", 111.1, 117.6, null],
+      ["B1", 105.3, 111.1, null],
+      ["B2", 100, 105.3, null],
+      ["C1", 96.2, 100, 200],
+      ["C2", null, 96.2, 150],
+      ["C3", null, 96.2, 25],
+    ]);
+    expect(metrics.load.threshold).toEqual({ paceSecondsPer100: 100, source: "test" });
   });
 
   it("without freestyle laps in 28 days the zones say why", () => {
@@ -63,6 +82,46 @@ describe("computeSwimMetrics: load on laps or on the whole swim", () => {
     expect(m.intensity.missing).toBe(
       "Nelle ultime 4 settimane non ci sono giri a stile libero da classificare: le zone si calcolano solo sullo stile libero.",
     );
+  });
+});
+
+describe("computeSwimMetrics: manual zones («Le tue zone»)", () => {
+  // Manual bounds a little slower than the CSS ones: 2:10 · 2:02 · 1:56 · 1:50 · 1:45.
+  const MANUAL = { bounds: { a1a2: 130, a2b1: 122, b1b2: 116, b2c1: 110, c1c2: 105 }, updatedAt: "2026-10-25T09:00:00.000Z" };
+  // 400 at 1:48 (C1 for these bounds, B1 from a CSS of 1:40), 100 at 2:05 (A2), 25 at 0:40 (C3).
+  const swim = activity(5, "2026-10-20T17:00:00Z", [[400, 432], rest(30), [100, 125], rest(30), [25, 10]]);
+
+  it("win over the CSS: zones, intensity and the contract say «manuali»", () => {
+    const m = computeSwimMetrics({ activities: [swim], cssTest: TEST_1MPS, paceZones: MANUAL, streakDates: [] }, NOW);
+    expect(m.sessions[0].zoneMeters).toEqual([0, 100, 0, 0, 400, 0, 25]);
+    expect(m.intensity.last28!.zoneMeters).toEqual([0, 100, 0, 0, 400, 0, 25]);
+    expect(m.zones).toMatchObject({ source: "manuali", bounds: MANUAL.bounds, manualUpdatedAt: "2026-10-25T09:00:00.000Z" });
+    expect(m.zones.autoBounds).toEqual(paceZoneBoundsFromCss(100));
+    expect(m.zones.ranges.find((r) => r.code === "B2")).toMatchObject({ fastPace: 110, slowPace: 116, level: "Soglia" });
+    // The load keeps the CSS.
+    expect(m.sessions[0]).toMatchObject({ cssPaceSecondsPer100: 100, cssSource: "test" });
+    expect(m.load.threshold).toEqual({ paceSecondsPer100: 100, source: "test" });
+  });
+
+  it("without a CSS the B2/C1 boundary is the threshold of the zones and of the load («zone manuali»)", () => {
+    const m = computeSwimMetrics({ activities: [swim], cssTest: null, paceZones: MANUAL, streakDates: [] }, NOW);
+    expect(m.css.current).toBeNull();
+    expect(m.zones.source).toBe("manuali");
+    expect(m.zones.autoBounds).toBeNull();
+    expect(m.sessions[0]).toMatchObject({ cssPaceSecondsPer100: 110, cssSource: "zone manuali" });
+    expect(m.sessions[0].stss).toBeGreaterThan(0);
+    expect(m.load.threshold).toEqual({ paceSecondsPer100: 110, source: "zone manuali" });
+    expect(m.load.today).not.toBeNull();
+    expect(m.load.missing).toBeNull();
+    expect(m.intensity.last28).toMatchObject({ zoneMeters: [0, 100, 0, 0, 400, 0, 25], easyPct: 19, mediumPct: 0, hardPct: 81 });
+    expect(m.intensity.missing).toBeNull();
+  });
+
+  it("without CSS and manual zones there are no zones", () => {
+    const m = computeSwimMetrics({ activities: [swim], cssTest: null, streakDates: [] }, NOW);
+    expect(m.zones).toEqual({ source: null, ranges: [], bounds: null, autoBounds: null, manualUpdatedAt: null });
+    expect(m.load.threshold).toBeNull();
+    expect(m.intensity.missing).toBe("Servono il passo soglia (o le tue zone) e nuotate con i giri.");
   });
 });
 

@@ -1,4 +1,10 @@
-import { dayKey, type SessionMetrics, type SwimMetrics } from "@shared/swimMetrics";
+import {
+  dayKey,
+  paceZoneBoundsFromCss,
+  paceZoneRanges,
+  type SessionMetrics,
+  type SwimMetrics,
+} from "@shared/swimMetrics";
 import { normalizeStroke, type MetricActivity, type MetricLap } from "./laps";
 
 /** [distance, seconds, stroke?, strokes?, swolf?]; distance 0 is a rest. */
@@ -42,7 +48,7 @@ export function sampleSwimMetrics(): SwimMetrics {
   const session = (overrides: Partial<SessionMetrics>): SessionMetrics => ({
     activityId: 1, date: "2026-10-27", poolLengthMeters: 25, isOpenWater: false,
     distanceMeters: 2500, movingSeconds: 2600, hasLaps: true,
-    intensityFactor: 0.92, stss: 56.3, zoneMeters: [500, 1000, 500, 400, 100],
+    intensityFactor: 0.92, stss: 56.3, zoneMeters: [500, 1000, 300, 200, 300, 100, 100],
     strokeIndex: 2.15, dpsMeters: 2.05, strokeRate: 30.2, swolf: 36.5,
     pacingCv: 2.8, pacingFade: 3.1,
     swimDistanceMeters: 2500, loadEstimated: false, unclassifiedMeters: 0,
@@ -84,7 +90,15 @@ export function sampleSwimMetrics(): SwimMetrics {
       history: [{ month: "2026-10", paceSecondsPer100: 104.3 }],
       missing: null,
     },
+    zones: {
+      source: "auto",
+      ranges: paceZoneRanges(paceZoneBoundsFromCss(104.3)),
+      bounds: paceZoneBoundsFromCss(104.3),
+      autoBounds: paceZoneBoundsFromCss(104.3),
+      manualUpdatedAt: null,
+    },
     load: {
+      threshold: { paceSecondsPer100: 104.3, source: "stima" },
       today: { ctl: 12.3, atl: 20.1, tsb: -7.8, reading: "neutro" },
       rampPerWeek: 2.1,
       days: [],
@@ -92,7 +106,7 @@ export function sampleSwimMetrics(): SwimMetrics {
     },
     intensity: {
       last28: {
-        zoneMeters: [3000, 4200, 1800, 900, 100], easyPct: 72, mediumPct: 18, hardPct: 10,
+        zoneMeters: [3000, 4200, 1000, 800, 600, 300, 100], easyPct: 72, mediumPct: 18, hardPct: 10,
         unclassifiedMeters: 1200, coveragePct: 80,
       },
       weeks: [],
