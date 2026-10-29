@@ -116,7 +116,7 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
             {baseName}
           </Link>
           {post.user_level != null && post.user_level > 0 ? (
-            <span className="shrink-0 text-xs text-muted-foreground tabular-nums">Liv. {post.user_level}</span>
+            <span className="shrink-0 text-xs text-muted-foreground tabular-nums">Livello {post.user_level}</span>
           ) : null}
         </div>
         <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
@@ -128,22 +128,21 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
             variant={isFollowing ? "ghost" : "outline"}
             size="sm"
             className="h-9 gap-1 px-3 text-sm"
-            aria-label={`Segui ${baseName}`}
-            aria-pressed={isFollowing}
             onClick={() => toggleFollow.mutate({ userId: post.user_id })}
             disabled={toggleFollow.isPending}
           >
+            {/* The name is not on the button: the label carries the state («Seguendo»). On a
+                phone the label is visually hidden but stays the accessible name. */}
             {isFollowing ? (
-              <>
-                <UserCheck className="size-4" aria-hidden />
-                <span className="hidden sm:inline">Seguendo</span>
-              </>
+              <UserCheck className="size-4" aria-hidden />
             ) : (
-              <>
-                <UserPlus className="size-4" aria-hidden />
-                <span className="hidden sm:inline">Segui</span>
-              </>
+              <UserPlus className="size-4" aria-hidden />
             )}
+            <span className="sr-only sm:not-sr-only">
+              {isFollowing ? "Seguendo" : "Segui"}
+            </span>
+            {" "}
+            <span className="sr-only">{baseName}</span>
           </Button>
         )}
         <DropdownMenu>
@@ -168,7 +167,7 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
                   deletePost.mutate({ postId: post.id })
                 }}
               >
-                <Trash2 className="size-3.5" />
+                <Trash2 className="size-3.5" aria-hidden />
                 {deletePost.isPending ? "Elimino..." : "Elimina"}
               </DropdownMenuItem>
             ) : (
@@ -180,7 +179,7 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
                     setLocation(`/home/report/post/${post.id}?from=${from}`)
                   }}
                 >
-                  <Flag className="size-3.5" />
+                  <Flag className="size-3.5" aria-hidden />
                   Segnala
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -190,7 +189,7 @@ export default function FeedPostHeader({ post, isOwner, isFollowing: initialIsFo
                     hidePost.mutate({ postId: post.id })
                   }}
                 >
-                  <EyeOff className="size-3.5" />
+                  <EyeOff className="size-3.5" aria-hidden />
                   {hidePost.isPending ? "Nascondo..." : "Nascondi"}
                 </DropdownMenuItem>
               </>

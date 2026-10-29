@@ -90,7 +90,7 @@ describe("FeedPost Corsia", () => {
 
   it("card attività: distanza, passo in tono azione, durata; niente calorie", () => {
     renderPost(activityPost)
-    const card = screen.getByRole("region", { name: "Nuotata in vasca" })
+    const card = screen.getByRole("group", { name: "Nuotata in vasca" })
     expect(card).toHaveTextContent("3,4 km Distanza")
     expect(within(card).getByText("1:49")).toHaveClass("text-action-text")
     expect(within(card).getByText("Passo /100")).toBeInTheDocument()
@@ -101,7 +101,7 @@ describe("FeedPost Corsia", () => {
 
   it("card attività: FC e SWOLF solo se presenti, al massimo quattro metriche", () => {
     renderPost({ ...activityPost, activity_heart_rate: 141.6, activity_swolf: "38" as unknown as number })
-    const card = screen.getByRole("region", { name: "Nuotata in vasca" })
+    const card = screen.getByRole("group", { name: "Nuotata in vasca" })
     expect(within(card).getByText("142")).toBeInTheDocument()
     expect(within(card).getByText("FC media")).toBeInTheDocument()
     expect(within(card).queryByText("SWOLF")).toBeNull()
@@ -149,9 +149,42 @@ describe("FeedPost Corsia", () => {
     expect(screen.getByRole("textbox", { name: "Aggiungi un commento" })).toBeInTheDocument()
   })
 
+  it("la card attività non è un landmark né un titolo", () => {
+    renderPost(activityPost)
+    expect(screen.queryByRole("region")).toBeNull()
+    expect(screen.queryByRole("heading", { name: "Nuotata in vasca" })).toBeNull()
+  })
+
+  it("intestazione: «Livello N» e pulsante Segui con il nome accessibile", () => {
+    renderPost({ ...activityPost, user_level: 12 })
+    expect(screen.getByText("Livello 12")).toBeInTheDocument()
+    const follow = screen.getByRole("button", { name: "Segui Giulia Bianchi" })
+    expect(follow).not.toHaveAttribute("aria-label")
+    expect(follow).not.toHaveAttribute("aria-pressed")
+    cleanup()
+
+    renderPost({ ...activityPost, is_following: true })
+    expect(screen.getByRole("button", { name: "Seguendo Giulia Bianchi" })).toBeInTheDocument()
+  })
+
+  it("più foto: nomi numerati «1 di 3»; una sola foto senza numero", () => {
+    renderPost({
+      ...activityPost,
+      media_urls: ["https://cdn.example.com/a.jpg", "https://cdn.example.com/b.jpg", "https://cdn.example.com/c.jpg"],
+    })
+    expect(screen.getByRole("button", { name: "Apri la foto 1 di 3" })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: "Apri la foto 3 di 3" })).toBeInTheDocument()
+    expect(screen.getAllByAltText(/^Foto del post, \d di 3$/)).toHaveLength(3)
+    cleanup()
+
+    renderPost({ ...activityPost, media_url: "https://cdn.example.com/a.jpg" })
+    expect(screen.getByRole("button", { name: "Apri la foto" })).toBeInTheDocument()
+    expect(screen.getByAltText("Foto del post")).toBeInTheDocument()
+  })
+
   it("foto a tutta larghezza senza testo sovrapposto, post separati da una riga", () => {
     const { container } = renderPost({ ...activityPost, media_url: "https://cdn.example.com/a.jpg" })
-    const img = screen.getByRole("img", { name: "Foto del post" })
+    const img = screen.getByAltText("Foto del post")
     const frame = img.closest("div")!
     expect(frame).toHaveClass("rounded-xl")
     expect(frame.textContent).toBe("")

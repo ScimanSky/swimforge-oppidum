@@ -12,7 +12,6 @@ import type { FeedPostRecord } from "./feed-types"
 interface FeedPostProps {
   post: FeedPostRecord
   currentUserId?: number
-  index?: number
   autoplayVideos?: boolean
 }
 
@@ -59,7 +58,6 @@ function activityTitle(isOpenWater: boolean | null | undefined) {
 /**
  * One feed post (Corsia, `renders/Feed.png`): header, text, compact activity card, media at
  * full width (never text on top), reactions; posts are separated by a rule, not boxed.
- * `index` is kept for callers (the stagger animation is gone).
  */
 export default function FeedPost({ post, currentUserId, autoplayVideos = true }: FeedPostProps) {
   const [commentsOpen, setCommentsOpen] = useState(false)
@@ -75,6 +73,9 @@ export default function FeedPost({ post, currentUserId, autoplayVideos = true }:
   const allMedia = mediaUrls.length > 0
     ? mediaUrls
     : (post.media_url ? [String(post.media_url)] : [])
+  /** « 1 di 3» when the post has several media, nothing for a single one. */
+  const mediaPosition = (idx: number, separator = "") =>
+    allMedia.length > 1 ? `${separator} ${idx + 1} di ${allMedia.length}` : ""
   const taggedUsers = parseTaggedUsers(post.tagged_users)
   const hashtags = normalizeArrayField(post.hashtags)
   const firstLink = post.content ? extractFirstUrl(post.content) : null
@@ -135,11 +136,11 @@ export default function FeedPost({ post, currentUserId, autoplayVideos = true }:
                     type="button"
                     className="block w-full cursor-zoom-in"
                     onClick={() => setOpenMediaUrl(url)}
-                    aria-label="Apri la foto"
+                    aria-label={`Apri la foto${mediaPosition(idx)}`}
                   >
                     <img
                       src={url}
-                      alt="Foto del post"
+                      alt={`Foto del post${mediaPosition(idx, ",")}`}
                       className="max-h-[420px] w-full object-cover"
                       loading="lazy"
                     />

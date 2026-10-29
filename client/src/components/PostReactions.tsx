@@ -52,7 +52,7 @@ type FloatingReaction = {
 
 export default function PostReactions({
   postId,
-  initialReactions = [],
+  initialReactions,
   userReaction,
   onReactionChange,
   variant = "emoji",
@@ -64,8 +64,9 @@ export default function PostReactions({
   const reactionsQuery = trpc.community.reactions.list.useQuery(
     { postId },
     {
-      enabled: true,
-      initialData: initialReactions,
+      // Seed only real data: an empty default would count as fresh for staleTime and the
+      // reactions would never be fetched on mount.
+      ...(initialReactions ? { initialData: initialReactions } : {}),
       staleTime: 15_000,
     }
   );

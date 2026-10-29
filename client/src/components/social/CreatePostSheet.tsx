@@ -382,7 +382,7 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
                   className="gap-2"
                   onClick={() => mediaInputRef.current?.click()}
                 >
-                  <ImagePlus className="size-4" />
+                  <ImagePlus className="size-4" aria-hidden />
                   Aggiungi foto/video
                 </Button>
                 <span className="text-xs text-muted-foreground">
@@ -416,7 +416,7 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
                         className="absolute right-1 top-1 rounded-full border border-border bg-background/90 p-1 text-foreground"
                         aria-label="Rimuovi media"
                       >
-                        <X className="size-3.5" />
+                        <X className="size-3.5" aria-hidden />
                       </button>
                     </div>
                   ))}
@@ -425,7 +425,7 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
 
               <div className="space-y-2">
                 <label className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                  <AtSign className="size-3.5" />
+                  <AtSign className="size-3.5" aria-hidden />
                   Tagga amici
                 </label>
                 <Input
@@ -463,8 +463,13 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
                     {taggedUsers.map((user) => (
                       <span key={user.userId} className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-card/50 px-2 py-1 text-xs">
                         @{user.username || user.name || `u${user.userId}`}
-                        <button type="button" onClick={() => removeTaggedUser(user.userId)} className="text-muted-foreground hover:text-foreground">
-                          <X className="size-3" />
+                        <button
+                          type="button"
+                          onClick={() => removeTaggedUser(user.userId)}
+                          className="text-muted-foreground hover:text-foreground"
+                          aria-label={`Rimuovi @${user.username || user.name || `u${user.userId}`}`}
+                        >
+                          <X className="size-3" aria-hidden />
                         </button>
                       </span>
                     ))}
@@ -475,7 +480,7 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
               {hashtags.length > 0 && (
                 <div className="rounded-xl border border-border/70 bg-background/40 p-2">
                   <p className="mb-1 flex items-center gap-1 text-xs text-muted-foreground">
-                    <Hash className="size-3.5" />
+                    <Hash className="size-3.5" aria-hidden />
                     Hashtag rilevati
                   </p>
                   <div className="flex flex-wrap gap-1.5">
@@ -497,7 +502,7 @@ export function CreatePostSheet({ open, onOpenChange, initialContent, initialPbS
                 >
                   {isPostPending ? (
                     <span className="inline-flex items-center gap-2">
-                      <Loader2 className="size-4 animate-spin" />
+                      <Loader2 className="size-4 animate-spin" aria-hidden />
                       Pubblico
                     </span>
                   ) : "Pubblica"}

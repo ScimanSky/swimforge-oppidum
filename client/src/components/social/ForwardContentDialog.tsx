@@ -192,7 +192,7 @@ export function ForwardContentDialog({
                         className="rounded-full p-0.5 hover:bg-raised"
                         aria-label={`Rimuovi ${label}`}
                       >
-                        <X className="size-3" />
+                        <X className="size-3" aria-hidden />
                       </button>
                     </Badge>
                   )

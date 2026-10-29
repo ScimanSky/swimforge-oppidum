@@ -62,12 +62,12 @@ function SuggestedUserRow({
       >
         {isFollowing ? (
           <>
-            <UserCheck className="size-3" />
+            <UserCheck className="size-3" aria-hidden />
             Seguendo
           </>
         ) : (
           <>
-            <UserPlus className="size-3" />
+            <UserPlus className="size-3" aria-hidden />
             Segui
           </>
         )}
@@ -85,12 +85,9 @@ export default function FeedSidebar() {
     { scope: "all", limit: 4 },
     { staleTime: 60_000 }
   )
-  const profileQuery = trpc.profile.get.useQuery()
   const suggestedUsers = suggestedQuery.data ?? []
   const recentClubs = ((recentClubsQuery.data as any[] | undefined) ?? []).slice(0, 3)
   const vm = buildFeedSidebarVm({ suggestedUsers })
-  const profileName = profileQuery.data?.username || "You"
-  const profileAvatar = profileQuery.data?.avatarUrl || null
 
   return (
     <div className="space-y-4">

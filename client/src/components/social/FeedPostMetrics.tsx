@@ -51,21 +51,23 @@ export default function FeedPostMetrics({
   const four = shown.length === MAX_METRICS
 
   return (
-    <section
+    // A group, not a landmark: every activity post would otherwise add a region.
+    <div
+      role="group"
       aria-labelledby={title ? titleId : undefined}
       aria-label={title ? undefined : "Dati della nuotata"}
       className="rounded-2xl border border-border bg-card p-4"
     >
       {title ? (
-        <h3 id={titleId} className="mb-3 truncate text-[15px] font-bold">
+        <p id={titleId} className="mb-3 truncate text-[15px] font-bold">
           {title}
-        </h3>
+        </p>
       ) : null}
       <div className={cn("grid gap-3", four ? "grid-cols-4" : "grid-cols-3")}>
         {shown.map((metric) => (
           <Metric key={metric.label} {...metric} size={four ? "sm" : "md"} />
         ))}
       </div>
-    </section>
+    </div>
   )
 }

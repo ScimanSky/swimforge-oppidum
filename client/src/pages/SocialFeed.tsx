@@ -189,12 +189,11 @@ export default function SocialFeed() {
                 )
               ) : (
                 <div className="flex flex-col">
-                  {posts.slice(0, visibleCount).map((post, index) => (
+                  {posts.slice(0, visibleCount).map((post) => (
                     <FeedPost
                       key={post.id}
                       post={post}
                       currentUserId={currentUserId}
-                      index={index}
                       autoplayVideos={autoplayVideos}
                     />
                   ))}
