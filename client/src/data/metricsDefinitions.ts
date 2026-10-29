@@ -1,6 +1,6 @@
 export const metricsDefinitions = {
   sei: {
-    title: "Swimming Efficiency Index (SEI)",
+    title: "Indice di efficienza in acqua (SEI)",
     description:
       "L'indice di efficienza del nuoto combina SWOLF, distanza per bracciata e pace in un unico punteggio che misura quanto sei efficiente in acqua. Un punteggio alto indica che nuoti velocemente usando meno energia.",
     formula: `SEI = (swolf_score × 0.4) + (stroke_efficiency × 0.35) + (pace_score × 0.25)
@@ -24,7 +24,7 @@ Dove:
     ],
   },
   tci: {
-    title: "Technical Consistency Index (TCI)",
+    title: "Indice di costanza tecnica (TCI)",
     description:
       "L'indice di consistenza tecnica misura quanto sei regolare tra le vasche e tra le sessioni. Un punteggio alto indica che mantieni lo stesso ritmo e la stessa tecnica per tutta la durata dell'allenamento.",
     formula: `TCI = 100 - (coefficiente_variazione × 100)
@@ -47,7 +47,7 @@ Dove:
     ],
   },
   ser: {
-    title: "Stroke Efficiency Rating (SER)",
+    title: "Efficienza della bracciata (SER)",
     description:
       "Il rating di efficienza della bracciata misura quanto 'scivoli' in acqua. Combina la distanza percorsa per ogni bracciata con il numero totale di bracciate. Più alto è il punteggio, più efficiente è la tua bracciata.",
     formula: `SER = (stroke_distance_ratio × 0.6) + (stroke_count_ratio × 0.4)
@@ -71,7 +71,7 @@ Dove:
     ],
   },
   acs: {
-    title: "Aerobic Capacity Score (ACS)",
+    title: "Capacità aerobica (ACS)",
     description:
       "Il punteggio di capacità aerobica misura l'efficienza del tuo sistema cardiovascolare durante il nuoto. Si basa sulla distribuzione del tempo nelle diverse zone di frequenza cardiaca e sull'effetto allenante.",
     formula: `ACS = zone_distribution_score × training_effect_multiplier
@@ -95,7 +95,7 @@ Dove:
     ],
   },
   rrs: {
-    title: "Recovery Readiness Score (RRS)",
+    title: "Prontezza al recupero (RRS)",
     description:
       "Il punteggio di prontezza al recupero stima quanto sei pronto per il prossimo allenamento intenso. Si basa sulla frequenza cardiaca a riposo e sul tempo trascorso dall'ultimo allenamento.",
     formula: `RRS = hr_recovery_score × time_factor
@@ -119,7 +119,7 @@ Dove:
     ],
   },
   poi: {
-    title: "Progressive Overload Index (POI)",
+    title: "Carico progressivo (POI)",
     description:
       "L'indice di sovraccarico progressivo misura se stai progredendo al ritmo giusto. Un valore tra +10% e +20% indica una progressione ottimale. Valori troppo alti indicano rischio di sovrallenamento, valori negativi indicano un calo.",
     formula: `POI = (distance_trend × 0.3) + (intensity_trend × 0.4) + (frequency_trend × 0.3)
@@ -141,15 +141,15 @@ Dove ogni trend è:
     ],
   },
   trend: {
-    title: "Trend",
+    title: "Tendenza",
     description:
-      "Mostra la direzione complessiva delle tue performance rispetto al periodo precedente, basata soprattutto su distanza totale e consistenza.",
+      "Mostra la direzione complessiva delle tue prestazioni rispetto al periodo precedente, basata soprattutto su distanza totale e consistenza.",
     formula: `Trend (%) = ((periodo_attuale - periodo_precedente) / periodo_precedente) × 100`,
     interpretation: {
-      excellent: "Trend fortemente positivo",
-      good: "Trend positivo e stabile",
-      fair: "Trend stabile",
-      poor: "Trend in calo",
+      excellent: "Tendenza fortemente positiva",
+      good: "Tendenza positiva e stabile",
+      fair: "Tendenza stabile",
+      poor: "Tendenza in calo",
     },
     howToImprove: [
       "Aumenta gradualmente il volume settimanale",
@@ -159,9 +159,9 @@ Dove ogni trend è:
     ],
   },
   performanceIndex: {
-    title: "Performance Index",
+    title: "Indice di prestazione",
     description:
-      "L'indice di performance generale combina distanza, frequenza e pace in un punteggio complessivo che riflette il tuo livello di forma fisica attuale nel nuoto.",
+      "L'indice di prestazione generale combina distanza, frequenza e passo in un punteggio complessivo che riflette il tuo livello di forma fisica attuale nel nuoto.",
     formula: `Performance Index = distanza_score + frequenza_score + pace_score
 
 Dove:
@@ -183,9 +183,9 @@ Dove:
     ],
   },
   consistencyScore: {
-    title: "Consistency Score",
+    title: "Costanza",
     description:
-      "Il punteggio di consistenza misura quanto sei regolare negli allenamenti. Si basa sulla frequenza settimanale e sullo streak (giorni consecutivi di allenamento).",
+      "Il punteggio di consistenza misura quanto sei regolare negli allenamenti. Si basa sulla frequenza settimanale e sulla serie (giorni consecutivi di allenamento).",
     formula: `Consistency = regolarità_score + streak_score - gap_penalty
 
 Dove:
@@ -203,7 +203,7 @@ Dove:
       "Inizia con obiettivi realistici (es. 2 volte/settimana)",
       "Trova un compagno di allenamento per motivazione",
       "Prepara la borsa la sera prima",
-      "Celebra i piccoli traguardi (streak di 7, 14, 30 giorni)",
+      "Celebra i piccoli traguardi (serie di 7, 14, 30 giorni)",
     ],
   },
 };

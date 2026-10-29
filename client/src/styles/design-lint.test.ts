@@ -71,7 +71,6 @@ const PENDING: Record<Rule, string[]> = {
     "pages/Coach.tsx",
     "pages/Home.tsx",
     "pages/Leaderboard.tsx",
-    "pages/Statistics.tsx",
   ],
   "alone-neon": [
     "components/club/ClubHero.tsx",
@@ -104,7 +103,6 @@ const PENDING: Record<Rule, string[]> = {
     "pages/ClubWorkoutsPage.tsx",
     "pages/Coach.tsx",
     "pages/Home.tsx",
-    "pages/Statistics.tsx",
   ],
   "testo-gradiente": [
     "components/BadgeUnlockNotification.tsx",
@@ -247,7 +245,6 @@ const PENDING: Record<Rule, string[]> = {
     "pages/PublicProfile.tsx",
     "pages/ReportPost.tsx",
     "pages/Settings.tsx",
-    "pages/Statistics.tsx",
   ],
   "colore-fisso": [
     "components/ActivityInsightNotification.tsx",
@@ -272,7 +269,6 @@ const PENDING: Record<Rule, string[]> = {
     "pages/NotFound.tsx",
     "pages/Register.tsx",
     "pages/ResetPassword.tsx",
-    "pages/Statistics.tsx",
     "pages/StravaConnect.tsx",
   ],
 };
