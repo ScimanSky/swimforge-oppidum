@@ -12,7 +12,9 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("wouter", () => ({
-  useLocation: () => ["/settings?onboarding=1&tab=connections", vi.fn()],
+  // wouter 3: the pathname comes from useLocation, the query from useSearch (see useSettingsTab).
+  useLocation: () => ["/settings", vi.fn()],
+  useSearch: () => "onboarding=1&tab=connections",
   Link: ({ children }: any) => <a>{children}</a>,
 }));
 vi.mock("sonner", () => ({
