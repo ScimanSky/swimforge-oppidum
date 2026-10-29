@@ -17,6 +17,7 @@ import { connectRedis } from "../lib/cache";
 import { assertAuthEnv } from "./env";
 import { healthRouter } from "../routes/health";
 import { linkPreviewRouter } from "../routes/link_preview";
+import { accountExportRouter } from "../routes/account_export";
 
 // Security middleware
 import { requestLogger, errorHandler, logger } from "../middleware/logger";
@@ -368,6 +369,9 @@ async function startServer() {
 
   // Link previews: authenticated, SSRF-guarded fetches of external pages and images.
   app.use(linkPreviewRouter);
+
+  // The caller's data export (GDPR portability), streamed as a JSON download.
+  app.use(accountExportRouter);
 
   // tRPC API
   app.use(

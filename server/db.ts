@@ -1029,101 +1029,14 @@ export async function incrementSessionTokenVersion(userId: number): Promise<void
   `);
 }
 
+/** The user's data export as one object (see account_export.ts; the app streams it instead). */
 export async function exportUserData(userId: number) {
   const db = await getDb();
   if (!db) {
     throw new Error(DB_UNAVAILABLE_ERR_MSG);
   }
-
-  const [
-    userResult,
-    profileResult,
-    activitiesResult,
-    socialPostsResult,
-    socialCommentsResult,
-    socialSplashesResult,
-    socialFollowsResult,
-    badgesResult,
-    xpResult,
-    recordsResult,
-    weeklyStatsResult,
-    goalsResult,
-    notificationsResult,
-    directMessagesResult,
-    clubsMembershipResult,
-    reportsResult,
-    hiddenPostsResult,
-    consentsResult,
-  ] = await Promise.all([
-    db.execute(sql`
-      SELECT id, open_id, name, email, login_method, role, created_at, updated_at, last_signed_in
-      FROM users
-      WHERE id = ${userId}
-      LIMIT 1
-    `),
-    db.execute(sql`SELECT * FROM swimmer_profiles WHERE user_id = ${userId} LIMIT 1`),
-    db.execute(sql`SELECT * FROM swimming_activities WHERE user_id = ${userId} ORDER BY activity_date DESC`),
-    db.execute(sql`SELECT * FROM social_posts WHERE user_id = ${userId} ORDER BY created_at DESC`),
-    db.execute(sql`SELECT * FROM social_comments WHERE user_id = ${userId} ORDER BY created_at DESC`),
-    db.execute(sql`SELECT * FROM social_splashes WHERE user_id = ${userId} ORDER BY created_at DESC`),
-    db.execute(sql`
-      SELECT *
-      FROM social_follows
-      WHERE follower_id = ${userId} OR following_id = ${userId}
-      ORDER BY created_at DESC
-    `),
-    db.execute(sql`
-      SELECT ub.*, bd.code AS badge_code, bd.name AS badge_name
-      FROM user_badges ub
-      JOIN badge_definitions bd ON bd.id = ub.badge_id
-      WHERE ub.user_id = ${userId}
-      ORDER BY ub.earned_at DESC
-    `),
-    db.execute(sql`SELECT * FROM xp_transactions WHERE user_id = ${userId} ORDER BY created_at DESC`),
-    db.execute(sql`SELECT * FROM personal_records WHERE user_id = ${userId} ORDER BY achieved_at DESC`),
-    db.execute(sql`SELECT * FROM weekly_stats WHERE user_id = ${userId} ORDER BY week_start DESC`),
-    db.execute(sql`SELECT * FROM user_goals WHERE user_id = ${userId} ORDER BY created_at DESC`),
-    db.execute(sql`SELECT * FROM user_notifications WHERE user_id = ${userId} ORDER BY created_at DESC`),
-    db.execute(sql`
-      SELECT *
-      FROM direct_messages
-      WHERE sender_id = ${userId} OR receiver_id = ${userId}
-      ORDER BY created_at DESC
-    `),
-    db.execute(sql`SELECT * FROM community_club_members WHERE user_id = ${userId} ORDER BY joined_at DESC`),
-    db.execute(sql`
-      SELECT *
-      FROM social_post_reports
-      WHERE reporter_user_id = ${userId} OR handled_by = ${userId}
-      ORDER BY created_at DESC
-    `),
-    db.execute(sql`SELECT * FROM social_hidden_posts WHERE user_id = ${userId} ORDER BY created_at DESC`),
-    db.execute(sql`SELECT * FROM user_consents WHERE user_id = ${userId} ORDER BY created_at DESC`),
-  ]);
-
-  return {
-    exportedAt: new Date().toISOString(),
-    user: userResult.rows[0] ?? null,
-    profile: profileResult.rows[0] ?? null,
-    data: {
-      activities: activitiesResult.rows,
-      socialPosts: socialPostsResult.rows,
-      socialComments: socialCommentsResult.rows,
-      socialSplashes: socialSplashesResult.rows,
-      socialFollows: socialFollowsResult.rows,
-      badges: badgesResult.rows,
-      xpTransactions: xpResult.rows,
-      personalRecords: recordsResult.rows,
-      weeklyStats: weeklyStatsResult.rows,
-      goals: goalsResult.rows,
-      notifications: notificationsResult.rows,
-      directMessages: directMessagesResult.rows,
-      clubMemberships: clubsMembershipResult.rows,
-      reports: reportsResult.rows,
-      hiddenPosts: hiddenPostsResult.rows,
-      consents: consentsResult.rows,
-    },
-  };
+  const { buildUserDataExport } = await import("./account_export");
+  return buildUserDataExport(db, userId);
 }
 
 export async function deleteUserAccount(userId: number): Promise<{ id: number; email: string; name: string | null; openId: string | null } | null> {

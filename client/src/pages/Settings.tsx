@@ -46,6 +46,7 @@ import { homePathForPlatform } from "@/lib/navigation"
 import { isNativePlatform } from "@/lib/platform"
 import { formatInteger } from "@/lib/format"
 import { errorToastMessage } from "@/lib/trpc-errors"
+import { downloadDataExport } from "@/lib/data-export"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
 import { it } from "date-fns/locale"
@@ -780,25 +781,17 @@ export default function Settings() {
     }
   }
 
+  const [isExporting, setIsExporting] = useState(false)
   const handleExportData = async () => {
+    if (isExporting) return
+    setIsExporting(true)
     try {
-      const payload = await utils.auth.exportMyData.fetch()
-      const now = new Date()
-      const fileName = `swimforge-data-export-${now.toISOString().slice(0, 10)}.json`
-      const blob = new Blob([JSON.stringify(payload, null, 2)], {
-        type: "application/json;charset=utf-8",
-      })
-      const url = URL.createObjectURL(blob)
-      const anchor = document.createElement("a")
-      anchor.href = url
-      anchor.download = fileName
-      document.body.appendChild(anchor)
-      anchor.click()
-      anchor.remove()
-      URL.revokeObjectURL(url)
+      await downloadDataExport()
       toast.success("Esportazione completata.")
     } catch (error: unknown) {
-      toast.error(errorToastMessage(error, "Impossibile esportare i dati."))
+      toast.error(error instanceof Error && error.message ? error.message : "Impossibile esportare i dati.")
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -1421,9 +1414,9 @@ export default function Settings() {
                   title="Esporta i dati"
                   description="Scarica tutti i tuoi dati in formato JSON"
                   action={
-                    <Button variant="outline" onClick={handleExportData}>
+                    <Button variant="outline" onClick={handleExportData} disabled={isExporting}>
                       <Download aria-hidden />
-                      Esporta
+                      {isExporting ? "Esportazione…" : "Esporta"}
                     </Button>
                   }
                 />
