@@ -97,7 +97,7 @@ describe("AdminReports (Corsia)", () => {
     vi.mocked(toast.success).mockClear();
   });
 
-  it("no h1: an h2 with the count, the open reports first, each with its facts and a link to the post", () => {
+  it("no h1: an h2 with the count, the open reports first, each with its facts and the reported post itself", () => {
     renderPage();
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
     expect(screen.getByRole("heading", { level: 2, name: "Segnalazioni dei post" })).toBeInTheDocument();
@@ -110,13 +110,37 @@ describe("AdminReports (Corsia)", () => {
     expect(within(item).getByText("2h fa")).toBeInTheDocument();
     const facts = within(item).getAllByRole("term").map((term) => `${term.textContent}: ${term.nextElementSibling?.textContent}`);
     expect(facts).toEqual([
+      "Post: n. 12",
       "Motivo: Molestie",
       "Segnalata da: Ada Rossi",
       "Autore del post: Utente 9",
       "Dettagli: Insulti nei commenti",
       "Contenuto del post: Testo del post",
     ]);
-    expect(within(item).getByRole("link", { name: "Apri il post n. 12" })).toHaveAttribute("href", "/post/12");
+    // The post page refuses a private or club post to the admin too: no link that dead-ends.
+    expect(within(item).queryByRole("link")).toBeNull();
+  });
+
+  it("the reported post's photo or video is shown in the report", () => {
+    state.reports = {
+      items: [
+        report({ post_media_url: "https://res.cloudinary.com/demo/image/upload/v1/foto.jpg" }),
+        report({ id: 32, post_id: 13, post_content: null, post_media_url: "https://res.cloudinary.com/demo/video/upload/v1/clip.mp4" }),
+      ],
+      total: 2,
+    };
+    renderPage();
+    const first = screen.getByRole("article", { name: "Segnalazione n. 31" });
+    expect(within(first).getByRole("img", { name: "Foto del post n. 12" })).toHaveAttribute(
+      "src",
+      "https://res.cloudinary.com/demo/image/upload/v1/foto.jpg"
+    );
+    const second = screen.getByRole("article", { name: "Segnalazione n. 32" });
+    expect(within(second).getByLabelText("Video del post n. 13")).toHaveAttribute(
+      "src",
+      "https://res.cloudinary.com/demo/video/upload/v1/clip.mp4"
+    );
+    expect(within(second).queryByText("Contenuto del post")).toBeNull();
   });
 
   it("a status button saves it with the note written; failures are Italian toasts", async () => {

@@ -1,5 +1,4 @@
 import { useId, useState } from "react"
-import { Link } from "wouter"
 import { toast } from "sonner"
 import AppLayout from "@/components/AppLayout"
 import { Chip } from "@/components/corsia/Chip"
@@ -8,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { formatInteger, formatTimeAgo, toFiniteNumber } from "@/lib/format"
+import { isVideoUrl } from "@/lib/post-media"
 import { trpc } from "@/lib/trpc"
 import { errorToastMessage } from "@/lib/trpc-errors"
 
@@ -40,7 +40,11 @@ const REASON_LABELS: Record<string, string> = {
 /** «1 segnalazione», «12 segnalazioni». */
 const reportsCount = (total: number) => `${formatInteger(total)} ${total === 1 ? "segnalazione" : "segnalazioni"}`
 
-/** `/admin/reports` (admins only): reported posts with their status and the moderation note. */
+/**
+ * `/admin/reports` (admins only): reported posts with their status and the moderation note. The
+ * post is shown here (text, first photo or video): its page refuses a private or club post to
+ * the admin as to anyone else.
+ */
 export default function AdminReports() {
   const [status, setStatus] = useState<ReportStatus>("open")
   const [noteById, setNoteById] = useState<Record<number, string>>({})
@@ -174,7 +178,9 @@ function ReportItem({
   const titleId = useId()
   const noteId = useId()
   const current = STATUS[item.status as ItemStatus] ?? STATUS.open
+  const mediaUrl = typeof item.post_media_url === "string" ? item.post_media_url.trim() : ""
   const facts: Array<[string, string]> = [
+    ["Post", `n. ${item.post_id}`],
     ["Motivo", REASON_LABELS[item.reason] ?? String(item.reason ?? "")],
     ["Segnalata da", item.reporter_name || `Utente ${item.reporter_user_id}`],
     ["Autore del post", item.post_author_name || `Utente ${item.post_author_id}`],
@@ -204,9 +210,27 @@ function ReportItem({
           ))}
         </dl>
 
-        <Link href={`/post/${item.post_id}`} className="inline-block text-sm font-semibold text-action-text hover:underline">
-          Apri il post n. {item.post_id}
-        </Link>
+        {mediaUrl ? (
+          <div className="overflow-hidden rounded-xl bg-raised">
+            {isVideoUrl(mediaUrl) ? (
+              <video
+                src={mediaUrl}
+                controls
+                playsInline
+                preload="metadata"
+                aria-label={`Video del post n. ${item.post_id}`}
+                className="max-h-[320px] w-full object-contain"
+              />
+            ) : (
+              <img
+                src={mediaUrl}
+                alt={`Foto del post n. ${item.post_id}`}
+                loading="lazy"
+                className="max-h-[320px] w-full object-contain"
+              />
+            )}
+          </div>
+        ) : null}
 
         <div className="space-y-1">
           <label htmlFor={noteId} className="text-sm font-semibold">
