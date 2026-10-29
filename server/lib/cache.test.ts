@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { dayKey } from "@shared/swimMetrics";
 
 const m = vi.hoisted(() => {
   const client = {
@@ -235,7 +236,7 @@ describe("Redis outage: client open (reconnecting) but not ready", () => {
 });
 
 describe("invalidateUserCache", () => {
-  it("also drops the user's swim metrics", async () => {
+  it("also drops the user's swim metrics of today (Rome day)", async () => {
     m.client.set.mockResolvedValue("OK");
     const multi = { del: vi.fn(), exec: vi.fn(async () => []) };
     m.client.multi.mockReturnValue(multi);
@@ -244,6 +245,8 @@ describe("invalidateUserCache", () => {
 
     await invalidateUserCache("42");
 
-    expect(multi.del).toHaveBeenCalledWith(expect.arrayContaining(["user:stats:42", "swim-metrics:v1:42"]));
+    expect(multi.del).toHaveBeenCalledWith(
+      expect.arrayContaining(["user:stats:42", `swim-metrics:v2:42:${dayKey(new Date())}`]),
+    );
   });
 });
