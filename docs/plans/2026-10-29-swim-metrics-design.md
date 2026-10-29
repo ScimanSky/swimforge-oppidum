@@ -86,31 +86,58 @@ bracciata (DPS) è in metri per ciclo, come negli studi.
   | < −30 | carico alto |
 
   Aumento di CTL > 8 punti/settimana: crescita molto rapida.
-- **Senza CSS:** nessun carico. Il riquadro spiega che serve il passo soglia.
+- **Senza CSS:** nessun carico, salvo con «Le tue zone»: allora la soglia è il loro confine
+  B2/C1 (fonte «zone manuali», detto nel riquadro e al coach). Il riquadro spiega che serve il
+  passo soglia.
 - **Mostrato:** equilibrio di oggi e lettura. Grafico: forma e fatica (linee) ed equilibrio (barre)
   sugli ultimi 90 giorni.
 
-### 4.3 Intensità (zone di passo dal CSS)
-- **Fonte:** zone di passo relative al CSS (Swim Smooth, TrainingPeaks); distribuzione
-  dell'intensità polarizzata o piramidale (Seiler, 2010; Stöggl e Sperlich, 2014). I confini sono
-  una convenzione, espressa in % della velocità soglia:
+### 4.3 Intensità (zone di passo A1–C3)
+Aggiornato il 29/10: il proprietario usa le zone italiane A1–C3 e ha chiesto che statistiche,
+coach e allenamenti le parlino (sostituiscono le cinque zone Z1–Z5 della prima versione).
+- **Fonte:** zone di passo A1–C3 della scuola italiana, legate al passo soglia (Swim Smooth,
+  TrainingPeaks); distribuzione dell'intensità polarizzata o piramidale (Seiler, 2010; Stöggl e
+  Sperlich, 2014). I confini, in % della velocità soglia, sono una **convenzione nostra approvata
+  dal proprietario**; il passo soglia è il confine B2/C1; un valore di confine va nella zona più
+  veloce.
 
-  | Zona | Velocità rispetto alla soglia |
-  |---|---|
-  | Z1 Facile | < 85% |
-  | Z2 Aerobico | 85–92% |
-  | Z3 Medio | 92–97% |
-  | Z4 Soglia | 97–103% |
-  | Z5 Sopra soglia | > 103% |
+  | Zona | Definizione del proprietario | Velocità / soglia | Livello | Ripetuta max | RPE |
+  |---|---|---|---|---|---|
+  | A1 Recupero attivo | nuoto molto rilassato, riscaldamento e defaticamento | < 85% | Facile | — | 2–3 |
+  | A2 Fondo lento | resistenza aerobica di base, sensazione confortevole | 85–90% | Aerobico | — | 3–4 |
+  | B1 Fondo medio | aerobico più sostenuto ma gestibile | 90–95% | Medio | — | 5 |
+  | B2 Fondo medio-alto | ti avvicini alla soglia, respiro impegnato | 95–100% | Soglia | — | 6–7 |
+  | C1 Soglia anaerobica | soglia alta, ritmo gara su medio-lunghe | 100–104% | Soglia | 200 m | 7–8 |
+  | C2 Capacità anaerobica | sforzo intenso | > 104% | Sopra soglia | 150 m | 8–9 |
+  | C3 Potenza anaerobica | sprint puro | tratto ≤ 25 m (o una vasca) più veloce di C1/C2 | Sopra soglia | 25 m | 10 |
 
-- **Calcolo:** ogni giro attivo a stile libero va in una zona secondo la sua velocità; si somma la
-  distanza. Gli altri stili, la tecnica e le gambe sono «non classificati» (`unclassifiedMeters`);
-  la copertura è la quota dei metri delle 4 settimane che sta nelle zone. Al coach le zone
-  arrivano come passi m:ss/100 m (passo = passo soglia / rapporto di velocità).
-- **Mostrato:** quota facile (Z1–Z2), medio (Z3) e intenso (Z4–Z5) degli ultimi 28 giorni.
-  Lettura: se Z3 supera ~35% del volume, «molto lavoro in zona media»; è un'indicazione basata
-  sugli studi, non una regola. Grafico: barre settimanali impilate per zona (8 settimane), con i
-  colori `--zone-1..5`.
+  Con il passo soglia del proprietario (1:48,5): A1 più lento di 2:07,6 · A2 2:00,6–2:07,6 ·
+  B1 1:54,2–2:00,6 · B2 1:48,5–1:54,2 · C1 1:44,3–1:48,5 · C2/C3 più veloce di 1:44,3 (test in
+  `shared/paceZones.test.ts` e nel fixture del proprietario).
+- **Cinque livelli** (doppio riferimento, allineati ai confini): Facile = A1, Aerobico = A2,
+  Medio = B1, Soglia = B2 + C1, Sopra soglia = C2 + C3. Sono anche le parole semplici con cui il
+  coach e gli allenamenti dicono l'intensità.
+- **Le tue zone:** l'utente può scrivere i cinque confini (s/100 m, tra 1:00 e 4:00, ognuno più
+  veloce del precedente) in `swimmer_profiles.preferences.paceZones = { bounds: { a1a2, a2b1,
+  b1b2, b2c1, c1c2 }, updatedAt }`, salvati con lo stesso merge SQL del test CSS. Quando ci sono
+  vincono ovunque (classificazione, riquadro, coach, allenamenti) e valgono per tutte le nuotate
+  mostrate. Senza CSS il confine B2/C1 è la soglia delle zone e del carico (fonte «zone manuali»).
+- **Calcolo:** ogni giro attivo a stile libero va nella zona del suo passo (confini manuali,
+  altrimenti quelli dal CSS valido nel giorno della nuotata); si somma la distanza. Gli altri
+  stili, la tecnica e le gambe sono «non classificati» (`unclassifiedMeters`); la copertura è la
+  quota dei metri delle 4 settimane che sta nelle zone. Al coach le zone arrivano come passi
+  m:ss/100 m con livello, ripetuta massima, sensazioni e scopo.
+- **Contratto:** `SwimMetrics.zones = { source: "auto" | "manuali" | null, ranges: [{ code,
+  name, level, fastPace, slowPace, maxRepMeters }], bounds, autoBounds, manualUpdatedAt }`, così
+  il client non ricalcola mai i confini; `load.threshold = { paceSecondsPer100, source }` con
+  `source` «stima», «test» o «zone manuali». `zoneCssOffsetSeconds(code, bounds)` dà il centro
+  della zona rispetto al CSS per i futuri obiettivi Garmin.
+- **Mostrato:** quota facile (A1–A2), medio (B1–B2) e intenso (C1–C3) degli ultimi 28 giorni.
+  Lettura: se il medio supera ~35% del volume, «molto lavoro in zona media»; è un'indicazione
+  basata sugli studi, non una regola. Nel riquadro: interruttore «7 zone» / «5 livelli» per
+  barra, tabella dei passi e barre settimanali impilate (8 settimane) con i colori `--pace-a1..c3`
+  (dal freddo al caldo; le zone cardio restano `--zone-1..5`); «Le tue zone» (editor) e «Le zone
+  A1–C3» (glossario).
 
 ### 4.4 Efficienza della bracciata (Stroke Index)
 - **Fonte:** Stroke Index = velocità × distanza per ciclo (Costill et al., 1985).
@@ -168,10 +195,10 @@ usano solo in sezioni che spariscono se la richiesta fallisce.
 - **Letture:** cinque query in parallelo (nuotate e giri di 180 giorni, profilo, giri vicini alle
   distanze CSS di 300 giorni per avere intera la finestra di 90 giorni di ogni mese, nuotate per
   settimana di Roma per la serie).
-- **Cache Redis:** `swim-metrics:v2:{userId}:{giorno di Roma}` (il carico di oggi cambia a
+- **Cache Redis:** `swim-metrics:v3:{userId}:{giorno di Roma}` (il carico di oggi cambia a
   mezzanotte), 1 ora. Si invalida a ogni nuova nuotata, modifica, cancellazione o sincronizzazione
-  che cambia le nuotate e al salvataggio o alla rimozione di un test CSS; negli stessi casi si
-  cancellano i suggerimenti AI della pagina Coach in cache.
+  che cambia le nuotate e al salvataggio o alla rimozione di un test CSS o delle tue zone; negli
+  stessi casi si cancellano i suggerimenti AI della pagina Coach in cache.
 - **Definizioni condivise** `shared/swimMetrics.ts`:
   - i tipi del risultato;
   - per ogni metrica: nome, cosa misura, formula, fonte, come si legge, soglie.
@@ -180,6 +207,9 @@ usano solo in sezioni che spariscono se la richiesta fallisce.
   - `statistics.getMetrics` (solo per sé);
   - `statistics.setCssTest` e `statistics.clearCssTest`, con validazione: tempi plausibili e
     T400/T200 tra 1,9 e 2,4;
+  - `statistics.setPaceZones` e `statistics.clearPaceZones` («Le tue zone»): cinque passi tra
+    1:00 e 4:00, ognuno più veloce del precedente, errori in italiano sul loro campo; svuotano la
+    cache delle metriche;
   - `statistics.getInsights`, i suggerimenti AI della pagina Coach, generati dalle nuove metriche.
     Prende il posto di `advanced.insights`.
 - **Coach** (`server/ai_coach_chat.ts`, `server/ai_insights.ts`):
@@ -188,6 +218,16 @@ usano solo in sezioni che spariscono se la richiesta fallisce.
   - riceve un glossario generato dalle definizioni condivise;
   - istruzioni: usare solo queste metriche, citarle quando servono, dire quando i dati sono pochi o
     l'affidabilità è bassa, non inventare altri indici.
+  - zone A1–C3 (chat e generatore): ogni ripetuta con codice, livello e passo dalle zone
+    dell'atleta («6×100 B2 · Soglia 1:49–1:54, rec. 20″»); mai oltre la ripetuta massima; ogni zona
+    usata spiegata in parole semplici (il vero allenatore del proprietario non usa le zone);
+    l'allenamento si segue anche solo con livelli e passi.
+  - **Allenamenti generati** (`server/ai_coach_zones.ts`): dopo la risposta del modello il server
+    controlla codici e distanze; spezza una ripetuta troppo lunga in vasche di andata e ritorno
+    con lo stesso recupero (4×300 C1 → 8×150 C1); per una zona sconosciuta o mancante chiede una
+    volta di nuovo dicendo cosa non va; se alla seconda una ripetuta è ancora troppo lunga usa
+    l'allenamento di riserva. Registra ogni violazione, aggiunge livello e passo obiettivo (solo
+    stile libero) e ricalcola il totale dei metri.
 
 ## 7. Interfaccia (Allena → Statistiche)
 - La sezione «Analisi avanzate» diventa «Metriche»: sei riquadri richiudibili, tutti chiusi
@@ -202,7 +242,7 @@ usano solo in sezioni che spariscono se la richiesta fallisce.
   - per il passo soglia, «Inserisci un test».
 - **Dati insufficienti:** «—» nell'intestazione e, aperto, cosa serve (es. «Servono almeno due
   nuotate continue a stile libero, una di almeno 400 m»).
-- **Grafici:** stile Corsia (token `--chart-*` e `--zone-*`, niente gradienti), leggibili in
+- **Grafici:** stile Corsia (token `--chart-*` e `--pace-*`, niente gradienti), leggibili in
   entrambi i temi, da 360 px al desktop, numeri con `lib/format.ts`, etichette in italiano, una
   frase di sintesi accessibile per grafico.
 
