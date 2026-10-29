@@ -8,6 +8,7 @@ import ClubDetailEnhanced from "./ClubDetailEnhanced";
 const state = vi.hoisted(() => ({
   club: null as any,
   clubError: null as any,
+  clubLoading: false,
   stats: null as any,
   statsError: null as any,
   announcements: [] as any[],
@@ -22,11 +23,17 @@ const state = vi.hoisted(() => ({
 
 const helpers = vi.hoisted(() => {
   // Like TanStack Query: a disabled query has no data and stays pending.
-  const query = (name: string, data: () => unknown, error: () => unknown = () => null) => ({
+  const query = (
+    name: string,
+    data: () => unknown,
+    error: () => unknown = () => null,
+    loading: () => boolean = () => false
+  ) => ({
     useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
       state.enabled[name] = options?.enabled;
       const base = { isLoading: false, refetch: state.refetch };
       if (options?.enabled === false) return { ...base, data: undefined, isPending: true, isError: false, error: null };
+      if (loading()) return { ...base, isLoading: true, data: undefined, isPending: true, isError: false, error: null };
       const failure = error();
       if (failure) return { ...base, data: undefined, isPending: false, isError: true, error: failure };
       return { ...base, data: data(), isPending: false, isError: false, error: null };
@@ -50,7 +57,7 @@ vi.mock("@/lib/trpc", () => {
     trpc: {
       community: {
         clubs: {
-          get: query("get", () => state.club, () => state.clubError),
+          get: query("get", () => state.club, () => state.clubError, () => state.clubLoading),
           weeklyStats: query("weeklyStats", () => state.stats, () => state.statsError),
           announcements: { list: query("announcements", () => state.announcements) },
           meets: { list: query("meets", () => undefined), create: mutation() },
@@ -109,6 +116,7 @@ describe("ClubDetailEnhanced (Corsia)", () => {
   beforeEach(() => {
     state.club = { ...baseClub };
     state.clubError = null;
+    state.clubLoading = false;
     state.statsError = null;
     state.updateCalls.length = 0;
     state.enabled = {};
@@ -308,6 +316,36 @@ describe("ClubDetailEnhanced (Corsia)", () => {
       expect(screen.queryByText("Non riesco a caricare i dati")).toBeNull();
       expect(toast.error).not.toHaveBeenCalled();
       expect(screen.getByRole("heading", { level: 2, name: "Rari Nantes" })).toBeTruthy();
+    });
+  });
+
+  describe("caricamento ed errori del club", () => {
+    it("in caricamento: scheletri annunciati", () => {
+      state.clubLoading = true;
+      renderClub();
+      expect(screen.getByRole("status").textContent).toContain("Caricamento del club");
+      expect(screen.queryByText("Club non trovato.")).toBeNull();
+    });
+
+    it("errore di rete: messaggio breve e Riprova, non «Club non trovato.»", async () => {
+      state.club = null;
+      state.clubError = { message: "Failed to fetch", data: undefined };
+      renderClub();
+      expect(screen.getByText("Non riesco a caricare i dati")).toBeTruthy();
+      expect(screen.queryByText("Club non trovato.")).toBeNull();
+      await userEvent.setup({ delay: null }).click(screen.getByRole("button", { name: "Riprova" }));
+      expect(state.refetch).toHaveBeenCalled();
+    });
+
+    it("NOT_FOUND e FORBIDDEN (club segreto): «Club non trovato.»", () => {
+      for (const code of ["NOT_FOUND", "FORBIDDEN"]) {
+        state.club = null;
+        state.clubError = { message: code, data: { code } };
+        renderClub();
+        expect(screen.getByText("Club non trovato.")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Riprova" })).toBeNull();
+        cleanup();
+      }
     });
   });
 });

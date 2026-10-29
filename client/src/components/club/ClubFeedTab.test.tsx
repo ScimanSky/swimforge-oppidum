@@ -5,12 +5,19 @@ import ClubFeedTab from "./ClubFeedTab";
 
 const state = vi.hoisted(() => ({
   posts: [] as any[],
+  feedStatus: "success" as "success" | "loading" | "error",
   createCalls: [] as any[],
+  refetch: vi.fn(),
 }));
 
 vi.mock("@/lib/trpc", () => {
-  const query = (data: () => unknown) => ({
-    useQuery: () => ({ data: data(), isLoading: false }),
+  const query = (data: () => unknown, status: () => string = () => "success") => ({
+    useQuery: () =>
+      status() === "loading"
+        ? { data: undefined, isLoading: true, isError: false, refetch: state.refetch }
+        : status() === "error"
+          ? { data: undefined, isLoading: false, isError: true, error: { message: "Rete" }, refetch: state.refetch }
+          : { data: data(), isLoading: false, isError: false, refetch: state.refetch },
   });
   const mutation = (calls?: any[]) => ({
     useMutation: () => ({
@@ -26,7 +33,7 @@ vi.mock("@/lib/trpc", () => {
     trpc: {
       community: {
         clubs: {
-          feed: query(() => state.posts),
+          feed: query(() => state.posts, () => state.feedStatus),
           createPost: mutation(state.createCalls),
         },
         users: { search: query(() => []) },
@@ -55,7 +62,9 @@ describe("ClubFeedTab (Corsia)", () => {
   afterEach(cleanup);
   beforeEach(() => {
     state.posts = [];
+    state.feedStatus = "success";
     state.createCalls.length = 0;
+    state.refetch.mockClear();
   });
 
   it("invita a unirsi se non sei membro", () => {
@@ -87,5 +96,21 @@ describe("ClubFeedTab (Corsia)", () => {
     expect(within(post).getByText("Anna")).toBeTruthy();
     expect(within(post).getByRole("button", { name: "Commenti: 2" })).toBeTruthy();
     expect(within(post).getByRole("button", { name: "Elimina post" })).toBeTruthy();
+  });
+
+  it("in caricamento: scheletri, non «Nessun post ancora.»", () => {
+    state.feedStatus = "loading";
+    render(<ClubFeedTab clubId={7} isMember />);
+    expect(screen.getByRole("status").textContent).toContain("Caricamento dei post");
+    expect(screen.queryByText("Nessun post ancora.")).toBeNull();
+  });
+
+  it("errore del feed: messaggio breve e Riprova, non «Nessun post ancora.»", async () => {
+    state.feedStatus = "error";
+    render(<ClubFeedTab clubId={7} isMember />);
+    expect(screen.getByText("Non riesco a caricare i dati")).toBeTruthy();
+    expect(screen.queryByText("Nessun post ancora.")).toBeNull();
+    await userEvent.setup({ delay: null }).click(screen.getByRole("button", { name: "Riprova" }));
+    expect(state.refetch).toHaveBeenCalled();
   });
 });

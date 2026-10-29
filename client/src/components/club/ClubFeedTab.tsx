@@ -9,12 +9,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { Spinner } from "@/components/ui/spinner";
 import { MessageCircle, Plus, ImagePlus, X, AtSign, Hash, Trash2 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
 import PostReactions from "@/components/PostReactions";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import {
   extractHashtags,
   isVideoUrl,
@@ -465,9 +465,9 @@ export default function ClubFeedTab({ clubId, isMember }: ClubFeedTabProps) {
       </section>
 
       {feedQuery.isLoading ? (
-        <div className="flex justify-center py-8">
-          <Spinner aria-label="Caricamento" className="size-6 text-muted-foreground" />
-        </div>
+        <LoadingSkeleton label="Caricamento dei post…" count={2} itemClassName="h-40 w-full rounded-2xl" />
+      ) : !feedQuery.data && feedQuery.isError ? (
+        <LoadError onRetry={() => void feedQuery.refetch()} />
       ) : !feedQuery.data || feedQuery.data.length === 0 ? (
         <div className="surface-panel p-4 text-center">
           <p className="text-sm font-semibold">Nessun post ancora.</p>

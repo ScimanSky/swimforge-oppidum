@@ -16,8 +16,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Spinner } from "@/components/ui/spinner";
 import { ChoiceGroup, type ChoiceOption } from "@/components/corsia/ChoiceGroup";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -335,14 +335,21 @@ export default function ClubDetailEnhanced() {
   if (clubQuery.isLoading) {
     return (
       <AppLayout>
-        <div className="flex justify-center py-16">
-          <Spinner aria-label="Caricamento" className="size-6 text-muted-foreground" />
-        </div>
+        <LoadingSkeleton label="Caricamento del club…" count={3} itemClassName="h-32 w-full rounded-2xl" />
       </AppLayout>
     );
   }
 
   if (!club) {
+    // A missing or secret club is «not found»; anything else (network, server) can be retried.
+    const errorCode = clubQuery.error?.data?.code;
+    if (clubQuery.isError && errorCode !== "NOT_FOUND" && errorCode !== "FORBIDDEN") {
+      return (
+        <AppLayout>
+          <LoadError onRetry={() => void clubQuery.refetch()} />
+        </AppLayout>
+      );
+    }
     return (
       <AppLayout>
         <div className="surface-panel p-4 text-center">
