@@ -9,7 +9,15 @@ import { createClient } from 'redis';
 import { logger } from '../middleware/logger';
 import { randomUUID } from 'node:crypto';
 import { getRedisPolicy } from './redis-policy';
-import { REDIS_COMMAND_TIMEOUT_MS, isRedisCircuitOpen, withRedisTimeout, withTimeout } from './with-timeout';
+import {
+  REDIS_COMMAND_TIMEOUT_MS,
+  isRedisCircuitOpen,
+  onRedisCircuitOpen,
+  resetRedisCircuit,
+  withRedisTimeout,
+  withTimeout,
+} from './with-timeout';
+import { logThrottled } from './throttled-log';
 
 /**
  * Largest serialized value we send to Redis. Upstash rejects requests over
@@ -18,34 +26,155 @@ import { REDIS_COMMAND_TIMEOUT_MS, isRedisCircuitOpen, withRedisTimeout, withTim
  */
 export const CACHE_MAX_VALUE_BYTES = 1024 * 1024;
 
-export const redis = createClient({
-  url: process.env.REDIS_URL || 'redis://localhost:6379',
-  // Reject commands while reconnecting instead of queueing them until the
-  // socket comes back (they would hang the requests waiting on them).
-  disableOfflineQueue: true,
-  socket: {
-    connectTimeout: 5000,
-    // Never give up for good: a client that stopped reconnecting stays in
-    // degraded mode until the process restarts. Back off to 30 s instead.
-    reconnectStrategy: (retries) => {
-      if (retries > 20) return 30_000;
-      return Math.min(100 + retries * 200, 5000);
+/** A TCP-connected socket that has not become ready within this is abandoned. */
+export const REDIS_HANDSHAKE_TIMEOUT_MS = 5000;
+/** Minimum spacing between two forced reconnects (replacing the client). */
+export const REDIS_RECONNECT_MIN_INTERVAL_MS = 30_000;
+
+function createRedisClient() {
+  return createClient({
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+    // Reject commands while reconnecting instead of queueing them until the
+    // socket comes back (they would hang the requests waiting on them).
+    disableOfflineQueue: true,
+    socket: {
+      connectTimeout: 5000,
+      // Never give up for good: a client that stopped reconnecting stays in
+      // degraded mode until the process restarts. Back off to 30 s instead.
+      reconnectStrategy: (retries) => {
+        if (retries > 20) return 30_000;
+        return Math.min(100 + retries * 200, 5000);
+      },
     },
-  },
-});
-
-redis.on('error', (err) => {
-  const message = err instanceof Error ? err.message : String(err);
-  logger.error(`Redis error: ${message}`, {
-    event: 'redis:error',
-    stack: err instanceof Error ? err.stack : undefined,
   });
-});
+}
 
-redis.on('connect', () => {
-  logger.info('Connected to Redis', {
-    event: 'redis:connected',
+type RedisClient = ReturnType<typeof createRedisClient>;
+
+/**
+ * Create a client and wire its events. Events from a client that has since
+ * been replaced (see requestRedisReconnect) are ignored.
+ */
+function buildRedisClient(): RedisClient {
+  const client = createRedisClient();
+  let handshakeTimer: ReturnType<typeof setTimeout> | undefined;
+  const clearHandshakeTimer = () => {
+    if (handshakeTimer) clearTimeout(handshakeTimer);
+    handshakeTimer = undefined;
+  };
+
+  client.on('error', (err) => {
+    clearHandshakeTimer();
+    if (client !== redis) return;
+    if (reconnectInFlight === client) reconnectInFlight = null;
+    const message = err instanceof Error ? err.message : String(err);
+    // Emitted on every reconnect attempt during an outage: keep it bounded.
+    logThrottled('error', 'redis:error', `Redis error: ${message}`, {
+      stack: err instanceof Error ? err.stack : undefined,
+    });
   });
+
+  // 'connect' = TCP connected, handshake starting. node-redis does not bound
+  // the handshake: against a server that accepts but never answers it waits
+  // forever with isOpen true and no error, so bound it here.
+  client.on('connect', () => {
+    if (client !== redis) return;
+    logger.info('Connected to Redis', { event: 'redis:connected' });
+    clearHandshakeTimer();
+    handshakeTimer = setTimeout(() => {
+      handshakeTimer = undefined;
+      if (client !== redis || client.isReady || !client.isOpen) return;
+      if (reconnectInFlight === client) reconnectInFlight = null;
+      logThrottled('warn', 'redis:handshake_timeout', `Redis did not become ready within ${REDIS_HANDSHAKE_TIMEOUT_MS}ms of connecting`);
+      requestRedisReconnect('handshake_timeout');
+    }, REDIS_HANDSHAKE_TIMEOUT_MS);
+    handshakeTimer.unref?.();
+  });
+
+  client.on('ready', () => {
+    clearHandshakeTimer();
+    if (client !== redis) return;
+    if (reconnectInFlight === client) reconnectInFlight = null;
+    // Timeouts counted against the previous socket say nothing about this one.
+    resetRedisCircuit();
+    logger.info('Redis ready', { event: 'redis:ready' });
+  });
+
+  client.on('end', clearHandshakeTimer);
+
+  return client;
+}
+
+/**
+ * The shared client. `let` on purpose: requestRedisReconnect replaces it, and
+ * ES module importers (`import { redis }`) see the new one.
+ */
+export let redis: RedisClient = buildRedisClient();
+
+/** The client whose forced reconnect has not finished (ready, error or handshake timeout). */
+let reconnectInFlight: RedisClient | null = null;
+let lastReconnectAt = Number.NEGATIVE_INFINITY;
+let deferredReconnect: ReturnType<typeof setTimeout> | undefined;
+
+function startRedisConnect(client: RedisClient): Promise<unknown> {
+  // connect() rejects only if the reconnect strategy gives up (ours never
+  // does) or the client is already open; never let it go unhandled.
+  const attempt = client.connect();
+  attempt.catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    logThrottled('warn', 'redis:connect_failed', `Redis connect failed: ${message}`);
+  });
+  return attempt;
+}
+
+/**
+ * Throw the current client away and connect a new one. Used when the socket is
+ * open but useless: the handshake never completed, or a ready socket went
+ * silent (the circuit breaker opened). node-redis cannot notice either case
+ * on its own: no error event, isOpen stays true.
+ *
+ * A new client is used instead of destroy() + connect() on the same one
+ * because node-redis may still be running its own reconnect loop on the old
+ * socket; reconnecting the same client would race two loops on one client.
+ *
+ * Runs at most one at a time and at most once every
+ * REDIS_RECONNECT_MIN_INTERVAL_MS; a request that comes too early is retried
+ * when allowed, if Redis is still not usable by then.
+ * Returns true if a reconnect was started now.
+ */
+export function requestRedisReconnect(reason: string): boolean {
+  const wait = lastReconnectAt + REDIS_RECONNECT_MIN_INTERVAL_MS - Date.now();
+  if (reconnectInFlight !== null || wait > 0) {
+    if (!deferredReconnect) {
+      deferredReconnect = setTimeout(() => {
+        deferredReconnect = undefined;
+        if (!redis.isReady || isRedisCircuitOpen()) requestRedisReconnect(reason);
+      }, Math.max(wait, 1000));
+      deferredReconnect.unref?.();
+    }
+    return false;
+  }
+
+  lastReconnectAt = Date.now();
+  logger.warn(`Recreating the Redis connection (${reason})`, { event: 'redis:reconnect', reason });
+
+  const previous = redis;
+  try {
+    // Rejects its pending commands at once and closes the socket.
+    if (previous.isOpen) previous.destroy();
+  } catch {
+    // already closed
+  }
+
+  const next = buildRedisClient();
+  redis = next;
+  reconnectInFlight = next;
+  void startRedisConnect(next);
+  return true;
+}
+
+onRedisCircuitOpen(() => {
+  requestRedisReconnect('circuit_open');
 });
 
 // Connect to Redis (non-blocking)
@@ -60,14 +189,10 @@ export async function connectRedis() {
   });
 
   try {
-    // Set a timeout for connection attempt
-    const connectionPromise = redis.connect();
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Redis connection timeout')), 5000)
-    );
-
-    await Promise.race([connectionPromise, timeoutPromise]);
-    logger.info('Redis connected successfully', { event: 'redis:ready' });
+    // Bounded wait for startup logging only; the handshake watchdog above
+    // takes care of a connection that hangs.
+    await withTimeout(startRedisConnect(redis), REDIS_HANDSHAKE_TIMEOUT_MS, 'Redis connection');
+    if (!redis.isReady) throw new Error('Redis not ready');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     logger.warn(`Redis connection warning: ${message}. Running in degraded mode`, {
@@ -113,7 +238,7 @@ async function acquireLock(
   lockKey: string,
   ttlMs: number
 ): Promise<{ token: string } | 'busy' | 'unavailable'> {
-  if (!redis.isOpen) return 'unavailable';
+  if (!redis.isReady) return 'unavailable';
   const token = randomUUID();
   try {
     const res = await withRedisTimeout(
@@ -124,13 +249,13 @@ async function acquireLock(
     return { token };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.warn(`Failed to acquire cache lock ${lockKey}: ${message}`, { event: 'cache:lock_unavailable' });
+    logThrottled('warn', 'cache:lock_unavailable', `Failed to acquire cache lock ${lockKey}: ${message}`);
     return 'unavailable';
   }
 }
 
 async function releaseLock(lockKey: string, token: string): Promise<void> {
-  if (!redis.isOpen) return;
+  if (!redis.isReady) return;
   // Only delete the lock if we still own it (prevents unlocking someone else's lock after TTL expiry).
   const script = `
     if redis.call("GET", KEYS[1]) == ARGV[1] then
@@ -143,7 +268,7 @@ async function releaseLock(lockKey: string, token: string): Promise<void> {
     await withRedisTimeout(() => redis.eval(script, { keys: [lockKey], arguments: [token] }), `EVAL release ${lockKey}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.warn(`Failed to release cache lock ${lockKey}: ${message}`, { event: 'cache:lock_release_failed' });
+    logThrottled('warn', 'cache:lock_release_failed', `Failed to release cache lock ${lockKey}: ${message}`);
   }
 }
 
@@ -152,7 +277,7 @@ async function releaseLock(lockKey: string, token: string): Promise<void> {
  */
 export async function getCached<T>(key: string): Promise<T | null> {
   try {
-    if (!redis.isOpen) return null; // Redis not connected
+    if (!redis.isReady) return null; // Redis not connected (or reconnecting)
     const cached = await withRedisTimeout(() => redis.get(key), `GET ${key}`);
     if (!cached) return null;
 
@@ -164,9 +289,7 @@ export async function getCached<T>(key: string): Promise<T | null> {
     return JSON.parse(cached) as T;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error(`Cache get failed for key ${key}: ${message}`, {
-      event: 'cache:get_failed',
-    });
+    logThrottled('error', 'cache:get_failed', `Cache get failed for key ${key}: ${message}`);
     return null;
   }
 }
@@ -180,7 +303,7 @@ export async function setCached<T>(
   ttl: number = 3600
 ): Promise<void> {
   try {
-    if (!redis.isOpen) return; // Redis not connected
+    if (!redis.isReady) return; // Redis not connected (or reconnecting)
     const payload = JSON.stringify(value);
     if (payload === undefined) return;
     const bytes = Buffer.byteLength(payload, 'utf8');
@@ -200,9 +323,7 @@ export async function setCached<T>(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error(`Cache set failed for key ${key}: ${message}`, {
-      event: 'cache:set_failed',
-    });
+    logThrottled('error', 'cache:set_failed', `Cache set failed for key ${key}: ${message}`);
   }
 }
 
@@ -211,7 +332,7 @@ export async function setCached<T>(
  */
 export async function deleteCached(key: string): Promise<void> {
   try {
-    if (!redis.isOpen) return; // Redis not connected
+    if (!redis.isReady) return; // Redis not connected (or reconnecting)
     await withRedisTimeout(() => redis.del(key), `DEL ${key}`);
 
     logger.debug(`Cache delete: ${key}`, {
@@ -219,9 +340,7 @@ export async function deleteCached(key: string): Promise<void> {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error(`Cache delete failed for key ${key}: ${message}`, {
-      event: 'cache:delete_failed',
-    });
+    logThrottled('error', 'cache:delete_failed', `Cache delete failed for key ${key}: ${message}`);
   }
 }
 
@@ -230,7 +349,7 @@ export async function deleteCached(key: string): Promise<void> {
  */
 export async function deleteMultipleCached(keys: string[]): Promise<void> {
   try {
-    if (!redis.isOpen || keys.length === 0) return; // Redis not connected
+    if (!redis.isReady || keys.length === 0) return; // Redis not connected (or reconnecting)
     await withRedisTimeout(() => redis.del(keys), `DEL ${keys.length} keys`);
 
     logger.debug(`Cache delete multiple: ${keys.length} keys`, {
@@ -238,8 +357,7 @@ export async function deleteMultipleCached(keys: string[]): Promise<void> {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.warn(`Redis connection warning: ${message}`, {
-      event: 'redis:connection_warning',
+    logThrottled('warn', 'redis:connection_warning', `Redis connection warning: ${message}`, {
       stack: error instanceof Error ? error.stack : undefined,
     });
   }
@@ -253,8 +371,8 @@ export async function getOrSetCached<T>(
   fetcher: () => Promise<T>,
   ttl: number = 3600
 ): Promise<T> {
-  if (!redis.isOpen) {
-    // Redis not connected; behave like a pass-through.
+  if (!redis.isReady) {
+    // Redis not connected (or reconnecting); behave like a pass-through.
     return await fetcher();
   }
 
@@ -313,7 +431,7 @@ export async function getOrSetCached<T>(
  */
 export async function invalidateCachePattern(pattern: string): Promise<void> {
   try {
-    if (!redis.isOpen || isRedisCircuitOpen()) return; // Redis not connected / not answering
+    if (!redis.isReady || isRedisCircuitOpen()) return; // Redis not connected / not answering
     const work = async () => {
       const keysToDelete: string[] = [];
 
@@ -338,9 +456,7 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
     await withTimeout(work(), REDIS_COMMAND_TIMEOUT_MS * 3, `invalidate ${pattern}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error(`Cache invalidate pattern failed for ${pattern}: ${message}`, {
-      event: 'cache:invalidate_pattern_failed',
-    });
+    logThrottled('error', 'cache:invalidate_pattern_failed', `Cache invalidate pattern failed for ${pattern}: ${message}`);
   }
 }
 
@@ -363,7 +479,7 @@ export const cacheKeys = {
  * Invalidate user-related caches
  */
 export async function invalidateUserCache(userId: string): Promise<void> {
-  if (!redis.isOpen) return;
+  if (!redis.isReady) return;
 
   const lockKey = `lock:cache_invalidate:user:${userId}`;
   const lock = await acquireLock(lockKey, 5000);
@@ -391,9 +507,7 @@ export async function invalidateUserCache(userId: string): Promise<void> {
       await withRedisTimeout(() => multi.exec(), `MULTI DEL user ${userId}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.warn(`Cache invalidate failed for user ${userId}: ${message}`, {
-        event: 'cache:invalidate_user_failed',
-      });
+      logThrottled('warn', 'cache:invalidate_user_failed', `Cache invalidate failed for user ${userId}: ${message}`);
     }
 
     // Pattern-based delete (SCAN) is best-effort; cannot be fully atomic with writes.
@@ -415,7 +529,7 @@ export async function invalidateLeaderboardCache(): Promise<void> {
  */
 export async function getCacheStats() {
   try {
-    if (!redis.isOpen) {
+    if (!redis.isReady) {
       return { keys: 0, info: 'Redis not connected' };
     }
     const info = await withRedisTimeout(() => redis.info('stats'), 'INFO stats');
@@ -427,9 +541,7 @@ export async function getCacheStats() {
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    logger.error(`Cache stats failed: ${message}`, {
-      event: 'cache:stats_failed',
-    });
+    logThrottled('error', 'cache:stats_failed', `Cache stats failed: ${message}`);
     return null;
   }
 }
