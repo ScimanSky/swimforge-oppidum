@@ -39,6 +39,15 @@ import { fetchWithTimeout } from "./lib/fetchWithTimeout";
 import { sendPushToUser } from "./push";
 import { buildGarminSyncPush, buildPersonalRecordPush, type PersonalRecordSummary } from "./push_messages";
 import type { GarminSyncCount } from "@shared/garmin-sync";
+import {
+  buildTrainingRecordType,
+  dominantStroke,
+  loadStoredPbCandidates,
+  normalizeStrokeType,
+  recomputePersonalRecordsFromStoredLaps,
+  type PoolLength,
+  type RecordStroke,
+} from "./personal_records";
 
 // Garmin microservice configuration
 const GARMIN_SERVICE_URL = process.env.GARMIN_SERVICE_URL || "http://localhost:8000";
@@ -132,25 +141,6 @@ function decodeStoredGarminToken(
 function buildStoredGarminTokenPayload(tokenData?: string | null): string | null {
   if (!tokenData) return null;
   return `${GARMIN_TOKEN_PREFIX}${tokenData}`;
-}
-
-type RecordStroke = "freestyle" | "backstroke" | "breaststroke" | "butterfly" | "mixed";
-type PoolLength = 25 | 50;
-
-const SUPPORTED_PB_DISTANCES: Record<RecordStroke, number[]> = {
-  freestyle: [50, 100, 200, 400, 800, 1500],
-  backstroke: [50, 100, 200],
-  breaststroke: [50, 100, 200],
-  butterfly: [50, 100, 200],
-  mixed: [200],
-};
-
-function isSupportedPbEvent(strokeType: RecordStroke, distanceMeters: number) {
-  return SUPPORTED_PB_DISTANCES[strokeType]?.includes(distanceMeters) ?? false;
-}
-
-function buildTrainingRecordType(distanceMeters: number, poolLengthMeters: PoolLength) {
-  return `pb_${distanceMeters}_${poolLengthMeters}_t`;
 }
 
 /**
@@ -374,17 +364,6 @@ const pickFirstFromSources = (sources: Array<Record<string, unknown>>, keys: str
   return null;
 };
 
-const normalizeStrokeType = (value: unknown): RecordStroke | null => {
-  if (!value) return null;
-  const raw = String(value).toLowerCase();
-  if (raw.includes("free") || raw.includes("stile") || raw.includes("crawl")) return "freestyle";
-  if (raw.includes("back") || raw.includes("dorso")) return "backstroke";
-  if (raw.includes("breast") || raw.includes("rana")) return "breaststroke";
-  if (raw.includes("butter") || raw.includes("farf")) return "butterfly";
-  if (raw.includes("mix")) return "mixed";
-  return "mixed";
-};
-
 const toTimestamp = (value: unknown) => {
   if (!value) return null;
   if (value instanceof Date) return value;
@@ -523,12 +502,13 @@ export function extractGarminAdvancedFields(fullDetails: unknown) {
   };
 }
 
+/** Stores the laps and lengths of `fullDetails`; returns how many laps were stored. */
 export async function persistGarminLapDetails(
   db: Awaited<ReturnType<typeof getDb>>,
   activityId: number,
   fullDetails: unknown
-) {
-  if (!db) return;
+): Promise<number> {
+  if (!db) return 0;
   const full = asRecord(fullDetails);
   const splitsVal = full?.["splits"];
   const splitsObj = asRecord(splitsVal);
@@ -540,7 +520,7 @@ export async function persistGarminLapDetails(
     : [];
 
   if (lapDtos.length === 0) {
-    return;
+    return 0;
   }
 
   // Reset existing laps/lengths for this activity
@@ -551,17 +531,12 @@ export async function persistGarminLapDetails(
     const lapRec = asRecord(lap);
     const lengthDtosVal = lapRec?.["lengthDTOs"];
     const lengthDTOs: unknown[] = Array.isArray(lengthDtosVal) ? lengthDtosVal : [];
-    const strokeCounts: Record<string, number> = {};
-    lengthDTOs.forEach((length) => {
-      const lengthRec = asRecord(length);
-      const strokeKey = normalizeStrokeType(
-        lengthRec?.["swimStroke"] ?? lengthRec?.["strokeType"] ?? lengthRec?.["stroke"]
-      );
-      if (!strokeKey) return;
-      strokeCounts[strokeKey] = (strokeCounts[strokeKey] ?? 0) + 1;
-    });
-    const dominantStroke =
-      Object.entries(strokeCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+    const lapStroke = dominantStroke(
+      lengthDTOs.map((length) => {
+        const lengthRec = asRecord(length);
+        return lengthRec?.["swimStroke"] ?? lengthRec?.["strokeType"] ?? lengthRec?.["stroke"];
+      })
+    );
 
     return {
       activityId,
@@ -581,7 +556,7 @@ export async function persistGarminLapDetails(
       avgHeartRate: toInt(lapRec?.["averageHR"] ?? lapRec?.["avgHeartRate"]),
       maxHeartRate: toInt(lapRec?.["maxHR"] ?? lapRec?.["maxHeartRate"]),
       numberOfActiveLengths: toInt(lapRec?.["numberOfActiveLengths"]),
-      strokeType: dominantStroke,
+      strokeType: lapStroke,
       startTimeGmt: toTimestamp(lapRec?.["startTimeGMT"]),
     };
   });
@@ -648,96 +623,7 @@ export async function persistGarminLapDetails(
   if (lengthRecords.length > 0) {
     await db.insert(garminActivityLengths).values(lengthRecords);
   }
-}
-
-type TrainingPbCandidate = {
-  strokeType: RecordStroke;
-  distanceMeters: number;
-  poolLengthMeters: PoolLength;
-  timeCs: number;
-  achievedAt: Date;
-};
-
-async function collectTrainingPbCandidates(params: {
-  db: NonNullable<Awaited<ReturnType<typeof getDb>>>;
-  activityId: number;
-  activityDate: Date;
-  activityDistanceMeters: number;
-  activityDurationSeconds: number;
-  activityStrokeType: unknown;
-  poolLengthMeters: number;
-  isOpenWater: boolean;
-}): Promise<TrainingPbCandidate[]> {
-  const {
-    db,
-    activityId,
-    activityDate,
-    activityDistanceMeters,
-    activityDurationSeconds,
-    activityStrokeType,
-    poolLengthMeters,
-    isOpenWater,
-  } = params;
-  if (isOpenWater) return [];
-  if (poolLengthMeters !== 25 && poolLengthMeters !== 50) return [];
-
-  const effectivePoolLength = poolLengthMeters as PoolLength;
-  const bestByKey = new Map<string, TrainingPbCandidate>();
-
-  const registerCandidate = (candidate: TrainingPbCandidate) => {
-    const key = `${candidate.strokeType}:${candidate.distanceMeters}`;
-    const previous = bestByKey.get(key);
-    if (!previous || candidate.timeCs < previous.timeCs) {
-      bestByKey.set(key, candidate);
-    }
-  };
-
-  const lapRows = await db
-    .select({
-      distanceMeters: garminActivityLaps.distanceMeters,
-      durationSeconds: garminActivityLaps.durationSeconds,
-      strokeType: garminActivityLaps.strokeType,
-    })
-    .from(garminActivityLaps)
-    .where(eq(garminActivityLaps.activityId, activityId));
-
-  for (const lap of lapRows) {
-    const distanceMeters = Number(lap.distanceMeters ?? 0);
-    const durationSeconds = Number(lap.durationSeconds ?? 0);
-    if (!Number.isFinite(distanceMeters) || !Number.isFinite(durationSeconds)) continue;
-    if (distanceMeters <= 0 || durationSeconds <= 0) continue;
-    const normalizedDistance = Math.round(distanceMeters);
-    const strokeType = normalizeStrokeType(lap.strokeType);
-    if (!strokeType || !isSupportedPbEvent(strokeType, normalizedDistance)) continue;
-    registerCandidate({
-      strokeType,
-      distanceMeters: normalizedDistance,
-      poolLengthMeters: effectivePoolLength,
-      timeCs: Math.round(durationSeconds * 100),
-      achievedAt: activityDate,
-    });
-  }
-
-  const summaryStroke = normalizeStrokeType(activityStrokeType);
-  const summaryDistance = Math.round(activityDistanceMeters);
-  if (
-    summaryStroke &&
-    Number.isFinite(summaryDistance) &&
-    Number.isFinite(activityDurationSeconds) &&
-    summaryDistance > 0 &&
-    activityDurationSeconds > 0 &&
-    isSupportedPbEvent(summaryStroke, summaryDistance)
-  ) {
-    registerCandidate({
-      strokeType: summaryStroke,
-      distanceMeters: summaryDistance,
-      poolLengthMeters: effectivePoolLength,
-      timeCs: Math.round(activityDurationSeconds * 100),
-      achievedAt: activityDate,
-    });
-  }
-
-  return Array.from(bestByKey.values());
+  return insertedLaps.length;
 }
 
 /**
@@ -1089,6 +975,27 @@ function calculateActivityXp(activity: GarminServiceActivity): number {
 }
 
 /**
+ * Silent records recompute from stored laps (no pb_detected, no push); never throws,
+ * a failure must not fail the sync.
+ */
+async function recomputeRecordsSafely(userId: number, activityIds?: number[]) {
+  try {
+    return activityIds
+      ? await recomputePersonalRecordsFromStoredLaps(userId, { activityIds })
+      : await recomputePersonalRecordsFromStoredLaps(userId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn(`[Garmin Sync] Records recompute failed for user ${userId}: ${message}`, {
+      event: "garmin:records_recompute_failed",
+      userId,
+      scope: activityIds ? "activities" : "all",
+      message,
+    });
+    return { candidates: 0, inserted: 0, updated: 0, unchanged: 0, skippedManual: 0 };
+  }
+}
+
+/**
  * Syncs swimming activities from Garmin Connect via the Garmin microservice.
  *
  * @param userId - SwimForge user id.
@@ -1176,14 +1083,28 @@ export async function syncGarminActivities(
       return { synced: 0, newXp: 0, detectedPbs: [], error: "Profile not found" };
     }
 
-    const existingRecords = await db
-      .select({
-        recordType: personalRecords.recordType,
-        strokeType: personalRecords.strokeType,
-        value: personalRecords.value,
-      })
-      .from(personalRecords)
-      .where(eq(personalRecords.userId, userId));
+    const loadExistingRecords = () =>
+      db
+        .select({
+          recordType: personalRecords.recordType,
+          strokeType: personalRecords.strokeType,
+          value: personalRecords.value,
+        })
+        .from(personalRecords)
+        .where(eq(personalRecords.userId, userId));
+
+    let existingRecords = await loadExistingRecords();
+
+    // A user with no records yet may have months of stored laps that never produced
+    // any (laps stored after the activity was inserted). Fill those records silently
+    // first, so the new swims below are judged against the real history and only
+    // genuine improvements are celebrated.
+    if (existingRecords.length === 0) {
+      const backfill = await recomputeRecordsSafely(userId);
+      if (backfill.inserted > 0 || backfill.updated > 0) {
+        existingRecords = await loadExistingRecords();
+      }
+    }
 
     const bestPbByKey = new Map<string, number>();
     for (const row of existingRecords) {
@@ -1197,17 +1118,22 @@ export async function syncGarminActivities(
       }
     }
 
+    // Already-imported swims whose laps this sync stored: their records are
+    // recomputed (silently) once the loop is done.
+    const lapsStoredForExisting = new Set<number>();
+
+    /** Fetches the full Garmin details; returns how many laps were stored. */
     const enrichActivityDetails = async (params: {
       activityId: number;
       garminActivityId: string;
       currentStrokeType?: string | null;
       baseRawData?: Record<string, any> | null;
-    }) => {
+    }): Promise<number> => {
       const fullDetails = await getGarminActivityFullDetails(
         userId,
         params.garminActivityId
       );
-      if (!fullDetails) return;
+      if (!fullDetails) return 0;
 
       const advanced = extractGarminAdvancedFields(fullDetails);
       const updates: Record<string, any> = {
@@ -1270,7 +1196,7 @@ export async function syncGarminActivities(
           .where(eq(swimmingActivities.id, params.activityId));
       }
 
-      await persistGarminLapDetails(db, params.activityId, fullDetails);
+      return await persistGarminLapDetails(db, params.activityId, fullDetails);
     };
 
     // Bulk fetch all existing Garmin activity IDs for this user to avoid N+1 queries
@@ -1328,7 +1254,8 @@ export async function syncGarminActivities(
 
         if (!existingLap && existingDetails) {
           try {
-            await persistGarminLapDetails(db, existing.id, existingDetails);
+            const storedLaps = await persistGarminLapDetails(db, existing.id, existingDetails);
+            if (storedLaps > 0) lapsStoredForExisting.add(existing.id);
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             logger.warn(`[Garmin] Failed to persist laps for activity ${activity.activity_id}: ${message}`, {
@@ -1342,12 +1269,13 @@ export async function syncGarminActivities(
 
         if (!hasSummary || !hasAdvanced) {
           try {
-            await enrichActivityDetails({
+            const storedLaps = await enrichActivityDetails({
               activityId: existing.id,
               garminActivityId: activity.activity_id,
               currentStrokeType: existing.strokeType,
               baseRawData: existingRaw,
             });
+            if (storedLaps > 0) lapsStoredForExisting.add(existing.id);
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
             logger.warn(`[Garmin] Failed to enrich existing activity ${activity.activity_id}: ${message}`, {
@@ -1456,16 +1384,9 @@ export async function syncGarminActivities(
         }
 
         try {
-          const pbCandidates = await collectTrainingPbCandidates({
-            db,
-            activityId: inserted.id,
-            activityDate,
-            activityDistanceMeters: Number(activity.distance_meters),
-            activityDurationSeconds: Number(activity.duration_seconds),
-            activityStrokeType: activity.stroke_type,
-            poolLengthMeters: Math.round(activity.pool_length || 25),
-            isOpenWater: Boolean(activity.is_open_water),
-          });
+          // Same rules and stored data as the silent recompute; only this path, for a
+          // swim imported now, emits pb_detected and the record push.
+          const pbCandidates = await loadStoredPbCandidates(db, userId, [inserted.id]);
 
           for (const candidate of pbCandidates) {
             const recordType = buildTrainingRecordType(candidate.distanceMeters, candidate.poolLengthMeters);
@@ -1525,6 +1446,10 @@ export async function syncGarminActivities(
       });
 
       syncedCount++;
+    }
+
+    if (lapsStoredForExisting.size > 0) {
+      await recomputeRecordsSafely(userId, Array.from(lapsStoredForExisting));
     }
 
     // Update profile totals
