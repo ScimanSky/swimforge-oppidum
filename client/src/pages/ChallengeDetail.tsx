@@ -39,12 +39,17 @@ const profileBadgeTitle = (name?: string | null, level?: number | string | null)
 
 export default function ChallengeDetail() {
   const params = useParams<{ id: string }>();
-  const challengeId = parseInt(params.id || "0");
+  const challengeId = Number(params.id);
+  // «/challenges/abc» is not a challenge: never sent to the server (a BAD_REQUEST there).
+  const validId = Number.isInteger(challengeId) && challengeId > 0;
   const titleId = useId();
   const rankingId = useId();
   const { user } = useAuth();
 
-  const challengeQuery = trpc.challenges.getById.useQuery({ id: challengeId });
+  const challengeQuery = trpc.challenges.getById.useQuery(
+    { id: challengeId },
+    { enabled: validId }
+  );
   const challenge = challengeQuery.data;
 
   // Countdown timer
@@ -123,6 +128,8 @@ export default function ChallengeDetail() {
     return () => clearInterval(interval);
   }, [challenge]);
 
+  // Before `isPending`: a disabled query stays pending for ever.
+  if (!validId) return <Notice>Sfida non trovata</Notice>;
   if (challengeQuery.isPending) {
     return (
       <AppLayout>
@@ -134,7 +141,8 @@ export default function ChallengeDetail() {
       </AppLayout>
     );
   }
-  if (!challenge && challengeQuery.isError && challengeQuery.error?.data?.code !== "NOT_FOUND") {
+  const errorCode = challengeQuery.error?.data?.code;
+  if (!challenge && challengeQuery.isError && errorCode !== "NOT_FOUND" && errorCode !== "BAD_REQUEST") {
     return (
       <AppLayout>
         <LoadError onRetry={() => void challengeQuery.refetch()} />

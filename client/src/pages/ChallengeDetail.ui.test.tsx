@@ -11,15 +11,19 @@ const state = vi.hoisted(() => ({
   error: null as any,
   refetch: vi.fn(),
   ids: [] as number[],
+  enabled: [] as unknown[],
 }));
 
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     challenges: {
       getById: {
-        useQuery: ({ id }: { id: number }) => {
+        useQuery: ({ id }: { id: number }, options?: { enabled?: boolean }) => {
           state.ids.push(id);
-          if (state.isLoading) return { data: undefined, isLoading: true, isPending: true, refetch: state.refetch };
+          state.enabled.push(options?.enabled);
+          // A disabled query stays pending, like TanStack Query's.
+          if (state.isLoading || options?.enabled === false)
+            return { data: undefined, isLoading: state.isLoading, isPending: true, refetch: state.refetch };
           if (state.error) return { data: undefined, isError: true, error: state.error, refetch: state.refetch };
           return { data: state.challenge, isLoading: false, refetch: state.refetch };
         },
@@ -36,9 +40,9 @@ vi.mock("@/components/AppLayout", () => ({
   AppLayout: ({ children }: any) => <div>{children}</div>,
 }));
 
-function renderDetail() {
+function renderDetail(path = "/challenges/12") {
   render(
-    <Router hook={memoryLocation({ path: "/challenges/12" }).hook}>
+    <Router hook={memoryLocation({ path }).hook}>
       <Route path="/challenges/:id">
         <ChallengeDetail />
       </Route>
@@ -53,6 +57,7 @@ describe("Sfida (Corsia)", () => {
     state.error = null;
     state.refetch.mockClear();
     state.ids.length = 0;
+    state.enabled.length = 0;
     state.challenge = {
       id: 12,
       name: "Ottobre in vasca",
@@ -134,6 +139,24 @@ describe("Sfida (Corsia)", () => {
     state.error = { message: "Challenge not found", data: { code: "NOT_FOUND" } };
     renderDetail();
     expect(screen.getByText("Sfida non trovata")).toBeTruthy();
+  });
+
+  it("id non valido: «Sfida non trovata» senza chiedere al server", () => {
+    for (const path of ["/challenges/abc", "/challenges/0", "/challenges/-3", "/challenges/1.5"]) {
+      state.enabled.length = 0;
+      renderDetail(path);
+      expect(screen.getByText("Sfida non trovata")).toBeTruthy();
+      expect(screen.queryByRole("status")).toBeNull();
+      expect(state.enabled.every((enabled) => enabled === false)).toBe(true);
+      cleanup();
+    }
+  });
+
+  it("richiesta rifiutata (BAD_REQUEST): «Sfida non trovata», non un errore di rete", () => {
+    state.error = { message: "Invalid input", data: { code: "BAD_REQUEST" } };
+    renderDetail();
+    expect(screen.getByText("Sfida non trovata")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Riprova" })).toBeNull();
   });
 
   it("errore di rete: messaggio breve e Riprova", async () => {
