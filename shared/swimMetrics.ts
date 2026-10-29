@@ -39,8 +39,15 @@ export type SwimMetrics = {
     missing: string | null;
   };
   efficiency: {
-    poolLengthMeters: number | null; latest: number | null; avg28: number | null;
+    poolLengthMeters: number | null; latest: number | null;
+    /** Median SI of the last 28 days (the name is historical). */
+    avg28: number | null;
     baseline: number | null; deltaPct: number | null; missing: string | null;
+    /** Swims behind avg28 and behind the baseline (same pool length). */
+    n28?: number; nBaseline?: number;
+    /** Median distance per cycle (m) and pace (s/100 m) of the same swims: a longer stroke or only faster? */
+    dps28?: number | null; dpsBaseline?: number | null;
+    pace28?: number | null; paceBaseline?: number | null;
   };
   pacing: {
     cv28: number | null; fade28: number | null;
@@ -128,12 +135,13 @@ export const SWIM_METRIC_DEFINITIONS: Record<SwimMetricKey, SwimMetricDefinition
     measures:
       "Quanta strada fai per ciclo di bracciata alla velocità a cui nuoti (Stroke Index).",
     formula:
-      "Stroke Index = velocità × distanza per ciclo (m/s × m), media pesata sulla distanza dei giri attivi a stile libero con le bracciate. Distanza per ciclo = distanza / bracciate (una bracciata dell'orologio è un ciclo del braccio); frequenza = bracciate al minuto.",
+      "Stroke Index = velocità × distanza per ciclo (m/s × m), media pesata sulla distanza dei giri attivi a stile libero con le bracciate. Distanza per ciclo = distanza / bracciate (una bracciata dell'orologio è un ciclo del braccio); frequenza = bracciate al minuto. Si usano solo i giri con 0,9–3,2 m per ciclo e almeno 15 cicli al minuto (fuori da questi valori il conteggio delle bracciate è sbagliato o nel giro c'è una sosta). Il valore delle ultime 4 settimane è la mediana delle nuotate.",
     source: "Stroke Index (Costill et al., 1985).",
     howToRead:
       "Più alto è meglio. Confrontalo solo con la tua base nella stessa lunghezza di vasca: la spinta dal muro cambia i valori tra 25 e 50 m.",
     conventions: [
-      "La base è la mediana delle tue nuotate dei 90 giorni prima delle ultime 4 settimane, nella stessa vasca.",
+      "La base è la mediana delle tue nuotate dei 90 giorni prima delle ultime 4 settimane, nella stessa vasca; servono almeno 3 nuotate.",
+      "Accanto allo Stroke Index ci sono la distanza per ciclo e il passo: se sale lo Stroke Index ma non la distanza per ciclo, vai solo più veloce.",
     ],
   },
   pacing: {

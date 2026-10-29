@@ -57,6 +57,7 @@ type InternalSession = {
   dpsMeters: number | null;
   strokeRate: number | null;
   swolf: number | null;
+  speedMps: number | null;
   pacingCv: number | null;
   pacingFade: number | null;
   lastSet: RepeatSet | null;
@@ -127,7 +128,7 @@ function computeSession(activity: MetricActivity, cssSpeed: number | null): Inte
   const pool = isPoolSwim(activity);
   const efficiency = pool
     ? sessionEfficiency(activity.laps)
-    : { strokeIndex: null, dpsMeters: null, strokeRate: null, swolf: null };
+    : { strokeIndex: null, dpsMeters: null, strokeRate: null, swolf: null, speedMps: null };
   const pacing = pool ? sessionPacing(activity.laps) : { cv: null, fade: null, sets: [] };
   return {
     activity,
@@ -248,6 +249,8 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
   const summaryRows = sessions.map((s) => ({
     date: s.activity.day,
     strokeIndex: s.strokeIndex,
+    dpsMeters: s.dpsMeters,
+    speedMps: s.speedMps,
     poolLengthMeters: s.activity.poolLengthMeters,
     isOpenWater: s.activity.isOpenWater,
     pacingCv: s.pacingCv,
@@ -270,6 +273,12 @@ export function computeSwimMetrics(input: SwimMetricsInput, now: Date): SwimMetr
       baseline: round(eff.baseline, 2),
       deltaPct: round(eff.deltaPct, 1),
       missing: eff.missing,
+      n28: eff.n28,
+      nBaseline: eff.nBaseline,
+      dps28: round(eff.dps28, 2),
+      dpsBaseline: round(eff.dpsBaseline, 2),
+      pace28: round(eff.pace28, 1),
+      paceBaseline: round(eff.paceBaseline, 1),
     },
     pacing: {
       cv28: round(pacing.cv28, 1),

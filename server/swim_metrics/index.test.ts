@@ -167,7 +167,7 @@ describe("getSwimMetrics", () => {
     expect(easyPct + mediumPct + hardPct).toBe(100);
 
     // Efficiency: 25 m, no baseline yet.
-    expect(metrics.efficiency).toMatchObject({ poolLengthMeters: 25, baseline: null, deltaPct: null });
+    expect(metrics.efficiency).toMatchObject({ poolLengthMeters: 25, baseline: null, deltaPct: null, n28: 2, nBaseline: 0 });
     expect(metrics.efficiency.latest).toBe(metrics.sessions[1].strokeIndex);
     expect(metrics.efficiency.missing).toMatch(/base/);
 
