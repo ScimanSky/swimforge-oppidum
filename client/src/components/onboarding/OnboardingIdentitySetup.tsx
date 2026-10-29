@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { trpc } from "@/lib/trpc";
 import { type OnboardingRole, setOnboardingIdentityLocally } from "@/lib/onboarding";
 
@@ -85,7 +86,22 @@ export function OnboardingIdentitySetup({ userId, onComplete, onSkip }: Props) {
   };
 
   // Steps 2 and 3 appear after a choice: their title takes the focus (the chosen button is gone).
-  const focusOnMount = (element: HTMLHeadingElement | null) => element?.focus({ preventScroll: true });
+  // A stable callback: React calls it when a title mounts, not again on every render.
+  const focusOnMount = useCallback(
+    (element: HTMLHeadingElement | null) => element?.focus({ preventScroll: true }),
+    [],
+  );
+
+  // The steps slide in from the side; with reduced motion they just swap.
+  const reduceMotion = usePrefersReducedMotion();
+  const stepMotion = reduceMotion
+    ? { initial: false as const, transition: { duration: 0 } }
+    : {
+        initial: { opacity: 0, x: 24 },
+        animate: { opacity: 1, x: 0 },
+        exit: { opacity: 0, x: -24 },
+        transition: { duration: 0.22 },
+      };
 
   const optionClass =
     "min-h-11 rounded-xl border border-border bg-raised px-4 py-3 text-left text-sm transition-colors hover:border-action-text focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50";
@@ -117,10 +133,7 @@ export function OnboardingIdentitySetup({ userId, onComplete, onSkip }: Props) {
         {currentStep === 0 && (
           <motion.div
             key="role"
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.22 }}
+            {...stepMotion}
             className="flex flex-col gap-3"
           >
             <h3 className="text-[17px] font-bold">Chi sei?</h3>
@@ -147,10 +160,7 @@ export function OnboardingIdentitySetup({ userId, onComplete, onSkip }: Props) {
         {currentStep === 1 && (
           <motion.div
             key="stroke"
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.22 }}
+            {...stepMotion}
             className="flex flex-col gap-3"
           >
             <h3 ref={focusOnMount} tabIndex={-1} className="text-[17px] font-bold outline-none">
@@ -178,10 +188,7 @@ export function OnboardingIdentitySetup({ userId, onComplete, onSkip }: Props) {
         {currentStep === 2 && (
           <motion.div
             key="pool"
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.22 }}
+            {...stepMotion}
             className="flex flex-col gap-3"
           >
             <h3 ref={focusOnMount} tabIndex={-1} className="text-[17px] font-bold outline-none">
