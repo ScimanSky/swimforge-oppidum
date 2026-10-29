@@ -55,6 +55,18 @@ describe("CookieBanner (Corsia)", () => {
     expect(screen.getByRole("link", { name: "Cookie Policy" })).toHaveAttribute("href", "/cookies");
   });
 
+  it("tutto in italiano: categorie e testo senza termini inglesi", async () => {
+    renderBanner();
+    const banner = screen.getByRole("region", { name: "Preferenze cookie" });
+    expect(banner).toHaveTextContent("cookie opzionali (analitici e di marketing) solo con il tuo consenso");
+    await userEvent.click(screen.getByRole("button", { name: "Personalizza" }));
+    expect(screen.getByRole("switch", { name: "Funzionali" })).toHaveAccessibleDescription(
+      "Preferenze dell'interfaccia (tema, barra laterale)"
+    );
+    expect(screen.getByRole("switch", { name: "Cookie analitici" })).toBeInTheDocument();
+    expect(banner).not.toHaveTextContent(/analytics|sidebar/i);
+  });
+
   it("già scelto: non compare", () => {
     window.localStorage.setItem(KEY, JSON.stringify({ analytics: false, marketing: false }));
     renderBanner();
@@ -74,10 +86,10 @@ describe("CookieBanner (Corsia)", () => {
     renderBanner();
     await userEvent.click(screen.getByRole("button", { name: "Personalizza" }));
     expect(screen.getByRole("switch", { name: "Necessari" })).toBeDisabled();
-    expect(screen.getByRole("switch", { name: "Analytics" })).toHaveAccessibleDescription(
+    expect(screen.getByRole("switch", { name: "Cookie analitici" })).toHaveAccessibleDescription(
       "Misure aggregate di utilizzo"
     );
-    await userEvent.click(screen.getByRole("switch", { name: "Analytics" }));
+    await userEvent.click(screen.getByRole("switch", { name: "Cookie analitici" }));
     await userEvent.click(screen.getByRole("button", { name: "Salva preferenze" }));
 
     expect(state.setBulk).toHaveBeenCalledWith({
@@ -105,7 +117,7 @@ describe("CookieBanner (Corsia)", () => {
     window.localStorage.setItem(KEY, JSON.stringify({ functional: true, analytics: true, marketing: false }));
     renderBanner();
     act(() => openCookiePreferencesPanel());
-    expect(screen.getByRole("switch", { name: "Analytics" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "Cookie analitici" })).toBeChecked();
     expect(screen.getByRole("switch", { name: "Marketing" })).not.toBeChecked();
   });
 });

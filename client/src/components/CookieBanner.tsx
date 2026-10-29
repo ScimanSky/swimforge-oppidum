@@ -187,8 +187,8 @@ export default function CookieBanner() {
           Preferenze cookie
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Usiamo cookie necessari sempre attivi e cookie opzionali (analytics/marketing) solo con tuo consenso.
-          Puoi modificare in qualsiasi momento in Impostazioni o dalla Cookie Policy.
+          Usiamo cookie necessari, sempre attivi, e cookie opzionali (analitici e di marketing) solo con il tuo
+          consenso. Puoi cambiare la scelta in qualsiasi momento in Impostazioni o dalla Cookie Policy.
         </p>
 
         {showCustomize ? (
@@ -196,12 +196,12 @@ export default function CookieBanner() {
             <CategoryRow title="Necessari" description="Autenticazione e sicurezza (sempre attivi)" checked disabled />
             <CategoryRow
               title="Funzionali"
-              description="Preferenze interfaccia (tema, sidebar)"
+              description="Preferenze dell'interfaccia (tema, barra laterale)"
               checked={draft.functional}
               onChange={(value) => setDraft((prev) => ({ ...prev, functional: value }))}
             />
             <CategoryRow
-              title="Analytics"
+              title="Cookie analitici"
               description="Misure aggregate di utilizzo"
               checked={draft.analytics}
               onChange={(value) => setDraft((prev) => ({ ...prev, analytics: value }))}

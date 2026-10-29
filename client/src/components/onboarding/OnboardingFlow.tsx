@@ -95,7 +95,7 @@ const ATHLETE_TOUR_STEPS: TourStep[] = [
   {
     selector: '[data-tour="profile-stats"]',
     title: "Il tuo profilo",
-    body: "Stats, badge, attività e follower — tutto il tuo percorso in un posto.",
+    body: "Statistiche, badge, attività e follower — tutto il tuo percorso in un posto.",
   },
 ];
 
@@ -112,13 +112,13 @@ const COACH_TOUR_STEPS: TourStep[] = [
   },
   {
     selector: '[data-tour="club-members"]',
-    title: "Roster atleti",
+    title: "Membri",
     body: "Gestisci iscrizioni, ruoli e inviti per il tuo club.",
   },
   {
     selector: '[data-tour="club-events"]',
     title: "Gare ed eventi",
-    body: "Programma eventi, meet e raduni del club.",
+    body: "Programma eventi, gare e raduni del club.",
   },
   {
     selector: '[data-tour="club-announcements"]',
@@ -127,7 +127,7 @@ const COACH_TOUR_STEPS: TourStep[] = [
   },
   {
     selector: '[data-tour="coach-panel"]',
-    title: "Dashboard coach",
+    title: "Area coach",
     body: "La panoramica completa: membri, eventi, statistiche del club.",
   },
 ];

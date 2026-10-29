@@ -195,4 +195,37 @@ describe("OnboardingFlow (Corsia): dialoghi accessibili", () => {
     await user.click(screen.getByRole("button", { name: "Vai alle attività" }));
     expect(location.history.at(-1)).toBe("/track");
   });
+
+  it("tour dell'atleta e del coach: i nomi italiani delle sezioni dell'app", async () => {
+    setOnboardingIdentityLocally({ role: "athlete", completed: true }, "7");
+    let user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderAt("/home");
+    await screen.findByRole("dialog", { name: "Benvenuto nel tour guidato" });
+    await finishIntro();
+    await user.click(screen.getByRole("button", { name: "Inizia tour interattivo" }));
+    for (let step = 0; step < 7; step++) await user.click(screen.getByRole("button", { name: "Avanti" }));
+    expect(screen.getByRole("dialog", { name: "Il tuo profilo" })).toHaveAccessibleDescription(
+      "Statistiche, badge, attività e follower — tutto il tuo percorso in un posto."
+    );
+    cleanup();
+
+    localStorage.clear();
+    setOnboardingIdentityLocally({ role: "coach", completed: true }, "7");
+    user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderAt("/home");
+    await screen.findByRole("dialog", { name: "Benvenuto nel tour guidato" });
+    await finishIntro();
+    await user.click(screen.getByRole("button", { name: "Inizia tour interattivo" }));
+    const titles: string[] = [];
+    const bodies: string[] = [];
+    for (let step = 0; step < 6; step++) {
+      const dialog = screen.getByRole("dialog");
+      titles.push(screen.getByRole("heading").textContent ?? "");
+      bodies.push(dialog.textContent ?? "");
+      if (step < 5) await user.click(screen.getByRole("button", { name: "Avanti" }));
+    }
+    expect(titles).toEqual(["Navigazione principale", "Club", "Membri", "Gare ed eventi", "Annunci club", "Area coach"]);
+    expect(bodies[3]).toContain("Programma eventi, gare e raduni del club.");
+    expect(bodies.join(" ")).not.toMatch(/Roster|meet|Dashboard/);
+  });
 });
