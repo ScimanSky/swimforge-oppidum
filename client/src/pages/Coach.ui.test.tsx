@@ -115,7 +115,7 @@ describe("Coach AI", () => {
 
     const metrics = screen.getByRole("region", { name: "Metriche" });
     expect(metrics).toHaveTextContent("1:49 /100 m Passo soglia");
-    expect(metrics).toHaveTextContent("64% facile Intensità");
+    expect(metrics).toHaveTextContent("64% in zona A Intensità");
     expect(metrics).toHaveTextContent("7,7 km/sett. Volume");
     expect(metrics).toHaveTextContent("9 sett. Serie");
     // The invented scores are gone.
