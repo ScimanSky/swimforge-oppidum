@@ -56,8 +56,9 @@ function setLastSeenId(nextId: number) {
 }
 
 /**
- * «Nuovo record personale» after a sync, one dialog per PB. Queued while the cookie banner or
- * the onboarding is open (useCelebrationsAllowed).
+ * «Nuovo record personale» after a sync, one dialog per PB. Only its buttons and Esc (as
+ * «Chiudi») close it: a stray tap outside does not mark the record seen. Queued while the
+ * cookie banner or the onboarding is open (useCelebrationsAllowed).
  */
 export default function PbCelebrationNotification() {
   const { isAuthenticated } = useAuth();
@@ -167,6 +168,7 @@ export default function PbCelebrationNotification() {
         showCloseButton={false}
         overlayClassName={CELEBRATION_LAYER}
         className={cn("rounded-2xl bg-card p-6 shadow-none sm:max-w-md", CELEBRATION_LAYER)}
+        onInteractOutside={(event) => event.preventDefault()}
       >
         <Chip tone="xp" className="justify-self-start">
           <Trophy className="size-4" aria-hidden />

@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
@@ -113,6 +113,23 @@ describe("PbCelebrationNotification (Corsia)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Chiudi" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(window.localStorage.getItem("swimforge:pbCelebration:lastSeenEventId")).toBe("4");
+  });
+
+  it("un tocco fuori non lo chiude; Esc vale «Chiudi»", async () => {
+    state.pbEvents = [event(7)];
+    render(<PbCelebrationNotification />);
+    const dialog = screen.getByRole("dialog", { name: "Stile libero 100m" });
+    // Radix listens for outside taps from the tick after opening.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+
+    fireEvent.pointerDown(document.body);
+    fireEvent.click(document.body);
+    expect(dialog).toBeInTheDocument();
+    expect(window.localStorage.getItem("swimforge:pbCelebration:lastSeenEventId")).toBeNull();
+
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(window.localStorage.getItem("swimforge:pbCelebration:lastSeenEventId")).toBe("7");
   });
 
   it("condividi apre il post precompilato", async () => {
