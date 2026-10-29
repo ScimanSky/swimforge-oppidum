@@ -19,6 +19,13 @@ interface EventMapEditorProps {
 
 const DEFAULT_CENTER: RoutePoint = { lat: 39.2238, lng: 9.1217 };
 
+/** A Corsia token's current value (Leaflet writes SVG attributes, where var() does not resolve). */
+function tokenColor(name: string): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  const value = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || undefined;
+}
+
 export default function EventMapEditor({
   pin,
   routePoints,
@@ -61,7 +68,7 @@ export default function EventMapEditor({
     readOnlyRef.current = readOnly;
   }, [readOnly]);
 
-  const mapHeightClass = useMemo(() => className ?? "h-64 w-full rounded-xl border border-border/70", [className]);
+  const mapHeightClass = useMemo(() => className ?? "h-64 w-full rounded-xl border border-border", [className]);
 
   useEffect(() => {
     let cancelled = false;
@@ -152,7 +159,8 @@ export default function EventMapEditor({
         L.marker([point.lat, point.lng], {
           icon: L.divIcon({
             className: "club-waypoint-marker",
-            html: `<div style="width:26px;height:26px;border-radius:9999px;background:rgba(0,229,255,0.92);color:#00111a;border:2px solid rgba(255,255,255,0.9);font-size:12px;font-weight:700;line-height:22px;text-align:center;box-shadow:0 0 12px rgba(0,229,255,0.45);">${index + 1}</div>`,
+            // Marker HTML lives in the DOM, so the theme tokens resolve here.
+            html: `<div style="width:26px;height:26px;border-radius:9999px;background:var(--primary);color:var(--primary-foreground);border:2px solid var(--background);font-size:12px;font-weight:700;line-height:22px;text-align:center;">${index + 1}</div>`,
             iconSize: [26, 26],
             iconAnchor: [13, 13],
           }),
@@ -166,9 +174,9 @@ export default function EventMapEditor({
       polylineRef.current = L.polyline(
         routePoints.map((point) => [point.lat, point.lng]),
         {
-          color: "#00e5ff",
+          color: tokenColor("--action-text"),
           weight: 2,
-          opacity: 0.55,
+          opacity: 0.7,
           dashArray: "8,8",
         }
       ).addTo(map);
@@ -194,15 +202,17 @@ export default function EventMapEditor({
           <Button
             type="button"
             size="sm"
-            variant={mode === "pin" ? "neon" : "outline-neon"}
+            variant={mode === "pin" ? "default" : "outline"}
+            aria-pressed={mode === "pin"}
             onClick={() => setMode("pin")}
           >
-            Modalita pin
+            Modalità pin
           </Button>
           <Button
             type="button"
             size="sm"
-            variant={mode === "route" ? "neon" : "outline-neon"}
+            variant={mode === "route" ? "default" : "outline"}
+            aria-pressed={mode === "route"}
             onClick={() => setMode("route")}
           >
             Aggiungi waypoint
@@ -210,7 +220,7 @@ export default function EventMapEditor({
           <Button
             type="button"
             size="sm"
-            variant="outline-neon"
+            variant="outline"
             onClick={() => onRouteChange(routePoints.slice(0, -1))}
             disabled={routePoints.length === 0}
           >

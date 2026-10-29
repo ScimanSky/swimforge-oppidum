@@ -117,7 +117,6 @@ const PENDING: Record<Rule, string[]> = {
     "components/DirectMessages.tsx",
     "components/PbCelebrationNotification.tsx",
     "components/club/ClubDocumentsPanel.tsx",
-    "components/club/EventMapEditor.tsx",
     "components/onboarding/OnboardingFirstAction.tsx",
     "components/onboarding/OnboardingFlow.tsx",
     "components/onboarding/OnboardingIdentitySetup.tsx",
