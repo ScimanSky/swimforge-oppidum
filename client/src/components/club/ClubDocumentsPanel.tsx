@@ -50,6 +50,8 @@ export default function ClubDocumentsPanel({ clubId, isMember, canUpload, clubNa
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [caption, setCaption] = useState("");
+  // Reading the file comes before the upload starts: the button stays off for both.
+  const [isReadingFile, setIsReadingFile] = useState(false);
 
   const documentsQuery = trpc.community.clubs.media.list.useQuery(
     { clubId, mediaType: "pdf", limit: 100 },
@@ -90,12 +92,16 @@ export default function ClubDocumentsPanel({ clubId, isMember, canUpload, clubNa
       return;
     }
 
+    if (isReadingFile || uploadPdfMutation.isPending) return;
     let base64: string;
+    setIsReadingFile(true);
     try {
       base64 = await toBase64(selectedFile);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Impossibile leggere il file selezionato.");
       return;
+    } finally {
+      setIsReadingFile(false);
     }
     uploadPdfMutation.mutate({
       clubId,
@@ -195,9 +201,9 @@ export default function ClubDocumentsPanel({ clubId, isMember, canUpload, clubNa
               placeholder="Es. Programma gare marzo 2026"
             />
           </div>
-          <Button onClick={handleUpload} disabled={!selectedFile || uploadPdfMutation.isPending}>
+          <Button onClick={handleUpload} disabled={!selectedFile || isReadingFile || uploadPdfMutation.isPending}>
             <Upload aria-hidden />
-            {uploadPdfMutation.isPending ? "Caricamento…" : "Carica PDF"}
+            {isReadingFile || uploadPdfMutation.isPending ? "Caricamento…" : "Carica PDF"}
           </Button>
         </div>
       ) : null}

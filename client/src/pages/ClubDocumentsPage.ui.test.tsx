@@ -131,6 +131,44 @@ describe("Documenti del club (Corsia)", () => {
     expect((screen.getByLabelText("Titolo o nota") as HTMLInputElement).value).toBe("");
   });
 
+  it("mentre il file viene letto il pulsante è spento: due tocchi, un solo caricamento", async () => {
+    state.club = { ...state.club, member_role: "coach" };
+    // A FileReader that finishes only when the test says so.
+    const pending: Array<() => void> = [];
+    const RealFileReader = window.FileReader;
+    class SlowFileReader {
+      result: string | null = null;
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      readAsDataURL() {
+        pending.push(() => {
+          this.result = "data:application/pdf;base64,JVBERi0xLjQ=";
+          this.onload?.();
+        });
+      }
+    }
+    window.FileReader = SlowFileReader as unknown as typeof FileReader;
+    try {
+      renderPage();
+      const user = userEvent.setup({ delay: null });
+      await user.upload(
+        screen.getByLabelText("File PDF") as HTMLInputElement,
+        new File(["%PDF-1.4"], "gare.pdf", { type: "application/pdf" })
+      );
+      await user.click(screen.getByRole("button", { name: "Carica PDF" }));
+      const busy = screen.getByRole("button", { name: "Caricamento…" });
+      expect(busy).toBeDisabled();
+      await user.click(busy);
+      expect(pending).toHaveLength(1);
+
+      act(() => pending.forEach((finish) => finish()));
+      await waitFor(() => expect(state.uploads).toHaveLength(1));
+      expect(screen.getByRole("button", { name: "Carica PDF" })).toBeEnabled();
+    } finally {
+      window.FileReader = RealFileReader;
+    }
+  });
+
   it("in caricamento e in errore: scheletri e Riprova, mai «Nessun PDF» né «0 PDF»", async () => {
     state.docsPending = true;
     renderPage();
