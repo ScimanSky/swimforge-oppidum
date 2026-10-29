@@ -8,6 +8,25 @@ const state = vi.hoisted(() => ({
   isLoading: false,
   invalidateGet: vi.fn(),
   invalidateList: vi.fn(),
+  invalidateFeed: vi.fn(),
+  invalidateUnshared: vi.fn(),
+  toggleShareCalls: [] as Array<{ activityId: number; share: boolean }>,
+  toggleShareOptions: null as any,
+}));
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+vi.mock("@/components/ui/switch", () => ({
+  Switch: ({ id, checked, onCheckedChange, disabled }: any) => (
+    <input
+      id={id}
+      type="checkbox"
+      role="switch"
+      checked={!!checked}
+      disabled={!!disabled}
+      onChange={e => onCheckedChange?.(e.currentTarget.checked)}
+    />
+  ),
 }));
 
 vi.mock("@/lib/trpc", () => ({
@@ -17,10 +36,27 @@ vi.mock("@/lib/trpc", () => ({
         useQuery: () => ({ data: state.activity, isLoading: state.isLoading }),
       },
     },
+    community: {
+      toggleShare: {
+        useMutation: (options: any) => {
+          state.toggleShareOptions = options;
+          return {
+            mutate: (vars: { activityId: number; share: boolean }) => {
+              state.toggleShareCalls.push(vars);
+            },
+            isPending: false,
+          };
+        },
+      },
+    },
     useUtils: () => ({
       activities: {
         get: { invalidate: state.invalidateGet },
         list: { invalidate: state.invalidateList },
+      },
+      community: {
+        feed: { invalidate: state.invalidateFeed },
+        unsharedActivities: { invalidate: state.invalidateUnshared },
       },
     }),
   },
@@ -119,6 +155,10 @@ describe("ActivityDetail (Corsia)", () => {
     state.isLoading = false;
     state.invalidateGet.mockReset();
     state.invalidateList.mockReset();
+    state.invalidateFeed.mockReset();
+    state.invalidateUnshared.mockReset();
+    state.toggleShareCalls = [];
+    state.toggleShareOptions = null;
   });
 
   afterEach(() => {
@@ -143,6 +183,32 @@ describe("ActivityDetail (Corsia)", () => {
     expect(screen.getByText("Passo medio").previousElementSibling).toHaveTextContent("1:52 /100");
     expect(screen.queryByText("FC massima")).not.toBeInTheDocument();
     expect(screen.queryByText("—")).not.toBeInTheDocument();
+  });
+
+  it("SWOLF joins the grid when present, in order, with dividers for a third row", () => {
+    state.activity = session({ avgSwolf: 38, maxHeartRate: 171 });
+
+    render(<ActivityDetail />);
+
+    const grid = screen.getByTestId("session-metrics");
+    const cells = Array.from(grid.children) as HTMLElement[];
+    expect(cells.map(cell => cell.lastElementChild?.lastElementChild?.textContent)).toEqual([
+      "Distanza",
+      "Durata",
+      "Passo medio",
+      "SWOLF",
+      "FC media",
+      "FC massima",
+      "Calorie",
+    ]);
+    expect(within(cells[3]).getByText("38")).toBeInTheDocument();
+    // Three columns: a left divider except at the start of a row, a top divider from row two.
+    expect(cells.map(cell => cell.classList.contains("border-l"))).toEqual([
+      false, true, true, false, true, true, false,
+    ]);
+    expect(cells.map(cell => cell.classList.contains("border-t"))).toEqual([
+      false, false, false, true, true, true, true,
+    ]);
   });
 
   it("without heart-rate zones or lap paces the charts are not drawn", () => {
@@ -184,31 +250,58 @@ describe("ActivityDetail (Corsia)", () => {
     expect(within(pace).getByText("Più veloce: rip. 2 · 1:40")).toBeInTheDocument();
   });
 
-  it("«Condividi nel feed» opens the share picker on this activity and refreshes it once shared", async () => {
+  it("the feed switch toggles sharing of this activity and refreshes it", async () => {
+    render(<ActivityDetail />);
+
+    const toggle = screen.getByRole("switch", { name: "Condividi nel feed" });
+    expect(toggle).not.toBeChecked();
+    await userEvent.click(toggle);
+    expect(state.toggleShareCalls).toEqual([{ activityId: 5, share: true }]);
+
+    await state.toggleShareOptions.onSuccess(undefined, { activityId: 5, share: true });
+    expect(state.invalidateGet).toHaveBeenCalledWith({ id: 5 });
+    expect(state.invalidateList).toHaveBeenCalled();
+    expect(state.invalidateFeed).toHaveBeenCalled();
+    expect(state.invalidateUnshared).toHaveBeenCalled();
+  });
+
+  it("a shared activity can be un-shared from the switch", async () => {
+    state.activity = session({ shareToFeed: true });
+
+    render(<ActivityDetail />);
+
+    const toggle = screen.getByRole("switch", { name: "Condividi nel feed" });
+    expect(toggle).toBeChecked();
+    await userEvent.click(toggle);
+    expect(state.toggleShareCalls).toEqual([{ activityId: 5, share: false }]);
+  });
+
+  it("«Condividi con foto o commento» opens the picker on this activity, only when not shared", async () => {
     render(<ActivityDetail />);
 
     expect(screen.getByTestId("share-picker-state")).toHaveTextContent("open:false|id:5");
-    await userEvent.click(screen.getByRole("button", { name: "Condividi nel feed" }));
+    await userEvent.click(screen.getByRole("button", { name: "Condividi con foto o commento" }));
     expect(screen.getByTestId("share-picker-state")).toHaveTextContent("open:true|id:5");
 
     await userEvent.click(screen.getByRole("button", { name: "simulate-shared" }));
     expect(state.invalidateGet).toHaveBeenCalledWith({ id: 5 });
     expect(state.invalidateList).toHaveBeenCalled();
-  });
 
-  it("an activity already in the feed says so instead of offering to share", () => {
+    cleanup();
     state.activity = session({ shareToFeed: true });
-
     render(<ActivityDetail />);
-
-    expect(screen.queryByRole("button", { name: "Condividi nel feed" })).not.toBeInTheDocument();
-    expect(screen.getByText("Condivisa nel feed")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Condividi con foto o commento" })
+    ).not.toBeInTheDocument();
   });
 
-  it("the coach AI button links to the coach", () => {
+  it("the coach AI button opens the coach on the session analysis", () => {
     render(<ActivityDetail />);
 
-    expect(screen.getByRole("link", { name: "Coach AI" })).toHaveAttribute("href", "/coach");
+    expect(screen.getByRole("link", { name: "Coach AI" })).toHaveAttribute(
+      "href",
+      "/coach?tab=session-iq"
+    );
   });
 
   it("laps are selectable and the repeats view lists repeats and their lengths", async () => {

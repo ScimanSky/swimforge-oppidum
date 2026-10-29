@@ -11,6 +11,7 @@ import { ShareActivityPicker } from "@/components/social/ShareActivityPicker"
 import { Chip } from "@/components/corsia/Chip"
 import { Metric, type MetricProps } from "@/components/corsia/Metric"
 import { PaceBars, paceBars } from "@/components/corsia/PaceBars"
+import { ShareToggle } from "@/components/corsia/ShareToggle"
 import { ZoneBar } from "@/components/corsia/ZoneBar"
 import { activityPlaceLabel, activitySourceLabel } from "@/lib/activity-labels"
 import {
@@ -314,11 +315,12 @@ const positiveNumber = (value: unknown) => {
 const distanceParts = (meters: number): { value: string; unit: string } =>
   meters >= 1000 ? { value: formatKm(meters), unit: "km" } : { value: String(Math.round(meters)), unit: "m" }
 
-/** Session summary (2×3 grid of `Sessione.png`); a metric without data is not shown. */
+/** Session summary (3-column grid of `Sessione.png`, SWOLF added when present); a metric without data is not shown. */
 function sessionSummaryMetrics(activity: {
   distanceMeters?: number | null
   durationSeconds?: number | null
   avgPacePer100m?: number | null
+  avgSwolf?: number | null
   avgHeartRate?: number | null
   maxHeartRate?: number | null
   calories?: number | null
@@ -331,6 +333,8 @@ function sessionSummaryMetrics(activity: {
   const pace = paceSecondsPer100m(activity)
   if (pace)
     metrics.push({ value: formatPaceValue(pace), unit: "/100", label: "Passo medio", tone: "action" })
+  const swolf = positiveNumber(activity.avgSwolf)
+  if (swolf) metrics.push({ value: String(Math.round(swolf)), label: "SWOLF" })
   const avgHr = positiveNumber(activity.avgHeartRate)
   if (avgHr) metrics.push({ value: String(Math.round(avgHr)), unit: "bpm", label: "FC media" })
   const maxHr = positiveNumber(activity.maxHeartRate)
@@ -936,7 +940,7 @@ export default function ActivityDetail() {
         </header>
 
         {summaryMetrics.length > 0 ? (
-          <div className="surface-panel grid grid-cols-3 overflow-hidden p-0">
+          <div data-testid="session-metrics" className="surface-panel grid grid-cols-3 overflow-hidden p-0">
             {summaryMetrics.map((metric, index) => (
               <div
                 key={metric.label}
@@ -973,21 +977,24 @@ export default function ActivityDetail() {
           </div>
         ) : null}
 
-        <div className="flex items-center gap-3">
-          {activity.shareToFeed ? (
-            <p className="flex h-12 flex-1 items-center text-sm font-semibold text-success">
-              Condivisa nel feed
-            </p>
-          ) : (
-            <Button type="button" size="lg" className="flex-1" onClick={() => setSharePickerOpen(true)}>
-              Condividi nel feed
+        <div className="space-y-3">
+          <ShareToggle
+            activityId={activity.id}
+            shared={Boolean(activity.shareToFeed)}
+            className="surface-panel px-4 py-3"
+          />
+          <div className="flex items-center justify-end gap-3">
+            {!activity.shareToFeed ? (
+              <Button type="button" size="lg" className="flex-1" onClick={() => setSharePickerOpen(true)}>
+                Condividi con foto o commento
+              </Button>
+            ) : null}
+            <Button variant="outline" size="icon-lg" asChild>
+              <Link href="/coach?tab=session-iq" aria-label="Coach AI" title="Coach AI">
+                <Sparkles className="size-5" aria-hidden />
+              </Link>
             </Button>
-          )}
-          <Button variant="outline" size="icon-lg" asChild>
-            <Link href="/coach" aria-label="Coach AI" title="Coach AI">
-              <Sparkles className="size-5" aria-hidden />
-            </Link>
-          </Button>
+          </div>
         </div>
 
         <section aria-labelledby={detailTitleId} className="space-y-4">

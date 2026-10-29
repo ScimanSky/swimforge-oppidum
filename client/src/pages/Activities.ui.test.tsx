@@ -51,6 +51,16 @@ vi.mock("@/lib/trpc", () => ({
         }),
       },
     },
+    useUtils: () => ({
+      activities: {
+        get: { invalidate: vi.fn() },
+        list: { invalidate: state.invalidateActivities },
+      },
+      community: {
+        feed: { invalidate: state.invalidateFeed },
+        unsharedActivities: { invalidate: state.invalidateUnshared },
+      },
+    }),
     useContext: () => ({
       activities: {
         list: {

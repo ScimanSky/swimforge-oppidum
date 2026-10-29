@@ -4,7 +4,6 @@ import AppLayout from "@/components/AppLayout"
 import { useEffect, useId, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Switch } from "@/components/ui/switch"
 import { ShareActivityPicker } from "@/components/social/ShareActivityPicker"
 import {
   Dialog,
@@ -25,12 +24,12 @@ import { ListFilter, Sparkles } from "lucide-react"
 import { Link } from "wouter"
 import { trpc } from "@/lib/trpc"
 import { Skeleton } from "@/components/ui/skeleton"
-import { toast } from "sonner"
 import { getSyncPromptDecision, SYNC_PROMPT_SEEN_KEY } from "@/lib/sync-share-prompt"
 import { ActivityCard } from "@/components/corsia/ActivityCard"
 import { Chip } from "@/components/corsia/Chip"
 import { Metric, type MetricProps } from "@/components/corsia/Metric"
 import { WeekCard } from "@/components/corsia/WeekCard"
+import { ShareToggle } from "@/components/corsia/ShareToggle"
 import { ZoneBar } from "@/components/corsia/ZoneBar"
 import { useCurrentDay } from "@/hooks/useCurrentDay"
 import { summarizeWeek } from "@/lib/week-summary"
@@ -112,26 +111,10 @@ export default function Activities() {
   const [syncPromptActivity, setSyncPromptActivity] = useState<any | null>(null)
   const isWide = useIsWide()
   const [page, setPage] = useState(1)
-  const shareSwitchId = useId()
   const panelTitleId = useId()
 
   const activitiesQuery = trpc.activities.list.useQuery({ limit: 100, offset: 0, source: "all" })
   const utils = trpc.useContext()
-  const toggleShareMutation = trpc.community.toggleShare.useMutation({
-    onSuccess: async (_, vars) => {
-      await Promise.all([
-        utils.activities.list.invalidate(),
-        utils.community.feed.invalidate(),
-        utils.community.unsharedActivities.invalidate(),
-      ])
-      toast.success(
-        vars.share ? "Attività condivisa nel feed." : "Condivisione attività disattivata."
-      )
-    },
-    onError: (error) => {
-      toast.error(error.message || "Impossibile aggiornare la condivisione.")
-    },
-  })
 
   const activities = useMemo(() => activitiesQuery.data ?? [], [activitiesQuery.data])
   // Kept mounted across days (app resumed the next morning): `now` changes with the day.
@@ -372,22 +355,11 @@ export default function Activities() {
                 </div>
               ) : null}
 
-              <div className="flex items-center justify-between gap-3 border-t border-border pt-5">
-                <label htmlFor={shareSwitchId} className="text-sm font-semibold">
-                  Condividi nel feed
-                </label>
-                <Switch
-                  id={shareSwitchId}
-                  checked={Boolean(panelActivity.shareToFeed)}
-                  disabled={toggleShareMutation.isPending}
-                  onCheckedChange={(checked) =>
-                    toggleShareMutation.mutate({
-                      activityId: panelActivity.id,
-                      share: checked,
-                    })
-                  }
-                />
-              </div>
+              <ShareToggle
+                activityId={panelActivity.id}
+                shared={Boolean(panelActivity.shareToFeed)}
+                className="border-t border-border pt-5"
+              />
 
               <div className="flex flex-wrap gap-2">
                 {!panelActivity.shareToFeed ? (
