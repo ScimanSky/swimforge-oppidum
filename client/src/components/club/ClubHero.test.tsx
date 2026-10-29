@@ -49,13 +49,13 @@ describe("ClubHero", () => {
     cleanup();
   });
 
-  it("renders external site link in full variant when website is present", () => {
+  it("renders the external site link when the website is present", () => {
     renderClubHero();
     const siteLink = screen.getByRole("link", { name: /sito del club/i });
     expect(siteLink).toHaveAttribute("href", "https://swimmasters.example.com");
   });
 
-  it("does not render external site link in full variant when website is missing", () => {
+  it("does not render the external site link when the website is missing", () => {
     renderClubHero({ website_url: null });
     expect(screen.queryByRole("link", { name: /sito del club/i })).not.toBeInTheDocument();
   });
@@ -132,7 +132,9 @@ describe("ClubHero", () => {
         hasActiveMeet: true,
       }
     );
-    expect(screen.getByRole("link", { name: /gare, iscrizioni aperte/i })).toBeInTheDocument();
+    // Also a published meet whose registrations are not open yet: never «iscrizioni aperte».
+    expect(screen.getByRole("link", { name: "Gare, gara in programma" })).toBeInTheDocument();
+    expect(screen.queryByText(/iscrizioni aperte/i)).not.toBeInTheDocument();
   });
 
   it("opens the members sheet from the members button", async () => {

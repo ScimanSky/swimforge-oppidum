@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Router } from "wouter";
 import { memoryLocation } from "wouter/memory-location";
@@ -29,11 +30,13 @@ vi.mock("@/components/AppLayout", () => ({
 }));
 
 function renderInvite() {
+  const location = memoryLocation({ path: "/community/invite/abc123", record: true });
   render(
-    <Router hook={memoryLocation({ path: "/community/invite/abc123" }).hook}>
+    <Router hook={location.hook}>
       <ClubInvite />
     </Router>
   );
+  return location;
 }
 
 describe("ClubInvite (Corsia)", () => {
@@ -61,6 +64,16 @@ describe("ClubInvite (Corsia)", () => {
     expect(screen.getByRole("link", { name: "Vai al club" }).getAttribute("href")).toBe(
       "/community/club/5"
     );
+  });
+
+  it("i link navigano dentro l'app, senza ricaricare la pagina", async () => {
+    state.mutation = { isPending: false, data: { clubId: 5 }, error: null };
+    const user = userEvent.setup({ delay: null });
+    const location = renderInvite();
+    await user.click(screen.getByRole("link", { name: "Vai al club" }));
+    expect(location.history.at(-1)).toBe("/community/club/5");
+    await user.click(screen.getByRole("link", { name: "Torna alla community" }));
+    expect(location.history.at(-1)).toBe("/home/community");
   });
 
   it("segnala un invito non valido", () => {

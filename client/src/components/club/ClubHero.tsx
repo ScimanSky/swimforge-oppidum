@@ -163,10 +163,11 @@ export default function ClubHero({
               {meetsPageHref ? (
                 <SectionLink href={meetsPageHref} icon={<Trophy aria-hidden />}>
                   Gare
+                  {/* A published or open meet: «in programma» is true of both. */}
                   {hasActiveMeet ? (
                     <>
                       <span aria-hidden className="size-2 rounded-full bg-primary" />
-                      <span className="sr-only">, iscrizioni aperte</span>
+                      <span className="sr-only">, gara in programma</span>
                     </>
                   ) : null}
                 </SectionLink>

@@ -82,6 +82,17 @@ describe("QuickActionsFAB", () => {
     expect(onCreateMeet).toHaveBeenCalledOnce();
   });
 
+  it("keeps a fixed name and tells open or closed with aria-expanded", async () => {
+    render(
+      <QuickActionsFAB isMember isStaff={false} onPost={vi.fn()} onCreateEvent={vi.fn()} onInvite={vi.fn()} />
+    );
+    const toggle = await screen.findByRole("button", { name: "Azioni del club" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "Azioni del club" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByRole("button", { name: /Chiudi/ })).not.toBeInTheDocument();
+  });
+
   it("does not render when the user is not a member", () => {
     render(
       <QuickActionsFAB

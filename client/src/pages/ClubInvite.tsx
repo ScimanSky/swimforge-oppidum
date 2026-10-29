@@ -1,5 +1,5 @@
 import { useEffect, useId } from "react";
-import { useRoute } from "wouter";
+import { Link, useRoute } from "wouter";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
@@ -35,11 +35,11 @@ export default function ClubInvite() {
         <div className="flex flex-col gap-2">
           {clubId && (
             <Button asChild>
-              <a href={`/community/club/${clubId}`}>Vai al club</a>
+              <Link href={`/community/club/${clubId}`}>Vai al club</Link>
             </Button>
           )}
           <Button variant="outline" asChild>
-            <a href="/home/community">Torna alla community</a>
+            <Link href="/home/community">Torna alla community</Link>
           </Button>
         </div>
       </section>

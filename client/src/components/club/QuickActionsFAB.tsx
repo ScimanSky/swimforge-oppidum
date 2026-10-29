@@ -44,7 +44,8 @@ export default function QuickActionsFAB({
     <div className="flex flex-col-reverse items-end gap-2">
       <Button
         size="icon"
-        aria-label={open ? "Chiudi azioni del club" : "Azioni del club"}
+        // A fixed name: aria-expanded already says whether the menu is open.
+        aria-label="Azioni del club"
         aria-expanded={open}
         className={`rounded-full shadow-lg ${isMobile ? "size-12" : "size-14"}`}
         onClick={() => setOpen(!open)}
