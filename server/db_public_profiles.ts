@@ -5,7 +5,6 @@ import { users, swimmerProfiles, socialFollows } from "../drizzle/schema";
 type PublicProfile = {
   userId: number;
   name: string | null;
-  email?: string | null;
   username: string | null;
   avatarUrl: string | null;
   coverUrl: string | null;
@@ -44,7 +43,6 @@ export async function getUserPublicProfile(params: {
     .select({
       userId: users.id,
       name: users.name,
-      email: users.email,
       username: swimmerProfiles.username,
       avatarUrl: swimmerProfiles.avatarUrl,
       coverUrl: swimmerProfiles.coverUrl,
@@ -262,7 +260,6 @@ export async function searchUsers(viewerUserId: number, query: string, limit = 1
         sql`(
           COALESCE(${users.name}, '') ILIKE ${pattern}
           OR COALESCE(${swimmerProfiles.username}, '') ILIKE ${pattern}
-          OR ${users.email} ILIKE ${pattern}
         )`,
       )
     )
@@ -270,11 +267,9 @@ export async function searchUsers(viewerUserId: number, query: string, limit = 1
       sql`CASE
         WHEN lower(COALESCE(${swimmerProfiles.username}, '')) = ${normalizedLower} THEN 0
         WHEN lower(COALESCE(${users.name}, '')) = ${normalizedLower} THEN 1
-        WHEN lower(${users.email}) = ${normalizedLower} THEN 2
-        WHEN lower(COALESCE(${swimmerProfiles.username}, '')) LIKE lower(${prefixPattern}) THEN 3
-        WHEN lower(COALESCE(${users.name}, '')) LIKE lower(${prefixPattern}) THEN 4
-        WHEN lower(${users.email}) LIKE lower(${prefixPattern}) THEN 5
-        ELSE 6
+        WHEN lower(COALESCE(${swimmerProfiles.username}, '')) LIKE lower(${prefixPattern}) THEN 2
+        WHEN lower(COALESCE(${users.name}, '')) LIKE lower(${prefixPattern}) THEN 3
+        ELSE 4
       END`,
       desc(users.createdAt),
       sql`COALESCE(${swimmerProfiles.level}, 0) DESC`,

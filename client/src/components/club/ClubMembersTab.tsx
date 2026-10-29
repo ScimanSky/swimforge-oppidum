@@ -134,16 +134,16 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
                     <Avatar className="h-12 w-12 cursor-pointer">
                       <AvatarImage src={member.user_avatar || undefined} />
                       <AvatarFallback>
-                        {(member.user_name || member.user_email?.split("@")[0] || "U")?.[0]?.toUpperCase() || "U"}
+                        {(member.user_name || member.user_username || "U")?.[0]?.toUpperCase() || "U"}
                       </AvatarFallback>
                     </Avatar>
                   </Link>
                   <div className="flex-1 min-w-0">
                     <Link href={`/u/${member.user_id}`} className="font-semibold truncate block hover:underline">
-                      {member.user_name || member.user_email?.split("@")[0] || `Utente #${member.user_id}`}
+                      {member.user_name || member.user_username || `Utente #${member.user_id}`}
                     </Link>
-                    {member.user_email && (
-                      <p className="text-sm text-muted-foreground truncate">{member.user_email}</p>
+                    {member.user_username && (
+                      <p className="text-sm text-muted-foreground truncate">@{member.user_username}</p>
                     )}
                     {member.role && (
                       <Badge
@@ -217,12 +217,12 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
                         <Avatar className="h-8 w-8 cursor-pointer">
                           <AvatarImage src={member.user_avatar || undefined} />
                           <AvatarFallback>
-                            {(member.user_name || member.user_email?.split("@")[0] || "U")?.[0]?.toUpperCase() || "U"}
+                            {(member.user_name || member.user_username || "U")?.[0]?.toUpperCase() || "U"}
                           </AvatarFallback>
                         </Avatar>
                       </Link>
                       <div className="flex-1 min-w-0 text-sm truncate">
-                        {member.user_name || member.user_email?.split("@")[0] || `Utente #${member.user_id}`}
+                        {member.user_name || member.user_username || `Utente #${member.user_id}`}
                       </div>
                       <Button
                         size="sm"
@@ -269,12 +269,12 @@ export default function ClubMembersTab({ clubId, isStaff, isOwner }: ClubMembers
                         <Avatar className="h-8 w-8 cursor-pointer">
                           <AvatarImage src={member.user_avatar || undefined} />
                           <AvatarFallback>
-                            {(member.user_name || member.user_email?.split("@")[0] || "U")?.[0]?.toUpperCase() || "U"}
+                            {(member.user_name || member.user_username || "U")?.[0]?.toUpperCase() || "U"}
                           </AvatarFallback>
                         </Avatar>
                       </Link>
                       <div className="flex-1 min-w-0 text-sm truncate">
-                        {member.user_name || member.user_email?.split("@")[0] || `Utente #${member.user_id}`}
+                        {member.user_name || member.user_username || `Utente #${member.user_id}`}
                       </div>
                       <Button
                         size="sm"

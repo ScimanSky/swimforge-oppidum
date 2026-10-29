@@ -101,7 +101,7 @@ export async function listClubMembers(clubId: number) {
       m.status,
       m.joined_at,
       u.name AS user_name,
-      u.email AS user_email,
+      sp.username AS user_username,
       sp.avatar_url AS user_avatar
     FROM community_club_members m
     JOIN users u ON u.id = m.user_id
@@ -124,7 +124,7 @@ export async function listClubMembersByStatus(clubId: number, status: "pending" 
       m.status,
       m.joined_at,
       u.name AS user_name,
-      u.email AS user_email,
+      sp.username AS user_username,
       sp.avatar_url AS user_avatar
     FROM community_club_members m
     JOIN users u ON u.id = m.user_id
@@ -171,7 +171,7 @@ export async function getClubFeed(userId: number, clubId: number, limit = 20) {
       p.visibility,
       p.created_at,
       u.name AS user_name,
-      u.email AS user_email,
+      sp.username AS user_username,
       sp.avatar_url AS user_avatar,
       EXISTS(
         SELECT 1 FROM user_presence up

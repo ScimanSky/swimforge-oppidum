@@ -54,7 +54,7 @@ export async function getSocialFeed(userId: number, options: { limit?: number; s
       p.created_at,
       p.updated_at,
       u.name AS user_name,
-      u.email AS user_email,
+      sp.username AS user_username,
       sp.avatar_url AS user_avatar,
       (
         SELECT c.name
@@ -632,7 +632,7 @@ export async function getComments(postId: number) {
       c.content,
       c.created_at,
       u.name AS user_name,
-      u.email AS user_email,
+      sp.username AS user_username,
       sp.avatar_url AS user_avatar
     FROM social_comments c
     JOIN users u ON u.id = c.user_id

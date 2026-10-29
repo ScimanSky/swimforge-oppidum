@@ -60,12 +60,12 @@ export default function FeedPostComments({ postId, isOpen }: FeedPostCommentsPro
                     <Avatar className="size-6 border border-border/60 shrink-0 mt-0.5">
                       <AvatarImage src={comment.user_avatar || ""} />
                       <AvatarFallback className="text-[9px]">
-                        {getInitials(comment.user_name || comment.user_email || "SW")}
+                        {getInitials(comment.user_name || comment.user_username || "SW")}
                       </AvatarFallback>
                     </Avatar>
                     <p className="text-sm text-foreground min-w-0">
                       <span className="font-semibold mr-1.5">
-                        {(comment.user_name || comment.user_email || "").split(" ")[0]}
+                        {(comment.user_name || comment.user_username || "").split(" ")[0]}
                       </span>
                       {comment.content}
                     </p>
