@@ -68,6 +68,27 @@ export const formatSignedInteger = (value: number | null | undefined) => {
   return rounded > 0 ? `+${formatInteger(rounded)}` : `−${formatInteger(-rounded)}`
 }
 
+const decimalFmts = new Map<number, Intl.NumberFormat>()
+
+/**
+ * Fixed decimals with the Italian comma and grouping, typographic minus: (1.456, 2) → «1,46»,
+ * (3, 1) → «3,0», (−4.25, 1) → «−4,3»; «—» if not a finite number.
+ */
+export const formatDecimal = (value: number | null | undefined, digits: number) => {
+  if (value === null || value === undefined || !Number.isFinite(value)) return NO_VALUE
+  let fmt = decimalFmts.get(digits)
+  if (!fmt) {
+    fmt = new Intl.NumberFormat("it-IT", {
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+      useGrouping: "always",
+    })
+    decimalFmts.set(digits, fmt)
+  }
+  const text = fmt.format(Math.abs(value))
+  return value < 0 && /[1-9]/.test(text) ? `−${text}` : text
+}
+
 /** Kilometres with Italian decimal comma, no unit: 3200 or «"3200"» → «3,2»; «—» if not a finite number. */
 export const formatKm = (meters: number | string | null | undefined) => {
   const number = toFiniteNumber(meters)

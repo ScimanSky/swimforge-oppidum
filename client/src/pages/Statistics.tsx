@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc";
 import {
@@ -13,22 +13,16 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
-import { BarChart3, Gauge, Info, Sparkles } from "lucide-react";
-import { metricsDefinitions } from "@/data/metricsDefinitions";
+import { Activity, BarChart3, Gauge } from "lucide-react";
 import { AppLayout } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { LoadError, LoadingSkeleton } from "@/components/corsia/LoadState";
 import { Metric } from "@/components/corsia/Metric";
 import { ZoneBar } from "@/components/corsia/ZoneBar";
-import {
-  formatDayMonth,
-  formatDayMonthYear,
-  formatInteger,
-  formatPaceValue,
-  formatSignedInteger,
-} from "@/lib/format";
+import { MetricCards } from "@/components/stats/MetricCards";
+import { formatDayMonth, formatInteger, formatPaceValue } from "@/lib/format";
 
 const PERIOD_OPTIONS = [
   { value: 7, label: "7 giorni" },
@@ -36,8 +30,6 @@ const PERIOD_OPTIONS = [
   { value: 90, label: "90 giorni" },
   { value: 365, label: "1 anno" },
 ];
-
-type MetricInfo = (typeof metricsDefinitions)[keyof typeof metricsDefinitions];
 
 const tooltipStyle = {
   background: "var(--card)",
@@ -61,102 +53,6 @@ const accordionTrigger =
   "rounded-2xl border border-border bg-card px-4 py-3 text-left text-[15px] font-semibold hover:no-underline";
 const cardTitle = "text-base font-bold text-foreground";
 
-function MetricInfoButton({ label, info }: { label: string; info: MetricInfo }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="-m-2 flex size-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
-        aria-label={`Come si calcola: ${label}`}
-      >
-        <Info className="size-4" aria-hidden />
-      </button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{info.title}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 text-sm text-muted-foreground">
-            <p>{info.description}</p>
-            <div className="whitespace-pre-line rounded-xl bg-raised p-3 text-xs text-foreground">
-              {info.formula}
-            </div>
-            <div>
-              <h3 className="mb-2 font-semibold text-foreground">Interpretazione</h3>
-              <ul className="space-y-1">
-                <li><strong>Ottimo:</strong> {info.interpretation.excellent}</li>
-                <li><strong>Buono:</strong> {info.interpretation.good}</li>
-                <li><strong>Discreto:</strong> {info.interpretation.fair}</li>
-                <li><strong>Scarso:</strong> {info.interpretation.poor}</li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="mb-2 font-semibold text-foreground">Come migliorare</h3>
-              <ul className="list-disc space-y-1 pl-5">
-                {info.howToImprove.map((tip: string, idx: number) => (
-                  <li key={idx}>{tip}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
-type Score = { label: string; value: string | null; unit?: string; info?: MetricInfo };
-
-/** Tile for one score: Metric and the «how it is computed» button. */
-function ScoreTile({ label, value, unit, info }: Score & { value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-2 rounded-2xl bg-raised p-4">
-      <Metric value={value} unit={unit} label={label} size="responsive" />
-      {info ? <MetricInfoButton label={label} info={info} /> : null}
-    </div>
-  );
-}
-
-const NOT_ENOUGH_DATA = "Servono più nuotate per questa analisi";
-
-/**
- * A card of score tiles. A score without data has no tile («una metrica senza dato non si
- * mostra»); a card left without tiles says so in one line.
- */
-function ScoreSection({
-  title,
-  scores,
-  children,
-}: {
-  title: string;
-  scores: Score[];
-  children?: ReactNode;
-}) {
-  const shown = scores.filter((score): score is Score & { value: string } => score.value !== null);
-  const isEmpty = shown.length === 0 && !children;
-  return (
-    <section className="surface-panel p-4">
-      <h3 className={cardTitle}>{title}</h3>
-      {isEmpty ? (
-        <p className="mt-2 text-sm text-muted-foreground">{NOT_ENOUGH_DATA}</p>
-      ) : (
-        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-          {shown.map((score) => (
-            <ScoreTile key={score.label} {...score} />
-          ))}
-          {children}
-        </div>
-      )}
-    </section>
-  );
-}
-
-const scoreValue = (value: number | null | undefined) =>
-  value !== null && value !== undefined && Number.isFinite(value) ? formatInteger(value) : null;
-
 const HR_ZONE_NAMES = ["Recupero", "Aerobica", "Soglia", "Anaerobica", "Massima"] as const;
 
 export default function Statistics() {
@@ -174,13 +70,10 @@ export default function Statistics() {
     { days: period },
     queryOptions
   );
-  // Server-side insights remain cached; keep the client cache short.
-  const { data: advanced, isLoading: advancedLoading } = trpc.statistics.getAdvanced.useQuery(
-    { days: period },
-    queryOptions
-  );
+  // Swim metrics have their own windows (28 and 90 days): not tied to the period, loaded apart.
+  const metricsQuery = trpc.statistics.getMetrics.useQuery(undefined, { staleTime: 5 * 60 * 1000 });
 
-  const isLoading = timelineLoading || performanceLoading || advancedLoading;
+  const isLoading = timelineLoading || performanceLoading;
 
   // Percent of time in zones 1-5 (ZoneBar only needs the proportions).
   const hrZones = performance
@@ -222,24 +115,6 @@ export default function Statistics() {
           .map((band) => `${band.range} ${formatInteger(band.count)}`)
           .join(", ")}.`
       : null;
-
-  const progressiveOverloadValue =
-    advanced?.poiBaseline === false ? null : advanced?.progressiveOverloadIndex ?? null;
-
-  // The signed value when the server sends it; older payloads only have |%| and a direction.
-  const trend = advanced?.trendBaseline ? advanced.trendIndicator : null;
-  const trendScore: { value: string | null; unit?: string } = !trend
-    ? { value: null }
-    : typeof trend.signedPercentage === "number"
-      ? { value: formatSignedInteger(trend.signedPercentage), unit: "%" }
-      : trend.direction === "stable"
-        ? { value: "Stabile" }
-        : {
-            value: formatSignedInteger(trend.direction === "down" ? -trend.percentage : trend.percentage),
-            unit: "%",
-          };
-
-  const streak = advanced?.streak;
 
   return (
     <AppLayout>
@@ -411,117 +286,30 @@ export default function Statistics() {
               </AccordionContent>
             </AccordionItem>
 
-            {advanced && (
-              <AccordionItem value="advanced" className="border-0">
-                <AccordionTrigger headingLevel={2} className={accordionTrigger}>
-                  <span className="inline-flex items-center gap-2">
-                    <Sparkles className="size-4 text-muted-foreground" aria-hidden />
-                    Analisi avanzate
-                  </span>
-                </AccordionTrigger>
-                <AccordionContent className="space-y-3 pt-3">
-                  <ScoreSection
-                    title="Punteggi"
-                    scores={[
-                      {
-                        label: "Prestazione",
-                        value: scoreValue(advanced.performanceIndex),
-                        unit: "/100",
-                        info: metricsDefinitions.performanceIndex,
-                      },
-                      {
-                        label: "Costanza",
-                        value: scoreValue(advanced.consistencyScore),
-                        unit: "/100",
-                        info: metricsDefinitions.consistencyScore,
-                      },
-                      {
-                        label: "Recupero",
-                        value: scoreValue(advanced.recoveryReadinessScore),
-                        unit: "/100",
-                        info: metricsDefinitions.rrs,
-                      },
-                    ]}
-                  >
-                    {streak ? (
-                      <div className="rounded-2xl bg-raised p-4">
-                        <Metric
-                          value={formatInteger(streak.current)}
-                          unit={streak.current === 1 ? "giorno" : "giorni"}
-                          label="Serie attuale"
-                          size="responsive"
-                        />
-                        <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-                          Record {formatInteger(streak.record)} g
-                        </p>
-                      </div>
-                    ) : null}
-                  </ScoreSection>
-
-                  <ScoreSection
-                    title="Metriche avanzate"
-                    scores={[
-                      {
-                        label: "SEI",
-                        value: scoreValue(advanced.swimmingEfficiencyIndex),
-                        unit: "/100",
-                        info: metricsDefinitions.sei,
-                      },
-                      {
-                        label: "TCI",
-                        value: scoreValue(advanced.technicalConsistencyIndex),
-                        unit: "/100",
-                        info: metricsDefinitions.tci,
-                      },
-                      {
-                        label: "SER",
-                        value: scoreValue(advanced.strokeEfficiencyRating),
-                        unit: "/100",
-                        info: metricsDefinitions.ser,
-                      },
-                      {
-                        label: "ACS",
-                        value: scoreValue(advanced.aerobicCapacityScore),
-                        unit: "/100",
-                        info: metricsDefinitions.acs,
-                      },
-                      {
-                        label: "Carico progressivo",
-                        value: formatSignedInteger(progressiveOverloadValue),
-                        unit: "%",
-                        info: metricsDefinitions.poi,
-                      },
-                      {
-                        label: "Tendenza",
-                        ...trendScore,
-                        info: metricsDefinitions.trend,
-                      },
-                    ]}
+            <AccordionItem value="metrics" className="border-0">
+              <AccordionTrigger headingLevel={2} className={accordionTrigger}>
+                <span className="inline-flex items-center gap-2">
+                  <Activity className="size-4 text-muted-foreground" aria-hidden />
+                  Metriche
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-3 pt-3">
+                <p className="text-sm text-muted-foreground">
+                  Ogni metrica usa i suoi giorni, indicati nel riquadro: il periodo scelto sopra non le cambia.
+                </p>
+                {metricsQuery.data ? (
+                  <MetricCards metrics={metricsQuery.data} />
+                ) : metricsQuery.isError ? (
+                  <LoadError onRetry={() => void metricsQuery.refetch()} />
+                ) : (
+                  <LoadingSkeleton
+                    label="Caricamento delle metriche…"
+                    count={6}
+                    itemClassName="h-[76px] w-full rounded-2xl"
                   />
-
-                  {advanced.predictions && (
-                    <section className="surface-panel p-4">
-                      <h3 className={cardTitle}>Previsioni</h3>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        Al ritmo attuale raggiungerai{" "}
-                        <span className="font-bold text-foreground tabular-nums">
-                          {formatKmNumber(advanced.predictions.targetKm)} km
-                        </span>{" "}
-                        entro il{" "}
-                        <span className="font-bold text-foreground">
-                          {formatDayMonthYear(advanced.predictions.estimatedDate)}
-                        </span>
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground tabular-nums">
-                        {advanced.predictions.daysRemaining === 1
-                          ? "1 giorno rimasto"
-                          : `${formatInteger(advanced.predictions.daysRemaining)} giorni rimasti`}
-                      </p>
-                    </section>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-            )}
+                )}
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
         )}
       </div>

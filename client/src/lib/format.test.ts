@@ -3,6 +3,7 @@ import {
   distanceParts,
   formatDayMonth,
   formatDayMonthYear,
+  formatDecimal,
   formatDistance,
   formatDurationParts,
   formatInteger,
@@ -44,6 +45,15 @@ describe("formatter Corsia", () => {
   it("data sessione", () =>
     expect(formatSessionDate(monday)).toBe("lun 26 ott · 10:47"));
   it("giorno e mese", () => expect(formatDayMonth(monday)).toBe("26 ott"));
+  it("decimali fissi con la virgola e il segno meno tipografico; «—» senza numero", () => {
+    expect(formatDecimal(1.456, 2)).toBe("1,46");
+    expect(formatDecimal(2.8, 1)).toBe("2,8");
+    expect(formatDecimal(3, 1)).toBe("3,0");
+    expect(formatDecimal(1234.5, 1)).toBe("1.234,5");
+    expect(formatDecimal(-4.25, 1)).toBe("−4,3");
+    expect(formatDecimal(null, 1)).toBe("—");
+    expect(formatDecimal(Number.NaN, 2)).toBe("—");
+  });
   it("giorno, mese e anno; «—» senza data valida", () => {
     expect(formatDayMonthYear(new Date(2025, 2, 12))).toBe("12 mar 2025");
     expect(formatDayMonthYear(null)).toBe("—");
