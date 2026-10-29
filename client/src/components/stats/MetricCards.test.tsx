@@ -491,6 +491,8 @@ describe("Metriche: riquadri", () => {
     ).toBeTruthy();
     expect(region).toHaveTextContent("2,8 Nuotate a settimana");
     expect(region).toHaveTextContent("+30 % Sulle 4 precedenti");
+    expect(region).toHaveTextContent("9 sett. Serie");
+    expect(region).toHaveTextContent("12 sett. Serie migliore");
     expect(region).toHaveTextContent("Ultime 12 settimane: 25 nuotate, 68,8 km.");
   });
 

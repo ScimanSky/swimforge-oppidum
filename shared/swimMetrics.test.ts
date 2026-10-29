@@ -14,6 +14,7 @@ import {
   weekStartKey,
   weeklyStreak,
   weeklyStreakFromCounts,
+  bestWeeklyStreakFromCounts,
 } from "./swimMetrics";
 
 describe("dayKey", () => {
@@ -101,6 +102,18 @@ describe("weeklyStreak", () => {
     expect(weeklyStreakFromCounts(counts, now)).toBe(2);
     expect(weeklyStreakFromCounts({ "2026-10-19": 2, "2026-10-26": 2 }, now)).toBe(2);
     expect(weeklyStreakFromCounts(new Map(), now)).toBe(0);
+  });
+
+  it("the best streak: the longest run of consecutive weeks with 2 swims, across the years", () => {
+    const counts = new Map([
+      ["2025-12-22", 2], ["2025-12-29", 2], ["2026-01-05", 2], // across new year: 3
+      ["2026-01-12", 1],
+      ["2026-10-19", 2], ["2026-10-26", 2], // current: 2
+      ["2026-11-02", 5], // a future week is not counted
+    ]);
+    expect(bestWeeklyStreakFromCounts(counts, now)).toBe(3);
+    expect(bestWeeklyStreakFromCounts({ "2026-10-12": 3 }, now)).toBe(1);
+    expect(bestWeeklyStreakFromCounts(new Map(), now)).toBe(0);
   });
 
   it("is 0 without swims and accepts another minimum", () => {

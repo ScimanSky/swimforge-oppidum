@@ -368,6 +368,9 @@ function VolumeBody({ metrics }: { metrics: SwimMetrics }) {
         <li>
           <Metric value={formatInteger(v.streakWeeks)} unit="sett." label="Serie" size="sm" />
         </li>
+        <li>
+          <Metric value={formatInteger(v.bestStreakWeeks ?? v.streakWeeks)} unit="sett." label="Serie migliore" size="sm" />
+        </li>
       </ul>
     </>
   );

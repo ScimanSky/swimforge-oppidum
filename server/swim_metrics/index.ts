@@ -1,8 +1,8 @@
 /**
  * Swim metrics of a user: reads 180 days of swims and their laps, 300 days of laps near the CSS
- * distances, the CSS test and the manual zones in the profile preferences and the swims per week
- * for the streak (five
- * queries in parallel), then computes everything (cached 1 hour).
+ * distances, the CSS test and the manual zones in the profile preferences and the swims per Rome
+ * week of all the history for the current and the best streak (five queries in parallel), then
+ * computes everything (cached 1 hour).
  */
 import { and, asc, between, eq, gte, sql } from "drizzle-orm";
 import type { SwimMetrics } from "@shared/swimMetrics";
@@ -20,8 +20,6 @@ export { computeSwimMetrics, type CssTest, type ManualPaceZones } from "./comput
 
 const DAY_MS = 86_400_000;
 export const SWIM_METRICS_TTL_SECONDS = 3600;
-/** The weekly streak looks back at most this far. */
-const STREAK_LOOKBACK_DAYS = 730;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -79,7 +77,6 @@ async function loadInput(userId: number, now: Date): Promise<SwimMetricsInput> {
   // One day of margin on each window: the compute keeps whole Rome days.
   const since = new Date(now.getTime() - (HISTORY_DAYS + 1) * DAY_MS);
   const cssSince = new Date(now.getTime() - (CSS_LAPS_DAYS + 1) * DAY_MS);
-  const streakSince = new Date(now.getTime() - STREAK_LOOKBACK_DAYS * DAY_MS);
   const recentSwims = and(eq(swimmingActivities.userId, userId), gte(swimmingActivities.activityDate, since));
 
   // Five independent queries, in parallel.
@@ -137,11 +134,12 @@ async function loadInput(userId: number, now: Date): Promise<SwimMetricsInput> {
           between(garminActivityLaps.distanceMeters, CSS_LAP_MIN_METERS, CSS_LAP_MAX_METERS),
         ),
       ),
-    // The streak: swims per Rome week over two years, counted by the database.
+    // The current and the best streak: swims per Rome week over all the history, counted by the
+    // database (one row per week).
     db
       .select({ weekStart: romeWeekStart, swims: sql<number>`count(*)::int` })
       .from(swimmingActivities)
-      .where(and(eq(swimmingActivities.userId, userId), gte(swimmingActivities.activityDate, streakSince)))
+      .where(eq(swimmingActivities.userId, userId))
       .groupBy(sql`1`),
   ]);
 

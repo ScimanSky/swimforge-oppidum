@@ -182,10 +182,13 @@ coach e allenamenti le parlino (sostituiscono le cinque zone Z1–Z5 della prima
 - **Calcolo:** km e nuotate per settimana (lunedì–domenica, fuso Europe/Rome) nelle ultime 12
   settimane; medie delle ultime 4 settimane e differenza % dalle 4 precedenti.
 - **Serie:** settimane consecutive con almeno 2 nuotate. La settimana in corso non interrompe la
-  serie finché non è finita. Sostituisce la serie lunedì/mercoledì/venerdì ovunque: Statistiche,
-  Profilo (`client/src/lib/profile-stats.ts`), Sfide.
-- **Mostrato:** km/settimana medi, nuotate/settimana medie, serie in settimane. Grafico: barre
-  settimanali dei km con il numero di nuotate.
+  serie finché non è finita. La serie migliore è la più lunga su tutta la storia. Il server le
+  calcola entrambe da una sola query raggruppata per settimana di Roma su tutte le nuotate
+  (`volume.streakWeeks`, `volume.bestStreakWeeks`); Statistiche, Profilo, Sfide e coach mostrano
+  gli stessi numeri e il client non ricalcola la serie (mentre le metriche arrivano, la serie
+  aspetta). Sostituisce la serie lunedì/mercoledì/venerdì ovunque.
+- **Mostrato:** km/settimana medi, nuotate/settimana medie, serie e serie migliore in settimane.
+  Grafico: barre settimanali dei km con il numero di nuotate.
 
 ## 5. Cosa sparisce
 `server/advanced_metrics.ts`, i campi relativi di `getAdvancedMetrics`, le relative voci di
@@ -200,8 +203,8 @@ usano solo in sezioni che spariscono se la richiesta fallisce.
   - `getSwimMetrics(userId)` legge 180 giorni di nuotate e i loro giri (due query) e calcola tutto.
 - **Letture:** cinque query in parallelo (nuotate e giri di 180 giorni, profilo, giri vicini alle
   distanze CSS di 300 giorni per avere intera la finestra di 90 giorni di ogni mese, nuotate per
-  settimana di Roma per la serie).
-- **Cache Redis:** `swim-metrics:v3:{userId}:{giorno di Roma}` (il carico di oggi cambia a
+  settimana di Roma di tutta la storia per la serie attuale e la migliore).
+- **Cache Redis:** `swim-metrics:v4:{userId}:{giorno di Roma}` (il carico di oggi cambia a
   mezzanotte), 1 ora. Si invalida a ogni nuova nuotata, modifica, cancellazione o sincronizzazione
   che cambia le nuotate e al salvataggio o alla rimozione di un test CSS o delle tue zone; negli
   stessi casi si cancellano i suggerimenti AI della pagina Coach in cache.

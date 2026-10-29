@@ -218,6 +218,7 @@ export function swimMetricsFixture(): SwimMetrics {
       avgSessions4: 2.8,
       changePct: 30,
       streakWeeks: 9,
+      bestStreakWeeks: 12,
     },
   };
 }
@@ -278,6 +279,7 @@ export function emptySwimMetricsFixture(): SwimMetrics {
       avgSessions4: 0,
       changePct: null,
       streakWeeks: 1,
+      bestStreakWeeks: 9,
     },
   };
 }

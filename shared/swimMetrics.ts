@@ -126,7 +126,11 @@ export type SwimMetrics = {
   };
   volume: {
     weeks: { weekStart: string; km: number; sessions: number }[]; // last 12 weeks, oldest first
-    avgKm4: number; avgSessions4: number; changePct: number | null; streakWeeks: number;
+    avgKm4: number; avgSessions4: number; changePct: number | null;
+    /** Weeks in a row with at least 2 swims, up to this week (the one shown everywhere). */
+    streakWeeks: number;
+    /** The longest such run over all the swims ever (never shorter than streakWeeks). */
+    bestStreakWeeks: number;
   };
 };
 
@@ -375,6 +379,30 @@ export function weeklyStreak(dates: Date[], now: Date, minPerWeek = 2): number {
     perWeek.set(key, (perWeek.get(key) ?? 0) + 1);
   }
   return weeklyStreakFromCounts(perWeek, now, minPerWeek);
+}
+
+/**
+ * The longest run of consecutive weeks (Monday to Sunday, Rome) with at least `minPerWeek`
+ * swims, up to the current week, from swims counted per week (Monday «YYYY-MM-DD» keys).
+ */
+export function bestWeeklyStreakFromCounts(
+  perWeek: Map<string, number> | Record<string, number>,
+  now: Date,
+  minPerWeek = 2,
+): number {
+  const entries = perWeek instanceof Map ? Array.from(perWeek) : Object.entries(perWeek);
+  const current = weekStartKey(now);
+  const weeks = entries
+    .filter(([week, swims]) => swims >= minPerWeek && week <= current)
+    .map(([week]) => week)
+    .sort();
+  let best = 0;
+  let run = 0;
+  weeks.forEach((week, index) => {
+    run = index > 0 && addDaysToKey(weeks[index - 1], 7) === week ? run + 1 : 1;
+    best = Math.max(best, run);
+  });
+  return best;
 }
 
 /** weeklyStreak from swims already counted per week (keys: the Monday «YYYY-MM-DD», Rome). */

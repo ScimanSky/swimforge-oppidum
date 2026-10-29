@@ -41,6 +41,17 @@ describe("volumeSummary", () => {
     expect(volumeSummary(activities, now).streakWeeks).toBe(2);
   });
 
+  it("the best streak is the longest run of weeks with 2 swims over all the history", () => {
+    const perWeek = new Map([
+      ["2025-01-06", 2], ["2025-01-13", 3], ["2025-01-20", 2], ["2025-01-27", 2], // 4 weeks
+      ["2025-02-03", 1], // breaks it
+      ["2026-10-12", 2], ["2026-10-19", 2], ["2026-10-26", 1], // now: 2 weeks
+    ]);
+    expect(volumeSummary(activities, now, perWeek)).toMatchObject({ streakWeeks: 2, bestStreakWeeks: 4 });
+    // From the dates of the activities: 28/09 (3), 12/10 (2), 19/10 (2) → best 2, as the current.
+    expect(volumeSummary(activities, now)).toMatchObject({ streakWeeks: 2, bestStreakWeeks: 2 });
+  });
+
   it("no change without previous weeks; streak from the dates given", () => {
     const result = volumeSummary([swim("2026-10-20T08:00:00Z", 1000)], now, [
       new Date("2026-10-20T08:00:00Z"),

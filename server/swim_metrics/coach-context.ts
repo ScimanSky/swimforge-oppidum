@@ -220,7 +220,8 @@ function pacingLine(m: SwimMetrics): string {
 function volumeLine(m: SwimMetrics): string {
   const v = m.volume;
   const change = v.changePct === null ? "" : ` (${signed(v.changePct, 0)}% sulle 4 precedenti)`;
-  return `- Volume e costanza (ultime 4 settimane complete): ${num(v.avgKm4)} km e ${num(v.avgSessions4)} nuotate a settimana${change} · serie: ${v.streakWeeks} settimane di fila con almeno 2 nuotate`;
+  const best = v.bestStreakWeeks > v.streakWeeks ? ` (la più lunga: ${v.bestStreakWeeks})` : "";
+  return `- Volume e costanza (ultime 4 settimane complete): ${num(v.avgKm4)} km e ${num(v.avgSessions4)} nuotate a settimana${change} · serie: ${v.streakWeeks} settimane di fila con almeno 2 nuotate${best}`;
 }
 
 function swimLine(s: SwimMetrics["sessions"][number]): string {

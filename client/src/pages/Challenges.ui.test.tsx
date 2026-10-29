@@ -11,7 +11,7 @@ const state = vi.hoisted(() => ({
   joinCalls: [] as any[],
   leaveCalls: [] as any[],
   createCalls: [] as any[],
-  activities: [] as any[],
+  metrics: undefined as any,
   pending: false,
   error: false,
   refetch: vi.fn(),
@@ -36,7 +36,7 @@ const mutation = vi.hoisted(() => (name: string, calls: any[]) => (options: any)
 vi.mock("@/lib/trpc", () => ({
   trpc: {
     profile: { get: { useQuery: () => ({ data: { userId: 4, level: 5, totalXp: 8420 } }) } },
-    activities: { list: { useQuery: () => ({ data: state.activities }) } },
+    statistics: { getMetrics: { useQuery: () => ({ data: state.metrics }) } },
     badges: { userBadges: { useQuery: () => ({ data: [{ id: 1 }, { id: 2 }] }) } },
     challenges: {
       list: {
@@ -122,7 +122,7 @@ describe("Sfide (Corsia)", () => {
     state.joinCalls.length = 0;
     state.leaveCalls.length = 0;
     state.createCalls.length = 0;
-    state.activities = [];
+    state.metrics = undefined;
     state.pending = false;
     state.error = false;
     state.refetch.mockClear();
@@ -147,37 +147,21 @@ describe("Sfide (Corsia)", () => {
     expect(state.refetch).toHaveBeenCalled();
   });
 
-  describe("«Serie attuale» come nel profilo (settimane con almeno 2 nuotate)", () => {
-    beforeEach(() => {
-      vi.useFakeTimers({ toFake: ["Date"] });
-      // Wednesday 28 October 2026, evening.
-      vi.setSystemTime(new Date(2026, 9, 28, 19, 0));
-    });
-    afterEach(() => vi.useRealTimers());
-
-    it("due settimane di fila con 2 nuotate contano 2 settimane", () => {
-      state.activities = [
-        { activityDate: new Date(2026, 9, 12, 7, 0).toISOString() },
-        { activityDate: new Date(2026, 9, 15, 7, 0).toISOString() },
-        { activityDate: new Date(2026, 9, 19, 7, 0).toISOString() },
-        { activityDate: new Date(2026, 9, 25, 12, 0).toISOString() },
-      ];
+  describe("«Serie attuale» come in Statistiche e nel profilo (settimane con almeno 2 nuotate)", () => {
+    it("è la serie delle metriche di nuoto, calcolata dal server su tutta la storia", () => {
+      state.metrics = { volume: { streakWeeks: 9, bestStreakWeeks: 12 } };
       renderChallenges();
       const summary = screen.getByRole("region", { name: "Riepilogo" });
       const streak = within(summary).getByText("Serie attuale").parentElement!;
-      expect(streak.textContent).toBe("2 sett. Serie attuale");
+      expect(streak.textContent).toBe("9 sett. Serie attuale");
       expect(within(summary).getByText("Serie: settimane di fila con almeno 2 nuotate.")).toBeTruthy();
     });
 
-    it("la settimana in corso con una nuotata non interrompe la serie", () => {
-      state.activities = [
-        { activityDate: new Date(2026, 9, 19, 7, 0).toISOString() },
-        { activityDate: new Date(2026, 9, 21, 7, 0).toISOString() },
-        { activityDate: new Date(2026, 9, 26, 7, 0).toISOString() },
-      ];
+    it("finché le metriche non arrivano la serie non c'è (mai un numero diverso)", () => {
       renderChallenges();
-      const streak = within(screen.getByRole("region", { name: "Riepilogo" })).getByText("Serie attuale").parentElement!;
-      expect(streak.textContent).toBe("1 sett. Serie attuale");
+      const summary = screen.getByRole("region", { name: "Riepilogo" });
+      expect(within(summary).queryByText("Serie attuale")).toBeNull();
+      expect(within(summary).queryByText("Serie: settimane di fila con almeno 2 nuotate.")).toBeNull();
     });
   });
 
@@ -226,6 +210,7 @@ describe("Sfide (Corsia)", () => {
   });
 
   it("senza h1 né titolo ripetuto; riepilogo con metriche e schede in italiano", () => {
+    state.metrics = { volume: { streakWeeks: 2, bestStreakWeeks: 4 } };
     renderChallenges();
     expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
     expect(screen.queryByRole("heading", { name: "Sfide" })).toBeNull();

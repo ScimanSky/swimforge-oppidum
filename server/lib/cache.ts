@@ -477,8 +477,9 @@ export const cacheKeys = {
     `user:activities:${key}:${limit}:${offset}`,
   search: (query: string) => `search:${query}`,
   badgeDefinitions: () => 'badge:definitions',
-  // v2: per Rome day (today's load rolls at midnight) and the fixed metrics' payload.
-  swimMetrics: (userId: string, romeDay: string) => `swim-metrics:v3:${userId}:${romeDay}`,
+  // Per Rome day (today's load rolls at midnight). v4: the best streak, and manual zones as the
+  // threshold of the load.
+  swimMetrics: (userId: string, romeDay: string) => `swim-metrics:v4:${userId}:${romeDay}`,
 };
 
 /**

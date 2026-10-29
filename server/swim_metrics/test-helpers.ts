@@ -125,6 +125,6 @@ export function sampleSwimMetrics(): SwimMetrics {
       missing: null,
       dpsDrop28: 2.0, strokeRateRise28: 1.5,
     },
-    volume: { weeks: [], avgKm4: 7.4, avgSessions4: 2.8, changePct: 12, streakWeeks: 5 },
+    volume: { weeks: [], avgKm4: 7.4, avgSessions4: 2.8, changePct: 12, streakWeeks: 5, bestStreakWeeks: 9 },
   };
 }

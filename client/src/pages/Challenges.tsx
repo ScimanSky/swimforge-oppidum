@@ -2,7 +2,7 @@
 
 import { assetUrl } from "@/lib/asset-base";
 import AppLayout from "@/components/AppLayout"
-import { useId, useMemo, useRef, useState, type ReactNode } from "react"
+import { useId, useRef, useState, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -46,7 +46,7 @@ import {
   challengeProgressPercent,
 } from "@/lib/challenges"
 import { formatDistance, formatInteger, toFiniteNumber } from "@/lib/format"
-import { activityDays, getStreaks, STREAK_EXPLANATION, STREAK_UNIT } from "@/lib/profile-stats"
+import { STREAK_EXPLANATION, STREAK_UNIT } from "@/lib/profile-stats"
 import { rankEntries } from "@/lib/ranking"
 
 const formatDaysLeft = (endDate: string | Date) => {
@@ -147,7 +147,10 @@ export default function Challenges() {
 
   const profileQuery = trpc.profile.get.useQuery()
   // Same query as the profile (shared cache), for the same «Serie attuale».
-  const activitiesQuery = trpc.activities.list.useQuery({ limit: 50, offset: 0, source: "all" })
+  const metricsQuery = trpc.statistics.getMetrics.useQuery(undefined, {
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  })
   const badgesQuery = trpc.badges.userBadges.useQuery()
   const challengesQuery = trpc.challenges.list.useQuery()
   const createChallenge = trpc.challenges.create.useMutation({
@@ -219,11 +222,9 @@ export default function Challenges() {
   const availablePaging = usePaged(availableChallenges, isDesktopWide ? 2 : 3, [activeTab])
   const leaderboardPaging = usePaged(rankedLeaderboard, isDesktopWide ? 3 : 4, [activeTab])
 
-  // The profile's streak (weeks with at least two swims), same number as there.
-  const streak = useMemo(
-    () => getStreaks(activityDays(activitiesQuery.data ?? [])).current,
-    [activitiesQuery.data]
-  )
+  // The streak of the swim metrics (weeks with at least two swims, all the history): the same
+  // number as Profilo, Statistiche and the coach.
+  const streak = metricsQuery.data?.volume.streakWeeks
   const challengesLoading = challengesQuery.isPending
   const challengesFailed = !challengesQuery.data && challengesQuery.isError
   const leaderboardLoading = leaderboardQuery.isPending
@@ -237,7 +238,7 @@ export default function Challenges() {
       ? { label: "Le tue sfide", value: formatInteger(participatingCount) }
       : null,
     badgesQuery.data ? { label: "Badge", value: formatInteger(badgesQuery.data.length) } : null,
-    activitiesQuery.data
+    streak !== undefined
       ? { label: "Serie attuale", value: formatInteger(streak), unit: STREAK_UNIT }
       : null,
     profileQuery.data
@@ -376,7 +377,7 @@ export default function Challenges() {
                 <Metric key={label} size="responsive" label={label} {...metric} />
               ))}
             </div>
-            {activitiesQuery.data ? (
+            {streak !== undefined ? (
               <p className="mt-3 text-xs text-muted-foreground">{STREAK_EXPLANATION}</p>
             ) : null}
           </section>

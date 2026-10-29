@@ -25,6 +25,8 @@ const state = vi.hoisted(() => ({
   achievementDefinitions: [] as any[],
   userAchievementBadges: [] as any[],
   activities: [] as any[],
+  metrics: undefined as any,
+  metricsPending: false,
   records: [] as any[],
   recordsEnabled: [] as Array<boolean | undefined>,
   me: { id: 7, name: "Marta", email: "marta@example.com" } as any,
@@ -64,6 +66,9 @@ vi.mock("@/lib/trpc", () => ({
       },
     },
     activities: { list: { useQuery: () => ({ data: state.activities }) } },
+    statistics: {
+      getMetrics: { useQuery: () => ({ data: state.metrics, isPending: state.metricsPending }) },
+    },
     badges: {
       progress: {
         useQuery: () => ({ data: state.badgesLoading ? undefined : state.badges, isLoading: state.badgesLoading }),
@@ -119,6 +124,8 @@ describe("Profilo (Corsia)", () => {
     state.achievementDefinitions = [];
     state.userAchievementBadges = [];
     state.activities = [];
+    state.metrics = undefined;
+    state.metricsPending = false;
     state.records = [];
     state.recordsEnabled = [];
     state.me = { id: 7, name: "Marta", email: "marta@example.com" };
@@ -230,43 +237,43 @@ describe("Profilo (Corsia)", () => {
     expect(stats).not.toHaveTextContent("SWOLF");
   });
 
-  it("SWOLF and streaks are scoped to the recent swims; lifetime totals are not", () => {
-    // Wednesday 28 October 2026, 18:00: two swims in the week of 19 October, two in this week.
-    vi.useFakeTimers({ now: new Date(2026, 9, 28, 18), toFake: ["Date"] });
+  it("SWOLF is scoped to the recent swims; the streaks are those of all the history, from the server", () => {
     state.activities = [
       { activityDate: new Date(2026, 9, 19, 10), avgSwolf: 40 },
       { activityDate: new Date(2026, 9, 23, 10), avgSwolf: 36 },
       { activityDate: new Date(2026, 9, 26, 10), avgSwolf: 38 },
       { activityDate: new Date(2026, 9, 28, 10), avgSwolf: 38 },
     ];
+    // The same numbers as Statistiche, Sfide and the coach (statistics.getMetrics).
+    state.metrics = { volume: { streakWeeks: 9, bestStreakWeeks: 12 } };
     renderProfile();
 
     const stats = screen.getByRole("region", { name: "Riepilogo" });
     const recent = within(stats).getByRole("region", { name: "Ultime 4 nuotate" });
     expect(recent).toHaveTextContent("38 SWOLF medio");
     expect(recent).toHaveTextContent("36 SWOLF migliore");
-    expect(recent).toHaveTextContent("2 sett. Serie attuale");
-    expect(recent).toHaveTextContent("2 sett. Serie migliore");
-    expect(recent).toHaveTextContent("Serie: settimane di fila con almeno 2 nuotate.");
+    expect(recent).not.toHaveTextContent("Serie");
     expect(recent).not.toHaveTextContent("Distanza totale");
+    const streaks = within(stats).getByRole("region", { name: "Costanza" });
+    expect(streaks).toHaveTextContent("9 sett. Serie attuale");
+    expect(streaks).toHaveTextContent("12 sett. Serie migliore");
+    expect(streaks).toHaveTextContent("Serie: settimane di fila con almeno 2 nuotate.");
     expect(stats).toHaveTextContent("3,2 km Distanza totale");
   });
 
-  it("a week with a single swim breaks the current streak, the best one stays", () => {
-    vi.useFakeTimers({ now: new Date(2026, 9, 28, 18), toFake: ["Date"] });
-    state.activities = [
-      { activityDate: new Date(2026, 9, 5, 10) },
-      { activityDate: new Date(2026, 9, 7, 10) },
-      { activityDate: new Date(2026, 9, 12, 10) },
-      { activityDate: new Date(2026, 9, 14, 10) },
-      { activityDate: new Date(2026, 9, 21, 10) },
-      { activityDate: new Date(2026, 9, 26, 10) },
-      { activityDate: new Date(2026, 9, 27, 10) },
-    ];
+  it("while the metrics load the streaks wait (never a number from the last 50 swims)", () => {
+    state.activities = [{ activityDate: new Date(2026, 9, 26, 10) }, { activityDate: new Date(2026, 9, 27, 10) }];
+    state.metricsPending = true;
     renderProfile();
-    const recent = screen.getByRole("region", { name: "Ultime 7 nuotate" });
-    expect(recent).toHaveTextContent("1 sett. Serie attuale");
-    expect(recent).toHaveTextContent("2 sett. Serie migliore");
+    const streaks = screen.getByRole("region", { name: "Costanza" });
+    expect(within(streaks).getByRole("status")).toHaveTextContent("Caricamento della serie…");
+    expect(streaks).not.toHaveTextContent("sett.");
+  });
+
+  it("if the metrics fail the streaks are left out", () => {
+    state.activities = [{ activityDate: new Date(2026, 9, 26, 10) }];
+    renderProfile();
+    expect(screen.queryByRole("region", { name: "Costanza" })).toBeNull();
   });
 
   it("links to Statistiche and Impostazioni", () => {

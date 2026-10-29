@@ -84,7 +84,7 @@ describe("updatePaceZones", () => {
     const { sql, params } = render(m.state.updates[0].values.preferences);
     expect(sql).toContain("||");
     expect(params).toEqual([JSON.stringify({ paceZones: { bounds: OWNER, updatedAt: "2026-10-29T10:00:00.000Z" } })]);
-    expect(m.deleteCached).toHaveBeenCalledWith("swim-metrics:v3:42:2026-10-29");
+    expect(m.deleteCached).toHaveBeenCalledWith("swim-metrics:v4:42:2026-10-29");
     expect(m.db.delete).toHaveBeenCalledWith(aiInsightsCache);
   });
 

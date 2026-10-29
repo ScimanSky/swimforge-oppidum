@@ -122,8 +122,14 @@ const cssLapRows = () => [
     return { activityDate: a.activityDate, poolLengthMeters: a.poolLengthMeters, isOpenWater: a.isOpenWater, distanceMeters: lap.distanceMeters, durationSeconds: lap.durationSeconds, movingDurationSeconds: lap.movingDurationSeconds, strokeType: lap.strokeType };
   }),
 ];
-// Swims per Rome week, as the grouped streak query returns them.
+// Swims per Rome week of all the history, as the grouped streak query returns them: a run of 4
+// weeks in the spring, then 3 weeks up to now.
 const STREAK_WEEKS = [
+  { weekStart: "2025-03-03", swims: 2 },
+  { weekStart: "2025-03-10", swims: 4 },
+  { weekStart: "2025-03-17", swims: 2 },
+  { weekStart: "2025-03-24", swims: 3 },
+  { weekStart: "2025-03-31", swims: 1 },
   { weekStart: "2026-10-05", swims: 2 },
   { weekStart: "2026-10-12", swims: 2 },
   { weekStart: "2026-10-19", swims: 3 },
@@ -152,16 +158,16 @@ describe("getSwimMetrics", () => {
   it("caches per user and Rome day for one hour, so today's load rolls at midnight", async () => {
     useData();
     await getSwimMetrics(42, NOW);
-    expect(m.getOrSetCached).toHaveBeenCalledWith("swim-metrics:v3:42:2026-10-29", expect.any(Function), 3600);
+    expect(m.getOrSetCached).toHaveBeenCalledWith("swim-metrics:v4:42:2026-10-29", expect.any(Function), 3600);
     // 23:30Z on 29/10 is already 30/10 in Rome.
     await getSwimMetrics(42, new Date("2026-10-29T23:30:00Z"));
-    expect(m.getOrSetCached).toHaveBeenLastCalledWith("swim-metrics:v3:42:2026-10-30", expect.any(Function), 3600);
+    expect(m.getOrSetCached).toHaveBeenLastCalledWith("swim-metrics:v4:42:2026-10-30", expect.any(Function), 3600);
   });
 
   it("invalidation drops today's cached metrics and the AI insights rows", async () => {
     m.db.deleted.length = 0;
     await invalidateSwimMetrics(42, NOW);
-    expect(m.deleteCached).toHaveBeenCalledWith("swim-metrics:v3:42:2026-10-29");
+    expect(m.deleteCached).toHaveBeenCalledWith("swim-metrics:v4:42:2026-10-29");
     expect(m.db.deleted).toEqual([aiInsightsCache]);
   });
 
@@ -170,7 +176,7 @@ describe("getSwimMetrics", () => {
     await getSwimMetrics(42, NOW);
     expect(m.state.tables).toEqual([swimmingActivities, garminActivityLaps, swimmerProfiles, garminActivityLaps, swimmingActivities]);
     expect(m.state.selectsAtFirstResolve).toBe(5);
-    // The streak is one grouped count per Rome week, not two years of dates.
+    // The streaks are one grouped count per Rome week over all the history, not a list of dates.
     expect(Object.keys(m.state.selections[4]).sort()).toEqual(["swims", "weekStart"]);
     expect(m.state.grouped).toEqual([false, false, false, false, true]);
   });
@@ -249,6 +255,7 @@ describe("getSwimMetrics", () => {
     expect(metrics.volume.weeks).toHaveLength(12);
     expect(metrics.volume.weeks[11]).toEqual({ weekStart: "2026-10-26", km: 2, sessions: 1 });
     expect(metrics.volume.streakWeeks).toBe(3); // weeks of 5, 12 and 19/10; the current one has 1
+    expect(metrics.volume.bestStreakWeeks).toBe(4); // 3 to 24 March 2025
   });
 
   it("uses a CSS test of the last 90 days and ignores an expired one", async () => {
@@ -285,7 +292,7 @@ describe("getSwimMetrics", () => {
     expect(metrics.zones).toMatchObject({ source: null, ranges: [] });
     expect(metrics.efficiency.missing).not.toBeNull();
     expect(metrics.pacing.missing).not.toBeNull();
-    expect(metrics.volume).toMatchObject({ avgKm4: 0, avgSessions4: 0, changePct: null, streakWeeks: 0 });
+    expect(metrics.volume).toMatchObject({ avgKm4: 0, avgSessions4: 0, changePct: null, streakWeeks: 0, bestStreakWeeks: 0 });
   });
 });
 

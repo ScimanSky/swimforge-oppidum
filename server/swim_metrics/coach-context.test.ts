@@ -26,7 +26,7 @@ describe("swimMetricsForCoach", () => {
     expect(text).toContain("base 2,02 su 9 nuotate (+4,0%)");
     expect(text).toContain("variabilità 2,8% (regolare)");
     expect(text).toContain("7,4 km e 2,8 nuotate a settimana (+12% sulle 4 precedenti)");
-    expect(text).toContain("serie: 5 settimane");
+    expect(text).toContain("serie: 5 settimane di fila con almeno 2 nuotate (la più lunga: 9)");
     for (const name of OLD_NAMES) expect(text).not.toMatch(name);
   });
 
