@@ -21,7 +21,7 @@ const options = {
       description: 'Complete API documentation for SwimForge swimming app',
       contact: {
         name: 'SwimForge Team',
-        email: 'support@swimforge.com',
+        email: 'admin@swimforge.it',
       },
     },
     servers: [
